@@ -342,14 +342,6 @@ public:
     //
 
     /**
-     * Returns a BSON representation of an update request that can be used to insert a shardIdentity
-     * doc into the shard for the given shardType (or update the shard's existing shardIdentity
-     * doc's configsvrConnString if the _id, shardName, and clusterId do not conflict).
-     */
-    BSONObj createShardIdentityUpsertForAddShard(OperationContext* opCtx,
-                                                 const std::string& shardName);
-
-    /**
      * Runs the setFeatureCompatibilityVersion command on all shards.
      */
     Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx, const BSONObj& cmdObj);

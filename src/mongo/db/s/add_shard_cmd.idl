@@ -1,0 +1,53 @@
+# Copyright (C) 2018 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/client/connection_string.h"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+types:
+    connectionstring:
+        bson_serialization_type: string
+        description: "A MongoDB ConnectionString"
+        cpp_type: "mongo::ConnectionString"
+        serializer: mongo::ConnectionString::toString
+        deserializer: mongo::ConnectionString::deserialize
+
+structs:
+    ShardIdentity:
+        description: "Contains all the information needed to identify a shard and lookup the shard identity document from storage"
+        fields:
+            shardName:
+                description: "The name of the shard"
+                type: string
+            clusterId:
+                description: "The unique identifier of the cluster"
+                type: objectid
+            configsvrConnectionString:
+                description: "Connection string to the config server"
+                type: connectionstring
+
+commands:
+    _addShard:
+        cpp_name: AddShard
+        description: "_addShard Command"
+        namespace: ignored
+        fields:
+            shardIdentity:
+                description: "Identity metadata for the new shard"
+                type: ShardIdentity

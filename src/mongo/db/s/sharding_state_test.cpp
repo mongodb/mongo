@@ -155,7 +155,7 @@ TEST_F(ShardingStateTest, ValidShardIdentitySucceeds) {
     Lock::GlobalWrite lk(operationContext());
 
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
@@ -171,7 +171,7 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
     Lock::GlobalWrite lk(operationContext());
 
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
@@ -209,7 +209,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
 
     auto clusterID = OID::gen();
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(clusterID);
@@ -217,7 +217,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
 
     ShardIdentityType shardIdentity2;
-    shardIdentity2.setConfigsvrConnString(
+    shardIdentity2.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity2.setShardName(kShardName);
     shardIdentity2.setClusterId(clusterID);
@@ -240,7 +240,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
 
     auto clusterID = OID::gen();
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(clusterID);
@@ -248,7 +248,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
 
     ShardIdentityType shardIdentity2;
-    shardIdentity2.setConfigsvrConnString(
+    shardIdentity2.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "b:2,c:3", "config"));
     shardIdentity2.setShardName(kShardName);
     shardIdentity2.setClusterId(clusterID);
@@ -281,10 +281,15 @@ TEST_F(ShardingStateTest,
 TEST_F(ShardingStateTest,
        InitializeShardingAwarenessIfNeededReadOnlyAndShardServerAndInvalidOverrideShardIdentity) {
     storageGlobalParams.readOnly = true;
-    serverGlobalParams.overrideShardIdentity = BSON("_id"
-                                                    << "shardIdentity"
-                                                    << "configsvrConnectionString"
-                                                    << "invalid");
+    serverGlobalParams.overrideShardIdentity =
+        BSON("_id"
+             << "shardIdentity"
+             << ShardIdentity::kShardNameFieldName
+             << kShardName
+             << ShardIdentity::kClusterIdFieldName
+             << OID::gen()
+             << ShardIdentity::kConfigsvrConnectionStringFieldName
+             << "invalid");
     auto swShardingInitialized =
         shardingState()->initializeShardingAwarenessIfNeeded(operationContext());
     ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, swShardingInitialized.getStatus().code());
@@ -296,12 +301,12 @@ TEST_F(ShardingStateTest,
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
     ASSERT_OK(shardIdentity.validate());
-    serverGlobalParams.overrideShardIdentity = shardIdentity.toBSON();
+    serverGlobalParams.overrideShardIdentity = shardIdentity.toShardIdentityDocument();
 
     auto swShardingInitialized =
         shardingState()->initializeShardingAwarenessIfNeeded(operationContext());
@@ -343,12 +348,12 @@ TEST_F(ShardingStateTest,
     serverGlobalParams.clusterRole = ClusterRole::None;
 
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
     ASSERT_OK(shardIdentity.validate());
-    serverGlobalParams.overrideShardIdentity = shardIdentity.toBSON();
+    serverGlobalParams.overrideShardIdentity = shardIdentity.toShardIdentityDocument();
 
     auto swShardingInitialized =
         shardingState()->initializeShardingAwarenessIfNeeded(operationContext());
@@ -380,12 +385,12 @@ TEST_F(ShardingStateTest,
 TEST_F(ShardingStateTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndValidOverrideShardIdentity) {
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
     ASSERT_OK(shardIdentity.validate());
-    serverGlobalParams.overrideShardIdentity = shardIdentity.toBSON();
+    serverGlobalParams.overrideShardIdentity = shardIdentity.toShardIdentityDocument();
 
     // Should error regardless of cluster role.
 
@@ -420,8 +425,13 @@ TEST_F(ShardingStateTest,
 
         BSONObj invalidShardIdentity = BSON("_id"
                                             << "shardIdentity"
-                                            << "configsvrConnectionString"
+                                            << ShardIdentity::kShardNameFieldName
+                                            << kShardName
+                                            << ShardIdentity::kClusterIdFieldName
+                                            << OID::gen()
+                                            << ShardIdentity::kConfigsvrConnectionStringFieldName
                                             << "invalid");
+
         _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
                                 invalidShardIdentity);
     }
@@ -442,12 +452,12 @@ TEST_F(ShardingStateTest,
 
         BSONObj validShardIdentity = [&] {
             ShardIdentityType shardIdentity;
-            shardIdentity.setConfigsvrConnString(
+            shardIdentity.setConfigsvrConnectionString(
                 ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
             shardIdentity.setShardName(kShardName);
             shardIdentity.setClusterId(OID::gen());
             ASSERT_OK(shardIdentity.validate());
-            return shardIdentity.toBSON();
+            return shardIdentity.toShardIdentityDocument();
         }();
 
         _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
@@ -496,12 +506,12 @@ TEST_F(ShardingStateTest,
 
     BSONObj validShardIdentity = [&] {
         ShardIdentityType shardIdentity;
-        shardIdentity.setConfigsvrConnString(
+        shardIdentity.setConfigsvrConnectionString(
             ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
         shardIdentity.setShardName(kShardName);
         shardIdentity.setClusterId(OID::gen());
         ASSERT_OK(shardIdentity.validate());
-        return shardIdentity.toBSON();
+        return shardIdentity.toShardIdentityDocument();
     }();
 
     _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),

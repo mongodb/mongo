@@ -32,29 +32,36 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/s/add_shard_cmd_gen.h"
 
 namespace mongo {
 
 /**
  * Contains all the information needed to make a mongod instance shard aware.
  */
-class ShardIdentityType {
+class ShardIdentityType : public ShardIdentity {
 public:
     // The _id value for this document type.
     static const std::string IdName;
 
-    // Field names and types in a shardIdentity document.
-    static const BSONField<std::string> configsvrConnString;
-    static const BSONField<std::string> shardName;
-    static const BSONField<OID> clusterId;
-
     ShardIdentityType() = default;
+    ShardIdentityType(const ShardIdentity& sid) : ShardIdentity(sid) {}
 
     /**
-     * Constructs a new ShardIdentityType object from BSON.
-     * Also does validation of the contents.
+     * Constructs a new ShardIdentityType object from a BSON object containing
+     * a shard identity document. Also does validation of the contents.
      */
-    static StatusWith<ShardIdentityType> fromBSON(const BSONObj& source);
+    static StatusWith<ShardIdentityType> fromShardIdentityDocument(const BSONObj& source);
+
+    /**
+     * Returns the BSON representation of the entry as a shard identity document.
+     */
+    BSONObj toShardIdentityDocument() const;
+
+    /**
+     * Returns a std::string representation of the current internal state.
+     */
+    std::string toString() const;
 
     /**
      * Returns OK if all fields have been set. Otherwise, returns NoSuchKey
@@ -63,42 +70,10 @@ public:
     Status validate() const;
 
     /**
-     * Returns the BSON representation of the entry.
-     */
-    BSONObj toBSON() const;
-
-    /**
-     * Returns a std::string representation of the current internal state.
-     */
-    std::string toString() const;
-
-    bool isConfigsvrConnStringSet() const;
-    const ConnectionString& getConfigsvrConnString() const;
-    void setConfigsvrConnString(ConnectionString connString);
-
-    bool isShardNameSet() const;
-    const std::string& getShardName() const;
-    void setShardName(std::string shardName);
-
-    bool isClusterIdSet() const;
-    const OID& getClusterId() const;
-    void setClusterId(OID clusterId);
-
-    /**
      * Returns an update object that can be used to update the config server field of the
      * shardIdentity document with the new connection string.
      */
     static BSONObj createConfigServerUpdateObject(const std::string& newConnString);
-
-private:
-    // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-
-    // (M) connection string to the config server.
-    boost::optional<ConnectionString> _configsvrConnString;
-    // (M) contains the name of the shard.
-    boost::optional<std::string> _shardName;
-    // (M) contains the (unique) identifier of the cluster.
-    boost::optional<OID> _clusterId;
 };
 
 }  // namespace mongo

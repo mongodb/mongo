@@ -127,6 +127,12 @@ public:
 
     static StatusWith<ConnectionString> parse(const std::string& url);
 
+    /**
+     * Deserialize a ConnectionString object from a string. Used by the IDL parser for the
+     * connectionstring type. Essentially just a throwing wrapper around ConnectionString::parse.
+     */
+    static ConnectionString deserialize(StringData url);
+
     static std::string typeToString(ConnectionType type);
 
     //

@@ -53,6 +53,8 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/add_shard_cmd_gen.h"
+#include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
@@ -642,21 +644,48 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         shardType.setMaxSizeMB(maxSize);
     }
 
-    // Insert a shardIdentity document onto the shard. This also triggers sharding initialization on
-    // the shard.
-    LOG(2) << "going to insert shardIdentity document into shard: " << shardType;
-    auto commandRequest = createShardIdentityUpsertForAddShard(opCtx, shardType.getName());
-    auto swCommandResponse =
-        _runCommandForAddShard(opCtx, targeter.get(), NamespaceString::kAdminDb, commandRequest);
-    if (!swCommandResponse.isOK()) {
-        return swCommandResponse.getStatus();
-    }
-    auto commandResponse = std::move(swCommandResponse.getValue());
-    BatchedCommandResponse batchResponse;
-    auto batchResponseStatus =
-        Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
-    if (!batchResponseStatus.isOK()) {
-        return batchResponseStatus;
+    // Helper function that runs a command on the to-be shard and returns the status
+    auto runCmdOnNewShard = [this, &opCtx, &targeter](const BSONObj& cmd) -> Status {
+        auto response =
+            _runCommandForAddShard(opCtx, targeter.get(), NamespaceString::kAdminDb, cmd);
+        // Grabs the underlying status from a StatusWith object by taking the first
+        // non-OK status, if there is one. This is needed due to the semantics of
+        // _runCommandForAddShard.
+        auto commandResponse = std::move(response.getValue());
+        BatchedCommandResponse batchResponse;
+        return Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
+    };
+
+    // Run _addShard command on the shard, which in turn inserts a shardIdentity document onto the
+    // shard and triggers initialization
+    LOG(2) << "going to run _addShard command on shard: " << shardType;
+    AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
+    BSONObj passthroughFields;  // Needed for IDL toBSON method
+    auto addShardCmdBSON = addShardCmd.toBSON(passthroughFields);
+
+    // Run _addShard command
+    auto addShardStatus = runCmdOnNewShard(addShardCmdBSON);
+
+    if (!addShardStatus.isOK()) {
+        // TODO (SERVER-35552): Fix this to use an FCV check instead
+        // If the _addShard command is not found, that means the mongod for the shard we're adding
+        // is running on an older version, so we retry instead with the old method of inserting a
+        // shard identity document directly.
+        if (addShardStatus == ErrorCodes::CommandNotFound) {
+            // Insert a shardIdentity document onto the shard. This also triggers sharding
+            // initialization on the shard.
+            LOG(2) << AddShard::kCommandName
+                   << " command not found. going to insert shardIdentity document into "
+                      "shard: "
+                   << shardType;
+
+            auto idCommand = add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
+            auto shardUpsertCmdStatus = runCmdOnNewShard(idCommand);
+
+            if (!shardUpsertCmdStatus.isOK()) {
+                return shardUpsertCmdStatus;
+            }
+        }
     }
 
     {
@@ -886,33 +915,6 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
 
 void ShardingCatalogManager::appendConnectionStats(executor::ConnectionPoolStats* stats) {
     _executorForAddShard->appendConnectionStats(stats);
-}
-
-BSONObj ShardingCatalogManager::createShardIdentityUpsertForAddShard(OperationContext* opCtx,
-                                                                     const std::string& shardName) {
-    BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(NamespaceString::kServerConfigurationNamespace);
-        updateOp.setUpdates(
-            {[&] {
-                write_ops::UpdateOpEntry entry;
-                entry.setQ(BSON("_id"
-                                << "shardIdentity"
-                                << ShardIdentityType::shardName(shardName)
-                                << ShardIdentityType::clusterId(
-                                       ClusterIdentityLoader::get(opCtx)->getClusterId())));
-                entry.setU(BSON("$set" << BSON(ShardIdentityType::configsvrConnString(
-                                    repl::ReplicationCoordinator::get(opCtx)
-                                        ->getConfig()
-                                        .getConnectionString()
-                                        .toString()))));
-                entry.setUpsert(true);
-                return entry;
-            }()});
-        return updateOp;
-    }());
-    request.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-
-    return request.toBSON();
 }
 
 // static

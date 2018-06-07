@@ -38,6 +38,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/add_shard_cmd_gen.h"
+#include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/catalog/config_server_version.h"
@@ -153,12 +155,12 @@ protected:
      * Waits for a request for the shardIdentity document to be upserted into a shard from the
      * config server on addShard.
      */
-    void expectShardIdentityUpsertReturnSuccess(const HostAndPort& expectedHost,
-                                                const std::string& expectedShardName) {
+    void expectAddShardCmdReturnSuccess(const HostAndPort& expectedHost,
+                                        const std::string& expectedShardName) {
+        using namespace add_shard_util;
         // Create the expected upsert shardIdentity command for this shardType.
-        auto upsertCmdObj =
-            ShardingCatalogManager::get(operationContext())
-                ->createShardIdentityUpsertForAddShard(operationContext(), expectedShardName);
+        auto upsertCmdObj = createShardIdentityUpsertForAddShard(
+            createAddShardCmd(operationContext(), expectedShardName));
 
         const auto opMsgRequest =
             OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, upsertCmdObj);
@@ -167,13 +169,13 @@ protected:
                                    UpdateOp::parse(opMsgRequest));
     }
 
-    void expectShardIdentityUpsertReturnFailure(const HostAndPort& expectedHost,
-                                                const std::string& expectedShardName,
-                                                const Status& statusToReturn) {
+    void expectAddShardCmdReturnFailure(const HostAndPort& expectedHost,
+                                        const std::string& expectedShardName,
+                                        const Status& statusToReturn) {
+        using namespace add_shard_util;
         // Create the expected upsert shardIdentity command for this shardType.
-        auto upsertCmdObj =
-            ShardingCatalogManager::get(operationContext())
-                ->createShardIdentityUpsertForAddShard(operationContext(), expectedShardName);
+        auto upsertCmdObj = createShardIdentityUpsertForAddShard(
+            createAddShardCmd(operationContext(), expectedShardName));
 
         const auto opMsgRequest =
             OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, upsertCmdObj);
@@ -196,8 +198,20 @@ protected:
             // Check that the db name in the request matches the expected db name.
             ASSERT_EQUALS(expectedNss.db(), request.dbname);
 
-            const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-            const auto updateOp = UpdateOp::parse(opMsgRequest);
+            const auto addShardOpMsgRequest =
+                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+
+            auto addShardCmd = AddShard::parse(IDLParserErrorContext(AddShard::kCommandName),
+                                               addShardOpMsgRequest);
+
+            const auto& updateOpField =
+                add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
+
+            const auto updateOpMsgRequest =
+                OpMsgRequest::fromDBAndBody(request.dbname, updateOpField);
+
+            const auto updateOp = UpdateOp::parse(updateOpMsgRequest);
+
             ASSERT_EQUALS(expectedNss, expectedUpdateOp.getNamespace());
 
             const auto& expectedUpdates = expectedUpdateOp.getUpdates();
@@ -336,23 +350,21 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
                                 << "ordered"
                                 << true
                                 << "updates"
-                                << BSON_ARRAY(
-                                       BSON("q" << BSON("_id"
-                                                        << "shardIdentity"
-                                                        << "shardName"
-                                                        << shardName
-                                                        << "clusterId"
-                                                        << _clusterId)
-                                                << "u"
-                                                << BSON("$set" << BSON("configsvrConnectionString"
-                                                                       << replicationCoordinator()
-                                                                              ->getConfig()
-                                                                              .getConnectionString()
-                                                                              .toString()))
-                                                << "multi"
-                                                << false
-                                                << "upsert"
-                                                << true))
+                                << BSON_ARRAY(BSON(
+                                       "q"
+                                       << BSON("_id"
+                                               << "shardIdentity")
+                                       << "u"
+                                       << BSON("shardName" << shardName << "clusterId" << _clusterId
+                                                           << "configsvrConnectionString"
+                                                           << replicationCoordinator()
+                                                                  ->getConfig()
+                                                                  .getConnectionString()
+                                                                  .toString())
+                                       << "multi"
+                                       << false
+                                       << "upsert"
+                                       << true))
                                 << "writeConcern"
                                 << BSON("w"
                                         << "majority"
@@ -360,9 +372,9 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
                                         << 15000)
                                 << "allowImplicitCollectionCreation"
                                 << true);
-    ASSERT_BSONOBJ_EQ(expectedBSON,
-                      ShardingCatalogManager::get(operationContext())
-                          ->createShardIdentityUpsertForAddShard(operationContext(), shardName));
+    auto addShardCmd = add_shard_util::createAddShardCmd(operationContext(), shardName);
+    auto actualBSON = add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
+    ASSERT_BSONOBJ_EQ(expectedBSON, actualBSON);
 }
 
 TEST_F(AddShardTest, StandaloneBasicSuccess) {
@@ -416,8 +428,8 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
 
     expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
 
-    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
-    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+    // The shard receives the _addShard command
+    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -495,8 +507,8 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
 
-    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
-    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+    // The shard receives the _addShard command
+    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -889,8 +901,8 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
 
     expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
 
-    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
-    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+    // The shard receives the _addShard command
+    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -954,8 +966,8 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
 
-    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
-    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+    // The shard receives the _addShard command
+    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(
@@ -1031,8 +1043,8 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
 
     expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
 
-    // The shardIdentity doc inserted into the admin.system.version collection on the shard.
-    expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
+    // The shard receives the _addShard command
+    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
     expectSetFeatureCompatibilityVersion(

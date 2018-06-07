@@ -202,6 +202,28 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "_addShard",
+          command: {
+              _addShard: 1,
+              shardIdentity: {
+                  shardName: "shard0000",
+                  clusterId: ObjectId('5b2031806195dffd744258ee'),
+                  configsvrConnectionString: "foobarbaz/host:20022,host:20023,host:20024"
+              }
+          },
+          skipSharded: true,  // Command doesn't exist on mongos
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "addShard",
           command: {addShard: "x"},
           skipUnlessSharded: true,

@@ -38,122 +38,46 @@ namespace mongo {
 
 const std::string ShardIdentityType::IdName("shardIdentity");
 
-const BSONField<std::string> ShardIdentityType::configsvrConnString("configsvrConnectionString");
-const BSONField<std::string> ShardIdentityType::shardName("shardName");
-const BSONField<OID> ShardIdentityType::clusterId("clusterId");
-
-StatusWith<ShardIdentityType> ShardIdentityType::fromBSON(const BSONObj& source) {
+StatusWith<ShardIdentityType> ShardIdentityType::fromShardIdentityDocument(const BSONObj& source) {
     if (!source.hasField("_id")) {
         return {ErrorCodes::NoSuchKey,
                 str::stream() << "missing _id field for shardIdentity document"};
     }
+    // Strip the id field since it's always the same and we don't store it
+    auto shardIdentityBSON = source.removeField("_id");
 
-    ShardIdentityType shardIdentity;
+    try {
+        ShardIdentityType shardIdentity =
+            ShardIdentity::parse(IDLParserErrorContext("ShardIdentity"), shardIdentityBSON);
 
-    {
-        std::string docId;
-        Status status = bsonExtractStringField(source, "_id", &docId);
-        if (!status.isOK()) {
-            return status;
+        const auto& configsvrConnStr = shardIdentity.getConfigsvrConnectionString();
+        if (configsvrConnStr.type() != ConnectionString::SET) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          str::stream()
+                              << "config server connection string can only be replica sets: "
+                              << configsvrConnStr.toString());
         }
 
-        if (docId != IdName) {
-            return {ErrorCodes::FailedToParse,
-                    str::stream() << "got _id: " << docId << " instead of " << IdName};
-        }
+        return shardIdentity;
+    } catch (const AssertionException& parseException) {
+        return parseException.toStatus();
     }
-
-    {
-        std::string connString;
-        Status status = bsonExtractStringField(source, configsvrConnString(), &connString);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        try {
-            // Note: ConnectionString::parse can uassert from HostAndPort constructor.
-            auto parsedConfigConnStrStatus = ConnectionString::parse(connString);
-            if (!parsedConfigConnStrStatus.isOK()) {
-                return parsedConfigConnStrStatus.getStatus();
-            }
-
-            auto configSvrConnStr = parsedConfigConnStrStatus.getValue();
-            if (configSvrConnStr.type() != ConnectionString::SET) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              str::stream()
-                                  << "config server connection string can only be replica sets: "
-                                  << configSvrConnStr.toString());
-            }
-
-            shardIdentity.setConfigsvrConnString(std::move(configSvrConnStr));
-        } catch (const AssertionException& parseException) {
-            return parseException.toStatus();
-        }
-    }
-
-    {
-        std::string name;
-        Status status = bsonExtractStringField(source, shardName(), &name);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        shardIdentity.setShardName(name);
-    }
-
-    {
-        OID oid;
-        Status status = bsonExtractOIDField(source, clusterId(), &oid);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        shardIdentity.setClusterId(oid);
-    }
-
-    return shardIdentity;
 }
 
 Status ShardIdentityType::validate() const {
-    if (!_configsvrConnString) {
-        return {ErrorCodes::NoSuchKey,
-                str::stream() << "missing " << configsvrConnString() << " field"};
-    }
-
-    if (_configsvrConnString->type() != ConnectionString::SET) {
+    const auto& configsvrConnStr = getConfigsvrConnectionString();
+    if (configsvrConnStr.type() != ConnectionString::SET) {
         return {ErrorCodes::UnsupportedFormat,
                 str::stream() << "config connection string can only be replica sets, got "
-                              << ConnectionString::typeToString(_configsvrConnString->type())};
+                              << ConnectionString::typeToString(configsvrConnStr.type())};
     }
-
-    if (!_shardName || _shardName->empty()) {
-        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << shardName() << " field"};
-    }
-
-    if (!_clusterId || !_clusterId->isSet()) {
-        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << clusterId() << " field"};
-    }
-
     return Status::OK();
 }
 
-BSONObj ShardIdentityType::toBSON() const {
+BSONObj ShardIdentityType::toShardIdentityDocument() const {
     BSONObjBuilder builder;
-
-    builder.append("_id", IdName);
-
-    if (_configsvrConnString) {
-        builder << configsvrConnString(_configsvrConnString->toString());
-    }
-
-    if (_shardName) {
-        builder << shardName(_shardName.get());
-    }
-
-    if (_clusterId) {
-        builder << clusterId(_clusterId.get());
-    }
-
+    builder.append("_id", ShardIdentityType::IdName);
+    builder.appendElements(ShardIdentity::toBSON());
     return builder.obj();
 }
 
@@ -161,49 +85,10 @@ std::string ShardIdentityType::toString() const {
     return toBSON().toString();
 }
 
-bool ShardIdentityType::isConfigsvrConnStringSet() const {
-    return _configsvrConnString.is_initialized();
-}
-
-const ConnectionString& ShardIdentityType::getConfigsvrConnString() const {
-    invariant(_configsvrConnString);
-    return _configsvrConnString.get();
-}
-
-void ShardIdentityType::setConfigsvrConnString(ConnectionString connString) {
-    _configsvrConnString = std::move(connString);
-}
-
-bool ShardIdentityType::isShardNameSet() const {
-    return _shardName.is_initialized();
-}
-
-const std::string& ShardIdentityType::getShardName() const {
-    invariant(_shardName);
-    return _shardName.get();
-}
-
-void ShardIdentityType::setShardName(std::string shardName) {
-    _shardName = std::move(shardName);
-}
-
-bool ShardIdentityType::isClusterIdSet() const {
-    return _clusterId.is_initialized();
-}
-
-const OID& ShardIdentityType::getClusterId() const {
-    invariant(_clusterId);
-    return _clusterId.get();
-}
-
-void ShardIdentityType::setClusterId(OID clusterId) {
-    _clusterId = std::move(clusterId);
-}
-
 BSONObj ShardIdentityType::createConfigServerUpdateObject(const std::string& newConnString) {
     BSONObjBuilder builder;
     BSONObjBuilder setConfigBuilder(builder.subobjStart("$set"));
-    setConfigBuilder.append(configsvrConnString(), newConnString);
+    setConfigBuilder.append(ShardIdentity::kConfigsvrConnectionStringFieldName, newConnString);
     setConfigBuilder.doneFast();
     return builder.obj();
 }

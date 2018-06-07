@@ -66,19 +66,19 @@ private:
 
 TEST_F(CollectionShardingStateTest, GlobalInitGetsCalledAfterWriteCommits) {
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
 
     DBDirectClient client(operationContext());
-    client.insert("admin.system.version", shardIdentity.toBSON());
+    client.insert("admin.system.version", shardIdentity.toShardIdentityDocument());
     ASSERT_EQ(1, getInitCallCount());
 }
 
 TEST_F(CollectionShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
@@ -95,7 +95,7 @@ TEST_F(CollectionShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
 
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(autoColl.getCollection()->insertDocument(
-            operationContext(), shardIdentity.toBSON(), {}, false));
+            operationContext(), shardIdentity.toShardIdentityDocument(), {}, false));
         ASSERT_EQ(0, getInitCallCount());
     }
 
@@ -104,22 +104,21 @@ TEST_F(CollectionShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
 
 TEST_F(CollectionShardingStateTest, GlobalInitDoesntGetsCalledIfNSIsNotForShardIdentity) {
     ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
+    shardIdentity.setConfigsvrConnectionString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
 
     DBDirectClient client(operationContext());
-    client.insert("admin.user", shardIdentity.toBSON());
+    client.insert("admin.user", shardIdentity.toShardIdentityDocument());
     ASSERT_EQ(0, getInitCallCount());
 }
 
 TEST_F(CollectionShardingStateTest, OnInsertOpThrowWithIncompleteShardIdentityDocument) {
-    ShardIdentityType shardIdentity;
-    shardIdentity.setShardName("a");
-
     DBDirectClient client(operationContext());
-    client.insert("admin.system.version", shardIdentity.toBSON());
+    client.insert(
+        "admin.system.version",
+        BSON("_id" << ShardIdentityType::IdName << ShardIdentity::kShardNameFieldName << "a"));
     ASSERT(!client.getLastError().empty());
 }
 

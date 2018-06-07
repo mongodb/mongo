@@ -211,7 +211,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             if (auto idElem = insertedDoc["_id"]) {
                 if (idElem.str() == ShardIdentityType::IdName) {
                     auto shardIdentityDoc =
-                        uassertStatusOK(ShardIdentityType::fromBSON(insertedDoc));
+                        uassertStatusOK(ShardIdentityType::fromShardIdentityDocument(insertedDoc));
                     uassertStatusOK(shardIdentityDoc.validate());
                     opCtx->recoveryUnit()->registerChange(
                         new ShardIdentityLogOpHandler(opCtx, std::move(shardIdentityDoc)));

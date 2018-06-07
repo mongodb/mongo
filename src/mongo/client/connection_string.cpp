@@ -217,6 +217,10 @@ StatusWith<ConnectionString> ConnectionString::parse(const std::string& url) {
     return Status(ErrorCodes::FailedToParse, str::stream() << "invalid url [" << url << "]");
 }
 
+ConnectionString ConnectionString::deserialize(StringData url) {
+    return uassertStatusOK(parse(url.toString()));
+}
+
 std::string ConnectionString::typeToString(ConnectionType type) {
     switch (type) {
         case INVALID:

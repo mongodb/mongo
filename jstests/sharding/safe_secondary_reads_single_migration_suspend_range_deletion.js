@@ -43,6 +43,7 @@
     };
 
     let testCases = {
+        _addShard: {skip: "primary only"},
         _cloneCatalogData: {skip: "primary only"},
         _configsvrAddShard: {skip: "primary only"},
         _configsvrAddShardToZone: {skip: "primary only"},
