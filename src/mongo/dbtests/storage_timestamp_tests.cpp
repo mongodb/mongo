@@ -1594,6 +1594,7 @@ public:
 
         repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
             repl::StorageInterface::get(_opCtx));
+        ASSERT(consistencyMarkers.createInternalCollections(_opCtx).isOK());
         consistencyMarkers.initializeMinValidDocument(_opCtx);
         consistencyMarkers.setInitialSyncFlag(_opCtx);
 

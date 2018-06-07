@@ -193,6 +193,32 @@ TEST_F(ReplicationConsistencyMarkersTest, GetMinValidAfterSettingInitialSyncFlag
     ASSERT(consistencyMarkers.getOplogTruncateAfterPoint(opCtx).isNull());
 }
 
+TEST_F(ReplicationConsistencyMarkersTest, ClearInitialSyncFlagResetsOplogTruncateAfterPoint) {
+    auto minValidNss = makeNamespace(_agent, "minValid");
+    auto oplogTruncateAfterPointNss = makeNamespace(_agent, "oplogTruncateAfterPoint");
+
+    ReplicationConsistencyMarkersImpl consistencyMarkers(
+        getStorageInterface(), minValidNss, oplogTruncateAfterPointNss);
+    auto opCtx = getOperationContext();
+    ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
+    consistencyMarkers.initializeMinValidDocument(opCtx);
+
+    ASSERT(consistencyMarkers.getOplogTruncateAfterPoint(opCtx).isNull());
+    ASSERT_FALSE(consistencyMarkers.getInitialSyncFlag(opCtx));
+
+    // Set the oplog truncate after point and verify it has been set correctly.
+    OpTime endOpTime({Seconds(456), 0}, 1LL);
+    consistencyMarkers.setOplogTruncateAfterPoint(opCtx, endOpTime.getTimestamp());
+    ASSERT_EQ(consistencyMarkers.getOplogTruncateAfterPoint(opCtx), endOpTime.getTimestamp());
+
+    // Clear the initial sync flag.
+    consistencyMarkers.clearInitialSyncFlag(opCtx);
+    ASSERT_FALSE(consistencyMarkers.getInitialSyncFlag(opCtx));
+
+    // Make sure the oplog truncate after point no longer exists.
+    ASSERT(consistencyMarkers.getOplogTruncateAfterPoint(opCtx).isNull());
+}
+
 TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     auto minValidNss = makeNamespace(_agent, "minValid");
     auto oplogTruncateAfterPointNss = makeNamespace(_agent, "oplogTruncateAfterPoint");
