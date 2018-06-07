@@ -110,22 +110,13 @@ public:
      * as another option.  These represent programming errors that should not happen during
      * normal operation.
      */
-    OptionDescription& addOptionChaining(const std::string& dottedName,
-                                         const std::string& singleName,
-                                         const OptionType type,
-                                         const std::string& description);
-
-    OptionDescription& addOptionChaining(const std::string& dottedName,
-                                         const std::string& singleName,
-                                         const OptionType type,
-                                         const std::string& description,
-                                         const std::string& deprecatedDottedName);
-
-    OptionDescription& addOptionChaining(const std::string& dottedName,
-                                         const std::string& singleName,
-                                         const OptionType type,
-                                         const std::string& description,
-                                         const std::vector<std::string>& deprecatedDottedNames);
+    OptionDescription& addOptionChaining(
+        const std::string& dottedName,
+        const std::string& singleName,
+        const OptionType type,
+        const std::string& description,
+        const std::vector<std::string>& deprecatedDottedNames = {},
+        const std::vector<std::string>& deprecatedSingleNames = {});
 
     // These functions are used by the OptionsParser to make calls into boost::program_options
     Status getBoostOptions(po::options_description* boostOptions,

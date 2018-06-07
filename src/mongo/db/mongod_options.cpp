@@ -226,7 +226,7 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "",
                            moe::Bool,
                            "disable data file preallocation - will often hurt performance",
-                           "storage.preallocDataFiles")
+                           {"storage.preallocDataFiles"})
         .setSources(moe::SourceYAMLConfig);
 
     storage_options
@@ -234,7 +234,7 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "nssize",
                            moe::Int,
                            ".ns file size (in MB) for new databases",
-                           "storage.nsSize")
+                           {"storage.nsSize"})
         .setDefault(moe::Value(16));
 
     storage_options
@@ -242,20 +242,20 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "quota",
                            moe::Switch,
                            "limits each database to a certain number of files (8 default)",
-                           "storage.quota.enforced")
+                           {"storage.quota.enforced"})
         .incompatibleWith("keyFile");
 
     storage_options.addOptionChaining("storage.mmapv1.quota.maxFilesPerDB",
                                       "quotaFiles",
                                       moe::Int,
                                       "number of files allowed per db, implies --quota",
-                                      "storage.quota.maxFilesPerDB");
+                                      {"storage.quota.maxFilesPerDB"});
 
     storage_options.addOptionChaining("storage.mmapv1.smallFiles",
                                       "smallfiles",
                                       moe::Switch,
                                       "use a smaller default file size",
-                                      "storage.smallFiles");
+                                      {"storage.smallFiles"});
 
     storage_options
         .addOptionChaining("storage.syncPeriodSecs",
@@ -325,7 +325,7 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "journalOptions",
                            moe::Int,
                            "journal diagnostic options",
-                           "storage.journal.debugFlags")
+                           {"storage.journal.debugFlags"})
         .incompatibleWith("durOptions");
 
     storage_options
@@ -338,7 +338,7 @@ Status addMongodOptions(moe::OptionSection* options) {
                                       "journalCommitInterval",
                                       moe::Int,
                                       "how often to group/batch commit (ms)",
-                                      "storage.mmapv1.journal.commitIntervalMs");
+                                      {"storage.mmapv1.journal.commitIntervalMs"});
 
     // Deprecated option that we don't want people to use for performance reasons
     storage_options

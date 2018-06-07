@@ -52,16 +52,6 @@ namespace mongo {
 
 namespace {
 
-/**
- * Configurable via --setParameter disableNonSSLConnectionLogging=true. If false (default)
- * if the sslMode is set to preferSSL, we will log connections that are not using SSL.
- * If true, such log messages will be suppressed.
- */
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly>
-    disableNonSSLConnectionLoggingParameter(ServerParameterSet::getGlobal(),
-                                            "disableNonSSLConnectionLogging",
-                                            &sslGlobalParams.disableNonSSLConnectionLogging);
-
 ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>
     setDiffieHellmanParameterPEMFile(ServerParameterSet::getGlobal(),
                                      "opensslDiffieHellmanParameters",
@@ -85,7 +75,7 @@ public:
         if (!sslGlobalParams.sslCipherConfig.empty()) {
             return Status(
                 ErrorCodes::BadValue,
-                "opensslCipherConfig setParameter is incompatible with net.ssl.sslCipherConfig");
+                "opensslCipherConfig setParameter is incompatible with net.tls.tlsCipherConfig");
         }
         // Note that there is very little validation that we can do here.
         // OpenSSL exposes no API to validate a cipher config string. The only way to figure out
@@ -97,6 +87,51 @@ public:
         return Status::OK();
     }
 } openSSLCipherConfig;
+
+/**
+ * Configurable via --setParameter disableNonSSLConnectionLogging=true. If false (default)
+ * if the sslMode is set to preferSSL, we will log connections that are not using SSL.
+ * If true, such log messages will be suppressed.
+ */
+class DisableNonSSLConnectionLoggingParameter
+    : public ExportedServerParameter<bool, ServerParameterType::kStartupOnly> {
+public:
+    DisableNonSSLConnectionLoggingParameter()
+        : ExportedServerParameter<bool, ServerParameterType::kStartupOnly>(
+              ServerParameterSet::getGlobal(),
+              "disableNonSSLConnectionLogging",
+              &sslGlobalParams.disableNonSSLConnectionLogging) {}
+    Status validate(const bool& potentialNewValue) final {
+        warning() << "Option: disableNonSSLConnectionLogging is deprecated. Please use "
+                  << "disableNonTLSConnectionLogging instead.";
+        if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
+            return Status(ErrorCodes::BadValue,
+                          "Error parsing command line: Multiple occurrences of option "
+                          "disableNonTLSConnectionLogging");
+        }
+        sslGlobalParams.disableNonSSLConnectionLoggingSet = true;
+        return Status::OK();
+    }
+} disableNonSSLConnectionLogging;
+
+class DisableNonTLSConnectionLoggingParameter
+    : public ExportedServerParameter<bool, ServerParameterType::kStartupOnly> {
+public:
+    DisableNonTLSConnectionLoggingParameter()
+        : ExportedServerParameter<bool, ServerParameterType::kStartupOnly>(
+              ServerParameterSet::getGlobal(),
+              "disableNonTLSConnectionLogging",
+              &sslGlobalParams.disableNonSSLConnectionLogging) {}
+    Status validate(const bool& potentialNewValue) final {
+        if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
+            return Status(ErrorCodes::BadValue,
+                          "Error parsing command line: Multiple occurrences of option "
+                          "disableNonTLSConnectionLogging");
+        }
+        sslGlobalParams.disableNonSSLConnectionLoggingSet = true;
+        return Status::OK();
+    }
+} disableNonTLSConnectionLogging;
 
 #ifdef MONGO_CONFIG_SSL
 

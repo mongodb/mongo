@@ -36,10 +36,10 @@ requireSSLProvider('openssl', function() {
         }
     }
 
-    assert.eq(getCmdLineOptsResult.parsed.net.ssl.PEMKeyPassword,
+    assert.eq(getCmdLineOptsResult.parsed.net.tls.PEMKeyPassword,
               "<password>",
               "Password not properly censored: " + tojson(getCmdLineOptsResult));
-    assert.eq(getCmdLineOptsResult.parsed.net.ssl.clusterPassword,
+    assert.eq(getCmdLineOptsResult.parsed.net.tls.clusterPassword,
               "<password>",
               "Password not properly censored: " + tojson(getCmdLineOptsResult));
 

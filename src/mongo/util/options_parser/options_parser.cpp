@@ -191,6 +191,7 @@ Status boostAnyToValue(const boost::any& anyValue,
                        const OptionType& type,
                        const Key& key,
                        Value* value) {
+
     try {
         if (anyValue.type() == typeid(StringVector_t)) {
             *value = Value(boost::any_cast<StringVector_t>(anyValue));
@@ -352,6 +353,90 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
     return stringToValue(stringVal, type, key, value);
 }
 
+Status checkLongName(const po::variables_map& vm,
+                     const std::string& singleName,
+                     const std::string& canonicalSingleName,
+                     const std::string& dottedName,
+                     const OptionType& type,
+                     Environment* environment,
+                     bool* optionAdded) {
+    // Trim off the short option from our name so we can look it up correctly in our map
+    std::string long_name;
+    std::string::size_type commaOffset = singleName.find(',');
+    if (commaOffset != string::npos) {
+        if (commaOffset != singleName.size() - 2) {
+            StringBuilder sb;
+            sb << "Unexpected comma in option name: \"" << singleName << "\""
+               << ": option name must be in the format \"option,o\" or \"option\", "
+               << "where \"option\" is the long name and \"o\" is the optional one "
+               << "character short alias";
+            return Status(ErrorCodes::BadValue, sb.str());
+        }
+        long_name = singleName.substr(0, commaOffset);
+    } else {
+        long_name = singleName;
+    }
+
+    if (vm.count(long_name)) {
+        if (!vm[long_name].defaulted() && singleName != canonicalSingleName) {
+            warning() << "Option: " << singleName << " is deprecated. Please use "
+                      << canonicalSingleName << " instead.";
+        } else if (long_name == "sslMode") {
+            warning() << "Option: sslMode is deprecated. Please use tlsMode instead.";
+        }
+
+        Value optionValue;
+        Status ret = boostAnyToValue(vm[long_name].value(), type, long_name, &optionValue);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        // If this is really a StringMap, try to split on "key=value" for each element
+        // in our StringVector
+        if (type == StringMap) {
+            StringVector_t keyValueVector;
+            ret = optionValue.get(&keyValueVector);
+            if (!ret.isOK()) {
+                return ret;
+            }
+            StringMap_t mapValue;
+            for (StringVector_t::iterator keyValueVectorIt = keyValueVector.begin();
+                 keyValueVectorIt != keyValueVector.end();
+                 ++keyValueVectorIt) {
+                std::string key;
+                std::string value;
+                if (!mongoutils::str::splitOn(*keyValueVectorIt, '=', key, value)) {
+                    StringBuilder sb;
+                    sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
+                    return Status(ErrorCodes::BadValue, sb.str());
+                }
+                // Make sure we aren't setting an option to two different values
+                if (mapValue.count(key) > 0 && mapValue[key] != value) {
+                    StringBuilder sb;
+                    sb << "Key Value Option: " << dottedName
+                       << " has a duplicate key from the same source: " << key;
+                    return Status(ErrorCodes::BadValue, sb.str());
+                }
+                mapValue[key] = value;
+            }
+            optionValue = Value(mapValue);
+        }
+        if (!(*optionAdded)) {
+            environment->set(dottedName, optionValue).transitional_ignore();
+        } else if (!vm[long_name].defaulted()) {
+            StringBuilder sb;
+            sb << "Error parsing command line:  Multiple occurrences of option \"" << long_name
+               << "\"";
+            return Status(ErrorCodes::BadValue, sb.str());
+        }
+        if (!vm[long_name].defaulted()) {
+            *optionAdded = true;
+        }
+    }
+
+    return Status::OK();
+}
+
 // Add all the values in the given variables_map to our environment.  See comments at the
 // beginning of this section.
 Status addBoostVariablesToEnvironment(const po::variables_map& vm,
@@ -363,66 +448,34 @@ Status addBoostVariablesToEnvironment(const po::variables_map& vm,
         return ret;
     }
 
-    for (std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
-         iterator != options_vector.end();
-         iterator++) {
-        // Trim off the short option from our name so we can look it up correctly in our map
-        std::string long_name;
-        std::string::size_type commaOffset = iterator->_singleName.find(',');
-        if (commaOffset != string::npos) {
-            if (commaOffset != iterator->_singleName.size() - 2) {
-                StringBuilder sb;
-                sb << "Unexpected comma in option name: \"" << iterator->_singleName << "\""
-                   << ": option name must be in the format \"option,o\" or \"option\", "
-                   << "where \"option\" is the long name and \"o\" is the optional one "
-                   << "character short alias";
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            long_name = iterator->_singleName.substr(0, commaOffset);
-        } else {
-            long_name = iterator->_singleName;
+    for (const OptionDescription& od : options_vector) {
+
+        bool optionAdded = false;
+        ret = checkLongName(vm,
+                            od._singleName,
+                            od._singleName,
+                            od._dottedName,
+                            od._type,
+                            environment,
+                            &optionAdded);
+
+        if (!ret.isOK()) {
+            return ret;
         }
 
-        if (vm.count(long_name)) {
-            Value optionValue;
-            Status ret =
-                boostAnyToValue(vm[long_name].value(), iterator->_type, long_name, &optionValue);
+        for (const std::string& deprecatedSingleName : od._deprecatedSingleNames) {
+
+            ret = checkLongName(vm,
+                                deprecatedSingleName,
+                                od._singleName,
+                                od._dottedName,
+                                od._type,
+                                environment,
+                                &optionAdded);
+
             if (!ret.isOK()) {
                 return ret;
             }
-
-            // If this is really a StringMap, try to split on "key=value" for each element
-            // in our StringVector
-            if (iterator->_type == StringMap) {
-                StringVector_t keyValueVector;
-                ret = optionValue.get(&keyValueVector);
-                if (!ret.isOK()) {
-                    return ret;
-                }
-                StringMap_t mapValue;
-                for (StringVector_t::iterator keyValueVectorIt = keyValueVector.begin();
-                     keyValueVectorIt != keyValueVector.end();
-                     ++keyValueVectorIt) {
-                    std::string key;
-                    std::string value;
-                    if (!mongoutils::str::splitOn(*keyValueVectorIt, '=', key, value)) {
-                        StringBuilder sb;
-                        sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                    // Make sure we aren't setting an option to two different values
-                    if (mapValue.count(key) > 0 && mapValue[key] != value) {
-                        StringBuilder sb;
-                        sb << "Key Value Option: " << iterator->_dottedName
-                           << " has a duplicate key from the same source: " << key;
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                    mapValue[key] = value;
-                }
-                optionValue = Value(mapValue);
-            }
-
-            environment->set(iterator->_dottedName, optionValue).transitional_ignore();
         }
     }
     return Status::OK();
@@ -964,6 +1017,16 @@ StatusWith<std::vector<std::string>> transformImplictOptions(
             implicitOptions[opt._singleName.substr(pos + 1)] = &opt;
         } else {
             implicitOptions[opt._singleName] = &opt;
+        }
+
+        for (const std::string& deprecatedSingleName : opt._deprecatedSingleNames) {
+            pos = deprecatedSingleName.find(',');
+            if (pos != string::npos) {
+                implicitOptions[deprecatedSingleName.substr(0, pos)] = &opt;
+                implicitOptions[deprecatedSingleName.substr(pos + 1)] = &opt;
+            } else {
+                implicitOptions[deprecatedSingleName] = &opt;
+            }
         }
     }
 

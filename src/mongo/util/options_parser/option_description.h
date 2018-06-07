@@ -78,13 +78,9 @@ public:
     OptionDescription(const std::string& dottedName,
                       const std::string& singleName,
                       const OptionType type,
-                      const std::string& description);
-
-    OptionDescription(const std::string& dottedName,
-                      const std::string& singleName,
-                      const OptionType type,
                       const std::string& description,
-                      const std::vector<std::string>& deprecatedDottedNames);
+                      const std::vector<std::string>& deprecatedDottedNames = {},
+                      const std::vector<std::string>& deprecatedSingleNames = {});
 
     /*
      * The following functions are part of the chaining interface for option registration.  See
@@ -231,6 +227,8 @@ public:
 
     // Deprecated dotted names - aliases for '_dottedName'.
     std::vector<std::string> _deprecatedDottedNames;
+    // Deprecated single names - aliases for '_singleName'.
+    std::vector<std::string> _deprecatedSingleNames;
 };
 
 }  // namespace optionenvironment

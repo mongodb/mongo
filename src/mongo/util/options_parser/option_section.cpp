@@ -57,69 +57,115 @@ Status OptionSection::addSection(const OptionSection& subSection) {
     return Status::OK();
 }
 
-OptionDescription& OptionSection::addOptionChaining(const std::string& dottedName,
-                                                    const std::string& singleName,
-                                                    const OptionType type,
-                                                    const std::string& description) {
-    std::vector<std::string> v;
-    return addOptionChaining(dottedName, singleName, type, description, v);
-}
-
-OptionDescription& OptionSection::addOptionChaining(const std::string& dottedName,
-                                                    const std::string& singleName,
-                                                    const OptionType type,
-                                                    const std::string& description,
-                                                    const std::string& deprecatedDottedName) {
-    std::vector<std::string> v;
-    v.push_back(deprecatedDottedName);
-    return addOptionChaining(dottedName, singleName, type, description, v);
-}
-
 OptionDescription& OptionSection::addOptionChaining(
     const std::string& dottedName,
     const std::string& singleName,
     const OptionType type,
     const std::string& description,
-    const std::vector<std::string>& deprecatedDottedNames) {
-    OptionDescription option(dottedName, singleName, type, description, deprecatedDottedNames);
+    const std::vector<std::string>& deprecatedDottedNames,
+    const std::vector<std::string>& deprecatedSingleNames) {
+    OptionDescription option(
+        dottedName, singleName, type, description, deprecatedDottedNames, deprecatedSingleNames);
+    // Verify deprecated dotted names.
+    // No empty deprecated dotted names.
+    if (std::count(deprecatedDottedNames.begin(), deprecatedDottedNames.end(), "")) {
+        StringBuilder sb;
+        sb << "Attempted to register option with empty string for deprecatedDottedName";
+        uasserted(ErrorCodes::InternalError, sb.str());
+    }
 
-    // Verify that single name, the dotted name and deprecated dotted names for this option
-    // conflicts with the names for any options we have already registered.
-    std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
-        if (option._dottedName == oditerator->_dottedName) {
+    // Should not be the same as dottedName.
+    if (std::count(deprecatedDottedNames.begin(), deprecatedDottedNames.end(), dottedName)) {
+        StringBuilder sb;
+        sb << "Attempted to register option with conflict between dottedName and "
+           << "deprecatedDottedName: " << dottedName;
+        uasserted(ErrorCodes::InternalError, sb.str());
+    }
+
+    // Verify deprecated single names.
+    // No empty deprecated single names.
+    if (std::count(deprecatedSingleNames.begin(), deprecatedSingleNames.end(), "")) {
+        StringBuilder sb;
+        sb << "Attempted to register option with empty string for deprecatedSingleName";
+        uasserted(ErrorCodes::InternalError, sb.str());
+    }
+
+    // Should not be the same as singleName.
+    if (std::count(deprecatedSingleNames.begin(), deprecatedSingleNames.end(), singleName)) {
+        StringBuilder sb;
+        sb << "Attempted to register option with conflict between singleName and "
+           << "deprecatedSingleName: " << singleName;
+        uasserted(ErrorCodes::InternalError, sb.str());
+    }
+
+    for (const OptionDescription& od : _options) {
+        if (option._dottedName == od._dottedName) {
             StringBuilder sb;
-            sb << "Attempted to register option with duplicate dottedName: " << option._dottedName;
+            sb << "Attempted to register option with duplicate dottedName: " << dottedName;
             uasserted(ErrorCodes::InternalError, sb.str());
         }
+
         // Allow options with empty singleName since some options are not allowed on the command
         // line
-        if (!option._singleName.empty() && option._singleName == oditerator->_singleName) {
+        if (!option._singleName.empty() && option._singleName == od._singleName) {
             StringBuilder sb;
-            sb << "Attempted to register option with duplicate singleName: " << option._singleName;
+            sb << "Attempted to register option with duplicate singleName: " << singleName;
             uasserted(ErrorCodes::InternalError, sb.str());
         }
-        // Deprecated dotted names should not conflict with dotted names or deprecated dotted
-        // names of any other options.
-        if (std::count(option._deprecatedDottedNames.begin(),
-                       option._deprecatedDottedNames.end(),
-                       oditerator->_dottedName)) {
+
+        if (std::count(
+                od._deprecatedDottedNames.begin(), od._deprecatedDottedNames.end(), dottedName)) {
             StringBuilder sb;
-            sb << "Attempted to register option with duplicate deprecated dotted name "
-               << "(with another option's dotted name): " << option._dottedName;
-            uasserted(ErrorCodes::BadValue, sb.str());
+            sb << "Attempted to register option with conflict between dottedName and existing "
+                  "deprecatedDottedName: "
+               << dottedName;
+            uasserted(ErrorCodes::InternalError, sb.str());
         }
-        for (std::vector<std::string>::const_iterator i =
-                 oditerator->_deprecatedDottedNames.begin();
-             i != oditerator->_deprecatedDottedNames.end();
-             ++i) {
-            if (std::count(option._deprecatedDottedNames.begin(),
-                           option._deprecatedDottedNames.end(),
-                           *i)) {
+
+        if (std::count(
+                od._deprecatedSingleNames.begin(), od._deprecatedSingleNames.end(), singleName)) {
+            StringBuilder sb;
+            sb << "Attempted to register option with conflict between singleName and existing "
+                  "deprecatedSingleName: "
+               << singleName;
+            uasserted(ErrorCodes::InternalError, sb.str());
+        }
+
+        for (const std::string& deprecatedDottedName : deprecatedDottedNames) {
+            if (deprecatedDottedName == od._dottedName) {
                 StringBuilder sb;
-                sb << "Attempted to register option with duplicate deprecated dotted name " << *i
-                   << " (other option " << oditerator->_dottedName << ")";
-                uasserted(ErrorCodes::BadValue, sb.str());
+                sb << "Attempted to register option with conflict between deprecatedDottedName "
+                      "and existing dottedName: "
+                   << dottedName;
+                uasserted(ErrorCodes::InternalError, sb.str());
+            }
+
+            if (std::count(od._deprecatedDottedNames.begin(),
+                           od._deprecatedDottedNames.end(),
+                           deprecatedDottedName)) {
+                StringBuilder sb;
+                sb << "Attempted to register option with duplicate deprecatedDottedName: "
+                   << deprecatedDottedName;
+                uasserted(ErrorCodes::InternalError, sb.str());
+            }
+        }
+
+        for (const std::string& deprecatedSingleName : deprecatedSingleNames) {
+            if (deprecatedSingleName == od._singleName) {
+                StringBuilder sb;
+                sb << "Attempted to register option with conflict between deprecatedSingleName "
+                      "and existing singleName: "
+                   << singleName;
+                uasserted(ErrorCodes::InternalError, sb.str());
+            }
+
+            if (std::count(od._deprecatedSingleNames.begin(),
+                           od._deprecatedSingleNames.end(),
+                           deprecatedSingleName)) {
+                StringBuilder sb;
+                sb << "Attempted to register option with duplicate deprecatedSingleName: "
+                   << deprecatedSingleName;
+                uasserted(ErrorCodes::InternalError, sb.str());
             }
         }
     }
@@ -324,6 +370,18 @@ Status OptionSection::getBoostOptions(po::options_description* boostOptions,
             boostOptions->add_options()(oditerator->_singleName.c_str(),
                                         boostType.release(),
                                         oditerator->_description.c_str());
+
+            for (const std::string& depreatedSingleName : oditerator->_deprecatedSingleNames) {
+                std::unique_ptr<po::value_semantic> boostTypeDep;
+                Status retDep = typeToBoostType(&boostTypeDep,
+                                                oditerator->_type,
+                                                includeDefaults ? oditerator->_default : Value(),
+                                                oditerator->_implicit,
+                                                !(sources & SourceCommandLine));
+                boostOptions->add_options()(depreatedSingleName.c_str(),
+                                            boostTypeDep.release(),
+                                            oditerator->_description.c_str());
+            }
         }
     }
 

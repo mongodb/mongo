@@ -640,7 +640,8 @@ private:
             uasserted(ErrorCodes::SSLHandshakeFailed,
                       "The server is configured to only allow SSL connections");
         } else {
-            if (_tl->_sslMode() == SSLParams::SSLMode_preferSSL) {
+            if (!sslGlobalParams.disableNonSSLConnectionLogging &&
+                _tl->_sslMode() == SSLParams::SSLMode_preferSSL) {
                 LOG(0) << "SSL mode is set to 'preferred' and connection " << id() << " to "
                        << remote() << " is not using SSL.";
             }

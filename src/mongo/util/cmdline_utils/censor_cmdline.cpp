@@ -41,7 +41,9 @@ static bool _isPasswordSwitch(char const* switchName);
 
 static bool _isPasswordArgument(const char* argumentName) {
     static const char* const passwordArguments[] = {
+        "net.tls.PEMKeyPassword",
         "net.ssl.PEMKeyPassword",
+        "net.tls.clusterPassword",
         "net.ssl.clusterPassword",
         "processManagement.windowsService.servicePassword",
         "security.kmip.clientCertificatePassword",
@@ -57,7 +59,9 @@ static bool _isPasswordArgument(const char* argumentName) {
 
 static bool _isPasswordSwitch(const char* switchName) {
     static const char* const passwordSwitches[] = {
+        "tlsPEMKeyPassword",
         "sslPEMKeyPassword",
+        "tlsClusterPassword",
         "sslClusterPassword",
         "servicePassword",
         "kmipClientCertificatePassword",
