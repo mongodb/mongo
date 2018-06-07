@@ -210,7 +210,10 @@ protected:
     friend TransportLayerASIO::BatonASIO;
 
 #ifdef MONGO_CONFIG_SSL
-    Future<void> handshakeSSLForEgress(const HostAndPort& target) {
+    // The unique_lock here is held by TransportLayerASIO to synchronize with the asyncConnect
+    // timeout callback. It will be unlocked before the SSL actually handshake begins.
+    Future<void> handshakeSSLForEgressWithLock(stdx::unique_lock<stdx::mutex> lk,
+                                               const HostAndPort& target) {
         if (!_tl->_egressSSLContext) {
             return Future<void>::makeReady(Status(ErrorCodes::SSLHandshakeFailed,
                                                   "SSL requested but SSL support is disabled"));
@@ -218,6 +221,8 @@ protected:
 
         _sslSocket.emplace(
             std::move(_socket), *_tl->_egressSSLContext, removeFQDNRoot(target.host()));
+        lk.unlock();
+
         auto doHandshake = [&] {
             if (_blockingMode == Sync) {
                 std::error_code ec;
@@ -238,6 +243,13 @@ protected:
                 SSLPeerInfo::forSession(shared_from_this()) = std::move(*swPeerInfo);
             }
         });
+    }
+
+    // For synchronous connections where we don't have an async timer, just take a dummy lock and
+    // pass it to the WithLock version of handshakeSSLForEgress
+    Future<void> handshakeSSLForEgress(const HostAndPort& target) {
+        stdx::mutex mutex;
+        return handshakeSSLForEgressWithLock(stdx::unique_lock<stdx::mutex>(mutex), target);
     }
 #endif
 

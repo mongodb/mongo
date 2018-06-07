@@ -62,6 +62,8 @@
 namespace mongo {
 namespace transport {
 
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
+
 class ASIOReactorTimer final : public ReactorTimer {
 public:
     explicit ASIOReactorTimer(asio::io_context& ctx)
@@ -450,7 +452,7 @@ private:
 
 Status makeConnectError(Status status, const HostAndPort& peer, const WrappedEndpoint& endpoint) {
     std::string errmsg;
-    if (peer.toString() != endpoint.toString()) {
+    if (peer.toString() != endpoint.toString() && !endpoint.toString().empty()) {
         errmsg = str::stream() << "Error connecting to " << peer << " (" << endpoint.toString()
                                << ")";
     } else {
@@ -551,16 +553,19 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
 
 Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
                                                        ConnectSSLMode sslMode,
-                                                       const ReactorHandle& reactor) {
+                                                       const ReactorHandle& reactor,
+                                                       Milliseconds timeout) {
+
     struct AsyncConnectState {
         AsyncConnectState(HostAndPort peer, asio::io_context& context)
-            : socket(context), resolver(context), peer(std::move(peer)) {}
+            : socket(context), timeoutTimer(context), resolver(context), peer(std::move(peer)) {}
 
-        Future<SessionHandle> finish() {
-            return SessionHandle(std::move(session));
-        }
+        AtomicBool done{false};
+        Promise<SessionHandle> promise;
 
+        stdx::mutex mutex;
         GenericSocket socket;
+        ASIOReactorTimer timeoutTimer;
         WrappedResolver resolver;
         WrappedEndpoint resolvedEndpoint;
         const HostAndPort peer;
@@ -569,22 +574,50 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
 
     auto reactorImpl = checked_cast<ASIOReactor*>(reactor.get());
     auto connector = std::make_shared<AsyncConnectState>(std::move(peer), *reactorImpl);
+    Future<SessionHandle> mergedFuture = connector->promise.getFuture();
 
     if (connector->peer.host().empty()) {
         return Status{ErrorCodes::HostNotFound, "Hostname or IP address to connect to is empty"};
     }
 
-    return connector->resolver.asyncResolve(connector->peer, _listenerOptions.enableIPv6)
+    if (timeout > Milliseconds{0} && timeout < Milliseconds::max()) {
+        connector->timeoutTimer.waitFor(timeout).getAsync([connector](Status status) {
+            if (status == ErrorCodes::CallbackCanceled || connector->done.swap(true)) {
+                return;
+            }
+
+            connector->promise.setError(
+                makeConnectError({ErrorCodes::NetworkTimeout, "Connecting timed out"},
+                                 connector->peer,
+                                 connector->resolvedEndpoint));
+
+            std::error_code ec;
+            stdx::lock_guard<stdx::mutex> lk(connector->mutex);
+            connector->resolver.cancel();
+            if (connector->session) {
+                connector->session->end();
+            } else {
+                connector->socket.cancel(ec);
+            }
+        });
+    }
+
+    connector->resolver.asyncResolve(connector->peer, _listenerOptions.enableIPv6)
         .then([connector](WrappedResolver::EndpointVector results) {
+            stdx::unique_lock<stdx::mutex> lk(connector->mutex);
             connector->resolvedEndpoint = results.front();
             connector->socket.open(connector->resolvedEndpoint->protocol());
             connector->socket.non_blocking(true);
+            lk.unlock();
+
             return connector->socket.async_connect(*connector->resolvedEndpoint, UseFuture{});
         })
-        .then([this, connector, sslMode]() {
+        .then([this, connector, sslMode]() -> Future<void> {
+            stdx::unique_lock<stdx::mutex> lk(connector->mutex);
             connector->session =
                 std::make_shared<ASIOSession>(this, std::move(connector->socket), false);
             connector->session->ensureAsync();
+
 #ifndef MONGO_CONFIG_SSL
             if (sslMode == kEnableSSL) {
                 uasserted(ErrorCodes::InvalidSSLConfiguration, "SSL requested but not supported");
@@ -594,16 +627,35 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
             if (sslMode == kEnableSSL ||
                 (sslMode == kGlobalSSLMode && ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
                                                (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
-                return connector->session->handshakeSSLForEgress(connector->peer).then([connector] {
-                    return connector->finish();
-                });
+                return connector->session
+                    ->handshakeSSLForEgressWithLock(std::move(lk), connector->peer)
+                    .then([connector] { return Status::OK(); });
             }
 #endif
-            return connector->finish();
+            return Status::OK();
         })
-        .onError([connector](Status status) -> Future<SessionHandle> {
+        .onError([connector](Status status) -> Future<void> {
             return makeConnectError(status, connector->peer, connector->resolvedEndpoint);
+        })
+        .getAsync([connector](Status connectResult) {
+            if (MONGO_FAIL_POINT(transportLayerASIOasyncConnectTimesOut)) {
+                log() << "asyncConnectTimesOut fail point is active. simulating timeout.";
+                return;
+            }
+
+            if (connector->done.swap(true)) {
+                return;
+            }
+
+            connector->timeoutTimer.cancel();
+            if (connectResult.isOK()) {
+                connector->promise.emplaceValue(std::move(connector->session));
+            } else {
+                connector->promise.setError(connectResult);
+            }
         });
+
+    return mergedFuture;
 }
 
 Status TransportLayerASIO::setup() {

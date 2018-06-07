@@ -55,7 +55,8 @@ public:
     static Future<Handle> connect(const HostAndPort& peer,
                                   transport::ConnectSSLMode sslMode,
                                   ServiceContext* const context,
-                                  transport::ReactorHandle reactor);
+                                  transport::ReactorHandle reactor,
+                                  Milliseconds timeout);
 
     Future<executor::RemoteCommandResponse> runCommandRequest(
         executor::RemoteCommandRequest request, const transport::BatonHandle& baton = nullptr);

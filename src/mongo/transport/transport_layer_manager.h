@@ -61,7 +61,8 @@ public:
                                       Milliseconds timeout) override;
     Future<SessionHandle> asyncConnect(HostAndPort peer,
                                        ConnectSSLMode sslMode,
-                                       const ReactorHandle& reactor) override;
+                                       const ReactorHandle& reactor,
+                                       Milliseconds timeout) override;
 
     Status start() override;
     void shutdown() override;
