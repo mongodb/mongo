@@ -59,7 +59,6 @@ struct CommitChunkMigrationRequest {
                                 const ShardId& fromShard,
                                 const ShardId& toShard,
                                 const ChunkType& migratedChunkType,
-                                const boost::optional<ChunkType>& controlChunkType,
                                 const ChunkVersion& fromShardChunkVersion,
                                 const Timestamp& validAfter);
 
@@ -74,9 +73,6 @@ struct CommitChunkMigrationRequest {
     }
     const ChunkType& getMigratedChunk() const {
         return _migratedChunk;
-    }
-    const boost::optional<ChunkType>& getControlChunk() const {
-        return _controlChunk;
     }
     const OID& getCollectionEpoch() {
         return _collectionEpoch;
@@ -96,10 +92,6 @@ struct CommitChunkMigrationRequest {
 
     // The chunk being moved.
     ChunkType _migratedChunk;
-
-    // TODO: SERVER-35209 Remove after v4.0, kept around for backwards compatibility.
-    // A chunk on the shard moved from, if any remain.
-    boost::optional<ChunkType> _controlChunk;
 
     OID _collectionEpoch;
 

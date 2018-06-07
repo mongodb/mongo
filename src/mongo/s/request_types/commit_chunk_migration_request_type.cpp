@@ -39,7 +39,6 @@ const char kConfigSvrCommitChunkMigration[] = "_configsvrCommitChunkMigration";
 const char kFromShard[] = "fromShard";
 const char kToShard[] = "toShard";
 const char kMigratedChunk[] = "migratedChunk";
-const char kControlChunk[] = "controlChunk";
 const char kFromShardCollectionVersion[] = "fromShardCollectionVersion";
 const char kValidAfter[] = "validAfter";
 
@@ -112,18 +111,6 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
     }
 
     {
-        // controlChunk is optional, so parse it if present.
-        if (obj.hasField(kControlChunk)) {
-            auto controlChunk = extractChunk(obj, kControlChunk);
-            if (!controlChunk.isOK()) {
-                return controlChunk.getStatus();
-            }
-
-            request._controlChunk = std::move(controlChunk.getValue());
-        }
-    }
-
-    {
         auto statusWithChunkVersion =
             ChunkVersion::parseFromBSONWithFieldForCommands(obj, kFromShardCollectionVersion);
         if (!statusWithChunkVersion.isOK()) {
@@ -155,7 +142,6 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
                                                   const ShardId& fromShard,
                                                   const ShardId& toShard,
                                                   const ChunkType& migratedChunk,
-                                                  const boost::optional<ChunkType>& controlChunk,
                                                   const ChunkVersion& fromShardCollectionVersion,
                                                   const Timestamp& validAfter) {
     invariant(builder->asTempObj().isEmpty());
@@ -167,9 +153,6 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kMigratedChunk, migratedChunk.toConfigBSON());
     fromShardCollectionVersion.appendWithFieldForCommands(builder, kFromShardCollectionVersion);
 
-    if (controlChunk) {
-        builder->append(kControlChunk, controlChunk->toConfigBSON());
-    }
     builder->append(kValidAfter, validAfter);
 }
 

@@ -74,7 +74,6 @@ const auto msmForCss = CollectionShardingState::declareDecoration<MigrationSourc
 // entered
 const Hours kMaxWaitToEnterCriticalSectionTimeout(6);
 const char kMigratedChunkVersionField[] = "migratedChunkVersion";
-const char kControlChunkVersionField[] = "controlChunkVersion";
 const char kWriteConcernField[] = "writeConcern";
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -403,14 +402,6 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         if (!status.isOK())
             return status;
 
-        boost::optional<ChunkType> controlChunkType = boost::none;
-        ChunkType differentChunk;
-        if (metadata->getDifferentChunk(_args.getMinKey(), &differentChunk)) {
-            controlChunkType = std::move(differentChunk);
-        } else {
-            log() << "Moving last chunk for the collection out";
-        }
-
         ChunkType migratedChunkType;
         migratedChunkType.setMin(_args.getMinKey());
         migratedChunkType.setMax(_args.getMaxKey());
@@ -421,7 +412,6 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
             _args.getFromShardId(),
             _args.getToShardId(),
             migratedChunkType,
-            controlChunkType,
             metadata->getCollVersion(),
             LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
 

@@ -51,47 +51,6 @@ const auto kKey3 = BSON("Key" << 50);
 
 const char kConfigSvrCommitChunkMigration[] = "_configsvrCommitChunkMigration";
 
-TEST(CommitChunkMigrationRequest, WithControlChunk) {
-    BSONObjBuilder builder;
-
-    ChunkVersion fromShardCollectionVersion(1, 2, OID::gen());
-
-    ChunkType migratedChunk;
-    migratedChunk.setMin(kKey0);
-    migratedChunk.setMax(kKey1);
-
-    ChunkType controlChunk;
-    controlChunk.setMin(kKey2);
-    controlChunk.setMax(kKey3);
-    boost::optional<ChunkType> controlChunkOpt = controlChunk;
-
-    Timestamp validAfter{1};
-
-    CommitChunkMigrationRequest::appendAsCommand(&builder,
-                                                 kNamespaceString,
-                                                 kShardId0,
-                                                 kShardId1,
-                                                 migratedChunk,
-                                                 controlChunkOpt,
-                                                 fromShardCollectionVersion,
-                                                 validAfter);
-
-    BSONObj cmdObj = builder.obj();
-
-    auto request = assertGet(CommitChunkMigrationRequest::createFromCommand(
-        NamespaceString(cmdObj[kConfigSvrCommitChunkMigration].String()), cmdObj));
-
-    ASSERT_EQ(kNamespaceString, request.getNss());
-    ASSERT_EQ(kShardId0, request.getFromShard());
-    ASSERT_EQ(kShardId1, request.getToShard());
-    ASSERT_BSONOBJ_EQ(kKey0, request.getMigratedChunk().getMin());
-    ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunk().getMax());
-    ASSERT(request.getControlChunk());
-    ASSERT_BSONOBJ_EQ(kKey2, request.getControlChunk()->getMin());
-    ASSERT_BSONOBJ_EQ(kKey3, request.getControlChunk()->getMax());
-    ASSERT_EQ(fromShardCollectionVersion.epoch(), request.getCollectionEpoch());
-}
-
 TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
     BSONObjBuilder builder;
 
@@ -108,7 +67,6 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
                                                  kShardId0,
                                                  kShardId1,
                                                  migratedChunk,
-                                                 boost::none,
                                                  fromShardCollectionVersion,
                                                  validAfter);
 
@@ -122,7 +80,6 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
     ASSERT_EQ(kShardId1, request.getToShard());
     ASSERT_BSONOBJ_EQ(kKey0, request.getMigratedChunk().getMin());
     ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunk().getMax());
-    ASSERT(!request.getControlChunk());
     ASSERT_EQ(fromShardCollectionVersion.epoch(), request.getCollectionEpoch());
 }
 
