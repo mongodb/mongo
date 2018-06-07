@@ -124,9 +124,13 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
                                            << timeout;
         handler->promise.setError(
             Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, std::move(reason)));
+
+        if (_client) {
+            _client->cancel();
+        }
     });
 
-    AsyncDBClient::connect(_peer, transport::kGlobalSSLMode, _serviceContext, _reactor)
+    AsyncDBClient::connect(_peer, transport::kGlobalSSLMode, _serviceContext, _reactor, timeout)
         .onError([](StatusWith<AsyncDBClient::Handle> swc) -> StatusWith<AsyncDBClient::Handle> {
             return Status(ErrorCodes::HostUnreachable, swc.getStatus().reason());
         })

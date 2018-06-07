@@ -100,7 +100,7 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
     auto server = connectionString.getServers().front();
 
     auto sc = getGlobalServiceContext();
-    auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kEgress);
+    auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
 
     stdx::thread thread([&] { reactor->run(); });
     const auto threadGuard = MakeGuard([&] {
@@ -109,7 +109,8 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
     });
 
     AsyncDBClient::Handle handle =
-        AsyncDBClient::connect(server, transport::kGlobalSSLMode, sc, reactor).get();
+        AsyncDBClient::connect(server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max())
+            .get();
 
     handle->initWireVersion(__FILE__, nullptr).get();
 
@@ -133,6 +134,27 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
 
         assertOK(future.get());
     }
+}
+
+TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {
+    auto connectionString = unittest::getFixtureConnectionString();
+    auto server = connectionString.getServers().front();
+
+    auto sc = getGlobalServiceContext();
+    auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
+
+    stdx::thread thread([&] { reactor->run(); });
+
+    const auto threadGuard = MakeGuard([&] {
+        reactor->stop();
+        thread.join();
+    });
+
+    FailPointEnableBlock fp("transportLayerASIOasyncConnectTimesOut");
+    auto client =
+        AsyncDBClient::connect(server, transport::kGlobalSSLMode, sc, reactor, Milliseconds{500})
+            .getNoThrow();
+    ASSERT_EQ(client.getStatus(), ErrorCodes::NetworkTimeout);
 }
 
 }  // namespace

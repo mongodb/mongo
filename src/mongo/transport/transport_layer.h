@@ -79,7 +79,8 @@ public:
 
     virtual Future<SessionHandle> asyncConnect(HostAndPort peer,
                                                ConnectSSLMode sslMode,
-                                               const ReactorHandle& reactor) = 0;
+                                               const ReactorHandle& reactor,
+                                               Milliseconds timeout) = 0;
 
     /**
      * Start the TransportLayer. After this point, the TransportLayer will begin accepting active
