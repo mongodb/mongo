@@ -141,19 +141,17 @@ public:
         OID expectedCollectionEpoch;
         uassertStatusOK(bsonExtractOIDField(cmdObj, "epoch", &expectedCollectionEpoch));
 
-        auto statusWithOptionalChunkRange = splitChunk(
-            opCtx, nss, keyPatternObj, chunkRange, splitKeys, shardName, expectedCollectionEpoch);
+        auto topChunk = uassertStatusOK(splitChunk(
+            opCtx, nss, keyPatternObj, chunkRange, splitKeys, shardName, expectedCollectionEpoch));
 
-        // If the split chunk returns something that is not Status::Ok(), then something failed.
-        uassertStatusOK(statusWithOptionalChunkRange.getStatus());
-
-        // Otherwise, we want to check whether or not top-chunk optimization should be performed.
-        // If yes, then we should have a ChunkRange that was returned. Regardless of whether it
-        // should be performed, we will return true.
-        if (auto topChunk = statusWithOptionalChunkRange.getValue()) {
+        // Otherwise, we want to check whether or not top-chunk optimization should be performed. If
+        // yes, then we should have a ChunkRange that was returned. Regardless of whether it should
+        // be performed, we will return true.
+        if (topChunk) {
             result.append("shouldMigrate",
                           BSON("min" << topChunk->getMin() << "max" << topChunk->getMax()));
         }
+
         return true;
     }
 

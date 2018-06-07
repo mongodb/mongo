@@ -1,5 +1,3 @@
-// mr.h
-
 /**
  *    Copyright (C) 2012 10gen Inc.
  *
@@ -176,7 +174,6 @@ private:
 };
 
 // -----------------
-
 
 class TupleKeyCmp {
 public:
@@ -410,9 +407,6 @@ protected:
     ScriptingFunction _reduceAndFinalizeAndInsert;
 };
 
-BSONObj fast_emit(const BSONObj& args, void* data);
-BSONObj _bailFromJS(const BSONObj& args, void* data);
-
 void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -423,5 +417,5 @@ void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
  */
 bool mrSupportsWriteConcern(const BSONObj& cmd);
 
-}  // end mr namespace
-}
+}  // namespace mr
+}  // namespace mongo

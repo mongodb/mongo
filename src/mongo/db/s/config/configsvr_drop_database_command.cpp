@@ -83,15 +83,13 @@ public:
         return cmdObj.firstElement().str();
     }
 
-
     bool run(OperationContext* opCtx,
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            uasserted(ErrorCodes::IllegalOperation,
-                      "_configsvrDropDatabase can only be run on config servers");
-        }
+        uassert(ErrorCodes::IllegalOperation,
+                "_configsvrDropDatabase can only be run on config servers",
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
         // Set the operation context read concern level to local for reads into the config database.
         repl::ReadConcernArgs::get(opCtx) =
@@ -178,7 +176,7 @@ public:
                         dbname,
                         BSONObj(),
                         ShardingCatalogClient::kMajorityWriteConcern)
-            .transitional_ignore();
+            .ignore();
 
         result.append("dropped", dbname);
         return true;

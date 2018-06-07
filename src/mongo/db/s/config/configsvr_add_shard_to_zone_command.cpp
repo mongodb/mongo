@@ -45,8 +45,6 @@
 namespace mongo {
 namespace {
 
-using std::string;
-
 /**
  * Internal sharding command run on config servers to add a shard to zone.
  *
@@ -92,10 +90,9 @@ public:
              const std::string& unusedDbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            uasserted(ErrorCodes::IllegalOperation,
-                      "_configsvrAddShardToZone can only be run on config servers");
-        }
+        uassert(ErrorCodes::IllegalOperation,
+                "_configsvrAddShardToZone can only be run on config servers",
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
         // Set the operation context read concern level to local for reads into the config database.
         repl::ReadConcernArgs::get(opCtx) =

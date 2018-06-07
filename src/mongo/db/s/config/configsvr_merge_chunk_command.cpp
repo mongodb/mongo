@@ -46,8 +46,6 @@
 namespace mongo {
 namespace {
 
-using std::string;
-
 /**
  * Internal sharding command run on config servers to merge a set of chunks.
  *
@@ -103,10 +101,9 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            uasserted(ErrorCodes::IllegalOperation,
-                      "_configsvrCommitChunkMerge can only be run on config servers");
-        }
+        uassert(ErrorCodes::IllegalOperation,
+                "_configsvrCommitChunkMerge can only be run on config servers",
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
         // Set the operation context read concern level to local for reads into the config database.
         repl::ReadConcernArgs::get(opCtx) =
@@ -114,17 +111,17 @@ public:
 
         auto parsedRequest = uassertStatusOK(MergeChunkRequest::parseFromConfigCommand(cmdObj));
 
-        Status mergeChunkResult =
+        uassertStatusOK(
             ShardingCatalogManager::get(opCtx)->commitChunkMerge(opCtx,
                                                                  parsedRequest.getNamespace(),
                                                                  parsedRequest.getEpoch(),
                                                                  parsedRequest.getChunkBoundaries(),
                                                                  parsedRequest.getShardName(),
-                                                                 parsedRequest.getValidAfter());
-
-        uassertStatusOK(mergeChunkResult);
+                                                                 parsedRequest.getValidAfter()));
         return true;
     }
+
 } configsvrMergeChunkCmd;
+
 }  // namespace
 }  // namespace mongo

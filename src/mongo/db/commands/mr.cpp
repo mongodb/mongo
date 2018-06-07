@@ -60,7 +60,6 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -92,6 +91,72 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 namespace dps = ::mongo::dotted_path_support;
 
 namespace mr {
+namespace {
+
+/**
+ * Runs a count against the namespace specified by 'ns'. If the caller holds the global write lock,
+ * then this function does not acquire any additional locks.
+ */
+unsigned long long collectionCount(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   bool callerHoldsGlobalLock) {
+    boost::optional<AutoGetCollectionForReadCommand> ctx;
+
+    Collection* coll = nullptr;
+
+    // If the global write lock is held, we must avoid using AutoGetCollectionForReadCommand as it
+    // may lead to deadlock when waiting for a majority snapshot to be committed. See SERVER-24596.
+    if (callerHoldsGlobalLock) {
+        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.ns());
+        if (db) {
+            coll = db->getCollection(opCtx, nss);
+        }
+    } else {
+        ctx.emplace(opCtx, nss);
+        coll = ctx->getCollection();
+    }
+
+    return coll ? coll->numRecords(opCtx) : 0;
+}
+
+/**
+ * Emit that will be called by a js function.
+ */
+BSONObj fastEmit(const BSONObj& args, void* data) {
+    uassert(10077, "fastEmit takes 2 args", args.nFields() == 2);
+    uassert(13069,
+            "an emit can't be more than half max bson size",
+            args.objsize() < (BSONObjMaxUserSize / 2));
+
+    State* state = (State*)data;
+    if (args.firstElement().type() == Undefined) {
+        BSONObjBuilder b(args.objsize());
+        b.appendNull("");
+        BSONObjIterator i(args);
+        i.next();
+        b.append(i.next());
+        state->emit(b.obj());
+    } else {
+        state->emit(args);
+    }
+    return BSONObj();
+}
+
+/**
+ * This function is called when we realize we cant use js mode for m/r on the 1st key.
+ */
+BSONObj _bailFromJS(const BSONObj& args, void* data) {
+    State* state = (State*)data;
+    state->bailFromJS();
+
+    // emit this particular key if there is one
+    if (!args.isEmpty()) {
+        fastEmit(args, data);
+    }
+    return BSONObj();
+}
+
+}  // namespace
 
 AtomicUInt32 Config::JOB_NUMBER;
 
@@ -140,9 +205,8 @@ BSONObj JSFinalizer::finalize(const BSONObj& o) {
     Scope::NoDBAccess no = s->disableDBAccess("can't access db inside finalize");
     s->invokeSafe(_func.func(), &o, 0);
 
-    // don't want to use o.objsize() to size b
-    // since there are many cases where the point of finalize
-    // is converting many fields to 1
+    // We don't want to use o.objsize() to size b since there are many cases where the point of
+    // finalize is converting many fields to 1
     BSONObjBuilder b;
     b.append(o.firstElement());
     s->append(b, "value", "__returnValue");
@@ -631,42 +695,15 @@ long long State::postProcessCollection(OperationContext* opCtx,
     return postProcessCollectionNonAtomic(opCtx, curOp, pm, holdingGlobalLock);
 }
 
-namespace {
-
-// Runs a count against the namespace specified by 'ns'. If the caller holds the global write lock,
-// then this function does not acquire any additional locks.
-unsigned long long _collectionCount(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    bool callerHoldsGlobalLock) {
-    Collection* coll = nullptr;
-    boost::optional<AutoGetCollectionForReadCommand> ctx;
-
-    // If the global write lock is held, we must avoid using AutoGetCollectionForReadCommand as it
-    // may lead to deadlock when waiting for a majority snapshot to be committed. See SERVER-24596.
-    if (callerHoldsGlobalLock) {
-        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.ns());
-        if (db) {
-            coll = db->getCollection(opCtx, nss);
-        }
-    } else {
-        ctx.emplace(opCtx, nss);
-        coll = ctx->getCollection();
-    }
-
-    return coll ? coll->numRecords(opCtx) : 0;
-}
-
-}  // namespace
-
 long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
                                                 CurOp* curOp,
                                                 ProgressMeterHolder& pm,
                                                 bool callerHoldsGlobalLock) {
     if (_config.outputOptions.finalNamespace == _config.tempNamespace)
-        return _collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
+        return collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
 
     if (_config.outputOptions.outType == Config::REPLACE ||
-        _collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock) == 0) {
+        collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock) == 0) {
         // This must be global because we may write across different databases.
         Lock::GlobalWrite lock(opCtx);
         // replace: just rename from temp to final collection name, dropping previous collection
@@ -686,8 +723,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
     } else if (_config.outputOptions.outType == Config::MERGE) {
         // merge: upsert new docs into old collection
         {
-            const auto count =
-                _collectionCount(opCtx, _config.tempNamespace, callerHoldsGlobalLock);
+            const auto count = collectionCount(opCtx, _config.tempNamespace, callerHoldsGlobalLock);
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setMessage_inlock(
                 "m/r: merge post processing", "M/R Merge Post Processing Progress", count);
@@ -706,8 +742,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
         BSONList values;
 
         {
-            const auto count =
-                _collectionCount(opCtx, _config.tempNamespace, callerHoldsGlobalLock);
+            const auto count = collectionCount(opCtx, _config.tempNamespace, callerHoldsGlobalLock);
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setMessage_inlock(
                 "m/r: reduce post processing", "M/R Reduce Post Processing Progress", count);
@@ -743,7 +778,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
         pm.finished();
     }
 
-    return _collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
+    return collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
 }
 
 /**
@@ -968,7 +1003,7 @@ void State::init() {
 void State::switchMode(bool jsMode) {
     _jsMode = jsMode;
     if (jsMode) {
-        // emit function that stays in JS
+        // Emit function that stays in JS
         _scope->setFunction("emit",
                             "function(key, value) {"
                             "  if (typeof(key) === 'object') {"
@@ -989,8 +1024,8 @@ void State::switchMode(bool jsMode) {
                             "}");
         _scope->injectNative("_bailFromJS", _bailFromJS, this);
     } else {
-        // emit now populates C++ map
-        _scope->injectNative("emit", fast_emit, this);
+        // Emit now populates C++ map
+        _scope->injectNative("emit", fastEmit, this);
     }
 }
 
@@ -1316,43 +1351,6 @@ void State::reduceAndSpillInMemoryStateIfNeeded() {
 }
 
 /**
- * emit that will be called by js function
- */
-BSONObj fast_emit(const BSONObj& args, void* data) {
-    uassert(10077, "fast_emit takes 2 args", args.nFields() == 2);
-    uassert(13069,
-            "an emit can't be more than half max bson size",
-            args.objsize() < (BSONObjMaxUserSize / 2));
-
-    State* state = (State*)data;
-    if (args.firstElement().type() == Undefined) {
-        BSONObjBuilder b(args.objsize());
-        b.appendNull("");
-        BSONObjIterator i(args);
-        i.next();
-        b.append(i.next());
-        state->emit(b.obj());
-    } else {
-        state->emit(args);
-    }
-    return BSONObj();
-}
-
-/**
- * function is called when we realize we cant use js mode for m/r on the 1st key
- */
-BSONObj _bailFromJS(const BSONObj& args, void* data) {
-    State* state = (State*)data;
-    state->bailFromJS();
-
-    // emit this particular key if there is one
-    if (!args.isEmpty()) {
-        fast_emit(args, data);
-    }
-    return BSONObj();
-}
-
-/**
  * This class represents a map/reduce command executed on a single server
  */
 class MapReduceCommand : public ErrmsgCommandDeprecated {
@@ -1441,7 +1439,7 @@ public:
             bool showTotal = true;
             if (state.config().filter.isEmpty()) {
                 const bool holdingGlobalLock = false;
-                const auto count = _collectionCount(opCtx, config.nss, holdingGlobalLock);
+                const auto count = collectionCount(opCtx, config.nss, holdingGlobalLock);
                 progressTotal =
                     (config.limit && static_cast<unsigned long long>(config.limit) < count)
                     ? config.limit

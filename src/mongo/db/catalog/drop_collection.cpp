@@ -56,10 +56,8 @@ Status dropCollection(OperationContext* opCtx,
         log() << "CMD: drop " << collectionName;
     }
 
-    const std::string dbname = collectionName.db().toString();
-
     return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
-        AutoGetDb autoDb(opCtx, dbname, MODE_X);
+        AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
         Database* const db = autoDb.getDb();
         Collection* coll = db ? db->getCollection(opCtx, collectionName) : nullptr;
         auto view =

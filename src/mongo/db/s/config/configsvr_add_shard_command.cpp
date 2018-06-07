@@ -92,19 +92,18 @@ public:
              const std::string& unusedDbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            uasserted(ErrorCodes::IllegalOperation,
-                      "_configsvrAddShard can only be run on config servers");
-        }
+        uassert(ErrorCodes::IllegalOperation,
+                "_configsvrAddShard can only be run on config servers",
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         // Do not allow adding shards while a featureCompatibilityVersion upgrade or downgrade is in
         // progress (see SERVER-31231 for details).
         invariant(!opCtx->lockState()->isLocked());
         Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
-
-        // Set the operation context read concern level to local for reads into the config database.
-        repl::ReadConcernArgs::get(opCtx) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         auto swParsedRequest = AddShardRequest::parseFromConfigCommand(cmdObj);
         uassertStatusOK(swParsedRequest.getStatus());
