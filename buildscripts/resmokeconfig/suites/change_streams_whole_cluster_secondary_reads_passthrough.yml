@@ -9,9 +9,6 @@ selector:
   - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
   # This test is not expected to work when run against a mongos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
-  # Not relevant for whole-cluster change streams.
-  - jstests/change_streams/metadata_notifications.js
-  - jstests/change_streams/whole_db_metadata_notifications.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the
@@ -37,6 +34,8 @@ selector:
   - assumes_read_preference_unchanged
   # Transactions not supported on sharded cluster.
   - uses_transactions
+  # Not relevant for whole-cluster change streams.
+  - do_not_run_in_whole_cluster_passthrough
 
 executor:
   archive:

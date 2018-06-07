@@ -119,14 +119,12 @@
         assertDropCollection(db.getSiblingDB(dbName), "test");
     });
 
-    // Dropping a database should generate drop entries for each collection followed by an
-    // invalidate.
-    // TODO SERVER-35029: This test should not invalidate the stream once there's support for
-    // returning a notification for the dropDatabase command.
+    // Dropping a database should generate drop entries for each collection followed by a database
+    // drop.
     assert.commandWorked(otherDB.dropDatabase());
     expected = [
         {operationType: "drop", ns: {db: otherDB.getName(), coll: "t2"}},
-        {operationType: "invalidate"}
+        {operationType: "dropDatabase", ns: {db: otherDB.getName()}},
     ];
 
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});

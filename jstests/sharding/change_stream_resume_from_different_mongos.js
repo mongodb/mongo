@@ -17,8 +17,8 @@
         rs: {nodes: 3, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
     });
 
-    for (let key of Object.keys(ChangeStreamTest.WatchMode)) {
-        const watchMode = ChangeStreamTest.WatchMode[key];
+    for (let key of Object.keys(ChangeStreamWatchMode)) {
+        const watchMode = ChangeStreamWatchMode[key];
         jsTestLog("Running test for mode " + watchMode);
 
         const s0DB = st.s0.getDB("test");

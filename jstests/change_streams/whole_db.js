@@ -1,4 +1,7 @@
 // Basic tests for $changeStream against all collections in a database.
+// Do not run in whole-cluster passthrough since this test assumes that the change stream will be
+// invalidated by a database drop.
+// @tags: [do_not_run_in_whole_cluster_passthrough]
 (function() {
     "use strict";
 
@@ -8,6 +11,7 @@
     load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
     db = db.getSiblingDB(jsTestName());
+    assert.commandWorked(db.dropDatabase());
 
     // Test that a single-database change stream cannot be opened on "admin", "config", or "local".
     assertInvalidChangeStreamNss("admin", 1);
@@ -62,20 +66,6 @@
         ];
         cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
     });
-
-    // Dropping the database should generate collection drop entries followed by an invalidate. Note
-    // that the order of collection drops is not guaranteed so only check the database name.
-    assert.commandWorked(db.dropDatabase());
-    let change = cst.getOneChange(cursor);
-    assert.eq(change.operationType, "drop", tojson(change));
-    assert.eq(change.ns.db, db.getName(), tojson(change));
-    change = cst.getOneChange(cursor);
-    assert.eq(change.operationType, "drop", tojson(change));
-    assert.eq(change.ns.db, db.getName(), tojson(change));
-
-    // TODO SERVER-35029: Expect to see a 'dropDatabase' entry before the invalidate.
-    change = cst.getOneChange(cursor, true);
-    assert.eq(change.operationType, "invalidate", tojson(change));
 
     cst.cleanUp();
 }());

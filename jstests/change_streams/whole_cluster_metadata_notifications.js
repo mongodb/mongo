@@ -31,7 +31,8 @@
         assert.writeOK(coll.remove({_id: 1}));
     }
 
-    // Drop the second database, which should invalidate the stream.
+    // Drop the second database, which should generate a 'drop' entry for the collection followed
+    // by a 'dropDatabase' entry.
     assert.commandWorked(testDB2.dropDatabase());
 
     // We should get 6 oplog entries; three ops of type insert, update, delete from each database.
@@ -50,10 +51,8 @@
         cursor: aggCursor,
         expectedChanges: [
             {operationType: "drop", ns: {db: testDB2.getName(), coll: db2Coll.getName()}},
-            // TODO SERVER-35029: Return an entry for a database drop, instead of "invalidate".
-            {operationType: "invalidate"}
+            {operationType: "dropDatabase", ns: {db: testDB2.getName()}},
         ],
-        expectInvalidate: true
     });
 
     // Test that a cluster-wide change stream can be resumed using a token from a collection which

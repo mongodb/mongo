@@ -17,8 +17,8 @@
 
     rst.initiate();
 
-    for (let key of Object.keys(ChangeStreamTest.WatchMode)) {
-        const watchMode = ChangeStreamTest.WatchMode[key];
+    for (let key of Object.keys(ChangeStreamWatchMode)) {
+        const watchMode = ChangeStreamWatchMode[key];
         jsTestLog("Running test for mode " + watchMode);
 
         const primary = rst.getPrimary();

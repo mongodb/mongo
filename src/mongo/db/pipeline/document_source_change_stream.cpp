@@ -36,6 +36,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -138,126 +139,6 @@ Value DocumentSourceOplogMatch::serialize(optional<ExplainOptions::Verbosity> ex
 DocumentSourceOplogMatch::DocumentSourceOplogMatch(BSONObj filter,
                                                    const intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSourceMatch(std::move(filter), expCtx) {}
-
-namespace {
-/**
- * This stage is used internally for change notifications to close cursor after returning
- * "invalidate" entries.
- * It is not intended to be created by the user.
- */
-class DocumentSourceCloseCursor final : public DocumentSource, public NeedsMergerDocumentSource {
-public:
-    GetNextResult getNext() final;
-
-    const char* getSourceName() const final {
-        // This is used in error reporting.
-        return "$changeStream";
-    }
-
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        // This stage should never be in the shards part of a split pipeline.
-        invariant(pipeState != Pipeline::SplitState::kSplitForShards);
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                (pipeState == Pipeline::SplitState::kUnsplit ? HostTypeRequirement::kNone
-                                                             : HostTypeRequirement::kMongoS),
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                ChangeStreamRequirement::kChangeStreamStage};
-    }
-
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        // This stage is created by the DocumentSourceChangeStream stage, so serializing it
-        // here would result in it being created twice.
-        return Value();
-    }
-
-    static boost::intrusive_ptr<DocumentSourceCloseCursor> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceCloseCursor(expCtx);
-    }
-
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return nullptr;
-    }
-
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
-        // This stage must run on mongos to ensure it sees any invalidation in the correct order,
-        // and to ensure that all remote cursors are cleaned up properly. We also must include a
-        // mergingPresorted $sort stage to communicate to the AsyncResultsMerger that we need to
-        // merge the streams in a particular order.
-        const bool mergingPresorted = true;
-        const long long noLimit = -1;
-        auto sortMergingPresorted =
-            DocumentSourceSort::create(pExpCtx,
-                                       change_stream_constants::kSortSpec,
-                                       noLimit,
-                                       DocumentSourceSort::kMaxMemoryUsageBytes,
-                                       mergingPresorted);
-        return {sortMergingPresorted, this};
-    }
-
-private:
-    /**
-     * Use the create static method to create a DocumentSourceCloseCursor.
-     */
-    DocumentSourceCloseCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(expCtx) {}
-
-    bool _shouldCloseCursor = false;
-    boost::optional<Document> _queuedInvalidate;
-};
-
-DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
-    pExpCtx->checkForInterrupt();
-
-    // Close cursor if we have returned an invalidate entry.
-    if (_shouldCloseCursor) {
-        uasserted(ErrorCodes::CloseChangeStream, "Change stream has been invalidated");
-    }
-
-    if (_queuedInvalidate) {
-        _shouldCloseCursor = true;
-        return DocumentSource::GetNextResult(std::move(_queuedInvalidate.get()));
-    }
-
-    auto nextInput = pSource->getNext();
-    if (!nextInput.isAdvanced())
-        return nextInput;
-
-    auto doc = nextInput.getDocument();
-    const auto& kOperationTypeField = DocumentSourceChangeStream::kOperationTypeField;
-    DocumentSourceChangeStream::checkValueType(
-        doc[kOperationTypeField], kOperationTypeField, BSONType::String);
-    auto operationType = doc[kOperationTypeField].getString();
-    if (operationType == DocumentSourceChangeStream::kInvalidateOpType) {
-        // Pass the invalidation forward, so that it can be included in the results, or
-        // filtered/transformed by further stages in the pipeline, then throw an exception
-        // to close the cursor on the next call to getNext().
-        _shouldCloseCursor = true;
-    }
-
-    // Check if this is an invalidating command and the next entry should be an "invalidate".
-    // TODO SERVER-35029: For whole-db change streams, only a database drop will invalidate the
-    // stream.
-    const auto invalidatingCommand = pExpCtx->isSingleNamespaceAggregation()
-        ? (operationType == DocumentSourceChangeStream::kDropCollectionOpType ||
-           operationType == DocumentSourceChangeStream::kRenameCollectionOpType)
-        : false;
-
-    if (invalidatingCommand) {
-        _queuedInvalidate = Document{
-            {DocumentSourceChangeStream::kIdField, doc[DocumentSourceChangeStream::kIdField]},
-            {DocumentSourceChangeStream::kClusterTimeField,
-             doc[DocumentSourceChangeStream::kClusterTimeField]},
-            {DocumentSourceChangeStream::kOperationTypeField, "invalidate"_sd}};
-    }
-
-    return nextInput;
-}
-
-}  // namespace
 
 void DocumentSourceChangeStream::checkValueType(const Value v,
                                                 const StringData filedName,
@@ -408,9 +289,11 @@ namespace {
  *      * The request is 'collectionless', meaning it's a change stream on a whole database or a
  *        whole cluster. Unlike individual collections, there is no concept of a default collation
  *        at the level of an entire database or cluster.
- *      * A collection with 'uuid' still exists, and we can figure out its default collation.
+ *      * The resume token contains a UUID and a collection with that UUID still exists, thus we can
+ *        figure out its default collation.
  */
-void assertResumeAllowed(const intrusive_ptr<ExpressionContext>& expCtx, CollectionUUID uuid) {
+void assertResumeAllowed(const intrusive_ptr<ExpressionContext>& expCtx,
+                         ResumeTokenData tokenData) {
     if (!expCtx->collation.isEmpty()) {
         // Explicit collation has been set, it's okay to resume.
         return;
@@ -432,7 +315,7 @@ void assertResumeAllowed(const intrusive_ptr<ExpressionContext>& expCtx, Collect
     // collection.
     uassert(ErrorCodes::InvalidResumeToken,
             cannotResumeErrMsg,
-            expCtx->uuid && expCtx->uuid.get() == uuid);
+            expCtx->uuid && tokenData.uuid && expCtx->uuid.get() == tokenData.uuid.get());
 }
 
 /**
@@ -457,13 +340,10 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
     if (auto resumeAfter = spec.getResumeAfter()) {
         ResumeToken token = resumeAfter.get();
         ResumeTokenData tokenData = token.getData();
-        uassert(40645,
-                "The resume token is invalid (no UUID), possibly from an invalidate.",
-                tokenData.uuid);
 
         // Verify that the requested resume attempt is possible based on the stream type, resume
         // token UUID, and collation.
-        assertResumeAllowed(expCtx, tokenData.uuid.get());
+        assertResumeAllowed(expCtx, tokenData);
 
         *startFromOut = tokenData.clusterTime;
         if (expCtx->needsMerge) {

@@ -47,6 +47,10 @@ ChangeStreamPassthroughHelpers.changeStreamSpec = function() {
     return {allChangesForCluster: true};
 };
 
+ChangeStreamPassthroughHelpers.passthroughType = function() {
+    return ChangeStreamWatchMode.kCluster;
+};
+
 // Redirect the DB's 'watch' function to use the cluster-wide version. The Collection.watch helper
 // has already been overridden to use DB.watch when we loaded 'implicit_whole_db_changestreams.js',
 // so this ensures that both the Collection and DB helpers will actually call the Mongo function.

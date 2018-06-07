@@ -99,6 +99,9 @@ const ChangeStreamPassthroughHelpers = {
     },
     upconvertGetMoreRequest: function(db, cmdObj) {
         return [this.execDBName(db), Object.assign({}, cmdObj, {collection: "$cmd.aggregate"})];
+    },
+    passthroughType: function() {
+        return ChangeStreamWatchMode.kDb;
     }
 };
 

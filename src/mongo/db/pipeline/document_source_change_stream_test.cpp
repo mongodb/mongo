@@ -128,6 +128,7 @@ public:
 
         if (expectedInvalidate) {
             next = closeCursor->getNext();
+            ASSERT_TRUE(next.isAdvanced());
             ASSERT_DOCUMENT_EQ(next.releaseDocument(), *expectedInvalidate);
             // Then throw an exception on the next call of getNext().
             ASSERT_THROWS(closeCursor->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
@@ -676,6 +677,11 @@ TEST_F(ChangeStreamStageTest, TransformRenameTarget) {
     checkTransformation(rename, expectedRename, {}, kDefaultSpec, expectedInvalidate);
 }
 
+TEST_F(ChangeStreamStageTest, MatchFiltersDropDatabaseCommand) {
+    OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
+    checkTransformation(dropDB, boost::none);
+}
+
 TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
     auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
     auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,
@@ -1052,7 +1058,7 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {
     // the expectation is for the $changeStream stage to infer the shard key from the resume token.
     checkTransformation(insertEntry,
                         expectedInsert,
-                        {},
+                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
                         BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
@@ -1088,20 +1094,26 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPres
     };
     checkTransformation(insertEntry,
                         expectedInsert,
-                        {},
+                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
                         BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
-TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyIfResumeTokenDoesntContainUUID) {
-    auto resumeToken = makeResumeToken(Timestamp(3, 45));
+TEST_F(ChangeStreamStageTest, ResumeAfterFailsIfResumeTokenDoesNotContainUUID) {
+    const Timestamp ts(3, 45);
+    const auto uuid = testUuid();
 
-    // TODO SERVER-34710: Allow resuming from an "invalidate" will change this behavior.
+    Collection collection(stdx::make_unique<CollectionMock>(nss));
+    UUIDCatalog::get(getExpCtx()->opCtx).onCreateCollection(getExpCtx()->opCtx, &collection, uuid);
+
+    // Create a resume token from only the timestamp.
+    auto resumeToken = makeResumeToken(ts);
+
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(
             BSON(DSChangeStream::kStageName << BSON("resumeAfter" << resumeToken)).firstElement(),
             getExpCtx()),
         AssertionException,
-        40645);
+        ErrorCodes::InvalidResumeToken);
 }
 
 TEST_F(ChangeStreamStageTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
@@ -1370,17 +1382,22 @@ TEST_F(ChangeStreamStageDBTest, TransformRename) {
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
-    bool dropDBFromMigrate = false;  // verify this doesn't get it filtered
-    OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, dropDBFromMigrate);
+    OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
 
-    // TODO SERVER-35029: Add notification for DB drop followed by invalidate.
-    // Drop database invalidate entry doesn't have a UUID.
-    Document expectedInvalidateDropDatabase{
+    // Drop database entry doesn't have a UUID.
+    Document expectedDropDatabase{
         {DSChangeStream::kIdField, makeResumeToken(kDefaultTs)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDropDatabaseOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
     };
-    checkTransformation(dropDB, expectedInvalidateDropDatabase);
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs)},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+    };
+
+    checkTransformation(dropDB, expectedDropDatabase, {}, kDefaultSpec, expectedInvalidate);
 }
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
@@ -1482,7 +1499,7 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldIncludeShardKeyFromResumeToken)
     };
     checkTransformation(insertEntry,
                         expectedInsert,
-                        {},
+                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
                         BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
@@ -1518,20 +1535,45 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyFieldsIfNotPr
     };
     checkTransformation(insertEntry,
                         expectedInsert,
-                        {},
+                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
                         BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
 TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyIfResumeTokenDoesntContainUUID) {
-    auto resumeToken = makeResumeToken(Timestamp(3, 45));
+    const Timestamp ts(3, 45);
+    const long long term = 4;
+    const auto opTime = repl::OpTime(ts, term);
+    const auto uuid = testUuid();
 
-    // TODO SERVER-34710: Allow resuming from an "invalidate" will change this behavior.
-    ASSERT_THROWS_CODE(
-        DSChangeStream::createFromBson(
-            BSON(DSChangeStream::kStageName << BSON("resumeAfter" << resumeToken)).firstElement(),
-            getExpCtx()),
-        AssertionException,
-        40645);
+    Collection collection(stdx::make_unique<CollectionMock>(nss));
+    UUIDCatalog::get(getExpCtx()->opCtx).onCreateCollection(getExpCtx()->opCtx, &collection, uuid);
+
+    // Create a resume token from only the timestamp.
+    auto resumeToken = makeResumeToken(ts);
+
+    // Insert oplog entry contains shardKey, however we are not able to extract the shard key from
+    // the resume token.
+    BSONObj insertDoc = BSON("_id" << 2 << "shardKey" << 3);
+    auto insertEntry = makeOplogEntry(OpTypeEnum::kInsert,  // op type
+                                      nss,                  // namespace
+                                      insertDoc,            // o
+                                      uuid,                 // uuid
+                                      boost::none,          // fromMigrate
+                                      boost::none,          // o2
+                                      opTime);              // opTime
+
+    Document expectedInsert{
+        {DSChangeStream::kIdField, makeResumeToken(ts, uuid, BSON("_id" << 2))},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kClusterTimeField, ts},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
+    };
+    checkTransformation(insertEntry,
+                        expectedInsert,
+                        {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
+                        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)));
 }
 
 }  // namespace

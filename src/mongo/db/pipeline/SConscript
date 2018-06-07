@@ -270,6 +270,7 @@ pipelineeEnv.Library(
         'document_source_bucket.cpp',
         'document_source_bucket_auto.cpp',
         'document_source_change_stream.cpp',
+        'document_source_change_stream_close_cursor.cpp',
         'document_source_change_stream_transform.cpp',
         'document_source_check_resume_token.cpp',
         'document_source_coll_stats.cpp',

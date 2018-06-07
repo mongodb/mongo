@@ -1,4 +1,7 @@
 // Tests of metadata notifications for a $changeStream on a whole database.
+// Do not run in whole-cluster passthrough since this test assumes that the change stream will be
+// invalidated by a database drop.
+// @tags: [do_not_run_in_whole_cluster_passthrough]
 (function() {
     "use strict";
 
@@ -159,6 +162,15 @@
         assert.eq(0, cst.getNextBatch(aggCursor).nextBatch.length);
         assert.writeOK(coll.insert({_id: 2}));
         assert.eq(cst.getOneChange(aggCursor).operationType, "insert");
+
+        // Drop the new collection to avoid an additional 'drop' notification when the database is
+        // dropped.
+        assertDropCollection(testDB, "renamed_coll");
+        cst.assertNextChangesEqual({
+            cursor: aggCursor,
+            expectedChanges:
+                [{operationType: "drop", ns: {db: testDB.getName(), coll: "renamed_coll"}}],
+        });
     }
 
     // Dropping a collection should return a 'drop' entry.
@@ -228,6 +240,23 @@
     // Drop the "system.views" collection to avoid view catalog errors in subsequent tests.
     assertDropCollection(testDB, "system.views");
     assertDropCollection(testDB, "non_system_collection");
+    cst.assertNextChangesEqual({
+        cursor: aggCursor,
+        expectedChanges: [
+            {operationType: "drop", ns: {db: testDB.getName(), coll: "non_system_collection"}},
+        ]
+    });
+
+    // Dropping the database should generate a 'dropDatabase' notification followed by an
+    // 'invalidate'.
+    assert.commandWorked(testDB.dropDatabase());
+    cst.assertNextChangesEqual({
+        cursor: aggCursor,
+        expectedChanges: [
+            {operationType: "dropDatabase", ns: {db: testDB.getName()}},
+            {operationType: "invalidate"}
+        ]
+    });
 
     cst.cleanUp();
 }());
