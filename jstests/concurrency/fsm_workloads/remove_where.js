@@ -6,6 +6,11 @@
  * Bulk inserts documents in batches of 100. Randomly selects ~1/10th of existing documents created
  * by the thread and removes them. Queries by the thread that created the documents to verify
  * counts.
+ *
+ * When the balancer is enabled, the nRemoved result may be inaccurate as
+ * a chunk migration may be active, causing the count function to assert.
+ *
+ * @tags: [assumes_balancer_off]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
@@ -36,15 +41,6 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.setup = function setup(db, collName, cluster) {
         /* no-op to prevent index from being created */
-    };
-
-    $config.skip = function skip(cluster) {
-        // When the balancer is enabled, the nRemoved result may be inaccurate as
-        // a chunk migration may be active, causing the count function to assert.
-        if (cluster.isBalancerEnabled()) {
-            return {skip: true, msg: 'does not run when balancer is enabled.'};
-        }
-        return {skip: false};
     };
 
     return $config;

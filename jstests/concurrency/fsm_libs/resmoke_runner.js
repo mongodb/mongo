@@ -8,7 +8,6 @@
     const prepareCollections = runner.internals.prepareCollections;
     const WorkloadFailure = runner.internals.WorkloadFailure;
     const throwError = runner.internals.throwError;
-    const shouldSkipWorkload = runner.internals.shouldSkipWorkload;
     const setupWorkload = runner.internals.setupWorkload;
     const teardownWorkload = runner.internals.teardownWorkload;
     const setIterations = runner.internals.setIterations;
@@ -73,11 +72,6 @@
 
         cluster.setup();
 
-        // Filter out workloads that need to be skipped.
-        //
-        // TODO SERVER-30001: Replace usages of $config.skip() functions with excluding files in the
-        // resmoke.py YAML suite by name or by tag.
-        workloads = workloads.filter(workload => !shouldSkipWorkload(workload, context, cluster));
         jsTest.log('Workload(s) started: ' + workloads.join(' '));
 
         prepareCollections(workloads, context, cluster, clusterOptions, executionOptions);

@@ -3,6 +3,8 @@
 /**
  * Stress tests writes to config.databases while continuously running setFCV to ensure that the
  * config.databases schema always matches the FCV.
+ *
+ * @tags: [requires_sharding]
  */
 var $config = (function() {
 
@@ -125,13 +127,6 @@ var $config = (function() {
         assertAlways.commandWorked(db.adminCommand({flushRouterConfig: 1}));
     }
 
-    function skip(cluster) {
-        if (!cluster.isSharded()) {
-            return {skip: true, msg: 'only runs in a sharded cluster'};
-        }
-        return {skip: false};
-    }
-
     // This test performs sharding catalog operations (which take distributed locks) concurrently
     // from many threads. Since a distributed lock is acquired by repeatedly attempting to grab the
     // lock every half second for 20 seconds (a max of 40 attempts), it's possible that some thread
@@ -148,7 +143,6 @@ var $config = (function() {
         transitions: transitions,
         setup: setup,
         teardown: teardown,
-        skip: skip,
     };
 
 })();

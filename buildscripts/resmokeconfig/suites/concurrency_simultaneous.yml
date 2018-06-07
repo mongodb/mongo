@@ -12,6 +12,10 @@ selector:
   # These workloads uses >100MB of data, which can overwhelm test hosts.
   - jstests/concurrency/fsm_workloads/agg_group_external.js
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
+  exclude_with_any_tags:
+  - uses_transactions
+  - requires_replication
+  - requires_sharding
   group_size: 10
   group_count_multiplier: 2.5
 

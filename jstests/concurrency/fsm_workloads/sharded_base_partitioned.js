@@ -17,6 +17,8 @@
  *   ---)[--)[----)[---) | [---)[---)[----)[-)[) | [-------)[-)[--------
  *
  *                         <===t2's partition==>
+ *
+ * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
@@ -177,16 +179,6 @@ var $config = (function() {
 
     };
 
-    var skip = function skip(cluster) {
-        if (!cluster.isSharded() || cluster.isAutoSplitEnabled() || cluster.isBalancerEnabled()) {
-            return {
-                skip: true,
-                msg: 'only runs in a sharded cluster with autoSplit & balancer disabled.'
-            };
-        }
-        return {skip: false};
-    };
-
     return {
         threadCount: 1,
         iterations: 1,
@@ -195,7 +187,6 @@ var $config = (function() {
         transitions: transitions,
         data: data,
         setup: setup,
-        skip: skip,
         passConnectionCache: true
     };
 })();

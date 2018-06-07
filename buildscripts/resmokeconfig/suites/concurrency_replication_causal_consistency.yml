@@ -22,6 +22,7 @@ selector:
   - requires_collstats
   - requires_dbstats
   - requires_datasize
+  - requires_sharding
 
 executor:
   archive:

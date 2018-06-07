@@ -101,15 +101,6 @@ var $config = (function() {
         checkMoneyBalance: {transferMoney: 1}
     };
 
-    var skip = function skip(cluster) {
-        // TODO(SERVER-34570) remove isSharded() check once transactions are supported in sharded
-        // environments.
-        if (cluster.isSharded() || cluster.isStandalone()) {
-            return {skip: true, msg: 'only runs in a replica set.'};
-        }
-        return {skip: false};
-    };
-
     return {
         threadCount: 10,
         iterations: 100,
@@ -118,7 +109,6 @@ var $config = (function() {
         transitions: transitions,
         data: {numAccounts: 20, initialValue: 2000},
         setup: setup,
-        skip: skip,
         teardown: teardown
     };
 

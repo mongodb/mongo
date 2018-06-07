@@ -131,15 +131,6 @@ var $config = (function() {
         listDatabasesNameOnly: {init: 0.75, listDatabases: 0.10, listDatabasesNameOnly: 0.15},
     };
 
-    // TODO SERVER-27831: Remove this skip function after the deadlock when listing the collections
-    // of the "local" database is fixed.
-    var skip = function skip(cluster) {
-        if (isEphemeralForTest(cluster.getDB("test"))) {
-            return {skip: true, msg: 'does not run with ephemeralForTest storage.'};
-        }
-        return {skip: false};
-    };
-
     return {
         data,
         // We only run a few iterations to reduce the amount of data cumulatively
@@ -150,6 +141,5 @@ var $config = (function() {
         // test hosts.
         threadCount: 10,
         iterations: 120, states, transitions,
-        skip: skip,
     };
 })();

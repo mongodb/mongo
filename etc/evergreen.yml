@@ -7229,7 +7229,7 @@ buildvariants:
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --wiredTigerEngineConfig=mmap=false --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --wiredTigerEngineConfig=mmap=false --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=requires_mmapv1,uses_transactions,does_not_support_wiredtiger_lsm
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
