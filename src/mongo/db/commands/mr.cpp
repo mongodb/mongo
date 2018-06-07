@@ -304,12 +304,20 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
         shardedFirstPass = true;
     }
 
-    if (outputOptions.outType != INMEMORY) {  // setup temp collection name
-        tempNamespace = NamespaceString(
-            outputOptions.outDB.empty() ? dbname : outputOptions.outDB,
-            str::stream() << "tmp.mr." << cmdObj.firstElement().valueStringData() << "_"
-                          << JOB_NUMBER.fetchAndAdd(1));
-        incLong = NamespaceString(str::stream() << tempNamespace.ns() << "_inc");
+    if (outputOptions.outType != INMEMORY) {
+        // Create names for the temp collection and the incremental collection. The incremental
+        // collection goes in the "local" database, so that it doesn't get replicated.
+        const std::string& outDBName = outputOptions.outDB.empty() ? dbname : outputOptions.outDB;
+        const std::string tmpCollDesc = str::stream()
+            << "tmp.mr." << cmdObj.firstElement().valueStringData() << "_"
+            << JOB_NUMBER.fetchAndAdd(1);
+        tempNamespace = NamespaceString(outDBName, tmpCollDesc);
+
+        // The name of the incremental collection includes the name of the database that we put
+        // temporary collection in, to make it easier to see which incremental database is paired
+        // with which temporary database when debugging.
+        incLong =
+            NamespaceString("local", str::stream() << tmpCollDesc << "_" << outDBName << "_inc");
     }
 
     {
@@ -387,10 +395,6 @@ void State::dropTempCollections() {
         ShardConnection::forgetNS(_config.tempNamespace.ns());
     }
     if (_useIncremental && !_config.incLong.isEmpty()) {
-        // We don't want to log the deletion of incLong as it isn't replicated. While
-        // harmless, this would lead to a scary looking warning on the secondaries.
-        repl::UnreplicatedWritesBlock uwb(_opCtx);
-
         writeConflictRetry(_opCtx, "M/R dropTempCollections", _config.incLong.ns(), [this] {
             Lock::DBLock lk(_opCtx, _config.incLong.db(), MODE_X);
             if (Database* db =
@@ -414,10 +418,8 @@ void State::prepTempCollection() {
 
     dropTempCollections();
     if (_useIncremental) {
-        // Create the inc collection and make sure we have index on "0" key.
-        // Intentionally not replicating the inc collection to secondaries.
-        repl::UnreplicatedWritesBlock uwb(_opCtx);
-
+        // Create the inc collection and make sure we have index on "0" key. The inc collection is
+        // in the "local" database, so it does not get replicated to secondaries.
         writeConflictRetry(_opCtx, "M/R prepTempCollection", _config.incLong.ns(), [this] {
             OldClientWriteContext incCtx(_opCtx, _config.incLong.ns());
             WriteUnitOfWork wuow(_opCtx);
@@ -783,7 +785,8 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
 }
 
 /**
- * Insert doc into the inc collection. This should not be replicated.
+ * Insert doc into the inc collection. The inc collection is in the "local" database, so this insert
+ * will not be replicated.
  */
 void State::_insertToInc(BSONObj& o) {
     verify(_onDisk);
@@ -792,7 +795,6 @@ void State::_insertToInc(BSONObj& o) {
         OldClientWriteContext ctx(_opCtx, _config.incLong.ns());
         WriteUnitOfWork wuow(_opCtx);
         Collection* coll = getCollectionOrUassert(_opCtx, ctx.db(), _config.incLong);
-        repl::UnreplicatedWritesBlock uwb(_opCtx);
 
         // The documents inserted into the incremental collection are of the form
         // {"0": <key>, "1": <value>}, so we cannot call fixDocumentForInsert(o) here because the
@@ -1880,5 +1882,5 @@ public:
 
 } mapReduceFinishCommand;
 
-}  // namespace
+}  // namespace mr
 }  // namespace mongo
