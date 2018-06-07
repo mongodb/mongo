@@ -577,7 +577,8 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
     ASSERT_THROWS(session.checkStatementExecuted(opCtx(), txnNum, 2), AssertionException);
 }
 
-// Test that transaction operations will abort if locks cannot be taken immediately.
+// Test that transaction lock acquisition times out in `maxTransactionLockRequestTimeoutMillis`
+// milliseconds.
 TEST_F(SessionTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
     const std::string dbName = "TestDB";
 
@@ -622,8 +623,12 @@ TEST_F(SessionTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
     newSession.beginOrContinueTxn(newOpCtx.get(), newTxnNum, false, true, "testDB", "insert");
     newSession.unstashTransactionResources(newOpCtx.get(), "insert");
 
+    Date_t t1 = Date_t::now();
     ASSERT_THROWS_CODE(
         Lock::DBLock(newOpCtx.get(), dbName, MODE_X), AssertionException, ErrorCodes::LockTimeout);
+    Date_t t2 = Date_t::now();
+    int defaultMaxTransactionLockRequestTimeoutMillis = 5;
+    ASSERT_GTE(t2 - t1, Milliseconds(defaultMaxTransactionLockRequestTimeoutMillis));
 
     // A non-conflicting lock acquisition should work just fine.
     { Lock::DBLock(newOpCtx.get(), "NewTestDB", MODE_X); }

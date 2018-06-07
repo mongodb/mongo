@@ -9,7 +9,7 @@
     testNumericServerParameter("maxTransactionLockRequestTimeoutMillis",
                                true /*isStartupParameter*/,
                                true /*isRuntimeParameter*/,
-                               0 /*defaultValue*/,
+                               5 /*defaultValue*/,
                                30 /*nonDefaultValidValue*/,
                                false /*hasLowerBound*/,
                                "unused" /*lowerOutOfBounds*/,
