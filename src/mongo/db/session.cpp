@@ -65,11 +65,9 @@ namespace mongo {
 // maxTransactionLockRequestTimeoutMillis will override it. If this is set to a negative value, it
 // is inactive and nothing will be overridden.
 //
-// The default of 0 milliseconds will ensure that transaction operations will immediately give up
-// trying to take any lock if it is not immediately available. This prevents deadlocks between
-// transactions. Setting a non-zero, positive value will also help obviate deadlocks, but won't
-// abort a deadlocked transaction operation to eliminate the deadlock for however long has been set.
-MONGO_EXPORT_SERVER_PARAMETER(maxTransactionLockRequestTimeoutMillis, int, 0);
+// 5 milliseconds will help avoid deadlocks, but will still allow fast-running metadata operations
+// to run without aborting transactions.
+MONGO_EXPORT_SERVER_PARAMETER(maxTransactionLockRequestTimeoutMillis, int, 5);
 
 Session::CursorExistsFunction Session::_cursorExistsFunction;
 
