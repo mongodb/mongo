@@ -65,7 +65,24 @@
     DB.prototype.getCollection = function() {
         var collection = originalGetCollection.apply(this, arguments);
 
-        const collStats = this.runCommand({collStats: collection.getName()});
+        // The following "collStats" command can behave unexpectedly when running in a causal
+        // consistency suite with secondary read preference. "collStats" does not support causal
+        // consistency, making it possible to see a stale view of the collection if run on a
+        // secondary, potentially causing shardCollection() to be called when it shouldn't.
+        // E.g. if the collection has just been sharded but not yet visible on the
+        // secondary, we could end up calling shardCollection on it again, which would fail.
+        //
+        // The workaround is to use a TestData flag to temporarily bypass the read preference
+        // override.
+        const testDataDoNotOverrideReadPreferenceOriginal = TestData.doNotOverrideReadPreference;
+        let collStats;
+
+        try {
+            TestData.doNotOverrideReadPreference = true;
+            collStats = this.runCommand({collStats: collection.getName()});
+        } finally {
+            TestData.doNotOverrideReadPreference = testDataDoNotOverrideReadPreferenceOriginal;
+        }
 
         // If the collection is already sharded or is non-empty, do not attempt to shard.
         if (collStats.sharded || collStats.count > 0) {
