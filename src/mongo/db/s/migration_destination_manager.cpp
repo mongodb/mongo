@@ -637,16 +637,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         // then upgrade it to X mode while creating the collection and indexes, but there is no way
         // to upgrade a DBLock once it's taken without releasing it, so we pre-emptively take it in
         // mode X.
-        Lock::DBLock lk(opCtx, _nss.db(), MODE_X);
+        AutoGetOrCreateDb autoCreateDb(opCtx, _nss.db(), MODE_X);
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Unable to start migration for " << _nss.ns()
+                              << " because the node is not primary",
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, _nss));
 
-        OldClientWriteContext ctx(opCtx, _nss.ns());
-        if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, _nss)) {
-            _setStateFailWarn(str::stream() << "Not primary during migration: " << _nss.ns()
-                                            << ": checking if collection exists");
-            return;
-        }
+        Database* const db = autoCreateDb.getDb();
 
-        Database* const db = ctx.db();
         Collection* collection = db->getCollection(opCtx, _nss);
         if (collection) {
             // We have an entry for a collection by this name. Check that our collection's UUID
@@ -656,39 +654,34 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                 donorUUID.emplace(UUID::parse(donorOptions));
             }
 
-            if (collection->uuid() != donorUUID) {
-                _setStateFailWarn(
+            uassert(ErrorCodes::InvalidUUID,
                     str::stream()
-                    << "Cannot receive chunk "
-                    << redact(ChunkRange(min, max).toString())
-                    << " for collection "
-                    << _nss.ns()
-                    << " because we already have an identically named collection with UUID "
-                    << (collection->uuid() ? collection->uuid()->toString() : "(none)")
-                    << ", which differs from the donor's UUID "
-                    << (donorUUID ? donorUUID->toString() : "(none)")
-                    << ". Manually drop the collection on this shard if it contains data from a "
-                       "previous incarnation of "
-                    << _nss.ns());
-                return;
-            }
+                        << "Cannot receive chunk "
+                        << ChunkRange(min, max).toString()
+                        << " for collection "
+                        << _nss.ns()
+                        << " because we already have an identically named collection with UUID "
+                        << (collection->uuid() ? collection->uuid()->toString() : "(none)")
+                        << ", which differs from the donor's UUID "
+                        << (donorUUID ? donorUUID->toString() : "(none)")
+                        << ". Manually drop the collection on this shard if it contains data from "
+                           "a previous incarnation of "
+                        << _nss.ns(),
+                    collection->uuid() == donorUUID);
         } else {
             // We do not have a collection by this name. Create the collection with the donor's
             // options.
             WriteUnitOfWork wuow(opCtx);
             const bool createDefaultIndexes = true;
-            Status status = Database::userCreateNS(opCtx,
+            uassertStatusOK(Database::userCreateNS(opCtx,
                                                    db,
                                                    _nss.ns(),
                                                    donorOptions,
                                                    CollectionOptions::parseForStorage,
                                                    createDefaultIndexes,
-                                                   donorIdIndexSpec);
-            if (!status.isOK()) {
-                warning() << "failed to create collection [" << _nss << "] "
-                          << " with options " << donorOptions << ": " << redact(status);
-            }
+                                                   donorIdIndexSpec));
             wuow.commit();
+
             collection = db->getCollection(opCtx, _nss);
         }
 
@@ -775,14 +768,19 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
                 BSONObj docToClone = docs.next().Obj();
                 {
-                    OldClientWriteContext cx(opCtx, _nss.ns());
+                    AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+                    uassert(ErrorCodes::ConflictingOperationInProgress,
+                            str::stream() << "Collection " << _nss.ns()
+                                          << " was dropped in the middle of the migration",
+                            autoColl.getCollection());
+
                     BSONObj localDoc;
                     if (willOverrideLocalId(opCtx,
                                             _nss,
                                             min,
                                             max,
                                             shardKeyPattern,
-                                            cx.db(),
+                                            autoColl.getDb(),
                                             docToClone,
                                             &localDoc)) {
                         const std::string errMsg = str::stream()
@@ -1003,27 +1001,30 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                                                   const BSONObj& shardKeyPattern,
                                                   const BSONObj& xfer,
                                                   repl::OpTime* lastOpApplied) {
-    repl::OpTime dummy;
-    if (lastOpApplied == NULL) {
-        lastOpApplied = &dummy;
-    }
+    invariant(lastOpApplied);
 
     bool didAnything = false;
 
+    // Deleted documents
     if (xfer["deleted"].isABSONObj()) {
-        Lock::DBLock dlk(opCtx, nss.db(), MODE_IX);
-        Helpers::RemoveSaver rs("moveChunk", nss.ns(), "removedDuring");
+        boost::optional<Helpers::RemoveSaver> rs;
+        if (serverGlobalParams.moveParanoia) {
+            rs.emplace("moveChunk", nss.ns(), "removedDuring");
+        }
 
-        BSONObjIterator i(xfer["deleted"].Obj());  // deleted documents
+        BSONObjIterator i(xfer["deleted"].Obj());
         while (i.more()) {
-            Lock::CollectionLock clk(opCtx->lockState(), nss.ns(), MODE_X);
-            OldClientContext ctx(opCtx, nss.ns());
+            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream() << "Collection " << _nss.ns()
+                                  << " was dropped in the middle of the migration",
+                    autoColl.getCollection());
 
             BSONObj id = i.next().Obj();
 
-            // do not apply delete if doc does not belong to the chunk being migrated
+            // Do not apply delete if doc does not belong to the chunk being migrated
             BSONObj fullObj;
-            if (Helpers::findById(opCtx, ctx.db(), nss.ns(), id, fullObj)) {
+            if (Helpers::findById(opCtx, autoColl.getDb(), nss.ns(), id, fullObj)) {
                 if (!isInRange(fullObj, min, max, shardKeyPattern)) {
                     if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
                         MONGO_UNREACHABLE;
@@ -1032,12 +1033,12 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                 }
             }
 
-            if (serverGlobalParams.moveParanoia) {
-                rs.goingToDelete(fullObj).transitional_ignore();
+            if (rs) {
+                uassertStatusOK(rs->goingToDelete(fullObj));
             }
 
             deleteObjects(opCtx,
-                          ctx.db() ? ctx.db()->getCollection(opCtx, nss) : nullptr,
+                          autoColl.getCollection(),
                           nss,
                           id,
                           true /* justOne */,
@@ -1049,10 +1050,15 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
         }
     }
 
-    if (xfer["reload"].isABSONObj()) {  // modified documents (insert/update)
+    // Inserted or updated documents
+    if (xfer["reload"].isABSONObj()) {
         BSONObjIterator i(xfer["reload"].Obj());
         while (i.more()) {
-            OldClientWriteContext cx(opCtx, nss.ns());
+            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream() << "Collection " << _nss.ns()
+                                  << " was dropped in the middle of the migration",
+                    autoColl.getCollection());
 
             BSONObj updatedDoc = i.next().Obj();
 
@@ -1065,8 +1071,14 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             }
 
             BSONObj localDoc;
-            if (willOverrideLocalId(
-                    opCtx, nss, min, max, shardKeyPattern, cx.db(), updatedDoc, &localDoc)) {
+            if (willOverrideLocalId(opCtx,
+                                    nss,
+                                    min,
+                                    max,
+                                    shardKeyPattern,
+                                    autoColl.getDb(),
+                                    updatedDoc,
+                                    &localDoc)) {
                 const std::string errMsg = str::stream()
                     << "cannot migrate chunk, local document " << redact(localDoc)
                     << " has same _id as reloaded remote document " << redact(updatedDoc);
