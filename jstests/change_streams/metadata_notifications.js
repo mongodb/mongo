@@ -1,4 +1,7 @@
 // Tests of $changeStream notifications for metadata operations.
+// Do not run in whole-cluster passthrough since this test assumes that the change stream will be
+// invalidated by a database drop.
+// @tags: [do_not_run_in_whole_cluster_passthrough]
 (function() {
     "use strict";
 
@@ -24,6 +27,13 @@
     // We explicitly test getMore, to ensure that the getMore command for a non-existent collection
     // does not return an error.
     let change = cst.getNextBatch(cursor);
+    assert.neq(change.id, 0);
+    assert.eq(change.nextBatch.length, 0, tojson(change.nextBatch));
+
+    // Dropping the empty database should not generate any notification for the change stream, since
+    // the collection does not exist yet.
+    assert.commandWorked(db.dropDatabase());
+    change = cst.getNextBatch(cursor);
     assert.neq(change.id, 0);
     assert.eq(change.nextBatch.length, 0, tojson(change.nextBatch));
 

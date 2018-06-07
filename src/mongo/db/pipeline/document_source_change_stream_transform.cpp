@@ -91,10 +91,7 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
         ResumeToken token = resumeAfter.get();
         ResumeTokenData tokenData = token.getData();
 
-        // TODO SERVER-34710: Resuming from an "invalidate" means that the resume token may not
-        // always contain a UUID.
-        invariant(tokenData.uuid);
-        if (!tokenData.documentKey.missing()) {
+        if (!tokenData.documentKey.missing() && tokenData.uuid) {
             std::vector<FieldPath> docKeyFields;
             auto docKey = tokenData.documentKey.getDocument();
 
@@ -309,6 +306,12 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 doc.addField(DocumentSourceChangeStream::kRenameTargetNssField,
                              Value(Document{{"db", renameTargetNss.db()},
                                             {"coll", renameTargetNss.coll()}}));
+            } else if (!input.getNestedField("o.dropDatabase").missing()) {
+                operationType = DocumentSourceChangeStream::kDropDatabaseOpType;
+
+                // Extract the database name from the namespace field and leave the collection name
+                // empty.
+                nss = NamespaceString(nss.db());
             } else {
                 // All other commands will invalidate the stream.
                 operationType = DocumentSourceChangeStream::kInvalidateOpType;
@@ -329,9 +332,10 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         default: { MONGO_UNREACHABLE; }
     }
 
-    // UUID should always be present except for invalidate entries.  It will not be under
-    // FCV 3.4, so we should close the stream as invalid.
-    if (operationType != DocumentSourceChangeStream::kInvalidateOpType && uuid.missing()) {
+    // UUID should always be present except for invalidate and dropDatabase entries.  It will not be
+    // under FCV 3.4, so we should close the stream as invalid.
+    if (operationType != DocumentSourceChangeStream::kInvalidateOpType &&
+        operationType != DocumentSourceChangeStream::kDropDatabaseOpType && uuid.missing()) {
         warning() << "Saw a CRUD op without a UUID.  Did Feature Compatibility Version get "
                      "downgraded after opening the stream?";
         operationType = DocumentSourceChangeStream::kInvalidateOpType;
@@ -370,7 +374,9 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
 
     doc.addField(DocumentSourceChangeStream::kFullDocumentField, fullDocument);
     doc.addField(DocumentSourceChangeStream::kNamespaceField,
-                 Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
+                 operationType == DocumentSourceChangeStream::kDropDatabaseOpType
+                     ? Value(Document{{"db", nss.db()}})
+                     : Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
     doc.addField(DocumentSourceChangeStream::kDocumentKeyField, documentKey);
 
     // Note that 'updateDescription' might be the 'missing' value, in which case it will not be
