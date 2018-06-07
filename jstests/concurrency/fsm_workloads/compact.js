@@ -6,6 +6,12 @@
  * Bulk inserts 1000 documents and builds indexes. Then alternates between compacting the
  * collection and verifying the number of documents and indexes. Operates on a separate collection
  * for each thread.
+ *
+ * There is a known hang during concurrent FSM workloads with the compact command used
+ * with wiredTiger LSM variants. Bypass this command for the wiredTiger LSM variant
+ * until a fix is available for WT-2523.
+ *
+ * @tags: [does_not_support_wiredtiger_lsm]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
@@ -81,26 +87,11 @@ var $config = (function() {
         query: {compact: 0.5, query: 0.5}
     };
 
-    var skip = function skip(cluster) {
-        if (cluster.isRunningWiredTigerLSM()) {
-            // There is a known hang during concurrent FSM workloads with the compact command used
-            // with wiredTiger LSM variants. Bypass this command for the wiredTiger LSM variant
-            // until a fix is available for WT-2523.
-            return {
-                skip: true,
-                msg: 'WT-2523: compact command can cause hang using WT LSM index during ' +
-                    'concurrent workloads'
-            };
-        }
-        return {skip: false};
-    };
-
     return {
         threadCount: 15,
         iterations: 10,
         states: states,
         transitions: transitions,
         data: data,
-        skip: skip
     };
 })();

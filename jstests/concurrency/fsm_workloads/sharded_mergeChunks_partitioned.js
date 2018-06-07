@@ -5,6 +5,8 @@
  *
  * Exercises the concurrent moveChunk operations, with each thread operating on its own set of
  * chunks.
+ *
+ * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');                // for extendWorkload

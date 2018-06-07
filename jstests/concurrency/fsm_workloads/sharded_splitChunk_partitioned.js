@@ -5,6 +5,8 @@
  *
  * Exercises the concurrent splitChunk operations, but each thread operates on its own set of
  * chunks.
+ *
+ * @tags: [requires_sharding, assumes_balancer_off, assumes_autosplit_off]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');                // for extendWorkload

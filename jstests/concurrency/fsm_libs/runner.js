@@ -377,17 +377,6 @@ var runner = (function() {
         }
     }
 
-    function shouldSkipWorkload(workload, context, cluster) {
-        var config = context[workload].config;
-        var result = config.skip.call(config.data, cluster);
-        if (result.skip) {
-            var msg = result.msg || '';
-            jsTest.log('Skipping workload: ' + workload + ' ' + msg);
-            return true;
-        }
-        return false;
-    }
-
     function setupWorkload(workload, context, cluster) {
         var myDB = context[workload].db;
         var collName = context[workload].collName;
@@ -687,11 +676,6 @@ var runner = (function() {
         }
         cluster.setup();
 
-        // Filter out workloads that need to be skipped.
-        bgWorkloads =
-            bgWorkloads.filter(workload => !shouldSkipWorkload(workload, bgContext, cluster));
-        workloads = workloads.filter(workload => !shouldSkipWorkload(workload, context, cluster));
-
         // Clean up the state left behind by other tests in the concurrency suite
         // to avoid having too many open files.
 
@@ -853,7 +837,6 @@ var runner = (function() {
             prepareCollections,
             WorkloadFailure,
             throwError,
-            shouldSkipWorkload,
             setupWorkload,
             teardownWorkload,
             setIterations,

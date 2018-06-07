@@ -195,13 +195,6 @@ var $config = (function() {
         checkNumUpdatedByEachTransaction(documents);
     }
 
-    function skip(cluster) {
-        if (cluster.isSharded() || cluster.isStandalone()) {
-            return {skip: true, msg: 'only runs in a replica set.'};
-        }
-        return {skip: false};
-    }
-
     return {
         threadCount: 10,
         iterations: 50,
@@ -210,7 +203,6 @@ var $config = (function() {
         data: {numDocs: 10},
         setup: setup,
         teardown: teardown,
-        skip: skip
     };
 
 })();

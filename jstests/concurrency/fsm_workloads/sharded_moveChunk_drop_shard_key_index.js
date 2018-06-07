@@ -6,6 +6,8 @@
  * Tests that dropping the shard key index while migrating a chunk doesn't cause the shard to abort.
  *
  * This workload was designed to reproduce SERVER-24994.
+ *
+ * @tags: [requires_sharding, assumes_balancer_off]
  */
 
 var $config = (function() {
@@ -69,13 +71,6 @@ var $config = (function() {
         }
     }
 
-    function skip(cluster) {
-        if (!cluster.isSharded() || cluster.isBalancerEnabled()) {
-            return {skip: true, msg: 'only runs in a sharded cluster with the balancer disabled.'};
-        }
-        return {skip: false};
-    }
-
     return {
         threadCount: 10,
         iterations: 100,
@@ -83,7 +78,6 @@ var $config = (function() {
         states: states,
         transitions: transitions,
         setup: setup,
-        skip: skip
     };
 
 })();
