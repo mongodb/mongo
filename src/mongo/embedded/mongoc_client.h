@@ -37,7 +37,7 @@ extern "C" {
 
 /**
  * Creates a client with the correct stream intiator set
- * @param db must be a valid db handle created by libmongodbcapi
+ * @param db must be a valid instance handle created by `mongo_embedded_v1_instance_create`
  * @returns a mongoc client or `NULL` on error
  */
 mongoc_client_t* mongo_embedded_v1_mongoc_client_create(mongo_embedded_v1_instance* instance);

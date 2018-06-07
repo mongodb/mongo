@@ -37,8 +37,7 @@
  *
  * @invariant All functions in this library (those `extern "C"` functions starting with
  * `mongo_embedded_v1_` in their names) have undefined behavior unless their thread safety
- * requirements
- * are met.
+ * requirements are met.
  *
  * We define "Thread Safety" to mean that a program will not exhibit undefined behavior in multiple
  * concurrent execution contexts over this library. Please note, however, that values returned from
@@ -49,8 +48,10 @@
  * @note The definition of "undefined behavior" with respect to this library includes any
  * undocumented result up to and including undefined behavior of the entire program under the C and
  * C++ language standards.
+ *
  * @note The specification of post-conditions in this library only holds if undefined behavior does
  * not occur.
+ *
  * @note Some functions provide runtime diagnostics for some violations of their preconditions --
  * this behavior is not guaranteed and is provided as a convenience for both debugging and
  * protection of data integrity. Some of these diagnostics are documented in the return-value
@@ -83,15 +84,14 @@ extern "C" {
  * object as a const-qualified (`const mongo_embedded_v1_status *`) pointer. If a single thread is
  * passing a `mongo_embedded_v1_status` object a function taking it by non-const-qualified
  * (`mongo_embedded_v1_status *`) pointer, then no other thread may access the
- * `mongo_embedded_v1_status`
- * object.
+ * `mongo_embedded_v1_status` object.
  *
  * @note All `mongo_embedded_v1_` functions which take a `status` object may be passed a `NULL`
  * pointer. In that case the function will not be able to report detailed status information;
  * however, that function may still be called.
  *
- * @note All `mongo_embedded_v1_status` functions can be used before the `libmongodbcapi` library is
- * initialized. This facilitates detailed error reporting from all library functions.
+ * @note All `mongo_embedded_v1_status` functions can be used before the `mongo_embedded_capi`
+ * library is initialized. This facilitates detailed error reporting from all library functions.
  */
 typedef struct mongo_embedded_v1_status mongo_embedded_v1_status;
 
@@ -99,24 +99,23 @@ typedef struct mongo_embedded_v1_status mongo_embedded_v1_status;
  * Allocate and construct an API-return-status buffer object of type `mongo_embedded_v1_status`.
  *
  * All `mongo_embedded_v1_` functions outside of the `mongo_embedded_v1_status` family accept
- * pointers to
- * these objects (specifically a parameter of type `mongo_embedded_v1_status *`). These functions
- * use
- * that output-parameter as a mechanism for detailed error reporting. If a `NULL` pointer is
- * passed, then these functions will not be able to report the details of their error.
+ * pointers to these objects (specifically a parameter of type `mongo_embedded_v1_status *`). These
+ * functions use that output-parameter as a mechanism for detailed error reporting. If a `NULL`
+ * pointer is passed, then these functions will not be able to report the details of their error.
  *
  * @pre None.
  *
  * @returns A pointer to a newly allocated `mongo_embedded_v1_status` object which will hold details
- * of
- * any failures of operations to which it was passed.
+ * of any failures of operations to which it was passed.
+ *
  * @returns `NULL` when construction of a `mongo_embedded_v1_status` object fails.
  *
  * @invariant This function is completely threadsafe.
  *
- * @note It is possible to use the rest of the `libmongodbcapi` functions without status objects if
- * detailed error reporting is unnecessary; however, if allocation of status objects fails it is
- * likely that all other `libmongodbcapi` operations will fail as well.
+ * @note It is possible to use the rest of the `mongo_embedded_v1` functions without status objects
+ * if detailed error reporting is unnecessary; however, if allocation of status objects fails it is
+ * likely that all other `mongo_embedded_v1` operations will fail as well.
+ *
  * @note Allocation of an Embedded MongoDB Status buffer should rarely fail, except for
  * out-of-memory reasons.
  *
@@ -129,9 +128,8 @@ mongo_embedded_v1_status* mongo_embedded_v1_status_create(void);
  *
  * Frees the storage associated with a valid `mongo_embedded_v1_status` object including all shared
  * observable storage, such as strings. The only way that a `mongo_embedded_v1_status` can be
- * validly
- * created is via `mongo_embedded_v1_status_create`, therefore the object being destroyed must have
- * been created using that function.
+ * validly created is via `mongo_embedded_v1_status_create`, therefore the object being destroyed
+ * must have been created using that function.
  *
  * @pre The specified `status` object must not be `NULL`.
  * @pre The specified `status` object must be a valid `mongo_embedded_v1_status` object.
@@ -154,12 +152,12 @@ mongo_embedded_v1_status* mongo_embedded_v1_status_create(void);
 void mongo_embedded_v1_status_destroy(mongo_embedded_v1_status* status);
 
 /**
- * The error codes reported by `libmongodbcapi` functions will be given the symbolic names as mapped
- * by this enum.
+ * The error codes reported by `mongo_embedded_v1` functions will be given the symbolic names as
+ * mapped by this enum.
  *
- * When a `libmongdbcapi` function fails (and it has been documented report errors) it will report
- * that error in the form of an `int` status code. That status code will always be returned as the
- * type `int`; however, the values in this enum can be used to classify the failure.
+ * When a `mongo_embedded_v1` function fails (and it has been documented to report errors) it will
+ * report that error in the form of an `int` status code. That status code will always be returned
+ * as the type `int`; however, the values in this enum can be used to classify the failure.
  */
 typedef enum {
     MONGO_EMBEDDED_V1_ERROR_IN_REPORTING_ERROR = -2,
@@ -183,16 +181,16 @@ typedef enum {
 /**
  * Gets an error code from a `mongo_embedded_v1_status` object.
  *
- * When a `libmongodbcapi` function fails (and it has been documented to report errors) it will
+ * When a `mongo_embedded_v1` function fails (and it has been documented to report errors) it will
  * report its error in the form of an `int` status code which is stored into a supplied
  * `mongo_embedded_v1_status` object, if provided. Some of these functions may also report extra
- * information, which will be reported by other observer functions. Every `libmongodbcapi` function
- * which reports errors will always update the `Error` code stored in a `mongo_embedded_v1_status`
- * object, even upon success.
+ * information, which will be reported by other observer functions. Every `mongo_embedded_v1`
+ * function which reports errors will always update the `Error` code stored in a
+ * `mongo_embedded_v1_status` object, even upon success.
  *
  * @pre The specified `status` object must not be `NULL`.
  * @pre The specified `status` object must be a valid `mongo_embedded_v1_status` object.
- * @pre The specified `status` object must have been passed to a `libmongodbcapi` function.
+ * @pre The specified `status` object must have been passed to a `mongo_embedded_v1` function.
  *
  * @param status The `mongo_embedded_v1_status` object from which to get an associated error code.
  *
@@ -203,10 +201,8 @@ typedef enum {
  * `mongo_embedded_v1_status`'s invariants are met.
  *
  * @note This function will report the `mongo_embedded_v1_error` value for the failure associated
- * with
- * `status`, therefore if the failing function returned a `mongo_embedded_v1_error` value itself,
- * then
- * calling this function is superfluous.
+ * with `status`, therefore if the failing function returned a `mongo_embedded_v1_error` value
+ * itself, then calling this function is superfluous.
  *
  * @note This function does not report its own failures.
  * @note This behavior of this function is undefined unless its preconditions are met.
@@ -216,7 +212,7 @@ int mongo_embedded_v1_status_get_error(const mongo_embedded_v1_status* status);
 /**
  * Gets a descriptive error message from a `mongo_embedded_v1_status` object.
  *
- * Any `libmongodbcapi` function which reports failure must, when it fails, update the specified
+ * Any `mongo_embedded_v1` function which reports failure must, when it fails, update the specified
  * `mongo_embedded_v1_status` object, if it exists, to contain a string indicating a user-readable
  * description of the failure. This error message string is dependent upon the kind of error
  * encountered and may contain dynamically generated information describing the specifics of the
@@ -224,7 +220,7 @@ int mongo_embedded_v1_status_get_error(const mongo_embedded_v1_status* status);
  *
  * @pre The specified `status` must not be `NULL`.
  * @pre The specified `status` must be a valid `mongo_embedded_v1_status` object.
- * @pre The specified `status` must have been passed to a `libmongodbcapi` function.
+ * @pre The specified `status` must have been passed to a `mongo_embedded_v1` function.
  * @pre The function to which the specified `status` was passed must not have returned
  * `MONGO_EMBEDDED_V1_SUCCESS` as its error code.
  *
@@ -232,16 +228,14 @@ int mongo_embedded_v1_status_get_error(const mongo_embedded_v1_status* status);
  * message.
  *
  * @returns A null-terminated string containing an error message. This string will be valid until
- * the next time that the specified `status` is passed to any other `libmongodbcapi` function
+ * the next time that the specified `status` is passed to any other `mongo_embedded_v1` function
  * (including those in the `mongo_embedded_v1_status` family).
  *
  * @invariant This function is thread-safe, if the thread safety requirements specified by
  * `mongo_embedded_v1_status`'s invariants are met; however, the pointer returned by this function
- * is
- * considered to be part of the specified `status` object for the purposes of thread safety. If the
- * `mongo_embedded_v1_status` is changed, by any thread, it will invalidate the string returned by
- * this
- * function.
+ * is considered to be part of the specified `status` object for the purposes of thread safety. If
+ * the `mongo_embedded_v1_status` is changed, by any thread, it will invalidate the string returned
+ * by this function.
  *
  * @note For failures where the `mongo_embedded_v1_status_cet_error( status ) ==
  * MONGO_EMBEDDED_V1_ERROR_EXCEPTION`, this returns a string representation of the internal C++
@@ -259,15 +253,15 @@ const char* mongo_embedded_v1_status_get_explanation(const mongo_embedded_v1_sta
 /**
  * Gets a status code from a `mongo_embedded_v1_status` object.
  *
- * Any `libmongodbcapi` function which reports failure must, when it fails, update the specified
+ * Any `mongo_embedded_v1` function which reports failure must, when it fails, update the specified
  * `mongo_embedded_v1_status` object, if it exists, to contain a numeric code indicating a
- * sub-category
- * of failure. This error code is one specified by the normal MongoDB Driver interface, if
- * `mongo_embedded_v1_error == MONGO_EMBEDDED_V1_ERROR_EXCEPTION`.
+ * sub-category of failure. This error code is one specified by the normal MongoDB Driver interface,
+ * if `mongo_embedded_v1_error == MONGO_EMBEDDED_V1_ERROR_EXCEPTION`.
  *
  * @pre The specified `status` must not be `NULL`.
  * @pre The specified `status` must be a valid `mongo_embedded_v1_status` object.
- * @pre The specified `status` must have been passed to a `libmongodbcapi` function.
+ * @pre The specified `status` must have been passed to a `mongo_embedded_v1` function.
+ *
  * @pre The function to which the specified `status` was passed must not have returned
  * `MONGO_EMBEDDED_V1_SUCCESS` as its error code.
  *
@@ -280,13 +274,11 @@ const char* mongo_embedded_v1_status_get_explanation(const mongo_embedded_v1_sta
  * `mongo_embedded_v1_status`'s invariants are met.
  *
  * @note For failures where the `mongo_embedded_v1_error == MONGO_EMBEDDED_V1_ERROR_EXCEPTION` and
- * the
- * exception was of type `mongo::DBException`, this returns the numeric code indicating which
+ * the exception was of type `mongo::DBException`, this returns the numeric code indicating which
  * specific `mongo::DBException` was thrown.
  *
  * @note For failures where the `mongo_embedded_v1_error != MONGO_EMBEDDED_V1_ERROR_EXCEPTION` the
- * value
- * of this code is unspecified.
+ * value of this code is unspecified.
  *
  * @note This function does not report its own failures.
  * @note This behavior of this function is undefined unless its preconditions are met.
@@ -297,26 +289,23 @@ int mongo_embedded_v1_status_get_code(const mongo_embedded_v1_status* status);
 /**
  * An object which describes the runtime state of the Embedded MongoDB Library.
  *
- * The `libmongodbcapi` library uses allocated objects of this type to indicate the present state of
- * the library. Some operations which the library provides need access to this object. Further a
+ * The `mongo_embedded_v1` library uses allocated objects of this type to indicate the present state
+ * of the library. Some operations which the library provides need access to this object. Further a
  * construction function and a destruction function for these objects are also provided. No more
  * than a single object instance of this type may exist at any given time.
  *
  * @invariant The use of `mongo_embedded_v1_lib` objects from multiple threads is not threadsafe
- * unless
- * all of the threads accessing a single `mongo_embedded_v1_lib` object are not destroying this
- * object.
- * If a single thread is passing a `mongo_embedded_v1_lib` to its destruction function, then no
- * other
- * thread may access the `mongo_embedded_v1_status` object.
+ * unless all of the threads accessing a single `mongo_embedded_v1_lib` object are not destroying
+ * this object.  If a single thread is passing a `mongo_embedded_v1_lib` to its destruction
+ * function, then no other thread may access the `mongo_embedded_v1_status` object.
  */
 typedef struct mongo_embedded_v1_lib mongo_embedded_v1_lib;
 
 /**
  * An object which describes the runtime state of the Embedded MongoDB Library.
  *
- * The `libmongodbcapi` library uses structures of this type to indicate the desired configuration
- * of the library.
+ * The `mongo_embedded_v1` library uses structures of this type to indicate the desired
+ * configuration of the library.
  *
  * @invariant Because the library is only initialized once, in a single-threaded fashion, there are
  * no thread-safety requirements on this type.
@@ -370,8 +359,8 @@ struct mongo_embedded_v1_init_params {
     uint64_t log_flags;
 
     /**
-     * Optional log callback to the mongodbcapi library, it is not allowed to reentry the
-     * mongodbcapi library from the callback.
+     * Optional log callback to the mongo_embedded_capi library, it is not legal to reenter the
+     * library from the callback.
      */
     mongo_embedded_v1_log_callback log_callback;
 
@@ -382,26 +371,27 @@ struct mongo_embedded_v1_init_params {
 };
 
 /**
- * Initializes the mongodbcapi library, required before any other call.
+ * Initializes the mongo_embedded_capi library; required before any other call except as otherwise
+ * noted.
  *
  * The Embedded MongoDB Library must be initialized before it can be used. However, it is
  * permissible to create and destroy `mongo_embedded_v1_status` objects without the library having
- * been
- * initialized. Initializing the library sets up internal state for all Embedded MongoDB Library
- * operations, including creating embedded "server-like" instances and creating clients.
+ * been initialized. Initializing the library sets up internal state for all Embedded MongoDB
+ * Library operations, including creating embedded "server-like" instances and creating clients.
  *
  * @pre The specified `params` object must either be a valid `mongo_embedded_v1_lib_params` object
- * (in
- * a valid state) or `NULL`.
+ * (in a valid state) or `NULL`.
+ *
  * @pre The specified `status` object must either be a valid `mongo_embedded_v1_status` object or
  * `NULL`.
+ *
  * @pre Either `mongo_embedded_v1_fini` must have never been called in this process, or it was
- * called
- * and returned success and `mongo_embedded_v1_lib_init` was not called after this.
+ * called and returned success and `mongo_embedded_v1_lib_init` was not called after this.
+ *
  * @pre Either `mongo_embedded_v1_init` must have never been called in this process, or it was
- * called
- * and then the embedded library was terminated by a successful call to
+ * called and then the embedded library was terminated by a successful call to
  * `mongo_embedded_v1_lib_fini`.
+ *
  * @pre No valid `mongo_embedded_v1_lib` must exist.
  *
  * @param params A pointer to mongo_embedded_v1_init_params containing library initialization
@@ -419,6 +409,7 @@ struct mongo_embedded_v1_init_params {
  * other non-`mongo_embedded_v1_status` operations can be called on any thread.
  *
  * @note This function exhibits undefined behavior unless its preconditions are met.
+ *
  * @note This function may return diagnosic errors for violations of its preconditions, but this
  * behavior is not guaranteed.
  */
@@ -432,13 +423,14 @@ mongo_embedded_v1_lib* mongo_embedded_v1_lib_init(const mongo_embedded_v1_init_p
  * terminated. Dataloss is not a risk; however, some database repair routines may be executed at
  * next initialization if the library is not properly quiesced. It is permissible to create and
  * destroy `mongo_embedded_v1_status` objects after the library has been quiesced. The library may
- * be
- * re-initialized with a potentially different configuration after it has been queisced.
+ * be re-initialized with a potentially different configuration after it has been queisced.
  *
  * @pre All `mongo_embedded_v1_instance` objects associated with this library handle must be
  * destroyed.
+ *
  * @pre The specified `lib` object must not be `NULL`.
  * @pre The specified `lib` object must be a valid `mongo_embedded_v1_lib` object.
+ *
  * @pre The specified `status` object must either be a valid `mongo_embedded_v1_status` object or
  * `NULL`.
  *
@@ -450,20 +442,22 @@ mongo_embedded_v1_lib* mongo_embedded_v1_lib_init(const mongo_embedded_v1_init_p
  * @post Either the Embedded MongoDB Library will be deinitialized, or an error will be reported.
  *
  * @returns Returns `MONGO_EMBEDDED_V1_SUCCESS` on success.
+ *
  * @returns Returns `MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED` and modifies `status` if
  * mongo_embedded_v1_lib_init() has not been called previously.
+ *
  * @returns Returns `MONGO_EMBEDDED_V1_ERROR_HAS_DB_HANDLES_OPEN` and modifies `status` if there are
  * open databases that haven't been closed with `mongo_embedded_v1_instance_create()`.
+ *
  * @returns Returns `MONGO_EMBEDDED_V1_ERROR_EXCEPTION` and modifies `status` for errors that
- * resulted
- * in an exception. Details can be retrived via `mongo_embedded_v1_process_get_status()`.
+ * resulted in an exception. Details can be retrived via `mongo_embedded_v1_process_get_status()`.
  *
  * @invariant This function is not thread safe. It cannot be called concurrently with any other
  * non-`mongo_embedded_v1_status` operation.
  *
- * @note This function exhibits undefined behavior unless its preconditions are met.
- * @note This function may return diagnosic errors for violations of its preconditions, but this
- * behavior is not guaranteed.
+ * @note This function exhibits undefined behavior unless its preconditions are met.  @note This
+ * function may return diagnosic errors for violations of its preconditions, but this behavior is
+ * not guaranteed.
  */
 int mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib* lib, mongo_embedded_v1_status* status);
 
@@ -471,18 +465,15 @@ int mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib* lib, mongo_embedded_v1_sta
  * An object which represents an instance of an Embedded MongoDB Server.
  *
  * The Embedded MongoDB Library uses allocated objects of this type (`mongo_embedded_v1_instance`)
- * to
- * indicate the present state of a single "server-like" MongoDB instance. Some operations which the
- * library provides need access to this object. Further a construction function and a destruction
- * function for these objects are also provided. No more than a single object instance of this type
- * may exist at any given time.
+ * to indicate the present state of a single "server-like" MongoDB instance. Some operations which
+ * the library provides need access to this object. Further a construction function and a
+ * destruction function for these objects are also provided. No more than a single object instance
+ * of this type may exist at any given time.
  *
  * @invariant The use of `mongo_embedded_v1_instance` objects from multiple threads is not
- * threadsafe
- * unless all of the threads accessing a single `mongo_embedded_v1_instance` object are not
- * destroying
- * this object. If a single thread is passing a `mongo_embedded_v1_instance` to its destruction
- * function, then no other thread may access the `mongo_embedded_v1_instance` object.
+ * threadsafe unless all of the threads accessing a single `mongo_embedded_v1_instance` object are
+ * not destroying this object. If a single thread is passing a `mongo_embedded_v1_instance` to its
+ * destruction function, then no other thread may access the `mongo_embedded_v1_instance` object.
  */
 typedef struct mongo_embedded_v1_instance mongo_embedded_v1_instance;
 
@@ -496,8 +487,10 @@ typedef struct mongo_embedded_v1_instance mongo_embedded_v1_instance;
  *
  * @pre The specified `lib` object must not be `NULL`
  * @pre The specified `lib` object must be a valid `mongo_embedded_v1_lib` object.
+ *
  * @pre The specified `yaml_config` string must either point to an ASCII null-terminated string or
  * be `NULL`.
+ *
  * @pre The specified `status` object must be either a valid `mongo_embedded_v1_status` object or
  * `NULL`.
  *
@@ -512,12 +505,13 @@ typedef struct mongo_embedded_v1_instance mongo_embedded_v1_instance;
  *
  * @post Either a new Embedded MongoDB Server will be created, or an error will be reported.
  *
- * @return A pointer to a newly constructed, valid `libmongdbcapi_instance`.
+ * @return A pointer to a newly constructed, valid `mongo_embedded_v1_instance`.
  * @return `NULL` and modifies `status` on failure.
  *
  * @invariant This function is completely threadsafe, as long as its preconditions are met.
  *
  * @note This function exhibits undefined behavior unless its preconditions are met.
+ *
  * @note This function may return diagnosic errors for violations of its preconditions, but this
  * behavior is not guaranteed.
  */
@@ -535,8 +529,10 @@ mongo_embedded_v1_instance* mongo_embedded_v1_instance_create(mongo_embedded_v1_
  *
  * @pre The specified `instance` object must not be `NULL`.
  * @pre The specified `instance` object must be a valid `mongo_embedded_v1_instance` object.
+ *
  * @pre The specified `status` object must be either a valid `mongo_embedded_v1_status` object or
  * `NULL`.
+ *
  * @pre All `mongo_embedded_v1_client` objects associated with this database must be destroyed.
  *
  * @param instance A pointer to a valid `mongo_embedded_v1_instance` instance to be destroyed.
@@ -548,8 +544,10 @@ mongo_embedded_v1_instance* mongo_embedded_v1_instance_create(mongo_embedded_v1_
  * reported.
  *
  * @returns `MONGO_EMBEDDED_V1_SUCCESS` on success.
+ *
  * @returns `MONGO_EMBEDDED_V1_ERROR_DB_CLIENTS_OPEN` and modifies `status` if there are
  * `mongo_embedded_v1_client` objects still open attached to the `instance`.
+ *
  * @returns `MONGO_EMBEDDED_V1_ERROR_EXCEPTION`and modifies `status` for other unspecified errors.
  *
  * @invariant This function is not threadsafe unless the specified `db` object is not passed
@@ -557,6 +555,7 @@ mongo_embedded_v1_instance* mongo_embedded_v1_instance_create(mongo_embedded_v1_
  * objects on distinct threads.
  *
  * @note This function exhibits undefined behavior unless its preconditions are met.
+ *
  * @note This function may return diagnosic errors for violations of its precondition, but this
  * behavior is not guaranteed.
  */
@@ -567,8 +566,8 @@ int mongo_embedded_v1_instance_destroy(mongo_embedded_v1_instance* instance,
  * An object which represents "client connection" to an Embedded MongoDB Server.
  *
  * A `mongo_embedded_v1_client` connection object is necessary to perform most database operations,
- * such as queries. Some operations which the library provides need access to this object. Further
- * a construction function and a destruction function for these objects are also provided. Multiple
+ * such as queries. Some operations which the library provides need access to this object. Further a
+ * construction function and a destruction function for these objects are also provided. Multiple
  * object instances of this type may exist at any given time.
  *
  * @invariant The use of `mongo_embedded_v1_client` objects from multiple threads is not threadsafe.
@@ -582,6 +581,7 @@ typedef struct mongo_embedded_v1_client mongo_embedded_v1_client;
  *
  * @pre The specified `instance` object must not be `NULL`
  * @pre The specified `instance` object must be a valid `mongo_embedded_v1_instance` object.
+ *
  * @pre The specified `status` object must be either a valid `mongo_embedded_v1_status` object or
  * `NULL`.
  *
@@ -605,11 +605,12 @@ mongo_embedded_v1_client* mongo_embedded_v1_client_create(mongo_embedded_v1_inst
  * Destroys an Embedded MongoDB Client.
  *
  * A client must be destroyed before the owning db is destroyed. Database clients must be destroyed
- * before the instance associated with them can be destroyed. Further, any resources associated
- * with client requests will be relinquished after this call completes.
+ * before the instance associated with them can be destroyed. Further, any resources associated with
+ * client requests will be relinquished after this call completes.
  *
  * @pre The specified `client` object must not be `NULL`.
  * @pre The specified `client` object must be a valid `mongo_embedded_v1_client` object.
+ *
  * @pre The specified `status` object must be either a valid `mongo_embedded_v1_status` object or
  * `NULL`.
  *
@@ -629,6 +630,7 @@ mongo_embedded_v1_client* mongo_embedded_v1_client_create(mongo_embedded_v1_inst
  * objects on distinct threads.
  *
  * @note This function exhibits undefined behavior unless its preconditions are met.
+ *
  * @note This function may return diagnosic errors for violations of its precondition, but this
  * behavior is not guaranteed.
  */
@@ -649,6 +651,7 @@ int mongo_embedded_v1_client_destroy(mongo_embedded_v1_client* client,
  * @pre The specified `output` pointer must point to a valid, non-const `void *` variable.
  * @pre The specified `output_size` pointer must not be `NULL`
  * @pre The specified `output` pointer must point to a valid, non-const `size_t` variable.
+ *
  * @pre The specified `status` object must be either a valid `mongo_embedded_v1_status` object or
  * `NULL`.
  *
@@ -675,14 +678,15 @@ int mongo_embedded_v1_client_destroy(mongo_embedded_v1_client* client,
  *
  * @invariant This function is not thread-safe unless its preconditions are met, and the specified
  * `mongo_embedded_v1_client` object is not concurrently accessed by any other thread until after
- * this
- * call has completed.
+ * this call has completed.
  *
  * @note The `output` and `output_size` parameters will not be modified unless the function
  * succeeds.
+ *
  * @note The storage associated with `output` will be valid until the next call to
  * `mongo_embedded_v1_client_wire_protocol_rpc` on the specified `client` object, or the `client` is
  * destroyed using `mongo_embedded_v1_client_destroy`.
+ *
  * @note That the storage which is referenced by `output` upon successful completion is considered
  * to be part of the specified `client` object for the purposes of thread-safety and undefined
  * behavior.
