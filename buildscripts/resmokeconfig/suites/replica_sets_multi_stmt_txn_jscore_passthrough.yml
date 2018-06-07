@@ -3,16 +3,8 @@ test_kind: multi_stmt_txn_passthrough
 selector:
   roots:
   - jstests/core/**/*.js
-  # TODO: SERVER-35089
-  # - jstests/libs/txns/txn_passthrough_runner_selftest.js
+  - jstests/libs/txns/txn_passthrough_runner_selftest.js
   exclude_files:
-  # TODO: SERVER-35089
-  - jstests/core/geo_allowedcomparisons.js
-  - jstests/core/geo_big_polygon2.js
-  - jstests/core/in.js
-  - jstests/core/orj.js
-  - jstests/core/insert1.js
-
   # These tests already run with transactions.
   - jstests/core/txns/*.js
 
@@ -37,7 +29,10 @@ selector:
   - jstests/core/find_getmore_bsonsize.js
   - jstests/core/find_getmore_cmd.js
   - jstests/core/find9.js
+  - jstests/core/geo_allowedcomparisons.js
+  - jstests/core/geo_big_polygon2.js
   - jstests/core/geonear_key.js
+  - jstests/core/in.js
   - jstests/core/index_big1.js
   - jstests/core/index_bigkeys.js
   - jstests/core/index_decimal.js
@@ -55,7 +50,7 @@ selector:
   - jstests/core/or1.js
   - jstests/core/or2.js
   - jstests/core/or3.js
-  - jstests/core/ork.js
+  - jstests/core/orj.js
   - jstests/core/ref4.js
   - jstests/core/regex_limit.js
   - jstests/core/remove_undefined.js
@@ -76,10 +71,14 @@ selector:
   - jstests/core/updatej.js
   - jstests/core/ref.js
 
-  # Consecutive writes totalling more than 16MB will cause the txn to abort with
-  # a TransactionTooLarge error.
+  # Consecutive writes totalling more than the size upper threshold will cause the txn to
+  # abort with a TransactionTooLarge error.
   - jstests/core/batch_size.js
   - jstests/core/single_batch.js
+  # For insert1.js, only Windows DEBUG builds are affected. We compute the in-memory size
+  # of the transaction, which uses the size of the oplog entry and is 8 bytes larger on
+  # Windows debug builds than other builds.
+  - jstests/core/insert1.js
 
   ##
   ## Some aggregation stages don't support snapshot readconcern.

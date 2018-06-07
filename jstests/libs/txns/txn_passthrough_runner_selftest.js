@@ -6,6 +6,9 @@
 
     const testName = jsTest.name();
 
+    // Use a unique db for every test so burn_in_tests can run this test multiple times.
+    db = db.getSiblingDB('txn_self_test' + Random.srand());
+
     // Profile all commands.
     db.setProfilingLevel(2);
 
