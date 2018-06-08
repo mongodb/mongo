@@ -5,7 +5,7 @@
  *   - non-capped collections
  *
  * This test fails with the ephemeralForTest storage engine.
- * @tags: [SERVER-21658]
+ * @tags: [SERVER-21658, requires_capped]
  */
 (function() {
     'use strict';

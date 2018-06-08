@@ -1,3 +1,4 @@
+// @tags: [requires_capped]
 db.jstests_capped.drop();
 db.createCollection("jstests_capped", {capped: true, size: 30000});
 

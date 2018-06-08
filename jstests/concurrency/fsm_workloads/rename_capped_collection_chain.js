@@ -6,6 +6,8 @@
  * Creates a capped collection and then repeatedly executes the renameCollection
  * command against it. The previous "to" namespace is used as the next "from"
  * namespace.
+ *
+ * @tags: [requires_capped]
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 

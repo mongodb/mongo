@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands, requires_fastcount]
+// @tags: [requires_non_retryable_commands, requires_fastcount, requires_capped]
 
 t = db.capped_empty;
 t.drop();

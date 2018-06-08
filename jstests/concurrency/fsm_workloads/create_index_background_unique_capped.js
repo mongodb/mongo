@@ -4,6 +4,8 @@
  * create_index_background_unique_capped.js
  *
  * Creates multiple unique background indexes in parallel, on capped collections.
+ *
+ * @tags: [requires_capped]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');                      // for extendWorkload

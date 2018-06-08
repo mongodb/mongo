@@ -7,7 +7,7 @@
  * to request more documents from the collection. If the pipeline is wrapped in a $facet stage, all
  * results will be computed in the initial request and buffered in the results array, preventing the
  * pipeline from requesting more documents.
- * @tags: [do_not_wrap_aggregations_in_facets]
+ * @tags: [do_not_wrap_aggregations_in_facets, requires_capped]
  */
 (function() {
     'use strict';

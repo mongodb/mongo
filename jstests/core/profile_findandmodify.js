@@ -1,8 +1,5 @@
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
-// @tags: [
-//     # profile command is not available on embedded
-//     incompatible_with_embedded,
-// ]
+// @tags: [requires_profiling]
 
 (function() {
     "use strict";

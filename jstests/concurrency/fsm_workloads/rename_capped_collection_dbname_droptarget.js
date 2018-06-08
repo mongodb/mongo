@@ -6,6 +6,8 @@
  * Creates a capped collection and then repeatedly executes the renameCollection
  * command against it, specifying a different database name in the namespace.
  * Inserts documents into the "to" namespace and specifies dropTarget=true.
+ *
+ * @tags: [requires_capped]
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropDatabases
 

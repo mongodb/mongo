@@ -126,6 +126,13 @@ Status MobileKVEngine::createRecordStore(OperationContext* opCtx,
                                          StringData ident,
                                          const CollectionOptions& options) {
     // TODO: eventually will support file renaming but otherwise do not use collection options.
+
+    // Mobile doesn't support capped collections
+    if (options.capped) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "Capped collections are not supported by the mobile storage engine");
+    }
+
     MobileRecordStore::create(opCtx, ident.toString());
     return Status::OK();
 }

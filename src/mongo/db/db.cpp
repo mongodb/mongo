@@ -523,8 +523,14 @@ ExitCode _initAndListen(int listenPort) {
         waitForShardRegistryReload(startupOpCtx.get()).transitional_ignore();
     }
 
+    auto storageEngine = serviceContext->getStorageEngine();
+    invariant(storageEngine);
+
     if (!storageGlobalParams.readOnly) {
-        logStartup(startupOpCtx.get());
+
+        if (storageEngine->supportsCappedCollections()) {
+            logStartup(startupOpCtx.get());
+        }
 
         startMongoDFTDC();
 
@@ -608,8 +614,6 @@ ExitCode _initAndListen(int listenPort) {
     //
     // Only do this on storage engines supporting snapshot reads, which hold resources we wish to
     // release periodically in order to avoid storage cache pressure build up.
-    auto storageEngine = serviceContext->getStorageEngine();
-    invariant(storageEngine);
     if (storageEngine->supportsReadConcernSnapshot()) {
         startPeriodicThreadToAbortExpiredTransactions(serviceContext);
         startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(serviceContext);

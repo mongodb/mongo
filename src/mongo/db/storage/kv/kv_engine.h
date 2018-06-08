@@ -208,6 +208,13 @@ public:
     }
 
     /**
+     * This must not change over the lifetime of the engine.
+     */
+    virtual bool supportsCappedCollections() const {
+        return true;
+    }
+
+    /**
      * Returns true if storage engine supports --directoryperdb.
      * See:
      *     http://docs.mongodb.org/manual/reference/program/mongod/#cmdoption--directoryperdb

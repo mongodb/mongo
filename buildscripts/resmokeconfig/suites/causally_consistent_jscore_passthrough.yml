@@ -8,7 +8,8 @@ selector:
   - jstests/core/txns/**/*.js
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
-  - jstests/core/apitest_db.js  # profiling.
+  - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine
+  - jstests/core/apitest_db_profile_level.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
   - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
   - jstests/core/capped_empty.js  # emptycapped.

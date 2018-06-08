@@ -1,4 +1,4 @@
-// @tags: [does_not_support_stepdowns, requires_non_retryable_writes]
+// @tags: [does_not_support_stepdowns, requires_non_retryable_writes, requires_profiling]
 
 // Confirms that profiled update execution contains all expected metrics with proper values.
 

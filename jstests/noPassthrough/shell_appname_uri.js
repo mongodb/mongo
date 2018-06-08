@@ -1,3 +1,4 @@
+// @tags: [requires_profiling]
 (function() {
     "use strict";
 

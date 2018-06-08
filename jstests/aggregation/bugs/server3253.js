@@ -91,10 +91,12 @@ test(input, [{$project: {c: {$concat: ["hello there ", "_id"]}}}], [
     {_id: 3, c: "hello there _id"}
 ]);
 
-// test with capped collection
-cappedOutput.drop();
-db.createCollection(cappedOutput.getName(), {capped: true, size: 2});
-assertErrorCode(input, {$out: cappedOutput.getName()}, 17152);
+// test with capped collection, skip for mobile SE as it doesn't support capped collections.
+if (jsTest.options().storageEngine !== "mobile") {
+    cappedOutput.drop();
+    db.createCollection(cappedOutput.getName(), {capped: true, size: 2});
+    assertErrorCode(input, {$out: cappedOutput.getName()}, 17152);
+}
 
 // ensure everything works even if input doesn't exist.
 test(inputDoesntExist, [], []);

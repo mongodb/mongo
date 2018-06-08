@@ -1,4 +1,4 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [does_not_support_stepdowns, requires_profiling]
 
 // Confirms that a repairCursor command and subsequent getMores of its cursor are profiled
 // correctly.

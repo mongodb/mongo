@@ -4398,7 +4398,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --mongod=./mongoed --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_eval_command,requires_background_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication,SERVER-32997
+      resmoke_args: --suites=core --mongod=./mongoed --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_eval_command,requires_background_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication,requires_capped,requires_profiling,SERVER-32997
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -11750,7 +11750,7 @@ buildvariants:
     # mobile storage engine.
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions
+      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
       --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -11807,7 +11807,7 @@ buildvariants:
   expansions:
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions
+      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
       --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
     compile_flags: >-
         -j$(grep -c ^processor /proc/cpuinfo)
@@ -11889,7 +11889,7 @@ buildvariants:
     # mobile storage engine.
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions
+      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
       --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-

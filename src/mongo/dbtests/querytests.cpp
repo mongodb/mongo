@@ -420,6 +420,11 @@ public:
         _client.dropCollection("unittests.querytests.TailNotAtEnd");
     }
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         const char* ns = "unittests.querytests.TailNotAtEnd";
         _client.createCollection(ns, 2047, true);
         insert(ns, BSON("a" << 0));
@@ -446,6 +451,11 @@ public:
         _client.dropCollection("unittests.querytests.EmptyTail");
     }
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         const char* ns = "unittests.querytests.EmptyTail";
         _client.createCollection(ns, 1900, true);
         unique_ptr<DBClientCursor> c = _client.query(
@@ -466,6 +476,11 @@ public:
         _client.dropCollection("unittests.querytests.TailableDelete");
     }
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         const char* ns = "unittests.querytests.TailableDelete";
         _client.createCollection(ns, 8192, true, 2);
         insert(ns, BSON("a" << 0));
@@ -489,6 +504,11 @@ public:
         _client.dropCollection("unittests.querytests.TailableDelete");
     }
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         const char* ns = "unittests.querytests.TailableDelete";
         _client.createCollection(ns, 8192, true, 2);
         insert(ns, BSON("a" << 0));
@@ -514,6 +534,11 @@ public:
         _client.dropCollection("unittests.querytests.TailableInsertDelete");
     }
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         const char* ns = "unittests.querytests.TailableInsertDelete";
         _client.createCollection(ns, 1330, true);
         insert(ns, BSON("a" << 0));
@@ -559,6 +584,11 @@ public:
     }
 
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         const char* ns = "unittests.querytests.TailableQueryOnId";
         BSONObj info;
         _client.runCommand("unittests",
@@ -602,6 +632,11 @@ public:
         _client.dropCollection("unittests.querytests.OplogReplayMode");
     }
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         const char* ns = "unittests.querytests.OplogReplayMode";
 
         // Create a capped collection of size 10.
@@ -641,6 +676,11 @@ public:
         _client.dropCollection("unittests.querytests.OplogReplayExplain");
     }
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         const char* ns = "unittests.querytests.OplogReplayExplain";
 
         // Create a capped collection of size 10.
@@ -1239,9 +1279,8 @@ public:
         _n = 0;
     }
     void run() {
-        // SERVER-32698 Skipping this test for mobile SE:
-        // Capped collection isn't properly supported yet with mobile SE.
-        if (mongo::storageGlobalParams.engine == "mobile") {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
             return;
         }
 
@@ -1398,6 +1437,11 @@ public:
     }
 
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
         ASSERT(_client.runCommand("local",
@@ -1457,6 +1501,11 @@ public:
     }
 
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         size_t startNumCursors = numCursorsOpen();
 
         BSONObj info;
@@ -1514,6 +1563,11 @@ public:
     }
 
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         size_t startNumCursors = numCursorsOpen();
 
         // Check OplogReplay mode with missing collection.
@@ -1578,6 +1632,11 @@ class Exhaust : public CollectionInternalBase {
 public:
     Exhaust() : CollectionInternalBase("exhaust") {}
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         BSONObj info;
         ASSERT(_client.runCommand("unittests",
                                   BSON("create"

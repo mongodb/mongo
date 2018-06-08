@@ -1,4 +1,5 @@
 // SERVER-4560 test
+// @tags: [requires_capped]
 
 var dbTest = db.getSisterDB("DB_create_collection_fail_cleanup");
 dbTest.dropDatabase();

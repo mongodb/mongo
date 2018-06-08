@@ -1,6 +1,7 @@
 /**
  * Confirms that the log output for command and legacy find and getMore are in the expected format.
  * Legacy operations should be upconverted to match the format of their command counterparts.
+ * @tags: [requires_profiling]
  */
 (function() {
     "use strict";

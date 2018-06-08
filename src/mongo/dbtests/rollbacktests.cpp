@@ -156,6 +156,11 @@ template <bool rollback, bool defaultIndexes, bool capped>
 class CreateCollection {
 public:
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         string ns = "unittests.rollback_create_collection";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
@@ -187,6 +192,11 @@ template <bool rollback, bool defaultIndexes, bool capped>
 class DropCollection {
 public:
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         string ns = "unittests.rollback_drop_collection";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
@@ -228,6 +238,11 @@ template <bool rollback, bool defaultIndexes, bool capped>
 class RenameCollection {
 public:
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         NamespaceString source("unittests.rollback_rename_collection_src");
         NamespaceString target("unittests.rollback_rename_collection_dest");
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -280,6 +295,11 @@ template <bool rollback, bool defaultIndexes, bool capped>
 class RenameDropTargetCollection {
 public:
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         NamespaceString source("unittests.rollback_rename_droptarget_collection_src");
         NamespaceString target("unittests.rollback_rename_droptarget_collection_dest");
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();

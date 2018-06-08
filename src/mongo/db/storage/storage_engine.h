@@ -191,6 +191,13 @@ public:
     }
 
     /**
+     * Returns whether the storage engine supports capped collections.
+     */
+    virtual bool supportsCappedCollections() const {
+        return true;
+    }
+
+    /**
      * Returns whether the engine supports a journalling concept or not.
      */
     virtual bool isDurable() const = 0;

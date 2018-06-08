@@ -247,7 +247,7 @@ if (typeof _threadInject != "undefined") {
             // Most profiler tests can be run in parallel with each other as they use test-specific
             // databases, with the exception of tests which modify slowms or the profiler's sampling
             // rate, since those affect profile settings globally.
-            parallelFilesDir + "/apitest_db.js",
+            parallelFilesDir + "/apitest_db_profile_level.js",
             parallelFilesDir + "/evalb.js",
             parallelFilesDir + "/geo_s2cursorlimitskip.js",
             parallelFilesDir + "/profile1.js",

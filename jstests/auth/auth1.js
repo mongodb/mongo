@@ -1,5 +1,6 @@
 // test read/write permissions
 // skip this test on 32-bit platforms
+// @tags: [requires_profiling]
 
 function setupTest() {
     print("START auth1.js");

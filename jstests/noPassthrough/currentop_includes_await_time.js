@@ -1,6 +1,7 @@
 /**
  * Test that the operation latencies reported in current op for a getMore on an awaitData cursor
  * include time spent blocking for the await time.
+ * @tags: [requires_capped]
  */
 (function() {
     "use test";

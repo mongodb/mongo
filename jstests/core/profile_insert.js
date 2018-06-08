@@ -3,6 +3,7 @@
 // @tags: [
 //   assumes_write_concern_unchanged,
 //   does_not_support_stepdowns,
+//   requires_profiling,
 // ]
 
 (function() {

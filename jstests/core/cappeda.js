@@ -1,4 +1,4 @@
-
+// @tags: [requires_capped]
 t = db.scan_capped_id;
 t.drop();
 

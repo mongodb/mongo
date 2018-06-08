@@ -83,7 +83,8 @@ KVStorageEngine::KVStorageEngine(
       _options(options),
       _engine(engine),
       _supportsDocLocking(_engine->supportsDocLocking()),
-      _supportsDBLocking(_engine->supportsDBLocking()) {
+      _supportsDBLocking(_engine->supportsDBLocking()),
+      _supportsCappedCollections(_engine->supportsCappedCollections()) {
     uassert(28601,
             "Storage engine does not support --directoryperdb",
             !(options.directoryPerDB && !engine->supportsDirectoryPerDB()));

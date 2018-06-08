@@ -348,6 +348,11 @@ public:
 class InsertBuildIdIndexInterrupt : public IndexBuildBase {
 public:
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         // Recreate the collection as capped, without an _id index.
         Database* db = _ctx.db();
         Collection* coll;
@@ -387,6 +392,11 @@ public:
 class InsertBuildIdIndexInterruptDisallowed : public IndexBuildBase {
 public:
     void run() {
+        // Skip the test if the storage engine doesn't support capped collections.
+        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+            return;
+        }
+
         // Recreate the collection as capped, without an _id index.
         Database* db = _ctx.db();
         Collection* coll;
