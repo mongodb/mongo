@@ -421,6 +421,10 @@ LogicalTime computeOperationTime(OperationContext* opCtx,
         return LogicalTime();
     }
 
+    if (startOperationTime == LogicalTime::kUninitialized) {
+        return LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
+    }
+
     auto operationTime = getClientOperationTime(opCtx);
     invariant(operationTime >= startOperationTime);
 
