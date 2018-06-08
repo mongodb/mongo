@@ -58,8 +58,9 @@
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
 
     // Should also succeed if maxTimeMS is supplied on the original find.
+    const sixtyMinutes = 60 * 60 * 1000;
     cmdRes = db.runCommand(
-        {find: collName, batchSize: 2, awaitData: true, tailable: true, maxTimeMS: 2000});
+        {find: collName, batchSize: 2, awaitData: true, tailable: true, maxTimeMS: sixtyMinutes});
     assert.commandWorked(cmdRes);
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
@@ -114,7 +115,7 @@
     // The oplog tailing in not possible on mongos.
     if (FixtureHelpers.isReplSet(db)) {
         var localDB = db.getSiblingDB("local");
-        var oplogColl = localDB.oplog.$main;
+        var oplogColl = localDB.oplog.rs;
 
         cmdRes = localDB.runCommand(
             {find: oplogColl.getName(), batchSize: 2, awaitData: true, tailable: true});
