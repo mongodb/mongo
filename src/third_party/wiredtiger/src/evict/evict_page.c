@@ -300,14 +300,16 @@ __evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 
 	/*
 	 * Discard the page and update the reference structure. If evicting a
-	 * WT_REF_LIMBO page, transition back to WT_REF_LOOKASIDE. Otherwise,
-	 * a page with a disk address is an on-disk page, and a page without
-	 * a disk address is a re-instantiated deleted page (for example, by
-	 * searching), that was never subsequently written.
+	 * WT_REF_LIMBO page with active history, transition back to
+	 * WT_REF_LOOKASIDE. Otherwise, a page with a disk address is an
+	 * on-disk page, and a page without a disk address is a re-instantiated
+	 * deleted page (for example, by searching), that was never
+	 * subsequently written.
 	 */
 	__wt_ref_out(session, ref);
 	if (!closing && ref->page_las != NULL &&
-	    ref->page_las->eviction_to_lookaside) {
+	    ref->page_las->eviction_to_lookaside &&
+	    __wt_page_las_active(session, ref)) {
 		ref->page_las->eviction_to_lookaside = false;
 		WT_PUBLISH(ref->state, WT_REF_LOOKASIDE);
 	} else if (ref->addr == NULL) {
@@ -451,6 +453,14 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 			 * page.
 			 */
 			if (__wt_page_del_active(session, child, true))
+				return (EBUSY);
+			break;
+		case WT_REF_LOOKASIDE:
+			/*
+			 * If the lookaside history is obsolete, the reference
+			 * can be ignored.
+			 */
+			if (__wt_page_las_active(session, child))
 				return (EBUSY);
 			break;
 		default:

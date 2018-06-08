@@ -50,12 +50,17 @@ __wt_conn_compat_config(
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	uint16_t min_major, min_minor, rel_major, rel_minor;
+	uint16_t max_major, max_minor, min_major, min_minor;
+	uint16_t rel_major, rel_minor;
 	char *value;
 	bool txn_active;
 
 	conn = S2C(session);
 	value = NULL;
+	max_major = WT_CONN_COMPAT_NONE;
+	max_minor = WT_CONN_COMPAT_NONE;
+	min_major = WT_CONN_COMPAT_NONE;
+	min_minor = WT_CONN_COMPAT_NONE;
 
 	WT_RET(__wt_config_gets(session, cfg, "compatibility.release", &cval));
 	if (cval.len == 0) {
@@ -85,26 +90,43 @@ __wt_conn_compat_config(
 		goto done;
 
 	/*
-	 * The minimum required version for existing files is only available
-	 * on opening the connection, not reconfigure.
+	 * The maximum and minimum required version for existing files
+	 * is only available on opening the connection, not reconfigure.
 	 */
 	WT_RET(__wt_config_gets(session,
 	    cfg, "compatibility.require_min", &cval));
-	if (cval.len == 0) {
-		min_major = WT_CONN_COMPAT_NONE;
-		min_minor = WT_CONN_COMPAT_NONE;
-	} else
+	if (cval.len != 0)
 		WT_RET(__conn_compat_parse(
 		    session, &cval, &min_major, &min_minor));
 
+	WT_RET(__wt_config_gets(session,
+	    cfg, "compatibility.require_max", &cval));
+	if (cval.len != 0)
+		WT_RET(__conn_compat_parse(
+		    session, &cval, &max_major, &max_minor));
+
+	/*
+	 * The maximum required must be greater than or equal to the
+	 * compatibility release we're using now. This is on an open and we're
+	 * checking the two against each other. We'll check against what was
+	 * saved on a restart later.
+	 */
+	if (!reconfig && max_major != WT_CONN_COMPAT_NONE &&
+	    (max_major < rel_major ||
+	    (max_major == rel_major && max_minor < rel_minor)))
+		WT_RET_MSG(session, ENOTSUP,
+		    "required max of %" PRIu16 ".%" PRIu16
+		    "cannot be smaller than compatibility release %"
+		    PRIu16 ".%" PRIu16,
+		    max_major, max_minor, rel_major, rel_minor);
+
 	/*
 	 * The minimum required must be less than or equal to the compatibility
-	 * release if one was set. This is on an open and we're checking the
+	 * release we're using now. This is on an open and we're checking the
 	 * two against each other. We'll check against what was saved on a
 	 * restart later.
 	 */
-	if (!reconfig && F_ISSET(conn, WT_CONN_COMPATIBILITY) &&
-	    min_major != WT_CONN_COMPAT_NONE &&
+	if (!reconfig && min_major != WT_CONN_COMPAT_NONE &&
 	    (min_major > rel_major ||
 	    (min_major == rel_major && min_minor > rel_minor)))
 		WT_RET_MSG(session, ENOTSUP,
@@ -115,17 +137,32 @@ __wt_conn_compat_config(
 
 	/*
 	 * On a reconfigure, check the new release version against any
+	 * required maximum version set on open.
+	 */
+	if (reconfig && conn->req_max_major != WT_CONN_COMPAT_NONE &&
+	    (conn->req_max_major < rel_major ||
+	    (conn->req_max_major == rel_major &&
+	    conn->req_max_minor < rel_minor)))
+		WT_RET_MSG(session, ENOTSUP,
+		    "required max of %" PRIu16 ".%" PRIu16
+		    "cannot be smaller than requested compatibility release %"
+		    PRIu16 ".%" PRIu16,
+		    conn->req_max_major, conn->req_max_minor,
+		    rel_major, rel_minor);
+
+	/*
+	 * On a reconfigure, check the new release version against any
 	 * required minimum version set on open.
 	 */
-	if (reconfig && conn->compat_req_major != WT_CONN_COMPAT_NONE &&
-	    (conn->compat_req_major > rel_major ||
-	    (conn->compat_req_major == rel_major &&
-	    conn->compat_req_minor > rel_minor)))
+	if (reconfig && conn->req_min_major != WT_CONN_COMPAT_NONE &&
+	    (conn->req_min_major > rel_major ||
+	    (conn->req_min_major == rel_major &&
+	    conn->req_min_minor > rel_minor)))
 		WT_RET_MSG(session, ENOTSUP,
 		    "required min of %" PRIu16 ".%" PRIu16
 		    "cannot be larger than requested compatibility release %"
 		    PRIu16 ".%" PRIu16,
-		    conn->compat_req_major, conn->compat_req_minor,
+		    conn->req_min_major, conn->req_min_minor,
 		    rel_major, rel_minor);
 
 	conn->compat_major = rel_major;
@@ -141,10 +178,13 @@ __wt_conn_compat_config(
 		WT_RET(__wt_metadata_turtle_rewrite(session));
 
 	/*
-	 * The required minimum cannot be set via reconfigure and it is
-	 * meaningless on a newly created database. We're done in those cases.
+	 * The required maximum and minimum cannot be set via reconfigure and
+	 * they are meaningless on a newly created database. We're done in
+	 * those cases.
 	 */
-	if (reconfig || conn->is_new || min_major == WT_CONN_COMPAT_NONE)
+	if (reconfig || conn->is_new ||
+	    (min_major == WT_CONN_COMPAT_NONE &&
+	    max_major == WT_CONN_COMPAT_NONE))
 		goto done;
 
 	/*
@@ -158,8 +198,17 @@ __wt_conn_compat_config(
 		rel_major = (uint16_t)cval.val;
 		WT_ERR(__wt_config_getones(session, value, "minor", &cval));
 		rel_minor = (uint16_t)cval.val;
-		if (min_major > rel_major ||
-		    (min_major == rel_major && min_minor > rel_minor))
+		if (max_major != WT_CONN_COMPAT_NONE &&
+		    (max_major < rel_major ||
+		    (max_major == rel_major && max_minor < rel_minor)))
+			WT_ERR_MSG(session, ENOTSUP,
+			    "required max of %" PRIu16 ".%" PRIu16
+			    "cannot be larger than saved release %"
+			    PRIu16 ".%" PRIu16,
+			    max_major, max_minor, rel_major, rel_minor);
+		if (min_major != WT_CONN_COMPAT_NONE &&
+		    (min_major > rel_major ||
+		    (min_major == rel_major && min_minor > rel_minor)))
 			WT_ERR_MSG(session, ENOTSUP,
 			    "required min of %" PRIu16 ".%" PRIu16
 			    "cannot be larger than saved release %"
@@ -170,9 +219,11 @@ __wt_conn_compat_config(
 	else
 		WT_ERR(ret);
 
-	conn->compat_req_major = min_major;
-	conn->compat_req_minor = min_minor;
-done:
+done:	conn->req_max_major = max_major;
+	conn->req_max_minor = max_minor;
+	conn->req_min_major = min_major;
+	conn->req_min_minor = min_minor;
+
 err:	if (value != NULL)
 		__wt_free(session, value);
 

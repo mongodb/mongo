@@ -646,6 +646,10 @@ wiredtiger_open_compatibility_configuration = [
         of the call.''',
         type='category', subconfig=
         compatibility_configuration_common + [
+        Config('require_max', '', r'''
+            required maximum compatibility version of existing data files.
+            Must be greater than or equal to any release version set in the
+            \c release setting. Has no effect if creating the database.'''),
         Config('require_min', '', r'''
             required minimum compatibility version of existing data files.
             Must be less than or equal to any release version set in the

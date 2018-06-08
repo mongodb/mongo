@@ -47,6 +47,7 @@ typedef struct {
 
 	/* Track the page's min/maximum transactions. */
 	uint64_t max_txn;
+	uint64_t min_txn_unstable;
 	WT_DECL_TIMESTAMP(max_timestamp)
 	WT_DECL_TIMESTAMP(max_onpage_timestamp)
 	WT_DECL_TIMESTAMP(min_saved_timestamp)
@@ -568,42 +569,6 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 }
 
 /*
- * __rec_las_checkpoint_test --
- *	Return if the lookaside table is going to collide with a checkpoint.
- */
-static inline bool
-__rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
-{
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-
-	/*
-	 * Running checkpoints can collide with the lookaside table because
-	 * reconciliation using the lookaside table writes the key's last
-	 * committed value, which might not be the value checkpoint would write.
-	 * If reconciliation was configured for lookaside table eviction, this
-	 * file participates in checkpoints, and any of the tree or system
-	 * transactional generation numbers don't match, there's a possible
-	 * collision.
-	 *
-	 * It's a complicated test, but the alternative is to have checkpoint
-	 * drain lookaside table reconciliations, and this isn't a problem for
-	 * most workloads.
-	 */
-	if (!F_ISSET(r, WT_REC_LOOKASIDE))
-		return (false);
-	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
-		return (false);
-	if (r->orig_btree_checkpoint_gen == btree->checkpoint_gen &&
-	    r->orig_txn_checkpoint_gen ==
-	    __wt_gen(session, WT_GEN_CHECKPOINT) &&
-	    r->orig_btree_checkpoint_gen == r->orig_txn_checkpoint_gen)
-		return (false);
-	return (true);
-}
-
-/*
  * __rec_write_check_complete --
  *	Check that reconciliation should complete.
  */
@@ -611,6 +576,8 @@ static int
 __rec_write_check_complete(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, int tret, bool *lookaside_retryp)
 {
+	WT_UNUSED(session);
+
 	/*
 	 * Tests in this function are lookaside tests and tests to decide if
 	 * rewriting a page in memory is worth doing. In-memory configurations
@@ -620,13 +587,6 @@ __rec_write_check_complete(
 	 */
 	if (F_ISSET(r, WT_REC_IN_MEMORY))
 		return (0);
-
-	/*
-	 * If we have used the lookaside table, check for a lookaside table and
-	 * checkpoint collision.
-	 */
-	if (r->cache_write_lookaside && __rec_las_checkpoint_test(session, r))
-		return (EBUSY);
 
 	/*
 	 * Fall back to lookaside eviction during checkpoints if a page can't
@@ -970,17 +930,22 @@ __rec_init(WT_SESSION_IMPL *session,
 	 * we choose will be stable.  However, if checkpointing with a
 	 * timestamp (indicated by a stable_timestamp being set), and the
 	 * timestamp hasn't changed since the last time this page was
-	 * reconciled, skew oldest instead.
+	 * reconciled, skew oldest instead. If a checkpoint is already running,
+	 * the oldest version is more likely to be what it needs.
 	 */
 	if (__wt_btree_immediately_durable(session))
 		las_skew_oldest = false;
 	else {
 		WT_ORDERED_READ(las_skew_oldest,
 		    txn_global->has_stable_timestamp);
-		if (las_skew_oldest)
-			las_skew_oldest = ref->page_las != NULL &&
+		if (las_skew_oldest) {
+			las_skew_oldest = (ref->page_las != NULL &&
 			    !__wt_txn_visible_all(session, WT_TXN_NONE,
-			    WT_TIMESTAMP_NULL(&ref->page_las->min_timestamp));
+			    WT_TIMESTAMP_NULL(
+			    &ref->page_las->min_timestamp))) ||
+			    btree->checkpoint_gen !=
+			    __wt_gen(session, WT_GEN_CHECKPOINT);
+		}
 	}
 	r->las_skew_newest = LF_ISSET(WT_REC_LOOKASIDE) &&
 	    LF_ISSET(WT_REC_VISIBLE_ALL) && !las_skew_oldest;
@@ -1010,19 +975,11 @@ __rec_init(WT_SESSION_IMPL *session,
 	if (page->type == WT_PAGE_COL_FIX)
 		LF_CLR(WT_REC_LOOKASIDE);
 
-	/*
-	 * Check for a lookaside table and checkpoint collision, and if we find
-	 * one, turn off the lookaside file (we've gone to all the effort of
-	 * getting exclusive access to the page, might as well try and evict
-	 * it).
-	 */
-	if (LF_ISSET(WT_REC_LOOKASIDE) && __rec_las_checkpoint_test(session, r))
-		LF_CLR(WT_REC_LOOKASIDE);
-
 	r->flags = flags;
 
 	/* Track the page's min/maximum transaction */
 	r->max_txn = WT_TXN_NONE;
+	r->min_txn_unstable = WT_TXN_ABORTED;
 	__wt_timestamp_set_zero(&r->max_timestamp);
 	__wt_timestamp_set_zero(&r->max_onpage_timestamp);
 	__wt_timestamp_set_inf(&r->min_saved_timestamp);
@@ -1307,7 +1264,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_UPDATE *first_txn_upd, *first_upd, *upd;
 	wt_timestamp_t *timestampp;
 	size_t upd_memsize;
-	uint64_t max_txn, txnid;
+	uint64_t max_txn, min_txn_unstable, txnid;
 	bool all_visible, skipped_birthmark, uncommitted;
 
 #ifdef HAVE_TIMESTAMPS
@@ -1323,6 +1280,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	first_txn_upd = NULL;
 	upd_memsize = 0;
 	max_txn = WT_TXN_NONE;
+	min_txn_unstable = WT_TXN_ABORTED;
 	skipped_birthmark = uncommitted = false;
 
 	/*
@@ -1422,6 +1380,13 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			if (upd->type == WT_UPDATE_BIRTHMARK)
 				skipped_birthmark = true;
 
+			/*
+			 * Track minimum transaction ID for unstable updates.
+			 */
+			if (txnid != WT_TXN_NONE &&
+			    WT_TXNID_LT(txnid, min_txn_unstable))
+				min_txn_unstable = txnid;
+
 			continue;
 		}
 
@@ -1468,6 +1433,13 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	if (WT_TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
+
+	/*
+	 * Track the oldest unstable transaction in the page. It is used to
+	 * decide whether to or not to read the history during a page read.
+	 */
+	if (WT_TXNID_LT(min_txn_unstable, r->min_txn_unstable))
+		r->min_txn_unstable = min_txn_unstable;
 
 #ifdef HAVE_TIMESTAMPS
 	/* Update the maximum timestamp. */
@@ -1814,17 +1786,21 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			break;
 
 		case WT_REF_LIMBO:
+			WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
+			/* FALLTHROUGH */
 		case WT_REF_LOOKASIDE:
 			/*
-			 * On disk, with lookaside updates.
+			 * On disk or in cache with lookaside updates.
 			 *
-			 * We should never be here during eviction, active
+			 * We should never be here during eviction: active
 			 * child pages in an evicted page's subtree fails the
 			 * eviction attempt.
 			 */
-			WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
-			if (F_ISSET(r, WT_REC_EVICT))
+			if (F_ISSET(r, WT_REC_EVICT) &&
+			    __wt_page_las_active(session, ref)) {
+				WT_ASSERT(session, false);
 				return (EBUSY);
+			}
 
 			/*
 			 * A page evicted with lookaside entries may not have
@@ -1836,7 +1812,6 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 				*statep = WT_CHILD_IGNORE;
 				WT_CHILD_RELEASE(session, *hazardp, ref);
 			}
-
 			goto done;
 
 		case WT_REF_MEM:
@@ -3456,7 +3431,9 @@ done:	if (F_ISSET(r, WT_REC_LOOKASIDE)) {
 		/* Track the oldest lookaside timestamp seen so far. */
 		multi->page_las.las_skew_newest = r->las_skew_newest;
 		multi->page_las.las_max_txn = r->max_txn;
+		multi->page_las.las_min_txn = r->min_txn_unstable;
 		WT_ASSERT(session, r->max_txn != WT_TXN_NONE);
+		WT_ASSERT(session, r->min_txn_unstable != WT_TXN_NONE);
 #ifdef HAVE_TIMESTAMPS
 		__wt_timestamp_set(&multi->page_las.min_timestamp,
 		    &r->min_saved_timestamp);

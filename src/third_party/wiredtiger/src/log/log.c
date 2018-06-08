@@ -975,15 +975,24 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp,
 		    WT_LOG_VERSION, desc->version);
 
 	/*
-	 * We error if the log version is less than the required minimum.
+	 * We error if the log version is less than the required minimum
+	 * or larger than the required maximum.
 	 */
-	if (conn->compat_req_major != WT_CONN_COMPAT_NONE &&
-	    desc->version < conn->log_req_version)
+	if (conn->req_max_major != WT_CONN_COMPAT_NONE &&
+	    desc->version > conn->log_req_max)
+		WT_ERR_MSG(session, WT_ERROR,
+		    "unsupported WiredTiger file version: this build"
+		    " requires a maximum version of %" PRIu16 ","
+		    " and the file is version %" PRIu16,
+		    conn->log_req_max, desc->version);
+
+	if (conn->req_min_major != WT_CONN_COMPAT_NONE &&
+	    desc->version < conn->log_req_min)
 		WT_ERR_MSG(session, WT_ERROR,
 		    "unsupported WiredTiger file version: this build"
 		    " requires a minimum version of %" PRIu16 ","
 		    " and the file is version %" PRIu16,
-		    conn->log_req_version, desc->version);
+		    conn->log_req_min, desc->version);
 
 	/*
 	 * Set up the return values if the magic number is valid.

@@ -1180,6 +1180,26 @@ __wt_page_del_active(
 }
 
 /*
+ * __wt_page_las_active --
+ *	Return if lookaside data for a page is still required.
+ */
+static inline bool
+__wt_page_las_active(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_PAGE_LOOKASIDE *page_las;
+
+	if ((page_las = ref->page_las) == NULL)
+		return (false);
+	if (page_las->invalid || !ref->page_las->las_skew_newest)
+		return (true);
+	if (__wt_txn_visible_all(session, page_las->las_max_txn,
+	    WT_TIMESTAMP_NULL(&page_las->onpage_timestamp)))
+		return (false);
+
+	return (true);
+}
+
+/*
  * __wt_btree_can_evict_dirty --
  *	Check whether eviction of dirty pages or splits are permitted in the
  *	current tree.

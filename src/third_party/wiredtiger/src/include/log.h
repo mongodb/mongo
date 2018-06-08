@@ -368,8 +368,6 @@ struct __wt_log_desc {
 
 /*
  * WiredTiger release version where log format version changed.
- * We only have to check the major version for now.  It is minor
- * version 0 once release numbers move on.
  */
 #define	WT_LOG_V2_MAJOR	3
 #define	WT_LOG_V2_MINOR	0

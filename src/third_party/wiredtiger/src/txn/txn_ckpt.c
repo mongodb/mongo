@@ -631,7 +631,7 @@ __checkpoint_prepare(
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
 	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
-	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL, NULL };
+	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL };
 	bool use_timestamp;
 
 	conn = S2C(session);
@@ -735,12 +735,8 @@ __checkpoint_prepare(
 		} else if (!F_ISSET(conn, WT_CONN_RECOVERING))
 			__wt_timestamp_set(&txn_global->meta_ckpt_timestamp,
 			    &txn_global->recovery_timestamp);
-	} else {
-		__wt_timestamp_set_zero(&txn->read_timestamp);
-		if (!F_ISSET(conn, WT_CONN_RECOVERING))
-			__wt_timestamp_set_zero(
-			    &txn_global->meta_ckpt_timestamp);
-	}
+	} else if (!F_ISSET(conn, WT_CONN_RECOVERING))
+		__wt_timestamp_set_zero(&txn_global->meta_ckpt_timestamp);
 #else
 	WT_UNUSED(use_timestamp);
 #endif
@@ -748,9 +744,18 @@ __checkpoint_prepare(
 	__wt_writeunlock(session, &txn_global->rwlock);
 
 #ifdef HAVE_TIMESTAMPS
-	if (F_ISSET(txn, WT_TXN_HAS_TS_READ))
+	if (F_ISSET(txn, WT_TXN_HAS_TS_READ)) {
 		__wt_verbose_timestamp(session, &txn->read_timestamp,
 		    "Checkpoint requested at stable timestamp");
+
+		/*
+		 * The snapshot we established when the transaction started may
+		 * be too early to match the timestamp we just read.
+		 *
+		 * Get a new one.
+		 */
+		__wt_txn_get_snapshot(session);
+	}
 #endif
 
 	/*

@@ -144,6 +144,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	__las_page_instantiate_verbose(session, las_pageid);
 	WT_STAT_CONN_INCR(session, cache_read_lookaside);
 	WT_STAT_DATA_INCR(session, cache_read_lookaside);
+	if (WT_SESSION_IS_CHECKPOINT(session))
+		WT_STAT_CONN_INCR(session, cache_read_lookaside_checkpoint);
 
 	__wt_btcur_init(session, &cbt);
 	__wt_btcur_open(&cbt);
@@ -501,8 +503,12 @@ skip_read:
 		/* FALLTHROUGH */
 	case WT_REF_LIMBO:
 		/* Instantiate updates from the database's lookaside table. */
-		if (previous_state == WT_REF_LIMBO)
+		if (previous_state == WT_REF_LIMBO) {
 			WT_STAT_CONN_INCR(session, cache_read_lookaside_delay);
+			if (WT_SESSION_IS_CHECKPOINT(session))
+				WT_STAT_CONN_INCR(session,
+				    cache_read_lookaside_delay_checkpoint);
+		}
 
 		WT_ERR(__las_page_instantiate(session, ref));
 		ref->page_las->eviction_to_lookaside = false;

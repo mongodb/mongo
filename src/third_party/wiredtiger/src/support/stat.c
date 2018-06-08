@@ -856,8 +856,10 @@ static const char * const __stats_connection_desc[] = {
 	"cache: pages read into cache after truncate",
 	"cache: pages read into cache after truncate in prepare state",
 	"cache: pages read into cache requiring lookaside entries",
+	"cache: pages read into cache requiring lookaside for checkpoint",
 	"cache: pages read into cache skipping older lookaside entries",
 	"cache: pages read into cache with skipped lookaside entries needed later",
+	"cache: pages read into cache with skipped lookaside entries needed later by checkpoint",
 	"cache: pages requested from the cache",
 	"cache: pages seen by eviction walk",
 	"cache: pages selected for eviction unable to be evicted",
@@ -1251,8 +1253,10 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_read_deleted = 0;
 	stats->cache_read_deleted_prepared = 0;
 	stats->cache_read_lookaside = 0;
+	stats->cache_read_lookaside_checkpoint = 0;
 	stats->cache_read_lookaside_skipped = 0;
 	stats->cache_read_lookaside_delay = 0;
+	stats->cache_read_lookaside_delay_checkpoint = 0;
 	stats->cache_pages_requested = 0;
 	stats->cache_eviction_pages_seen = 0;
 	stats->cache_eviction_fail = 0;
@@ -1683,10 +1687,14 @@ __wt_stat_connection_aggregate(
 	to->cache_read_deleted_prepared +=
 	    WT_STAT_READ(from, cache_read_deleted_prepared);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
+	to->cache_read_lookaside_checkpoint +=
+	    WT_STAT_READ(from, cache_read_lookaside_checkpoint);
 	to->cache_read_lookaside_skipped +=
 	    WT_STAT_READ(from, cache_read_lookaside_skipped);
 	to->cache_read_lookaside_delay +=
 	    WT_STAT_READ(from, cache_read_lookaside_delay);
+	to->cache_read_lookaside_delay_checkpoint +=
+	    WT_STAT_READ(from, cache_read_lookaside_delay_checkpoint);
 	to->cache_pages_requested +=
 	    WT_STAT_READ(from, cache_pages_requested);
 	to->cache_eviction_pages_seen +=
