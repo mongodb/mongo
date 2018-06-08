@@ -377,8 +377,13 @@ LogicalTime getClientOperationTime(OperationContext* opCtx) {
  * The latest in-memory clusterTime is returned if the start operationTime is uninitialized.
  */
 LogicalTime computeOperationTime(OperationContext* opCtx, LogicalTime startOperationTime) {
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const bool isReplSet =
+        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    invariant(isReplSet);
+
     if (startOperationTime == LogicalTime::kUninitialized) {
-        return LogicalClock::get(opCtx)->getClusterTime();
+        return LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
     }
 
     auto operationTime = getClientOperationTime(opCtx);
@@ -387,7 +392,6 @@ LogicalTime computeOperationTime(OperationContext* opCtx, LogicalTime startOpera
     // If the last operationTime has not changed, consider this command a read, and, for replica set
     // members, construct the operationTime with the proper optime for its read concern level.
     if (operationTime == startOperationTime) {
-        auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
         // Note: ReadConcernArgs::getLevel returns kLocal if none was set.
