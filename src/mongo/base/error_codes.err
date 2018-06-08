@@ -259,6 +259,7 @@ error_code("UnknownFeatureCompatibilityVersion", 258);
 error_code("KeyedExecutorRetry", 259);
 error_code("InvalidResumeToken", 260);
 error_code("TooManyFilesOpen", 261);
+error_code("FailPointSetFailed", 262)
 
 # Error codes 4000-8999 are reserved.
 
