@@ -619,6 +619,13 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
 BSONObj getDefaultCollationForUnshardedCollection(const Shard* primaryShard,
                                                   const NamespaceString& nss) {
+    // Because collectionless aggregations are generally run against the 'admin' database, the
+    // standard logic will attempt to resolve its non-existent collation by sending a specious
+    // 'listCollections' command to the config servers. To prevent this, we immediately return an
+    // empty BSONObj if the namespace is collectionless.
+    if (nss.isCollectionlessAggregateNS()) {
+        return BSONObj();
+    }
     ScopedDbConnection conn(primaryShard->getConnString());
     BSONObj defaultCollation;
     std::list<BSONObj> all =
