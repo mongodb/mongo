@@ -103,6 +103,10 @@ test_rwlock_SOURCES = rwlock/main.c
 noinst_PROGRAMS += test_rwlock
 all_TESTS += test_rwlock
 
+test_wt4105_large_doc_small_upd_SOURCES = wt4105_large_doc_small_upd/main.c
+noinst_PROGRAMS += test_wt4105_large_doc_small_upd
+all_TESTS += test_wt4105_large_doc_small_upd
+
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)
 LOG_COMPILER = $(TEST_WRAPPER)

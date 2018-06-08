@@ -2740,6 +2740,10 @@ struct __wt_connection {
  * below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;release, compatibility release
  * version string., a string; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;require_max, required maximum compatibility
+ * version of existing data files.  Must be greater than or equal to any release
+ * version set in the \c release setting.  Has no effect if creating the
+ * database., a string; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;require_min, required minimum compatibility
  * version of existing data files.  Must be less than or equal to any release
  * version set in the \c release setting.  Has no effect if creating the
@@ -5114,551 +5118,558 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_READ_DELETED_PREPARED	1107
 /*! cache: pages read into cache requiring lookaside entries */
 #define	WT_STAT_CONN_CACHE_READ_LOOKASIDE		1108
+/*! cache: pages read into cache requiring lookaside for checkpoint */
+#define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_CHECKPOINT	1109
 /*! cache: pages read into cache skipping older lookaside entries */
-#define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_SKIPPED	1109
+#define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_SKIPPED	1110
 /*!
  * cache: pages read into cache with skipped lookaside entries needed
  * later
  */
-#define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_DELAY		1110
+#define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_DELAY		1111
+/*!
+ * cache: pages read into cache with skipped lookaside entries needed
+ * later by checkpoint
+ */
+#define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_DELAY_CHECKPOINT	1112
 /*! cache: pages requested from the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_REQUESTED		1111
+#define	WT_STAT_CONN_CACHE_PAGES_REQUESTED		1113
 /*! cache: pages seen by eviction walk */
-#define	WT_STAT_CONN_CACHE_EVICTION_PAGES_SEEN		1112
+#define	WT_STAT_CONN_CACHE_EVICTION_PAGES_SEEN		1114
 /*! cache: pages selected for eviction unable to be evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		1113
+#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		1115
 /*! cache: pages walked for eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALK		1114
+#define	WT_STAT_CONN_CACHE_EVICTION_WALK		1116
 /*! cache: pages written from cache */
-#define	WT_STAT_CONN_CACHE_WRITE			1115
+#define	WT_STAT_CONN_CACHE_WRITE			1117
 /*! cache: pages written requiring in-memory restoration */
-#define	WT_STAT_CONN_CACHE_WRITE_RESTORE		1116
+#define	WT_STAT_CONN_CACHE_WRITE_RESTORE		1118
 /*! cache: percentage overhead */
-#define	WT_STAT_CONN_CACHE_OVERHEAD			1117
+#define	WT_STAT_CONN_CACHE_OVERHEAD			1119
 /*! cache: tracked bytes belonging to internal pages in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_INTERNAL		1118
+#define	WT_STAT_CONN_CACHE_BYTES_INTERNAL		1120
 /*! cache: tracked bytes belonging to leaf pages in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_LEAF			1119
+#define	WT_STAT_CONN_CACHE_BYTES_LEAF			1121
 /*! cache: tracked dirty bytes in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			1120
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			1122
 /*! cache: tracked dirty pages in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			1121
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			1123
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		1122
+#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		1124
 /*! connection: auto adjusting condition resets */
-#define	WT_STAT_CONN_COND_AUTO_WAIT_RESET		1123
+#define	WT_STAT_CONN_COND_AUTO_WAIT_RESET		1125
 /*! connection: auto adjusting condition wait calls */
-#define	WT_STAT_CONN_COND_AUTO_WAIT			1124
+#define	WT_STAT_CONN_COND_AUTO_WAIT			1126
 /*! connection: detected system time went backwards */
-#define	WT_STAT_CONN_TIME_TRAVEL			1125
+#define	WT_STAT_CONN_TIME_TRAVEL			1127
 /*! connection: files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				1126
+#define	WT_STAT_CONN_FILE_OPEN				1128
 /*! connection: memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1127
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1129
 /*! connection: memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1128
+#define	WT_STAT_CONN_MEMORY_FREE			1130
 /*! connection: memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1129
+#define	WT_STAT_CONN_MEMORY_GROW			1131
 /*! connection: pthread mutex condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				1130
+#define	WT_STAT_CONN_COND_WAIT				1132
 /*! connection: pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1131
+#define	WT_STAT_CONN_RWLOCK_READ			1133
 /*! connection: pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1132
+#define	WT_STAT_CONN_RWLOCK_WRITE			1134
 /*! connection: total fsync I/Os */
-#define	WT_STAT_CONN_FSYNC_IO				1133
+#define	WT_STAT_CONN_FSYNC_IO				1135
 /*! connection: total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1134
+#define	WT_STAT_CONN_READ_IO				1136
 /*! connection: total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1135
+#define	WT_STAT_CONN_WRITE_IO				1137
 /*! cursor: cursor create calls */
-#define	WT_STAT_CONN_CURSOR_CREATE			1136
+#define	WT_STAT_CONN_CURSOR_CREATE			1138
 /*! cursor: cursor insert calls */
-#define	WT_STAT_CONN_CURSOR_INSERT			1137
+#define	WT_STAT_CONN_CURSOR_INSERT			1139
 /*! cursor: cursor modify calls */
-#define	WT_STAT_CONN_CURSOR_MODIFY			1138
+#define	WT_STAT_CONN_CURSOR_MODIFY			1140
 /*! cursor: cursor next calls */
-#define	WT_STAT_CONN_CURSOR_NEXT			1139
+#define	WT_STAT_CONN_CURSOR_NEXT			1141
 /*! cursor: cursor prev calls */
-#define	WT_STAT_CONN_CURSOR_PREV			1140
+#define	WT_STAT_CONN_CURSOR_PREV			1142
 /*! cursor: cursor remove calls */
-#define	WT_STAT_CONN_CURSOR_REMOVE			1141
+#define	WT_STAT_CONN_CURSOR_REMOVE			1143
 /*! cursor: cursor reserve calls */
-#define	WT_STAT_CONN_CURSOR_RESERVE			1142
+#define	WT_STAT_CONN_CURSOR_RESERVE			1144
 /*! cursor: cursor reset calls */
-#define	WT_STAT_CONN_CURSOR_RESET			1143
+#define	WT_STAT_CONN_CURSOR_RESET			1145
 /*! cursor: cursor restarted searches */
-#define	WT_STAT_CONN_CURSOR_RESTART			1144
+#define	WT_STAT_CONN_CURSOR_RESTART			1146
 /*! cursor: cursor search calls */
-#define	WT_STAT_CONN_CURSOR_SEARCH			1145
+#define	WT_STAT_CONN_CURSOR_SEARCH			1147
 /*! cursor: cursor search near calls */
-#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			1146
+#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			1148
 /*! cursor: cursor sweep buckets */
-#define	WT_STAT_CONN_CURSOR_SWEEP_BUCKETS		1147
+#define	WT_STAT_CONN_CURSOR_SWEEP_BUCKETS		1149
 /*! cursor: cursor sweep cursors closed */
-#define	WT_STAT_CONN_CURSOR_SWEEP_CLOSED		1148
+#define	WT_STAT_CONN_CURSOR_SWEEP_CLOSED		1150
 /*! cursor: cursor sweep cursors examined */
-#define	WT_STAT_CONN_CURSOR_SWEEP_EXAMINED		1149
+#define	WT_STAT_CONN_CURSOR_SWEEP_EXAMINED		1151
 /*! cursor: cursor sweeps */
-#define	WT_STAT_CONN_CURSOR_SWEEP			1150
+#define	WT_STAT_CONN_CURSOR_SWEEP			1152
 /*! cursor: cursor update calls */
-#define	WT_STAT_CONN_CURSOR_UPDATE			1151
+#define	WT_STAT_CONN_CURSOR_UPDATE			1153
 /*! cursor: cursors cached on close */
-#define	WT_STAT_CONN_CURSOR_CACHE			1152
+#define	WT_STAT_CONN_CURSOR_CACHE			1154
 /*! cursor: cursors reused from cache */
-#define	WT_STAT_CONN_CURSOR_REOPEN			1153
+#define	WT_STAT_CONN_CURSOR_REOPEN			1155
 /*! cursor: truncate calls */
-#define	WT_STAT_CONN_CURSOR_TRUNCATE			1154
+#define	WT_STAT_CONN_CURSOR_TRUNCATE			1156
 /*! data-handle: connection data handles currently active */
-#define	WT_STAT_CONN_DH_CONN_HANDLE_COUNT		1155
+#define	WT_STAT_CONN_DH_CONN_HANDLE_COUNT		1157
 /*! data-handle: connection sweep candidate became referenced */
-#define	WT_STAT_CONN_DH_SWEEP_REF			1156
+#define	WT_STAT_CONN_DH_SWEEP_REF			1158
 /*! data-handle: connection sweep dhandles closed */
-#define	WT_STAT_CONN_DH_SWEEP_CLOSE			1157
+#define	WT_STAT_CONN_DH_SWEEP_CLOSE			1159
 /*! data-handle: connection sweep dhandles removed from hash list */
-#define	WT_STAT_CONN_DH_SWEEP_REMOVE			1158
+#define	WT_STAT_CONN_DH_SWEEP_REMOVE			1160
 /*! data-handle: connection sweep time-of-death sets */
-#define	WT_STAT_CONN_DH_SWEEP_TOD			1159
+#define	WT_STAT_CONN_DH_SWEEP_TOD			1161
 /*! data-handle: connection sweeps */
-#define	WT_STAT_CONN_DH_SWEEPS				1160
+#define	WT_STAT_CONN_DH_SWEEPS				1162
 /*! data-handle: session dhandles swept */
-#define	WT_STAT_CONN_DH_SESSION_HANDLES			1161
+#define	WT_STAT_CONN_DH_SESSION_HANDLES			1163
 /*! data-handle: session sweep attempts */
-#define	WT_STAT_CONN_DH_SESSION_SWEEPS			1162
+#define	WT_STAT_CONN_DH_SESSION_SWEEPS			1164
 /*! lock: checkpoint lock acquisitions */
-#define	WT_STAT_CONN_LOCK_CHECKPOINT_COUNT		1163
+#define	WT_STAT_CONN_LOCK_CHECKPOINT_COUNT		1165
 /*! lock: checkpoint lock application thread wait time (usecs) */
-#define	WT_STAT_CONN_LOCK_CHECKPOINT_WAIT_APPLICATION	1164
+#define	WT_STAT_CONN_LOCK_CHECKPOINT_WAIT_APPLICATION	1166
 /*! lock: checkpoint lock internal thread wait time (usecs) */
-#define	WT_STAT_CONN_LOCK_CHECKPOINT_WAIT_INTERNAL	1165
+#define	WT_STAT_CONN_LOCK_CHECKPOINT_WAIT_INTERNAL	1167
 /*!
  * lock: commit timestamp queue lock application thread time waiting for
  * the dhandle lock (usecs)
  */
-#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WAIT_APPLICATION	1166
+#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WAIT_APPLICATION	1168
 /*!
  * lock: commit timestamp queue lock internal thread time waiting for the
  * dhandle lock (usecs)
  */
-#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WAIT_INTERNAL	1167
+#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WAIT_INTERNAL	1169
 /*! lock: commit timestamp queue read lock acquisitions */
-#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_READ_COUNT	1168
+#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_READ_COUNT	1170
 /*! lock: commit timestamp queue write lock acquisitions */
-#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WRITE_COUNT	1169
+#define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WRITE_COUNT	1171
 /*!
  * lock: dhandle lock application thread time waiting for the dhandle
  * lock (usecs)
  */
-#define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_APPLICATION	1170
+#define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_APPLICATION	1172
 /*!
  * lock: dhandle lock internal thread time waiting for the dhandle lock
  * (usecs)
  */
-#define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_INTERNAL		1171
+#define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_INTERNAL		1173
 /*! lock: dhandle read lock acquisitions */
-#define	WT_STAT_CONN_LOCK_DHANDLE_READ_COUNT		1172
+#define	WT_STAT_CONN_LOCK_DHANDLE_READ_COUNT		1174
 /*! lock: dhandle write lock acquisitions */
-#define	WT_STAT_CONN_LOCK_DHANDLE_WRITE_COUNT		1173
+#define	WT_STAT_CONN_LOCK_DHANDLE_WRITE_COUNT		1175
 /*! lock: metadata lock acquisitions */
-#define	WT_STAT_CONN_LOCK_METADATA_COUNT		1174
+#define	WT_STAT_CONN_LOCK_METADATA_COUNT		1176
 /*! lock: metadata lock application thread wait time (usecs) */
-#define	WT_STAT_CONN_LOCK_METADATA_WAIT_APPLICATION	1175
+#define	WT_STAT_CONN_LOCK_METADATA_WAIT_APPLICATION	1177
 /*! lock: metadata lock internal thread wait time (usecs) */
-#define	WT_STAT_CONN_LOCK_METADATA_WAIT_INTERNAL	1176
+#define	WT_STAT_CONN_LOCK_METADATA_WAIT_INTERNAL	1178
 /*!
  * lock: read timestamp queue lock application thread time waiting for
  * the dhandle lock (usecs)
  */
-#define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_WAIT_APPLICATION	1177
+#define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_WAIT_APPLICATION	1179
 /*!
  * lock: read timestamp queue lock internal thread time waiting for the
  * dhandle lock (usecs)
  */
-#define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_WAIT_INTERNAL	1178
+#define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_WAIT_INTERNAL	1180
 /*! lock: read timestamp queue read lock acquisitions */
-#define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_READ_COUNT	1179
+#define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_READ_COUNT	1181
 /*! lock: read timestamp queue write lock acquisitions */
-#define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_WRITE_COUNT	1180
+#define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_WRITE_COUNT	1182
 /*! lock: schema lock acquisitions */
-#define	WT_STAT_CONN_LOCK_SCHEMA_COUNT			1181
+#define	WT_STAT_CONN_LOCK_SCHEMA_COUNT			1183
 /*! lock: schema lock application thread wait time (usecs) */
-#define	WT_STAT_CONN_LOCK_SCHEMA_WAIT_APPLICATION	1182
+#define	WT_STAT_CONN_LOCK_SCHEMA_WAIT_APPLICATION	1184
 /*! lock: schema lock internal thread wait time (usecs) */
-#define	WT_STAT_CONN_LOCK_SCHEMA_WAIT_INTERNAL		1183
+#define	WT_STAT_CONN_LOCK_SCHEMA_WAIT_INTERNAL		1185
 /*!
  * lock: table lock application thread time waiting for the table lock
  * (usecs)
  */
-#define	WT_STAT_CONN_LOCK_TABLE_WAIT_APPLICATION	1184
+#define	WT_STAT_CONN_LOCK_TABLE_WAIT_APPLICATION	1186
 /*!
  * lock: table lock internal thread time waiting for the table lock
  * (usecs)
  */
-#define	WT_STAT_CONN_LOCK_TABLE_WAIT_INTERNAL		1185
+#define	WT_STAT_CONN_LOCK_TABLE_WAIT_INTERNAL		1187
 /*! lock: table read lock acquisitions */
-#define	WT_STAT_CONN_LOCK_TABLE_READ_COUNT		1186
+#define	WT_STAT_CONN_LOCK_TABLE_READ_COUNT		1188
 /*! lock: table write lock acquisitions */
-#define	WT_STAT_CONN_LOCK_TABLE_WRITE_COUNT		1187
+#define	WT_STAT_CONN_LOCK_TABLE_WRITE_COUNT		1189
 /*!
  * lock: txn global lock application thread time waiting for the dhandle
  * lock (usecs)
  */
-#define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WAIT_APPLICATION	1188
+#define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WAIT_APPLICATION	1190
 /*!
  * lock: txn global lock internal thread time waiting for the dhandle
  * lock (usecs)
  */
-#define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WAIT_INTERNAL	1189
+#define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WAIT_INTERNAL	1191
 /*! lock: txn global read lock acquisitions */
-#define	WT_STAT_CONN_LOCK_TXN_GLOBAL_READ_COUNT		1190
+#define	WT_STAT_CONN_LOCK_TXN_GLOBAL_READ_COUNT		1192
 /*! lock: txn global write lock acquisitions */
-#define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WRITE_COUNT	1191
+#define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WRITE_COUNT	1193
 /*! log: busy returns attempting to switch slots */
-#define	WT_STAT_CONN_LOG_SLOT_SWITCH_BUSY		1192
+#define	WT_STAT_CONN_LOG_SLOT_SWITCH_BUSY		1194
 /*! log: force checkpoint calls slept */
-#define	WT_STAT_CONN_LOG_FORCE_CKPT_SLEEP		1193
+#define	WT_STAT_CONN_LOG_FORCE_CKPT_SLEEP		1195
 /*! log: log bytes of payload data */
-#define	WT_STAT_CONN_LOG_BYTES_PAYLOAD			1194
+#define	WT_STAT_CONN_LOG_BYTES_PAYLOAD			1196
 /*! log: log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1195
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1197
 /*! log: log files manually zero-filled */
-#define	WT_STAT_CONN_LOG_ZERO_FILLS			1196
+#define	WT_STAT_CONN_LOG_ZERO_FILLS			1198
 /*! log: log flush operations */
-#define	WT_STAT_CONN_LOG_FLUSH				1197
+#define	WT_STAT_CONN_LOG_FLUSH				1199
 /*! log: log force write operations */
-#define	WT_STAT_CONN_LOG_FORCE_WRITE			1198
+#define	WT_STAT_CONN_LOG_FORCE_WRITE			1200
 /*! log: log force write operations skipped */
-#define	WT_STAT_CONN_LOG_FORCE_WRITE_SKIP		1199
+#define	WT_STAT_CONN_LOG_FORCE_WRITE_SKIP		1201
 /*! log: log records compressed */
-#define	WT_STAT_CONN_LOG_COMPRESS_WRITES		1200
+#define	WT_STAT_CONN_LOG_COMPRESS_WRITES		1202
 /*! log: log records not compressed */
-#define	WT_STAT_CONN_LOG_COMPRESS_WRITE_FAILS		1201
+#define	WT_STAT_CONN_LOG_COMPRESS_WRITE_FAILS		1203
 /*! log: log records too small to compress */
-#define	WT_STAT_CONN_LOG_COMPRESS_SMALL			1202
+#define	WT_STAT_CONN_LOG_COMPRESS_SMALL			1204
 /*! log: log release advances write LSN */
-#define	WT_STAT_CONN_LOG_RELEASE_WRITE_LSN		1203
+#define	WT_STAT_CONN_LOG_RELEASE_WRITE_LSN		1205
 /*! log: log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				1204
+#define	WT_STAT_CONN_LOG_SCANS				1206
 /*! log: log scan records requiring two reads */
-#define	WT_STAT_CONN_LOG_SCAN_REREADS			1205
+#define	WT_STAT_CONN_LOG_SCAN_REREADS			1207
 /*! log: log server thread advances write LSN */
-#define	WT_STAT_CONN_LOG_WRITE_LSN			1206
+#define	WT_STAT_CONN_LOG_WRITE_LSN			1208
 /*! log: log server thread write LSN walk skipped */
-#define	WT_STAT_CONN_LOG_WRITE_LSN_SKIP			1207
+#define	WT_STAT_CONN_LOG_WRITE_LSN_SKIP			1209
 /*! log: log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				1208
+#define	WT_STAT_CONN_LOG_SYNC				1210
 /*! log: log sync time duration (usecs) */
-#define	WT_STAT_CONN_LOG_SYNC_DURATION			1209
+#define	WT_STAT_CONN_LOG_SYNC_DURATION			1211
 /*! log: log sync_dir operations */
-#define	WT_STAT_CONN_LOG_SYNC_DIR			1210
+#define	WT_STAT_CONN_LOG_SYNC_DIR			1212
 /*! log: log sync_dir time duration (usecs) */
-#define	WT_STAT_CONN_LOG_SYNC_DIR_DURATION		1211
+#define	WT_STAT_CONN_LOG_SYNC_DIR_DURATION		1213
 /*! log: log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				1212
+#define	WT_STAT_CONN_LOG_WRITES				1214
 /*! log: logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1213
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1215
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1214
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1216
 /*! log: number of pre-allocated log files to create */
-#define	WT_STAT_CONN_LOG_PREALLOC_MAX			1215
+#define	WT_STAT_CONN_LOG_PREALLOC_MAX			1217
 /*! log: pre-allocated log files not ready and missed */
-#define	WT_STAT_CONN_LOG_PREALLOC_MISSED		1216
+#define	WT_STAT_CONN_LOG_PREALLOC_MISSED		1218
 /*! log: pre-allocated log files prepared */
-#define	WT_STAT_CONN_LOG_PREALLOC_FILES			1217
+#define	WT_STAT_CONN_LOG_PREALLOC_FILES			1219
 /*! log: pre-allocated log files used */
-#define	WT_STAT_CONN_LOG_PREALLOC_USED			1218
+#define	WT_STAT_CONN_LOG_PREALLOC_USED			1220
 /*! log: records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1219
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1221
 /*! log: slot close lost race */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSE_RACE		1220
+#define	WT_STAT_CONN_LOG_SLOT_CLOSE_RACE		1222
 /*! log: slot close unbuffered waits */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSE_UNBUF		1221
+#define	WT_STAT_CONN_LOG_SLOT_CLOSE_UNBUF		1223
 /*! log: slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1222
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1224
 /*! log: slot join atomic update races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			1223
+#define	WT_STAT_CONN_LOG_SLOT_RACES			1225
 /*! log: slot join calls atomic updates raced */
-#define	WT_STAT_CONN_LOG_SLOT_YIELD_RACE		1224
+#define	WT_STAT_CONN_LOG_SLOT_YIELD_RACE		1226
 /*! log: slot join calls did not yield */
-#define	WT_STAT_CONN_LOG_SLOT_IMMEDIATE			1225
+#define	WT_STAT_CONN_LOG_SLOT_IMMEDIATE			1227
 /*! log: slot join calls found active slot closed */
-#define	WT_STAT_CONN_LOG_SLOT_YIELD_CLOSE		1226
+#define	WT_STAT_CONN_LOG_SLOT_YIELD_CLOSE		1228
 /*! log: slot join calls slept */
-#define	WT_STAT_CONN_LOG_SLOT_YIELD_SLEEP		1227
+#define	WT_STAT_CONN_LOG_SLOT_YIELD_SLEEP		1229
 /*! log: slot join calls yielded */
-#define	WT_STAT_CONN_LOG_SLOT_YIELD			1228
+#define	WT_STAT_CONN_LOG_SLOT_YIELD			1230
 /*! log: slot join found active slot closed */
-#define	WT_STAT_CONN_LOG_SLOT_ACTIVE_CLOSED		1229
+#define	WT_STAT_CONN_LOG_SLOT_ACTIVE_CLOSED		1231
 /*! log: slot joins yield time (usecs) */
-#define	WT_STAT_CONN_LOG_SLOT_YIELD_DURATION		1230
+#define	WT_STAT_CONN_LOG_SLOT_YIELD_DURATION		1232
 /*! log: slot transitions unable to find free slot */
-#define	WT_STAT_CONN_LOG_SLOT_NO_FREE_SLOTS		1231
+#define	WT_STAT_CONN_LOG_SLOT_NO_FREE_SLOTS		1233
 /*! log: slot unbuffered writes */
-#define	WT_STAT_CONN_LOG_SLOT_UNBUFFERED		1232
+#define	WT_STAT_CONN_LOG_SLOT_UNBUFFERED		1234
 /*! log: total in-memory size of compressed records */
-#define	WT_STAT_CONN_LOG_COMPRESS_MEM			1233
+#define	WT_STAT_CONN_LOG_COMPRESS_MEM			1235
 /*! log: total log buffer size */
-#define	WT_STAT_CONN_LOG_BUFFER_SIZE			1234
+#define	WT_STAT_CONN_LOG_BUFFER_SIZE			1236
 /*! log: total size of compressed records */
-#define	WT_STAT_CONN_LOG_COMPRESS_LEN			1235
+#define	WT_STAT_CONN_LOG_COMPRESS_LEN			1237
 /*! log: written slots coalesced */
-#define	WT_STAT_CONN_LOG_SLOT_COALESCED			1236
+#define	WT_STAT_CONN_LOG_SLOT_COALESCED			1238
 /*! log: yields waiting for previous log file close */
-#define	WT_STAT_CONN_LOG_CLOSE_YIELDS			1237
+#define	WT_STAT_CONN_LOG_CLOSE_YIELDS			1239
 /*! perf: file system read latency histogram (bucket 1) - 10-49ms */
-#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT50	1238
+#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT50	1240
 /*! perf: file system read latency histogram (bucket 2) - 50-99ms */
-#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT100	1239
+#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT100	1241
 /*! perf: file system read latency histogram (bucket 3) - 100-249ms */
-#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT250	1240
+#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT250	1242
 /*! perf: file system read latency histogram (bucket 4) - 250-499ms */
-#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT500	1241
+#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT500	1243
 /*! perf: file system read latency histogram (bucket 5) - 500-999ms */
-#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT1000	1242
+#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_LT1000	1244
 /*! perf: file system read latency histogram (bucket 6) - 1000ms+ */
-#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_GT1000	1243
+#define	WT_STAT_CONN_PERF_HIST_FSREAD_LATENCY_GT1000	1245
 /*! perf: file system write latency histogram (bucket 1) - 10-49ms */
-#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT50	1244
+#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT50	1246
 /*! perf: file system write latency histogram (bucket 2) - 50-99ms */
-#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT100	1245
+#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT100	1247
 /*! perf: file system write latency histogram (bucket 3) - 100-249ms */
-#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT250	1246
+#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT250	1248
 /*! perf: file system write latency histogram (bucket 4) - 250-499ms */
-#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT500	1247
+#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT500	1249
 /*! perf: file system write latency histogram (bucket 5) - 500-999ms */
-#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT1000	1248
+#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_LT1000	1250
 /*! perf: file system write latency histogram (bucket 6) - 1000ms+ */
-#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_GT1000	1249
+#define	WT_STAT_CONN_PERF_HIST_FSWRITE_LATENCY_GT1000	1251
 /*! perf: operation read latency histogram (bucket 1) - 100-249us */
-#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_LT250	1250
+#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_LT250	1252
 /*! perf: operation read latency histogram (bucket 2) - 250-499us */
-#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_LT500	1251
+#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_LT500	1253
 /*! perf: operation read latency histogram (bucket 3) - 500-999us */
-#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_LT1000	1252
+#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_LT1000	1254
 /*! perf: operation read latency histogram (bucket 4) - 1000-9999us */
-#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_LT10000	1253
+#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_LT10000	1255
 /*! perf: operation read latency histogram (bucket 5) - 10000us+ */
-#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_GT10000	1254
+#define	WT_STAT_CONN_PERF_HIST_OPREAD_LATENCY_GT10000	1256
 /*! perf: operation write latency histogram (bucket 1) - 100-249us */
-#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_LT250	1255
+#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_LT250	1257
 /*! perf: operation write latency histogram (bucket 2) - 250-499us */
-#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_LT500	1256
+#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_LT500	1258
 /*! perf: operation write latency histogram (bucket 3) - 500-999us */
-#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_LT1000	1257
+#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_LT1000	1259
 /*! perf: operation write latency histogram (bucket 4) - 1000-9999us */
-#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_LT10000	1258
+#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_LT10000	1260
 /*! perf: operation write latency histogram (bucket 5) - 10000us+ */
-#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_GT10000	1259
+#define	WT_STAT_CONN_PERF_HIST_OPWRITE_LATENCY_GT10000	1261
 /*! reconciliation: fast-path pages deleted */
-#define	WT_STAT_CONN_REC_PAGE_DELETE_FAST		1260
+#define	WT_STAT_CONN_REC_PAGE_DELETE_FAST		1262
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1261
+#define	WT_STAT_CONN_REC_PAGES				1263
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1262
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1264
 /*! reconciliation: pages deleted */
-#define	WT_STAT_CONN_REC_PAGE_DELETE			1263
+#define	WT_STAT_CONN_REC_PAGE_DELETE			1265
 /*! reconciliation: split bytes currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1264
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1266
 /*! reconciliation: split objects currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1265
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1267
 /*! session: open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1266
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1268
 /*! session: open session count */
-#define	WT_STAT_CONN_SESSION_OPEN			1267
+#define	WT_STAT_CONN_SESSION_OPEN			1269
 /*! session: table alter failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_FAIL		1268
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_FAIL		1270
 /*! session: table alter successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SUCCESS	1269
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SUCCESS	1271
 /*! session: table alter unchanged and skipped */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SKIP		1270
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SKIP		1272
 /*! session: table compact failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL		1271
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL		1273
 /*! session: table compact successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SUCCESS	1272
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SUCCESS	1274
 /*! session: table create failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_FAIL		1273
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_FAIL		1275
 /*! session: table create successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_SUCCESS	1274
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_SUCCESS	1276
 /*! session: table drop failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1275
+#define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1277
 /*! session: table drop successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1276
+#define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1278
 /*! session: table rebalance failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_FAIL	1277
+#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_FAIL	1279
 /*! session: table rebalance successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_SUCCESS	1278
+#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_SUCCESS	1280
 /*! session: table rename failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_FAIL		1279
+#define	WT_STAT_CONN_SESSION_TABLE_RENAME_FAIL		1281
 /*! session: table rename successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_SUCCESS	1280
+#define	WT_STAT_CONN_SESSION_TABLE_RENAME_SUCCESS	1282
 /*! session: table salvage failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1281
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1283
 /*! session: table salvage successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1282
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1284
 /*! session: table truncate failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1283
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1285
 /*! session: table truncate successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1284
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1286
 /*! session: table verify failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1285
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1287
 /*! session: table verify successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1286
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1288
 /*! thread-state: active filesystem fsync calls */
-#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1287
+#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1289
 /*! thread-state: active filesystem read calls */
-#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1288
+#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1290
 /*! thread-state: active filesystem write calls */
-#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1289
+#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1291
 /*! thread-yield: application thread time evicting (usecs) */
-#define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1290
+#define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1292
 /*! thread-yield: application thread time waiting for cache (usecs) */
-#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1291
+#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1293
 /*!
  * thread-yield: connection close blocked waiting for transaction state
  * stabilization
  */
-#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1292
+#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1294
 /*! thread-yield: connection close yielded for lsm manager shutdown */
-#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1293
+#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1295
 /*! thread-yield: data handle lock yielded */
-#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1294
+#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1296
 /*!
  * thread-yield: get reference for page index and slot time sleeping
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1295
+#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1297
 /*! thread-yield: log server sync yielded for log write */
-#define	WT_STAT_CONN_LOG_SERVER_SYNC_BLOCKED		1296
+#define	WT_STAT_CONN_LOG_SERVER_SYNC_BLOCKED		1298
 /*! thread-yield: page access yielded due to prepare state change */
-#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1297
+#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1299
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1298
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1300
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1299
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1301
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1300
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1302
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1301
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1303
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1302
+#define	WT_STAT_CONN_PAGE_SLEEP				1304
 /*!
  * thread-yield: page delete rollback time sleeping for state change
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1303
+#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1305
 /*! thread-yield: page reconciliation yielded due to child modification */
-#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1304
+#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1306
 /*! transaction: commit timestamp queue insert to empty */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_EMPTY		1305
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_EMPTY		1307
 /*! transaction: commit timestamp queue inserts to tail */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_TAIL		1306
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_TAIL		1308
 /*! transaction: commit timestamp queue inserts total */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_INSERTS		1307
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_INSERTS		1309
 /*! transaction: commit timestamp queue length */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_LEN		1308
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_LEN		1310
 /*! transaction: number of named snapshots created */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1309
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1311
 /*! transaction: number of named snapshots dropped */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1310
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1312
 /*! transaction: prepared transactions */
-#define	WT_STAT_CONN_TXN_PREPARE			1311
+#define	WT_STAT_CONN_TXN_PREPARE			1313
 /*! transaction: prepared transactions committed */
-#define	WT_STAT_CONN_TXN_PREPARE_COMMIT			1312
+#define	WT_STAT_CONN_TXN_PREPARE_COMMIT			1314
 /*! transaction: prepared transactions currently active */
-#define	WT_STAT_CONN_TXN_PREPARE_ACTIVE			1313
+#define	WT_STAT_CONN_TXN_PREPARE_ACTIVE			1315
 /*! transaction: prepared transactions rolled back */
-#define	WT_STAT_CONN_TXN_PREPARE_ROLLBACK		1314
+#define	WT_STAT_CONN_TXN_PREPARE_ROLLBACK		1316
 /*! transaction: query timestamp calls */
-#define	WT_STAT_CONN_TXN_QUERY_TS			1315
+#define	WT_STAT_CONN_TXN_QUERY_TS			1317
 /*! transaction: read timestamp queue insert to empty */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_EMPTY		1316
+#define	WT_STAT_CONN_TXN_READ_QUEUE_EMPTY		1318
 /*! transaction: read timestamp queue inserts to head */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_HEAD		1317
+#define	WT_STAT_CONN_TXN_READ_QUEUE_HEAD		1319
 /*! transaction: read timestamp queue inserts total */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_INSERTS		1318
+#define	WT_STAT_CONN_TXN_READ_QUEUE_INSERTS		1320
 /*! transaction: read timestamp queue length */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_LEN			1319
+#define	WT_STAT_CONN_TXN_READ_QUEUE_LEN			1321
 /*! transaction: rollback to stable calls */
-#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE		1320
+#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE		1322
 /*! transaction: rollback to stable updates aborted */
-#define	WT_STAT_CONN_TXN_ROLLBACK_UPD_ABORTED		1321
+#define	WT_STAT_CONN_TXN_ROLLBACK_UPD_ABORTED		1323
 /*! transaction: rollback to stable updates removed from lookaside */
-#define	WT_STAT_CONN_TXN_ROLLBACK_LAS_REMOVED		1322
+#define	WT_STAT_CONN_TXN_ROLLBACK_LAS_REMOVED		1324
 /*! transaction: set timestamp calls */
-#define	WT_STAT_CONN_TXN_SET_TS				1323
+#define	WT_STAT_CONN_TXN_SET_TS				1325
 /*! transaction: set timestamp commit calls */
-#define	WT_STAT_CONN_TXN_SET_TS_COMMIT			1324
+#define	WT_STAT_CONN_TXN_SET_TS_COMMIT			1326
 /*! transaction: set timestamp commit updates */
-#define	WT_STAT_CONN_TXN_SET_TS_COMMIT_UPD		1325
+#define	WT_STAT_CONN_TXN_SET_TS_COMMIT_UPD		1327
 /*! transaction: set timestamp oldest calls */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1326
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1328
 /*! transaction: set timestamp oldest updates */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1327
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1329
 /*! transaction: set timestamp stable calls */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1328
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1330
 /*! transaction: set timestamp stable updates */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1329
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1331
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1330
+#define	WT_STAT_CONN_TXN_BEGIN				1332
 /*! transaction: transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1331
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1333
 /*! transaction: transaction checkpoint generation */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1332
+#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1334
 /*! transaction: transaction checkpoint max time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1333
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1335
 /*! transaction: transaction checkpoint min time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1334
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1336
 /*! transaction: transaction checkpoint most recent time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1335
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1337
 /*! transaction: transaction checkpoint scrub dirty target */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1336
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1338
 /*! transaction: transaction checkpoint scrub time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1337
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1339
 /*! transaction: transaction checkpoint total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1338
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1340
 /*! transaction: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1339
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1341
 /*!
  * transaction: transaction checkpoints skipped because database was
  * clean
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1340
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1342
 /*! transaction: transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1341
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1343
 /*!
  * transaction: transaction fsync calls for checkpoint after allocating
  * the transaction ID
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1342
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1344
 /*!
  * transaction: transaction fsync duration for checkpoint after
  * allocating the transaction ID (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1343
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1345
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1344
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1346
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1345
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1347
 /*!
  * transaction: transaction range of IDs currently pinned by named
  * snapshots
  */
-#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1346
+#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1348
 /*! transaction: transaction range of timestamps currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1347
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1349
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1348
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1350
 /*! transaction: transaction sync calls */
-#define	WT_STAT_CONN_TXN_SYNC				1349
+#define	WT_STAT_CONN_TXN_SYNC				1351
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1350
+#define	WT_STAT_CONN_TXN_COMMIT				1352
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1351
+#define	WT_STAT_CONN_TXN_ROLLBACK			1353
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1352
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1354
 
 /*!
  * @}

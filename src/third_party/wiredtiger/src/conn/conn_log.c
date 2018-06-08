@@ -125,15 +125,23 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
 	}
 
 	/*
-	 * Set up the minimum log version required if needed.
+	 * Set up the maximum and minimum log version required if needed.
 	 */
-	if (conn->compat_req_major != WT_CONN_COMPAT_NONE) {
-		if (conn->compat_req_major < WT_LOG_V2_MAJOR)
-			conn->log_req_version = 1;
-		else if (conn->compat_req_minor == WT_LOG_V2_MINOR)
-			conn->log_req_version = 2;
+	if (conn->req_max_major != WT_CONN_COMPAT_NONE) {
+		if (conn->req_max_major < WT_LOG_V2_MAJOR)
+			conn->log_req_max = 1;
+		else if (conn->req_max_minor == WT_LOG_V2_MINOR)
+			conn->log_req_max = 2;
 		else
-			conn->log_req_version = WT_LOG_VERSION;
+			conn->log_req_max = WT_LOG_VERSION;
+	}
+	if (conn->req_min_major != WT_CONN_COMPAT_NONE) {
+		if (conn->req_min_major < WT_LOG_V2_MAJOR)
+			conn->log_req_min = 1;
+		else if (conn->req_min_minor == WT_LOG_V2_MINOR)
+			conn->log_req_min = 2;
+		else
+			conn->log_req_min = WT_LOG_VERSION;
 	}
 
 	/*
