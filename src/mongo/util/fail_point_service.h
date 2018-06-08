@@ -40,9 +40,14 @@ namespace mongo {
 FailPointRegistry* getGlobalFailPointRegistry();
 
 /**
+ * Set a fail point in the global registry to a given value via BSON
+ * @throw DBException If no failpoint called failPointName exists.
+ */
+void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj);
+
+/**
  * Convenience macro for defining a fail point. Must be used at namespace scope.
  * Note: that means never at local scope (inside functions) or class scope.
- *
  * NOTE: Never use in header files, only sources.
  */
 #define MONGO_FAIL_POINT_DEFINE(fp)                                                   \

@@ -41,9 +41,6 @@
 
 namespace mongo {
 
-using std::string;
-using std::stringstream;
-
 /**
  * Command for modifying installed fail points.
  *
@@ -65,19 +62,19 @@ using std::stringstream;
  *    data: <Object> // optional arbitrary object to store.
  * }
  */
-class FaultInjectCmd : public ErrmsgCommandDeprecated {
+class FaultInjectCmd : public BasicCommand {
 public:
-    FaultInjectCmd() : ErrmsgCommandDeprecated("configureFailPoint") {}
+    FaultInjectCmd() : BasicCommand("configureFailPoint") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
@@ -86,35 +83,20 @@ public:
     }
 
     // No auth needed because it only works when enabled via command line.
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {}
 
     std::string help() const override {
         return "modifies the settings of a fail point";
     }
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
-                   const BSONObj& cmdObj,
-                   string& errmsg,
-                   BSONObjBuilder& result) {
-        const string failPointName(cmdObj.firstElement().str());
-        FailPointRegistry* registry = getGlobalFailPointRegistry();
-        FailPoint* failPoint = registry->getFailPoint(failPointName);
-
-        if (failPoint == nullptr) {
-            errmsg = failPointName + " not found";
-            return false;
-        }
-
-        FailPoint::Mode mode;
-        FailPoint::ValType val;
-        BSONObj data;
-        std::tie(mode, val, data) = uassertStatusOK(FailPoint::parseBSON(cmdObj));
-
-        failPoint->setMode(mode, val, data);
-        warning() << "failpoint: " << failPointName << " set to: " << failPoint->toBSON();
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        const std::string failPointName(cmdObj.firstElement().str());
+        setGlobalFailPoint(failPointName, cmdObj);
 
         return true;
     }
