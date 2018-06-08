@@ -30,6 +30,9 @@
 
 namespace mongo {
 
-class TxnStats {};
+/**
+ * Tracks metrics for a single multi-document transaction.
+ */
+class SingleTransactionStats {};
 
 }  // namespace mongo

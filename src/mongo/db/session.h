@@ -39,8 +39,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/single_transaction_stats.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/txn_stats.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -550,8 +550,8 @@ private:
     // transaction state resets.
     std::vector<MultikeyPathInfo> _multikeyPathInfo;
 
-    // Tracks per-transaction metrics.
-    TxnStats _txnStats;
+    // Tracks metrics for a single multi-document transaction. Not used for retryable writes.
+    boost::optional<SingleTransactionStats> _singleTransactionStats;
 };
 
 }  // namespace mongo
