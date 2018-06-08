@@ -1404,21 +1404,29 @@ functions:
           resmoke_exit_code=$?
           set -o errexit
 
-          # 74 is exit code for IOError on POSIX systems.
-          if [ $resmoke_exit_code = 74 ]; then
-            echo $resmoke_exit_code > run_tests_system_failure
+          # 74 is exit code for IOError on POSIX systems, which is raised when the machine is
+          # shutting down.
+          #
+          # 75 is exit code resmoke.py uses when the log output would be incomplete due to failing
+          # to communicate with logkeeper.
+          if [[ $resmoke_exit_code = 74 || $resmoke_exit_code = 75 ]]; then
+            echo $resmoke_exit_code > run_tests_infrastructure_failure
             exit 0
           fi
           exit $resmoke_exit_code
           fi # end if [[ ${disable_unit_tests} && ! -f ${skip_tests|/dev/null} ]]
 
+      # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
+      # directly actionable. We use type=setup rather than type=system or type=test for this command
+      # because we don't intend for any human to look at this failure.
     - command: shell.exec
+      type: setup
       params:
         working_dir: src
         script: |
           set -o verbose
-          if [ -f run_tests_system_failure ]; then
-            exit $(cat run_tests_system_failure)
+          if [ -f run_tests_infrastructure_failure ]; then
+            exit $(cat run_tests_infrastructure_failure)
           fi
 
   "scons compile" :

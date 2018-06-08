@@ -35,6 +35,7 @@ class Resmoke(object):
         self._resmoke_logger = None
         self._archive = None
         self._interrupted = False
+        self._exit_code = 0
 
     def configure_from_command_line(self):
         """Configure this instance using the command line arguments."""
@@ -45,6 +46,19 @@ class Resmoke(object):
         logging.flush.start_thread()
         self._exec_logger = logging.loggers.EXECUTOR_LOGGER
         self._resmoke_logger = self._exec_logger.new_resmoke_logger()
+
+    def _exit_logging(self):
+        if not self._interrupted:
+            logging.flush.stop_thread()
+            self._exit_on_incomplete_logging()
+
+    def _exit_on_incomplete_logging(self):
+        if logging.buildlogger.is_log_output_incomplete():
+            exit_code = errors.LoggerRuntimeConfigError.EXIT_CODE
+            self._resmoke_logger.info(
+                "Exiting with code %d rather than requested code %d because we failed to flush all"
+                " log output to logkeeper.", exit_code, self._exit_code)
+            self.exit(exit_code)
 
     def run(self):
         """Run resmoke."""
@@ -62,8 +76,7 @@ class Resmoke(object):
             else:
                 self.run_tests()
         finally:
-            if not self._interrupted:
-                logging.flush.stop_thread()
+            self._exit_logging()
 
     def list_suites(self):
         """List the suites that are available to execute."""
@@ -126,8 +139,7 @@ class Resmoke(object):
             exit_code = max(suite.return_code for suite in suites)
             self.exit(exit_code)
         finally:
-            if not self._interrupted:
-                self._exit_archival()
+            self._exit_archival()
             if suites:
                 reportfile.write(suites)
 
@@ -160,12 +172,14 @@ class Resmoke(object):
             suite.return_code = 0
             return False
         executor_config = suite.get_executor_config()
-        executor = testing.executor.TestSuiteExecutor(
-            self._exec_logger, suite, archive_instance=self._archive, **executor_config)
         try:
+            executor = testing.executor.TestSuiteExecutor(
+                self._exec_logger, suite, archive_instance=self._archive, **executor_config)
             executor.run()
-        except errors.UserInterrupt:
-            suite.return_code = 130  # Simulate SIGINT as exit code.
+        except (errors.UserInterrupt, errors.LoggerRuntimeConfigError) as err:
+            self._exec_logger.error("Encountered an error when running %ss of suite %s: %s",
+                                    suite.test_kind, suite.get_display_name(), err)
+            suite.return_code = err.EXIT_CODE
             return True
         except IOError:
             suite.return_code = 74  # Exit code for IOError on POSIX systems.
@@ -225,11 +239,12 @@ class Resmoke(object):
 
     def _exit_archival(self):
         """Finish up archival tasks before exit if enabled in the cli options."""
-        if self._archive:
+        if self._archive and not self._interrupted:
             self._archive.exit()
 
     def exit(self, exit_code):
         """Exit with the provided exit code."""
+        self._exit_code = exit_code
         self._resmoke_logger.info("Exiting with code: %d", exit_code)
         sys.exit(exit_code)
 

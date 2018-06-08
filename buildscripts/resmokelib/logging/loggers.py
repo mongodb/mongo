@@ -7,6 +7,7 @@ import sys
 
 from . import buildlogger
 from . import formatters
+from .. import errors
 
 _DEFAULT_FORMAT = "[%(name)s] %(message)s"
 
@@ -174,15 +175,18 @@ class JobLogger(BaseLogger):
         BaseLogger.__init__(self, name, parent=parent)
         self.job_num = job_num
         self.fixture_root_logger = fixture_root_logger
-        # create build_id if it should
         if self.build_logger_server:
+            # If we're configured to log messages to the buildlogger server, then request a new
+            # build_id for this job.
             self.build_id = self.build_logger_server.new_build_id("job%d" % job_num)
-            if self.build_id:
-                url = self.build_logger_server.get_build_log_url(self.build_id)
-                parent.info("Writing output of job #%d to %s.", job_num, url)
-            else:
-                parent.info("Encountered an error configuring buildlogger for job #%d, falling"
-                            " back to stderr.", job_num)
+            if not self.build_id:
+                buildlogger.set_log_output_incomplete()
+                raise errors.LoggerRuntimeConfigError(
+                    "Encountered an error configuring buildlogger for job #{:d}: Failed to get a"
+                    " new build_id".format(job_num))
+
+            url = self.build_logger_server.get_build_log_url(self.build_id)
+            parent.info("Writing output of job #%d to %s.", job_num, url)
         else:
             self.build_id = None
 
@@ -193,14 +197,19 @@ class JobLogger(BaseLogger):
     def new_test_logger(self, test_shortname, test_basename, command, parent):
         """Create a new test logger that will be a child of the given parent."""
         if self.build_id:
+            # If we're configured to log messages to the buildlogger server, then request a new
+            # test_id for this test.
             test_id = self.build_logger_server.new_test_id(self.build_id, test_basename, command)
-            if test_id:
-                url = self.build_logger_server.get_test_log_url(self.build_id, test_id)
-                self.info("Writing output of %s to %s.", test_shortname, url)
-                return TestLogger(test_shortname, parent, self.build_id, test_id, url)
-            else:
-                self.info("Encountered an error configuring buildlogger for test %s, falling"
-                          " back to stderr.", test_shortname)
+            if not test_id:
+                buildlogger.set_log_output_incomplete()
+                raise errors.LoggerRuntimeConfigError(
+                    "Encountered an error configuring buildlogger for test {}: Failed to get a new"
+                    " test_id".format(test_basename))
+
+            url = self.build_logger_server.get_test_log_url(self.build_id, test_id)
+            self.info("Writing output of %s to %s.", test_basename, url)
+            return TestLogger(test_shortname, parent, self.build_id, test_id, url)
+
         return TestLogger(test_shortname, parent)
 
 
@@ -226,14 +235,9 @@ class TestLogger(BaseLogger):
         logger_info = self.logging_config[TESTS_LOGGER_NAME]
         handler_info = _get_buildlogger_handler_info(logger_info)
         if handler_info is not None:
-            if build_id and test_id:
-                handler = self.build_logger_server.get_test_handler(build_id, test_id, handler_info)
-                handler.setFormatter(self.get_formatter(logger_info))
-                self.addHandler(handler)
-            else:
-                # The build_id or test_id could not be obtained from the build logger server, so
-                # we're falling back to stderr.
-                self.addHandler(_fallback_buildlogger_handler())
+            handler = self.build_logger_server.get_test_handler(build_id, test_id, handler_info)
+            handler.setFormatter(self.get_formatter(logger_info))
+            self.addHandler(handler)
 
     def new_test_thread_logger(self, test_kind, thread_id):
         """Create a new child test thread logger."""
@@ -272,14 +276,9 @@ class FixtureLogger(BaseLogger):
         logger_info = self.logging_config[FIXTURE_LOGGER_NAME]
         handler_info = _get_buildlogger_handler_info(logger_info)
         if handler_info is not None:
-            if build_id:
-                handler = self.build_logger_server.get_global_handler(build_id, handler_info)
-                handler.setFormatter(self.get_formatter(logger_info))
-                self.addHandler(handler)
-            else:
-                # The build_id could not be obtained from the build logger server, so we're
-                # falling back to stderr.
-                self.addHandler(_fallback_buildlogger_handler())
+            handler = self.build_logger_server.get_global_handler(build_id, handler_info)
+            handler.setFormatter(self.get_formatter(logger_info))
+            self.addHandler(handler)
 
     def new_fixture_node_logger(self, node_name):
         """Create a new child FixtureNodeLogger."""
