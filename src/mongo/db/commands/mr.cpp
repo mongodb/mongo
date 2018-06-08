@@ -123,7 +123,7 @@ unsigned long long collectionCount(OperationContext* opCtx,
  * Emit that will be called by a js function.
  */
 BSONObj fastEmit(const BSONObj& args, void* data) {
-    uassert(10077, "fastEmit takes 2 args", args.nFields() == 2);
+    uassert(10077, "emit takes 2 args", args.nFields() == 2);
     uassert(13069,
             "an emit can't be more than half max bson size",
             args.objsize() < (BSONObjMaxUserSize / 2));
