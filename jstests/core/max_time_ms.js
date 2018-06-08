@@ -22,7 +22,7 @@ var error;
 //
 
 t.drop();
-t.insert([{}, {}, {}]);
+assert.commandWorked(t.insert([{}, {}, {}]));
 cursor = t.find({
     $where: function() {
         sleep(100);
@@ -33,7 +33,11 @@ cursor.maxTimeMS(100);
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected query to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+// TODO SERVER-32565: The error should always be ExceededTimeLimit, but there are rare cases where
+// interrupting javascript execution on the server with a stepdown or timeout causes an
+// InternalError instead, so we also accept that here.
+assert(ErrorCodes.ExceededTimeLimit == error.code || ErrorCodes.InternalError == error.code,
+       "Failed with error: " + tojson(error));
 
 //
 // Simple negative test for query: a ~300ms query with a 10s time limit should not hit the time
@@ -41,7 +45,7 @@ assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
 //
 
 t.drop();
-t.insert([{}, {}, {}]);
+assert.commandWorked(t.insert([{}, {}, {}]));
 cursor = t.find({
     $where: function() {
         sleep(100);
@@ -61,8 +65,9 @@ assert.doesNotThrow(function() {
 //
 
 t.drop();
-t.insert([{_id: 0}, {_id: 1}, {_id: 2}]);                                      // fast batch
-t.insert([{_id: 3, slow: true}, {_id: 4, slow: true}, {_id: 5, slow: true}]);  // slow batch
+assert.commandWorked(t.insert([{_id: 0}, {_id: 1}, {_id: 2}]));  // fast batch
+assert.commandWorked(
+    t.insert([{_id: 3, slow: true}, {_id: 4, slow: true}, {_id: 5, slow: true}]));  // slow batch
 cursor = t.find({
               $where: function() {
                   if (this.slow) {
@@ -83,7 +88,11 @@ error = assert.throws(function() {
     cursor.next();
     cursor.next();
 }, [], "expected batch 2 (getmore) to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+// TODO SERVER-32565: The error should always be ExceededTimeLimit, but there are rare cases where
+// interrupting javascript execution on the server with a stepdown or timeout causes an
+// InternalError instead, so we also accept that here.
+assert(ErrorCodes.ExceededTimeLimit == error.code || ErrorCodes.InternalError == error.code,
+       "Failed with error: " + tojson(error));
 
 //
 // Simple negative test for getmore:
@@ -93,8 +102,8 @@ assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
 //
 
 t.drop();
-t.insert([{_id: 0}, {_id: 1}, {_id: 2}]);              // fast batch
-t.insert([{_id: 3}, {_id: 4}, {_id: 5, slow: true}]);  // slow batch
+assert.commandWorked(t.insert([{_id: 0}, {_id: 1}, {_id: 2}]));              // fast batch
+assert.commandWorked(t.insert([{_id: 3}, {_id: 4}, {_id: 5, slow: true}]));  // slow batch
 cursor = t.find({
               $where: function() {
                   if (this.slow) {
@@ -124,7 +133,8 @@ assert.doesNotThrow(function() {
 
 t.drop();
 for (var i = 0; i < 5; i++) {
-    t.insert([{_id: 3 * i}, {_id: (3 * i) + 1}, {_id: (3 * i) + 2, slow: true}]);
+    assert.commandWorked(
+        t.insert([{_id: 3 * i}, {_id: (3 * i) + 1}, {_id: (3 * i) + 2, slow: true}]));
 }
 cursor = t.find({
               $where: function() {
@@ -139,7 +149,11 @@ cursor.maxTimeMS(6 * 1000);
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected find() to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+// TODO SERVER-32565: The error should always be ExceededTimeLimit, but there are rare cases where
+// interrupting javascript execution on the server with a stepdown or timeout causes an
+// InternalError instead, so we also accept that here.
+assert(ErrorCodes.ExceededTimeLimit == error.code || ErrorCodes.InternalError == error.code,
+       "Failed with error: " + tojson(error));
 
 //
 // Many-batch negative test for getmore:
@@ -149,7 +163,8 @@ assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
 
 t.drop();
 for (var i = 0; i < 5; i++) {
-    t.insert([{_id: 3 * i}, {_id: (3 * i) + 1}, {_id: (3 * i) + 2, slow: true}]);
+    assert.commandWorked(
+        t.insert([{_id: 3 * i}, {_id: (3 * i) + 1}, {_id: (3 * i) + 2, slow: true}]));
 }
 cursor = t.find({
               $where: function() {
@@ -189,7 +204,7 @@ assert(res.ok == 1,
 //
 
 t.drop();
-t.insert({});
+assert.commandWorked(t.insert({}));
 
 // Verify lower boundary for acceptable input (0 is acceptable, 1 isn't).
 
@@ -327,7 +342,7 @@ assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
 assert.eq(1,
           t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}).ok);
 t.drop();
-t.insert([{}, {}, {}]);
+assert.commandWorked(t.insert([{}, {}, {}]));
 cursor = t.find({
     $where: function() {
         sleep(100);
@@ -342,7 +357,7 @@ assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", 
 
 // maxTimeAlwaysTimeOut positive test for getmore.
 t.drop();
-t.insert([{}, {}, {}]);
+assert.commandWorked(t.insert([{}, {}, {}]));
 cursor = t.find().maxTimeMS(10 * 1000).batchSize(2);
 assert.doesNotThrow.automsg(function() {
     cursor.next();
@@ -357,8 +372,9 @@ assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
 
 // maxTimeNeverTimeOut positive test for getmore.
 t.drop();
-t.insert([{_id: 0}, {_id: 1}, {_id: 2}]);                                      // fast batch
-t.insert([{_id: 3, slow: true}, {_id: 4, slow: true}, {_id: 5, slow: true}]);  // slow batch
+assert.commandWorked(t.insert([{_id: 0}, {_id: 1}, {_id: 2}]));  // fast batch
+assert.commandWorked(
+    t.insert([{_id: 3, slow: true}, {_id: 4, slow: true}, {_id: 5, slow: true}]));  // slow batch
 cursor = t.find({
               $where: function() {
                   if (this.slow) {
@@ -412,7 +428,7 @@ assert.commandWorked(
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected query to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+assert.eq(ErrorCodes.ExceededTimeLimit, error.code, "Failed with error: " + tojson(error));
 assert.commandWorked(
     t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
 
