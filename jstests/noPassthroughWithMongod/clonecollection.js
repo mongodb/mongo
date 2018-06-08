@@ -1,3 +1,4 @@
+// @tags: [requires_capped, requires_profiling]
 // Test cloneCollection command
 var baseName = "jstests_clonecollection";
 

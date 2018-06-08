@@ -1,3 +1,4 @@
+// @tags: [requires_capped]
 t = db.jstests_capped4;
 t.drop();
 

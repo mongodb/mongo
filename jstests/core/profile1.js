@@ -1,4 +1,5 @@
-// @tags: [does_not_support_stepdowns, requires_non_retryable_commands, requires_collstats]
+// @tags: [does_not_support_stepdowns, requires_non_retryable_commands,
+// requires_collstats, requires_capped, requires_profiling]
 
 (function() {
     "use strict";

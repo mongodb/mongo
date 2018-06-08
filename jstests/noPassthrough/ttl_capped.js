@@ -1,6 +1,7 @@
 /**
  * Test that a TTL index on a capped collection doesn't crash the server or cause the TTL monitor
  * to skip processing other (non-capped) collections on the database.
+ * @tags: [requires_capped]
  */
 (function() {
     "use strict";

@@ -1,4 +1,5 @@
 // Check that username information gets recorded properly in profiler.
+// @tags: [requires_profiling]
 var conn = MongoRunner.runMongod();
 var db1 = conn.getDB("profile-a");
 var db2 = db1.getSisterDB("profile-b");

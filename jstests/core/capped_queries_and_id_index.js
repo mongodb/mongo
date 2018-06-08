@@ -1,4 +1,5 @@
 // Tests the behavior of querying or updating a capped collection with and without an _id index.
+// @tags: [requires_capped]
 (function() {
     "use strict";
     const coll = db.capped9;

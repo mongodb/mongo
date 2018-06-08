@@ -1,4 +1,4 @@
-
+// @tags: [requires_capped]
 tn = "capped5";
 
 t = db[tn];

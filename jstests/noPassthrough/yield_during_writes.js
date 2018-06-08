@@ -1,4 +1,5 @@
 // Ensure that multi-update and multi-remove operations yield regularly.
+// @tags: [requires_profiling]
 (function() {
     'use strict';
 

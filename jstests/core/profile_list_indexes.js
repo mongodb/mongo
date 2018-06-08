@@ -1,4 +1,4 @@
-// @tags: [does_not_support_stepdowns, requires_getmore]
+// @tags: [does_not_support_stepdowns, requires_getmore, requires_profiling]
 
 // Confirms that a listIndexes command and subsequent getMores of its cursor are profiled correctly.
 

@@ -1,6 +1,7 @@
 // Tests that specifying a maxTimeMS on a getMore for a tailable + awaitData cursor is not
 // interpreted as a deadline for the operation.
 // This test was designed to reproduce SERVER-33942 against a mongod.
+// @tags: [requires_capped]
 (function() {
     "use strict";
 

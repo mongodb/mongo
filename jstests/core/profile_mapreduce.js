@@ -1,4 +1,4 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [does_not_support_stepdowns, requires_profiling]
 
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
 

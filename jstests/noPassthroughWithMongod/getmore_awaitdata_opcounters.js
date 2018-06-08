@@ -1,5 +1,6 @@
 /**
  * Test that opcounters are correct for getMore operations on awaitData cursors.
+ * @tags: [requires_capped]
  */
 (function() {
     "use strict";

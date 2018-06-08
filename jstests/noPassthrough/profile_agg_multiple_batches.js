@@ -1,5 +1,6 @@
 // Tests that keysExamined and docsExamined are correct for aggregation when multiple batches pass
 // through DocumentSourceCursor.
+// @tags: [requires_profiling]
 
 (function() {
     "use strict";

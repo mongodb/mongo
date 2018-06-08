@@ -1,4 +1,5 @@
 // Test for race condition SERVER-2807.  One cursor is dropped and another is not.
+// @tags: [requires_capped]
 
 collName = 'jstests_slowNightly_explain2';
 

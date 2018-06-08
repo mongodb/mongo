@@ -80,6 +80,10 @@ public:
         return false;
     }
 
+    bool supportsCappedCollections() const override {
+        return false;
+    }
+
     bool supportsDirectoryPerDB() const override {
         return false;
     }

@@ -1,4 +1,4 @@
-// @tags: [requires_getmore]
+// @tags: [requires_getmore, requires_capped]
 
 // Test that tailable cursors work correctly with skip and limit.
 (function() {

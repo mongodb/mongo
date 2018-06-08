@@ -1,5 +1,5 @@
 // SERVER-22011: Deadlock in ticket distribution
-// @tags: [requires_replication]
+// @tags: [requires_replication, requires_capped]
 (function() {
     'use strict';
 

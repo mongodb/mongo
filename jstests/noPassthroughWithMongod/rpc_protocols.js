@@ -3,6 +3,7 @@
 // A user can configure the shell to send commands via OP_QUERY or OP_COMMAND. This can be done at
 // startup using the "--rpcProtocols" command line option, or at runtime using the
 // "setClientRPCProtocols" method on the Mongo object.
+// @tags: [requires_profiling]
 
 var RPC_PROTOCOLS = {OP_QUERY: "opQueryOnly", OP_COMMAND: "opCommandOnly"};
 

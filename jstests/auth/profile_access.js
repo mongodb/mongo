@@ -1,3 +1,4 @@
+// @tags: [requires_profiling]
 var conn = MongoRunner.runMongod({auth: ""});
 
 var adminDb = conn.getDB("admin");

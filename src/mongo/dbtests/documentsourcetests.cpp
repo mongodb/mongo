@@ -351,6 +351,11 @@ TEST_F(DocumentSourceCursorTest, ExpressionContextAndSerializeVerbosityMismatch)
 }
 
 TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout) {
+    // Skip the test if the storage engine doesn't support capped collections.
+    if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        return;
+    }
+
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
     const bool capped = true;
     const long long cappedSize = 1024;
@@ -431,6 +436,11 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
 }
 
 TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKilled) {
+    // Skip the test if the storage engine doesn't support capped collections.
+    if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        return;
+    }
+
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
     const bool capped = true;
     const long long cappedSize = 1024;
