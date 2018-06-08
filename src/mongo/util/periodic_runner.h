@@ -72,7 +72,35 @@ public:
         Milliseconds interval;
     };
 
+    class PeriodicJobHandle {
+    public:
+        virtual ~PeriodicJobHandle() = default;
+
+        /**
+         * Starts running the job
+         */
+        virtual void start() = 0;
+        /**
+         * Pauses the job temporarily so that it does not execute until
+         * unpaused
+         */
+        virtual void pause() = 0;
+        /**
+         * Resumes a paused job so that it continues executing each interval
+         */
+        virtual void resume() = 0;
+    };
+
     virtual ~PeriodicRunner();
+
+
+    /**
+     * Creates a new job and adds it to the runner, but does not schedule it.
+     * The caller is responsible for calling 'start' on the resulting handle in
+     * order to begin the job running. This API should be used when the caller
+     * is interested in observing and controlling the job execution state.
+     */
+    virtual std::unique_ptr<PeriodicJobHandle> makeJob(PeriodicJob job) = 0;
 
     /**
      * Schedules a job to be run at periodic intervals.
