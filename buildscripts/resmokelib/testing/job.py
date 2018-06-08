@@ -6,7 +6,6 @@ import sys
 
 from .. import config
 from .. import errors
-from .. import logging
 from ..testing.hooks import stepdown
 from ..utils import queue as _queue
 
@@ -53,10 +52,7 @@ class Job(object):
             self.logger.exception("Encountered an error during test execution.")
             should_stop = True
 
-        # We give up on running more tests if the log output from an earlier run test ended up being
-        # incomplete. Checking for should_stop=True isn't sufficient because it is possible for the
-        # flush thread rather than another job thread to have called set_log_output_incomplete().
-        if should_stop or logging.buildlogger.is_log_output_incomplete():
+        if should_stop:
             # Set the interrupt flag so that other jobs do not start running more tests.
             interrupt_flag.set()
             # Drain the queue to unblock the main thread.

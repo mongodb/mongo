@@ -54,6 +54,15 @@ class Resmoke(object):
 
     def _exit_on_incomplete_logging(self):
         if logging.buildlogger.is_log_output_incomplete():
+            if self._exit_code == 0:
+                # We don't anticipate users to look at passing Evergreen tasks very often that even
+                # if the log output is incomplete, we'd still rather not show anything in the
+                # Evergreen UI or cause a JIRA ticket to be created.
+                self._resmoke_logger.info(
+                    "We failed to flush all log output to logkeeper but all tests passed, so"
+                    " ignoring.")
+                return
+
             exit_code = errors.LoggerRuntimeConfigError.EXIT_CODE
             self._resmoke_logger.info(
                 "Exiting with code %d rather than requested code %d because we failed to flush all"
