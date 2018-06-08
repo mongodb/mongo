@@ -609,6 +609,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
         _setActiveTxn(wl, txnNumber);
         _autocommit = true;
         _txnState = MultiDocumentTransactionState::kNone;
+        _singleTransactionStats = boost::none;
     }
 
     invariant(_transactionOperations.empty());
