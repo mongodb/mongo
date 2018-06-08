@@ -182,8 +182,8 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
         }
 
         // Add op to buffer.
-        ops.push_back(std::move(entry));
         totalBytes += entry.getRawObjSizeBytes();
+        ops.push_back(std::move(entry));
         BSONObj opToPopAndDiscard;
         invariant(_oplogBuffer->tryPop(opCtx, &opToPopAndDiscard));
         dassert(ops.back() == OplogEntry(opToPopAndDiscard));
