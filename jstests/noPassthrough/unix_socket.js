@@ -8,6 +8,7 @@
  *    cause the server to exit with an error (socket names with whitespace are now supported)
  * 4) That the default unix socket doesn't get created if --nounixsocket is specified
  */
+//@tags: [requires_sharding]
 (function() {
     'use strict';
     // This test will only work on POSIX machines.
@@ -36,13 +37,22 @@
                              `Expected ping command to succeed for ${path}`);
     };
 
-    var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',') {
+    var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',', optMongos) {
         var optDict = optDict || {};
         if (bindPath) {
             optDict["bind_ip"] = `${MongoRunner.dataDir}/${bindPath}${bindSep}127.0.0.1`;
         }
-        var conn = MongoRunner.runMongod(optDict);
-        assert.neq(conn, null, "Expected mongod to start okay");
+
+        var conn, shards;
+        if (optMongos) {
+            shards = new ShardingTest({shards: 1, mongos: 1, other: {mongosOptions: optDict}});
+            assert.neq(shards, null, "Expected cluster to start okay");
+            conn = shards.s0;
+        } else {
+            conn = MongoRunner.runMongod(optDict);
+        }
+
+        assert.neq(conn, null, `Expected ${optMongos ? "mongos" : "mongod"} to start okay`);
 
         const defaultUNIXSocket = `/tmp/mongodb-${conn.port}.sock`;
         var checkPath = defaultUNIXSocket;
@@ -59,21 +69,30 @@
         var re = new RegExp("anonymous unix socket");
         assert(doesLogMatchRegex(ll, re), "Log message did not contain 'anonymous unix socket'");
 
-        MongoRunner.stopMongod(conn);
+        if (optMongos) {
+            shards.stop();
+        } else {
+            MongoRunner.stopMongod(conn);
+        }
+
         assert.eq(fileExists(checkPath), false);
     };
 
     // Check that the default unix sockets work
     testSockOptions();
+    testSockOptions(undefined, undefined, undefined, ',', true);
 
     // Check that a custom unix socket path works
     testSockOptions("testsock.socket", "testsock.socket");
+    testSockOptions("testsock.socket", "testsock.socket", undefined, ',', true);
 
     // Check that a custom unix socket path works with spaces
     testSockOptions("test sock.socket", "test sock.socket");
+    testSockOptions("test sock.socket", "test sock.socket", undefined, ',', true);
 
     // Check that a custom unix socket path works with spaces before the comma and after
     testSockOptions("testsock.socket ", "testsock.socket", undefined, ', ');
+    testSockOptions("testsock.socket ", "testsock.socket", undefined, ', ', true);
 
     // Check that a bad UNIX path breaks
     assert.throws(function() {
@@ -93,4 +112,10 @@
     testSockOptions(
         undefined, `socketdir/mongodb-${port}.sock`, {unixSocketPrefix: socketPrefix, port: port});
 
+    port = allocatePort();
+    testSockOptions(undefined,
+                    `socketdir/mongodb-${port}.sock`,
+                    {unixSocketPrefix: socketPrefix, port: port},
+                    ',',
+                    true);
 })();

@@ -184,6 +184,14 @@ void cleanupTask(ServiceContext* serviceContext) {
     {
         Client::initThreadIfNotAlready();
         Client& client = cc();
+
+        // Shutdown the TransportLayer so that new connections aren't accepted
+        if (auto tl = serviceContext->getTransportLayer()) {
+            log(LogComponent::kNetwork) << "shutdown: going to close all sockets...";
+
+            tl->shutdown();
+        }
+
         ServiceContext::UniqueOperationContext uniqueTxn;
         OperationContext* opCtx = client.getOperationContext();
         if (!opCtx) {
@@ -224,14 +232,6 @@ void cleanupTask(ServiceContext* serviceContext) {
         // When running under address sanitizer, we get false positive leaks due to disorder around
         // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
         // harder to dry up the server from active connections before going on to really shut down.
-
-        // Shutdown the TransportLayer so that new connections aren't accepted
-        if (auto tl = serviceContext->getTransportLayer()) {
-            log(LogComponent::kNetwork)
-                << "shutdown: going to close all sockets because ASAN is active...";
-
-            tl->shutdown();
-        }
 
         // Shut down the global dbclient pool so callers stop waiting for connections.
         shardConnectionPool.shutdown();
