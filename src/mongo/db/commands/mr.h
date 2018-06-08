@@ -41,8 +41,6 @@
 
 namespace mongo {
 
-class Collection;
-class Database;
 class OperationContext;
 
 namespace mr {
@@ -372,10 +370,6 @@ public:
     }
     void switchMode(bool jsMode);
     void bailFromJS();
-
-    static Collection* getCollectionOrUassert(OperationContext* opCtx,
-                                              Database* db,
-                                              const NamespaceString& nss);
 
     const Config& _config;
     DBDirectClient _db;

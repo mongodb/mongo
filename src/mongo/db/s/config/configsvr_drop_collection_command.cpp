@@ -35,6 +35,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
@@ -50,6 +51,33 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(setDropCollDistLockWait);
+
+template <typename F>
+auto staleExceptionRetry(OperationContext* opCtx, StringData opStr, F&& f) {
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Command " << opStr << " does not support database versioning",
+            !OperationShardingState::get(opCtx).hasDbVersion());
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Command " << opStr << " does not support collection versioning",
+            !OperationShardingState::get(opCtx).hasShardVersion());
+
+    for (int tries = 0;; ++tries) {
+        // Try kMaxStaleExceptionTries times and on the last try, rethrow the exception
+        const bool canRetry = tries < kMaxNumStaleVersionRetries - 1;
+        try {
+            return f();
+        } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+            log() << "Attempt " << tries << " of " << opStr << " received StaleShardVersion error"
+                  << causedBy(ex);
+
+            if (canRetry) {
+                continue;
+            }
+            throw;
+        }
+        MONGO_UNREACHABLE;
+    }
+}
 
 /**
  * Internal sharding command run on config servers to drop a collection from a database.
@@ -123,56 +151,46 @@ public:
         ON_BLOCK_EXIT(
             [opCtx, nss] { Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss); });
 
+        staleExceptionRetry(
+            opCtx, "_configsvrDropCollection", [&] { _dropCollection(opCtx, nss); });
+
+        return true;
+    }
+
+private:
+    static void _dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
+        auto const catalogClient = Grid::get(opCtx)->catalogClient();
+
         auto collStatus =
             catalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::get(opCtx).getLevel());
         if (collStatus == ErrorCodes::NamespaceNotFound) {
-            // We checked the sharding catalog and found that this collection doesn't exist.
-            // This may be because it never existed, or because a drop command was sent
-            // previously. This data might not be majority committed though, so we will set the
-            // client's last optime to the system's last optime to ensure the client waits for
-            // the writeConcern to be satisfied.
+            // We checked the sharding catalog and found that this collection doesn't exist. This
+            // may be because it never existed, or because a drop command was sent previously. This
+            // data might not be majority committed though, so we will set the client's last optime
+            // to the system's last optime to ensure the client waits for the writeConcern to be
+            // satisfied.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
             // If the DB isn't in the sharding catalog either, consider the drop a success.
             auto dbStatus = catalogClient->getDatabase(
                 opCtx, nss.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel());
             if (dbStatus == ErrorCodes::NamespaceNotFound) {
-                return true;
+                return;
             }
             uassertStatusOK(dbStatus);
+
             // If we found the DB but not the collection, the collection might exist and not be
             // sharded, so send the command to the primary shard.
-            try {
-                _dropUnshardedCollectionFromShard(
-                    opCtx, dbStatus.getValue().value.getPrimary(), nss, &result);
-            } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
-                // If attempting to drop the collection as unsharded fails due to stale shard
-                // version, this means that the collection became sharded after this drop operation
-                // started. With the distributed lock in place, this can only happen if the lock was
-                // overtaken or metadata is manually tampered with. Since retrying the drop at this
-                // point could potentially cause orphaned chunk data to remain, instead of retrying
-                // just fail the drop.
-                uassertStatusOKWithContext(
-                    Status(ErrorCodes::ConflictingOperationInProgress,
-                           str::stream()
-                               << "Collection "
-                               << nss.ns()
-                               << " became sharded while the drop operation was in progress."),
-                    ex.toString());
-            }
+            _dropUnshardedCollectionFromShard(opCtx, dbStatus.getValue().value.getPrimary(), nss);
         } else {
             uassertStatusOK(collStatus);
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->dropCollection(opCtx, nss));
         }
-
-        return true;
     }
 
-private:
     static void _dropUnshardedCollectionFromShard(OperationContext* opCtx,
                                                   const ShardId& shardId,
-                                                  const NamespaceString& nss,
-                                                  BSONObjBuilder* result) {
+                                                  const NamespaceString& nss) {
 
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
@@ -210,10 +228,7 @@ private:
         }
 
         uassertStatusOK(cmdDropResult.commandStatus);
-        if (!cmdDropResult.writeConcernStatus.isOK()) {
-            appendWriteConcernErrorToCmdResponse(
-                shardId, cmdDropResult.response["writeConcernError"], *result);
-        }
+        uassertStatusOK(cmdDropResult.writeConcernStatus);
     };
 
 } configsvrDropCollectionCmd;

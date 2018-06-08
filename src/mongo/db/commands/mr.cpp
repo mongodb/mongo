@@ -156,6 +156,15 @@ BSONObj _bailFromJS(const BSONObj& args, void* data) {
     return BSONObj();
 }
 
+Collection* getCollectionOrUassert(OperationContext* opCtx,
+                                   Database* db,
+                                   const NamespaceString& nss) {
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    Collection* out = db ? db->getCollection(opCtx, nss) : NULL;
+    uassert(18697, "Collection unexpectedly disappeared: " + nss.ns(), out);
+    return out;
+}
+
 }  // namespace
 
 AtomicUInt32 Config::JOB_NUMBER;
@@ -1040,15 +1049,6 @@ void State::bailFromJS() {
     _config.reducer->numReduces = _scope->getNumberInt("_redCt");
 }
 
-Collection* State::getCollectionOrUassert(OperationContext* opCtx,
-                                          Database* db,
-                                          const NamespaceString& nss) {
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    Collection* out = db ? db->getCollection(opCtx, nss) : NULL;
-    uassert(18697, "Collection unexpectedly disappeared: " + nss.ns(), out);
-    return out;
-}
-
 /**
  * Applies last reduce and finalize on a list of tuples (key, val)
  * Inserts single result {_id: key, value: val} into temp collection
@@ -1501,7 +1501,7 @@ public:
                 unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
                 {
                     Database* db = scopedAutoDb->getDb();
-                    Collection* coll = State::getCollectionOrUassert(opCtx, db, config.nss);
+                    Collection* coll = getCollectionOrUassert(opCtx, db, config.nss);
                     invariant(coll);
 
                     exec = uassertStatusOK(
