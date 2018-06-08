@@ -181,6 +181,7 @@ selector:
   # immediately available to a transaction as it is still being replicated. Transactions
   # fail with "Unable to acquire lock" errors.
   - jstests/core/function_string_representations.js
+  - jstests/core/mr_errorhandling.js
   - jstests/core/mr_merge.js
   - jstests/core/mr_merge2.js
   - jstests/core/mr_replaceIntoDB.js
