@@ -79,11 +79,6 @@ public:
     bool getNextChunk(const BSONObj& lookupKey, ChunkType* chunk) const;
 
     /**
-     * Given a chunk identifying key "chunkMinKey", finds a different chunk if one exists.
-     */
-    bool getDifferentChunk(const BSONObj& chunkMinKey, ChunkType* differentChunk) const;
-
-    /**
      * Validates that the passed-in chunk's bounds exactly match a chunk in the metadata cache.
      */
     Status checkChunkIsValid(const ChunkType& chunk) const;

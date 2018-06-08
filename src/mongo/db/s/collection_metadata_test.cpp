@@ -122,12 +122,6 @@ TEST_F(NoChunkFixture, GetNextChunk) {
         !makeCollectionMetadata()->getNextChunk(makeCollectionMetadata()->getMinKey(), &nextChunk));
 }
 
-TEST_F(NoChunkFixture, GetDifferentChunk) {
-    ChunkType differentChunk;
-    ASSERT(!makeCollectionMetadata()->getDifferentChunk(makeCollectionMetadata()->getMinKey(),
-                                                        &differentChunk));
-}
-
 TEST_F(NoChunkFixture, RangeOverlapsChunk) {
     ASSERT(!makeCollectionMetadata()->rangeOverlapsChunk(
         ChunkRange{BSON("a" << 100), BSON("a" << 200)}));
@@ -209,11 +203,6 @@ TEST_F(SingleChunkFixture, GetNextChunkShouldFindNothing) {
     ChunkType nextChunk;
     ASSERT(
         !makeCollectionMetadata()->getNextChunk(makeCollectionMetadata()->getMaxKey(), &nextChunk));
-}
-
-TEST_F(SingleChunkFixture, GetDifferentChunkShouldFindNothing) {
-    ChunkType differentChunk;
-    ASSERT(!makeCollectionMetadata()->getDifferentChunk(BSON("a" << 10), &differentChunk));
 }
 
 TEST_F(SingleChunkFixture, RangeOverlapsChunk) {
@@ -377,29 +366,6 @@ TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkFromLast) {
     ASSERT(makeCollectionMetadata()->getNextChunk(BSON("a" << 30), &nextChunk));
     ASSERT_EQUALS(0, nextChunk.getMin().woCompare(BSON("a" << 30)));
     ASSERT_EQUALS(0, nextChunk.getMax().woCompare(BSON("a" << MAXKEY)));
-}
-
-TEST_F(ThreeChunkWithRangeGapFixture, GetDifferentChunkFromBeginning) {
-    auto metadata(makeCollectionMetadata());
-
-    ChunkType differentChunk;
-    ASSERT(metadata->getDifferentChunk(metadata->getMinKey(), &differentChunk));
-    ASSERT_BSONOBJ_EQ(BSON("a" << 10), differentChunk.getMin());
-    ASSERT_BSONOBJ_EQ(BSON("a" << 20), differentChunk.getMax());
-}
-
-TEST_F(ThreeChunkWithRangeGapFixture, GetDifferentChunkFromMiddle) {
-    ChunkType differentChunk;
-    ASSERT(makeCollectionMetadata()->getDifferentChunk(BSON("a" << 10), &differentChunk));
-    ASSERT_EQUALS(0, differentChunk.getMin().woCompare(BSON("a" << MINKEY)));
-    ASSERT_EQUALS(0, differentChunk.getMax().woCompare(BSON("a" << 10)));
-}
-
-TEST_F(ThreeChunkWithRangeGapFixture, GetDifferentChunkFromLast) {
-    ChunkType differentChunk;
-    ASSERT(makeCollectionMetadata()->getDifferentChunk(BSON("a" << 30), &differentChunk));
-    ASSERT_EQUALS(0, differentChunk.getMin().woCompare(BSON("a" << MINKEY)));
-    ASSERT_EQUALS(0, differentChunk.getMax().woCompare(BSON("a" << 10)));
 }
 
 /**

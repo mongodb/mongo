@@ -72,20 +72,6 @@ bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk
     return true;
 }
 
-bool CollectionMetadata::getDifferentChunk(const BSONObj& chunkMinKey,
-                                           ChunkType* differentChunk) const {
-    for (const auto& found : _cm->chunks()) {
-        if (found.getShardId() == _thisShardId) {
-            if (found.getMin().woCompare(chunkMinKey) != 0) {
-                differentChunk->setMin(found.getMin());
-                differentChunk->setMax(found.getMax());
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) const {
     ChunkType existingChunk;
 
