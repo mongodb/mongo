@@ -659,10 +659,11 @@ BSONObj getDefaultCollationForUnshardedCollection(const BSONObj collectionInfo) 
 /**
  *  Populates the "collation" and "uuid" parameters with the following semantics:
  *  - The "collation" parameter will be set to the default collation for the collection or the
- * simple collation if there is no default. If the collection does not exist, this will be set to an
- * empty object.
+ *    simple collation if there is no default. If the collection does not exist or if the aggregate
+ *    is on the collectionless namespace, this will be set to an empty object.
  *  - The "uuid" is retrieved from the chunk manager for sharded collections or the listCollections
- * output for unsharded collections.
+ *    output for unsharded collections. The UUID will remain unset if the aggregate is on the
+ *    collectionless namespace.
  */
 std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
     const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
@@ -670,6 +671,14 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
     const AggregationRequest& request) {
     const bool collectionIsSharded = (routingInfo && routingInfo->cm());
     const bool collectionIsNotSharded = (routingInfo && !routingInfo->cm());
+
+    // Because collectionless aggregations are generally run against the 'admin' database, the
+    // standard logic will attempt to resolve its non-existent UUID and collation by sending a
+    // specious 'listCollections' command to the config servers. To prevent this, we immediately
+    // return the user-defined collation if one exists, or an empty BSONObj otherwise.
+    if (nss.isCollectionlessAggregateNS()) {
+        return {request.getCollation(), boost::none};
+    }
 
     // If the collection is unsharded, obtain collInfo from the primary shard.
     const auto unshardedCollInfo = collectionIsNotSharded
