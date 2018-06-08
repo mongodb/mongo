@@ -51,6 +51,7 @@ public:
     PeriodicRunnerImpl(ServiceContext* svc, ClockSource* clockSource);
     ~PeriodicRunnerImpl();
 
+    std::unique_ptr<PeriodicRunner::PeriodicJobHandle> makeJob(PeriodicJob job) override;
     void scheduleJob(PeriodicJob job) override;
 
     void startup() override;
@@ -58,14 +59,49 @@ public:
     void shutdown() override;
 
 private:
-    struct PeriodicJobImpl : public std::enable_shared_from_this<PeriodicJobImpl> {
-        PeriodicJobImpl(PeriodicJob job, PeriodicRunnerImpl* parent);
+    class PeriodicJobImpl {
+        MONGO_DISALLOW_COPYING(PeriodicJobImpl);
 
-        void run();
+    public:
+        PeriodicJobImpl(PeriodicJob job, ClockSource* source, ServiceContext* svc);
 
-        PeriodicJob job;
-        PeriodicRunnerImpl* parent;
-        stdx::thread thread;
+        void start();
+        void pause();
+        void resume();
+        void stop();
+
+        bool isAlive();
+
+        enum class ExecutionStatus { NOT_SCHEDULED, RUNNING, PAUSED, CANCELED };
+
+    private:
+        void _run();
+
+        PeriodicJob _job;
+        ClockSource* _clockSource;
+        ServiceContext* _serviceContext;
+        stdx::thread _thread;
+
+        stdx::mutex _mutex;
+        stdx::condition_variable _condvar;
+        /**
+         * The current execution status of the job.
+         */
+        ExecutionStatus _execStatus{ExecutionStatus::NOT_SCHEDULED};
+    };
+
+    std::shared_ptr<PeriodicRunnerImpl::PeriodicJobImpl> createAndAddJob(PeriodicJob job);
+
+    class PeriodicJobHandleImpl : public PeriodicJobHandle {
+    public:
+        explicit PeriodicJobHandleImpl(std::weak_ptr<PeriodicJobImpl> jobImpl)
+            : _jobWeak(jobImpl) {}
+        void start() override;
+        void pause() override;
+        void resume() override;
+
+    private:
+        std::weak_ptr<PeriodicJobImpl> _jobWeak;
     };
 
     ServiceContext* _svc;
@@ -74,7 +110,6 @@ private:
     std::vector<std::shared_ptr<PeriodicJobImpl>> _jobs;
 
     stdx::mutex _mutex;
-    stdx::condition_variable _condvar;
     bool _running = false;
 };
 

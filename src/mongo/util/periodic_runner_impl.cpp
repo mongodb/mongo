@@ -41,18 +41,28 @@ PeriodicRunnerImpl::PeriodicRunnerImpl(ServiceContext* svc, ClockSource* clockSo
     : _svc(svc), _clockSource(clockSource) {}
 
 PeriodicRunnerImpl::~PeriodicRunnerImpl() {
-    shutdown();
+    PeriodicRunnerImpl::shutdown();
+}
+
+std::shared_ptr<PeriodicRunnerImpl::PeriodicJobImpl> PeriodicRunnerImpl::createAndAddJob(
+    PeriodicJob job) {
+    auto impl = std::make_shared<PeriodicJobImpl>(std::move(job), this->_clockSource, this->_svc);
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _jobs.push_back(impl);
+    return impl;
+}
+
+std::unique_ptr<PeriodicRunner::PeriodicJobHandle> PeriodicRunnerImpl::makeJob(PeriodicJob job) {
+    auto handle = std::make_unique<PeriodicJobHandleImpl>(createAndAddJob(job));
+    return std::move(handle);
 }
 
 void PeriodicRunnerImpl::scheduleJob(PeriodicJob job) {
-    auto impl = std::make_shared<PeriodicJobImpl>(std::move(job), this);
-
-    {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        _jobs.push_back(impl);
-        if (_running) {
-            impl->run();
-        }
+    auto impl = createAndAddJob(job);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_running) {
+        impl->start();
     }
 }
 
@@ -66,56 +76,127 @@ void PeriodicRunnerImpl::startup() {
     _running = true;
 
     // schedule any jobs that we have
-    for (auto job : _jobs) {
-        job->run();
+    for (auto& job : _jobs) {
+        job->start();
     }
 }
 
 void PeriodicRunnerImpl::shutdown() {
-    std::vector<stdx::thread> threads;
-    const auto guard = MakeGuard([&] {
-        for (auto& thread : threads) {
-            thread.join();
-        }
-    });
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_running) {
+        _running = false;
 
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (_running) {
-            _running = false;
-
-            for (auto&& job : _jobs) {
-                threads.push_back(std::move(job->thread));
+        for (auto& job : _jobs) {
+            if (job->isAlive()) {
+                job->stop();
             }
-
-            _jobs.clear();
-
-            _condvar.notify_all();
         }
+        _jobs.clear();
     }
 }
 
-PeriodicRunnerImpl::PeriodicJobImpl::PeriodicJobImpl(PeriodicJob job, PeriodicRunnerImpl* parent)
-    : job(std::move(job)), parent(parent) {}
+PeriodicRunnerImpl::PeriodicJobImpl::PeriodicJobImpl(PeriodicJob job,
+                                                     ClockSource* source,
+                                                     ServiceContext* svc)
+    : _job(std::move(job)), _clockSource(source), _serviceContext(svc) {}
 
-void PeriodicRunnerImpl::PeriodicJobImpl::run() {
-    thread = stdx::thread([ this, anchor = shared_from_this() ] {
-        Client::initThread(job.name, parent->_svc, nullptr);
-
+void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
+    _thread = stdx::thread([this] {
+        Client::initThread(_job.name, _serviceContext, nullptr);
         while (true) {
-            auto start = parent->_clockSource->now();
+            auto start = _clockSource->now();
 
-            job.job(Client::getCurrent());
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            // Wait until it's unpaused or canceled
+            _condvar.wait(lk, [&] { return _execStatus != ExecutionStatus::PAUSED; });
+            if (_execStatus == ExecutionStatus::CANCELED) {
+                break;
+            }
 
-            stdx::unique_lock<stdx::mutex> lk(parent->_mutex);
-            if (parent->_clockSource->waitForConditionUntil(
-                    parent->_condvar, lk, start + job.interval, [&] {
-                        return !parent->_running;
-                    })) {
+            // Unlock while job is running so we can pause/cancel concurrently
+            lk.unlock();
+            _job.job(Client::getCurrent());
+            lk.lock();
+
+            if (_clockSource->waitForConditionUntil(_condvar, lk, start + _job.interval, [&] {
+                    return _execStatus == ExecutionStatus::CANCELED;
+                })) {
                 break;
             }
         }
     });
+}
+
+void PeriodicRunnerImpl::PeriodicJobImpl::start() {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::NOT_SCHEDULED);
+        _execStatus = PeriodicJobImpl::ExecutionStatus::RUNNING;
+    }
+    _run();
+}
+
+void PeriodicRunnerImpl::PeriodicJobImpl::pause() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING);
+    _execStatus = PeriodicJobImpl::ExecutionStatus::PAUSED;
+}
+
+void PeriodicRunnerImpl::PeriodicJobImpl::resume() {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::PAUSED);
+        _execStatus = PeriodicJobImpl::ExecutionStatus::RUNNING;
+    }
+    _condvar.notify_one();
+}
+
+void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        invariant(isAlive());
+        invariant(_thread.joinable());
+
+        _execStatus = PeriodicJobImpl::ExecutionStatus::CANCELED;
+    }
+    _condvar.notify_one();
+    _thread.join();
+}
+
+bool PeriodicRunnerImpl::PeriodicJobImpl::isAlive() {
+    return _execStatus == ExecutionStatus::RUNNING || _execStatus == ExecutionStatus::PAUSED;
+}
+
+
+namespace {
+
+template <typename T>
+std::shared_ptr<T> lockAndAssertExists(std::weak_ptr<T> ptr, StringData errMsg) {
+    if (auto p = ptr.lock()) {
+        return p;
+    } else {
+        uasserted(ErrorCodes::InternalError, errMsg);
+    }
+}
+
+constexpr auto kPeriodicJobHandleLifetimeErrMsg =
+    "The PeriodicRunner job for this handle no longer exists"_sd;
+
+}  // namespace
+
+void PeriodicRunnerImpl::PeriodicJobHandleImpl::start() {
+    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
+    job->start();
+}
+
+void PeriodicRunnerImpl::PeriodicJobHandleImpl::pause() {
+    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
+    job->pause();
+}
+
+void PeriodicRunnerImpl::PeriodicJobHandleImpl::resume() {
+    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
+    job->resume();
 }
 
 }  // namespace mongo

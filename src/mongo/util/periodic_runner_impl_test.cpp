@@ -105,6 +105,148 @@ TEST_F(PeriodicRunnerImplTest, OneJobTest) {
     }
 }
 
+TEST_F(PeriodicRunnerImplTest, OnePausableJobDoesNotRunWithoutStart) {
+    int count = 0;
+    Milliseconds interval{5};
+
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+
+    // Add a job, ensure that it runs once
+    PeriodicRunner::PeriodicJob job("job",
+                                    [&count, &mutex, &cv](Client*) {
+                                        {
+                                            stdx::unique_lock<stdx::mutex> lk(mutex);
+                                            count++;
+                                        }
+                                        cv.notify_all();
+                                    },
+                                    interval);
+
+    auto handle = runner().makeJob(std::move(job));
+    clockSource().advance(interval);
+    ASSERT_EQ(count, 0);
+}
+
+TEST_F(PeriodicRunnerImplTest, OnePausableJobRunsCorrectlyWithStart) {
+    int count = 0;
+    Milliseconds interval{5};
+
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+
+    // Add a job, ensure that it runs once
+    PeriodicRunner::PeriodicJob job("job",
+                                    [&count, &mutex, &cv](Client*) {
+                                        {
+                                            stdx::unique_lock<stdx::mutex> lk(mutex);
+                                            count++;
+                                        }
+                                        cv.notify_all();
+                                    },
+                                    interval);
+
+    auto handle = runner().makeJob(std::move(job));
+    handle->start();
+    // Fast forward ten times, we should run all ten times.
+    for (int i = 0; i < 10; i++) {
+        clockSource().advance(interval);
+        {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            cv.wait(lk, [&count, &i] { return count > i; });
+        }
+    }
+}
+
+TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
+    int count = 0;
+    Milliseconds interval{5};
+
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+
+    // Add a job, ensure that it runs once
+    PeriodicRunner::PeriodicJob job("job",
+                                    [&count, &mutex, &cv](Client*) {
+                                        {
+                                            stdx::unique_lock<stdx::mutex> lk(mutex);
+                                            count++;
+                                        }
+                                        cv.notify_all();
+                                    },
+                                    interval);
+
+    auto handle = runner().makeJob(std::move(job));
+    handle->start();
+    // Fast forward ten times, we should run all ten times.
+    for (int i = 0; i < 10; i++) {
+        clockSource().advance(interval);
+        {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            cv.wait(lk, [&count, &i] { return count > i; });
+        }
+    }
+    auto numExecutionsBeforePause = count;
+    handle->pause();
+    // Fast forward ten times, we shouldn't run anymore
+    for (int i = 0; i < 10; i++) {
+        clockSource().advance(interval);
+    }
+    ASSERT_TRUE(count == numExecutionsBeforePause || count == numExecutionsBeforePause + 1);
+}
+
+TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
+    int count = 0;
+    int numFastForwardsForIterationWhileActive = 10;
+    Milliseconds interval{5};
+
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+
+    // Add a job, ensure that it runs once
+    PeriodicRunner::PeriodicJob job("job",
+                                    [&count, &mutex, &cv](Client*) {
+                                        {
+                                            stdx::unique_lock<stdx::mutex> lk(mutex);
+                                            count++;
+                                        }
+                                        cv.notify_all();
+                                    },
+                                    interval);
+
+    auto handle = runner().makeJob(std::move(job));
+    handle->start();
+    // Fast forward ten times, we should run all ten times.
+    for (int i = 0; i < numFastForwardsForIterationWhileActive; i++) {
+        clockSource().advance(interval);
+        {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            cv.wait(lk, [&count, &i] { return count > i; });
+        }
+    }
+    auto countBeforePause = count;
+    ASSERT_TRUE(countBeforePause == numFastForwardsForIterationWhileActive ||
+                countBeforePause == numFastForwardsForIterationWhileActive + 1);
+    handle->pause();
+    // Fast forward ten times, we shouldn't run anymore
+    for (int i = 0; i < 10; i++) {
+        clockSource().advance(interval);
+    }
+    handle->resume();
+    // Fast forward ten times, we should run all ten times.
+    for (int i = 0; i < numFastForwardsForIterationWhileActive; i++) {
+        clockSource().advance(interval);
+        {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            cv.wait(lk, [&count, &countBeforePause, &i] { return count > countBeforePause + i; });
+        }
+    }
+
+    // This is slightly racy so once in a while count will be one extra
+    ASSERT_TRUE(count == numFastForwardsForIterationWhileActive * 2 ||
+                count == numFastForwardsForIterationWhileActive * 2 + 1);
+}
+
 TEST_F(PeriodicRunnerImplTestNoSetup, ScheduleBeforeStartupTest) {
     int count = 0;
     Milliseconds interval{5};
@@ -175,6 +317,7 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
             cv.wait(lk, [&countA, &countB, &i] { return (countA > i && countB >= i / 2); });
         }
     }
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, TwoJobsDontDeadlock) {
