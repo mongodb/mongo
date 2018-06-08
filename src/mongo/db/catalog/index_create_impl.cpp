@@ -70,6 +70,8 @@ MONGO_FAIL_POINT_DEFINE(crashAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(slowBackgroundIndexBuild);
+MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildOf);
 
 AtomicInt32 maxIndexBuildMemoryUsageMegabytes(500);
 
@@ -319,6 +321,16 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
     return indexInfoObjs;
 }
 
+void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& doc) {
+    MONGO_FAIL_POINT_BLOCK(*fp, data) {
+        int i = doc.getIntField("i");
+        if (data.getData()["i"].numberInt() == i) {
+            log() << "Hanging " << where << " index build of i=" << i;
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET((*fp));
+        }
+    }
+}
+
 Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
     invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -383,6 +395,8 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
             // Done before insert so we can retry document if it WCEs.
             progress->setTotalWhileRunning(_collection->numRecords(_opCtx));
 
+            failPointHangDuringBuild(&hangBeforeIndexBuildOf, "before", objToIndex.value());
+
             WriteUnitOfWork wunit(_opCtx);
             Status ret = insert(objToIndex.value(), loc);
             if (_buildInBackground)
@@ -403,6 +417,8 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
                     return restoreStatus;
                 }
             }
+
+            failPointHangDuringBuild(&hangAfterIndexBuildOf, "after", objToIndex.value());
 
             // Go to the next document
             progress->hit();
