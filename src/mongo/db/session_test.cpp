@@ -36,6 +36,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/fill_locker_info.h"
@@ -1179,6 +1180,23 @@ TEST_F(SessionTest, TransactionTooLargeWhileBuilding) {
     ASSERT_THROWS_CODE(session.addTransactionOperation(opCtx(), operation),
                        AssertionException,
                        ErrorCodes::TransactionTooLarge);
+}
+
+TEST_F(SessionTest, IncrementTotalStartedUponStartTransaction) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    unsigned long long beforeTransactionStart =
+        ServerTransactionsMetrics::get(opCtx())->getTotalStarted();
+
+    const TxnNumber txnNum = 1;
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    // Tests that the total transactions started counter is incremented by 1 when a new transaction
+    // is started.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalStarted(),
+              beforeTransactionStart + 1U);
 }
 
 }  // namespace

@@ -46,12 +46,17 @@ public:
     static ServerTransactionsMetrics* get(ServiceContext* service);
     static ServerTransactionsMetrics* get(OperationContext* opCtx);
 
+    unsigned long long getTotalStarted() const;
+    void incrementTotalStarted();
+
     /**
      * Appends the accumulated stats to a transactions stats object.
      */
     void updateStats(TransactionsStats* stats);
 
 private:
+    // The total number of multi-document transactions started since the last server startup.
+    AtomicUInt64 _totalStarted{0};
 };
 
 }  // namespace mongo

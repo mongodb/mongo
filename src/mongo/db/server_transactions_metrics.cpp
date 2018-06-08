@@ -51,6 +51,14 @@ ServerTransactionsMetrics* ServerTransactionsMetrics::get(OperationContext* opCt
     return get(opCtx->getServiceContext());
 }
 
+unsigned long long ServerTransactionsMetrics::getTotalStarted() const {
+    return _totalStarted.load();
+}
+
+void ServerTransactionsMetrics::incrementTotalStarted() {
+    _totalStarted.fetchAndAdd(1);
+}
+
 void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     // This is a dummy function until we start tracking global transactions metrics.
 }

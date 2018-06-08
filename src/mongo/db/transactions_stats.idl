@@ -36,6 +36,9 @@ structs:
       retriedStatementsCount:
         type: long
         default: 0
+      totalStarted:
+        type: long
+        default: 0
       transactionsCollectionWriteCount:
         type: long
         default: 0
