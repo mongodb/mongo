@@ -1,5 +1,6 @@
 /**
  * Tests that "atClusterTime" is supported by the "dbHash" command.
+ * @tags: [uses_transactions]
  */
 (function() {
     "use strict";
@@ -17,11 +18,6 @@
     const session = primary.startSession({causalConsistency: false});
     const db = session.getDatabase("test");
     let txnNumber = 0;
-
-    if (!db.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
 
     // We force 'secondary' to sync from 'primary' using the "forceSyncSourceCandidate" failpoint to
     // ensure that an intermittent connectivity issue doesn't lead to the secondary not advancing

@@ -1,7 +1,7 @@
 /**
  * Tests for the aggregate command's support for readConcern level "snapshot".
  *
- * @tags: [requires_replication]
+ * @tags: [uses_transactions]
  */
 (function() {
     "use strict";
@@ -19,10 +19,6 @@
     let session =
         rst.getPrimary().getDB(kDBName).getMongo().startSession({causalConsistency: false});
     let sessionDB = session.getDatabase(kDBName);
-    if (!sessionDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
 
     let txnNumber = NumberLong(0);
     assert.commandWorked(sessionDB.runCommand({create: kCollName, writeConcern: {w: "majority"}}));

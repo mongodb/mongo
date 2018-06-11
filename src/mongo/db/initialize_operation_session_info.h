@@ -46,6 +46,9 @@ namespace mongo {
  * Both isReplSetMemberOrMongos and supportsDocLocking need to be true if the command contains a
  * transaction number, otherwise this function will throw.
  *
+ * supportsRecoverToStableTimestamp needs to be true if the command contains autocommit:false,
+ * otherwise this function will throw.
+ *
  * On success, returns the parsed request information. Returning boost::none implies that the
  * proper command or session requirements were not met.
  */
@@ -54,6 +57,7 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
     const BSONObj& requestBody,
     bool requiresAuth,
     bool isReplSetMemberOrMongos,
-    bool supportsDocLocking);
+    bool supportsDocLocking,
+    bool supportsRecoverToStableTimestamp);
 
 }  // namespace mongo

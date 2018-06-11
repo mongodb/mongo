@@ -10,18 +10,27 @@
     // Configurations.
     //
 
-    // readConcern 'snapshot' should fail on storage engines that do not support it.
+    // Transactions should fail on storage engines that do not support them.
     let rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
     let session =
         rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     let sessionDb = session.getDatabase(dbName);
-    if (!sessionDb.serverStatus().storageEngine.supportsSnapshotReadConcern) {
+    if (!sessionDb.serverStatus().storageEngine.supportsSnapshotReadConcern ||
+        !sessionDb.serverStatus().storageEngine.persistent) {
+        // Transactions with readConcern snapshot fail.
         session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
                                      ErrorCodes.IllegalOperation);
         session.abortTransaction();
+
+        // Transactions without readConcern snapshot fail.
+        session.startTransaction();
+        assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
+                                     ErrorCodes.IllegalOperation);
+        session.abortTransaction();
+
         rst.stopSet();
         return;
     }

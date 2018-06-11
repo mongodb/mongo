@@ -1,6 +1,6 @@
 // Tests that a cursor is iterated in a transaction/session iff it was created in that
 // transaction/session. Specifically tests this in the context of snapshot cursors.
-// @tags: [requires_replication]
+// @tags: [uses_transactions]
 (function() {
     "use strict";
 
@@ -15,10 +15,6 @@
     rst.initiate();
 
     const primaryDB = rst.getPrimary().getDB(dbName);
-    if (!primaryDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
 
     const session1 = primaryDB.getMongo().startSession();
     const sessionDB1 = session1.getDatabase(dbName);

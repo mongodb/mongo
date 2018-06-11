@@ -1,7 +1,7 @@
 // Test that the read concern level 'snapshot' exhibits the correct yielding behavior. That is,
 // operations performed at read concern level snapshot check for interrupt but do not yield locks or
 // storage engine resources.
-// @tags: [requires_replication]
+// @tags: [uses_transactions]
 (function() {
     "use strict";
 
@@ -23,11 +23,6 @@
     const adminDB = db.getSiblingDB("admin");
     const coll = db.coll;
     TestData.numDocs = 4;
-
-    if (!db.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
 
     // Set 'internalQueryExecYieldIterations' to 2 to ensure that commands yield on the second try
     // (i.e. after they have established a snapshot but before they have returned any documents).

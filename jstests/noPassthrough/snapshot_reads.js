@@ -1,5 +1,5 @@
 // Tests snapshot isolation on readConcern level snapshot read.
-// @tags: [requires_replication]
+// @tags: [uses_transactions]
 (function() {
     "use strict";
 
@@ -14,10 +14,6 @@
     rst.initiate(conf);
 
     const primaryDB = rst.getPrimary().getDB(dbName);
-    if (!primaryDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
 
     function parseCursor(cmdResult) {
         if (cmdResult.hasOwnProperty("cursor")) {

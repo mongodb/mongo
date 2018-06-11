@@ -335,7 +335,7 @@ void runCommand(OperationContext* opCtx,
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, opType);
 
-    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
+    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true, true);
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto readConcernParseStatus = readConcernArgs.initialize(request.body);

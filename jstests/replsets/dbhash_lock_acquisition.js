@@ -1,6 +1,7 @@
 /**
  * Tests that the dbHash command acquires IX mode locks on the global, database, and collection
  * resources when running inside a multi-statement transaction.
+ * @tags: [uses_transactions]
  */
 (function() {
     "use strict";
@@ -11,11 +12,6 @@
 
     const primary = rst.getPrimary();
     const db = primary.getDB("test");
-
-    if (!db.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
 
     const session = primary.startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(db.getName());
