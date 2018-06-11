@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <vector>
 
+#include "mongo/base/counter.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/time_support.h"
@@ -61,6 +62,11 @@ public:
      * Batch of oplog entries (in BSON format) for bulk read/write operations.
      */
     using Batch = std::vector<Value>;
+
+    /**
+     * Counters for this oplog buffer.
+     */
+    class Counters;
 
     OplogBuffer() = default;
     virtual ~OplogBuffer() = default;
@@ -160,6 +166,34 @@ public:
      * Returns the item most recently added to the oplog buffer or nothing if the buffer is empty.
      */
     virtual boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const = 0;
+};
+
+class OplogBuffer::Counters {
+public:
+    /**
+     * Clears counters.
+     * This function should only be called by a single thread.
+     */
+    void clear() {
+        count.decrement(count.get());
+        size.decrement(size.get());
+    }
+
+    void increment(const Value& value) {
+        count.increment(1);
+        size.increment(std::size_t(value.objsize()));
+    }
+
+    void decrement(const Value& value) {
+        count.decrement(1);
+        size.decrement(std::size_t(value.objsize()));
+    }
+
+    // Number of operations in this OplogBuffer.
+    Counter64 count;
+
+    // Total size of operations in this OplogBuffer. Measured in bytes.
+    Counter64 size;
 };
 
 }  // namespace repl
