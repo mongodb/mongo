@@ -91,7 +91,7 @@ int runDbTests(int argc, char** argv) {
     srand((unsigned)frameworkGlobalParams.seed);
 
     createLockFile(globalServiceContext);
-    initializeStorageEngine(globalServiceContext);
+    initializeStorageEngine(globalServiceContext, StorageEngineInitFlags::kNone);
     auto registry = stdx::make_unique<OpObserverRegistry>();
     registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
     globalServiceContext->setOpObserver(std::move(registry));

@@ -210,9 +210,7 @@ ServiceContext* initialize(const char* yaml_config) {
 
     DEV log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
 
-    createLockFile(serviceContext);
-
-    initializeStorageEngine(serviceContext);
+    initializeStorageEngine(serviceContext, StorageEngineInitFlags::kAllowNoLockFile);
 
     // Warn if we detect configurations for multiple registered storage engines in the same
     // configuration file/environment.

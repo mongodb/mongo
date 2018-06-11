@@ -47,14 +47,15 @@ namespace mongo {
 
 extern bool _supportsDocLocking;
 
-void initializeStorageEngine(ServiceContext* service) {
+void initializeStorageEngine(ServiceContext* service, StorageEngineInitFlags initFlags) {
     // This should be set once.
     invariant(!service->getStorageEngine());
 
     // We should have a lock file or be in read-only mode. Confusingly, we can still have a lockFile
     // if we are in read-only mode. This can happen if the server is started in read-only mode on a
     // writable dbpath.
-    invariant(StorageEngineLockFile::get(service) || storageGlobalParams.readOnly);
+    invariant((initFlags & StorageEngineInitFlags::kAllowNoLockFile) ||
+              StorageEngineLockFile::get(service) || storageGlobalParams.readOnly);
 
     const std::string dbpath = storageGlobalParams.dbpath;
     if (auto existingStorageEngine = StorageEngineMetadata::getStorageEngineForPath(dbpath)) {

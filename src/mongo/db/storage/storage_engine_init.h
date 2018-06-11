@@ -33,13 +33,22 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/platform/bitwise_enum_operators.h"
 
 namespace mongo {
 
 /**
+ * Valid flags to pass to initializeStorageEngine. Used as a bitfield.
+ */
+enum StorageEngineInitFlags {
+    kNone = 0,
+    kAllowNoLockFile = 1 << 0,
+};
+
+/**
  * Initializes the storage engine on "service".
  */
-void initializeStorageEngine(ServiceContext* service);
+void initializeStorageEngine(ServiceContext* service, StorageEngineInitFlags initFlags);
 
 /**
  * Shuts down storage engine cleanly and releases any locks on mongod.lock.
@@ -89,5 +98,7 @@ Status validateStorageOptions(
  * Appends a the list of available storage engines to a BSONObjBuilder for reporting purposes.
  */
 void appendStorageEngineList(ServiceContext* service, BSONObjBuilder* result);
+
+ENABLE_BITMASK_OPERATORS(StorageEngineInitFlags)
 
 }  // namespace mongo
