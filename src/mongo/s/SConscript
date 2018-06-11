@@ -10,6 +10,7 @@ env.SConscript(
         'client',
         'commands',
         'query',
+        'transaction',
         'write_ops',
     ],
     exports=[
@@ -100,6 +101,7 @@ env.Library(
         "$BUILD_DIR/mongo/s/client/sharding_client",
         "$BUILD_DIR/mongo/s/coreshard",
         '$BUILD_DIR/mongo/s/client/shard_interface',
+        'transaction/router_session',
     ],
 )
 

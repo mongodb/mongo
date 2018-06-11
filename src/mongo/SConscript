@@ -428,6 +428,7 @@ mongos = env.Program(
         's/is_mongos',
         's/sharding_egress_metadata_hook_for_mongos',
         's/sharding_initialization',
+        's/transaction/router_session',
         's/query/cluster_cursor_cleanup_job',
         'transport/service_entry_point',
         'transport/transport_layer_manager',

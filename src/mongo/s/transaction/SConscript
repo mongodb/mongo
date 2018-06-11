@@ -1,0 +1,26 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='router_session',
+    source=[
+        'router_session_runtime_state.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/s/common_s',
+    ],
+)
+
+env.CppUnitTest(
+    target='router_session_test',
+    source=[
+        'router_session_runtime_state_test.cpp',
+    ],
+    LIBDEPS=[
+        'router_session',
+    ]
+)

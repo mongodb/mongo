@@ -71,7 +71,6 @@ selector:
   - jstests/sharding/resume_change_stream.js
   - jstests/sharding/change_stream_resume_from_different_mongos.js
   - jstests/sharding/change_stream_shard_failover.js
-  - jstests/sharding/transactions_prohibited_in_sharded_cluster.js
   # Requires count command to be accurate on sharded clusters, introduced in v4.0.
   - jstests/sharding/accurate_count_with_predicate.js
   # Disabled throughout sharding. See SERVER-31937 for details.

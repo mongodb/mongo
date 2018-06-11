@@ -73,6 +73,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction/router_session_runtime_state.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -301,10 +302,6 @@ void runCommand(OperationContext* opCtx,
     }
 
     CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
-    // Transactions are disallowed in sharded clusters in MongoDB 4.0.
-    uassert(50841,
-            "Multi-document transactions cannot be run in a sharded cluster.",
-            !request.body.hasField("startTransaction") && !request.body.hasField("autocommit"));
 
     // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
     // the OperationContext. Be sure to do this as soon as possible so that further processing by
@@ -335,7 +332,25 @@ void runCommand(OperationContext* opCtx,
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, opType);
 
-    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true, true);
+    boost::optional<ScopedRouterSession> scopedSession;
+    if (auto osi = initializeOperationSessionInfo(
+            opCtx, request.body, command->requiresAuth(), true, true, true)) {
+
+        if (osi->getAutocommit()) {
+            scopedSession.emplace(opCtx);
+
+            auto routerSession = RouterSessionRuntimeState::get(opCtx);
+            invariant(routerSession);
+
+            auto txnNumber = opCtx->getTxnNumber();
+            invariant(txnNumber);
+
+            auto startTxnSetting = osi->getStartTransaction();
+            bool startTransaction = startTxnSetting ? *startTxnSetting : false;
+
+            routerSession->beginOrContinueTxn(*txnNumber, startTransaction);
+        }
+    }
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto readConcernParseStatus = readConcernArgs.initialize(request.body);

@@ -38,6 +38,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/transaction/router_session_runtime_state.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
@@ -68,8 +69,16 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
       _db(dbName.toString()),
       _readPreference(readPreference),
       _retryPolicy(retryPolicy) {
+    auto routerSession = RouterSessionRuntimeState::get(opCtx);
+
     for (const auto& request : requests) {
-        _remotes.emplace_back(request.shardId, request.cmdObj);
+        auto cmdObj = request.cmdObj;
+        if (routerSession) {
+            auto& participant = routerSession->getOrCreateParticipant(request.shardId);
+            cmdObj = participant.attachTxnFieldsIfNeeded(request.cmdObj);
+        }
+
+        _remotes.emplace_back(request.shardId, cmdObj);
     }
 
     // Initialize command metadata to handle the read preference.
@@ -292,7 +301,13 @@ void AsyncRequestsSender::_makeProgress(OperationContext* opCtx) {
     // Store the response or error.
     if (job->cbData.response.status.isOK()) {
         remote.swResponse = std::move(job->cbData.response);
+
+        if (auto routerSession = RouterSessionRuntimeState::get(opCtx)) {
+            auto& participant = routerSession->getOrCreateParticipant(remote.shardId);
+            participant.markAsCommandSent();
+        }
     } else {
+        // TODO: call participant.markAsCommandSent on "transaction already started" errors?
         remote.swResponse = std::move(job->cbData.response.status);
     }
 }
