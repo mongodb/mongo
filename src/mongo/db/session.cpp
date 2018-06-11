@@ -378,7 +378,7 @@ void Session::setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opC
     // commands are only allowed when test commands are enabled, but violate an invariant that the
     // read timestamp cannot be changed on a RecoveryUnit while it is active.
     if (opCtx->getClient()->isInDirectClient() &&
-        opCtx->recoveryUnit()->getTimestampReadSource() != RecoveryUnit::ReadSource::kNone) {
+        opCtx->recoveryUnit()->getTimestampReadSource() != RecoveryUnit::ReadSource::kUnset) {
         return;
     }
 
