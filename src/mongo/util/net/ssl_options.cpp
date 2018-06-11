@@ -254,14 +254,16 @@ Status addSSLServerOptions(moe::OptionSection* options) {
                             moe::String,
                             "SSL Certificate in system store")
         .incompatibleWith("net.ssl.PEMKeyFile")
-        .incompatibleWith("net.ssl.PEMKeyPassword");
+        .incompatibleWith("net.ssl.PEMKeyPassword")
+        .setSources(moe::SourceYAMLCLI);
     options
         ->addOptionChaining("net.ssl.clusterCertificateSelector",
                             "sslClusterCertificateSelector",
                             moe::String,
                             "SSL Certificate in system store for internal SSL authentication")
         .incompatibleWith("net.ssl.clusterFile")
-        .incompatibleWith("net.ssl.clusterFilePassword");
+        .incompatibleWith("net.ssl.clusterFilePassword")
+        .setSources(moe::SourceYAMLCLI);
 #endif
 
     return Status::OK();
@@ -317,14 +319,17 @@ Status addSSLClientOptions(moe::OptionSection* options) {
                             moe::String,
                             "SSL Certificate in system store")
         .incompatibleWith("ssl.PEMKeyFile")
-        .incompatibleWith("ssl.PEMKeyPassword");
+        .incompatibleWith("ssl.PEMKeyPassword")
+        .setSources(moe::SourceYAMLCLI);
 #endif
 
-    options->addOptionChaining(
-        "ssl.disabledProtocols",
-        "sslDisabledProtocols",
-        moe::String,
-        "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2]");
+    options
+        ->addOptionChaining(
+            "ssl.disabledProtocols",
+            "sslDisabledProtocols",
+            moe::String,
+            "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2]")
+        .setSources(moe::SourceYAMLCLI);
 
     return Status::OK();
 }
