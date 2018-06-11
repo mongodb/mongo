@@ -902,6 +902,7 @@ void Session::_abortTransaction(WithLock wl) {
     _transactionOperations.clear();
     _txnState = MultiDocumentTransactionState::kAborted;
     _speculativeTransactionReadOpTime = repl::OpTime();
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
@@ -1032,6 +1033,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
     _txnState = MultiDocumentTransactionState::kCommitted;
+    ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
 }
 
 BSONObj Session::reportStashedState() const {
