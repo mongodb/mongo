@@ -791,6 +791,11 @@ void FreeMonProcessor::doAsyncMetricsComplete(
         auto opCtxUnique = client->makeOperationContext();
         FreeMonStorage::deleteState(opCtxUnique.get());
 
+        _state->setState(StorageStateEnum::pending);
+
+        // Clear out the in-memory state
+        _lastReadState = boost::none;
+
         return;
     }
 
@@ -945,7 +950,10 @@ void FreeMonProcessor::doNotifyOnDelete(Client* client) {
     // the same and stop free monitoring. We continue collecting though.
 
     // So we mark the internal state as disabled which stop registration and metrics send
-    _state->setState(StorageStateEnum::disabled);
+    _state->setState(StorageStateEnum::pending);
+
+    // Clear out the in-memory state
+    _lastReadState = boost::none;
 }
 
 void FreeMonProcessor::doNotifyOnRollback(Client* client) {

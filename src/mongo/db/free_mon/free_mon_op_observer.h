@@ -61,7 +61,7 @@ public:
 
     void aboutToDelete(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       const BSONObj& doc) final {}
+                       const BSONObj& doc) final;
 
     void onDelete(OperationContext* opCtx,
                   const NamespaceString& nss,

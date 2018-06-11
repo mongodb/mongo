@@ -21,7 +21,7 @@ import mock_http_common
 stats = mock_http_common.Stats()
 last_metrics = None
 last_register = None
-
+disable_faults = False
 fault_type = None
 
 """Fault which causes the server to return an HTTP failure on register."""
@@ -65,6 +65,10 @@ class FreeMonHandler(http.server.BaseHTTPRequestHandler):
             self._do_last_register()
         elif path == mock_http_common.URL_PATH_LAST_METRICS:
             self._do_last_metrics()
+        elif path == mock_http_common.URL_DISABLE_FAULTS:
+            self._do_disable_faults()
+        elif path == mock_http_common.URL_ENABLE_FAULTS:
+            self._do_enable_faults()
         else:
             self.send_response(http.HTTPStatus.NOT_FOUND)
             self.end_headers()
@@ -100,14 +104,16 @@ class FreeMonHandler(http.server.BaseHTTPRequestHandler):
         decoded_doc = bson.BSON.decode(raw_input)
         last_register = dumps(decoded_doc)
 
-        if fault_type == FAULT_FAIL_REGISTER:
+        if not disable_faults and fault_type == FAULT_FAIL_REGISTER:
+            stats.fault_calls += 1
             self.send_response(http.HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_header("content-type", "application/octet-stream")
             self.end_headers()
             self.wfile.write("Internal Error of some sort.".encode())
             return
 
-        if fault_type == FAULT_INVALID_REGISTER:
+        if not disable_faults and fault_type == FAULT_INVALID_REGISTER:
+            stats.fault_calls += 1
             data = bson.BSON.encode({
                 'version': bson.int64.Int64(42),
                 'haltMetricsUploading': False,
@@ -148,7 +154,10 @@ You can disable monitoring at any time by running db.disableFreeMonitoring()."""
         decoded_doc = bson.BSON.decode(raw_input)
         last_metrics = dumps(decoded_doc)
 
-        if stats.metrics_calls > 5 and fault_type == FAULT_HALT_METRICS_5:
+        if not disable_faults and \
+            stats.metrics_calls > 5 and \
+            fault_type == FAULT_HALT_METRICS_5:
+            stats.fault_calls += 1
             data = bson.BSON.encode({
                 'version': bson.int64.Int64(1),
                 'haltMetricsUploading': True,
@@ -157,7 +166,9 @@ You can disable monitoring at any time by running db.disableFreeMonitoring()."""
                 'reportingInterval': bson.int64.Int64(1),
                 'message': 'Thanks for all the metrics',
             })
-        elif stats.metrics_calls > 3 and fault_type == FAULT_PERMANENTLY_DELETE_AFTER_3:
+        elif not disable_faults and \
+            stats.metrics_calls > 3 and fault_type == FAULT_PERMANENTLY_DELETE_AFTER_3:
+            stats.fault_calls += 1
             data = bson.BSON.encode({
                 'version': bson.int64.Int64(1),
                 'haltMetricsUploading': False,
@@ -196,6 +207,15 @@ You can disable monitoring at any time by running db.disableFreeMonitoring()."""
 
         self.wfile.write(str(last_metrics).encode('utf-8'))
 
+    def _do_disable_faults(self):
+        global disable_faults
+        disable_faults = True
+        self._send_header()
+
+    def _do_enable_faults(self):
+        global disable_faults
+        disable_faults = False
+        self._send_header()
 
 def run(port, server_class=http.server.HTTPServer, handler_class=FreeMonHandler):
     """Run web server."""
@@ -213,6 +233,7 @@ def run(port, server_class=http.server.HTTPServer, handler_class=FreeMonHandler)
 def main():
     """Main Method."""
     global fault_type
+    global disable_faults
 
     parser = argparse.ArgumentParser(description='MongoDB Mock Free Monitoring Endpoint.')
 
@@ -221,6 +242,8 @@ def main():
     parser.add_argument('-v', '--verbose', action='count', help="Enable verbose tracing")
 
     parser.add_argument('--fault', type=str, help="Type of fault to inject")
+
+    parser.add_argument('--disable-faults', action='store_true', help="Disable faults on startup")
 
     args = parser.parse_args()
     if args.verbose:
@@ -232,6 +255,9 @@ def main():
             sys.exit(1)
 
         fault_type = args.fault
+
+    if args.disable_faults:
+        disable_faults = True
 
     run(args.port)
 
