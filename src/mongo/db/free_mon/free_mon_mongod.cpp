@@ -76,7 +76,7 @@ class ExportedFreeMonEndpointURL : public LockedServerParameter<std::string> {
 public:
     ExportedFreeMonEndpointURL()
         : LockedServerParameter<std::string>("cloudFreeMonitoringEndpointURL",
-                                             "https://localhost:8080",
+                                             "https://cloud.mongodb.com/freemonitoring/mongo",
                                              ServerParameterType::kStartupOnly) {}
 
 

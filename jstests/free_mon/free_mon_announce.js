@@ -17,7 +17,8 @@ load("jstests/free_mon/libs/free_mon.js");
     function getConnectAnnounce() {
         // Capture message as it'd be presented to a user.
         clearRawMongoProgramOutput();
-        const exitCode = runMongoProgram('mongo', '--port', mongod.port, '--eval', ';');
+        const exitCode = runMongoProgram(
+            'mongo', '--port', mongod.port, '--eval', "shellHelper( 'show', 'freeMonitoring' );");
         assert.eq(exitCode, 0);
         return rawMongoProgramOutput();
     }
@@ -25,7 +26,7 @@ load("jstests/free_mon/libs/free_mon.js");
     // state === 'enabled'.
     admin.enableFreeMonitoring();
     WaitForRegistration(mongod);
-    const reminder = "Don't forget to check your metrics";
+    const reminder = "To see your monitoring data";
     assert.neq(getConnectAnnounce().search(reminder), -1, 'userReminder not found');
 
     // Cleanup.

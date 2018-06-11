@@ -318,6 +318,9 @@ void FreeMonProcessor::writeState(Client* client) {
 void FreeMonProcessor::doServerRegister(
     Client* client, const FreeMonMessageWithPayload<FreeMonMessageType::RegisterServer>* msg) {
 
+    // Enqueue the first metrics gather first so we have something to send on intial registration
+    enqueue(FreeMonMessage::createNow(FreeMonMessageType::MetricsCollect));
+
     // If we are asked to register now, then kick off a registration request
     const auto regType = msg->getPayload().first;
     if (regType == RegistrationType::RegisterOnStart) {
@@ -350,9 +353,6 @@ void FreeMonProcessor::doServerRegister(
             }
         }
     }
-
-    // Enqueue the first metrics gather unless we are not going to register
-    enqueue(FreeMonMessage::createNow(FreeMonMessageType::MetricsCollect));
 }
 
 namespace {
@@ -623,6 +623,7 @@ void FreeMonProcessor::doAsyncRegisterComplete(
 
     // Update in-memory state
     _registrationRetry->setMin(Seconds(resp.getReportingInterval()));
+    _metricsGatherInterval = Seconds(resp.getReportingInterval());
 
     {
         auto state = _state.synchronize();
@@ -651,9 +652,8 @@ void FreeMonProcessor::doAsyncRegisterComplete(
 
     log() << "Free Monitoring is Enabled. Frequency: " << resp.getReportingInterval() << " seconds";
 
-    // Enqueue next metrics upload
-    enqueue(FreeMonMessage::createWithDeadline(FreeMonMessageType::MetricsSend,
-                                               _registrationRetry->getNextDeadline(client)));
+    // Enqueue next metrics upload immediately to deliver a good experience
+    enqueue(FreeMonMessage::createNow(FreeMonMessageType::MetricsSend));
 }
 
 void FreeMonProcessor::doAsyncRegisterFail(
@@ -823,12 +823,13 @@ void FreeMonProcessor::doAsyncMetricsComplete(
     writeState(client);
 
     // Reset retry counter
+    _metricsGatherInterval = Seconds(resp.getReportingInterval());
     _metricsRetry->setMin(Seconds(resp.getReportingInterval()));
     _metricsRetry->reset();
 
     // Enqueue next metrics upload
     enqueue(FreeMonMessage::createWithDeadline(FreeMonMessageType::MetricsSend,
-                                               _registrationRetry->getNextDeadline(client)));
+                                               _metricsRetry->getNextDeadline(client)));
 }
 
 void FreeMonProcessor::doAsyncMetricsFail(
@@ -905,7 +906,6 @@ void FreeMonProcessor::processInMemoryStateChange(const FreeMonStorageState& ori
         }
     }
 }
-
 
 void FreeMonProcessor::doNotifyOnUpsert(
     Client* client, const FreeMonMessageWithPayload<FreeMonMessageType::NotifyOnUpsert>* msg) {
