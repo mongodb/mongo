@@ -1093,6 +1093,7 @@ private:
     bool _weakValidation;
     bool _allowInvalidCertificates;
     bool _allowInvalidHostnames;
+    bool _suppressNoCertificateWarning;
     asio::ssl::apple::Context _clientCtx;
     asio::ssl::apple::Context _serverCtx;
     CFUniquePtr<::CFArrayRef> _ca;
@@ -1102,7 +1103,8 @@ private:
 SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
     : _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
-      _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
+      _allowInvalidHostnames(params.sslAllowInvalidHostnames),
+      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning) {
 
     uassertStatusOK(initSSLContext(&_clientCtx, params, ConnectionDirection::kOutgoing));
     if (_clientCtx.certs) {
@@ -1256,11 +1258,14 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
         return {boost::none};
     }
 
-    const auto badCert = [](StringData msg,
-                            bool warn = false) -> StatusWith<boost::optional<SSLPeerInfo>> {
+    const auto badCert = [this](StringData msg,
+                                bool warn = false) -> StatusWith<boost::optional<SSLPeerInfo>> {
         constexpr StringData prefix = "SSL peer certificate validation failed: "_sd;
         if (warn) {
-            warning() << prefix << msg;
+            // do not output warning if "no certificate" warnings are suppressed
+            if (!_suppressNoCertificateWarning) {
+                warning() << prefix << msg;
+            }
             return {boost::none};
         } else {
             std::string m = str::stream() << prefix << msg << "; connection rejected";

@@ -77,6 +77,8 @@ struct SSLParams {
     bool sslAllowInvalidHostnames = false;        // --sslAllowInvalidHostnames
     bool disableNonSSLConnectionLogging =
         false;  // --setParameter disableNonSSLConnectionLogging=true
+    bool suppressNoTLSPeerCertificateWarning =
+        false;  // --setParameter suppressNoTLSPeerCertificateWarning
 
     SSLParams() {
         sslMode.store(SSLMode_disabled);

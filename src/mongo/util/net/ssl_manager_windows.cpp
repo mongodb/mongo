@@ -303,6 +303,7 @@ private:
     bool _weakValidation;
     bool _allowInvalidCertificates;
     bool _allowInvalidHostnames;
+    bool _suppressNoCertificateWarning;
     SSLConfiguration _sslConfiguration;
 
     SCHANNEL_CRED _clientCred;
@@ -372,7 +373,8 @@ namespace {
 SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
     : _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
-      _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
+      _allowInvalidHostnames(params.sslAllowInvalidHostnames),
+      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning) {
 
     if (params.sslFIPSMode) {
         BOOLEAN enabled = FALSE;
@@ -1610,14 +1612,16 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerWindows::parseAndValidatePeer
 
     if (ss == SEC_E_NO_CREDENTIALS) {  // no certificate presented by peer
         if (_weakValidation) {
-            warning() << "no SSL certificate provided by peer";
+            // do not give warning if "no certificate" warnings are suppressed
+            if (!_suppressNoCertificateWarning) {
+                warning() << "no SSL certificate provided by peer";
+            }
+            return {boost::none};
         } else {
             auto msg = "no SSL certificate provided by peer; connection rejected";
             error() << msg;
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
-
-        return {boost::none};
     }
 
     // Check for unexpected errors
