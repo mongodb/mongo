@@ -1253,6 +1253,9 @@ Status multiSyncApply(OperationContext* opCtx,
     DisableDocumentValidation validationDisabler(opCtx);
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
 
+    // Explicitly start future read transactions without a timestamp.
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+
     ApplierHelpers::stableSortByNamespace(ops);
 
     // This function is only called in steady state replication and recovering.

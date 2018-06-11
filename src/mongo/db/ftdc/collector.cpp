@@ -69,6 +69,9 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
     opCtx->lockState()->setShouldAcquireTicket(false);
 
+    // Explicitly start future read transactions without a timestamp.
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+
     for (auto& collector : _collectors) {
         BSONObjBuilder subObjBuilder(builder.subobjStart(collector->name()));
 

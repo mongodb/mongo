@@ -214,13 +214,20 @@ public:
      * external timestamp source to read from.
      */
     enum ReadSource {
-        kNone,               // Do not read from a timestamp. This is the default.
-        kMajorityCommitted,  // Read from the majority all-commmitted timestamp.
-        kLastApplied,  // Read from the last applied timestamp. New transactions start at the most
-                       // up-to-date timestamp.
-        kLastAppliedSnapshot,  // Read from the last applied timestamp. New transactions will always
-                               // read from the same timestamp and never advance.
-        kProvided              // Read from the timestamp provided to setTimestampReadSource.
+        // This is the default behavior and will read without a timestamp.
+        kUnset,
+        // Read without a timestamp explicitly.
+        kNoTimestamp,
+        // Read from the majority all-commmitted timestamp.
+        kMajorityCommitted,
+        // Read from the last applied timestamp. New transactions start at the most up-to-date
+        // timestamp.
+        kLastApplied,
+        // Read from the last applied timestamp. New transactions will always read from the same
+        // timestamp and never advance.
+        kLastAppliedSnapshot,
+        // Read from the timestamp provided to setTimestampReadSource.
+        kProvided
     };
 
     /**
@@ -236,7 +243,7 @@ public:
                                         boost::optional<Timestamp> provided = boost::none) {}
 
     virtual ReadSource getTimestampReadSource() const {
-        return ReadSource::kNone;
+        return ReadSource::kUnset;
     };
 
     /**
