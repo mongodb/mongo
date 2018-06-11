@@ -32,6 +32,10 @@ def main():
         url_str += mock_http_common.URL_PATH_LAST_REGISTER
     elif args.query == "last_metrics":
         url_str += mock_http_common.URL_PATH_LAST_METRICS
+    elif args.query == "disable_faults":
+        url_str += mock_http_common.URL_DISABLE_FAULTS
+    elif args.query == "enable_faults":
+        url_str += mock_http_common.URL_ENABLE_FAULTS
     else:
         print("Unknown query type")
         sys.exit(1)

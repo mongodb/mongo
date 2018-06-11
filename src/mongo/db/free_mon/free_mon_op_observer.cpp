@@ -32,6 +32,7 @@
 
 #include "mongo/db/free_mon/free_mon_controller.h"
 #include "mongo/db/free_mon/free_mon_storage.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 namespace {
@@ -43,6 +44,8 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
     return !isReplSet || (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
                           repl::MemberState::RS_PRIMARY);
 }
+
+const auto getFreeMonDeleteState = OperationContext::declareDecoration<bool>();
 
 }  // namespace
 
@@ -111,6 +114,18 @@ void FreeMonOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntry
     }
 }
 
+void FreeMonOpObserver::aboutToDelete(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const BSONObj& doc) {
+
+    bool isFreeMonDoc = (nss == NamespaceString::kServerConfigurationNamespace) &&
+        (doc["_id"].str() == FreeMonStorage::kFreeMonDocIdKey);
+
+    // Set a flag that indicates whether the document to be delete is the free monitoring state
+    // document
+    getFreeMonDeleteState(opCtx) = isFreeMonDoc;
+}
+
 void FreeMonOpObserver::onDelete(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  OptionalCollectionUUID uuid,
@@ -125,7 +140,7 @@ void FreeMonOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    if (deletedDoc.get()["_id"].str() == FreeMonStorage::kFreeMonDocIdKey) {
+    if (getFreeMonDeleteState(opCtx) == true) {
         auto controller = FreeMonController::get(opCtx->getServiceContext());
 
         if (controller != nullptr) {
