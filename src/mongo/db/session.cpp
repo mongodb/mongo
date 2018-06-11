@@ -607,6 +607,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
             Date_t::fromMillisSinceEpoch(_singleTransactionStats->getStartTime() / 1000) +
             stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalStarted();
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentOpen();
     } else {
         // Execute a retryable write or snapshot read.
         invariant(startTransaction == boost::none);
@@ -914,6 +915,7 @@ void Session::_abortTransaction(WithLock wl) {
     if (isMultiDocumentTransaction) {
         _singleTransactionStats->setEndTime(curTimeMicros64());
     }
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
@@ -1049,6 +1051,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     if (isMultiDocumentTransaction) {
         _singleTransactionStats->setEndTime(curTimeMicros64());
     }
+    ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
 }
 
 BSONObj Session::reportStashedState() const {

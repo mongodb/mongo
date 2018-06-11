@@ -1235,6 +1235,66 @@ TEST_F(SessionTest, IncrementTotalAbortedUponAbort) {
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAborted(), beforeAbortCount + 1U);
 }
 
+TEST_F(SessionTest, TrackTotalOpenTransactionsWithAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    unsigned long long beforeTransactionStart =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentOpen();
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    // Tests that starting a transaction increments the open transactions counter by 1.
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(),
+              beforeTransactionStart + 1U);
+
+    // Tests that stashing the transaction resources does not affect the open transactions counter.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    session.stashTransactionResources(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(),
+              beforeTransactionStart + 1U);
+
+    // Tests that aborting a transaction decrements the open transactions counter by 1.
+    session.abortArbitraryTransaction();
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(), beforeTransactionStart);
+}
+
+TEST_F(SessionTest, TrackTotalOpenTransactionsWithCommit) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    unsigned long long beforeTransactionStart =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentOpen();
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    // Tests that starting a transaction increments the open transactions counter by 1.
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(),
+              beforeTransactionStart + 1U);
+
+    // Tests that stashing the transaction resources does not affect the open transactions counter.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    session.stashTransactionResources(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(),
+              beforeTransactionStart + 1U);
+
+    session.unstashTransactionResources(opCtx(), "insert");
+
+    // Tests that committing a transaction decrements the open transactions counter by 1.
+    session.commitTransaction(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(), beforeTransactionStart);
+}
+
 /**
  * Test fixture for transactions metrics.
  */
