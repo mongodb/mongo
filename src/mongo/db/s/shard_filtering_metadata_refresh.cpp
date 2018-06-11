@@ -204,39 +204,13 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName))
             .databaseVersion();
 
-    // Only set the in-memory version in FCV 4.0, and hold the lock across checking the FCV and
-    // setting the version.
-    Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
-    if (serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-        // First, check under a shared lock if another thread already updated the cached version.
-        // This is a best-effort optimization to make as few threads as possible to convoy on the
-        // exclusive lock below.
-        {
-            // Take the DBLock directly rather than using AutoGetDb, to prevent a recursive call
-            // into checkDbVersion().
-            Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-            const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
-            if (!db) {
-                log() << "Database " << dbName
-                      << " has been dropped; not caching the refreshed databaseVersion";
-                return;
-            }
-
-            const auto cachedDbVersion = DatabaseShardingState::get(db).getDbVersion(opCtx);
-            if (cachedDbVersion && refreshedDbVersion &&
-                cachedDbVersion->getUuid() == refreshedDbVersion->getUuid() &&
-                cachedDbVersion->getLastMod() >= refreshedDbVersion->getLastMod()) {
-                LOG(2) << "Skipping setting cached databaseVersion for " << dbName
-                       << " to refreshed version " << refreshedDbVersion->toBSON()
-                       << " because current cached databaseVersion is already "
-                       << cachedDbVersion->toBSON();
-                return;
-            }
-        }
-
-        // The cached version is older than the refreshed version; update the cached version.
-        Lock::DBLock dbLock(opCtx, dbName, MODE_X);
+    // First, check under a shared lock if another thread already updated the cached version.
+    // This is a best-effort optimization to make as few threads as possible to convoy on the
+    // exclusive lock below.
+    {
+        // Take the DBLock directly rather than using AutoGetDb, to prevent a recursive call
+        // into checkDbVersion().
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
         const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
         if (!db) {
             log() << "Database " << dbName
@@ -244,8 +218,28 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
             return;
         }
 
-        DatabaseShardingState::get(db).setDbVersion(opCtx, std::move(refreshedDbVersion));
+        const auto cachedDbVersion = DatabaseShardingState::get(db).getDbVersion(opCtx);
+        if (cachedDbVersion && refreshedDbVersion &&
+            cachedDbVersion->getUuid() == refreshedDbVersion->getUuid() &&
+            cachedDbVersion->getLastMod() >= refreshedDbVersion->getLastMod()) {
+            LOG(2) << "Skipping setting cached databaseVersion for " << dbName
+                   << " to refreshed version " << refreshedDbVersion->toBSON()
+                   << " because current cached databaseVersion is already "
+                   << cachedDbVersion->toBSON();
+            return;
+        }
     }
+
+    // The cached version is older than the refreshed version; update the cached version.
+    Lock::DBLock dbLock(opCtx, dbName, MODE_X);
+    const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
+    if (!db) {
+        log() << "Database " << dbName
+              << " has been dropped; not caching the refreshed databaseVersion";
+        return;
+    }
+
+    DatabaseShardingState::get(db).setDbVersion(opCtx, std::move(refreshedDbVersion));
 }
 
 }  // namespace mongo

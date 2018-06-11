@@ -71,10 +71,6 @@ public:
 
     void shutDown(OperationContext* opCtx) override;
 
-    Status updateDatabase(OperationContext* opCtx,
-                          const std::string& dbName,
-                          const DatabaseType& db) override;
-
     Status logAction(OperationContext* opCtx,
                      const std::string& what,
                      const std::string& ns,

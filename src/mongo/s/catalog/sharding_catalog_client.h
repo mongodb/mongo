@@ -109,13 +109,6 @@ public:
     virtual void shutDown(OperationContext* opCtx) = 0;
 
     /**
-     * Updates or creates the metadata for a given database.
-     */
-    virtual Status updateDatabase(OperationContext* opCtx,
-                                  const std::string& dbName,
-                                  const DatabaseType& db) = 0;
-
-    /**
      * Retrieves the metadata for a given database, if it exists.
      *
      * @param dbName name of the database (case sensitive)

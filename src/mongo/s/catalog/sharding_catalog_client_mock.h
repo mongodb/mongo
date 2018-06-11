@@ -44,12 +44,6 @@ public:
 
     void shutDown(OperationContext* opCtx) override;
 
-    Status enableSharding(OperationContext* opCtx, const std::string& dbName);
-
-    Status updateDatabase(OperationContext* opCtx,
-                          const std::string& dbName,
-                          const DatabaseType& db) override;
-
     StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
         OperationContext* opCtx,
         const std::string& dbName,

@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
@@ -111,11 +112,11 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     const auto primaryShardId =
         uassertStatusOK(_selectShardForNewDatabase(opCtx, Grid::get(opCtx)->shardRegistry()));
 
-    // Take the fcvLock to prevent the fcv from changing from the point we decide whether to include
-    // a databaseVersion until after we finish writing the database entry. Otherwise, we may end up
-    // in fcv>3.6, but without a databaseVersion.
-    invariant(!opCtx->lockState()->isLocked());
-    Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+    // Hold the Global IX lock across checking the FCV and writing the new database entry.
+    // Because of the Global S lock barrier in setFCV, this ensures either the setFCV schema
+    // upgrade/downgrade will block until we have written the entry, or we will write the entry in
+    // the target FCV's schema.
+    Lock::GlobalLock lk(opCtx, MODE_IX);
 
     // If in FCV>3.6, generate a databaseVersion, including a UUID, for the new database.
     boost::optional<DatabaseVersion> dbVersion = boost::none;
@@ -132,7 +133,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     log() << "Registering new database " << db << " in sharding catalog";
 
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
-        opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kMajorityWriteConcern));
+        opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kLocalWriteConcern));
 
     return db;
 }
@@ -154,8 +155,26 @@ void ShardingCatalogManager::enableSharding(OperationContext* opCtx, const std::
     auto dbType = createDatabase(opCtx, dbName);
     dbType.setSharded(true);
 
+    // We must wait for the database entry to be majority committed, because it's possible that
+    // reading from the majority snapshot has been set on the RecoveryUnit due to an earlier read,
+    // such as overtaking a distlock or loading the ShardRegistry.
+    WriteConcernResult unusedResult;
+    uassertStatusOK(
+        waitForWriteConcern(opCtx,
+                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                            WriteConcernOptions(WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                Milliseconds{30000}),
+                            &unusedResult));
+
     log() << "Enabling sharding for database [" << dbName << "] in config db";
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateDatabase(opCtx, dbName, dbType));
+    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+        opCtx,
+        DatabaseType::ConfigNS,
+        BSON(DatabaseType::name(dbName)),
+        BSON("$set" << BSON(DatabaseType::sharded(true))),
+        false,
+        ShardingCatalogClient::kLocalWriteConcern));
 }
 
 StatusWith<std::vector<std::string>> ShardingCatalogManager::getDatabasesForShard(
@@ -192,9 +211,10 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    // Check if the FCV has been changed under us.
-    invariant(!opCtx->lockState()->isLocked());
-    Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+    // Hold the Global IX lock across checking the FCV and writing the database entry. Because of
+    // the Global S lock barrier in setFCV, this ensures a concurrent setFCV will block before
+    // performing schema downgrade until we have written the entry.
+    Lock::GlobalLock lk(opCtx, MODE_IX);
 
     auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
 
@@ -250,8 +270,8 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
         DatabaseType::ConfigNS,
         updateQueryBuilder.obj(),
         newDbType.toBSON(),
-        true,
-        ShardingCatalogClient::kMajorityWriteConcern);
+        false,
+        ShardingCatalogClient::kLocalWriteConcern);
 
     if (!updateStatus.isOK()) {
         log() << "error committing movePrimary: " << dbname

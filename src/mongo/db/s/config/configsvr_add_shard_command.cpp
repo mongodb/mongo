@@ -97,11 +97,6 @@ public:
                       "_configsvrAddShard can only be run on config servers");
         }
 
-        // Do not allow adding shards while a featureCompatibilityVersion upgrade or downgrade is in
-        // progress (see SERVER-31231 for details).
-        invariant(!opCtx->lockState()->isLocked());
-        Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
-
         // Set the operation context read concern level to local for reads into the config database.
         repl::ReadConcernArgs::get(opCtx) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
