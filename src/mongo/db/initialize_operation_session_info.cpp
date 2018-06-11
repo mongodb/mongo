@@ -64,9 +64,14 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
     if (osi.getSessionId()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-        opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
+        auto lsc = LogicalSessionCache::get(opCtx->getServiceContext());
+        if (!lsc) {
+            // Ignore session information if the logical session cache has not been set up, e.g. on
+            // the embedded version of mongod.
+            return boost::none;
+        }
 
-        LogicalSessionCache* lsc = LogicalSessionCache::get(opCtx->getServiceContext());
+        opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
         lsc->vivify(opCtx, opCtx->getLogicalSessionId().get());
     } else {
         uassert(ErrorCodes::InvalidOptions,

@@ -339,6 +339,22 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SupportsDocLockingFa
         ErrorCodes::IllegalOperation);
 }
 
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IgnoresInfoIfNoCache) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    LogicalSessionCache::set(_opCtx->getServiceContext(), nullptr);
+
+    ASSERT_FALSE(initializeOperationSessionInfo(
+        _opCtx.get(),
+        BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
+                       << "TestField"),
+        true,
+        true,
+        true));
+}
+
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTooLongName) {
     auto id = UUID::gen();
 
