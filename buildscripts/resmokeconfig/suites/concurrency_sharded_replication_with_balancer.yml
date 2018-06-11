@@ -111,6 +111,9 @@ selector:
   - jstests/concurrency/fsm_workloads/yield_and_hashed.js
   - jstests/concurrency/fsm_workloads/yield_and_sorted.js
 
+  # TODO Unblacklist (SERVER-35538).
+  - jstests/concurrency/fsm_workloads/database_versioning.js
+
 executor:
   archive:
     hooks:
