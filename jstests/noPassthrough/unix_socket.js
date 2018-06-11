@@ -5,7 +5,7 @@
  * 2) If you specify a custom socket in the bind_ip param, that it shows up as
  *    /tmp/custom_socket.sock
  * 3) That bad socket paths, like paths longer than the maximum size of a sockaddr
- *    cause the server to exit with an error
+ *    cause the server to exit with an error (socket names with whitespace are now supported)
  * 4) That the default unix socket doesn't get created if --nounixsocket is specified
  */
 (function() {
@@ -36,10 +36,10 @@
                              `Expected ping command to succeed for ${path}`);
     };
 
-    var testSockOptions = function(bindPath, expectSockPath, optDict) {
+    var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',') {
         var optDict = optDict || {};
         if (bindPath) {
-            optDict["bind_ip"] = `${MongoRunner.dataDir}/${bindPath},127.0.0.1`;
+            optDict["bind_ip"] = `${MongoRunner.dataDir}/${bindPath}${bindSep}127.0.0.1`;
         }
         var conn = MongoRunner.runMongod(optDict);
         assert.neq(conn, null, "Expected mongod to start okay");
@@ -68,6 +68,12 @@
 
     // Check that a custom unix socket path works
     testSockOptions("testsock.socket", "testsock.socket");
+
+    // Check that a custom unix socket path works with spaces
+    testSockOptions("test sock.socket", "test sock.socket");
+
+    // Check that a custom unix socket path works with spaces before the comma and after
+    testSockOptions("testsock.socket ", "testsock.socket", undefined, ', ');
 
     // Check that a bad UNIX path breaks
     assert.throws(function() {

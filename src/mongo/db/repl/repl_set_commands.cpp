@@ -199,15 +199,11 @@ private:
 
 namespace {
 HostAndPort someHostAndPortForMe() {
-    const auto& bind_ip = serverGlobalParams.bind_ip;
+    const auto& addrs = serverGlobalParams.bind_ips;
     const auto& bind_port = serverGlobalParams.port;
     const auto& af = IPv6Enabled() ? AF_UNSPEC : AF_INET;
     bool localhost_only = true;
 
-    std::vector<std::string> addrs;
-    if (!bind_ip.empty()) {
-        boost::split(addrs, bind_ip, boost::is_any_of(","), boost::token_compress_on);
-    }
     for (const auto& addr : addrs) {
         // Get all addresses associated with each named bind host.
         // If we find any that are valid external identifiers,

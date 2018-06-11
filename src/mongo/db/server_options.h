@@ -48,7 +48,7 @@ struct ServerGlobalParams {
         return port == DefaultDBPort;
     }
 
-    std::string bind_ip;  // --bind_ip
+    std::vector<std::string> bind_ips;  // --bind_ip
     bool enableIPv6 = false;
     bool rest = false;  // --rest
 

@@ -424,7 +424,7 @@ int bridgeMain(int argc, char** argv, char** envp) {
     fassert(50766, serviceContext->getServiceExecutor()->start());
 
     transport::TransportLayerASIO::Options opts;
-    opts.ipList = "0.0.0.0";
+    opts.ipList.emplace_back("0.0.0.0");
     opts.port = mongoBridgeGlobalParams.port;
 
     serviceContext->setTransportLayer(std::make_unique<mongo::transport::TransportLayerASIO>(
