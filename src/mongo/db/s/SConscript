@@ -197,6 +197,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/client/sharding_client',

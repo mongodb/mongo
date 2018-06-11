@@ -63,17 +63,6 @@ void ShardingCatalogClientMock::shutDown(OperationContext* opCtx) {
     }
 }
 
-Status ShardingCatalogClientMock::enableSharding(OperationContext* opCtx,
-                                                 const std::string& dbName) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
-Status ShardingCatalogClientMock::updateDatabase(OperationContext* opCtx,
-                                                 const string& dbName,
-                                                 const DatabaseType& db) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientMock::getDatabase(
     OperationContext* opCtx, const string& dbName, repl::ReadConcernLevel readConcernLevel) {
     return {ErrorCodes::InternalError, "Method not implemented"};

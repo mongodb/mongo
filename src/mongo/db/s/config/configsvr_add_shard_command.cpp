@@ -100,11 +100,6 @@ public:
         repl::ReadConcernArgs::get(opCtx) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-        // Do not allow adding shards while a featureCompatibilityVersion upgrade or downgrade is in
-        // progress (see SERVER-31231 for details).
-        invariant(!opCtx->lockState()->isLocked());
-        Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
-
         auto swParsedRequest = AddShardRequest::parseFromConfigCommand(cmdObj);
         uassertStatusOK(swParsedRequest.getStatus());
         auto parsedRequest = std::move(swParsedRequest.getValue());

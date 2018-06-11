@@ -1080,7 +1080,13 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
     DatabaseType dbt("test", ShardId("shard0000"), true);
 
     auto future = launchAsync([this, dbt] {
-        auto status = catalogClient()->updateDatabase(operationContext(), dbt.getName(), dbt);
+        auto status =
+            catalogClient()->updateConfigDocument(operationContext(),
+                                                  DatabaseType::ConfigNS,
+                                                  BSON(DatabaseType::name(dbt.getName())),
+                                                  dbt.toBSON(),
+                                                  true,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_OK(status);
     });
 
@@ -1114,14 +1120,20 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(ShardingCatalogClientTest, UpdateDatabaseExceededTimeLimit) {
+TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentExceededTimeLimit) {
     HostAndPort host1("TestHost1");
     configTargeter()->setFindHostReturnValue(host1);
 
     DatabaseType dbt("test", ShardId("shard0001"), false);
 
     auto future = launchAsync([this, dbt] {
-        auto status = catalogClient()->updateDatabase(operationContext(), dbt.getName(), dbt);
+        auto status =
+            catalogClient()->updateConfigDocument(operationContext(),
+                                                  DatabaseType::ConfigNS,
+                                                  BSON(DatabaseType::name(dbt.getName())),
+                                                  dbt.toBSON(),
+                                                  true,
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_EQ(ErrorCodes::ExceededTimeLimit, status);
     });
 

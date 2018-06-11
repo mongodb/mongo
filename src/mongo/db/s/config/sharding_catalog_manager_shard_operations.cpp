@@ -45,6 +45,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/namespace_string.h"
@@ -658,65 +659,84 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return batchResponseStatus;
     }
 
+    {
+        // Hold the fcvLock across checking the FCV, sending setFCV to the new shard, and
+        // writing the entry for the new shard to config.shards. This ensures the FCV doesn't change
+        // after we send setFCV to the new shard, but before we write its entry to config.shards.
+        // (Note, we don't use a Global IX lock here, because we don't want to hold the global lock
+        // while blocking on the network).
+        invariant(!opCtx->lockState()->isLocked());
+        Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
-    // Since addShard runs under the fcvLock, it is guaranteed the fcv state won't change, but it's
-    // possible an earlier setFCV failed partway, so we handle all possible fcv states. Note, if
-    // the state is upgrading (downgrading), a user cannot switch to downgrading (upgrading) without
-    // first finishing the upgrade (downgrade).
-    BSONObj setFCVCmd;
-    switch (serverGlobalParams.featureCompatibility.getVersion()) {
-        case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
-        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
-            setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                             << FeatureCompatibilityVersionParser::kVersion40
-                             << WriteConcernOptions::kWriteConcernField
-                             << opCtx->getWriteConcern().toBSON());
-            break;
-        default:
-            setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                             << FeatureCompatibilityVersionParser::kVersion36
-                             << WriteConcernOptions::kWriteConcernField
-                             << opCtx->getWriteConcern().toBSON());
-            break;
-    }
-    auto versionResponse =
-        _runCommandForAddShard(opCtx, targeter.get(), NamespaceString::kAdminDb, setFCVCmd);
-    if (!versionResponse.isOK()) {
-        return versionResponse.getStatus();
-    }
+        BSONObj setFCVCmd;
+        switch (serverGlobalParams.featureCompatibility.getVersion()) {
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
+            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
+                setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
+                                 << FeatureCompatibilityVersionParser::kVersion40
+                                 << WriteConcernOptions::kWriteConcernField
+                                 << opCtx->getWriteConcern().toBSON());
+                break;
+            default:
+                setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
+                                 << FeatureCompatibilityVersionParser::kVersion36
+                                 << WriteConcernOptions::kWriteConcernField
+                                 << opCtx->getWriteConcern().toBSON());
+                break;
+        }
+        auto versionResponse =
+            _runCommandForAddShard(opCtx, targeter.get(), NamespaceString::kAdminDb, setFCVCmd);
+        if (!versionResponse.isOK()) {
+            return versionResponse.getStatus();
+        }
 
-    if (!versionResponse.getValue().commandStatus.isOK()) {
-        return versionResponse.getValue().commandStatus;
-    }
+        if (!versionResponse.getValue().commandStatus.isOK()) {
+            return versionResponse.getValue().commandStatus;
+        }
 
-    log() << "going to insert new entry for shard into config.shards: " << shardType.toString();
+        log() << "going to insert new entry for shard into config.shards: " << shardType.toString();
 
-    Status result = Grid::get(opCtx)->catalogClient()->insertConfigDocument(
-        opCtx,
-        ShardType::ConfigNS,
-        shardType.toBSON(),
-        ShardingCatalogClient::kMajorityWriteConcern);
-    if (!result.isOK()) {
-        log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
-        return result;
+        Status result = Grid::get(opCtx)->catalogClient()->insertConfigDocument(
+            opCtx,
+            ShardType::ConfigNS,
+            shardType.toBSON(),
+            ShardingCatalogClient::kLocalWriteConcern);
+        if (!result.isOK()) {
+            log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
+            return result;
+        }
     }
 
     // Add all databases which were discovered on the new shard
     for (const auto& dbName : dbNamesStatus.getValue()) {
         DatabaseType dbt(dbName, shardType.getName(), false);
 
-        // If we're in FCV 4.0, we should add a version to each database.
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40 ||
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
-            dbt.setVersion(databaseVersion::makeNew());
-        }
+        {
+            // Hold the Global IX lock across checking the FCV and writing the database entry.
+            // Because of the Global S lock barrier in setFCV, this ensures either the setFCV schema
+            // upgrade/downgrade will block until we have written the entry, or we will write the
+            // entry in the target FCV's schema.
+            Lock::GlobalLock lk(opCtx, MODE_IX);
 
-        Status status = Grid::get(opCtx)->catalogClient()->updateDatabase(opCtx, dbName, dbt);
-        if (!status.isOK()) {
-            log() << "adding shard " << shardConnectionString.toString()
-                  << " even though could not add database " << dbName;
+            // If we're in FCV 4.0, we should add a version to each database.
+            if (serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40 ||
+                serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
+                dbt.setVersion(databaseVersion::makeNew());
+            }
+
+            const auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+                opCtx,
+                DatabaseType::ConfigNS,
+                BSON(DatabaseType::name(dbName)),
+                dbt.toBSON(),
+                true,
+                ShardingCatalogClient::kLocalWriteConcern);
+            if (!status.isOK()) {
+                log() << "adding shard " << shardConnectionString.toString()
+                      << " even though could not add database " << dbName;
+            }
         }
     }
 

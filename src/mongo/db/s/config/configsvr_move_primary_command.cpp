@@ -257,12 +257,13 @@ public:
         }
 
         {
-            // Check if the FCV has been changed under us.
-            invariant(!opCtx->lockState()->isLocked());
-            Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+            // Hold the Global IX lock across checking the FCV and writing the database entry.
+            // Because of the Global S lock barrier in setFCV, this ensures a concurrent setFCV
+            // will block before performing schema upgrade until we have written the entry.
+            Lock::GlobalLock lk(opCtx, MODE_IX);
 
             // If we are upgrading to (or are fully on) FCV 4.0, then fail. If we do not fail, we
-            // will potentially write an unversioned database in a schema that requires versions.
+            // will potentially change the primary shard of a database without changing its version.
             if (serverGlobalParams.featureCompatibility.getVersion() ==
                     ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40 ||
                 serverGlobalParams.featureCompatibility.getVersion() ==
@@ -271,9 +272,14 @@ public:
                           "committing movePrimary failed due to version mismatch");
             }
 
-            // Update the new primary in the config server metadata.
-            dbType.setPrimary(toShard->getId());
-            uassertStatusOK(catalogClient->updateDatabase(opCtx, dbname, dbType));
+            // Update the database entry with the new primary shard.
+            uassertStatusOK(catalogClient->updateConfigDocument(
+                opCtx,
+                DatabaseType::ConfigNS,
+                BSON(DatabaseType::name(dbname)),
+                BSON("$set" << BSON(DatabaseType::primary(toShard->getId().toString()))),
+                false,
+                ShardingCatalogClient::kLocalWriteConcern));
         }
 
 

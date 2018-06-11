@@ -169,6 +169,11 @@ selector:
   # much value in running it.
   - jstests/concurrency/fsm_workloads/drop_collection.js
 
+  # TODO (SERVER-35534) Unblacklist this workload from the concurrency stepdown suites. It fails
+  # with PooledConnectionsDropped when setFCV is run concurrently with movePrimary, which seems like
+  # it's due to a race condition in the NetworkInterfaceTL.
+  - jstests/concurrency/fsm_workloads/database_versioning.js
+
 executor:
   archive:
     hooks:
