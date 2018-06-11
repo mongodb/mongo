@@ -1,6 +1,6 @@
 // Test that causally consistent majority-committed read-only transactions will wait for the
 // majority commit point to move past 'afterClusterTime' before they can commit.
-// @tags: [requires_replication]
+// @tags: [uses_transactions]
 (function() {
     "use strict";
 
@@ -67,13 +67,8 @@
         }));
     }
 
-    if (assert.commandWorked(primaryDB.serverStatus()).storageEngine.supportsCommittedReads) {
-        testReadConcernLevel("majority");
-    }
-
-    if (assert.commandWorked(primaryDB.serverStatus()).storageEngine.supportsSnapshotReadConcern) {
-        testReadConcernLevel("snapshot");
-    }
+    testReadConcernLevel("majority");
+    testReadConcernLevel("snapshot");
 
     rst.stopSet();
 }());

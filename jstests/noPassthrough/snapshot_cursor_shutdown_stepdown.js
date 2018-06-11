@@ -1,5 +1,5 @@
 // Tests that stashed transaction resources are destroyed at shutdown and stepdown.
-// @tags: [requires_replication]
+// @tags: [uses_transactions]
 (function() {
     "use strict";
 
@@ -15,10 +15,6 @@
     rst.initiate();
 
     let primaryDB = rst.getPrimary().getDB(dbName);
-    if (!primaryDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
 
     let session = primaryDB.getMongo().startSession();
     let sessionDB = session.getDatabase(dbName);

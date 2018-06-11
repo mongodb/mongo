@@ -10,8 +10,6 @@
  *  - 'local'-only commands should error on majority-committed levels, and accept 'local' level.
  *  - An aggregation with '$out' should fail with majority-committed levels.
  *
- * Tests are run for both majority-committed read concern levels: "majority" and "snapshot".
- *
  * All of this requires support for committed reads, so this test will be skipped if the storage
  * engine does not support them.
  */
@@ -231,8 +229,6 @@ load("jstests/libs/analyze_plan.js");
     const db = conn.getDB("test");
     const supportsCommittedReads =
         assert.commandWorked(db.serverStatus()).storageEngine.supportsCommittedReads;
-    const supportsSnapshotReadConcern =
-        assert.commandWorked(db.serverStatus()).storageEngine.supportsSnapshotReadConcern;
     MongoRunner.stopMongod(conn);
 
     if (supportsCommittedReads) {

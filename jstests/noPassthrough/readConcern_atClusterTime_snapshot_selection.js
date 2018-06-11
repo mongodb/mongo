@@ -2,7 +2,7 @@
 // to be majority committed. If 'atClusterTime' is older than the oldest available snapshot, the
 // error code SnapshotTooOld is returned.
 //
-// @tags: [requires_replication]
+// @tags: [uses_transactions]
 (function() {
     "use strict";
 
@@ -18,11 +18,6 @@
     const primarySession =
         rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     const primaryDB = primarySession.getDatabase(dbName);
-
-    if (!assert.commandWorked(primaryDB.serverStatus()).storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
 
     const secondaryConns = rst.getSecondaries();
     const secondaryConn0 = secondaryConns[0];

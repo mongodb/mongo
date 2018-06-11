@@ -13,7 +13,7 @@
  * applicable.
  *
  * This test requires replica set configuration and user credentials to persist across a restart.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, uses_transactions]
  */
 
 // Restarts cause issues with authentication for awaiting replication.
@@ -89,15 +89,6 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     // Create necessary users at both cluster and shard-local level.
     createUsers(shardConn);
     createUsers(mongosConn);
-
-    // Gate this test to transaction supporting engines only as it uses txnNumber.
-    assert(shardAdminDB.auth("admin", "pwd"));
-    if (!shardAdminDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        jsTestLog("Do not run on storage engine that does not support transactions");
-        st.stop();
-        return;
-    }
-    shardAdminDB.logout();
 
     // Create a test database and some dummy data on rs0.
     assert(clusterAdminDB.auth("admin", "pwd"));
