@@ -66,6 +66,11 @@ ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>
     setDiffieHellmanParameterPEMFile(ServerParameterSet::getGlobal(),
                                      "opensslDiffieHellmanParameters",
                                      &sslGlobalParams.sslPEMTempDHParam);
+
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly>
+    suppressNoTLSPeerCertificateWarning(ServerParameterSet::getGlobal(),
+                                        "suppressNoTLSPeerCertificateWarning",
+                                        &sslGlobalParams.suppressNoTLSPeerCertificateWarning);
 }  // namespace
 
 class OpenSSLCipherConfigParameter

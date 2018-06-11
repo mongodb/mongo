@@ -1077,6 +1077,7 @@ private:
     bool _weakValidation;
     bool _allowInvalidCertificates;
     bool _allowInvalidHostnames;
+    bool _suppressNoCertificateWarning;
     asio::ssl::apple::Context _clientCtx;
     asio::ssl::apple::Context _serverCtx;
     CFUniquePtr<::CFArrayRef> _ca;
@@ -1086,7 +1087,8 @@ private:
 SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
     : _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
-      _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
+      _allowInvalidHostnames(params.sslAllowInvalidHostnames),
+      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning) {
 
     uassertStatusOK(initSSLContext(&_clientCtx, params, ConnectionDirection::kOutgoing));
     if (_clientCtx.certs) {
@@ -1257,9 +1259,19 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     const auto status = ::SSLCopyPeerTrust(ssl, &trust);
     CFUniquePtr<::SecTrustRef> cftrust(trust);
     if ((status != ::errSecSuccess) || (!cftrust)) {
-        return badCert(str::stream() << "Unable to retreive SSL trust from peer: "
-                                     << stringFromOSStatus(status),
-                       _weakValidation);
+        if (_weakValidation && _suppressNoCertificateWarning) {
+            return {boost::none};
+        } else {
+            if (status == ::errSecSuccess) {
+                return badCert(str::stream() << "no SSL certificate provided by peer: "
+                                             << stringFromOSStatus(status),
+                               _weakValidation);
+            } else {
+                return badCert(str::stream() << "Unable to retreive SSL trust from peer: "
+                                             << stringFromOSStatus(status),
+                               _weakValidation);
+            }
+        }
     }
 
     if (_ca) {
@@ -1284,7 +1296,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
 
     auto cert = ::SecTrustGetCertificateAtIndex(cftrust.get(), 0);
     if (!cert) {
-        return badCert("no SSL certificate provided by peer", _weakValidation);
+        return badCert("no SSL certificate found in trust container", _weakValidation);
     }
 
     CFUniquePtr<::CFMutableArrayRef> oids(
