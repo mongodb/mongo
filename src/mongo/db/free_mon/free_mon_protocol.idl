@@ -41,6 +41,9 @@ structs:
             description: "Existing Registration Id"
             type: string
             optional: true
+          localTime:
+            description: "Local time at registration send"
+            type: date
           tags:
             description: "Tags"
             type: array<string>
@@ -82,6 +85,9 @@ structs:
           id:
             description: "Registration Id"
             type: string
+          localTime:
+            description: "Local time at metrics send"
+            type: date
           encoding:
             description: "Compression Encoding"
             type: MetricsEncoding

@@ -414,6 +414,8 @@ void FreeMonProcessor::doCommandRegister(Client* client,
 
     req.setVersion(kProtocolVersion);
 
+    req.setLocalTime(client->getServiceContext()->getPreciseClockSource()->now());
+
     if (!msg->getPayload().empty()) {
         // Cache the tags for subsequent retries
         _tags = msg->getPayload();
@@ -743,6 +745,7 @@ void FreeMonProcessor::doMetricsSend(Client* client) {
     invariant(!_state->getRegistrationId().empty());
 
     req.setVersion(kProtocolVersion);
+    req.setLocalTime(client->getServiceContext()->getPreciseClockSource()->now());
     req.setEncoding(MetricsEncodingEnum::snappy);
 
     req.setId(_state->getRegistrationId());
