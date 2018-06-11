@@ -378,9 +378,9 @@ TEST_F(ScatterGatherTest, DoNotProcessMoreThanSufficientResponses) {
 // and that the algorithm processes the response correctly.
 TEST_F(ScatterGatherTest, AlgorithmProcessesCallbackCanceledResponse) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner* sgr = new ScatterGatherRunner(sga, &getExecutor());
+    ScatterGatherRunner sgr(sga, &getExecutor());
     bool ranCompletion = false;
-    StatusWith<executor::TaskExecutor::EventHandle> status = sgr->start();
+    StatusWith<executor::TaskExecutor::EventHandle> status = sgr.start();
     ASSERT_OK(getExecutor()
                   .onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion))
                   .getStatus());
