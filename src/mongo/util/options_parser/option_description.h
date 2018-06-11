@@ -64,6 +64,7 @@ enum OptionSources {
     SourceYAMLConfig = 4,
     SourceAllConfig = SourceINIConfig | SourceYAMLConfig,
     SourceAllLegacy = SourceINIConfig | SourceCommandLine,
+    SourceYAMLCLI = SourceYAMLConfig | SourceCommandLine,
     SourceAll = SourceCommandLine | SourceINIConfig | SourceYAMLConfig
 };
 
