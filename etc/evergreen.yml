@@ -11769,9 +11769,7 @@ buildvariants:
   - name: dbtest
   # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
   # - name: concurrency
-  #   distros:
-  #   - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
-  - name: concurrency_simultaneous
+  # - name: concurrency_simultaneous
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth
@@ -11826,7 +11824,7 @@ buildvariants:
   - name: dbtest
   # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
   # - name: concurrency
-  - name: concurrency_simultaneous
+  # - name: concurrency_simultaneous
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth
@@ -11908,7 +11906,7 @@ buildvariants:
   - name: dbtest
   # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
   # - name: concurrency
-  - name: concurrency_simultaneous
+  # - name: concurrency_simultaneous
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth
