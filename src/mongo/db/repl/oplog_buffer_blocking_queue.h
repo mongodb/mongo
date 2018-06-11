@@ -40,6 +40,7 @@ namespace repl {
 class OplogBufferBlockingQueue final : public OplogBuffer {
 public:
     OplogBufferBlockingQueue();
+    explicit OplogBufferBlockingQueue(Counters* counters);
 
     void startup(OperationContext* opCtx) override;
     void shutdown(OperationContext* opCtx) override;
@@ -60,6 +61,7 @@ public:
     boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override;
 
 private:
+    Counters* const _counters;
     BlockingQueue<BSONObj> _queue;
 };
 
