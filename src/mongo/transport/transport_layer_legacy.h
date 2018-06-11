@@ -59,10 +59,10 @@ class TransportLayerLegacy final : public TransportLayer {
 public:
     struct Options {
         Options(const ServerGlobalParams* params);
-        Options() : port(0), ipList("") {}
+        Options() : port(0), ipList() {}
 
-        int port;            // port to bind to
-        std::string ipList;  // addresses to bind to
+        int port;                         // port to bind to
+        std::vector<std::string> ipList;  // addresses to bind to
     };
 
     TransportLayerLegacy(const Options& opts, ServiceEntryPoint* sep);

@@ -412,7 +412,6 @@ int bridgeMain(int argc, char** argv, char** envp) {
     listener = stdx::make_unique<BridgeListener>();
     listener->setupSockets();
     listener->initAndListen();
-
     return EXIT_CLEAN;
 }
 

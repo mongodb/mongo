@@ -36,6 +36,10 @@
 #define SYSLOG_NAMES
 #include <syslog.h>
 #endif
+#include <algorithm>
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <ios>
@@ -891,18 +895,21 @@ Status storeServerOptions(const moe::Environment& params) {
 
     if (params.count("net.bindIpAll") && params["net.bindIpAll"].as<bool>()) {
         // Bind to all IP addresses
-        serverGlobalParams.bind_ip = "0.0.0.0";
+        serverGlobalParams.bind_ips.emplace_back("0.0.0.0");
         if (params.count("net.ipv6") && params["net.ipv6"].as<bool>()) {
-            serverGlobalParams.bind_ip += ",::";
+            serverGlobalParams.bind_ips.emplace_back("::");
         }
     } else if (params.count("net.bindIp")) {
-        // Bind to enumerated IP addresses
-        serverGlobalParams.bind_ip = params["net.bindIp"].as<std::string>();
-    } else {
-        // Bind to localhost
-        serverGlobalParams.bind_ip = "";
+        std::string bind_ip = params["net.bindIp"].as<std::string>();
+        boost::split(serverGlobalParams.bind_ips,
+                     bind_ip,
+                     [](char c) { return c == ','; },
+                     boost::token_compress_on);
     }
 
+    for (auto& ip : serverGlobalParams.bind_ips) {
+        boost::algorithm::trim(ip);
+    }
 #ifndef _WIN32
     if (params.count("net.unixDomainSocket.pathPrefix")) {
         serverGlobalParams.socket = params["net.unixDomainSocket.pathPrefix"].as<string>();

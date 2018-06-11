@@ -52,11 +52,25 @@ namespace mongo {
 namespace transport {
 
 TransportLayerLegacy::Options::Options(const ServerGlobalParams* params)
-    : port(params->port), ipList(params->bind_ip) {}
+    : port(params->port), ipList(params->bind_ips) {}
 
 TransportLayerLegacy::ListenerLegacy::ListenerLegacy(const TransportLayerLegacy::Options& opts,
                                                      NewConnectionCb callback)
-    : Listener("", opts.ipList, opts.port, getGlobalServiceContext(), true),
+    : Listener("",
+               [](const std::vector<std::string>& ips) -> std::string {
+                   // convert IP vector back to string for compatibility with legacy networking code
+                   // forgive me father
+                   StringBuilder ip_str;
+                   StringData comma;
+                   for (const auto& ip : ips) {
+                       ip_str << comma << ip;
+                       comma = ",";
+                   }
+                   return ip_str.str();
+               }(opts.ipList),
+               opts.port,
+               getGlobalServiceContext(),
+               true),
       _accepted(std::move(callback)) {}
 
 void TransportLayerLegacy::ListenerLegacy::accepted(std::unique_ptr<AbstractMessagingPort> mp) {
