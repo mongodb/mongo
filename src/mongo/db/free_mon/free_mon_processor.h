@@ -247,7 +247,9 @@ public:
 
         if (_count > 0) {
             --_count;
-            _condvar.notify_one();
+            if (_count == 0) {
+                _condvar.notify_one();
+            }
         }
     }
 

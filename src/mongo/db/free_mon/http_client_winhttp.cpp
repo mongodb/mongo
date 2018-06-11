@@ -203,6 +203,13 @@ private:
             return;
         }
 
+        DWORD setting;
+        DWORD settingLength = sizeof(setting);
+        setting = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
+        if (!WinHttpSetOption(session, WINHTTP_OPTION_REDIRECT_POLICY, &setting, settingLength)) {
+            setError("Failed setting HTTP session option");
+            return;
+        }
         if (!WinHttpSetTimeouts(
                 session, kResolveTimeout, kConnectTimeout, kSendTimeout, kReceiveTimeout)) {
             setError("Failed setting HTTP timeout");

@@ -124,7 +124,13 @@ class FreeMonHandler(http.server.BaseHTTPRequestHandler):
                 'informationalURL': 'http://www.example.com/123',
                 'message': 'Welcome to the Mock Free Monitoring Endpoint',
                 'reportingInterval': bson.int64.Int64(1),
-                'userReminder': "Don't forget to check your metrics!",
+                'userReminder':
+"""To see your monitoring data, navigate to the unique URL below.
+Anyone you share the URL with will also be able to view this page.
+
+https://localhost:8080/someUUID6v5jLKTIZZklDvN5L8sZ
+
+You can disable monitoring at any time by running db.disableFreeMonitoring().""",
             })
 
         self._send_header()

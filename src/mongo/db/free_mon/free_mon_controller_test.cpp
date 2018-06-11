@@ -175,8 +175,10 @@ public:
 
         if (_count > 0) {
             --_count;
-            _payload = std::move(payload);
-            _condvar.notify_one();
+            if (_count == 0) {
+                _payload = std::move(payload);
+                _condvar.notify_one();
+            }
         }
     }
 
@@ -844,7 +846,6 @@ struct ControllerHolder {
     std::unique_ptr<FreeMonController> controller;
 };
 
-
 // Positive: Test Register works
 TEST_F(FreeMonControllerTest, TestRegister) {
     ControllerHolder controller(_mockThreadPool.get(), FreeMonNetworkInterfaceMock::Options());
@@ -1003,11 +1004,11 @@ TEST_F(FreeMonControllerTest, TestMetricsWithDisabledStorageThenRegister) {
     FreeMonStorage::replace(_opCtx.get(), initStorage(StorageStateEnum::disabled));
 
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
-    controller->turnCrankForTest(Turner().registerServer().collect(4));
+    controller->turnCrankForTest(Turner().registerServer().metricsSend().collect(4));
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
 
-    controller->turnCrankForTest(Turner().registerCommand().collect(2).metricsSend());
+    controller->turnCrankForTest(Turner().registerCommand().metricsSend().collect(2).metricsSend());
 
     ASSERT_GTE(controller.network->getRegistersCalls(), 1);
     ASSERT_GTE(controller.network->getMetricsCalls(), 1);
@@ -1024,7 +1025,7 @@ TEST_F(FreeMonControllerTest, TestMetricsWithDisabledStorageThenRegisterAndRereg
     FreeMonStorage::replace(_opCtx.get(), initStorage(StorageStateEnum::disabled));
 
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
-    controller->turnCrankForTest(Turner().registerServer().collect(4));
+    controller->turnCrankForTest(Turner().registerServer().metricsSend().collect(4));
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
 
@@ -1040,7 +1041,7 @@ TEST_F(FreeMonControllerTest, TestMetricsWithDisabledStorageThenRegisterAndRereg
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
 
-    controller->turnCrankForTest(Turner().registerCommand().collect(2).metricsSend());
+    controller->turnCrankForTest(Turner().registerCommand().metricsSend().collect(2).metricsSend());
 
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get())->getState() == StorageStateEnum::enabled);
 
@@ -1086,7 +1087,7 @@ TEST_F(FreeMonControllerTest, TestMetricsHalt) {
     controller.start(RegistrationType::RegisterOnStart);
 
     controller->turnCrankForTest(
-        Turner().registerServer().registerCommand().collect(4).metricsSend());
+        Turner().registerServer().registerCommand().metricsSend().collect(4).metricsSend());
 
     ASSERT_TRUE(!FreeMonStorage::read(_opCtx.get()).get().getRegistrationId().empty());
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::disabled);
@@ -1150,13 +1151,11 @@ TEST_F(FreeMonControllerTest, TestPreRegistrationMetricBatching) {
 
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
 
-    controller->turnCrankForTest(Turner().registerServer().collect(3));
+    controller->turnCrankForTest(Turner().registerServer().collect(4));
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
 
-    controller->turnCrankForTest(Turner().registerCommand().collect(1));
-
-    controller->turnCrankForTest(Turner().metricsSend().collect(1));
+    controller->turnCrankForTest(Turner().registerCommand().metricsSend());
 
     // Ensure we sent all the metrics batched before registration
     ASSERT_EQ(controller.network->getLastMetrics().nFields(), 4);
@@ -1165,27 +1164,6 @@ TEST_F(FreeMonControllerTest, TestPreRegistrationMetricBatching) {
 
     // Ensure we only send 2 metrics in the normal happy case
     ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
-}
-
-// Negative: Test metrics buffers on failure, and retries
-TEST_F(FreeMonControllerTest, TestMetricBatchingOnError) {
-    FreeMonNetworkInterfaceMock::Options opts;
-    opts.fail2MetricsUploads = true;
-    ControllerHolder controller(_mockThreadPool.get(), opts);
-
-    controller.start(RegistrationType::RegisterOnStart);
-
-    controller->turnCrankForTest(Turner().registerServer().registerCommand().collect(2));
-
-    controller->turnCrankForTest(Turner().metricsSend().collect());
-
-    // Ensure we sent all the metrics batched before registration
-    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
-
-    controller->turnCrankForTest(Turner().metricsSend().collect());
-
-    // Ensure we resent all the failed metrics
-    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 3);
 }
 
 // Negative: Test metrics buffers on failure, and retries and ensure 2 metrics occurs after a blip
@@ -1199,18 +1177,13 @@ TEST_F(FreeMonControllerTest, TestMetricBatchingOnErrorRealtime) {
 
     controller.start(RegistrationType::RegisterOnStart);
 
-    // Ensure the first upload sends 2 samples
-    ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());
+    // Ensure the second upload sends 1 samples
+    ASSERT_TRUE(controller.network->waitMetricsCalls(2, Seconds(5)).is_initialized());
     ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
 
-    // Ensure the second upload sends 3 samples because first failed
+    // Ensure the third upload sends 3 samples because first failed
     ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());
-    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 3);
-
-    // Ensure the third upload sends 5 samples because second failed
-    // Since the second retry is 2s, we collected 2 samples
-    ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());
-    ASSERT_GTE(controller.network->getLastMetrics().nFields(), 4);
+    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 4);
 
     // Ensure the fourth upload sends 2 samples
     ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());
@@ -1444,7 +1417,8 @@ TEST_F(FreeMonControllerRSTest, SecondaryStartOnBadUpdate) {
 
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
 
-    controller->turnCrankForTest(Turner().registerServer().registerCommand().collect(2));
+    controller->turnCrankForTest(
+        Turner().registerServer().registerCommand().metricsSend().collect(2));
 
     controller->notifyOnUpsert(BSON("version" << 2LL));
 
@@ -1481,7 +1455,7 @@ TEST_F(FreeMonControllerRSTest, SecondaryRollbackStopMetrics) {
     controller->notifyOnRollback();
 
     controller->turnCrankForTest(
-        Turner().notifyOnRollback().registerCommand().collect(2).metricsSend());
+        Turner().notifyOnRollback().registerCommand().metricsSend().collect(2).metricsSend());
 
     // Since there is no local write, it remains enabled
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::enabled);

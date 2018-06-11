@@ -1001,6 +1001,47 @@ shellHelper.show = function(what) {
         }
     }
 
+    if (what == "freeMonitoring") {
+        var dbDeclared, ex;
+        try {
+            // !!db essentially casts db to a boolean
+            // Will throw a reference exception if db hasn't been declared.
+            dbDeclared = !!db;
+        } catch (ex) {
+            dbDeclared = false;
+        }
+
+        if (dbDeclared) {
+            const freemonStatus = db.adminCommand({getFreeMonitoringStatus: 1});
+
+            if (freemonStatus.ok) {
+                if (freemonStatus.state == 'enabled' &&
+                    freemonStatus.hasOwnProperty('userReminder')) {
+                    print("---");
+                    print(freemonStatus.userReminder);
+                    print("---");
+                } else if (freemonStatus.state === 'undecided') {
+                    print(
+                        "---\n" +
+                        "Enable MongoDB's free cloud-based monitoring service to collect and display\n" +
+                        "metrics about your deployment (disk utilization, CPU, operation statistics,\n" +
+                        "etc).\n" + "\n" +
+                        "The monitoring data will be available on a MongoDB website with a unique\n" +
+                        "URL created for you. Anyone you share the URL with will also be able to\n" +
+                        "view this page. MongoDB may use this information to make product\n" +
+                        "improvements and to suggest MongoDB products and deployment options to you.\n" +
+                        "\n" + "To enable free monitoring, run the following command:\n" +
+                        "db.enableFreeMonitoring()\n" + "---\n");
+                }
+            }
+
+            return "";
+        } else {
+            print("Cannot show freeMonitoring, \"db\" is not set");
+            return "";
+        }
+    }
+
     throw Error("don't know how to show [" + what + "]");
 
 };

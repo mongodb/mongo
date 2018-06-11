@@ -266,14 +266,6 @@ connect = function(url, user, pass) {
         chatty("WARNING: shell and server versions do not match");
     }
 
-    // Optionally display free monitoring message.
-    const freemonStatus = db.adminCommand({getFreeMonitoringStatus: 1});
-    if (freemonStatus.ok) {
-        if (freemonStatus.userReminder) {
-            chatty(freemonStatus.userReminder);
-        }
-    }
-
     return db;
 };
 
