@@ -89,11 +89,11 @@ typename std::enable_if<EnableBitMaskOperators<Enum>::enable, Enum&>::type opera
 
 }  // namespace mongo
 
-#define ENABLE_BITMASK_OPERATORS(x)                                                               \
-                                                                                                  \
-    template <>                                                                                   \
-                                                                                                  \
-    struct EnableBitMaskOperators<x> {                                                            \
-        static_assert(std::is_enum<typename x>::value, "template parameter is not an enum type"); \
-        static const bool enable = true;                                                          \
+#define ENABLE_BITMASK_OPERATORS(x)                                                      \
+                                                                                         \
+    template <>                                                                          \
+                                                                                         \
+    struct EnableBitMaskOperators<x> {                                                   \
+        static_assert(std::is_enum<x>::value, "template parameter is not an enum type"); \
+        static const bool enable = true;                                                 \
     };

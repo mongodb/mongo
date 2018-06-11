@@ -54,7 +54,7 @@ void ServiceContextDevnullTestFixture::setUp() {
         mongo::storageGlobalParams.engine = "devnull";
         mongo::storageGlobalParams.engineSetByUser = true;
         createLockFile(serviceContext);
-        initializeStorageEngine(serviceContext);
+        initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
     }
 }
 
