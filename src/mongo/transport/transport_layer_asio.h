@@ -99,7 +99,7 @@ public:
         }
 
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
-        std::string ipList;                            // addresses to bind to
+        std::vector<std::string> ipList;               // addresses to bind to
 #ifndef _WIN32
         bool useUnixSockets = true;  // whether to allow UNIX sockets in ipList
 #endif

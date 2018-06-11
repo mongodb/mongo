@@ -272,7 +272,7 @@ thread_local TransportLayerASIO::ASIOReactor* TransportLayerASIO::ASIOReactor::_
 
 TransportLayerASIO::Options::Options(const ServerGlobalParams* params)
     : port(params->port),
-      ipList(params->bind_ip),
+      ipList(params->bind_ips),
 #ifndef _WIN32
       useUnixSockets(!params->noUnixSocket),
 #endif
@@ -666,8 +666,7 @@ Status TransportLayerASIO::setup() {
             listenAddrs.emplace_back("::1");
         }
     } else if (!_listenerOptions.ipList.empty()) {
-        boost::split(
-            listenAddrs, _listenerOptions.ipList, boost::is_any_of(","), boost::token_compress_on);
+        listenAddrs = _listenerOptions.ipList;
     }
 
 #ifndef _WIN32

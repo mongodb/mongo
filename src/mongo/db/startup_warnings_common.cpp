@@ -118,7 +118,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     }
 #endif
 
-    if (serverParams.bind_ip.empty()) {
+    if (serverParams.bind_ips.empty()) {
         log() << startupWarningsLog;
         log() << "** WARNING: This server is bound to localhost." << startupWarningsLog;
         log() << "**          Remote systems will be unable to connect to this server. "
