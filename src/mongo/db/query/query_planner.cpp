@@ -294,13 +294,9 @@ bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
 // static
 const int QueryPlanner::kPlannerVersion = 1;
 
-Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const taggedTree,
-                                             const vector<IndexEntry>& relevantIndices,
-                                             PlanCacheIndexTree** out) {
-    // On any early return, the out-parameter must contain NULL.
-    *out = NULL;
-
-    if (NULL == taggedTree) {
+StatusWith<unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTaggedTree(
+    const MatchExpression* const taggedTree, const vector<IndexEntry>& relevantIndices) {
+    if (!taggedTree) {
         return Status(ErrorCodes::BadValue, "Cannot produce cache data: tree is NULL.");
     }
 
@@ -361,16 +357,14 @@ Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const tagged
 
     for (size_t i = 0; i < taggedTree->numChildren(); ++i) {
         MatchExpression* taggedChild = taggedTree->getChild(i);
-        PlanCacheIndexTree* indexTreeChild;
-        Status s = cacheDataFromTaggedTree(taggedChild, relevantIndices, &indexTreeChild);
-        if (!s.isOK()) {
-            return s;
+        auto swIndexTreeChild = cacheDataFromTaggedTree(taggedChild, relevantIndices);
+        if (!swIndexTreeChild.isOK()) {
+            return swIndexTreeChild;
         }
-        indexTree->children.push_back(indexTreeChild);
+        indexTree->children.push_back(swIndexTreeChild.getValue().release());
     }
 
-    *out = indexTree.release();
-    return Status::OK();
+    return {std::move(indexTree)};
 }
 
 // static
@@ -513,7 +507,7 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
 
     // Use the cached index assignments to build solnRoot.
     std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
-        query, clone.release(), false, params.indices, params));
+        query, std::move(clone), params.indices, params));
 
     if (!solnRoot) {
         return Status(ErrorCodes::BadValue,
@@ -873,30 +867,31 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         PlanEnumerator isp(enumParams);
         isp.init().transitional_ignore();
 
-        unique_ptr<MatchExpression> rawTree;
-        while ((rawTree = isp.getNext()) && (out->size() < params.maxIndexedSolutions)) {
+        unique_ptr<MatchExpression> nextTaggedTree;
+        while ((nextTaggedTree = isp.getNext()) && (out->size() < params.maxIndexedSolutions)) {
             LOG(5) << "About to build solntree from tagged tree:" << endl
-                   << redact(rawTree.get()->toString());
+                   << redact(nextTaggedTree->toString());
 
             // Store the plan cache index tree before calling prepareForAccessingPlanning(), so that
             // the PlanCacheIndexTree has the same sort as the MatchExpression used to generate the
             // plan cache key.
-            std::unique_ptr<MatchExpression> clone(rawTree.get()->shallowClone());
-            PlanCacheIndexTree* cacheData;
-            Status indexTreeStatus =
-                cacheDataFromTaggedTree(clone.get(), relevantIndices, &cacheData);
-            if (!indexTreeStatus.isOK()) {
-                LOG(5) << "Query is not cachable: " << redact(indexTreeStatus.reason());
+            std::unique_ptr<MatchExpression> clone(nextTaggedTree->shallowClone());
+            std::unique_ptr<PlanCacheIndexTree> cacheData;
+            auto statusWithCacheData = cacheDataFromTaggedTree(clone.get(), relevantIndices);
+            if (!statusWithCacheData.isOK()) {
+                LOG(5) << "Query is not cachable: "
+                       << redact(statusWithCacheData.getStatus().reason());
+            } else {
+                cacheData = std::move(statusWithCacheData.getValue());
             }
-            unique_ptr<PlanCacheIndexTree> autoData(cacheData);
 
             // We have already cached the tree in canonical order, so now we can order the nodes for
             // access planning.
-            prepareForAccessPlanning(rawTree.get());
+            prepareForAccessPlanning(nextTaggedTree.get());
 
             // This can fail if enumeration makes a mistake.
             std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
-                query, rawTree.release(), false, relevantIndices, params));
+                query, std::move(nextTaggedTree), relevantIndices, params));
 
             if (!solnRoot) {
                 continue;
@@ -904,11 +899,11 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
 
             QuerySolution* soln =
                 QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
-            if (NULL != soln) {
+            if (soln) {
                 LOG(5) << "Planner: adding solution:" << endl << redact(soln->toString());
-                if (indexTreeStatus.isOK()) {
+                if (statusWithCacheData.isOK()) {
                     SolutionCacheData* scd = new SolutionCacheData();
-                    scd->tree.reset(autoData.release());
+                    scd->tree.reset(cacheData.release());
                     soln->cacheData.reset(scd);
                 }
                 out->push_back(soln);

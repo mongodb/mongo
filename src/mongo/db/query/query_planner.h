@@ -86,14 +86,10 @@ public:
      * @param relevantIndices -- a list of the index entries used to tag
      *   the tree (i.e. index numbers in the tags refer to entries in this vector)
      *
-     * On success, a new tagged tree is returned through the out-parameter 'out'.
-     * The caller has ownership of both taggedTree and *out.
-     *
-     * On failure, 'out' is set to NULL.
+     * On success, a new tagged tree is returned.
      */
-    static Status cacheDataFromTaggedTree(const MatchExpression* const taggedTree,
-                                          const std::vector<IndexEntry>& relevantIndices,
-                                          PlanCacheIndexTree** out);
+    static StatusWith<std::unique_ptr<PlanCacheIndexTree>> cacheDataFromTaggedTree(
+        const MatchExpression* const taggedTree, const std::vector<IndexEntry>& relevantIndices);
 
     /**
      * @param filter -- an untagged MatchExpression
