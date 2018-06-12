@@ -169,7 +169,7 @@ private:
 class QueryStageAndHashInvalidation : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -274,7 +274,7 @@ public:
 class QueryStageAndHashInvalidateLookahead : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -364,7 +364,7 @@ public:
 class QueryStageAndHashTwoLeaf : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -414,7 +414,7 @@ public:
 class QueryStageAndHashTwoLeafFirstChildLargeKeys : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -467,7 +467,7 @@ public:
 class QueryStageAndHashTwoLeafLastChildLargeKeys : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -519,7 +519,7 @@ public:
 class QueryStageAndHashThreeLeaf : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -581,7 +581,7 @@ public:
 class QueryStageAndHashThreeLeafMiddleChildLargeKeys : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -641,7 +641,7 @@ public:
 class QueryStageAndHashWithNothing : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -703,7 +703,7 @@ public:
 class QueryStageAndHashProducesNothing : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -756,7 +756,7 @@ public:
 class QueryStageAndHashFirstChildFetched : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -815,7 +815,7 @@ public:
 class QueryStageAndHashSecondChildFetched : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -871,7 +871,7 @@ public:
 class QueryStageAndHashDeadChild : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -1009,7 +1009,7 @@ public:
 class QueryStageAndSortedInvalidation : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -1133,7 +1133,7 @@ public:
 class QueryStageAndSortedThreeLeaf : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -1187,7 +1187,7 @@ public:
 class QueryStageAndSortedWithNothing : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -1232,7 +1232,7 @@ public:
 class QueryStageAndSortedProducesNothing : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -1281,7 +1281,7 @@ public:
 class QueryStageAndSortedByLastChild : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -1346,7 +1346,7 @@ public:
 class QueryStageAndSortedFirstChildFetched : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {
@@ -1400,7 +1400,7 @@ public:
 class QueryStageAndSortedSecondChildFetched : public QueryStageAndBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = ctx.getCollection();
         if (!coll) {

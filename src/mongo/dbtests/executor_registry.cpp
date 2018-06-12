@@ -56,7 +56,7 @@ static const NamespaceString nss("unittests.ExecutorRegistryDiskLocInvalidation"
 class ExecutorRegistryBase {
 public:
     ExecutorRegistryBase() : _client(&_opCtx) {
-        _ctx.reset(new OldClientWriteContext(&_opCtx, nss.ns()));
+        _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
         _client.dropCollection(nss.ns());
 
         for (int i = 0; i < N(); ++i) {
@@ -103,7 +103,7 @@ public:
     // Order of these is important for initialization
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
-    unique_ptr<OldClientWriteContext> _ctx;
+    unique_ptr<dbtests::WriteContextForTests> _ctx;
     DBDirectClient _client;
 };
 
@@ -243,7 +243,7 @@ public:
         // requires a "global write lock."
         _ctx.reset();
         _client.dropDatabase("somesillydb");
-        _ctx.reset(new OldClientWriteContext(&_opCtx, nss.ns()));
+        _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
         ASSERT_OK(exec->restoreState());
 
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, NULL));
@@ -254,7 +254,7 @@ public:
         // Drop our DB.  Once again, must give up the lock.
         _ctx.reset();
         _client.dropDatabase("unittests");
-        _ctx.reset(new OldClientWriteContext(&_opCtx, nss.ns()));
+        _ctx.reset(new dbtests::WriteContextForTests(&_opCtx, nss.ns()));
         ASSERT_EQUALS(ErrorCodes::QueryPlanKilled, exec->restoreState());
     }
 };

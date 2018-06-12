@@ -95,7 +95,7 @@ protected:
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
-    OldClientWriteContext _ctx;
+    dbtests::WriteContextForTests _ctx;
     DBDirectClient _client;
 };
 

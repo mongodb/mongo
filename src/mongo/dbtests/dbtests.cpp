@@ -123,6 +123,39 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     return Status::OK();
 }
 
+WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData ns)
+    : _opCtx(opCtx), _nss(ns) {
+    // Lock the database and collection
+    _autoCreateDb.emplace(opCtx, _nss.db(), MODE_IX);
+    _collLock.emplace(opCtx->lockState(), _nss.ns(), MODE_IX);
+
+    const bool doShardVersionCheck = false;
+
+    _clientContext.emplace(opCtx, _nss.ns(), doShardVersionCheck);
+    invariant(_autoCreateDb->getDb() == _clientContext->db());
+
+    // If the collection exists, there is no need to lock into stronger mode
+    if (getCollection())
+        return;
+
+    // If the database was just created, it is already locked in MODE_X so we can skip the relocking
+    // code below
+    if (_autoCreateDb->justCreated()) {
+        dassert(opCtx->lockState()->isDbLockedForMode(_nss.db(), MODE_X));
+        return;
+    }
+
+    // If the collection doesn't exists, put the context in a state where the database is locked in
+    // MODE_X so that the collection can be created
+    _clientContext.reset();
+    _collLock.reset();
+    _autoCreateDb.reset();
+    _autoCreateDb.emplace(opCtx, _nss.db(), MODE_X);
+
+    _clientContext.emplace(opCtx, _nss.ns(), _autoCreateDb->getDb());
+    invariant(_autoCreateDb->getDb() == _clientContext->db());
+}
+
 }  // namespace dbtests
 }  // namespace mongo
 

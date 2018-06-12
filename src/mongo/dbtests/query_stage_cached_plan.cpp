@@ -74,7 +74,7 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 

@@ -58,7 +58,7 @@ public:
     QueryStageSubplanTest() : _client(_opCtx.get()) {}
 
     virtual ~QueryStageSubplanTest() {
-        OldClientWriteContext ctx(opCtx(), nss.ns());
+        dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
         _client.dropCollection(nss.ns());
     }
 
@@ -112,7 +112,7 @@ private:
  * back to regular planning.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
-    OldClientWriteContext ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
     addIndex(BSON("a"
                   << "2d"
                   << "b"
@@ -149,7 +149,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
  * Test the SubplanStage's ability to plan an individual branch using the plan cache.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
-    OldClientWriteContext ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
 
     addIndex(BSON("a" << 1));
     addIndex(BSON("a" << 1 << "b" << 1));
@@ -207,7 +207,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
  * Ensure that the subplan stage doesn't create a plan cache entry if there are no query results.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
-    OldClientWriteContext ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
 
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1));
@@ -262,7 +262,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
  * Ensure that the subplan stage doesn't create a plan cache entry if there are no query results.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
-    OldClientWriteContext ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
 
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
@@ -441,7 +441,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
  * Regression test for SERVER-19388.
  */
 TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
-    OldClientWriteContext ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
 
@@ -484,7 +484,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
 }
 
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning) {
-    OldClientWriteContext ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
     // Build a query with a rooted $or.
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
@@ -517,7 +517,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
 }
 
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
-    OldClientWriteContext ctx(opCtx(), nss.ns());
+    dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
     // Build a query with a rooted $or.
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));

@@ -61,7 +61,7 @@ static const NamespaceString nss("unittests.QueryStageDelete");
 class QueryStageDeleteBase {
 public:
     QueryStageDeleteBase() : _client(&_opCtx) {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
 
         for (size_t i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
@@ -72,7 +72,7 @@ public:
     }
 
     virtual ~QueryStageDeleteBase() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         _client.dropCollection(nss.ns());
     }
 
@@ -130,7 +130,7 @@ private:
 class QueryStageDeleteInvalidateUpcomingObject : public QueryStageDeleteBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
 
         Collection* coll = ctx.getCollection();
 
@@ -196,7 +196,7 @@ class QueryStageDeleteReturnOldDoc : public QueryStageDeleteBase {
 public:
     void run() {
         // Various variables we'll need.
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         Collection* coll = ctx.getCollection();
         const int targetDocIndex = 0;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
@@ -265,7 +265,7 @@ class QueryStageDeleteSkipOwnedObjects : public QueryStageDeleteBase {
 public:
     void run() {
         // Various variables we'll need.
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         Collection* coll = ctx.getCollection();
         const BSONObj query = BSONObj();
         const auto ws = make_unique<WorkingSet>();

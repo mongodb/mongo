@@ -63,7 +63,7 @@ public:
     void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        OldClientWriteContext ctx(&opCtx, _ns);
+        dbtests::WriteContextForTests ctx(&opCtx, _ns);
 
         int numFinishedIndexesStart = _catalog->numIndexesReady(&opCtx);
 
@@ -130,7 +130,7 @@ public:
     void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        OldClientWriteContext ctx(&opCtx, _ns);
+        dbtests::WriteContextForTests ctx(&opCtx, _ns);
         const std::string indexName = "x_1";
 
         ASSERT_OK(dbtests::createIndexFromSpec(

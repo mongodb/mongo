@@ -138,7 +138,7 @@ public:
         setOplogCollectionName(getGlobalServiceContext());
         createOplog(&_opCtx);
 
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         WriteUnitOfWork wuow(&_opCtx);
 
         Collection* c = ctx.db()->getCollection(&_opCtx, ns());

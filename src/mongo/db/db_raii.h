@@ -184,16 +184,6 @@ public:
         return _justCreated;
     }
 
-    /**
-     * Only used by the OldClientWriteContext class below and internally, do not use in any new
-     * code.
-     */
-    OldClientContext(OperationContext* opCtx,
-                     const std::string& ns,
-                     bool doVersion,
-                     Database* db,
-                     bool justCreated);
-
 private:
     friend class CurOp;
 
@@ -202,40 +192,7 @@ private:
     OperationContext* const _opCtx;
 
     Database* _db;
-    bool _justCreated;
-};
-
-/**
- * Combines AutoGetOrCreateDb and OldClientContext. If the requested 'ns' exists, the constructed
- * object will have both the database and the collection locked in MODE_IX. Otherwise, the database
- * will be locked in MODE_X and will be created (note, only the database will be created, but not
- * the collection).
- *
- * TODO: Based on its usages, this class should become AutoGetOrCreateCollection whereby the
- * requested collection should be automatically created instead of relying on the callers to perform
- * a check and create it afterwards.
- */
-class OldClientWriteContext {
-    MONGO_DISALLOW_COPYING(OldClientWriteContext);
-
-public:
-    OldClientWriteContext(OperationContext* opCtx, StringData ns);
-
-    Database* db() const {
-        return _clientContext->db();
-    }
-
-    Collection* getCollection() const {
-        return db()->getCollection(_opCtx, _nss);
-    }
-
-private:
-    OperationContext* const _opCtx;
-    const NamespaceString _nss;
-
-    boost::optional<AutoGetOrCreateDb> _autoCreateDb;
-    boost::optional<Lock::CollectionLock> _collLock;
-    boost::optional<OldClientContext> _clientContext;
+    bool _justCreated{false};
 };
 
 /**

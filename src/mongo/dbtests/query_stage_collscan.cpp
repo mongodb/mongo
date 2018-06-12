@@ -64,7 +64,7 @@ static const NamespaceString nss{"unittests.QueryStageCollectionScan"};
 class QueryStageCollectionScanBase {
 public:
     QueryStageCollectionScanBase() : _client(&_opCtx) {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
 
         for (int i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
@@ -74,7 +74,7 @@ public:
     }
 
     virtual ~QueryStageCollectionScanBase() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         _client.dropCollection(nss.ns());
     }
 
@@ -277,7 +277,7 @@ public:
 class QueryStageCollscanInvalidateUpcomingObject : public QueryStageCollectionScanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
 
         Collection* coll = ctx.getCollection();
 
@@ -343,7 +343,7 @@ public:
 class QueryStageCollscanInvalidateUpcomingObjectBackward : public QueryStageCollectionScanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         Collection* coll = ctx.getCollection();
 
         // Get the RecordIds that would be returned by an in-order scan.

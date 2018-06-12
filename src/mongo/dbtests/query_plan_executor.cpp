@@ -193,7 +193,7 @@ private:
  * PlanExecutor is doing a collection scan.
  */
 TEST_F(PlanExecutorTest, DropCollScan) {
-    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
@@ -215,7 +215,7 @@ TEST_F(PlanExecutorTest, DropCollScan) {
  * Test dropping the collection while the PlanExecutor is doing an index scan.
  */
 TEST_F(PlanExecutorTest, DropIndexScan) {
-    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
     insert(BSON("_id" << 1 << "a" << 6));
     insert(BSON("_id" << 2 << "a" << 7));
     insert(BSON("_id" << 3 << "a" << 8));
@@ -237,7 +237,7 @@ TEST_F(PlanExecutorTest, DropIndexScan) {
  * Test dropping the collection while an agg PlanExecutor is doing an index scan.
  */
 TEST_F(PlanExecutorTest, DropIndexScanAgg) {
-    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
 
     insert(BSON("_id" << 1 << "a" << 6));
     insert(BSON("_id" << 2 << "a" << 7));
@@ -282,7 +282,7 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
 }
 
 TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
-    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
@@ -297,7 +297,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
 }
 
 TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwaitData) {
-    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
@@ -315,7 +315,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwa
 }
 
 TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailableButNotAwaitData) {
-    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
@@ -331,7 +331,7 @@ TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailabl
 }
 
 TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYield) {
-    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
 
@@ -395,7 +395,7 @@ protected:
  * scan.
  */
 TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
-    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
     setupCollection();
 
     BSONObj filterObj = fromjson("{a: {$gte: 2}}");
@@ -419,7 +419,7 @@ TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
  * index scan.
  */
 TEST_F(PlanExecutorSnapshotTest, SnapshotTest) {
-    OldClientWriteContext ctx(&_opCtx, nss.ns());
+    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
     setupCollection();
     BSONObj indexSpec = BSON("_id" << 1);
     addIndex(indexSpec);

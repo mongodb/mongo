@@ -61,7 +61,7 @@ public:
     QueryStageMergeSortTestBase() : _client(&_opCtx) {}
 
     virtual ~QueryStageMergeSortTestBase() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         _client.dropCollection(ns());
     }
 
@@ -121,7 +121,7 @@ private:
 class QueryStageMergeSortPrefixIndex : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -192,7 +192,7 @@ public:
 class QueryStageMergeSortDups : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -262,7 +262,7 @@ public:
 class QueryStageMergeSortDupsNoDedup : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -333,7 +333,7 @@ public:
 class QueryStageMergeSortPrefixIndexReverse : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -405,7 +405,7 @@ public:
 class QueryStageMergeSortOneStageEOF : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -474,7 +474,7 @@ public:
 class QueryStageMergeSortManyShort : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -533,7 +533,7 @@ public:
 class QueryStageMergeSortInvalidation : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -649,7 +649,7 @@ public:
 class QueryStageMergeSortInvalidationMutationDedup : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -746,7 +746,7 @@ private:
 class QueryStageMergeSortStringsWithNullCollation : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -819,7 +819,7 @@ public:
 class QueryStageMergeSortStringsRespectsCollation : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {

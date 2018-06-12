@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "mongo/db/db_raii.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -38,6 +39,7 @@ using namespace mongo::unittest;
 using std::shared_ptr;
 
 namespace mongo {
+
 class BSONObj;
 class OperationContext;
 class Status;
@@ -57,5 +59,35 @@ Status createIndex(OperationContext* opCtx,
  * Creates an index from a BSON spec, if it does not already exist.
  */
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec);
+
+/**
+ * Combines AutoGetOrCreateDb and OldClientContext. If the requested 'ns' exists, the constructed
+ * object will have both the database and the collection locked in MODE_IX. Otherwise, the database
+ * will be locked in MODE_X and will be created (note, only the database will be created, but not
+ * the collection).
+ */
+class WriteContextForTests {
+    MONGO_DISALLOW_COPYING(WriteContextForTests);
+
+public:
+    WriteContextForTests(OperationContext* opCtx, StringData ns);
+
+    Database* db() const {
+        return _clientContext->db();
+    }
+
+    Collection* getCollection() const {
+        return db()->getCollection(_opCtx, _nss);
+    }
+
+private:
+    OperationContext* const _opCtx;
+    const NamespaceString _nss;
+
+    boost::optional<AutoGetOrCreateDb> _autoCreateDb;
+    boost::optional<Lock::CollectionLock> _collLock;
+    boost::optional<OldClientContext> _clientContext;
+};
+
 }  // namespace dbtests
 }  // namespace mongo

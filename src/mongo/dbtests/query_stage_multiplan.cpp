@@ -81,12 +81,12 @@ std::unique_ptr<QuerySolution> createQuerySolution() {
 class QueryStageMultiPlanTest : public unittest::Test {
 public:
     QueryStageMultiPlanTest() : _client(_opCtx.get()) {
-        OldClientWriteContext ctx(_opCtx.get(), nss.ns());
+        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
         _client.dropCollection(nss.ns());
     }
 
     virtual ~QueryStageMultiPlanTest() {
-        OldClientWriteContext ctx(_opCtx.get(), nss.ns());
+        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
         _client.dropCollection(nss.ns());
     }
 
@@ -95,12 +95,12 @@ public:
     }
 
     void insert(const BSONObj& obj) {
-        OldClientWriteContext ctx(_opCtx.get(), nss.ns());
+        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
         _client.insert(nss.ns(), obj);
     }
 
     void remove(const BSONObj& obj) {
-        OldClientWriteContext ctx(_opCtx.get(), nss.ns());
+        dbtests::WriteContextForTests ctx(_opCtx.get(), nss.ns());
         _client.remove(nss.ns(), obj);
     }
 

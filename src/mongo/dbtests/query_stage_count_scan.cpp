@@ -56,7 +56,7 @@ public:
     CountBase() : _client(&_opCtx) {}
 
     virtual ~CountBase() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         _client.dropCollection(ns());
     }
 
@@ -117,7 +117,7 @@ private:
 class QueryStageCountScanDups : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert some docs
         insert(BSON("a" << BSON_ARRAY(5 << 7)));
@@ -149,7 +149,7 @@ public:
 class QueryStageCountScanInclusiveBounds : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert some docs
         for (int i = 0; i < 10; ++i) {
@@ -181,7 +181,7 @@ public:
 class QueryStageCountScanExclusiveBounds : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert some docs
         for (int i = 0; i < 10; ++i) {
@@ -213,7 +213,7 @@ public:
 class QueryStageCountScanLowerBound : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert doc, add index
         insert(BSON("a" << 2));
@@ -241,7 +241,7 @@ public:
 class QueryStageCountScanNothingInInterval : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert documents, add index
         insert(BSON("a" << 2));
@@ -271,7 +271,7 @@ public:
 class QueryStageCountScanNothingInIntervalFirstMatchTooHigh : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert some documents, add index
         insert(BSON("a" << 2));
@@ -301,7 +301,7 @@ public:
 class QueryStageCountScanNoChangeDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -354,7 +354,7 @@ public:
 class QueryStageCountScanDeleteDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -410,7 +410,7 @@ public:
 class QueryStageCountScanInsertNewDocsDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -469,7 +469,7 @@ public:
 class QueryStageCountScanBecomesMultiKeyDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -524,7 +524,7 @@ public:
 class QueryStageCountScanUnusedKeys : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert docs, add index
         for (int i = 0; i < 10; ++i) {
@@ -559,7 +559,7 @@ public:
 class QueryStageCountScanUnusedEndKey : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert docs, add index
         for (int i = 0; i < 10; ++i) {
@@ -592,7 +592,7 @@ public:
 class QueryStageCountScanKeyBecomesUnusedDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {

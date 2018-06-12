@@ -55,7 +55,7 @@ using std::unique_ptr;
 class IndexScanBase {
 public:
     IndexScanBase() : _client(&_opCtx) {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         for (int i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
@@ -70,7 +70,7 @@ public:
     }
 
     virtual ~IndexScanBase() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         _client.dropCollection(ns());
     }
 
@@ -109,7 +109,7 @@ public:
     }
 
     void makeGeoData() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         for (int i = 0; i < numObj(); ++i) {
             double lat = double(rand()) / RAND_MAX;

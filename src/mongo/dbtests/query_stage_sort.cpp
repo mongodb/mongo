@@ -236,7 +236,7 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -258,7 +258,7 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -289,7 +289,7 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -314,7 +314,7 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -426,7 +426,7 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
@@ -525,7 +525,7 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {

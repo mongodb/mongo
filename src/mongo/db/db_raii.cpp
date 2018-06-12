@@ -246,7 +246,6 @@ bool AutoGetCollectionForRead::_conflictingCatalogChanges(
     return true;
 }
 
-
 AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
@@ -268,12 +267,7 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
 }
 
 OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)
-    : OldClientContext(
-          opCtx, ns, doVersion, DatabaseHolder::getDatabaseHolder().get(opCtx, ns), false) {}
-
-OldClientContext::OldClientContext(
-    OperationContext* opCtx, const std::string& ns, bool doVersion, Database* db, bool justCreated)
-    : _opCtx(opCtx), _db(db), _justCreated(justCreated) {
+    : _opCtx(opCtx), _db(DatabaseHolder::getDatabaseHolder().get(opCtx, ns)) {
     if (!_db) {
         const auto dbName = nsToDatabaseSubstring(ns);
         invariant(_opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
@@ -318,48 +312,6 @@ OldClientContext::~OldClientContext() {
                 _timer.micros(),
                 currentOp->isCommand(),
                 currentOp->getReadWriteType());
-}
-
-
-OldClientWriteContext::OldClientWriteContext(OperationContext* opCtx, StringData ns)
-    : _opCtx(opCtx), _nss(ns) {
-    // Lock the database and collection
-    _autoCreateDb.emplace(opCtx, _nss.db(), MODE_IX);
-    _collLock.emplace(opCtx->lockState(), _nss.ns(), MODE_IX);
-
-    const bool doShardVersionCheck = false;
-
-    _clientContext.emplace(opCtx,
-                           _nss.ns(),
-                           doShardVersionCheck,
-                           _autoCreateDb->getDb(),
-                           _autoCreateDb->justCreated());
-    invariant(_autoCreateDb->getDb() == _clientContext->db());
-
-    // If the collection exists, there is no need to lock into stronger mode
-    if (getCollection())
-        return;
-
-    // If the database was just created, it is already locked in MODE_X so we can skip the relocking
-    // code below
-    if (_autoCreateDb->justCreated()) {
-        dassert(opCtx->lockState()->isDbLockedForMode(_nss.db(), MODE_X));
-        return;
-    }
-
-    // If the collection doesn't exists, put the context in a state where the database is locked in
-    // MODE_X so that the collection can be created
-    _clientContext.reset();
-    _collLock.reset();
-    _autoCreateDb.reset();
-    _autoCreateDb.emplace(opCtx, _nss.db(), MODE_X);
-
-    _clientContext.emplace(opCtx,
-                           _nss.ns(),
-                           doShardVersionCheck,
-                           _autoCreateDb->getDb(),
-                           _autoCreateDb->justCreated());
-    invariant(_autoCreateDb->getDb() == _clientContext->db());
 }
 
 LockMode getLockModeForQuery(OperationContext* opCtx) {

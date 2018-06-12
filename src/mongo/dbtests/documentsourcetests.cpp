@@ -86,7 +86,7 @@ protected:
         // clean up first if this was called before
         _source.reset();
 
-        OldClientWriteContext ctx(opCtx(), nss.ns());
+        dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         if (hint) {

@@ -282,7 +282,7 @@ public:
 
         {
             // Check internal server handoff to getmore.
-            OldClientWriteContext ctx(&_opCtx, ns);
+            dbtests::WriteContextForTests ctx(&_opCtx, ns);
             auto pinnedCursor = unittest::assertGet(
                 ctx.getCollection()->getCursorManager()->pinCursor(&_opCtx, cursorId));
             ASSERT_EQUALS(2, pinnedCursor.getCursor()->pos());
@@ -1285,7 +1285,7 @@ public:
         }
 
         string err;
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         // note that extents are always at least 4KB now - so this will get rounded up
         // a bit.
@@ -1352,7 +1352,7 @@ public:
     HelperTest() : CollectionBase("helpertest") {}
 
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         for (int i = 0; i < 50; i++) {
             insert(ns(), BSON("_id" << i << "x" << i * 2));
@@ -1399,7 +1399,7 @@ public:
     HelperByIdTest() : CollectionBase("helpertestbyid") {}
 
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         for (int i = 0; i < 1000; i++) {
             insert(ns(), BSON("_id" << i << "x" << i * 2));
@@ -1420,7 +1420,7 @@ class ClientCursorTest : public CollectionBase {
     ClientCursorTest() : CollectionBase("clientcursortest") {}
 
     void run() {
-        OldClientWriteContext ctx(&_opCtx, ns());
+        dbtests::WriteContextForTests ctx(&_opCtx, ns());
 
         for (int i = 0; i < 1000; i++) {
             insert(ns(), BSON("_id" << i << "x" << i * 2));
