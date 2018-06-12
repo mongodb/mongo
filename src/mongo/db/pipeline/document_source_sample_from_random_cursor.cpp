@@ -148,10 +148,9 @@ Value DocumentSourceSampleFromRandomCursor::serialize(
     return Value(DOC(getSourceName() << DOC("size" << _size)));
 }
 
-DocumentSource::GetDepsReturn DocumentSourceSampleFromRandomCursor::getDependencies(
-    DepsTracker* deps) const {
+DepsTracker::State DocumentSourceSampleFromRandomCursor::getDependencies(DepsTracker* deps) const {
     deps->fields.insert(_idField);
-    return SEE_NEXT;
+    return DepsTracker::State::SEE_NEXT;
 }
 
 intrusive_ptr<DocumentSourceSampleFromRandomCursor> DocumentSourceSampleFromRandomCursor::create(

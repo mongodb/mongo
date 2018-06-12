@@ -104,7 +104,8 @@ public:
         return TransformerType::kExclusionProjection;
     }
 
-    Document serializeStageOptions(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Document serializeTransformation(
+        boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     /**
      * Parses the projection specification given by 'spec', populating internal data structures.
@@ -118,8 +119,8 @@ public:
      */
     Document applyProjection(const Document& inputDoc) const final;
 
-    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
-        return DocumentSource::SEE_NEXT;
+    DepsTracker::State addDependencies(DepsTracker* deps) const final {
+        return DepsTracker::State::SEE_NEXT;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {

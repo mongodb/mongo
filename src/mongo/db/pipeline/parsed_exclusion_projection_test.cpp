@@ -87,7 +87,7 @@ TEST(ExclusionProjection, ShouldSerializeToEquivalentProjection) {
 
     // Converts numbers to bools, converts dotted paths to nested documents. Note order of excluded
     // fields is subject to change.
-    auto serialization = exclusion.serializeStageOptions(boost::none);
+    auto serialization = exclusion.serializeTransformation(boost::none);
     ASSERT_EQ(serialization.size(), 4UL);
     ASSERT_VALUE_EQ(serialization["a"], Value(false));
     ASSERT_VALUE_EQ(serialization["_id"], Value(false));
@@ -103,8 +103,8 @@ TEST(ExclusionProjection, ShouldSerializeToEquivalentProjection) {
 }
 
 TEST(ExclusionProjection, ShouldNotAddAnyDependencies) {
-    // An exclusion projection will cause the $project stage to return GetDepsReturn::SEE_NEXT,
-    // meaning it doesn't strictly require any fields.
+    // An exclusion projection will cause the stage to return DepsTracker::State::SEE_NEXT, meaning
+    // it doesn't strictly require any fields.
     //
     // For example, if our projection was {a: 0}, and a later stage requires the field "a", then "a"
     // will be added to the dependencies correctly. If a later stage doesn't need "a", then we don't

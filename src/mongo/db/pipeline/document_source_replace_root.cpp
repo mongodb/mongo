@@ -45,8 +45,7 @@ using boost::intrusive_ptr;
 /**
  * This class implements the transformation logic for the $replaceRoot stage.
  */
-class ReplaceRootTransformation final
-    : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
+class ReplaceRootTransformation final : public TransformerInterface {
 
 public:
     ReplaceRootTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx)
@@ -80,15 +79,16 @@ public:
         _newRoot->optimize();
     }
 
-    Document serializeStageOptions(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Document serializeTransformation(
+        boost::optional<ExplainOptions::Verbosity> explain) const final {
         return Document{{"newRoot", _newRoot->serialize(static_cast<bool>(explain))}};
     }
 
-    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
+    DepsTracker::State addDependencies(DepsTracker* deps) const final {
         _newRoot->addDependencies(deps);
         // This stage will replace the entire document with a new document, so any existing fields
         // will be replaced and cannot be required as dependencies.
-        return DocumentSource::EXHAUSTIVE_FIELDS;
+        return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {

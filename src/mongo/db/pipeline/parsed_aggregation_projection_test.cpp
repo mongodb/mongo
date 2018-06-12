@@ -44,6 +44,8 @@ namespace mongo {
 namespace parsed_aggregation_projection {
 namespace {
 
+using ProjectionParseMode = ParsedAggregationProjection::ProjectionParseMode;
+
 template <typename T>
 BSONObj wrapInLiteral(const T& arg) {
     return BSON("$literal" << arg);
@@ -433,140 +435,202 @@ TEST(ParsedAggregationProjectionErrors, ShouldNotErrorOnTwoNestedFields) {
 TEST(ParsedAggregationProjectionType, ShouldDefaultToInclusionProjection) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << true));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("a" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionType, ShouldDetectExclusionProjection) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto parsedProject = ParsedAggregationProjection::create(expCtx, BSON("a" << false));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kExclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id.x" << false));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kExclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << BSON("x" << false)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kExclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("x" << BSON("_id" << false)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kExclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << false));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kExclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionType, ShouldDetectInclusionProjection) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto parsedProject = ParsedAggregationProjection::create(expCtx, BSON("a" << true));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject =
         ParsedAggregationProjection::create(expCtx, BSON("_id" << false << "a" << true));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject =
         ParsedAggregationProjection::create(expCtx, BSON("_id" << false << "a.b.c" << true));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id.x" << true));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << BSON("x" << true)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("x" << BSON("_id" << true)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionType, ShouldTreatOnlyComputedFieldsAsAnInclusionProjection) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto parsedProject = ParsedAggregationProjection::create(expCtx, BSON("a" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(
         expCtx, BSON("_id" << false << "a" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(
         expCtx, BSON("_id" << false << "a.b.c" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id.x" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject =
         ParsedAggregationProjection::create(expCtx, BSON("_id" << BSON("x" << wrapInLiteral(1))));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject =
         ParsedAggregationProjection::create(expCtx, BSON("x" << BSON("_id" << wrapInLiteral(1))));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionType, ShouldAllowMixOfInclusionAndComputedFields) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto parsedProject =
         ParsedAggregationProjection::create(expCtx, BSON("a" << true << "b" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(
         expCtx, BSON("a.b" << true << "a.c" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject = ParsedAggregationProjection::create(
         expCtx, BSON("a" << BSON("b" << true << "c" << wrapInLiteral(1))));
-    ASSERT(parsedProject->getType() ==
-           DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-               kInclusionProjection);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(expCtx,
+                                                        BSON("a" << BSON("b" << true << "c"
+                                                                             << "stringLiteral")));
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+}
+
+TEST(ParsedAggregationProjectionType, ShouldRejectMixOfInclusionAndComputedFieldsInStrictMode) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx,
+                                                      BSON("a" << true << "b" << wrapInLiteral(1)),
+                                                      ProjectionParseMode::kBanComputedFields),
+                  AssertionException);
+
+    ASSERT_THROWS(
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("a.b" << true << "a.c" << wrapInLiteral(1)),
+                                            ProjectionParseMode::kBanComputedFields),
+        AssertionException);
+
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx,
+                      BSON("a" << BSON("b" << true << "c" << wrapInLiteral(1))),
+                      ProjectionParseMode::kBanComputedFields),
+                  AssertionException);
+
+    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx,
+                                                      BSON("a" << BSON("b" << true << "c"
+                                                                           << "stringLiteral")),
+                                                      ProjectionParseMode::kBanComputedFields),
+                  AssertionException);
+}
+
+TEST(ParsedAggregationProjectionType, ShouldRejectOnlyComputedFieldsInStrictMode) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx,
+                      BSON("a" << wrapInLiteral(1) << "b" << wrapInLiteral(2)),
+                      ProjectionParseMode::kBanComputedFields),
+                  AssertionException);
+
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx,
+                      BSON("a.b" << wrapInLiteral(1) << "a.c" << wrapInLiteral(2)),
+                      ProjectionParseMode::kBanComputedFields),
+                  AssertionException);
+
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx,
+                      BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << wrapInLiteral(2))),
+                      ProjectionParseMode::kBanComputedFields),
+                  AssertionException);
+
+    ASSERT_THROWS(ParsedAggregationProjection::create(
+                      expCtx,
+                      BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << wrapInLiteral(2))),
+                      ProjectionParseMode::kBanComputedFields),
+                  AssertionException);
+}
+
+TEST(ParsedAggregationProjectionType, ShouldAcceptInclusionProjectionInStrictMode) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("a" << true), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("_id" << false << "a" << true), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("_id" << false << "a.b.c" << true), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("_id.x" << true), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("_id" << BSON("x" << true)), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("x" << BSON("_id" << true)), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+}
+
+TEST(ParsedAggregationProjectionType, ShouldAcceptExclusionProjectionInStrictMode) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("a" << false), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("_id.x" << false), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("_id" << BSON("x" << false)), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("x" << BSON("_id" << false)), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
+
+    parsedProject = ParsedAggregationProjection::create(
+        expCtx, BSON("_id" << false), ProjectionParseMode::kBanComputedFields);
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionType, ShouldCoerceNumericsToBools) {
@@ -576,8 +640,7 @@ TEST(ParsedAggregationProjectionType, ShouldCoerceNumericsToBools) {
         auto parsedProject =
             ParsedAggregationProjection::create(expCtx, Document{{"a", zero}}.toBson());
         ASSERT(parsedProject->getType() ==
-               DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-                   kExclusionProjection);
+               TransformerInterface::TransformerType::kExclusionProjection);
     }
 
     std::vector<Value> nonZeroes = {
@@ -586,8 +649,7 @@ TEST(ParsedAggregationProjectionType, ShouldCoerceNumericsToBools) {
         auto parsedProject =
             ParsedAggregationProjection::create(expCtx, Document{{"a", nonZero}}.toBson());
         ASSERT(parsedProject->getType() ==
-               DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType::
-                   kInclusionProjection);
+               TransformerInterface::TransformerType::kInclusionProjection);
     }
 }
 

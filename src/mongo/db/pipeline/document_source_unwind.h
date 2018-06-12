@@ -58,7 +58,7 @@ public:
         return constraints;
     }
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     /**
      * Creates a new $unwind DocumentSource from a BSON specification.

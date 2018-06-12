@@ -477,7 +477,7 @@ BSONObj DocumentSourceMatch::getQuery() const {
     return _predicate;
 }
 
-DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* deps) const {
+DepsTracker::State DocumentSourceMatch::getDependencies(DepsTracker* deps) const {
     // Get all field or variable dependencies.
     _expression->addDependencies(deps);
 
@@ -486,10 +486,10 @@ DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* 
         // know what field it will be searching without examining indices.
         deps->needWholeDocument = true;
         deps->setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
-        return EXHAUSTIVE_FIELDS;
+        return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 
-    return SEE_NEXT;
+    return DepsTracker::State::SEE_NEXT;
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,

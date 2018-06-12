@@ -34,8 +34,9 @@
 #include <memory>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/transformer_interface.h"
 
 namespace mongo {
 
@@ -137,16 +138,24 @@ private:
  * represents either an inclusion or exclusion projection. This is the common interface between the
  * two types of projections.
  */
-class ParsedAggregationProjection
-    : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
+class ParsedAggregationProjection : public TransformerInterface {
 public:
+    // Allows the caller to specify whether computed fields should be allowed within inclusion
+    // projections; they are implicitly prohibited within exclusion projections.
+    enum class ProjectionParseMode {
+        kBanComputedFields,   // No computed fields are permitted in the projection spec.
+        kAllowComputedFields  // Computed fields are permitted.
+    };
+
     /**
      * Main entry point for a ParsedAggregationProjection.
      *
      * Throws a AssertionException if 'spec' is an invalid projection specification.
      */
     static std::unique_ptr<ParsedAggregationProjection> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const BSONObj& spec,
+        ProjectionParseMode parseRules = ProjectionParseMode::kAllowComputedFields);
 
     virtual ~ParsedAggregationProjection() = default;
 
@@ -166,8 +175,8 @@ public:
     /**
      * Add any dependencies needed by this projection or any sub-expressions to 'deps'.
      */
-    virtual DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const {
-        return DocumentSource::NOT_SUPPORTED;
+    virtual DepsTracker::State addDependencies(DepsTracker* deps) const {
+        return DepsTracker::State::NOT_SUPPORTED;
     }
 
     /**

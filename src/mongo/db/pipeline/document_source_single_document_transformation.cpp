@@ -77,7 +77,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimi
 void DocumentSourceSingleDocumentTransformation::doDispose() {
     if (_parsedTransform) {
         // Cache the stage options document in case this stage is serialized after disposing.
-        _cachedStageOptions = _parsedTransform->serializeStageOptions(pExpCtx->explain);
+        _cachedStageOptions = _parsedTransform->serializeTransformation(pExpCtx->explain);
         _parsedTransform.reset();
     }
 }
@@ -85,7 +85,7 @@ void DocumentSourceSingleDocumentTransformation::doDispose() {
 Value DocumentSourceSingleDocumentTransformation::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(Document{{getSourceName(),
-                           _parsedTransform ? _parsedTransform->serializeStageOptions(explain)
+                           _parsedTransform ? _parsedTransform->serializeTransformation(explain)
                                             : _cachedStageOptions}});
 }
 
@@ -101,7 +101,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::
     return std::next(itr);
 }
 
-DocumentSource::GetDepsReturn DocumentSourceSingleDocumentTransformation::getDependencies(
+DepsTracker::State DocumentSourceSingleDocumentTransformation::getDependencies(
     DepsTracker* deps) const {
     // Each parsed transformation is responsible for adding its own dependencies, and returning
     // the correct dependency return type for that transformation.

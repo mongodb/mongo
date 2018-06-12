@@ -216,7 +216,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     return std::next(itr);
 }
 
-DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(DepsTracker* deps) const {
+DepsTracker::State DocumentSourceSort::getDependencies(DepsTracker* deps) const {
     for (auto&& keyPart : _sortPattern) {
         if (keyPart.expression) {
             keyPart.expression->addDependencies(deps);
@@ -229,7 +229,7 @@ DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(DepsTracker* d
         deps->setNeedsMetadata(DepsTracker::MetadataType::SORT_KEY, true);
     }
 
-    return SEE_NEXT;
+    return DepsTracker::State::SEE_NEXT;
 }
 
 

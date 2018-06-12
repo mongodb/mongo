@@ -758,7 +758,7 @@ public:
     void run() {
         createGroup(fromjson("{_id:'$x',a:{$sum:'$y.z'},b:{$avg:{$add:['$u','$v']}}}"));
         DepsTracker dependencies;
-        ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_ALL, group()->getDependencies(&dependencies));
+        ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, group()->getDependencies(&dependencies));
         ASSERT_EQUALS(4U, dependencies.fields.size());
         // Dependency from _id expression.
         ASSERT_EQUALS(1U, dependencies.fields.count("x"));

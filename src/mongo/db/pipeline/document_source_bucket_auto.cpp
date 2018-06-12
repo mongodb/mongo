@@ -72,7 +72,7 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::getNext() {
     return makeDocument(*(_bucketsIterator++));
 }
 
-DocumentSource::GetDepsReturn DocumentSourceBucketAuto::getDependencies(DepsTracker* deps) const {
+DepsTracker::State DocumentSourceBucketAuto::getDependencies(DepsTracker* deps) const {
     // Add the 'groupBy' expression.
     _groupByExpression->addDependencies(deps);
 
@@ -84,7 +84,7 @@ DocumentSource::GetDepsReturn DocumentSourceBucketAuto::getDependencies(DepsTrac
     // We know exactly which fields will be present in the output document. Future stages cannot
     // depend on any further fields. The grouping process will remove any metadata from the
     // documents, so there can be no further dependencies on metadata.
-    return EXHAUSTIVE_ALL;
+    return DepsTracker::State::EXHAUSTIVE_ALL;
 }
 
 DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {

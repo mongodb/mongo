@@ -436,7 +436,7 @@ TEST_F(BucketAutoTests, ShouldAddDependenciesOfGroupByFieldAndComputedFields) {
                                   "{$sum : '$a'}, field2 : {$avg : '$b'}}}}"));
 
     DepsTracker dependencies;
-    ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
+    ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
     ASSERT_EQUALS(3U, dependencies.fields.size());
 
     // Dependency from 'groupBy'
@@ -455,7 +455,7 @@ TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromGroupByField) {
         createBucketAuto(fromjson("{$bucketAuto : {groupBy : {$meta: 'textScore'}, buckets : 2}}"));
 
     DepsTracker dependencies(DepsTracker::MetadataAvailable::kTextScore);
-    ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
+    ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
     ASSERT_EQUALS(0U, dependencies.fields.size());
 
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
@@ -468,7 +468,7 @@ TEST_F(BucketAutoTests, ShouldNeedTextScoreInDependenciesFromOutputField) {
                                   "{$avg : {$meta : 'textScore'}}}}}"));
 
     DepsTracker dependencies(DepsTracker::MetadataAvailable::kTextScore);
-    ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
+    ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, bucketAuto->getDependencies(&dependencies));
     ASSERT_EQUALS(1U, dependencies.fields.size());
 
     // Dependency from 'groupBy'

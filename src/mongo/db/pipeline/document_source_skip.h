@@ -78,8 +78,8 @@ public:
                        : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     }
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        return SEE_NEXT;  // This doesn't affect needed fields
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        return DepsTracker::State::SEE_NEXT;  // This doesn't affect needed fields
     }
 
     // Virtuals for NeedsMergerDocumentSource

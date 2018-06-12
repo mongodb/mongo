@@ -43,6 +43,31 @@ class ParsedDeps;
  */
 struct DepsTracker {
     /**
+     * Used by aggregation stages to report whether or not dependency resolution is complete, or
+     * must continue to the next stage.
+     */
+    enum State {
+        // The full object and all metadata may be required.
+        NOT_SUPPORTED = 0x0,
+
+        // Later stages could need either fields or metadata. For example, a $limit stage will pass
+        // through all fields, and they may or may not be needed by future stages.
+        SEE_NEXT = 0x1,
+
+        // Later stages won't need more fields from input. For example, an inclusion projection like
+        // {_id: 1, a: 1} will only output two fields, so future stages cannot possibly depend on
+        // any other fields.
+        EXHAUSTIVE_FIELDS = 0x2,
+
+        // Later stages won't need more metadata from input. For example, a $group stage will group
+        // documents together, discarding their text score and sort keys.
+        EXHAUSTIVE_META = 0x4,
+
+        // Later stages won't need either fields or metadata.
+        EXHAUSTIVE_ALL = EXHAUSTIVE_FIELDS | EXHAUSTIVE_META,
+    };
+
+    /**
      * Represents the type of metadata a pipeline might request.
      */
     enum class MetadataType {

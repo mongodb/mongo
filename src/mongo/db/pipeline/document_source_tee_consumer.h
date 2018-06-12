@@ -67,8 +67,8 @@ public:
     /**
      * Returns SEE_NEXT, since it requires no fields, and changes nothing about the documents.
      */
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        return GetDepsReturn::SEE_NEXT;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        return DepsTracker::State::SEE_NEXT;
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;

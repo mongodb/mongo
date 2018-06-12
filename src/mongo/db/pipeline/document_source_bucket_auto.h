@@ -44,7 +44,7 @@ namespace mongo {
 class DocumentSourceBucketAuto final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final;
     GetNextResult getNext() final;
     const char* getSourceName() const final;
 

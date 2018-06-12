@@ -65,9 +65,9 @@ public:
         return constraints;
     }
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
         _startWith->addDependencies(deps);
-        return SEE_NEXT;
+        return DepsTracker::State::SEE_NEXT;
     };
 
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {

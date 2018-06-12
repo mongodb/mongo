@@ -403,15 +403,14 @@ Value DocumentSourceChangeStreamTransform::serialize(
     return Value(Document{{getSourceName(), changeStreamOptions}});
 }
 
-DocumentSource::GetDepsReturn DocumentSourceChangeStreamTransform::getDependencies(
-    DepsTracker* deps) const {
+DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTracker* deps) const {
     deps->fields.insert(repl::OplogEntry::kOpTypeFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTimestampFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kNamespaceFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kUuidFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kObjectFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kObject2FieldName.toString());
-    return DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL;
+    return DepsTracker::State::EXHAUSTIVE_ALL;
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceChangeStreamTransform::getModifiedPaths() const {

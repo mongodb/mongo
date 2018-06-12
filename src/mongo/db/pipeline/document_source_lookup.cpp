@@ -679,7 +679,7 @@ void DocumentSourceLookUp::serializeToArray(
     }
 }
 
-DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker* deps) const {
+DepsTracker::State DocumentSourceLookUp::getDependencies(DepsTracker* deps) const {
     if (wasConstructedWithPipelineSyntax()) {
         // We will use the introspection pipeline which we prebuilt during construction.
         invariant(_parsedIntrospectionPipeline);
@@ -706,7 +706,7 @@ DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker*
     } else {
         deps->fields.insert(_localField->fullPath());
     }
-    return SEE_NEXT;
+    return DepsTracker::State::SEE_NEXT;
 }
 
 void DocumentSourceLookUp::detachFromOperationContext() {

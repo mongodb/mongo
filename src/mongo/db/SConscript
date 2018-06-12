@@ -927,6 +927,16 @@ env.Library(
 )
 
 env.Library(
+    target='projection_exec_agg',
+    source=[
+        'exec/projection_exec_agg.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'pipeline/parsed_aggregation_projection'
+    ]
+)
+
+env.Library(
     target='query_exec',
     source=[
         'clientcursor.cpp',

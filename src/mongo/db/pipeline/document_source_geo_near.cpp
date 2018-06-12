@@ -220,7 +220,7 @@ bool DocumentSourceGeoNear::needsGeoNearPoint() const {
     return static_cast<bool>(includeLocs);
 }
 
-DocumentSource::GetDepsReturn DocumentSourceGeoNear::getDependencies(DepsTracker* deps) const {
+DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) const {
     // TODO (SERVER-35424): Implement better dependency tracking. For example, 'distanceField' is
     // produced by this stage, and we could inform the query system that it need not include it in
     // its response. For now, assume that we require the entire document as well as the appropriate
@@ -229,7 +229,7 @@ DocumentSource::GetDepsReturn DocumentSourceGeoNear::getDependencies(DepsTracker
     deps->setNeedsMetadata(DepsTracker::MetadataType::GEO_NEAR_POINT, needsGeoNearPoint());
 
     deps->needWholeDocument = true;
-    return GetDepsReturn::EXHAUSTIVE_FIELDS;
+    return DepsTracker::State::EXHAUSTIVE_FIELDS;
 }
 
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)

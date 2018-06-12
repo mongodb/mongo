@@ -2515,8 +2515,8 @@ public:
 
 class DocumentSourceDependenciesNotSupported : public DocumentSourceDependencyDummy {
 public:
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        return GetDepsReturn::NOT_SUPPORTED;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        return DepsTracker::State::NOT_SUPPORTED;
     }
 
     static boost::intrusive_ptr<DocumentSourceDependenciesNotSupported> create() {
@@ -2526,9 +2526,9 @@ public:
 
 class DocumentSourceNeedsASeeNext : public DocumentSourceDependencyDummy {
 public:
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->fields.insert("a");
-        return GetDepsReturn::SEE_NEXT;
+        return DepsTracker::State::SEE_NEXT;
     }
 
     static boost::intrusive_ptr<DocumentSourceNeedsASeeNext> create() {
@@ -2538,9 +2538,9 @@ public:
 
 class DocumentSourceNeedsOnlyB : public DocumentSourceDependencyDummy {
 public:
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->fields.insert("b");
-        return GetDepsReturn::EXHAUSTIVE_FIELDS;
+        return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 
     static boost::intrusive_ptr<DocumentSourceNeedsOnlyB> create() {
@@ -2550,9 +2550,9 @@ public:
 
 class DocumentSourceNeedsOnlyTextScore : public DocumentSourceDependencyDummy {
 public:
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
-        return GetDepsReturn::EXHAUSTIVE_META;
+        return DepsTracker::State::EXHAUSTIVE_META;
     }
 
     static boost::intrusive_ptr<DocumentSourceNeedsOnlyTextScore> create() {
@@ -2562,8 +2562,8 @@ public:
 
 class DocumentSourceStripsTextScore : public DocumentSourceDependencyDummy {
 public:
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        return GetDepsReturn::EXHAUSTIVE_META;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        return DepsTracker::State::EXHAUSTIVE_META;
     }
 
     static boost::intrusive_ptr<DocumentSourceStripsTextScore> create() {

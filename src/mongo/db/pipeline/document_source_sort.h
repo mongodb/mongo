@@ -82,7 +82,7 @@ public:
         return allPrefixes(_rawSort);
     }
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final;

@@ -95,7 +95,7 @@ TEST_F(DocumentSourceLimitTest, DisposeShouldCascadeAllTheWayToSource) {
 TEST_F(DocumentSourceLimitTest, ShouldNotIntroduceAnyDependencies) {
     auto limit = DocumentSourceLimit::create(getExpCtx(), 1);
     DepsTracker dependencies;
-    ASSERT_EQUALS(DocumentSource::SEE_NEXT, limit->getDependencies(&dependencies));
+    ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, limit->getDependencies(&dependencies));
     ASSERT_EQUALS(0U, dependencies.fields.size());
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
     ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));

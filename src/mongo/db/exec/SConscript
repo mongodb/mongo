@@ -97,3 +97,14 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/service_context_d",
     ],
 )
+
+env.CppUnitTest(
+    target='projection_exec_agg_test',
+    source=[
+        'projection_exec_agg_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/projection_exec_agg',
+    ],
+)

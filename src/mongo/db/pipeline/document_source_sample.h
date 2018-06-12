@@ -52,8 +52,8 @@ public:
                 TransactionRequirement::kAllowed};
     }
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        return SEE_NEXT;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        return DepsTracker::State::SEE_NEXT;
     }
 
     boost::intrusive_ptr<DocumentSource> getShardSource() final;

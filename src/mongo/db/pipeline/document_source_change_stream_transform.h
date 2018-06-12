@@ -45,7 +45,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>&, BSONObj changeStreamSpec);
 
     Document applyTransformation(const Document& input);
-    DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final;
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;

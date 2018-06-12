@@ -247,9 +247,9 @@ Value DocumentSourceUnwind::serialize(boost::optional<ExplainOptions::Verbosity>
                                 << (_indexPath ? Value((*_indexPath).fullPath()) : Value()))));
 }
 
-DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
+DepsTracker::State DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
     deps->fields.insert(_unwindPath.fullPath());
-    return SEE_NEXT;
+    return DepsTracker::State::SEE_NEXT;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(

@@ -105,7 +105,7 @@ public:
         return distanceMultiplier;
     }
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     /**
      * Returns true if the $geoNear specification requires the geoNear point metadata.

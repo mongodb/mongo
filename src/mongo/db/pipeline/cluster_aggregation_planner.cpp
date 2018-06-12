@@ -123,7 +123,7 @@ void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
     //    add an unnecessary project (and therefore a deep-copy).
     for (auto&& source : shardPipe->getSources()) {
         DepsTracker dt(DepsTracker::kAllMetadataAvailable);
-        if (source->getDependencies(&dt) & DocumentSource::EXHAUSTIVE_FIELDS)
+        if (source->getDependencies(&dt) & DepsTracker::State::EXHAUSTIVE_FIELDS)
             return;
     }
     // if we get here, add the project.

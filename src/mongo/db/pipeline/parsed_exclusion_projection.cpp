@@ -135,7 +135,7 @@ void ExclusionNode::addModifiedPaths(std::set<std::string>* modifiedPaths) const
 // ParsedExclusionProjection.
 //
 
-Document ParsedExclusionProjection::serializeStageOptions(
+Document ParsedExclusionProjection::serializeTransformation(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     return _root->serialize();
 }

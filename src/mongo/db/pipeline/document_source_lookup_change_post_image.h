@@ -77,7 +77,7 @@ public:
         return constraints;
     }
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const {
+    DepsTracker::State getDependencies(DepsTracker* deps) const {
         // The namespace is not technically needed yet, but we will if there is more than one
         // collection involved.
         deps->fields.insert(DocumentSourceChangeStream::kNamespaceField.toString());
@@ -86,7 +86,7 @@ public:
         deps->fields.insert(DocumentSourceChangeStream::kIdField.toString());
         // This stage does not restrict the output fields to a finite set, and has no impact on
         // whether metadata is available or needed.
-        return SEE_NEXT;
+        return DepsTracker::State::SEE_NEXT;
     }
 
     /**

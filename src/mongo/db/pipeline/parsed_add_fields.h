@@ -71,7 +71,8 @@ public:
      */
     void parse(const BSONObj& spec) final;
 
-    Document serializeStageOptions(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Document serializeTransformation(
+        boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument output;
         _root->serialize(&output, explain);
         return output.freeze();
@@ -84,9 +85,9 @@ public:
         _root->optimize();
     }
 
-    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
+    DepsTracker::State addDependencies(DepsTracker* deps) const final {
         _root->addDependencies(deps);
-        return DocumentSource::SEE_NEXT;
+        return DepsTracker::State::SEE_NEXT;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {

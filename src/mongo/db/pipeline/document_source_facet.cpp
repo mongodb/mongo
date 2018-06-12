@@ -267,7 +267,7 @@ DocumentSource::StageConstraints DocumentSourceFacet::constraints(
             TransactionRequirement::kAllowed};
 }
 
-DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
+DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
     const bool scopeHasVariables = pExpCtx->variablesParseState.hasDefinedVariables();
     for (auto&& facet : _facets) {
         auto subDepsTracker = facet.pipeline->getDependencies(deps->getMetadataAvailable());
@@ -293,7 +293,7 @@ DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* 
 
     // We will combine multiple documents into one, and the output document will have new fields, so
     // we will stop looking for dependencies at this point.
-    return GetDepsReturn::EXHAUSTIVE_ALL;
+    return DepsTracker::State::EXHAUSTIVE_ALL;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(

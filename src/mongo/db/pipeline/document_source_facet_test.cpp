@@ -510,9 +510,9 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
  */
 class DocumentSourceNeedsA : public DocumentSourcePassthrough {
 public:
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->fields.insert("a");
-        return GetDepsReturn::EXHAUSTIVE_ALL;
+        return DepsTracker::State::EXHAUSTIVE_ALL;
     }
 
     static boost::intrusive_ptr<DocumentSource> create() {
@@ -525,9 +525,9 @@ public:
  */
 class DocumentSourceNeedsB : public DocumentSourcePassthrough {
 public:
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->fields.insert("b");
-        return GetDepsReturn::EXHAUSTIVE_ALL;
+        return DepsTracker::State::EXHAUSTIVE_ALL;
     }
 
     static boost::intrusive_ptr<DocumentSource> create() {
@@ -562,7 +562,7 @@ TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
     DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);
-    ASSERT_EQ(facetStage->getDependencies(&deps), DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL);
+    ASSERT_EQ(facetStage->getDependencies(&deps), DepsTracker::State::EXHAUSTIVE_ALL);
     ASSERT_FALSE(deps.needWholeDocument);
     ASSERT_FALSE(deps.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
     ASSERT_EQ(deps.fields.size(), 2UL);
@@ -575,9 +575,9 @@ TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
  */
 class DocumentSourceNeedsWholeDocument : public DocumentSourcePassthrough {
 public:
-    GetDepsReturn getDependencies(DepsTracker* deps) const override {
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->needWholeDocument = true;
-        return GetDepsReturn::EXHAUSTIVE_ALL;
+        return DepsTracker::State::EXHAUSTIVE_ALL;
     }
     static boost::intrusive_ptr<DocumentSourceNeedsWholeDocument> create() {
         return new DocumentSourceNeedsWholeDocument();
@@ -600,7 +600,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireWholeDocumentIfAnyPipelineRequiresW
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
     DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);
-    ASSERT_EQ(facetStage->getDependencies(&deps), DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL);
+    ASSERT_EQ(facetStage->getDependencies(&deps), DepsTracker::State::EXHAUSTIVE_ALL);
     ASSERT_TRUE(deps.needWholeDocument);
     ASSERT_FALSE(deps.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
 }
@@ -610,9 +610,9 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireWholeDocumentIfAnyPipelineRequiresW
  */
 class DocumentSourceNeedsOnlyTextScore : public DocumentSourcePassthrough {
 public:
-    GetDepsReturn getDependencies(DepsTracker* deps) const override {
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
-        return GetDepsReturn::EXHAUSTIVE_ALL;
+        return DepsTracker::State::EXHAUSTIVE_ALL;
     }
     static boost::intrusive_ptr<DocumentSourceNeedsOnlyTextScore> create() {
         return new DocumentSourceNeedsOnlyTextScore();
@@ -639,7 +639,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRequireTextScoreIfAnyPipelineRequiresTextS
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
     DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
-    ASSERT_EQ(facetStage->getDependencies(&deps), DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL);
+    ASSERT_EQ(facetStage->getDependencies(&deps), DepsTracker::State::EXHAUSTIVE_ALL);
     ASSERT_TRUE(deps.needWholeDocument);
     ASSERT_TRUE(deps.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
 }

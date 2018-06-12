@@ -227,7 +227,7 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
     return Value(DOC(getSourceName() << insides.freeze()));
 }
 
-DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* deps) const {
+DepsTracker::State DocumentSourceGroup::getDependencies(DepsTracker* deps) const {
     // add the _id
     for (size_t i = 0; i < _idExpressions.size(); i++) {
         _idExpressions[i]->addDependencies(deps);
@@ -238,7 +238,7 @@ DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* 
         accumulatedField.expression->addDependencies(deps);
     }
 
-    return EXHAUSTIVE_ALL;
+    return DepsTracker::State::EXHAUSTIVE_ALL;
 }
 
 intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(

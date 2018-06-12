@@ -199,7 +199,8 @@ public:
     /**
      * Serialize the projection.
      */
-    Document serializeStageOptions(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Document serializeTransformation(
+        boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument output;
         if (_idExcluded) {
             output.addField("_id", Value(false));
@@ -215,9 +216,9 @@ public:
         _root->optimize();
     }
 
-    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
+    DepsTracker::State addDependencies(DepsTracker* deps) const final {
         _root->addDependencies(deps);
-        return DocumentSource::EXHAUSTIVE_FIELDS;
+        return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {

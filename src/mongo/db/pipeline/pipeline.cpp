@@ -487,11 +487,11 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
     bool knowAllMeta = false;
     for (auto&& source : _sources) {
         DepsTracker localDeps(deps.getMetadataAvailable());
-        DocumentSource::GetDepsReturn status = source->getDependencies(&localDeps);
+        DepsTracker::State status = source->getDependencies(&localDeps);
 
         deps.vars.insert(localDeps.vars.begin(), localDeps.vars.end());
 
-        if ((skipFieldsAndMetadataDeps |= (status == DocumentSource::NOT_SUPPORTED))) {
+        if ((skipFieldsAndMetadataDeps |= (status == DepsTracker::State::NOT_SUPPORTED))) {
             // Assume this stage needs everything. We may still know something about our
             // dependencies if an earlier stage returned EXHAUSTIVE_FIELDS or EXHAUSTIVE_META. If
             // this scope has variables, we need to keep enumerating the remaining stages but will
@@ -507,14 +507,14 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
             deps.fields.insert(localDeps.fields.begin(), localDeps.fields.end());
             if (localDeps.needWholeDocument)
                 deps.needWholeDocument = true;
-            knowAllFields = status & DocumentSource::EXHAUSTIVE_FIELDS;
+            knowAllFields = status & DepsTracker::State::EXHAUSTIVE_FIELDS;
         }
 
         if (!knowAllMeta) {
             for (auto&& req : localDeps.getAllRequiredMetadataTypes()) {
                 deps.setNeedsMetadata(req, true);
             }
-            knowAllMeta = status & DocumentSource::EXHAUSTIVE_META;
+            knowAllMeta = status & DepsTracker::State::EXHAUSTIVE_META;
         }
 
         // If there are variables defined at this pipeline's scope, there may be dependencies upon

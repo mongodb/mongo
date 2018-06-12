@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/transformer_interface.h"
 
 namespace mongo {
 
@@ -40,56 +41,6 @@ namespace mongo {
  */
 class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
 public:
-    /**
-     * This class defines the minimal interface that every parser wishing to take advantage of
-     * DocumentSourceSingleDocumentTransformation must implement.
-     *
-     * This interface ensures that DocumentSourceSingleDocumentTransformations are passed parsed
-     * objects that can execute the transformation and provide additional features like
-     * serialization and reporting and returning dependencies. The parser must also provide
-     * implementations for optimizing and adding the expression context, even if those functions do
-     * nothing.
-     */
-    class TransformerInterface {
-    public:
-        enum class TransformerType {
-            kExclusionProjection,
-            kInclusionProjection,
-            kComputedProjection,
-            kReplaceRoot,
-        };
-        virtual ~TransformerInterface() = default;
-        virtual Document applyTransformation(const Document& input) = 0;
-        virtual TransformerType getType() const = 0;
-        virtual void optimize() = 0;
-        virtual DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const = 0;
-        virtual GetModPathsReturn getModifiedPaths() const = 0;
-
-        /**
-         * Returns the document describing this stage, not including the stage name. For example,
-         * should return just {_id: 0, x: 1} for the stage parsed from {$project: {_id: 0, x: 1}}.
-         */
-        virtual Document serializeStageOptions(
-            boost::optional<ExplainOptions::Verbosity> explain) const = 0;
-
-        /**
-         * Returns true if this transformer is an inclusion projection and is a subset of
-         * 'proj', which must be a valid projection specification. For example, if this
-         * TransformerInterface represents the inclusion projection
-         *
-         *      {a: 1, b: 1, c: 1}
-         *
-         * then it is a subset of the projection {a: 1, c: 1}, and this function returns
-         * true.
-         */
-        virtual bool isSubsetOfProjection(const BSONObj& proj) const {
-            return false;
-        }
-
-    private:
-        friend class DocumentSourceSingleDocumentTransformation;
-    };
-
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         std::unique_ptr<TransformerInterface> parsedTransform,
@@ -101,7 +52,7 @@ public:
     GetNextResult getNext() final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
+    DepsTracker::State getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,

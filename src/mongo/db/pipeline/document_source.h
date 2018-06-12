@@ -624,36 +624,15 @@ public:
         return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}, {}};
     }
 
-    enum GetDepsReturn {
-        // The full object and all metadata may be required.
-        NOT_SUPPORTED = 0x0,
-
-        // Later stages could need either fields or metadata. For example, a $limit stage will pass
-        // through all fields, and they may or may not be needed by future stages.
-        SEE_NEXT = 0x1,
-
-        // Later stages won't need more fields from input. For example, an inclusion projection like
-        // {_id: 1, a: 1} will only output two fields, so future stages cannot possibly depend on
-        // any other fields.
-        EXHAUSTIVE_FIELDS = 0x2,
-
-        // Later stages won't need more metadata from input. For example, a $group stage will group
-        // documents together, discarding their text score and sort keys.
-        EXHAUSTIVE_META = 0x4,
-
-        // Later stages won't need either fields or metadata.
-        EXHAUSTIVE_ALL = EXHAUSTIVE_FIELDS | EXHAUSTIVE_META,
-    };
-
     /**
      * Get the dependencies this operation needs to do its job. If overridden, subclasses must add
      * all paths needed to apply their transformation to 'deps->fields', and call
      * 'deps->setNeedsMetadata()' to indicate what metadata (e.g. text score), if any, is required.
      *
-     * See GetDepsReturn above for the possible return values and what they mean.
+     * See DepsTracker::State for the possible return values and what they mean.
      */
-    virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
-        return NOT_SUPPORTED;
+    virtual DepsTracker::State getDependencies(DepsTracker* deps) const {
+        return DepsTracker::State::NOT_SUPPORTED;
     }
 
 protected:
