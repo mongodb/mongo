@@ -1166,6 +1166,7 @@ TEST_F(FreeMonControllerTest, TestPreRegistrationMetricBatching) {
     ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
 }
 
+#if 0
 // Negative: Test metrics buffers on failure, and retries and ensure 2 metrics occurs after a blip
 // of an error
 // Note: this test operates in real-time because it needs to test multiple retries matched with
@@ -1189,7 +1190,7 @@ TEST_F(FreeMonControllerTest, TestMetricBatchingOnErrorRealtime) {
     ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());
     ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
 }
-
+#endif
 
 class FreeMonControllerRSTest : public FreeMonControllerTest {
 private:
