@@ -38,25 +38,25 @@ const auto getInReplicationRecovery = ServiceContext::declareDecoration<bool>();
 const auto getSizeRecoveryState = ServiceContext::declareDecoration<SizeRecoveryState>();
 }  // namespace
 
-bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ns) const {
+bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ident) const {
     if (!inReplicationRecovery(getGlobalServiceContext())) {
         return true;
     }
 
-    if (NamespaceString::oplog(ns)) {
-        return true;
-    }
-
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _collectionsAlwaysNeedingSizeAdjustment.count(ns) > 0;
+    return collectionAlwaysNeedsSizeAdjustment(ident);
 }
 
-void SizeRecoveryState::markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ns) {
+bool SizeRecoveryState::collectionAlwaysNeedsSizeAdjustment(const std::string& ident) const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _collectionsAlwaysNeedingSizeAdjustment.insert(ns);
+    return _collectionsAlwaysNeedingSizeAdjustment.count(ident) > 0;
 }
 
-void SizeRecoveryState::clearStateAfterRecovery() {
+void SizeRecoveryState::markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ident) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _collectionsAlwaysNeedingSizeAdjustment.insert(ident);
+}
+
+void SizeRecoveryState::clearStateBeforeRecovery() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _collectionsAlwaysNeedingSizeAdjustment.clear();
 }

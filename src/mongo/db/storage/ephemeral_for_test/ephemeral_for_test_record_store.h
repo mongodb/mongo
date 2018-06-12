@@ -56,6 +56,10 @@ public:
 
     virtual const char* name() const;
 
+    const std::string& getIdent() const override {
+        return ns();
+    }
+
     virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const;
 
     virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const;

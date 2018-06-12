@@ -667,17 +667,10 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
 
     if (_isOplog) {
         checkOplogFormatVersion(ctx, _uri);
-    }
-
-    // Most record stores will not have their size metadata adjusted during replication recovery.
-    // However, if this record store was created during the recovery process, we will need to keep
-    // track of size adjustments for any writes applied to it during recovery.
-    const auto serviceCtx = getGlobalServiceContext();
-    if (inReplicationRecovery(serviceCtx)) {
-        LOG_FOR_RECOVERY(2)
-            << "Marking newly-created record store as needing size adjustment during recovery. ns: "
-            << ns() << ", ident: " << _uri;
-        sizeRecoveryState(serviceCtx).markCollectionAsAlwaysNeedsSizeAdjustment(ns());
+        // The oplog always needs to be marked for size adjustment since it is journaled and also
+        // may change during replication recovery (if truncated).
+        sizeRecoveryState(getGlobalServiceContext())
+            .markCollectionAsAlwaysNeedsSizeAdjustment(_uri);
     }
 }
 
@@ -726,11 +719,18 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
         // if writes to this collection were not included in the stable checkpoint the last time
         // this node shut down. We set the data size and the record count to zero, but will adjust
         // these if writes are played during startup recovery.
+        // Alternatively, this may be a collection we are creating during replication recovery.
+        // In that case the collection will be given a new ident and a new SizeStorer entry. The
+        // collection size from before we recovered to stable timestamp is not associated with this
+        // record store and so we must keep track of the count throughout recovery.
+        //
+        // We mark a RecordStore as needing size adjustment iff its size is accurate at the current
+        // time but not as of the top of the oplog.
         LOG_FOR_RECOVERY(2) << "Record store was empty; setting count metadata to zero but marking "
                                "record store as needing size adjustment during recovery. ns: "
                             << ns() << ", ident: " << _uri;
         sizeRecoveryState(getGlobalServiceContext())
-            .markCollectionAsAlwaysNeedsSizeAdjustment(ns());
+            .markCollectionAsAlwaysNeedsSizeAdjustment(_uri);
         _sizeInfo->dataSize.store(0);
         _sizeInfo->numRecords.store(0);
 
@@ -889,6 +889,26 @@ bool WiredTigerRecordStore::cappedAndNeedDelete() const {
 
 int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx,
                                                     const RecordId& justInserted) {
+    // If the collection does not need size adjustment, then we are in replication recovery and
+    // replaying operations we've already played. This may occur after rollback or after a shutdown.
+    // Any inserts beyond the stable timestamp have been undone, but any documents deleted from
+    // capped collections did not come back due to being performed in an untimestamped side
+    // transaction. Additionally, the SizeStorer's information reflects the state of the collection
+    // before rollback/shutdown, post capped deletions.
+    //
+    // If we have a RecordStore whose size we know accurately as of the stable timestamp, rather
+    // than as of the top of the oplog, then we must actually perform capped deletions because they
+    // have not previously been accounted for. The collection will be marked as needing size
+    // adjustment when enterring this function.
+    //
+    // One edge case to consider is where we need to delete a document that we insert as part of
+    // replication recovery. If we don't mark the collection for size adjustment then we will not
+    // perform the capped deletions as expected. In that case, the collection is guaranteed to be
+    // empty at the stable timestamp and thus guaranteed to be marked for size adjustment.
+    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(_uri)) {
+        return 0;
+    }
+
     invariant(!_oplogStones);
 
     // We only want to do the checks occasionally as they are expensive.
@@ -1654,6 +1674,9 @@ boost::optional<RecordId> WiredTigerRecordStore::oplogStartHack(
 void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
                                                    long long numRecords,
                                                    long long dataSize) {
+    // We're correcting the size as of now, future writes should be tracked.
+    sizeRecoveryState(getGlobalServiceContext()).markCollectionAsAlwaysNeedsSizeAdjustment(_uri);
+
     _sizeInfo->numRecords.store(numRecords);
     _sizeInfo->dataSize.store(dataSize);
 
@@ -1688,7 +1711,7 @@ private:
 };
 
 void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t diff) {
-    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(ns())) {
+    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(_uri)) {
         return;
     }
 
@@ -1711,7 +1734,7 @@ private:
 };
 
 void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t amount) {
-    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(ns())) {
+    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(_uri)) {
         return;
     }
 

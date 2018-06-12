@@ -67,6 +67,10 @@ public:
         return "devnull";
     }
 
+    const std::string& getIdent() const override {
+        MONGO_UNREACHABLE;
+    }
+
     virtual void setCappedCallback(CappedCallback*) {}
 
     virtual long long dataSize(OperationContext* opCtx) const {

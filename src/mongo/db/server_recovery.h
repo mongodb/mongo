@@ -46,31 +46,38 @@ namespace mongo {
  * However, there may be exceptions that require the server to adjust size metadata even during
  * recovery. One such case is the oplog: during rollback, the oplog is truncated, and then recovery
  * occurs using oplog entries after the common point from the sync source. The server will need to
- * adjust the size metadata for the oplog namespace to ensure that the count of oplog entries is
+ * adjust the size metadata for the oplog collection to ensure that the count of oplog entries is
  * correct after rollback recovery.
  *
- * This class is responsible for keeping track of namespaces that require this special
+ * This class is responsible for keeping track of idents that require this special
  * count adjustment.
  */
 class SizeRecoveryState {
 public:
     /**
-     * If replication recovery is ongoing, returns false unless 'ns' is the oplog namespace or has
-     * been specifically marked as requiring adjustment even during recovery.
+     * If replication recovery is ongoing, returns false unless 'ident' has been specifically marked
+     * as requiring adjustment even during recovery.
      *
      * If the system is not currently undergoing replication recovery, always returns true.
      */
-    bool collectionNeedsSizeAdjustment(const std::string& ns) const;
+    bool collectionNeedsSizeAdjustment(const std::string& ident) const;
 
     /**
-     * Mark 'ns' as always requiring size adjustment, even if replication recovery is ongoing.
+     * Returns whether 'ident' has been specifically marked as requiring adjustment even during
+     * recovery.
      */
-    void markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ns);
+    bool collectionAlwaysNeedsSizeAdjustment(const std::string& ident) const;
 
     /**
-     * Clears all internal state. This method should be called when replication recovery ends.
+     * Mark 'ident' as always requiring size adjustment, even if replication recovery is ongoing.
      */
-    void clearStateAfterRecovery();
+    void markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ident);
+
+    /**
+     * Clears all internal state. This method should be called before calling 'recover to a stable
+     * timestamp'.
+     */
+    void clearStateBeforeRecovery();
 
 private:
     mutable stdx::mutex _mutex;
