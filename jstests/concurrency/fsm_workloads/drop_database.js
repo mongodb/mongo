@@ -26,16 +26,6 @@ var $config = (function() {
 
     var transitions = {init: {createAndDrop: 1}, createAndDrop: {createAndDrop: 1}};
 
-    return {
-        threadCount: 10,
-        // We only run a few iterations to reduce the amount of data cumulatively
-        // written to disk by mmapv1. For example, setting 10 threads and 5
-        // iterations causes this workload to write at least 32MB (.ns and .0 files)
-        // * 10 threads * 5 iterations worth of data to disk, which can be slow on
-        // test hosts.
-        iterations: 5,
-        states: states,
-        transitions: transitions
-    };
+    return {threadCount: 10, iterations: 20, states: states, transitions: transitions};
 
 })();

@@ -6,7 +6,6 @@ selector:
   exclude_files:
   - jstests/disk/directoryperdb.js
   exclude_with_any_tags:
-  - requires_mmapv1
   - requires_wiredtiger
 
 executor:

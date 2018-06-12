@@ -31,7 +31,6 @@ selector:
   - jstests/sharding/sharding_options.js
   - jstests/sharding/current_op_no_shards.js
   - jstests/sharding/config_rs_change.js
-  - jstests/sharding/user_flags_sharded.js
   - jstests/sharding/move_chunk_with_session_helper.js
   - jstests/sharding/movechunk_include.js
 

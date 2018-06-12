@@ -1,7 +1,0 @@
-{
-    "storage" : {
-        "mmapv1" : {
-            "preallocDataFiles" : true
-        }
-    }
-}

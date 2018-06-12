@@ -4,7 +4,6 @@ selector:
   roots:
   - jstests/disk/*.js
   exclude_with_any_tags:
-  - requires_mmapv1
   - requires_mobile_se
 
 executor:

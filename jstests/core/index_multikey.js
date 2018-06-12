@@ -8,9 +8,6 @@
     // For making assertions about explain output.
     load("jstests/libs/analyze_plan.js");
 
-    const storageEngine = jsTest.options().storageEngine || "wiredTiger";
-    const storageEngineSupportsMultikeyPaths = (storageEngine !== "mmapv1");
-
     const coll = db.getCollection("index_multikey");
     coll.drop();
 
@@ -26,11 +23,9 @@
     assert.eq(ixscan.isMultiKey,
               false,
               "empty index should not be marked multikey; plan: " + tojson(ixscan));
-    if (storageEngineSupportsMultikeyPaths) {
-        assert.eq(ixscan.multiKeyPaths,
-                  {a: [], b: []},
-                  "empty index should have no multiKeyPaths; plan: " + tojson(ixscan));
-    }
+    assert.eq(ixscan.multiKeyPaths,
+              {a: [], b: []},
+              "empty index should have no multiKeyPaths; plan: " + tojson(ixscan));
 
     // After a failed insert, the index should not be marked as multikey.
     assert.commandFailedWithCode(coll.insert({a: [[1], {0: 1}]}), 16746);
@@ -38,21 +33,16 @@
     assert.eq(ixscan.isMultiKey,
               false,
               "index should not be marked multikey after failed insert; plan: " + tojson(ixscan));
-    if (storageEngineSupportsMultikeyPaths) {
-        assert.eq(
-            ixscan.multiKeyPaths,
-            {a: [], b: []},
-            "index should have empty multiKeyPaths after failed insert; plan: " + tojson(ixscan));
-    }
+    assert.eq(ixscan.multiKeyPaths,
+              {a: [], b: []},
+              "index should have empty multiKeyPaths after failed insert; plan: " + tojson(ixscan));
 
     assert.commandWorked(coll.insert({a: [1, 2, 3]}));
     ixscan = getIndexScanExplainOutput();
     assert.eq(ixscan.isMultiKey,
               true,
               "index should have been marked as multikey after insert; plan: " + tojson(ixscan));
-    if (storageEngineSupportsMultikeyPaths) {
-        assert.eq(ixscan.multiKeyPaths,
-                  {a: ["a"], b: []},
-                  "index has wrong multikey paths after insert; plan: " + ixscan);
-    }
-}());
+    assert.eq(ixscan.multiKeyPaths,
+              {a: ["a"], b: []},
+              "index has wrong multikey paths after insert; plan: " + ixscan);
+})();

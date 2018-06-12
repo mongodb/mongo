@@ -51,7 +51,6 @@ selector:
   - jstests/replsets/initiate.js
   - jstests/replsets/initiate_prohibits_w0.js
   - jstests/replsets/single_server_majority.js
-  - jstests/replsets/mmap_disallows_rc_majority.js
   - jstests/replsets/rslib.js
   - jstests/replsets/cloneDb.js
   - jstests/replsets/two_nodes_priority_take_over.js

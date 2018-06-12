@@ -1,4 +1,4 @@
-function test() {
+(function() {
     "use strict";
     var t = db.update_serializability1;
     t.drop();
@@ -24,10 +24,4 @@ function test() {
 
     // both operations should happen on every document
     assert.eq(N, t.find({x: 2, y: 2}).count());
-}
-
-if (db.serverStatus().storageEngine.name == 'mmapv1') {
-    jsTest.log('skipping test on mmapv1');  // This is only guaranteed on other engines.
-} else {
-    test();
-}
+})();

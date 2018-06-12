@@ -77,11 +77,8 @@
     assert.eq(resultDoc, {b: {c: 1}});
     explain = coll.find({a: 2}, {_id: 0, "b.c": 1}).explain("queryPlanner");
     assert(isIxscan(db, explain.queryPlanner.winningPlan));
-    if (jsTest.options().storageEngine !== "mmapv1") {
-        // Storage engines other than MMAPv1 track path-level multikey info, and can use this info
-        // to generate a covered plan.
-        assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
-    }
+    // Path-level multikey info allows for generating a covered plan.
+    assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
 
     // Verify that dotted projections work for multiple levels of nesting.
     assert.commandWorked(coll.createIndex({a: 1, "x.y.y": 1, "x.y.z": 1, "x.z": 1}));

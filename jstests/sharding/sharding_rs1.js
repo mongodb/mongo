@@ -1,9 +1,5 @@
 /**
  * tests sharding with replica sets
- *
- * This test is labeled resource intensive because its total io_write is 798MB compared to a median
- * of 135MB across all sharding tests in mmapv1.
- * @tags: [resource_intensive]
  */
 (function() {
     'use strict';

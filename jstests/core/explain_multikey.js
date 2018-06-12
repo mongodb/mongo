@@ -52,16 +52,7 @@
         var stage = createIndexAndRunExplain(testOptions);
 
         assert.eq(true, stage.isMultiKey, "expected index to be multikey: " + tojson(stage));
-        if (jsTest.options().storageEngine !== "mmapv1") {
-            assert.eq(
-                {a: [], "b.c": ["b", "b.c"], "b.d": ["b"]}, stage.multiKeyPaths, tojson(stage));
-        } else {
-            // Path-level multikey tracking is supported for all storage engines that use the
-            // KVCatalog. MMAPv1 is the only storage engine that does not.
-            //
-            // TODO SERVER-22727: Store path-level multikey information in MMAPv1 index catalog.
-            assert(!stage.hasOwnProperty("multiKeyPaths"), tojson(stage));
-        }
+        assert.eq({a: [], "b.c": ["b", "b.c"], "b.d": ["b"]}, stage.multiKeyPaths, tojson(stage));
 
         // Drop the collection and insert a document that shouldn't cause the index to be multikey.
         testOptions.docToInsert = {
@@ -71,15 +62,7 @@
         stage = createIndexAndRunExplain(testOptions);
 
         assert.eq(false, stage.isMultiKey, "expected index not to be multikey: " + tojson(stage));
-        if (jsTest.options().storageEngine !== "mmapv1") {
-            assert.eq({a: [], "b.c": [], "b.d": []}, stage.multiKeyPaths, tojson(stage));
-        } else {
-            // Path-level multikey tracking is supported for all storage engines that use the
-            // KVCatalog. MMAPv1 is the only storage engine that does not.
-            //
-            // TODO SERVER-22727: Store path-level multikey information in MMAPv1 index catalog.
-            assert(!stage.hasOwnProperty("multiKeyPaths"), tojson(stage));
-        }
+        assert.eq({a: [], "b.c": [], "b.d": []}, stage.multiKeyPaths, tojson(stage));
     }
 
     verifyMultikeyInfoInExplainOutput({

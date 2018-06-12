@@ -270,15 +270,5 @@ assert.eq(0, db.getCollection("test_db").getIndexes().length, "24");
                t.totalIndexSize(),
                'db.collection.totalIndexSize() cannot be undefined on a non-empty collection');
 
-    if (db.isMaster().msg !== 'isdbgrid' && db.serverStatus().storageEngine.name === 'mmapv1') {
-        // Only in MMAPv1 do we guarantee that storageSize only changes when you write to a
-        // collection.
-        assert.eq(stats.storageSize, t.storageSize());
-        assert.eq(stats.totalIndexSize, t.totalIndexSize());
-        assert.eq(t.storageSize() + t.totalIndexSize(),
-                  t.totalSize(),
-                  'incorrect db.collection.totalSize() on a non-empty collection');
-    }
-
     t.drop();
 }());

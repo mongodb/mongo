@@ -15,8 +15,6 @@ selector:
   roots:
   - jstests/replsets/*.js
   exclude_files:
-  # Disable config_server_checks.js since it starts mmap servers.
-  - jstests/replsets/config_server_checks.js
   - jstests/replsets/slavedelay1.js
   - jstests/replsets/replsets_killop.js
   - jstests/replsets/tags.js
@@ -222,7 +220,6 @@ selector:
   - jstests/replsets/lastop.js
   - jstests/replsets/initiate.js
   - jstests/replsets/initiate_prohibits_w0.js
-  - jstests/replsets/mmap_disallows_rc_majority.js
   - jstests/replsets/single_server_majority.js
   - jstests/replsets/rslib.js
   - jstests/replsets/two_nodes_priority_take_over.js

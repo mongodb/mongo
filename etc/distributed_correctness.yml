@@ -302,29 +302,6 @@ tasks:
         test: "distributed_correctness_suite_1_wiredTiger"
     - func: "analyze"
 
-- name: distributed_correctness_suite_1_MMAPv1
-  depends_on:
-    - name: distributed_correctness_suite_1_wiredTiger
-      status : "*"
-  commands:
-    - func: "prepare environment"
-    - func: "restore cluster"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
-
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "distributed_correctness_suite_1"
-
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "distributed_correctness_suite_1_MMAPv1"
-    - func: "destroy cluster"
-    - func: "analyze"
-
 #######################################
 #               Modules               #
 #######################################
@@ -366,4 +343,3 @@ buildvariants:
       distros:
       - rhel70
     - name: distributed_correctness_suite_1_wiredTiger
-    - name: distributed_correctness_suite_1_MMAPv1

@@ -255,23 +255,6 @@ tasks:
         script_flags: --ycsb-throughput-analysis reports
     - func: "destroy cluster"
 
-- name: shard_cluster_MMAPv1_test
-  depends_on:
-    - name: compile
-  exec_timeout_secs: 216000
-  commands:
-    - func: "prepare environment"
-      vars:
-        storageEngine: "mmapv1"
-        test: "ycsb"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-      vars:
-        script_flags: --ycsb-throughput-analysis reports
-    - func: "destroy cluster"
-
-
 #######################################
 #               Modules               #
 #######################################
@@ -310,23 +293,3 @@ buildvariants:
       distros:
       - rhel70
     - name: shard_cluster_test
-
-- name: linux-mmapv1-shard
-  display_name: Linux MMAPv1 Shard
-  batchtime: 40320 # 4 week
-  modules: *modules
-  expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    setup: shard-longevity
-    cluster: longevity
-    numShard: 3
-    storageEngine: mmapv1
-    use_scons_cache: true
-    project: *project
-  run_on:
-    - "rhel70-perf-longevity"
-  tasks:
-    - name: compile
-      distros:
-      - rhel70
-    - name: shard_cluster_MMAPv1_test

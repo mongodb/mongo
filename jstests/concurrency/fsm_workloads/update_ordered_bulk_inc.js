@@ -11,7 +11,7 @@
  * Uses an ordered, bulk operation to perform the updates.
  */
 
-// For isMongod, recordIdCanChangeOnUpdate, and supportsDocumentLevelConcurrency.
+// For isMongod and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -41,17 +41,10 @@ var $config = (function() {
         find: function find(db, collName) {
             var docs = db[collName].find().toArray();
 
-            if (isMongod(db) && !recordIdCanChangeOnUpdate(db)) {
-                // If the RecordId cannot change and we aren't updating any fields in any indexes,
-                // we should always see all matching documents, since they would not be able to move
-                // ahead or behind our collection scan or index scan.
-                assertWhenOwnColl.eq(this.docCount, docs.length);
-            } else {
-                // On MMAPv1, we may see more than 'this.docCount' documents during our find. This
-                // can happen if an update causes the document to grow such that it is moved in
-                // front of an index or collection scan which has already returned it.
-                assertWhenOwnColl.gte(docs.length, this.docCount);
-            }
+            // We aren't updating any fields in any indexes, so we should always see all
+            // matching documents, since they would not be able to move ahead or behind
+            // our collection scan or index scan.
+            assertWhenOwnColl.eq(this.docCount, docs.length);
 
             if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
                 // Storage engines which support document-level concurrency will automatically retry

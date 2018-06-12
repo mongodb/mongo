@@ -18,10 +18,6 @@ src:src/third_party/zlib-*/*
 # See SERVER-29505.
 src:src/third_party/timelib-*/*
 
-# See SERVER-22705. We depend on the C flexible array trick
-# which trips up UBSAN.
-src:src/mongo/db/storage/mmap_v1/*
-
 # Blacklisting these functions due to a bug in libstdc++:
 # http://stackoverflow.com/questions/30122500/is-this-code-really-undefined-as-clang-seems-to-indicate
 fun:_ZStaNRSt13_Ios_FmtflagsS_

@@ -16,9 +16,8 @@
             pidfilepath: path + "/pidfile",
         };
 
-        // directoryperdb is only supported with the wiredTiger, and mmapv1 storage engines
-        if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger" ||
-            jsTest.options().storageEngine === "mmapv1") {
+        // directoryperdb is only supported with the wiredTiger storage engine
+        if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger") {
             options["directoryperdb"] = "";
         }
 

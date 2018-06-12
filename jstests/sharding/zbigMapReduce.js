@@ -2,8 +2,7 @@
  * This test is skipped on 32-bit platforms
  *
  * This test is labeled resource intensive because its total io_write is 625MB compared to a median
- * of 5MB across all sharding tests in wiredTiger. Its total io_write is 3387MB compared to a median
- * of 135MB in mmapv1.
+ * of 5MB across all sharding tests in wiredTiger.
  * @tags: [resource_intensive]
  */
 function setupTest() {

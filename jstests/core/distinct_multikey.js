@@ -6,8 +6,6 @@
 
     load("jstests/libs/analyze_plan.js");
 
-    const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
-
     let coll = db.jstest_distinct_multikey;
     coll.drop();
     assert.commandWorked(coll.createIndex({a: 1}));
@@ -67,15 +65,8 @@
     result = coll.distinct("a", {a: {$gte: 2}});
     assert.eq([7, 8], result.sort());
     explain = coll.explain("queryPlanner").distinct("a", {a: {$gte: 2}});
-    if (isMMAPv1) {
-        // MMAPv1 does not support path-level multikey metadata tracking. It cannot use a distinct
-        // scan since it does not know that the "a" field is not multikey.
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "IXSCAN"));
-    } else {
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
-    }
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 
     // Test distinct over a trailing multikey field.
     result = coll.distinct("b", {a: {$gte: 2}});
@@ -94,15 +85,8 @@
     result = coll.distinct("b", {a: 3});
     assert.eq([1, 7, 8], result.sort());
     explain = coll.explain("queryPlanner").distinct("b", {a: 3});
-    if (isMMAPv1) {
-        // MMAPv1 does not support path-level multikey metadata tracking. It cannot use a distinct
-        // scan since it does not know that the "a" field is not multikey.
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "IXSCAN"));
-    } else {
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
-    }
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 
     // Test distinct over a trailing non-multikey dotted path where the leading field is multikey.
     coll.drop();
@@ -114,13 +98,6 @@
     result = coll.distinct("b.c", {a: 3});
     assert.eq([1, 7, 8], result.sort());
     explain = coll.explain("queryPlanner").distinct("b.c", {a: 3});
-    if (isMMAPv1) {
-        // MMAPv1 does not support path-level multikey metadata tracking. It cannot use a distinct
-        // scan since it does not know that the "a" field is not multikey.
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "IXSCAN"));
-    } else {
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
-    }
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 }());

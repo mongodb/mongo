@@ -3,13 +3,6 @@
 (function() {
     "use strict";
 
-    // This test should not be run on mmapv1 because the 'system.indexes' collection exists on that
-    // storage engine.
-    const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
-    if (isMMAPv1) {
-        return;
-    }
-
     // Cannot create system.indexes using the 'create' command.
     assert.commandFailedWithCode(db.createCollection("system.indexes"),
                                  ErrorCodes.InvalidNamespace);

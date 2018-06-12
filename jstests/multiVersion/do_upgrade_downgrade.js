@@ -320,9 +320,6 @@
     replicaSetTest({shardsvr: ""});
 
     // Do tests for standalones and replica sets started with --configsvr.
-    if (jsTest.options().storageEngine !== "mmapv1") {
-        // We don't allow starting config servers with the MMAP storage engine.
-        standaloneTest({configsvr: ""});
-        replicaSetTest({configsvr: ""});
-    }
+    standaloneTest({configsvr: ""});
+    replicaSetTest({configsvr: ""});
 })();

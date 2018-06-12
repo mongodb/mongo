@@ -4,8 +4,8 @@
 
 // Basic functional tests for the listCollections command.
 //
-// Note that storage engines are allowed to advertise internal collections to the user (in
-// particular, the MMAPv1 storage engine currently advertises the "system.indexes" collection).
+// Note that storage engines used to be allowed to advertise internal collections to the user (in
+// particular, the MMAPv1 storage engine used to advertise the "system.indexes" collection).
 // Hence, this test suite does not test for a particular number of collections returned in
 // listCollections output, but rather tests for existence or absence of particular collections in
 // listCollections output.

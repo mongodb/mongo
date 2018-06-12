@@ -50,22 +50,6 @@ function getStorageEngineName(db) {
 }
 
 /**
- * Returns true if the current storage engine is mmapv1, and false otherwise.
- */
-function isMMAPv1(db) {
-    return getStorageEngineName(db) === 'mmapv1';
-}
-
-/**
- * Returns true if an update can cause the RecordId of a document to change.
- */
-function recordIdCanChangeOnUpdate(db) {
-    // A RecordId on MMAPv1 is just its location on disk, which can change if the document grows and
-    // needs to be moved.
-    return isMMAPv1(db);
-}
-
-/**
  * Returns true if the current storage engine is wiredTiger, and false otherwise.
  */
 function isWiredTiger(db) {

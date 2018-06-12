@@ -256,7 +256,7 @@ var BackupRestoreTest = function(options) {
         var nodes = rst.startSet();
 
         // Initialize replica set using default timeout. This should give us sufficient time to
-        // allocate 1GB oplogs on slow test hosts with mmapv1.
+        // allocate 1GB oplogs on slow test hosts.
         rst.initiate();
         rst.awaitNodesAgreeOnPrimary();
         var primary = rst.getPrimary();

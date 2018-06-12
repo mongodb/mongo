@@ -24,7 +24,7 @@ var RetryableWritesUtil = (function() {
         return kRetryableWriteCommands.has(cmdName);
     }
 
-    const kStorageEnginesWithoutDocumentLocking = new Set(["ephemeralForTest", "mmapv1"]);
+    const kStorageEnginesWithoutDocumentLocking = new Set(["ephemeralForTest"]);
 
     /**
      * Returns true if the given storage engine supports retryable writes (i.e. supports

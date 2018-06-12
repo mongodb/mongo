@@ -6,10 +6,6 @@
 (function() {
     "use strict";
 
-    // The MMAP storage engine does not store path-level multikey metadata, so it cannot participate
-    // in related query planning optimizations.
-    const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
-
     load("jstests/libs/analyze_plan.js");
 
     let coll = db.jstests_array_sort;
@@ -133,25 +129,22 @@
         expected: [{_id: 0}, {_id: 1}]
     });
 
-    if (!isMMAPv1) {
-        // Test that, for storage engines which support path-level multikey tracking, a multikey
-        // index can provide a sort over a non-multikey field.
-        coll.drop();
-        assert.commandWorked(coll.createIndex({a: 1, "b.c": 1}));
-        assert.writeOK(coll.insert({a: [1, 2, 3], b: {c: 9}}));
-        explain = coll.find({a: 2}).sort({"b.c": -1}).explain();
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "IXSCAN"));
-        assert(!planHasStage(db, explain.queryPlanner.winningPlan, "SORT"));
+    // Test that a multikey index can provide a sort over a non-multikey field.
+    coll.drop();
+    assert.commandWorked(coll.createIndex({a: 1, "b.c": 1}));
+    assert.writeOK(coll.insert({a: [1, 2, 3], b: {c: 9}}));
+    explain = coll.find({a: 2}).sort({"b.c": -1}).explain();
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "IXSCAN"));
+    assert(!planHasStage(db, explain.queryPlanner.winningPlan, "SORT"));
 
-        const pipeline = [
-            {$match: {a: 2}},
-            {$sort: {"b.c": -1}},
-        ];
-        explain = coll.explain().aggregate(pipeline);
-        assert(aggPlanHasStage(explain, "IXSCAN"));
-        assert(!aggPlanHasStage(explain, "SORT"));
-        assert(!aggPlanHasStage(explain, "$sort"));
-    }
+    const pipeline = [
+        {$match: {a: 2}},
+        {$sort: {"b.c": -1}},
+    ];
+    explain = coll.explain().aggregate(pipeline);
+    assert(aggPlanHasStage(explain, "IXSCAN"));
+    assert(!aggPlanHasStage(explain, "SORT"));
+    assert(!aggPlanHasStage(explain, "$sort"));
 
     // Test that we can correctly sort by an array field in agg when there are additional fields not
     // involved in the sort pattern.

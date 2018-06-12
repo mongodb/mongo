@@ -7,9 +7,6 @@
 // system.namespaces on the donor, which is empty on wiredtiger.
 // As a result, the new collection created on receiver has different
 // options.
-//
-// P.S. wiredtiger options are not valid for MMAPv1, but MMAPv1 will
-// keep and ignore them.
 
 var st = new ShardingTest({shards: 2});
 

@@ -1,5 +1,5 @@
 /**
- * Tests that a mongod started with --directoryperdb will write data for database x into a direcotry
+ * Tests that a mongod started with --directoryperdb will write data for database x into a directory
  * named x inside the dbpath.
  *
  * This test does not make sense for in-memory storage engines, since they will not produce any data
@@ -13,7 +13,7 @@
     var baseDir = "jstests_directoryperdb";
     var dbpath = MongoRunner.dataPath + baseDir + "/";
 
-    var isDirectoryPerDBSupported = jsTest.options().storageEngine == "mmapv1" ||
+    var isDirectoryPerDBSupported =
         jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
 
     var m = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: ''});

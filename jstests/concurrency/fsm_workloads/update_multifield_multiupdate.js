@@ -9,7 +9,7 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
 load('jstests/concurrency/fsm_workloads/update_multifield.js');  // for $config
 
-// For isMongod and recordIdCanChangeOnUpdate.
+// For isMongod
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = extendWorkload($config, function($config, $super) {
@@ -20,16 +20,9 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
 
         if (isMongod(db)) {
-            if (!recordIdCanChangeOnUpdate(db)) {
-                // If a document's RecordId cannot change, then we should not
-                // have updated any document more than once, since the update
-                // stage internally de-duplicates based on RecordId.
-                assertWhenOwnColl.lte(this.numDocs, res.nMatched, tojson(res));
-            } else {
-                // If RecordIds can change, then there are no guarantees on how
-                // many documents were updated.
-                assertAlways.gte(res.nMatched, 0, tojson(res));
-            }
+            // If a document's RecordId cannot change, then we should not have updated any document
+            // more than once, since the update stage internally de-duplicates based on RecordId.
+            assertWhenOwnColl.lte(this.numDocs, res.nMatched, tojson(res));
         } else {  // mongos
             assertAlways.gte(res.nMatched, 0, tojson(res));
         }

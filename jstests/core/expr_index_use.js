@@ -5,8 +5,6 @@
 
     load("jstests/libs/analyze_plan.js");
 
-    const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
-
     const coll = db.expr_index_use;
     coll.drop();
 
@@ -179,12 +177,9 @@
     confirmExpectedExprExecution({$eq: ["$g.h", [1]]}, {nReturned: 1});
     confirmExpectedExprExecution({$eq: ["$g.h", 1]}, {nReturned: 0});
 
-    // Comparison against a non-multikey field of a multikey index can use an index, on storage
-    // engines other than MMAPv1.
+    // Comparison against a non-multikey field of a multikey index can use an index
     const metricsToCheck = {nReturned: 1};
-    if (!isMMAPv1) {
-        metricsToCheck.expectedIndex = {i: 1, j: 1};
-    }
+    metricsToCheck.expectedIndex = {i: 1, j: 1};
     confirmExpectedExprExecution({$eq: ["$i", 1]}, metricsToCheck);
     metricsToCheck.nReturned = 0;
     confirmExpectedExprExecution({$eq: ["$i", 2]}, metricsToCheck);

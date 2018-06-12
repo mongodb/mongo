@@ -16,23 +16,6 @@
     const latest = "latest";
 
     /**
-     * If we're using mmapv1, we must recover the journal files from an unclean shutdown before
-     * attempting to run with --repair.
-     */
-    let recoverMMapJournal = function(isMMAPv1, conn, dbpath) {
-        if (isMMAPv1) {
-            let returnCode = runMongoProgram("mongod",
-                                             "--port",
-                                             conn.port,
-                                             "--journalOptions",
-                                             /*MMAPV1Options::JournalRecoverOnly*/ 4,
-                                             "--dbpath",
-                                             dbpath);
-            assert.eq(returnCode, /*EXIT_NET_ERROR*/ 48);
-        }
-    };
-
-    /**
      * Ensure that a mongod (without using --repair) fails to start up if there are non-local
      * collections and the FCV document in the admin database has been removed.
      *
@@ -71,13 +54,10 @@
     // deleted.
     doStartupFailTests(latest, dbpath);
 
-    const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
-
     // --repair can be used to restore a missing featureCompatibilityVersion document to an existing
     // admin database, as long as all collections have UUIDs. The FCV should be initialized to
     // lastStableFCV / downgraded FCV.
     connection = setupMissingFCVDoc(latest, dbpath);
-    recoverMMapJournal(isMMAPv1, connection, dbpath);
     let returnCode =
         runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);
     assert.eq(

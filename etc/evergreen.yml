@@ -391,7 +391,6 @@ variables:
   - *sharding_ese
   - *unittests
   expansions: &enterprise-windows-64-2k8-nopush-expansions-template
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     platform_decompress: unzip
     exe: ".exe"
     msi_target: msi
@@ -3575,7 +3574,7 @@ tasks:
   - func: "send benchmark results"
 
 - <<: *run_jepsen_template
-  name: jepsen_register_findAndModify_WT
+  name: jepsen_register_findAndModify
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -3595,21 +3594,6 @@ tasks:
     vars:
       <<: *jepsen_config_vars
       jepsen_read_concern: --read-concern linearizable
-      jepsen_storage_engine: --storage-engine mmapv1
-      jepsen_test_name: register
-      # Running Jepsen when using the MMAPv1 storage engine for longer periods of time can lead to
-      # out of memory issues and task timeouts during the analysis phase.
-      jepsen_time_limit: --time-limit 300
-
-- <<: *run_jepsen_template
-  name: jepsen_register_linearizableRead_WT
-  commands:
-  - func: "do setup"
-  - func: "do jepsen setup"
-  - func: "run jepsen test"
-    vars:
-      <<: *jepsen_config_vars
-      jepsen_read_concern: --read-concern linearizable
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_test_name: register
 
@@ -3622,27 +3606,11 @@ tasks:
     vars:
       <<: *jepsen_config_vars
       jepsen_read_concern: --read-concern linearizable
-      jepsen_storage_engine: --storage-engine mmapv1
-      jepsen_test_name: set
-      # Running Jepsen when using the MMAPv1 storage engine for longer periods of time can lead to
-      # out of memory issues and task timeouts during the analysis phase.
-      jepsen_time_limit: --time-limit 300
-
-- <<: *run_jepsen_template
-  name: jepsen_set_linearizableRead_WT
-  commands:
-  - func: "do setup"
-  - func: "do jepsen setup"
-  - func: "run jepsen test"
-    vars:
-      <<: *jepsen_config_vars
-      jepsen_read_concern: --read-concern linearizable
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_test_name: set
 
 - <<: *run_jepsen_template
-  # We only run this test on wiredTiger since MMAPv1 doesn't support majority read concern.
-  name: jepsen_read-concern-majority_WT
+  name: jepsen_read-concern-majority
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -3653,8 +3621,7 @@ tasks:
       jepsen_test_name: read-concern-majority
 
 - <<: *run_jepsen_template
-  # We only run this test on wiredTiger since MMAPv1 doesn't support majority read concern.
-  name: jepsen_read-concern-majority_w1_WT
+  name: jepsen_read-concern-majority_w1
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -4224,15 +4191,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: disk_mmapv1
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=disk_mmapv1 --storageEngine=mmapv1
-      run_multiple_jobs: false
-
-- <<: *task_template
   name: disk_mobile
   commands:
   - func: "do setup"
@@ -4249,26 +4207,6 @@ tasks:
     vars:
       resmoke_args: --suites=disk_wiredtiger --storageEngine=wiredTiger
       run_multiple_jobs: false
-
-- <<: *task_template
-  name: durability
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=durability
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: dur_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=dur_jscore_passthrough
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: ese
@@ -4579,15 +4517,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: mmap
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=mmap
-      run_multiple_jobs: true
-
-- <<: *task_template
   name: multiversion_auth
   commands:
   - func: "do setup"
@@ -4607,17 +4536,6 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=multiversion --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: multiversion_multistorage_engine
-  commands:
-  - func: "do setup"
-  - func: "do multiversion setup"
-  - func: "run tests"
-    vars:
-      task_path_suffix: /data/multiversion
-      resmoke_args: --suites=multiversion_multistorage_engine
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -6099,16 +6017,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: watchdog_mmapv1
-  commands:
-  - func: "do setup"
-  - func: "do watchdog setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=watchdog --storageEngine=mmapv1
-      run_multiple_jobs: false
-
-- <<: *task_template
   name: watchdog_wiredtiger
   commands:
   - func: "do setup"
@@ -6895,7 +6803,6 @@ buildvariants:
   - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -6962,7 +6869,6 @@ buildvariants:
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
-  - name: multiversion_multistorage_engine
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: bulk_gle_passthrough
@@ -7002,7 +6908,6 @@ buildvariants:
   - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --repeat=10 --shuffle
@@ -7044,7 +6949,6 @@ buildvariants:
   run_on:
   - rhel62-large
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
@@ -7211,7 +7115,7 @@ buildvariants:
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
     # exclude those tests as well.
-    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_mmapv1,requires_sharding,uses_transactions
+    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
@@ -7261,7 +7165,7 @@ buildvariants:
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --wiredTigerEngineConfig=mmap=false --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=requires_mmapv1,uses_transactions,does_not_support_wiredtiger_lsm
+    test_flags: --wiredTigerEngineConfig=mmap=false --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=uses_transactions,does_not_support_wiredtiger_lsm
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
@@ -7281,7 +7185,6 @@ buildvariants:
   - ubuntu1404-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -7377,7 +7280,6 @@ buildvariants:
   - ubuntu1804-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -7466,7 +7368,6 @@ buildvariants:
   - ubuntu1804-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -7510,7 +7411,6 @@ buildvariants:
   - name: snmp
   - name: ssl
   - name: sslSpecial
-  - name: watchdog_mmapv1
   - name: watchdog_wiredtiger
   - name: package
     distros:
@@ -7525,7 +7425,6 @@ buildvariants:
   - ubuntu1804-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     compile_flags: >-
       --dbg=on
       --opt=on
@@ -7568,7 +7467,6 @@ buildvariants:
   - name: snmp
   - name: ssl
   - name: sslSpecial
-  - name: watchdog_mmapv1
   - name: watchdog_wiredtiger
 
 - name: enterprise-ubuntu1804-64-clang-cxx17
@@ -7579,7 +7477,6 @@ buildvariants:
   - ubuntu1804-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     compile_flags: >-
       --dbg=on
       --opt=on
@@ -7625,7 +7522,6 @@ buildvariants:
   - name: snmp
   - name: ssl
   - name: sslSpecial
-  - name: watchdog_mmapv1
   - name: watchdog_wiredtiger
 
 - name: ubuntu1604
@@ -7634,7 +7530,6 @@ buildvariants:
   - ubuntu1604-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -7673,25 +7568,19 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: jepsen_register_findAndModify_WT
+  - name: jepsen_register_findAndModify
     distros:
     - ubuntu1604-build
   - name: jepsen_register_linearizableRead
     distros:
     - ubuntu1604-build
-  - name: jepsen_register_linearizableRead_WT
-    distros:
-    - ubuntu1604-build
   - name: jepsen_set_linearizableRead
     distros:
     - ubuntu1604-build
-  - name: jepsen_set_linearizableRead_WT
+  - name: jepsen_read-concern-majority
     distros:
     - ubuntu1604-build
-  - name: jepsen_read-concern-majority_WT
-    distros:
-    - ubuntu1604-build
-  - name: jepsen_read-concern-majority_w1_WT
+  - name: jepsen_read-concern-majority_w1
     distros:
     - ubuntu1604-build
   - name: jsCore
@@ -7753,7 +7642,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     max_jobs: 8 # Avoid starting too many mongod's on ARM test servers
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: arm64
@@ -7833,7 +7721,6 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     max_jobs: 8 # Avoid starting too many mongod's on ARM test servers
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager.py
     packager_arch: arm64
@@ -7870,7 +7757,6 @@ buildvariants:
     push_arch: ppc64le-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: 2
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: ppc64le
@@ -7954,7 +7840,6 @@ buildvariants:
     push_arch: s390x-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: 2
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -8055,7 +7940,6 @@ buildvariants:
   - linux-64-amzn-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -8129,7 +8013,6 @@ buildvariants:
   - linux-64-amzn-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -8225,7 +8108,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=requires_mmapv1
       --excludeWithAnyTags=SERVER-34286
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -8303,7 +8185,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=requires_mmapv1
       --excludeWithAnyTags=SERVER-34286
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -8402,7 +8283,6 @@ buildvariants:
   run_on:
   - windows-64-vs2015-small
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
@@ -8551,7 +8431,6 @@ buildvariants:
   run_on:
   - windows-64-vs2015-small
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     platform_decompress: unzip
     exe: ".exe"
     push_path: win32
@@ -8878,7 +8757,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
-    test_flags: --serviceExecutor=adaptive --excludeWithAnyTags=requires_mmapv1
+    test_flags: --serviceExecutor=adaptive
     gorootvars: 'PATH="/cygdrive/c/go1.8/go/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/go1.8/go" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: false
@@ -8908,7 +8787,7 @@ buildvariants:
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,requires_mmapv1,uses_transactions
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     ext: zip
     use_scons_cache: true
     multiversion_platform: windows
@@ -8964,7 +8843,6 @@ buildvariants:
   - windows-64-vs2015-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     platform_decompress: unzip
     exe: ".exe"
     push_path: win32
@@ -9040,7 +8918,6 @@ buildvariants:
   - name: mongosTest
   - name: multiversion
   - name: multiversion_auth
-  - name: multiversion_multistorage_engine
   - name: noPassthroughWithMongod
   - name: noPassthrough
   - name: parallel
@@ -9085,7 +8962,6 @@ buildvariants:
   - windows-64-vs2015-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
@@ -9120,7 +8996,7 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,requires_ssl_mongo_tools
+    test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -9231,7 +9107,6 @@ buildvariants:
   run_on:
   - macos-1012
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     num_jobs_available: 1
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
@@ -9264,7 +9139,7 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,requires_ssl_mongo_tools
+    test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
     push_path: osx
     push_bucket: downloads.10gen.com
     push_name: macos
@@ -9312,7 +9187,7 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,requires_ssl_mongo_tools
+    test_flags: --excludeWithAnyTags=requires_ssl_mongo_tools
     push_path: osx
     push_bucket: downloads.10gen.com
     push_name: osx
@@ -9363,7 +9238,7 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions
     build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
@@ -9395,7 +9270,7 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions
     build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_flags: >-
@@ -9425,7 +9300,7 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions
     build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
@@ -9460,7 +9335,7 @@ buildvariants:
   expansions:
     build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
-    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
@@ -9490,7 +9365,7 @@ buildvariants:
   expansions:
     build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
-    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
@@ -9592,7 +9467,7 @@ buildvariants:
   - ubuntu1604-build
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions
     build_cdriver: true
     # We need --allocator=system here to work around SERVER-XXXXX
     compile_flags: >-
@@ -9604,7 +9479,6 @@ buildvariants:
         -DCMAKE_C_COMPILER=/opt/mongodbtoolchain/v2/bin/gcc
         -DCMAKE_CXX_COMPILER=/opt/mongodbtoolchain/v2/bin/g++
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     disable_unit_tests: true
     enable_embedded_tests: native
@@ -9618,7 +9492,7 @@ buildvariants:
   - ubuntu1604-build
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions
     build_cdriver: true
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
@@ -9638,7 +9512,6 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     disable_unit_tests: true
     enable_embedded_tests: android_emulator
@@ -9657,7 +9530,7 @@ buildvariants:
   - ubuntu1604-build
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions
     build_cdriver: true
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
@@ -9676,7 +9549,6 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     disable_unit_tests: true
     enable_embedded_tests: android_emulator
@@ -9695,7 +9567,7 @@ buildvariants:
   - ubuntu1604-build
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions
     build_cdriver: true
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
@@ -9738,7 +9610,6 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -9875,7 +9746,6 @@ buildvariants:
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
-  - name: multiversion_multistorage_engine
   - name: noPassthroughWithMongod
   - name: noPassthrough
   - name: parallel
@@ -10282,7 +10152,6 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
@@ -10363,7 +10232,6 @@ buildvariants:
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
-  - name: multiversion_multistorage_engine
   - name: noPassthroughWithMongod
   - name: noPassthrough
   - name: parallel
@@ -10415,7 +10283,6 @@ buildvariants:
   run_on:
   - rhel70-small
   expansions: &enterprise-rhel-70-64-bit-expansions-template
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -10493,7 +10360,6 @@ buildvariants:
   run_on:
   - ubuntu1604-test
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
     compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     scons_cache_scope: shared
@@ -10519,7 +10385,6 @@ buildvariants:
   - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -10607,7 +10472,6 @@ buildvariants:
   - rhel70-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -10709,11 +10573,9 @@ buildvariants:
   batchtime: 1440 # 1 day
   stepback: false
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: ppc64le
@@ -10822,7 +10684,6 @@ buildvariants:
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: 2
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -10931,7 +10792,7 @@ buildvariants:
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_mmapv1,blacklist_from_rhel_67_s390x
+    test_flags: --excludeWithAnyTags=blacklist_from_rhel_67_s390x
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -11028,7 +10889,7 @@ buildvariants:
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_mmapv1,blacklist_from_rhel_67_s390x
+    test_flags: --excludeWithAnyTags=blacklist_from_rhel_67_s390x
     has_packages: true
     packager_script: packager.py
     packager_arch: s390x
@@ -11065,7 +10926,6 @@ buildvariants:
   - ubuntu1404-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -11121,7 +10981,6 @@ buildvariants:
   - ubuntu1604-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -11147,25 +11006,19 @@ buildvariants:
   - name: audit
   - name: dbtest
   - name: ese
-  - name: jepsen_register_findAndModify_WT
+  - name: jepsen_register_findAndModify
     distros:
     - ubuntu1604-build
   - name: jepsen_register_linearizableRead
     distros:
     - ubuntu1604-build
-  - name: jepsen_register_linearizableRead_WT
-    distros:
-    - ubuntu1604-build
   - name: jepsen_set_linearizableRead
     distros:
     - ubuntu1604-build
-  - name: jepsen_set_linearizableRead_WT
+  - name: jepsen_read-concern-majority
     distros:
     - ubuntu1604-build
-  - name: jepsen_read-concern-majority_WT
-    distros:
-    - ubuntu1604-build
-  - name: jepsen_read-concern-majority_w1_WT
+  - name: jepsen_read-concern-majority_w1
     distros:
     - ubuntu1604-build
   - name: jsCore
@@ -11185,7 +11038,6 @@ buildvariants:
   - name: snmp
   - name: ssl
   - name: sslSpecial
-  - name: watchdog_mmapv1
   - name: watchdog_wiredtiger
   - name: package
     distros:
@@ -11200,7 +11052,6 @@ buildvariants:
   run_on:
    - ubuntu1604-test
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     lang_environment: LANG=C
     compile_flags: --link-model=dynamic --ssl CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
     scons_cache_scope: shared
@@ -11220,7 +11071,6 @@ buildvariants:
   run_on:
    - ubuntu1604-test
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     lang_environment: LANG=C
     compile_flags: --link-model=dynamic --ssl CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
     scons_cache_scope: shared
@@ -11247,7 +11097,6 @@ buildvariants:
   - suse12-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -11310,7 +11159,6 @@ buildvariants:
     push_arch: s390x-enterprise-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -11410,7 +11258,6 @@ buildvariants:
   - suse12-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -11505,7 +11352,6 @@ buildvariants:
   - debian81-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -11558,7 +11404,6 @@ buildvariants:
   - debian81-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -11651,7 +11496,6 @@ buildvariants:
   - debian92-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -11707,7 +11551,6 @@ buildvariants:
   - debian92-test
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -11808,7 +11651,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,requires_mmapv1,uses_transactions
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     multiversion_platform: rhel62
     multiversion_edition: enterprise
@@ -11940,7 +11783,7 @@ buildvariants:
     # mobile storage engine.
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
+      --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
       --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -11997,7 +11840,7 @@ buildvariants:
   expansions:
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
+      --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
       --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993
     compile_flags: >-
         -j$(grep -c ^processor /proc/cpuinfo)
@@ -12081,7 +11924,7 @@ buildvariants:
     # mobile storage engine.
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
+      --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
       --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
@@ -12137,7 +11980,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     # Transactions are not explicitly supported on the ephemeralForTest storage engine.
-    test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_mmapv1,requires_wiredtiger,uses_transactions
+    test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
@@ -12224,7 +12067,7 @@ buildvariants:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling,uses_transactions
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
     tooltags: -tags 'sasl ssl'
     build_mongoreplay: true
@@ -12305,7 +12148,7 @@ buildvariants:
   expansions:
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: 2
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling,uses_transactions
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
     tooltags: -tags 'sasl ssl'
     build_mongoreplay: true
@@ -12399,7 +12242,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb --variables-files=etc/scons/mongodbtoolchain_gcc.vars --runtime-hardening=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     # Transactions are not explicitly supported on the RocksDB storage engine.
-    test_flags: --storageEngine=rocksdb --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,uses_transactions
+    test_flags: --storageEngine=rocksdb --excludeWithAnyTags=requires_wiredtiger,uses_transactions
     use_scons_cache: true
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
@@ -12425,7 +12268,6 @@ buildvariants:
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
     lang_environment: LANG=C
@@ -12509,7 +12351,6 @@ buildvariants:
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
-  - name: multiversion_multistorage_engine
   - name: noPassthroughWithMongod
   - name: noPassthrough
   - name: parallel
@@ -12561,7 +12402,6 @@ buildvariants:
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
     lang_environment: LANG=C
@@ -12605,7 +12445,6 @@ buildvariants:
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     # We need llvm-symbolizer in the PATH for UBSAN.
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
     lang_environment: LANG=C
@@ -12689,7 +12528,6 @@ buildvariants:
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
-  - name: multiversion_multistorage_engine
   - name: noPassthroughWithMongod
   - name: noPassthrough
   - name: parallel
@@ -12742,7 +12580,6 @@ buildvariants:
   - ubuntu1604-build
   stepback: true
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
     lang_environment: LANG=C
@@ -12783,7 +12620,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     build_mongoreplay: false
     hang_analyzer_dump_core: false
-    test_flags: --serviceExecutor=adaptive --excludeWithAnyTags=requires_mmapv1
+    test_flags: --serviceExecutor=adaptive
     scons_cache_scope: shared
   display_tasks:
   - *unittests
@@ -12832,7 +12669,6 @@ buildvariants:
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
-  - name: multiversion_multistorage_engine
   - name: noPassthroughWithMongod
   - name: noPassthrough
   - name: parallel
@@ -12874,7 +12710,6 @@ buildvariants:
   modules:
   - enterprise
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     lang_environment: LANG=C
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -12903,401 +12738,3 @@ buildvariants:
     distros:
     - rhel62-small
 
-- name: enterprise-rhel-62-64-bit-mmapv1
-  display_name: Enterprise RHEL 6.2 MMAPv1
-  modules:
-  - enterprise
-  run_on:
-  - rhel62-small
-  batchtime: 1440 # 1 day
-  expansions:
-    # Transactions are not supported on the MMAPv1 storage engine.
-    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    compile_flags: >-
-      --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release
-      --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-      CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include"
-      --use-basis-tech-rosette-linguistics-platform=on
-    multiversion_platform: rhel62
-    multiversion_edition: enterprise
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: rhel62
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
-    tooltags: -tags 'ssl sasl'
-    build_mongoreplay: true
-  tasks:
-  - name: compile_TG
-  - name: aggregation
-  - name: aggregation_fuzzer
-  - name: audit
-  - name: auth
-  - name: auth_audit
-  - name: bulk_gle_passthrough
-  - name: concurrency
-  - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_replication
-  - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_sharded_causal_consistency
-  - name: concurrency_sharded_causal_consistency_and_balancer
-  - name: concurrency_simultaneous
-  - name: dbtest
-  - name: disk_mmapv1
-  - name: dur_jscore_passthrough
-  - name: durability
-  - name: gle_auth
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_write_cmd
-  - name: jsCore
-  - name: jsCore_compatibility
-  - name: jsCore_decimal
-  - name: jsCore_op_query
-  - name: jstestfuzz
-  - name: jstestfuzz_concurrent
-  - name: jstestfuzz_concurrent_replication
-  - name: jstestfuzz_concurrent_replication_session
-  - name: jstestfuzz_concurrent_sharded
-  - name: jstestfuzz_concurrent_sharded_causal_consistency
-  - name: jstestfuzz_concurrent_sharded_continuous_stepdown
-  - name: jstestfuzz_concurrent_sharded_session
-  - name: jstestfuzz_interrupt
-  - name: jstestfuzz_interrupt_replication
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_initsync
-  - name: jstestfuzz_replication_session
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_causal_consistency
-  - name: jstestfuzz_sharded_continuous_stepdown
-  - name: jstestfuzz_sharded_session
-  - name: mmap
-  - name: multiversion
-  - name: multiversion_auth
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
-  - name: parallel_compatibility
-  - name: read_concern_linearizable_passthrough
-    distros:
-    - rhel62-large
-  - name: read_only
-  - name: read_only_sharded
-  - name: replica_sets
-    distros:
-    - rhel62-large
-  - name: replica_sets_initsync_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_initsync_static_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: rlp
-  - name: rollback_fuzzer
-  - name: serial_run
-  - name: sharded_collections_jscore_passthrough
-  - name: sharding
-    distros:
-    - rhel62-large
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_jscore_passthrough
-  - name: slow1
-  - name: snmp
-  - name: tool
-  - name: update_fuzzer
-  - name: update_fuzzer_replication
-
-- name: enterprise-windows-64-2k8-mmapv1
-  display_name: Enterprise Windows 2008R2 MMAPv1
-  modules:
-  - enterprise
-  run_on:
-  - windows-64-vs2015-small
-  batchtime: 1440 # 1 day
-  expansions:
-    # Transactions are not supported on the MMAPv1 storage engine.
-    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions
-    platform_decompress: unzip
-    exe: .exe
-    gorootvars: 'PATH="/cygdrive/c/go1.8/go/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/go1.8/go" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
-    tooltags: "-tags 'ssl sasl'"
-    build_mongoreplay: false
-    gorootvars: >-
-      PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
-      CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    msi_target: msi
-    content_type: application/zip
-    compile_flags: >-
-      --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include
-      c:/sasl/include c:/snmp/include c:/curl/include"  LIBPATH="c:/openssl/lib c:/sasl/lib
-      c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows
-      --win-version-min=ws08r2
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: python
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    ext: zip
-    use_scons_cache: true
-  tasks:
-  - name: compile_TG
-  - name: aggregation
-  - name: aggregation_fuzzer
-  - name: audit
-  - name: auth
-  - name: auth_audit
-  - name: bulk_gle_passthrough
-  - name: concurrency
-    distros:
-    - windows-64-vs2015-large
-  - name: concurrency_replication
-    distros:
-    - windows-64-vs2015-large
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - windows-64-vs2015-large
-  - name: concurrency_sharded_replication
-    distros:
-    - windows-64-vs2015-large
-  - name: concurrency_sharded_replication_with_balancer
-    distros:
-    - windows-64-vs2015-large
-  - name: concurrency_sharded_causal_consistency
-    distros:
-    - windows-64-vs2015-large
-  - name: concurrency_sharded_causal_consistency_and_balancer
-    distros:
-    - windows-64-vs2015-large
-  - name: concurrency_simultaneous
-    distros:
-    - windows-64-vs2015-large
-  - name: dbtest
-  - name: disk_mmapv1
-  - name: dur_jscore_passthrough
-  - name: durability
-  - name: gle_auth
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_write_cmd
-  - name: jsCore
-  - name: jsCore_compatibility
-  - name: jsCore_decimal
-  - name: jsCore_op_query
-  - name: jstestfuzz
-  - name: jstestfuzz_concurrent
-  - name: jstestfuzz_concurrent_replication
-  - name: jstestfuzz_concurrent_replication_session
-  - name: jstestfuzz_concurrent_sharded
-  - name: jstestfuzz_concurrent_sharded_causal_consistency
-  - name: jstestfuzz_concurrent_sharded_continuous_stepdown
-  - name: jstestfuzz_concurrent_sharded_session
-  - name: jstestfuzz_interrupt
-  - name: jstestfuzz_interrupt_replication
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_initsync
-  - name: jstestfuzz_replication_session
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_causal_consistency
-  - name: jstestfuzz_sharded_continuous_stepdown
-  - name: jstestfuzz_sharded_session
-  - name: mmap
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
-  - name: parallel_compatibility
-  - name: read_concern_linearizable_passthrough
-    distros:
-    - windows-64-vs2015-large
-  - name: read_only
-  - name: read_only_sharded
-  - name: replica_sets
-    distros:
-    - windows-64-vs2015-large
-  - name: replica_sets_initsync_jscore_passthrough
-    distros:
-    - windows-64-vs2015-large
-  - name: replica_sets_initsync_static_jscore_passthrough
-    distros:
-    - windows-64-vs2015-large
-  - name: replica_sets_jscore_passthrough
-    distros:
-    - windows-64-vs2015-large
-  - name: rollback_fuzzer
-  - name: serial_run
-  - name: sharded_collections_jscore_passthrough
-  - name: sharding
-    distros:
-    - windows-64-vs2015-large
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_jscore_passthrough
-  - name: slow1
-  - name: snmp
-  - name: tool
-  - name: update_fuzzer
-  - name: update_fuzzer_replication
-
-- name: enterprise-osx-1010-mmapv1
-  display_name: Enterprise macOS 10.10 MMAPv1
-  modules:
-  - enterprise
-  run_on:
-  - macos-1012
-  batchtime: 1440 # 1 day
-  expansions:
-    # Transactions are not supported on the MMAPv1 storage engine.
-    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions,requires_ssl_mongo_tools
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: >-
-      --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10"
-      LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
-    multiversion_platform: osx
-    multiversion_edition: enterprise
-    num_jobs_available: 1
-    gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
-    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
-    build_mongoreplay: true
-  tasks:
-  - name: compile_TG
-  - name: aggregation
-  - name: aggregation_fuzzer
-  - name: audit
-  - name: auth
-  - name: auth_audit
-  - name: bulk_gle_passthrough
-  - name: concurrency
-  - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
-  - name: concurrency_sharded_replication
-  - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_sharded_causal_consistency
-  - name: concurrency_sharded_causal_consistency_and_balancer
-  - name: concurrency_simultaneous
-  - name: dbtest
-  - name: disk_mmapv1
-  - name: dur_jscore_passthrough
-  - name: durability
-  - name: gle_auth
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_write_cmd
-  - name: jsCore
-  - name: jsCore_compatibility
-  - name: jsCore_decimal
-  - name: jsCore_op_query
-  - name: jstestfuzz
-  - name: jstestfuzz_concurrent
-  - name: jstestfuzz_concurrent_replication
-  - name: jstestfuzz_concurrent_replication_session
-  - name: jstestfuzz_concurrent_sharded
-  - name: jstestfuzz_concurrent_sharded_causal_consistency
-  - name: jstestfuzz_concurrent_sharded_continuous_stepdown
-  - name: jstestfuzz_concurrent_sharded_session
-  - name: jstestfuzz_interrupt
-  - name: jstestfuzz_interrupt_replication
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_initsync
-  - name: jstestfuzz_replication_session
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_causal_consistency
-  - name: jstestfuzz_sharded_continuous_stepdown
-  - name: jstestfuzz_sharded_session
-  - name: mmap
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
-  - name: parallel_compatibility
-  - name: read_concern_linearizable_passthrough
-  - name: read_only
-  - name: read_only_sharded
-  - name: replica_sets
-  - name: replica_sets_initsync_jscore_passthrough
-  - name: replica_sets_initsync_static_jscore_passthrough
-  - name: replica_sets_jscore_passthrough
-  - name: rollback_fuzzer
-  - name: serial_run
-  - name: sharded_collections_jscore_passthrough
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_jscore_passthrough
-  - name: slow1
-  - name: tool
-  - name: update_fuzzer
-  - name: update_fuzzer_replication
-
-- name: linux-64-duroff-mmapv1
-  display_name: Linux (No Journal) MMAPv1
-  run_on:
-  - rhel62-small
-  batchtime: 1440 # 1 day
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux-duroff
-    push_arch: x86_64
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --nojournal --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,requires_journaling,uses_transactions
-    scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
-    tooltags: ""
-    build_mongoreplay: false
-  display_tasks:
-  - *unittests
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel62-large
-  - name: aggregation
-  - name: aggregation_auth
-  - name: aggregation_fuzzer
-  - name: auth
-  - name: bulk_gle_passthrough
-  - name: concurrency
-  - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_replication
-  - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_simultaneous
-  - name: dbtest
-  - name: disk_mmapv1
-  - name: durability
-  - name: dur_jscore_passthrough
-  - name: failpoints
-  - name: failpoints_auth
-  - name: jsCore
-  - name: jsCore_auth
-  - name: jsCore_compatibility
-  - name: jstestfuzz
-  - name: jstestfuzz_concurrent
-  - name: jstestfuzz_concurrent_replication
-  - name: jstestfuzz_concurrent_sharded
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_sharded
-  - name: mmap
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
-  - name: parallel_compatibility
-  - name: replica_sets
-  - name: replica_sets_auth
-  - name: replica_sets_jscore_passthrough
-  - name: serial_run
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_jscore_passthrough
-  - name: slow1
-  - name: tool
