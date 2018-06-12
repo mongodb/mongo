@@ -95,6 +95,42 @@ namespace mongo {
 class QueryPlannerAccess {
 public:
     /**
+     * Return a CollectionScanNode that scans as requested in 'query'.
+     */
+    static std::unique_ptr<QuerySolutionNode> makeCollectionScan(const CanonicalQuery& query,
+                                                                 bool tailable,
+                                                                 const QueryPlannerParams& params);
+
+    /**
+     * Return a plan that uses the provided index as a proxy for a collection scan.
+     */
+    static std::unique_ptr<QuerySolutionNode> scanWholeIndex(const IndexEntry& index,
+                                                             const CanonicalQuery& query,
+                                                             const QueryPlannerParams& params,
+                                                             int direction = 1);
+
+    /**
+     * Return a plan that scans the provided index from [startKey to endKey).
+     */
+    static std::unique_ptr<QuerySolutionNode> makeIndexScan(const IndexEntry& index,
+                                                            const CanonicalQuery& query,
+                                                            const QueryPlannerParams& params,
+                                                            const BSONObj& startKey,
+                                                            const BSONObj& endKey);
+
+    /**
+     * Consructs a data access plan for 'query' which answers the predicate contained in 'root'.
+     * Assumes the presence of the passed in indices. Planning behavior is controlled by the
+     * settings in 'params'.
+     */
+    static std::unique_ptr<QuerySolutionNode> buildIndexedDataAccess(
+        const CanonicalQuery& query,
+        std::unique_ptr<MatchExpression> root,
+        const std::vector<IndexEntry>& indices,
+        const QueryPlannerParams& params);
+
+private:
+    /**
      * Building the leaves (i.e. the index scans) is done by looping through
      * predicates one at a time. During the process, there is a fair amount of state
      * information to keep track of, which we consolidate into this data structure.
@@ -126,7 +162,7 @@ public:
             loosestBounds = IndexBoundsBuilder::EXACT;
 
             if (MatchExpression::OR == root->matchType()) {
-                curOr.reset(new OrMatchExpression());
+                curOr = stdx::make_unique<OrMatchExpression>();
             }
         }
 
@@ -182,72 +218,42 @@ public:
         ScanBuildingState();
     };
 
-    /**
-     * Return a CollectionScanNode that scans as requested in 'query'.
-     */
-    static std::unique_ptr<QuerySolutionNode> makeCollectionScan(const CanonicalQuery& query,
-                                                                 bool tailable,
-                                                                 const QueryPlannerParams& params);
-
-    /**
-     * Return a plan that uses the provided index as a proxy for a collection scan.
-     */
-    static QuerySolutionNode* scanWholeIndex(const IndexEntry& index,
-                                             const CanonicalQuery& query,
-                                             const QueryPlannerParams& params,
-                                             int direction = 1);
-
-    /**
-     * Return a plan that scans the provided index from [startKey to endKey).
-     */
-    static QuerySolutionNode* makeIndexScan(const IndexEntry& index,
-                                            const CanonicalQuery& query,
-                                            const QueryPlannerParams& params,
-                                            const BSONObj& startKey,
-                                            const BSONObj& endKey);
-
+    // When recursively building data access, the caller may either continue to hold ownership of
+    // 'root', or may transfer ownership. When the caller holds ownership, it passes an owned
+    // pointer in 'root' and nullptr in 'ownedRoot'. When the caller transfers ownership, it passes
+    // owned and unowned pointers to the same match expression node in 'root' and 'ownedRoot'.
     //
-    // Indexed Data Access methods.
+    // The caller only holds ownership when planning inside an "array operator", e.g. when
+    // recursively performing access planning for an $elemMatch object. Therefore, whether or not
+    // 'ownedRoot' is null is also used as a check for whether we need to apply special logic for
+    // the "in array operator" case.
     //
-    // The inArrayOperator flag deserves some attention.  It is set when we're processing a
-    // child of an MatchExpression::ELEM_MATCH_OBJECT.
-    //
-    // When true, the following behavior changes for all methods below that take it as an argument:
-    // 0. No deletion of MatchExpression(s).  In fact,
-    // 1. No mutation of the MatchExpression at all.  We need the tree as-is in order to perform
-    //    a filter on the entire tree.
-    // 2. No fetches performed.  There will be a final fetch by the caller of buildIndexedDataAccess
-    //    who set the value of inArrayOperator to true.
-    // 3. No compound indices are used and no bounds are combined.  These are
-    //    incorrect in the context of these operators.
-    //
+    // Specifically, for $elemMatch nodes, the entire $elemMatch filter must be attached to a FETCH
+    // node. This is why the caller retains ownership of the $elemMatch filter. However, the
+    // recursive call for children of the $elemMatch will also refrain from adding any FETCH stages.
+    // There will be a final FETCH node added to which the entire $elemMatch filter will be affixed.
+    static std::unique_ptr<QuerySolutionNode> _buildIndexedDataAccess(
+        const CanonicalQuery& query,
+        MatchExpression* root,
+        std::unique_ptr<MatchExpression> ownedRoot,
+        const std::vector<IndexEntry>& indices,
+        const QueryPlannerParams& params);
 
-    /**
-     * If 'inArrayOperator' is false, takes ownership of 'root'.
-     */
-    static QuerySolutionNode* buildIndexedDataAccess(const CanonicalQuery& query,
-                                                     MatchExpression* root,
-                                                     bool inArrayOperator,
-                                                     const std::vector<IndexEntry>& indices,
-                                                     const QueryPlannerParams& params);
+    // See _buildIndexedDataAccess() for description of 'root' and 'ownedRoot'.
+    static std::unique_ptr<QuerySolutionNode> buildIndexedAnd(
+        const CanonicalQuery& query,
+        MatchExpression* root,
+        std::unique_ptr<MatchExpression> ownedRoot,
+        const std::vector<IndexEntry>& indices,
+        const QueryPlannerParams& params);
 
-    /**
-     * Takes ownership of 'root'.
-     */
-    static QuerySolutionNode* buildIndexedAnd(const CanonicalQuery& query,
-                                              MatchExpression* root,
-                                              bool inArrayOperator,
-                                              const std::vector<IndexEntry>& indices,
-                                              const QueryPlannerParams& params);
-
-    /**
-     * Takes ownership of 'root'.
-     */
-    static QuerySolutionNode* buildIndexedOr(const CanonicalQuery& query,
-                                             MatchExpression* root,
-                                             bool inArrayOperator,
-                                             const std::vector<IndexEntry>& indices,
-                                             const QueryPlannerParams& params);
+    // See _buildIndexedDataAccess() for description of 'root' and 'ownedRoot'.
+    static std::unique_ptr<QuerySolutionNode> buildIndexedOr(
+        const CanonicalQuery& query,
+        MatchExpression* root,
+        std::unique_ptr<MatchExpression> ownedRoot,
+        const std::vector<IndexEntry>& indices,
+        const QueryPlannerParams& params);
 
     /**
      * Traverses the tree rooted at the $elemMatch expression 'node',
@@ -266,8 +272,8 @@ public:
 
     /**
      * Given a list of OR-related subtrees returned by processIndexScans(), looks for logically
-     * equivalent IndexScanNodes and combines them. This is an optimization to avoid creating
-     * plans that repeat index access work.
+     * equivalent IndexScanNodes and combines them. This is an optimization to avoid creating plans
+     * that repeat index access work.
      *
      * Example:
      *  Suppose processIndexScans() returns a list of the following three query solutions:
@@ -279,20 +285,16 @@ public:
      *    2) FETCH (filter: {$or:[{d:1}, {e:1}]}) -> IXSCAN (bounds: {c: [[3,3]]})
      *
      * Used as a helper for buildIndexedOr().
-     *
-     * Takes ownership of 'scans'. The caller assumes ownership of the pointers in the returned
-     * list of QuerySolutionNode*.
      */
-    static std::vector<QuerySolutionNode*> collapseEquivalentScans(
-        const std::vector<QuerySolutionNode*> scans);
+    static std::vector<std::unique_ptr<QuerySolutionNode>> collapseEquivalentScans(
+        std::vector<std::unique_ptr<QuerySolutionNode>> scans);
 
     /**
      * Helper used by buildIndexedAnd and buildIndexedOr.
      *
-     * The children of AND and OR nodes are sorted by the index that the subtree rooted at
-     * that node uses.  Child nodes that use the same index are adjacent to one another to
-     * facilitate grouping of index scans.  As such, the processing for AND and OR is
-     * almost identical.
+     * The children of AND and OR nodes are sorted by the index that the subtree rooted at that node
+     * uses.  Child nodes that use the same index are adjacent to one another to facilitate grouping
+     * of index scans.  As such, the processing for AND and OR is almost identical.
      *
      * Does not take ownership of 'root' but may remove children from it.
      */
@@ -301,19 +303,18 @@ public:
                                   bool inArrayOperator,
                                   const std::vector<IndexEntry>& indices,
                                   const QueryPlannerParams& params,
-                                  std::vector<QuerySolutionNode*>* out);
+                                  std::vector<std::unique_ptr<QuerySolutionNode>>* out);
 
     /**
-     * Used by processIndexScans(...) in order to recursively build a data access
-     * plan for a "subnode", a node in the MatchExpression tree which is indexed by
-     * virtue of its children.
+     * Used by processIndexScans(...) in order to recursively build a data access plan for a
+     * "subnode", a node in the MatchExpression tree which is indexed by virtue of its children.
      *
      * The resulting scans are outputted in the out-parameter 'out'.
      */
     static bool processIndexScansSubnode(const CanonicalQuery& query,
                                          ScanBuildingState* scanState,
                                          const QueryPlannerParams& params,
-                                         std::vector<QuerySolutionNode*>* out);
+                                         std::vector<std::unique_ptr<QuerySolutionNode>>* out);
 
     /**
      * Used by processIndexScansSubnode(...) to build the leaves of the solution tree for an
@@ -324,7 +325,7 @@ public:
     static bool processIndexScansElemMatch(const CanonicalQuery& query,
                                            ScanBuildingState* scanState,
                                            const QueryPlannerParams& params,
-                                           std::vector<QuerySolutionNode*>* out);
+                                           std::vector<std::unique_ptr<QuerySolutionNode>>* out);
 
     //
     // Helpers for creating an index scan.
@@ -333,17 +334,18 @@ public:
     /**
      * Create a new data access node.
      *
-     * If the node is an index scan, the bounds for 'expr' are computed and placed into the
-     * first field's OIL position.  The rest of the OILs are allocated but uninitialized.
+     * If the node is an index scan, the bounds for 'expr' are computed and placed into the first
+     * field's OIL position.  The rest of the OILs are allocated but uninitialized.
      *
-     * If the node is a geo node, grab the geo data from 'expr' and stuff it into the
-     * geo solution node of the appropriate type.
+     * If the node is a geo node, grab the geo data from 'expr' and stuff it into the geo solution
+     * node of the appropriate type.
      */
-    static QuerySolutionNode* makeLeafNode(const CanonicalQuery& query,
-                                           const IndexEntry& index,
-                                           size_t pos,
-                                           MatchExpression* expr,
-                                           IndexBoundsBuilder::BoundsTightness* tightnessOut);
+    static std::unique_ptr<QuerySolutionNode> makeLeafNode(
+        const CanonicalQuery& query,
+        const IndexEntry& index,
+        size_t pos,
+        const MatchExpression* expr,
+        IndexBoundsBuilder::BoundsTightness* tightnessOut);
 
     /**
      * Merge the predicate 'expr' with the leaf node 'node'.
@@ -373,11 +375,11 @@ public:
      * 'scanState'. The resulting scan is outputted in the out-parameter 'out', transferring
      * ownership in the process.
      *
-     * If 'scanState' is building an index scan for OR-related predicates, filters
-     * may be affixed to the scan as necessary.
+     * If 'scanState' is building an index scan for OR-related predicates, filters may be affixed to
+     * the scan as necessary.
      */
     static void finishAndOutputLeaf(ScanBuildingState* scanState,
-                                    std::vector<QuerySolutionNode*>* out);
+                                    std::vector<std::unique_ptr<QuerySolutionNode>>* out);
 
     /**
      * Returns true if the current scan in 'scanState' requires a FetchNode.
