@@ -20,8 +20,6 @@ selector:
   - jstests/replsets/*[aA]uth*.js
   # Also skip tests that require a ScopedThread, because ScopedThreads don't inherit credentials.
   - jstests/replsets/interrupted_batch_insert.js
-  - jstests/replsets/view_definition_initial_sync_with_feature_compatibility.js
-  - jstests/replsets/collection_validator_initial_sync_with_feature_compatibility.js
   - jstests/replsets/replsetprio1.js
   - jstests/replsets/index_restart_secondary.js
   - jstests/replsets/read_committed_with_catalog_changes.js

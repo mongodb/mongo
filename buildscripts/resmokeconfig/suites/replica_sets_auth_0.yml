@@ -18,8 +18,6 @@ selector:
   #   14 minutes to run on linux-64-debug
   #   17 minutes to run on enterprise-windows-64-2k8
   roots:
-  - jstests/replsets/view_definition_initial_sync_with_feature_compatibility.js
-  - jstests/replsets/collection_validator_initial_sync_with_feature_compatibility.js
   - jstests/replsets/replsetprio1.js
   - jstests/replsets/index_restart_secondary.js
   exclude_files:

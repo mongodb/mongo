@@ -17,9 +17,6 @@ selector:
   exclude_files:
   # Disable config_server_checks.js since it starts mmap servers.
   - jstests/replsets/config_server_checks.js
-  - jstests/replsets/view_definition_initial_sync_with_feature_compatibility.js
-  - jstests/replsets/collection_validator_initial_sync_with_feature_compatibility.js
-  - jstests/replsets/read_committed_with_catalog_changes.js
   - jstests/replsets/slavedelay1.js
   - jstests/replsets/replsets_killop.js
   - jstests/replsets/tags.js

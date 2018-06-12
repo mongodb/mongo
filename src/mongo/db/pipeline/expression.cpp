@@ -4518,20 +4518,9 @@ const char* ExpressionToUpper::getOpName() const {
 
 /* -------------------------- ExpressionTrim ------------------------------ */
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    trim,
-    ExpressionTrim::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    ltrim,
-    ExpressionTrim::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    rtrim,
-    ExpressionTrim::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION(trim, ExpressionTrim::parse);
+REGISTER_EXPRESSION(ltrim, ExpressionTrim::parse);
+REGISTER_EXPRESSION(rtrim, ExpressionTrim::parse);
 
 intrusive_ptr<Expression> ExpressionTrim::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -5401,45 +5390,18 @@ Expression::Parser makeConversionAlias(const StringData shortcutName, BSONType t
 const double ExpressionConvert::kLongLongMaxPlusOneAsDouble =
     scalbn(1, std::numeric_limits<long long>::digits);
 
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    convert,
-    ExpressionConvert::parse,
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION(convert, ExpressionConvert::parse);
 
 // Also register shortcut expressions like $toInt, $toString, etc. which can be used as a shortcut
 // for $convert without an 'onNull' or 'onError'.
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    toString,
-    makeConversionAlias("$toString"_sd, BSONType::String),
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    toObjectId,
-    makeConversionAlias("$toObjectId"_sd, BSONType::jstOID),
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    toDate,
-    makeConversionAlias("$toDate"_sd, BSONType::Date),
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    toDouble,
-    makeConversionAlias("$toDouble"_sd, BSONType::NumberDouble),
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    toInt,
-    makeConversionAlias("$toInt"_sd, BSONType::NumberInt),
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    toLong,
-    makeConversionAlias("$toLong"_sd, BSONType::NumberLong),
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    toDecimal,
-    makeConversionAlias("$toDecimal"_sd, BSONType::NumberDecimal),
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-REGISTER_EXPRESSION_WITH_MIN_VERSION(
-    toBool,
-    makeConversionAlias("$toBool"_sd, BSONType::Bool),
-    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION(toString, makeConversionAlias("$toString"_sd, BSONType::String));
+REGISTER_EXPRESSION(toObjectId, makeConversionAlias("$toObjectId"_sd, BSONType::jstOID));
+REGISTER_EXPRESSION(toDate, makeConversionAlias("$toDate"_sd, BSONType::Date));
+REGISTER_EXPRESSION(toDouble, makeConversionAlias("$toDouble"_sd, BSONType::NumberDouble));
+REGISTER_EXPRESSION(toInt, makeConversionAlias("$toInt"_sd, BSONType::NumberInt));
+REGISTER_EXPRESSION(toLong, makeConversionAlias("$toLong"_sd, BSONType::NumberLong));
+REGISTER_EXPRESSION(toDecimal, makeConversionAlias("$toDecimal"_sd, BSONType::NumberDecimal));
+REGISTER_EXPRESSION(toBool, makeConversionAlias("$toBool"_sd, BSONType::Bool));
 
 boost::intrusive_ptr<Expression> ExpressionConvert::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
