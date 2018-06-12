@@ -695,26 +695,6 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
                                        "intermediate CA certificates belong in the CA file.");
     }
 
-    // PEM files can have either private key format
-    // Also the private key can either come before or after the certificate
-    auto swPrivateKeyBlob = findPEMBlob(buf, "RSA PRIVATE KEY"_sd);
-    // We expect to find at least one certificate
-    if (!swPrivateKeyBlob.isOK()) {
-        // A "PRIVATE KEY" is actually a PKCS #8 PrivateKeyInfo ASN.1 type. We do not support it for
-        // now so tell the user how to fix it.
-        // Warn user rsa -in roles.key -out roles2.key
-        swPrivateKeyBlob = findPEMBlob(buf, "PRIVATE KEY"_sd);
-        if (!swPrivateKeyBlob.isOK()) {
-            return swPrivateKeyBlob.getStatus();
-        } else {
-            return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "Expected to find 'RSA PRIVATE KEY' in PEM file, found "
-                                           "'PRIVATE KEY' instead.");
-        }
-    }
-
-    auto privateKeyBlob = swPrivateKeyBlob.getValue();
-
     auto swCert = decodePEMBlob(publicKeyBlob);
     if (!swCert.isOK()) {
         return swCert.getStatus();
@@ -734,18 +714,70 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
 
     UniqueCertificate certHolder(cert);
 
-    auto swPrivateKeyBuf = decodePEMBlob(privateKeyBlob);
-    if (!swPrivateKeyBuf.isOK()) {
-        return swPrivateKeyBuf.getStatus();
+    std::vector<uint8_t> privateKey;
+
+    // PEM files can have either private key format
+    // Also the private key can either come before or after the certificate
+    auto swPrivateKeyBlob = findPEMBlob(buf, "RSA PRIVATE KEY"_sd);
+    // We expect to find at least one certificate
+    if (!swPrivateKeyBlob.isOK()) {
+        // A "PRIVATE KEY" is actually a PKCS #8 PrivateKeyInfo ASN.1 type.
+        swPrivateKeyBlob = findPEMBlob(buf, "PRIVATE KEY"_sd);
+        if (!swPrivateKeyBlob.isOK()) {
+            return swPrivateKeyBlob.getStatus();
+        }
+
+        auto privateKeyBlob = swPrivateKeyBlob.getValue();
+
+        auto swPrivateKeyBuf = decodePEMBlob(privateKeyBlob);
+        if (!swPrivateKeyBuf.isOK()) {
+            return swPrivateKeyBuf.getStatus();
+        }
+
+        auto privateKeyBuf = swPrivateKeyBuf.getValue();
+
+        auto swPrivateKey =
+            decodeObject(PKCS_PRIVATE_KEY_INFO, privateKeyBuf.data(), privateKeyBuf.size());
+        if (!swPrivateKey.isOK()) {
+            return swPrivateKey.getStatus();
+        }
+
+        CRYPT_PRIVATE_KEY_INFO* privateKeyInfo =
+            reinterpret_cast<CRYPT_PRIVATE_KEY_INFO*>(swPrivateKey.getValue().data());
+
+        if (strcmp(privateKeyInfo->Algorithm.pszObjId, szOID_RSA_RSA) != 0) {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "Non-RSA private keys are not supported, use the "
+                                           "Windows certificate store instead");
+        }
+
+        auto swPrivateKey2 = decodeObject(PKCS_RSA_PRIVATE_KEY,
+                                          privateKeyInfo->PrivateKey.pbData,
+                                          privateKeyInfo->PrivateKey.cbData);
+        if (!swPrivateKey2.isOK()) {
+            return swPrivateKey2.getStatus();
+        }
+
+        privateKey = swPrivateKey2.getValue();
+    } else {
+        auto privateKeyBlob = swPrivateKeyBlob.getValue();
+
+        auto swPrivateKeyBuf = decodePEMBlob(privateKeyBlob);
+        if (!swPrivateKeyBuf.isOK()) {
+            return swPrivateKeyBuf.getStatus();
+        }
+
+        auto privateKeyBuf = swPrivateKeyBuf.getValue();
+
+        auto swPrivateKey =
+            decodeObject(PKCS_RSA_PRIVATE_KEY, privateKeyBuf.data(), privateKeyBuf.size());
+        if (!swPrivateKey.isOK()) {
+            return swPrivateKey.getStatus();
+        }
+
+        privateKey = swPrivateKey.getValue();
     }
 
-    auto privateKeyBuf = swPrivateKeyBuf.getValue();
-
-    auto swPrivateKey =
-        decodeObject(PKCS_RSA_PRIVATE_KEY, privateKeyBuf.data(), privateKeyBuf.size());
-    if (!swPrivateKey.isOK()) {
-        return swPrivateKey.getStatus();
-    }
 
     HCRYPTPROV hProv;
     std::wstring wstr;
@@ -803,8 +835,7 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     UniqueCryptProvider cryptProvider(hProv);
 
     HCRYPTKEY hkey;
-    ret = CryptImportKey(
-        hProv, swPrivateKey.getValue().data(), swPrivateKey.getValue().size(), 0, 0, &hkey);
+    ret = CryptImportKey(hProv, privateKey.data(), privateKey.size(), 0, 0, &hkey);
     if (!ret) {
         DWORD gle = GetLastError();
         return Status(ErrorCodes::InvalidSSLConfiguration,
