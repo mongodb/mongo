@@ -49,7 +49,12 @@ OplogBufferBlockingQueue::OplogBufferBlockingQueue() : OplogBufferBlockingQueue(
 OplogBufferBlockingQueue::OplogBufferBlockingQueue(Counters* counters)
     : _counters(counters), _queue(kOplogBufferSize, &getDocumentSize) {}
 
-void OplogBufferBlockingQueue::startup(OperationContext*) {}
+void OplogBufferBlockingQueue::startup(OperationContext*) {
+    // Update server status metric to reflect the current oplog buffer's max size.
+    if (_counters) {
+        _counters->setMaxSize(getMaxSize());
+    }
+}
 
 void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
     clear(opCtx);

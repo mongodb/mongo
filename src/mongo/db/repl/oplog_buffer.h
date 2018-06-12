@@ -171,6 +171,14 @@ public:
 class OplogBuffer::Counters {
 public:
     /**
+     * Sets maximum size of operations for this OplogBuffer.
+     * This function should only be called by a single thread.
+     */
+    void setMaxSize(std::size_t newMaxSize) {
+        maxSize.increment(newMaxSize - maxSize.get());
+    }
+
+    /**
      * Clears counters.
      * This function should only be called by a single thread.
      */
@@ -194,6 +202,9 @@ public:
 
     // Total size of operations in this OplogBuffer. Measured in bytes.
     Counter64 size;
+
+    // Maximum size of operations in this OplogBuffer. Measured in bytes.
+    Counter64 maxSize;
 };
 
 }  // namespace repl
