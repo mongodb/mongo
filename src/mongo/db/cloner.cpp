@@ -42,6 +42,7 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
@@ -169,12 +170,14 @@ struct Cloner::Fun {
 
                 WriteUnitOfWork wunit(opCtx);
                 const bool createDefaultIndexes = true;
+                CollectionOptions collectionOptions;
+                uassertStatusOK(collectionOptions.parse(
+                    from_options, CollectionOptions::ParseKind::parseForCommand));
                 Status s = Database::userCreateNS(
                     opCtx,
                     db,
                     to_collection.toString(),
-                    from_options,
-                    CollectionOptions::parseForCommand,
+                    collectionOptions,
                     createDefaultIndexes,
                     fixIndexSpec(to_collection.db().toString(), from_id_index));
                 verify(s.isOK());
@@ -378,13 +381,15 @@ void Cloner::copyIndexes(OperationContext* opCtx,
             opCtx->checkForInterrupt();
 
             WriteUnitOfWork wunit(opCtx);
+            CollectionOptions collectionOptions;
+            uassertStatusOK(
+                collectionOptions.parse(from_opts, CollectionOptions::ParseKind::parseForCommand));
             const bool createDefaultIndexes = true;
             Status s = Database::userCreateNS(
                 opCtx,
                 db,
                 to_collection.toString(),
-                from_opts,
-                CollectionOptions::parseForCommand,
+                collectionOptions,
                 createDefaultIndexes,
                 fixIndexSpec(to_collection.db().toString(), getIdIndexSpec(from_indexes)));
             invariant(s.isOK());
@@ -484,9 +489,11 @@ bool Cloner::copyCollection(OperationContext* opCtx,
             opCtx->checkForInterrupt();
 
             WriteUnitOfWork wunit(opCtx);
+            CollectionOptions collectionOptions;
+            uassertStatusOK(collectionOptions.parse(options, optionsParser));
             const bool createDefaultIndexes = true;
             Status status = Database::userCreateNS(
-                opCtx, db, ns, options, optionsParser, createDefaultIndexes, idIndexSpec);
+                opCtx, db, ns, collectionOptions, createDefaultIndexes, idIndexSpec);
             if (!status.isOK()) {
                 errmsg = status.toString();
                 // abort write unit of work
@@ -529,8 +536,8 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
 
         BSONElement collectionOptions = collection["options"];
         if (collectionOptions.isABSONObj()) {
-            auto parseOptionsStatus = CollectionOptions().parse(collectionOptions.Obj(),
-                                                                CollectionOptions::parseForCommand);
+            auto parseOptionsStatus = CollectionOptions().parse(
+                collectionOptions.Obj(), CollectionOptions::ParseKind::parseForCommand);
             if (!parseOptionsStatus.isOK()) {
                 return parseOptionsStatus;
             }
@@ -636,12 +643,14 @@ Status Cloner::createCollectionsForDb(
                 const bool createDefaultIndexes = true;
                 auto options = optionsBuilder.obj();
 
+                CollectionOptions collectionOptions;
+                uassertStatusOK(collectionOptions.parse(
+                    options, CollectionOptions::ParseKind::parseForStorage));
                 Status createStatus =
                     Database::userCreateNS(opCtx,
                                            db,
                                            nss.ns(),
-                                           options,
-                                           CollectionOptions::parseForStorage,
+                                           collectionOptions,
                                            createDefaultIndexes,
                                            fixIndexSpec(nss.db().toString(), params.idIndexSpec));
                 if (!createStatus.isOK()) {

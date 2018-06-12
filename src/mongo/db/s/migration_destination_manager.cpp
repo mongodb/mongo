@@ -676,14 +676,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             // We do not have a collection by this name. Create the collection with the donor's
             // options.
             WriteUnitOfWork wuow(opCtx);
+            CollectionOptions collectionOptions;
+            uassertStatusOK(collectionOptions.parse(donorOptions,
+                                                    CollectionOptions::ParseKind::parseForStorage));
             const bool createDefaultIndexes = true;
-            Status status = Database::userCreateNS(opCtx,
-                                                   db,
-                                                   _nss.ns(),
-                                                   donorOptions,
-                                                   CollectionOptions::parseForStorage,
-                                                   createDefaultIndexes,
-                                                   donorIdIndexSpec);
+            Status status = Database::userCreateNS(
+                opCtx, db, _nss.ns(), collectionOptions, createDefaultIndexes, donorIdIndexSpec);
             if (!status.isOK()) {
                 warning() << "failed to create collection [" << _nss << "] "
                           << " with options " << donorOptions << ": " << redact(status);

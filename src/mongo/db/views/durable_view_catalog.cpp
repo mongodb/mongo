@@ -137,7 +137,8 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
                                     const BSONObj& view) {
     dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_X));
     NamespaceString systemViewsNs(_db->getSystemViewsName());
-    Collection* systemViews = _db->getOrCreateCollection(opCtx, systemViewsNs);
+    Collection* systemViews = _db->getCollection(opCtx, systemViewsNs);
+    invariant(systemViews);
 
     const bool requireIndex = false;
     RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()), requireIndex);

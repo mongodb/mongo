@@ -481,8 +481,11 @@ public:
                     if (!collection) {
                         uassertStatusOK(userAllowedCreateNS(nsString.db(), nsString.coll()));
                         WriteUnitOfWork wuow(opCtx);
+                        CollectionOptions collectionOptions;
+                        uassertStatusOK(collectionOptions.parse(
+                            BSONObj(), CollectionOptions::ParseKind::parseForCommand));
                         uassertStatusOK(Database::userCreateNS(
-                            opCtx, autoDb->getDb(), nsString.ns(), BSONObj()));
+                            opCtx, autoDb->getDb(), nsString.ns(), collectionOptions));
                         wuow.commit();
 
                         collection = autoDb->getDb()->getCollection(opCtx, nsString);

@@ -97,12 +97,26 @@ Status createCollection(OperationContext* opCtx,
                           str::stream() << "Not primary while creating collection " << nss.ns());
         }
 
+        CollectionOptions collectionOptions;
+        Status status = collectionOptions.parse(options, kind);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if (collectionOptions.isView()) {
+            // If the `system.views` collection does not exist, create it in a separate
+            // WriteUnitOfWork.
+            WriteUnitOfWork wuow(opCtx);
+            ctx.db()->getOrCreateCollection(opCtx, NamespaceString(ctx.db()->getSystemViewsName()));
+            wuow.commit();
+        }
+
         WriteUnitOfWork wunit(opCtx);
 
         // Create collection.
         const bool createDefaultIndexes = true;
         status = Database::userCreateNS(
-            opCtx, ctx.db(), nss.ns(), options, kind, createDefaultIndexes, idIndex);
+            opCtx, ctx.db(), nss.ns(), std::move(collectionOptions), createDefaultIndexes, idIndex);
 
         if (!status.isOK()) {
             return status;
