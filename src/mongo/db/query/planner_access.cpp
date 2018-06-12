@@ -115,8 +115,8 @@ bool scansAreEquivalent(const QuerySolutionNode* lhs, const QuerySolutionNode* r
  * their index scans reversed to provide the sort. Otherwise, returns an empty vector.
  * 'nodes' must not be empty.
  */
-std::vector<bool> canProvideSortWithMergeSort(
-    const std::vector<std::unique_ptr<QuerySolutionNode>>& nodes, const BSONObj& requestedSort) {
+std::vector<bool> canProvideSortWithMergeSort(const std::vector<QuerySolutionNode*>& nodes,
+                                              const BSONObj& requestedSort) {
     invariant(!nodes.empty());
     std::vector<bool> shouldReverseScan;
     const auto reverseSort = QueryPlannerCommon::reverseSortObj(requestedSort);
@@ -142,6 +142,7 @@ using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
 
+// static
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params) {
     // Make the (only) node, a collection scan.
@@ -176,11 +177,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     return std::move(csn);
 }
 
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
+// static
+QuerySolutionNode* QueryPlannerAccess::makeLeafNode(
     const CanonicalQuery& query,
     const IndexEntry& index,
     size_t pos,
-    const MatchExpression* expr,
+    MatchExpression* expr,
     IndexBoundsBuilder::BoundsTightness* tightnessOut) {
     // We're guaranteed that all GEO_NEARs are first.  This slightly violates the "sort index
     // predicates by their position in the compound index" rule but GEO_NEAR isn't an ixscan.
@@ -195,13 +197,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
     if (MatchExpression::GEO_NEAR == expr->matchType()) {
         // We must not keep the expression node around.
         *tightnessOut = IndexBoundsBuilder::EXACT;
-        auto nearExpr = static_cast<const GeoNearMatchExpression*>(expr);
+        GeoNearMatchExpression* nearExpr = static_cast<GeoNearMatchExpression*>(expr);
 
         BSONElement elt = index.keyPattern.firstElement();
         bool indexIs2D = (String == elt.type() && "2d" == elt.String());
 
         if (indexIs2D) {
-            auto ret = stdx::make_unique<GeoNear2DNode>(index);
+            GeoNear2DNode* ret = new GeoNear2DNode(index);
             ret->nq = &nearExpr->getData();
             ret->baseBounds.fields.resize(index.keyPattern.nFields());
             if (NULL != query.getProj()) {
@@ -211,7 +213,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
 
             return ret;
         } else {
-            auto ret = stdx::make_unique<GeoNear2DSphereNode>(index);
+            GeoNear2DSphereNode* ret = new GeoNear2DSphereNode(index);
             ret->nq = &nearExpr->getData();
             ret->baseBounds.fields.resize(index.keyPattern.nFields());
             if (NULL != query.getProj()) {
@@ -223,8 +225,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
     } else if (MatchExpression::TEXT == expr->matchType()) {
         // We must not keep the expression node around.
         *tightnessOut = IndexBoundsBuilder::EXACT;
-        auto textExpr = static_cast<const TextMatchExpressionBase*>(expr);
-        auto ret = stdx::make_unique<TextNode>(index);
+        TextMatchExpressionBase* textExpr = static_cast<TextMatchExpressionBase*>(expr);
+        TextNode* ret = new TextNode(index);
         ret->ftsQuery = textExpr->getFTSQuery().clone();
 
         // Count the number of prefix fields before the "text" field.
@@ -241,7 +243,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
     } else {
         // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()
         // because expr might be inside an array operator that provides a path prefix.
-        auto isn = stdx::make_unique<IndexScanNode>(index);
+        IndexScanNode* isn = new IndexScanNode(index);
         isn->bounds.fields.resize(index.keyPattern.nFields());
         isn->addKeyMetadata = query.getQueryRequest().returnKey();
         isn->queryCollator = query.getCollator();
@@ -446,6 +448,7 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     }
 }
 
+// static
 void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntry& index) {
     TextNode* tn = static_cast<TextNode*>(node);
 
@@ -528,6 +531,7 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
     tn->indexPrefix = prefixBob.obj();
 }
 
+// static
 bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
     if (scanState->loosestBounds == IndexBoundsBuilder::EXACT) {
         return false;
@@ -540,8 +544,9 @@ bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
     }
 }
 
+// static
 void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
-                                             vector<std::unique_ptr<QuerySolutionNode>>* out) {
+                                             vector<QuerySolutionNode*>* out) {
     finishLeafNode(scanState->currentScan.get(), scanState->indices[scanState->currentIndexNumber]);
 
     if (MatchExpression::OR == scanState->root->matchType()) {
@@ -549,13 +554,13 @@ void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
             // In order to correctly evaluate the predicates for this index, we have to
             // fetch the full documents. Add a fetch node above the index scan whose filter
             // includes *all* of the predicates used to generate the ixscan.
-            auto fetch = stdx::make_unique<FetchNode>();
+            FetchNode* fetch = new FetchNode();
             // Takes ownership.
-            fetch->filter = std::move(scanState->curOr);
+            fetch->filter.reset(scanState->curOr.release());
             // Takes ownership.
             fetch->children.push_back(scanState->currentScan.release());
 
-            scanState->currentScan = std::move(fetch);
+            scanState->currentScan.reset(fetch);
         } else if (scanState->loosestBounds == IndexBoundsBuilder::INEXACT_COVERED) {
             // This an OR, at least one of the predicates used to generate 'currentScan'
             // is inexact covered, but none is inexact fetch. This means that we can put
@@ -566,13 +571,14 @@ void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
             //   Say we have index {a: 1} and query {$or: [{a: /foo/}, {a: /bar/}]}.
             //   The entire query, {$or: [{a: /foo/}, {a: /bar/}]}, should be a filter
             //   in the index scan stage itself.
-            scanState->currentScan->filter = std::move(scanState->curOr);
+            scanState->currentScan->filter.reset(scanState->curOr.release());
         }
     }
 
-    out->push_back(std::move(scanState->currentScan));
+    out->push_back(scanState->currentScan.release());
 }
 
+// static
 void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
     const StageType type = node->getType();
 
@@ -641,6 +647,7 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
     IndexBoundsBuilder::alignBounds(bounds, index.keyPattern);
 }
 
+// static
 void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,
                                                vector<MatchExpression*>* out,
                                                vector<MatchExpression*>* subnodesOut) {
@@ -657,9 +664,12 @@ void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,
     }
 }
 
-std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEquivalentScans(
-    std::vector<std::unique_ptr<QuerySolutionNode>> scans) {
-    invariant(scans.size() > 0);
+// static
+std::vector<QuerySolutionNode*> QueryPlannerAccess::collapseEquivalentScans(
+    const std::vector<QuerySolutionNode*> scans) {
+    std::vector<std::unique_ptr<QuerySolutionNode>> ownedScans =
+        transitional_tools_do_not_use::spool_vector(scans);
+    invariant(ownedScans.size() > 0);
 
     // Scans that need to be collapsed will be adjacent to each other in the list due to how we
     // sort the query predicate. We step through the list, either merging the current scan into
@@ -667,11 +677,11 @@ std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEqui
     // be merged.
     std::vector<std::unique_ptr<QuerySolutionNode>> collapsedScans;
 
-    collapsedScans.push_back(std::move(scans[0]));
-    for (size_t i = 1; i < scans.size(); ++i) {
-        if (scansAreEquivalent(collapsedScans.back().get(), scans[i].get())) {
+    collapsedScans.push_back(std::move(ownedScans[0]));
+    for (size_t i = 1; i < ownedScans.size(); ++i) {
+        if (scansAreEquivalent(collapsedScans.back().get(), ownedScans[i].get())) {
             // We collapse the entry from 'ownedScans' into the back of 'collapsedScans'.
-            std::unique_ptr<QuerySolutionNode> collapseFrom = std::move(scans[i]);
+            std::unique_ptr<QuerySolutionNode> collapseFrom(std::move(ownedScans[i]));
             FetchNode* collapseFromFetch = getFetchNode(collapseFrom.get());
             FetchNode* collapseIntoFetch = getFetchNode(collapsedScans.back().get());
 
@@ -701,20 +711,21 @@ std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEqui
             collapseIntoFetch->filter = MatchExpression::optimize(std::move(collapsedFilter));
         } else {
             // Scans are not equivalent and can't be collapsed.
-            collapsedScans.push_back(std::move(scans[i]));
+            collapsedScans.push_back(std::move(ownedScans[i]));
         }
     }
 
     invariant(collapsedScans.size() > 0);
-    return collapsedScans;
+    return transitional_tools_do_not_use::leak_vector(collapsedScans);
 }
 
+// static
 bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
                                            MatchExpression* root,
                                            bool inArrayOperator,
                                            const std::vector<IndexEntry>& indices,
                                            const QueryPlannerParams& params,
-                                           std::vector<std::unique_ptr<QuerySolutionNode>>* out) {
+                                           std::vector<QuerySolutionNode*>* out) {
     // Initialize the ScanBuildingState.
     ScanBuildingState scanState(root, inArrayOperator, indices);
 
@@ -794,11 +805,11 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
             // Reset state before producing a new leaf.
             scanState.resetForNextScan(scanState.ixtag);
 
-            scanState.currentScan = makeLeafNode(query,
-                                                 indices[scanState.currentIndexNumber],
-                                                 scanState.ixtag->pos,
-                                                 child,
-                                                 &scanState.tightness);
+            scanState.currentScan.reset(makeLeafNode(query,
+                                                     indices[scanState.currentIndexNumber],
+                                                     scanState.ixtag->pos,
+                                                     child,
+                                                     &scanState.tightness));
 
             handleFilter(&scanState);
         }
@@ -812,11 +823,11 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
     return true;
 }
 
-bool QueryPlannerAccess::processIndexScansElemMatch(
-    const CanonicalQuery& query,
-    ScanBuildingState* scanState,
-    const QueryPlannerParams& params,
-    std::vector<std::unique_ptr<QuerySolutionNode>>* out) {
+// static
+bool QueryPlannerAccess::processIndexScansElemMatch(const CanonicalQuery& query,
+                                                    ScanBuildingState* scanState,
+                                                    const QueryPlannerParams& params,
+                                                    std::vector<QuerySolutionNode*>* out) {
     MatchExpression* root = scanState->root;
     MatchExpression* child = root->getChild(scanState->curChild);
     const vector<IndexEntry>& indices = scanState->indices;
@@ -845,22 +856,23 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
         MatchExpression* subnode = emSubnodes[i];
 
         if (!Indexability::isBoundsGenerating(subnode)) {
-            // 'subnode' is beneath an $elemMatch. When planning the children of array operators, we
-            // keep ownership of the match expression node. Therefore, we pass nullptr for the
-            // 'ownedRoot' argument.
-            auto childSolution = _buildIndexedDataAccess(query, subnode, nullptr, indices, params);
+            // Must pass true for 'inArrayOperator' because the subnode is
+            // beneath an ELEM_MATCH_OBJECT.
+            QuerySolutionNode* childSolution =
+                buildIndexedDataAccess(query, subnode, true, indices, params);
 
-            // _buildIndexedDataAccess(...) returns NULL in error conditions, when it is unable to
-            // construct a query solution from a tagged match expression tree. If we are unable to
-            // construct a solution according to the instructions from the enumerator, then we bail
-            // out early (by returning false) rather than continuing on and potentially constructing
-            // an invalid solution tree.
-            if (!childSolution) {
+            // buildIndexedDataAccess(...) returns NULL in error conditions, when
+            // it is unable to construct a query solution from a tagged match
+            // expression tree. If we are unable to construct a solution according
+            // to the instructions from the enumerator, then we bail out early
+            // (by returning false) rather than continuing on and potentially
+            // constructing an invalid solution tree.
+            if (NULL == childSolution) {
                 return false;
             }
 
             // Output the resulting solution tree.
-            out->push_back(std::move(childSolution));
+            out->push_back(childSolution);
         }
     }
 
@@ -899,11 +911,11 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
             scanState->currentIndexNumber = scanState->ixtag->index;
 
             scanState->tightness = IndexBoundsBuilder::INEXACT_FETCH;
-            scanState->currentScan = makeLeafNode(query,
-                                                  indices[scanState->currentIndexNumber],
-                                                  scanState->ixtag->pos,
-                                                  emChild,
-                                                  &scanState->tightness);
+            scanState->currentScan.reset(makeLeafNode(query,
+                                                      indices[scanState->currentIndexNumber],
+                                                      scanState->ixtag->pos,
+                                                      emChild,
+                                                      &scanState->tightness));
         }
     }
 
@@ -914,49 +926,52 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
     return true;
 }
 
-bool QueryPlannerAccess::processIndexScansSubnode(
-    const CanonicalQuery& query,
-    ScanBuildingState* scanState,
-    const QueryPlannerParams& params,
-    std::vector<std::unique_ptr<QuerySolutionNode>>* out) {
+// static
+bool QueryPlannerAccess::processIndexScansSubnode(const CanonicalQuery& query,
+                                                  ScanBuildingState* scanState,
+                                                  const QueryPlannerParams& params,
+                                                  std::vector<QuerySolutionNode*>* out) {
     MatchExpression* root = scanState->root;
     MatchExpression* child = root->getChild(scanState->curChild);
     const vector<IndexEntry>& indices = scanState->indices;
     bool inArrayOperator = scanState->inArrayOperator;
 
-    // We may detach the current child from the tree and assume ownership.
-    std::unique_ptr<MatchExpression> ownedChild;
-
     if (MatchExpression::AND == root->matchType() &&
         MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
         return processIndexScansElemMatch(query, scanState, params, out);
     } else if (!inArrayOperator) {
-        // The logical sub-tree is responsible for fully evaluating itself. Any required filters or
-        // fetches are already hung on it. As such, we remove the filter branch from our tree and
-        // assume ownership of it.
+        // The logical sub-tree is responsible for fully evaluating itself.  Any
+        // required filters or fetches are already hung on it.  As such, we remove the
+        // filter branch from our tree.  buildIndexedDataAccess takes ownership of the
+        // child.
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
-        ownedChild.reset(child);
+        // The curChild of today is the curChild+1 of yesterday.
     } else {
         ++scanState->curChild;
     }
 
     // If inArrayOperator: takes ownership of child, which is OK, since we detached
     // child from root.
-    auto childSolution =
-        _buildIndexedDataAccess(query, child, std::move(ownedChild), indices, params);
-    if (!childSolution) {
+    QuerySolutionNode* childSolution =
+        buildIndexedDataAccess(query, child, inArrayOperator, indices, params);
+    if (NULL == childSolution) {
         return false;
     }
-    out->push_back(std::move(childSolution));
+    out->push_back(childSolution);
     return true;
 }
 
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
-    const CanonicalQuery& query,
-    MatchExpression* root,
-    std::unique_ptr<MatchExpression> ownedRoot,
-    const vector<IndexEntry>& indices,
-    const QueryPlannerParams& params) {
+// static
+QuerySolutionNode* QueryPlannerAccess::buildIndexedAnd(const CanonicalQuery& query,
+                                                       MatchExpression* root,
+                                                       bool inArrayOperator,
+                                                       const vector<IndexEntry>& indices,
+                                                       const QueryPlannerParams& params) {
+    unique_ptr<MatchExpression> autoRoot;
+    if (!inArrayOperator) {
+        autoRoot.reset(root);
+    }
+
     // If we are not allowed to trim for ixisect, then clone the match expression before
     // passing it to processIndexScans(), which may do the trimming. If we end up with
     // an index intersection solution, then we use our copy of the match expression to be
@@ -968,8 +983,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         clonedRoot = root->shallowClone();
     }
 
-    std::vector<std::unique_ptr<QuerySolutionNode>> ixscanNodes;
-    const bool inArrayOperator = !ownedRoot;
+    vector<QuerySolutionNode*> ixscanNodes;
     if (!processIndexScans(query, root, inArrayOperator, indices, params, &ixscanNodes)) {
         return NULL;
     }
@@ -980,7 +994,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
     //
 
     // This is the node we're about to return.
-    std::unique_ptr<QuerySolutionNode> andResult;
+    QuerySolutionNode* andResult;
 
     // We must use an index for at least one child of the AND.  We shouldn't be here if this
     // isn't the case.
@@ -988,7 +1002,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
 
     // Short-circuit: an AND of one child is just the child.
     if (ixscanNodes.size() == 1) {
-        andResult = std::move(ixscanNodes[0]);
+        andResult = ixscanNodes[0];
     } else {
         // Figure out if we want AndHashNode or AndSortedNode.
         bool allSortedByDiskLoc = true;
@@ -999,24 +1013,21 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
             }
         }
         if (allSortedByDiskLoc) {
-            auto asn = stdx::make_unique<AndSortedNode>();
-            asn->addChildren(std::move(ixscanNodes));
-            andResult = std::move(asn);
+            AndSortedNode* asn = new AndSortedNode();
+            asn->children.swap(ixscanNodes);
+            andResult = asn;
         } else if (internalQueryPlannerEnableHashIntersection.load()) {
-            {
-                auto ahn = stdx::make_unique<AndHashNode>();
-                ahn->addChildren(std::move(ixscanNodes));
-                andResult = std::move(ahn);
-            }
-
+            AndHashNode* ahn = new AndHashNode();
+            ahn->children.swap(ixscanNodes);
+            andResult = ahn;
             // The AndHashNode provides the sort order of its last child.  If any of the
             // possible subnodes of AndHashNode provides the sort order we care about, we put
             // that one last.
-            for (size_t i = 0; i < andResult->children.size(); ++i) {
-                andResult->children[i]->computeProperties();
-                const BSONObjSet& sorts = andResult->children[i]->getSort();
+            for (size_t i = 0; i < ahn->children.size(); ++i) {
+                ahn->children[i]->computeProperties();
+                const BSONObjSet& sorts = ahn->children[i]->getSort();
                 if (sorts.end() != sorts.find(query.getQueryRequest().getSort())) {
-                    std::swap(andResult->children[i], andResult->children.back());
+                    std::swap(ahn->children[i], ahn->children.back());
                     break;
                 }
             }
@@ -1025,7 +1036,11 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
             // Clean up the index scans and bail out by returning NULL.
             LOG(5) << "Can't build index intersection solution: "
                    << "AND_SORTED is not possible and AND_HASH is disabled.";
-            return nullptr;
+
+            for (size_t i = 0; i < ixscanNodes.size(); i++) {
+                delete ixscanNodes[i];
+            }
+            return NULL;
         }
     }
 
@@ -1040,32 +1055,32 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         // We got an index intersection solution, and we aren't allowed to answer predicates
         // using the index. We add a fetch with the entire filter.
         invariant(clonedRoot.get());
-        auto fetch = stdx::make_unique<FetchNode>();
-        fetch->filter = std::move(clonedRoot);
+        FetchNode* fetch = new FetchNode();
+        fetch->filter.reset(clonedRoot.release());
         // Takes ownership of 'andResult'.
-        fetch->children.push_back(andResult.release());
+        fetch->children.push_back(andResult);
         return fetch;
     }
 
     // If there are any nodes still attached to the AND, we can't answer them using the
     // index, so we put a fetch with filter.
     if (root->numChildren() > 0) {
-        auto fetch = stdx::make_unique<FetchNode>();
-        verify(ownedRoot);
-        if (ownedRoot->numChildren() == 1) {
+        FetchNode* fetch = new FetchNode();
+        verify(NULL != autoRoot.get());
+        if (autoRoot->numChildren() == 1) {
             // An $and of one thing is that thing.
-            MatchExpression* child = ownedRoot->getChild(0);
-            ownedRoot->getChildVector()->clear();
+            MatchExpression* child = autoRoot->getChild(0);
+            autoRoot->getChildVector()->clear();
             // Takes ownership.
             fetch->filter.reset(child);
             // 'autoRoot' will delete the empty $and.
         } else {  // root->numChildren() > 1
             // Takes ownership.
-            fetch->filter = std::move(ownedRoot);
+            fetch->filter.reset(autoRoot.release());
         }
         // takes ownership
-        fetch->children.push_back(andResult.release());
-        andResult = std::move(fetch);
+        fetch->children.push_back(andResult);
+        andResult = fetch;
     } else {
         // root has no children, let autoRoot get rid of it when it goes out of scope.
     }
@@ -1073,15 +1088,18 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
     return andResult;
 }
 
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
-    const CanonicalQuery& query,
-    MatchExpression* root,
-    std::unique_ptr<MatchExpression> ownedRoot,
-    const vector<IndexEntry>& indices,
-    const QueryPlannerParams& params) {
+// static
+QuerySolutionNode* QueryPlannerAccess::buildIndexedOr(const CanonicalQuery& query,
+                                                      MatchExpression* root,
+                                                      bool inArrayOperator,
+                                                      const vector<IndexEntry>& indices,
+                                                      const QueryPlannerParams& params) {
+    unique_ptr<MatchExpression> autoRoot;
+    if (!inArrayOperator) {
+        autoRoot.reset(root);
+    }
 
-    const bool inArrayOperator = !ownedRoot;
-    std::vector<std::unique_ptr<QuerySolutionNode>> ixscanNodes;
+    vector<QuerySolutionNode*> ixscanNodes;
     if (!processIndexScans(query, root, inArrayOperator, indices, params, &ixscanNodes)) {
         return NULL;
     }
@@ -1099,13 +1117,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
 
     // If all index scans are identical, then we collapse them into a single scan. This prevents
     // us from creating OR plans where the branches of the OR perform duplicate work.
-    ixscanNodes = collapseEquivalentScans(std::move(ixscanNodes));
+    ixscanNodes = collapseEquivalentScans(ixscanNodes);
 
-    std::unique_ptr<QuerySolutionNode> orResult;
+    QuerySolutionNode* orResult = NULL;
 
     // An OR of one node is just that node.
     if (1 == ixscanNodes.size()) {
-        orResult = std::move(ixscanNodes[0]);
+        orResult = ixscanNodes[0];
     } else {
         std::vector<bool> shouldReverseScan;
 
@@ -1122,18 +1140,18 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
             invariant(ixscanNodes.size() == shouldReverseScan.size());
             for (size_t i = 0; i < ixscanNodes.size(); ++i) {
                 if (shouldReverseScan[i]) {
-                    QueryPlannerCommon::reverseScans(ixscanNodes[i].get());
+                    QueryPlannerCommon::reverseScans(ixscanNodes[i]);
                 }
             }
 
-            auto msn = stdx::make_unique<MergeSortNode>();
+            MergeSortNode* msn = new MergeSortNode();
             msn->sort = query.getQueryRequest().getSort();
-            msn->addChildren(std::move(ixscanNodes));
-            orResult = std::move(msn);
+            msn->children.swap(ixscanNodes);
+            orResult = msn;
         } else {
-            auto orn = stdx::make_unique<OrNode>();
-            orn->addChildren(std::move(ixscanNodes));
-            orResult = std::move(orn);
+            OrNode* orn = new OrNode();
+            orn->children.swap(ixscanNodes);
+            orResult = orn;
         }
     }
 
@@ -1148,48 +1166,47 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
     return orResult;
 }
 
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedDataAccess(
-    const CanonicalQuery& query,
-    std::unique_ptr<MatchExpression> root,
-    const vector<IndexEntry>& indices,
-    const QueryPlannerParams& params) {
-    MatchExpression* unownedRoot = root.get();
-    return _buildIndexedDataAccess(query, unownedRoot, std::move(root), indices, params);
-}
-
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
-    const CanonicalQuery& query,
-    MatchExpression* root,
-    std::unique_ptr<MatchExpression> ownedRoot,
-    const vector<IndexEntry>& indices,
-    const QueryPlannerParams& params) {
+// static
+QuerySolutionNode* QueryPlannerAccess::buildIndexedDataAccess(const CanonicalQuery& query,
+                                                              MatchExpression* root,
+                                                              bool inArrayOperator,
+                                                              const vector<IndexEntry>& indices,
+                                                              const QueryPlannerParams& params) {
     if (root->getCategory() == MatchExpression::MatchCategory::kLogical &&
         !Indexability::isBoundsGeneratingNot(root)) {
         if (MatchExpression::AND == root->matchType()) {
             // Takes ownership of root.
-            return buildIndexedAnd(query, root, std::move(ownedRoot), indices, params);
+            return buildIndexedAnd(query, root, inArrayOperator, indices, params);
         } else if (MatchExpression::OR == root->matchType()) {
             // Takes ownership of root.
-            return buildIndexedOr(query, root, std::move(ownedRoot), indices, params);
+            return buildIndexedOr(query, root, inArrayOperator, indices, params);
         } else {
-            return nullptr;
+            // Can't do anything with negated logical nodes index-wise.
+            if (!inArrayOperator) {
+                delete root;
+            }
+            return NULL;
         }
     } else {
-        if (!root->getTag()) {
+        unique_ptr<MatchExpression> autoRoot;
+        if (!inArrayOperator) {
+            autoRoot.reset(root);
+        }
+
+        if (NULL == root->getTag()) {
             // No index to use here, not in the context of logical operator, so we're SOL.
-            return nullptr;
+            return NULL;
         } else if (Indexability::isBoundsGenerating(root)) {
             // Make an index scan over the tagged index #.
             IndexTag* tag = static_cast<IndexTag*>(root->getTag());
 
             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::EXACT;
-            auto soln = makeLeafNode(query, indices[tag->index], tag->pos, root, &tightness);
+            QuerySolutionNode* soln =
+                makeLeafNode(query, indices[tag->index], tag->pos, root, &tightness);
             verify(NULL != soln);
-            finishLeafNode(soln.get(), indices[tag->index]);
+            finishLeafNode(soln, indices[tag->index]);
 
-            if (!ownedRoot) {
-                // We're performing access planning for the child of an array operator such as
-                // $elemMatch value.
+            if (inArrayOperator) {
                 return soln;
             }
 
@@ -1205,49 +1222,52 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             } else if (tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                        !indices[tag->index].multikey) {
                 verify(NULL == soln->filter.get());
-                soln->filter = std::move(ownedRoot);
+                soln->filter.reset(autoRoot.release());
                 return soln;
             } else {
-                auto fetch = stdx::make_unique<FetchNode>();
-                fetch->filter = std::move(ownedRoot);
-                fetch->children.push_back(soln.release());
+                FetchNode* fetch = new FetchNode();
+                verify(NULL != autoRoot.get());
+                fetch->filter.reset(autoRoot.release());
+                fetch->children.push_back(soln);
                 return fetch;
             }
         } else if (Indexability::arrayUsesIndexOnChildren(root)) {
-            std::unique_ptr<QuerySolutionNode> solution;
+            QuerySolutionNode* solution = NULL;
 
             invariant(root->matchType() == MatchExpression::ELEM_MATCH_OBJECT);
             // The child is an AND.
             invariant(1 == root->numChildren());
-
-            // Recursively build a data access plan for the child of the $elemMatch object. We
-            // maintain ownership of 'ownedRoot'.
-            solution = _buildIndexedDataAccess(query, root->getChild(0), nullptr, indices, params);
-            if (!solution) {
-                return nullptr;
+            solution = buildIndexedDataAccess(query, root->getChild(0), true, indices, params);
+            if (NULL == solution) {
+                return NULL;
             }
 
             // There may be an array operator above us.
-            if (!ownedRoot) {
+            if (inArrayOperator) {
                 return solution;
             }
 
-            auto fetch = stdx::make_unique<FetchNode>();
-            fetch->filter = std::move(ownedRoot);
-            fetch->children.push_back(solution.release());
+            FetchNode* fetch = new FetchNode();
+            // Takes ownership of 'root'.
+            verify(NULL != autoRoot.get());
+            fetch->filter.reset(autoRoot.release());
+            fetch->children.push_back(solution);
             return fetch;
         }
     }
 
-    return nullptr;
+    if (!inArrayOperator) {
+        delete root;
+    }
+
+    return NULL;
 }
 
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
-    const IndexEntry& index,
-    const CanonicalQuery& query,
-    const QueryPlannerParams& params,
-    int direction) {
-    std::unique_ptr<QuerySolutionNode> solnRoot;
+QuerySolutionNode* QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
+                                                      const CanonicalQuery& query,
+                                                      const QueryPlannerParams& params,
+                                                      int direction) {
+    QuerySolutionNode* solnRoot = NULL;
 
     // Build an ixscan over the id index, use it, and return it.
     unique_ptr<IndexScanNode> isn = make_unique<IndexScanNode>(index);
@@ -1265,19 +1285,20 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-        solnRoot = std::move(isn);
+        solnRoot = isn.release();
     } else {
         // TODO: We may not need to do the fetch if the predicates in root are covered.  But
         // for now it's safe (though *maybe* slower).
         unique_ptr<FetchNode> fetch = make_unique<FetchNode>();
         fetch->filter = std::move(filter);
         fetch->children.push_back(isn.release());
-        solnRoot = std::move(fetch);
+        solnRoot = fetch.release();
     }
 
     return solnRoot;
 }
 
+// static
 void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
                                                  MatchExpression* match,
                                                  MatchExpression::MatchType type) {
@@ -1306,6 +1327,7 @@ void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
     }
 }
 
+// static
 void QueryPlannerAccess::handleFilter(ScanBuildingState* scanState) {
     if (MatchExpression::OR == scanState->root->matchType()) {
         handleFilterOr(scanState);
@@ -1317,6 +1339,7 @@ void QueryPlannerAccess::handleFilter(ScanBuildingState* scanState) {
     }
 }
 
+// static
 void QueryPlannerAccess::handleFilterOr(ScanBuildingState* scanState) {
     MatchExpression* root = scanState->root;
     MatchExpression* child = root->getChild(scanState->curChild);
@@ -1337,6 +1360,7 @@ void QueryPlannerAccess::handleFilterOr(ScanBuildingState* scanState) {
     }
 }
 
+// static
 void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
     MatchExpression* root = scanState->root;
     MatchExpression* child = root->getChild(scanState->curChild);
@@ -1372,16 +1396,15 @@ void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
     }
 }
 
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
-    const IndexEntry& index,
-    const CanonicalQuery& query,
-    const QueryPlannerParams& params,
-    const BSONObj& startKey,
-    const BSONObj& endKey) {
-    std::unique_ptr<QuerySolutionNode> solnRoot;
+QuerySolutionNode* QueryPlannerAccess::makeIndexScan(const IndexEntry& index,
+                                                     const CanonicalQuery& query,
+                                                     const QueryPlannerParams& params,
+                                                     const BSONObj& startKey,
+                                                     const BSONObj& endKey) {
+    QuerySolutionNode* solnRoot = NULL;
 
     // Build an ixscan over the id index, use it, and return it.
-    auto isn = stdx::make_unique<IndexScanNode>(index);
+    IndexScanNode* isn = new IndexScanNode(index);
     isn->direction = 1;
     isn->addKeyMetadata = query.getQueryRequest().returnKey();
     isn->bounds.isSimpleRange = true;
@@ -1394,14 +1417,14 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-        solnRoot = std::move(isn);
+        solnRoot = isn;
     } else {
         // TODO: We may not need to do the fetch if the predicates in root are covered.  But
         // for now it's safe (though *maybe* slower).
         unique_ptr<FetchNode> fetch = make_unique<FetchNode>();
         fetch->filter = std::move(filter);
-        fetch->children.push_back(isn.release());
-        solnRoot = std::move(fetch);
+        fetch->children.push_back(isn);
+        solnRoot = fetch.release();
     }
 
     return solnRoot;
