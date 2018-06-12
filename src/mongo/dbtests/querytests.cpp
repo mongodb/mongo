@@ -1291,13 +1291,12 @@ public:
         // a bit.
         {
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT(Database::userCreateNS(&_opCtx,
-                                          ctx.db(),
-                                          ns(),
-                                          fromjson("{ capped : true, size : 2000, max: 10000 }"),
-                                          CollectionOptions::parseForCommand,
-                                          false)
-                       .isOK());
+            CollectionOptions collectionOptions;
+            ASSERT_OK(
+                collectionOptions.parse(fromjson("{ capped : true, size : 2000, max: 10000 }"),
+                                        CollectionOptions::parseForCommand));
+            ASSERT(
+                Database::userCreateNS(&_opCtx, ctx.db(), ns(), collectionOptions, false).isOK());
             wunit.commit();
         }
 

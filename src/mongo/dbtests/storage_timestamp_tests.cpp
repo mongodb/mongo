@@ -33,6 +33,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -324,7 +325,8 @@ public:
             _opCtx,
             AutoGetCollectionForRead(_opCtx, NamespaceString::kRsOplogNamespace).getCollection(),
             query,
-            ret));
+            ret))
+            << "Query: " << query;
         return ret;
     }
 
@@ -2337,6 +2339,66 @@ public:
     }
 };
 
+class ViewCreationSeparateTransaction : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        auto kvStorageEngine =
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
+        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+
+        const NamespaceString backingCollNss("unittests.backingColl");
+        reset(backingCollNss);
+
+        const NamespaceString viewNss("unittests.view");
+        const NamespaceString systemViewsNss("unittests.system.views");
+
+        ASSERT_OK(createCollection(_opCtx,
+                                   viewNss.db().toString(),
+                                   BSON("create" << viewNss.coll() << "pipeline" << BSONArray()
+                                                 << "viewOn"
+                                                 << backingCollNss.coll())));
+
+        const Timestamp systemViewsCreateTs = queryOplog(BSON("op"
+                                                              << "c"
+                                                              << "ns"
+                                                              << (viewNss.db() + ".$cmd")
+                                                              << "o.create"
+                                                              << "system.views"))["ts"]
+                                                  .timestamp();
+        const Timestamp viewCreateTs = queryOplog(BSON("op"
+                                                       << "i"
+                                                       << "ns"
+                                                       << systemViewsNss.ns()
+                                                       << "o._id"
+                                                       << viewNss.ns()))["ts"]
+                                           .timestamp();
+
+        {
+            Lock::GlobalRead read(_opCtx);
+            auto systemViewsMd = getMetaDataAtTime(
+                kvCatalog, systemViewsNss, Timestamp(systemViewsCreateTs.asULL() - 1));
+            ASSERT_EQ("", systemViewsMd.ns)
+                << systemViewsNss
+                << " incorrectly exists before creation. CreateTs: " << systemViewsCreateTs;
+
+            systemViewsMd = getMetaDataAtTime(kvCatalog, systemViewsNss, systemViewsCreateTs);
+            ASSERT_EQ(systemViewsNss.ns(), systemViewsMd.ns);
+
+            AutoGetCollection autoColl(_opCtx, systemViewsNss, LockMode::MODE_IS);
+            assertDocumentAtTimestamp(autoColl.getCollection(), systemViewsCreateTs, BSONObj());
+            assertDocumentAtTimestamp(
+                autoColl.getCollection(),
+                viewCreateTs,
+                BSON("_id" << viewNss.ns() << "viewOn" << backingCollNss.coll() << "pipeline"
+                           << BSONArray()));
+        }
+    }
+};
 
 class AllStorageTimestampTests : public unittest::Suite {
 public:
@@ -2373,6 +2435,7 @@ public:
         add<TimestampIndexBuilderOnPrimary<false>>();
         add<TimestampIndexBuilderOnPrimary<true>>();
         add<SecondaryReadsDuringBatchApplicationAreAllowed>();
+        add<ViewCreationSeparateTransaction>();
     }
 };
 

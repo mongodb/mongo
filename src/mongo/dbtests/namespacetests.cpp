@@ -165,7 +165,11 @@ namespace NamespaceDetailsTests {
         void create() {
             Lock::GlobalWrite lk;
             const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext(); OperationContext& opCtx = *opCtxPtr;
-            ASSERT( userCreateNS( &opCtx, db(), ns(), fromjson( spec() ), false ).isOK() );
+
+            CollectionOptions collectionOptions;
+            ASSERT_OK(collectionOptions.parse(fromjson(spec()),
+                                              CollectionOptions::parseForCommand));
+            ASSERT_OK(userCreateNS(&opCtx, db(), ns(), collectionOptions, false));
         }
         virtual string spec() const = 0;
         int nRecords() const {

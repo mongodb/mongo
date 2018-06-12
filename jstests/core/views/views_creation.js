@@ -15,9 +15,10 @@
     assert.eq(0, collNames.length, tojson(collNames));
 
     // You cannot create a view that starts with 'system.'.
-    assert.commandFailedWithCode(viewsDB.runCommand({create: "system.views", viewOn: "collection"}),
-                                 ErrorCodes.InvalidNamespace,
-                                 "Created an illegal view named 'system.views'");
+    assert.commandFailedWithCode(
+        viewsDB.runCommand({create: "system.special", viewOn: "collection"}),
+        ErrorCodes.InvalidNamespace,
+        "Created an illegal view named 'system.views'");
 
     // We don't run this check on MMAPv1 as it automatically creates a system.indexes collection
     // when creating a database, which causes this command to fail with NamespaceAlreadyExists.

@@ -672,14 +672,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             // We do not have a collection by this name. Create the collection with the donor's
             // options.
             WriteUnitOfWork wuow(opCtx);
+            CollectionOptions collectionOptions;
+            uassertStatusOK(collectionOptions.parse(donorOptions,
+                                                    CollectionOptions::ParseKind::parseForStorage));
             const bool createDefaultIndexes = true;
-            uassertStatusOK(Database::userCreateNS(opCtx,
-                                                   db,
-                                                   _nss.ns(),
-                                                   donorOptions,
-                                                   CollectionOptions::parseForStorage,
-                                                   createDefaultIndexes,
-                                                   donorIdIndexSpec));
+            uassertStatusOK(Database::userCreateNS(
+                opCtx, db, _nss.ns(), collectionOptions, createDefaultIndexes, donorIdIndexSpec));
             wuow.commit();
 
             collection = db->getCollection(opCtx, _nss);

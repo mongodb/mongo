@@ -457,7 +457,7 @@ BSONObj KVCatalog::_findEntry(OperationContext* opCtx, StringData ns, RecordId* 
     {
         stdx::lock_guard<stdx::mutex> lk(_identsLock);
         NSToIdentMap::const_iterator it = _idents.find(ns.toString());
-        invariant(it != _idents.end());
+        invariant(it != _idents.end(), str::stream() << "Did not find collection. Ns: " << ns);
         dl = it->second.storedLoc;
     }
 

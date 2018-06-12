@@ -949,14 +949,13 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
 (OperationContext* opCtx,
  Database* db,
  StringData ns,
- BSONObj options,
- CollectionOptions::ParseKind parseKind,
+ CollectionOptions collectionOptions,
  bool createDefaultIndexes,
  const BSONObj& idIndex)
     ->Status {
     invariant(db);
 
-    LOG(1) << "create collection " << ns << ' ' << options;
+    LOG(1) << "create collection " << ns << ' ' << collectionOptions.toBSON();
 
     if (!NamespaceString::validCollectionComponent(ns))
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << ns);
@@ -970,12 +969,6 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
     if (db->getViewCatalog()->lookup(opCtx, ns))
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "a view '" << ns.toString() << "' already exists");
-
-    CollectionOptions collectionOptions;
-    Status status = collectionOptions.parse(options, parseKind);
-
-    if (!status.isOK())
-        return status;
 
     // Validate the collation, if there is one.
     std::unique_ptr<CollatorInterface> collator;
@@ -1024,7 +1017,7 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
         }
     }
 
-    status = validateStorageOptions(
+    Status status = validateStorageOptions(
         opCtx->getServiceContext(),
         collectionOptions.storageEngine,
         [](const auto& x, const auto& y) { return x->validateCollectionStorageOptions(y); });
@@ -1044,7 +1037,6 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
     }
 
     if (collectionOptions.isView()) {
-        invariant(parseKind == CollectionOptions::parseForCommand);
         uassertStatusOK(db->createView(opCtx, ns, collectionOptions));
     } else {
         invariant(
