@@ -158,7 +158,7 @@ functions:
         script: |
           set -o errexit
           source ./venv/bin/activate
-          REFTAGS="3.4.13-Baseline 3.2.17-Baseline 3.0.15-Baseline 3.6.0-Baseline 3.6.1-Baseline" # These are project specific
+          REFTAGS="3.4.13-Baseline 3.2.17-Baseline 3.0.15-Baseline 3.6.0-Baseline 3.6.1-Baseline 3.6.5-Baseline" # These are project specific
           # Project Opts are  project specific, but don't match expansion from elsewhere.
           # Note project_id performance doesn't match string perf used elsewhere for ${project}
           PROJECT_OPTS="--overrideFile ../dsi/analysis/${branch_name}/perf_override.json --project_id performance"
@@ -181,7 +181,7 @@ functions:
           # appropriate flags if it's `true`.
           reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
-          REFTAG="3.4.13-Baseline"
+          REFTAG="3.6.5-Baseline"
           OVERRIDE="../dsi/analysis/${branch_name}/perf_override.json"
           python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.075 --threadThreshold 0.12
   "run perf tests":
