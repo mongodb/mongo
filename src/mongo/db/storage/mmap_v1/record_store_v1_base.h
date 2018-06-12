@@ -171,6 +171,10 @@ public:
 
     virtual ~RecordStoreV1Base();
 
+    const std::string& getIdent() const override {
+        MONGO_UNREACHABLE;
+    }
+
     virtual long long dataSize(OperationContext* opCtx) const {
         return _details->dataSize();
     }

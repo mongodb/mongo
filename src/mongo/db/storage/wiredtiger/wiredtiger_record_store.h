@@ -237,6 +237,11 @@ public:
     const std::string& getURI() const {
         return _uri;
     }
+
+    const std::string& getIdent() const override {
+        return _uri;
+    }
+
     uint64_t tableId() const {
         return _tableId;
     }

@@ -223,6 +223,10 @@ const char* MobileRecordStore::name() const {
     return "Mobile";
 }
 
+const std::string& MobileRecordStore::getIdent() const {
+    return _ident;
+}
+
 void MobileRecordStore::_initDataSizeIfNeeded_inlock(OperationContext* opCtx) const {
     if (_isDataSizeInitialized) {
         return;

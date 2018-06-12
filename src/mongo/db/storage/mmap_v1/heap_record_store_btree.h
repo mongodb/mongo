@@ -46,6 +46,10 @@ class HeapRecordStoreBtree : public RecordStore {
     struct MmapV1RecordHeader;
 
 public:
+    const std::string& getIdent() const override {
+        MONGO_UNREACHABLE;
+    }
+
     // RecordId(0,0) isn't valid for records.
     explicit HeapRecordStoreBtree(StringData ns) : RecordStore(ns), _nextId(1) {}
 

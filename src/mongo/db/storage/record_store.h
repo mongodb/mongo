@@ -295,6 +295,8 @@ public:
         return _ns;
     }
 
+    virtual const std::string& getIdent() const = 0;
+
     /**
      * The dataSize is an approximation of the sum of the sizes (in bytes) of the
      * documents or entries in the recordStore.

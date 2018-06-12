@@ -53,6 +53,8 @@ public:
 
     const char* name() const override;
 
+    const std::string& getIdent() const override;
+
     RecordData dataFor(OperationContext* opCtx, const RecordId& recId) const override;
 
     bool findRecord(OperationContext* opCtx, const RecordId& recId, RecordData* rd) const override;

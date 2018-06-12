@@ -217,7 +217,6 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
             inReplicationRecovery(serviceCtx),
             "replication recovery flag is unexpectedly unset when exiting recoverFromOplog()");
         inReplicationRecovery(serviceCtx) = false;
-        sizeRecoveryState(serviceCtx).clearStateAfterRecovery();
     });
 
     const auto truncateAfterPoint = _consistencyMarkers->getOplogTruncateAfterPoint(opCtx);
