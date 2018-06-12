@@ -67,18 +67,17 @@ namespace {
 constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
 }  // namespace
 
+boost::intrusive_ptr<DocumentSourceChangeStreamTransform>
+DocumentSourceChangeStreamTransform::create(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                            BSONObj changeStreamSpec) {
+    return new DocumentSourceChangeStreamTransform(expCtx, changeStreamSpec);
+}
+
 DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    BSONObj changeStreamSpec,
-    ServerGlobalParams::FeatureCompatibility::Version fcv,
-    bool isIndependentOfAnyCollection)
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONObj changeStreamSpec)
     : DocumentSource(expCtx),
       _changeStreamSpec(changeStreamSpec.getOwned()),
-      _resumeTokenFormat(
-          fcv >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40
-              ? ResumeToken::SerializationFormat::kHexString
-              : ResumeToken::SerializationFormat::kBinData),
-      _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {
+      _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()) {
 
     _nsRegex.emplace(DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns));
 
@@ -329,15 +328,9 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         default: { MONGO_UNREACHABLE; }
     }
 
-    // UUID should always be present except for invalidate entries.  It will not be under
-    // FCV 3.4, so we should close the stream as invalid.
-    if (operationType != DocumentSourceChangeStream::kInvalidateOpType && uuid.missing()) {
-        warning() << "Saw a CRUD op without a UUID.  Did Feature Compatibility Version get "
-                     "downgraded after opening the stream?";
-        operationType = DocumentSourceChangeStream::kInvalidateOpType;
-        fullDocument = Value();
-        updateDescription = Value();
-        documentKey = Value();
+    // UUID should always be present except for invalidate entries.
+    if (operationType != DocumentSourceChangeStream::kInvalidateOpType) {
+        invariant(!uuid.missing(), "Saw a CRUD op without a UUID");
     }
 
     // Note that 'documentKey' and/or 'uuid' might be missing, in which case they will not appear
@@ -352,7 +345,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     }
 
     doc.addField(DocumentSourceChangeStream::kIdField,
-                 Value(ResumeToken(resumeTokenData).toDocument(_resumeTokenFormat)));
+                 Value(ResumeToken(resumeTokenData).toDocument()));
     doc.addField(DocumentSourceChangeStream::kOperationTypeField, Value(operationType));
     doc.addField(DocumentSourceChangeStream::kClusterTimeField, Value(resumeTokenData.clusterTime));
 
@@ -386,9 +379,6 @@ Value DocumentSourceChangeStreamTransform::serialize(
     // cluster time on the mongos.  This ensures all shards use the same start time.
     if (pExpCtx->inMongos &&
         changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterFieldName].missing() &&
-        changeStreamOptions
-            [DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeDeprecatedFieldName]
-                .missing() &&
         changeStreamOptions[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName]
             .missing()) {
         MutableDocument newChangeStreamOptions(changeStreamOptions);

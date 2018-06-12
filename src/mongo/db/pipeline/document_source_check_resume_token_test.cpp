@@ -69,7 +69,7 @@ protected:
         _mock->queue.push_back(
             Document{{"_id",
                       ResumeToken(ResumeTokenData(ts, version, applyOpsIndex, Value(docKey), uuid))
-                          .toDocument(ResumeToken::SerializationFormat::kHexString)}});
+                          .toDocument()}});
     }
 
     /**

@@ -37,13 +37,12 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
-
-using Format = ResumeToken::SerializationFormat;
 
 TEST(ResumeToken, EncodesFullTokenFromData) {
     Timestamp ts(1000, 2);
@@ -66,7 +65,7 @@ TEST(ResumeToken, EncodesTimestampOnlyTokenFromData) {
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 }
 
-TEST(ResumeToken, ShouldRoundTripThroughHexStringEncoding) {
+TEST(ResumeToken, ShouldRoundTripThroughHexEncoding) {
     Timestamp ts(1000, 2);
     UUID testUuid = UUID::gen();
     Document documentKey{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
@@ -74,72 +73,29 @@ TEST(ResumeToken, ShouldRoundTripThroughHexStringEncoding) {
     ResumeTokenData resumeTokenDataIn(ts, 0, 0, Value(documentKey), testUuid);
 
     // Test serialization/parsing through Document.
-    auto rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString));
+    auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument());
     ResumeTokenData tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 
     // Test serialization/parsing through BSON.
-    rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
     tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 }
 
-TEST(ResumeToken, ShouldRoundTripThroughBinDataEncoding) {
-    Timestamp ts(1000, 2);
-    UUID testUuid = UUID::gen();
-    Document documentKey{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
-
-    ResumeTokenData resumeTokenDataIn(ts, 0, 0, Value(documentKey), testUuid);
-
-    // Test serialization/parsing through Document.
-    auto rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kBinData).toBson());
-    ResumeTokenData tokenData = rtToken.getData();
-    ASSERT_EQ(resumeTokenDataIn, tokenData);
-
-    // Test serialization/parsing through BSON.
-    rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kBinData).toBson());
-    tokenData = rtToken.getData();
-    ASSERT_EQ(resumeTokenDataIn, tokenData);
-}
-
-TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughHexStringEncoding) {
+TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughHexEncoding) {
     Timestamp ts(1001, 3);
 
     ResumeTokenData resumeTokenDataIn;
     resumeTokenDataIn.clusterTime = ts;
 
     // Test serialization/parsing through Document.
-    auto rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
     ResumeTokenData tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 
     // Test serialization/parsing through BSON.
-    rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
-    tokenData = rtToken.getData();
-    ASSERT_EQ(resumeTokenDataIn, tokenData);
-}
-
-TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughBinDataEncoding) {
-    Timestamp ts(1001, 3);
-
-    ResumeTokenData resumeTokenDataIn;
-    resumeTokenDataIn.clusterTime = ts;
-
-    // Test serialization/parsing through Document.
-    auto rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kBinData).toBson());
-    ResumeTokenData tokenData = rtToken.getData();
-    ASSERT_EQ(resumeTokenDataIn, tokenData);
-
-    // Test serialization/parsing through BSON.
-    rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kBinData).toBson());
+    rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
     tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 }
@@ -154,8 +110,8 @@ TEST(ResumeToken, TestMissingTypebitsOptimization) {
     ResumeToken hasTypeBitsToken(hasTypeBitsData);
     ResumeToken noTypeBitsToken(noTypeBitsData);
     ASSERT_EQ(noTypeBitsToken, hasTypeBitsToken);
-    auto hasTypeBitsDoc = hasTypeBitsToken.toDocument(Format::kHexString);
-    auto noTypeBitsDoc = noTypeBitsToken.toDocument(Format::kHexString);
+    auto hasTypeBitsDoc = hasTypeBitsToken.toDocument();
+    auto noTypeBitsDoc = noTypeBitsToken.toDocument();
     ASSERT_FALSE(hasTypeBitsDoc["_typeBits"].missing());
     ASSERT_TRUE(noTypeBitsDoc["_typeBits"].missing()) << noTypeBitsDoc["_typeBits"];
     auto rtHasTypeBitsData = ResumeToken::parse(hasTypeBitsDoc).getData();
@@ -175,61 +131,47 @@ TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {
     ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, BSONNULL}}), AssertionException);
     ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, 0}}), AssertionException);
 
+    ASSERT_THROWS(
+        ResumeToken::parse(Document{{"_data"_sd, BSONBinData("\xde\xad", 2, BinDataGeneral)}}),
+        AssertionException);
+
     // Valid data field, but wrong type typeBits.
     Timestamp ts(1010, 4);
     ResumeTokenData tokenData;
     tokenData.clusterTime = ts;
-    auto goodTokenDocBinData = ResumeToken(tokenData).toDocument(Format::kBinData);
-    auto goodData = goodTokenDocBinData["_data"].getBinData();
+    auto goodTokenDocBinData = ResumeToken(tokenData).toDocument();
+    auto goodData = goodTokenDocBinData["_data"].getStringData();
     ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, goodData}, {"_typeBits", "string"_sd}}),
                   AssertionException);
-    auto goodTokenDocString = ResumeToken(tokenData).toDocument(Format::kHexString);
-    auto goodString = goodTokenDocString["_data"].getString();
-    ASSERT_THROWS(
-        ResumeToken::parse(Document{{"_data"_sd, goodString}, {"_typeBits", "string"_sd}}),
-        AssertionException);
 
-    // Valid data except wrong bindata type.
-    ASSERT_THROWS(ResumeToken::parse(
-                      Document{{"_data"_sd, BSONBinData(goodData.data, goodData.length, newUUID)}}),
-                  AssertionException);
     // Valid data, wrong typeBits bindata type.
-    ASSERT_THROWS(
-        ResumeToken::parse(Document{{"_data"_sd, goodData},
-                                    {"_typeBits", BSONBinData(goodData.data, 0, newUUID)}}),
-        AssertionException);
+    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, goodData},
+                                              {"_typeBits", BSONBinData("\0", 0, newUUID)}}),
+                  AssertionException);
 }
 
-TEST(ResumeToken, FailsToDecodeInvalidKeyStringBinData) {
+TEST(ResumeToken, FailsToDecodeInvalidKeyString) {
     Timestamp ts(1010, 4);
     ResumeTokenData tokenData;
     tokenData.clusterTime = ts;
-    auto goodTokenDocBinData = ResumeToken(tokenData).toDocument(Format::kBinData);
-    auto goodData = goodTokenDocBinData["_data"].getBinData();
+    auto goodTokenDocBinData = ResumeToken(tokenData).toDocument();
+    auto goodData = goodTokenDocBinData["_data"].getStringData();
     const unsigned char zeroes[] = {0, 0, 0, 0, 0};
     const unsigned char nonsense[] = {165, 85, 77, 86, 255};
 
-    // Data of correct type, but empty.  This won't fail until we try to decode the data.
-    auto emptyToken =
-        ResumeToken::parse(Document{{"_data"_sd, BSONBinData(zeroes, 0, BinDataGeneral)}});
+    // Data of correct type, but empty.
+    const auto emptyToken = ResumeToken::parse(Document{{"_data"_sd, toHex(zeroes, 0)}});
     ASSERT_THROWS_CODE(emptyToken.getData(), AssertionException, 40649);
 
-    auto incorrectType = ResumeToken::parse(Document{{"_data"_sd, "string"_sd}});
-    ASSERT_THROWS_CODE(incorrectType.getData(), AssertionException, ErrorCodes::FailedToParse);
-
     // Data of correct type with a bunch of zeros.
-    auto zeroesToken = ResumeToken::parse(
-        Document{{"_data"_sd, BSONBinData(zeroes, sizeof(zeroes), BinDataGeneral)}});
+    const auto zeroesToken =
+        ResumeToken::parse(Document{{"_data"_sd, toHex(zeroes, sizeof(zeroes))}});
     ASSERT_THROWS_CODE(zeroesToken.getData(), AssertionException, 50811);
-    zeroesToken = ResumeToken::parse(Document{{"_data"_sd, "00000"_sd}});
-    ASSERT_THROWS_CODE(zeroesToken.getData(), AssertionException, ErrorCodes::FailedToParse);
 
     // Data of correct type with a bunch of nonsense.
-    auto nonsenseToken = ResumeToken::parse(
-        Document{{"_data"_sd, BSONBinData(nonsense, sizeof(nonsense), BinDataGeneral)}});
+    const auto nonsenseToken =
+        ResumeToken::parse(Document{{"_data"_sd, toHex(nonsense, sizeof(nonsense))}});
     ASSERT_THROWS_CODE(nonsenseToken.getData(), AssertionException, 50811);
-    nonsenseToken = ResumeToken::parse(Document{{"_data"_sd, "nonsense"_sd}});
-    ASSERT_THROWS_CODE(nonsenseToken.getData(), AssertionException, ErrorCodes::FailedToParse);
 
     // Valid data, bad typeBits; note that an all-zeros typebits is valid so it is not tested here.
     auto badTypeBitsToken = ResumeToken::parse(
@@ -241,12 +183,20 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyStringBinData) {
         60,  // CType::kStringLike
         55,  // Non-null terminated
     };
-    auto invalidStringToken = ResumeToken::parse(
-        Document{{"_data"_sd, BSONBinData(invalidString, sizeof(invalidString), BinDataGeneral)}});
+    auto invalidStringToken =
+        ResumeToken::parse(Document{{"_data"_sd, toHex(invalidString, sizeof(invalidString))}});
+    // invalidStringToken.getData();
     ASSERT_THROWS_WITH_CHECK(
         invalidStringToken.getData(), AssertionException, [](const AssertionException& exception) {
             ASSERT_EQ(exception.code(), 50816);
             ASSERT_STRING_CONTAINS(exception.reason(), "Failed to find null terminator in string");
+        });
+
+    auto invalidHexString = ResumeToken::parse(Document{{"_data"_sd, "nonsense"_sd}});
+    ASSERT_THROWS_WITH_CHECK(
+        invalidHexString.getData(), AssertionException, [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+            ASSERT_STRING_CONTAINS(exception.reason(), "not a valid hex string");
         });
 }
 
@@ -258,15 +208,13 @@ TEST(ResumeToken, WrongVersionToken) {
     resumeTokenDataIn.version = 0;
 
     // This one with version 0 should succeed.
-    auto rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
     ResumeTokenData tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 
     // With version 1 it should fail.
     resumeTokenDataIn.version = 1;
-    rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
 
     ASSERT_THROWS(rtToken.getData(), AssertionException);
 }
@@ -279,15 +227,13 @@ TEST(ResumeToken, InvalidApplyOpsIndex) {
     resumeTokenDataIn.applyOpsIndex = 1234;
 
     // Should round trip with a non-negative applyOpsIndex.
-    auto rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
     ResumeTokenData tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 
     // Should fail with a negative applyOpsIndex.
     resumeTokenDataIn.applyOpsIndex = std::numeric_limits<size_t>::max();
-    rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
 
     ASSERT_THROWS(rtToken.getData(), AssertionException);
 }
@@ -309,8 +255,8 @@ TEST(ResumeToken, StringEncodingSortsCorrectly) {
     }
 
     auto assertLt = [](const ResumeTokenData& lower, const ResumeTokenData& higher) {
-        auto lowerString = ResumeToken(lower).toDocument(Format::kHexString)["_data"].getString();
-        auto higherString = ResumeToken(higher).toDocument(Format::kHexString)["_data"].getString();
+        auto lowerString = ResumeToken(lower).toDocument()["_data"].getString();
+        auto higherString = ResumeToken(higher).toDocument()["_data"].getString();
         ASSERT_LT(lowerString, higherString);
     };
 

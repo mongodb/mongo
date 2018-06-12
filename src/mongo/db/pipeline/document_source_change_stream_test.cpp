@@ -196,7 +196,7 @@ public:
         tokenData.documentKey = docKey;
         if (!uuid.missing())
             tokenData.uuid = uuid.getUuid();
-        return ResumeToken(tokenData).toDocument(ResumeToken::SerializationFormat::kHexString);
+        return ResumeToken(tokenData).toDocument();
     }
 
     /**
@@ -303,6 +303,15 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedOption) {
             BSON(DSChangeStream::kStageName << BSON("unexpected" << 4)).firstElement(), expCtx),
         AssertionException,
         40415);
+
+    // In older versions this option was accepted.
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
+                           BSON(DSChangeStream::kStageName << BSON(
+                                    "$_resumeAfterClusterTime" << BSON("ts" << Timestamp(0, 1))))
+                               .firstElement(),
+                           expCtx),
+                       AssertionException,
+                       40415);
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectNonStringFullDocumentOption) {
@@ -328,26 +337,6 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
         40575);
 }
 
-TEST_F(ChangeStreamStageTest, ShouldRejectBothResumeAfterClusterTimeAndResumeAfterOptions) {
-    auto expCtx = getExpCtx();
-
-    // Need to put the collection in the UUID catalog so the resume token is valid.
-    Collection collection(stdx::make_unique<CollectionMock>(nss));
-    UUIDCatalog::get(expCtx->opCtx).onCreateCollection(expCtx->opCtx, &collection, testUuid());
-
-    ASSERT_THROWS_CODE(
-        DSChangeStream::createFromBson(
-            BSON(DSChangeStream::kStageName
-                 << BSON("resumeAfter"
-                         << makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))
-                         << "$_resumeAfterClusterTime"
-                         << BSON("ts" << kDefaultTs)))
-                .firstElement(),
-            expCtx),
-        AssertionException,
-        40674);
-}
-
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {
     auto expCtx = getExpCtx();
 
@@ -366,24 +355,6 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfter
             expCtx),
         AssertionException,
         40674);
-}
-
-TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtAndResumeAfterClusterTimeOptions) {
-    auto expCtx = getExpCtx();
-
-    // Need to put the collection in the UUID catalog so the resume token is valid.
-    Collection collection(stdx::make_unique<CollectionMock>(nss));
-    UUIDCatalog::get(expCtx->opCtx).onCreateCollection(expCtx->opCtx, &collection, testUuid());
-
-    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
-                           BSON(DSChangeStream::kStageName
-                                << BSON("$_resumeAfterClusterTime" << BSON("ts" << kDefaultTs)
-                                                                   << "startAtOperationTime"
-                                                                   << kDefaultTs))
-                               .firstElement(),
-                           expCtx),
-                       AssertionException,
-                       50573);
 }
 
 TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {

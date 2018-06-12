@@ -175,11 +175,6 @@ public:
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    static boost::intrusive_ptr<DocumentSource> createTransformationStage(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        BSONObj changeStreamSpec,
-        ServerGlobalParams::FeatureCompatibility::Version fcv);
-
     /**
      * Given a BSON object containing an aggregation command with a $changeStream stage, and a
      * resume token, returns a new BSON object with the same command except with the addition of a
@@ -204,8 +199,7 @@ private:
     // For instance, whether it is permitted to run given the current FCV, whether the namespace is
     // valid for the options specified in the spec, etc.
     static void assertIsLegalSpecification(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           const DocumentSourceChangeStreamSpec& spec,
-                                           ServerGlobalParams::FeatureCompatibility::Version fcv);
+                                           const DocumentSourceChangeStreamSpec& spec);
 
     // It is illegal to construct a DocumentSourceChangeStream directly, use createFromBson()
     // instead.

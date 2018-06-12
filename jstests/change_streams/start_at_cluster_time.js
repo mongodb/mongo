@@ -36,8 +36,7 @@
     assert.eq(next.operationType, "update", tojson(next));
     assert.eq(next.documentKey._id, 1, tojson(next));
 
-    // Test that startAtOperationTime is not allowed alongside resumeAfter or
-    // $_resumeAfterClusterTime.
+    // Test that startAtOperationTime is not allowed alongside resumeAfter.
     assert.commandFailedWithCode(db.runCommand({
         aggregate: coll.getName(),
         pipeline:
@@ -45,18 +44,6 @@
         cursor: {}
     }),
                                  40674);
-
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [{
-            $changeStream: {
-                startAtOperationTime: timeOfFirstUpdate,
-                $_resumeAfterClusterTime: {ts: timeOfFirstUpdate}
-            }
-        }],
-        cursor: {}
-    }),
-                                 50573);
 
     // Test that resuming from a time in the future will wait for that time to come.
     let resumeTimeFarFuture = db.runCommand({isMaster: 1}).$clusterTime.clusterTime;

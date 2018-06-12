@@ -38,10 +38,12 @@ namespace mongo {
 
 class DocumentSourceChangeStreamTransform : public DocumentSource {
 public:
-    DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        BSONObj changeStreamSpec,
-                                        ServerGlobalParams::FeatureCompatibility::Version fcv,
-                                        bool isIndependentOfAnyCollection);
+    /**
+     * Creates a new transformation stage from the given specification.
+     */
+    static boost::intrusive_ptr<DocumentSourceChangeStreamTransform> create(
+        const boost::intrusive_ptr<ExpressionContext>&, BSONObj changeStreamSpec);
+
     Document applyTransformation(const Document& input);
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
@@ -54,6 +56,10 @@ public:
     }
 
 private:
+    // This constructor is private, callers should use the 'create()' method above.
+    DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        BSONObj changeStreamSpec);
+
     struct DocumentKeyCacheEntry {
         DocumentKeyCacheEntry() = default;
 
@@ -126,8 +132,6 @@ private:
     bool isDocumentRelevant(const Document& d);
 
     BSONObj _changeStreamSpec;
-
-    ResumeToken::SerializationFormat _resumeTokenFormat;
 
     // Map of collection UUID to document key fields.
     std::map<UUID, DocumentKeyCacheEntry> _documentKeyCache;

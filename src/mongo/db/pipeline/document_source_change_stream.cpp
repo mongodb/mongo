@@ -442,7 +442,6 @@ void assertResumeAllowed(const intrusive_ptr<ExpressionContext>& expCtx, Collect
  */
 void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
                         const DocumentSourceChangeStreamSpec& spec,
-                        ServerGlobalParams::FeatureCompatibility::Version fcv,
                         intrusive_ptr<DocumentSource>* resumeStageOut,
                         boost::optional<Timestamp>* startFromOut) {
     if (!expCtx->inMongos) {
@@ -476,31 +475,13 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
         }
     }
 
-    auto resumeAfterClusterTime = spec.getResumeAfterClusterTimeDeprecated();
     auto startAtOperationTime = spec.getStartAtOperationTime();
 
-    uassert(40674,
-            "Only one type of resume option is allowed, but multiple were found.",
-            !(*resumeStageOut) || (!resumeAfterClusterTime && !startAtOperationTime));
 
-    if (resumeAfterClusterTime) {
-        if (fcv >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-            warning() << "The '$_resumeAfterClusterTime' option is deprecated, please use "
-                         "'startAtOperationTime' instead.";
-        }
-        *startFromOut = resumeAfterClusterTime->getTimestamp();
-    }
-
-    // New field name starting in 4.0 is 'startAtOperationTime'.
     if (startAtOperationTime) {
-        uassert(50573,
-                str::stream()
-                    << "Do not specify both "
-                    << DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName
-                    << " and "
-                    << DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeDeprecatedFieldName
-                    << " in a $changeStream stage.",
-                !resumeAfterClusterTime);
+        uassert(40674,
+                "Only one type of resume option is allowed, but multiple were found.",
+                !*resumeStageOut);
         *startFromOut = *startAtOperationTime;
         *resumeStageOut = DocumentSourceShardCheckResumability::create(expCtx, **startFromOut);
     }
@@ -520,13 +501,12 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
                                                       elem.embeddedObject());
 
-    const auto fcv = serverGlobalParams.featureCompatibility.getVersion();
     // Make sure that it is legal to run this $changeStream before proceeding.
-    DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec, fcv);
+    DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec);
 
     boost::optional<Timestamp> startFrom;
     intrusive_ptr<DocumentSource> resumeStage = nullptr;
-    parseResumeOptions(expCtx, spec, fcv, &resumeStage, &startFrom);
+    parseResumeOptions(expCtx, spec, &resumeStage, &startFrom);
 
     auto fullDocOption = spec.getFullDocument();
     uassert(40575,
@@ -550,7 +530,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             buildMatchFilter(expCtx, *startFrom, startFromInclusive), expCtx));
     }
 
-    stages.push_back(createTransformationStage(expCtx, elem.embeddedObject(), fcv));
+    stages.push_back(DocumentSourceChangeStreamTransform::create(expCtx, elem.embeddedObject()));
     if (resumeStage) {
         stages.push_back(resumeStage);
     }
@@ -591,18 +571,7 @@ BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(const BSONObj or
 }
 
 void DocumentSourceChangeStream::assertIsLegalSpecification(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    const DocumentSourceChangeStreamSpec& spec,
-    ServerGlobalParams::FeatureCompatibility::Version fcv) {
-    // Change stream on an entire database is a new 4.0 feature.
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            str::stream() << "$changeStream on an entire database is not allowed in the current "
-                             "feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            !expCtx->ns.isCollectionlessAggregateNS() ||
-                fcv >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-
+    const intrusive_ptr<ExpressionContext>& expCtx, const DocumentSourceChangeStreamSpec& spec) {
     // If 'allChangesForCluster' is true, the stream must be opened on the 'admin' database with
     // {aggregate: 1}.
     uassert(ErrorCodes::InvalidOptions,
@@ -627,14 +596,4 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             !expCtx->ns.isSystem());
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationStage(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    BSONObj changeStreamSpec,
-    ServerGlobalParams::FeatureCompatibility::Version fcv) {
-    // Mark the transformation stage as independent of any collection if the change stream is
-    // watching all collections in the database.
-    const bool isIndependentOfAnyCollection = expCtx->ns.isCollectionlessAggregateNS();
-    return intrusive_ptr<DocumentSource>(new DocumentSourceChangeStreamTransform(
-        expCtx, changeStreamSpec, fcv, isIndependentOfAnyCollection));
-}
 }  // namespace mongo
