@@ -127,7 +127,14 @@ public:
 
         LOG(0) << "CMD: reIndex " << toReIndexNss;
 
+        // This Global write lock is necessary to ensure no other connections establish a snapshot
+        // while the reIndex command is running.  The reIndex command does not write oplog entries
+        // (for the most part) and thus the minimumVisibleSnapshot mechanism doesn't completely
+        // avoid reading at times that may show discrepancies between the in-memory index catalog
+        // and the on-disk index catalog.
+        Lock::GlobalWrite lk(opCtx);
         AutoGetOrCreateDb autoDb(opCtx, dbname, MODE_X);
+
         Collection* collection = autoDb.getDb()->getCollection(opCtx, toReIndexNss);
         if (!collection) {
             if (autoDb.getDb()->getViewCatalog()->lookup(opCtx, toReIndexNss.ns()))
