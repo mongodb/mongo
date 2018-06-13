@@ -189,6 +189,8 @@ public:
         return true;
     }
 
+    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const final;
+
     virtual Status compact(OperationContext* opCtx,
                            RecordStoreCompactAdaptor* adaptor,
                            const CompactOptions* options,
