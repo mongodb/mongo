@@ -213,32 +213,6 @@ public:
         }
     };
 
-    class RollbackTimeLimitHolder {
-    public:
-        /**
-         * Returns the maximum amount of data we are willing to roll back, in seconds.
-         */
-        unsigned long long getRollbackTimeLimit() const {
-            const stdx::lock_guard<stdx::mutex> lock(_rollbackTimeLimitSecsMutex);
-            return _rollbackTimeLimitSecs;
-        }
-
-        /**
-         * Set a new limit on the allowed length of the rollback period. Measured in seconds.
-         */
-        void setRollbackTimeLimit(unsigned long long newLimit) {
-            const stdx::lock_guard<stdx::mutex> lock(_rollbackTimeLimitSecsMutex);
-            _rollbackTimeLimitSecs = newLimit;
-        }
-
-    private:
-        // Guards access to the _rollbackTimeLimitSecs member variable.
-        mutable stdx::mutex _rollbackTimeLimitSecsMutex;
-
-        // We disallow rollback if the data has a larger timespan, in seconds, than this number.
-        unsigned long long _rollbackTimeLimitSecs = 1800;
-    };
-
     /**
      * Creates a RollbackImpl instance that will run the entire rollback algorithm. This is
      * called during steady state replication when we determine that we have to roll back after

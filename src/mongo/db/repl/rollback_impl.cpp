@@ -62,13 +62,25 @@ namespace repl {
 namespace {
 
 RollbackImpl::Listener kNoopListener;
-RollbackImpl::RollbackTimeLimitHolder kRollbackTimeLimitHolder;
 
 // Control whether or not the server will write out data files containing deleted documents during
 // rollback. This server parameter affects both rollback via refetch and rollback via recovery to
 // stable timestamp.
 constexpr bool createRollbackFilesDefault = true;
 MONGO_EXPORT_SERVER_PARAMETER(createRollbackDataFiles, bool, createRollbackFilesDefault);
+
+/**
+ * This amount, measured in seconds, represents the maximum allowed rollback period.
+ * It is calculated by taking the difference of the wall clock times of the oplog entries
+ * at the top of the local oplog and at the common point.
+ */
+MONGO_EXPORT_SERVER_PARAMETER(rollbackTimeLimitSecs, int, 60 * 60 * 24)  // Default 1 day
+    ->withValidator([](const int& newVal) {
+        if (newVal > 0) {
+            return Status::OK();
+        }
+        return Status(ErrorCodes::BadValue, "rollbackTimeLimitSecs must be greater than 0");
+    });
 
 // The name of the insert, update and delete commands as found in oplog command entries.
 constexpr auto kInsertCmdName = "insert"_sd;
@@ -694,7 +706,7 @@ Status RollbackImpl::_checkAgainstTimeLimit(
             _rollbackStats.lastLocalWallClockTime = topOfOplogWallTime;
             _rollbackStats.commonPointWallClockTime = commonPointWallTime;
 
-            auto timeLimit = kRollbackTimeLimitHolder.getRollbackTimeLimit();
+            auto timeLimit = static_cast<unsigned long long>(rollbackTimeLimitSecs.loadRelaxed());
 
             if (diff > timeLimit) {
                 return Status(ErrorCodes::UnrecoverableRollbackError,
@@ -944,56 +956,6 @@ void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
     log() << "\ttotal number of entries rolled back (including no-ops): "
           << _observerInfo.numberOfEntriesObserved;
 }
-
-/**
- * This amount, measured in seconds, represents the maximum allowed rollback period.
- * It is calculated by taking the difference of the wall clock times of the oplog entries
- * at the top of the local oplog and at the common point.
- */
-class RollbackTimeLimitServerParameter final : public ServerParameter {
-    MONGO_DISALLOW_COPYING(RollbackTimeLimitServerParameter);
-
-public:
-    static constexpr auto kName = "rollbackTimeLimitSecs"_sd;
-
-    RollbackTimeLimitServerParameter()
-        : ServerParameter(ServerParameterSet::getGlobal(), kName.toString(), true, true) {}
-
-    virtual void append(OperationContext* opCtx,
-                        BSONObjBuilder& builder,
-                        const std::string& name) final {
-        builder.append(name,
-                       static_cast<long long>(kRollbackTimeLimitHolder.getRollbackTimeLimit()));
-    }
-
-    virtual Status set(const BSONElement& newValueElement) final {
-        long long newValue;
-        if (!newValueElement.coerce(&newValue) || newValue <= 0)
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Invalid value for " << kName << ": "
-                                                    << newValueElement
-                                                    << ". Must be a positive integer.");
-        kRollbackTimeLimitHolder.setRollbackTimeLimit(static_cast<unsigned long long>(newValue));
-        return Status::OK();
-    }
-
-    virtual Status setFromString(const std::string& str) final {
-        long long newValue;
-        Status status = parseNumberFromString(str, &newValue);
-        if (!status.isOK())
-            return status;
-        if (newValue <= 0)
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Invalid value for " << kName << ": "
-                                                    << newValue
-                                                    << ". Must be a positive integer.");
-
-        kRollbackTimeLimitHolder.setRollbackTimeLimit(static_cast<unsigned long long>(newValue));
-        return Status::OK();
-    }
-} rollbackTimeLimitSecs;
-
-constexpr decltype(RollbackTimeLimitServerParameter::kName) RollbackTimeLimitServerParameter::kName;
 
 }  // namespace repl
 }  // namespace mongo
