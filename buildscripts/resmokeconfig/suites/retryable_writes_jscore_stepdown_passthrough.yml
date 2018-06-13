@@ -72,6 +72,10 @@ selector:
   - jstests/core/startup_log.js # Checks pid, which is different on each server.
   - jstests/core/validate_cmd_ns.js # Calls _exec() directly, not retryable.
 
+  # Runs an explain expected to run for several seconds -- failovers may
+  # exhaust retry attempts
+  - jstests/core/explain2.js
+
   exclude_with_any_tags:
   ##
   # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js
