@@ -263,13 +263,22 @@ connect = function(url, user, pass) {
         }
     }
 
-    // Check server version
-    var serverVersion = db.version();
-    chatty("MongoDB server version: " + serverVersion);
+    // Implicit sessions should not be used when opening a connection. In particular, the buildInfo
+    // command is erroneously marked as requiring auth in MongoDB 3.6 and therefore fails if a
+    // logical session id is included in the request.
+    const originalTestData = TestData;
+    TestData = Object.merge(originalTestData, {disableImplicitSessions: true});
+    try {
+        // Check server version
+        var serverVersion = db.version();
+        chatty("MongoDB server version: " + serverVersion);
 
-    var shellVersion = version();
-    if (serverVersion.slice(0, 3) != shellVersion.slice(0, 3)) {
-        chatty("WARNING: shell and server versions do not match");
+        var shellVersion = version();
+        if (serverVersion.slice(0, 3) != shellVersion.slice(0, 3)) {
+            chatty("WARNING: shell and server versions do not match");
+        }
+    } finally {
+        TestData = originalTestData;
     }
 
     return db;
