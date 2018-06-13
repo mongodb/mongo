@@ -1346,8 +1346,8 @@ public:
 class SyncTest : public SyncTail {
 public:
     bool returnEmpty;
-    SyncTest()
-        : SyncTail(nullptr, nullptr, nullptr, SyncTail::MultiSyncApplyFunc(), nullptr),
+    explicit SyncTest(OplogApplier::Observer* observer)
+        : SyncTail(observer, nullptr, nullptr, SyncTail::MultiSyncApplyFunc(), nullptr),
           returnEmpty(false) {}
     virtual ~SyncTest() {}
     BSONObj getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) override {
@@ -1360,6 +1360,16 @@ public:
                     << "foo"
                     << "baz");
     }
+};
+
+class FetchAndInsertMissingDocumentObserver : public OplogApplier::Observer {
+public:
+    void onBatchBegin(const OplogApplier::Operations&) final {}
+    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
+    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {
+        fetched = true;
+    }
+    bool fetched = false;
 };
 
 class FetchAndInsertMissingDocument : public Base {
@@ -1398,17 +1408,23 @@ public:
         verify(threw);
 
         // now this should succeed
-        SyncTest t;
+        FetchAndInsertMissingDocumentObserver observer;
+        SyncTest t(&observer);
         verify(t.fetchAndInsertMissingDocument(&_opCtx, oplogEntry));
+        ASSERT(observer.fetched);
         verify(!_client
                     .findOne(ns(),
                              BSON("_id"
                                   << "on remote"))
                     .isEmpty());
 
+        // Reset flag in observer before next test case.
+        observer.fetched = false;
+
         // force it not to find an obj
         t.returnEmpty = true;
         verify(!t.fetchAndInsertMissingDocument(&_opCtx, oplogEntry));
+        ASSERT_FALSE(observer.fetched);
     }
 };
 
