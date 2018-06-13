@@ -16,7 +16,7 @@
         assert.commandFailed(mongos.adminCommand({shardCollection: ns, key: keyDoc}));
 
         assert.eq(mongos.getDB('config').collections.count({_id: ns, dropped: false}), 0);
-        mongos.getDB(kDbName).dropDatabase();
+        assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
     }
 
     function testAndClenaupWithKeyOK(keyDoc) {
@@ -29,7 +29,7 @@
         assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: keyDoc}));
 
         assert.eq(mongos.getDB('config').collections.count({_id: ns, dropped: false}), 1);
-        mongos.getDB(kDbName).dropDatabase();
+        assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
     }
 
     function testAndClenaupWithKeyNoIndexOK(keyDoc) {
@@ -41,7 +41,7 @@
         assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: keyDoc}));
 
         assert.eq(mongos.getDB('config').collections.count({_id: ns, dropped: false}), 1);
-        mongos.getDB(kDbName).dropDatabase();
+        assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
     }
 
     function getIndexSpecByName(coll, indexName) {
@@ -110,7 +110,7 @@
     assert.commandFailed(
         mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}, unique: true}));
 
-    mongos.getDB(kDbName).dropDatabase();
+    assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
     // Shard empty collections no index required.
     testAndClenaupWithKeyNoIndexOK({_id: 1});
@@ -284,7 +284,7 @@
     assert.commandWorked(mongos.getDB(kDbName).createCollection('foo'));
     assert.commandWorked(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {a: 1}}));
 
-    mongos.getDB(kDbName).dropDatabase();
+    assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
     //
     // Tests for the shell helper sh.shardCollection().
