@@ -99,6 +99,7 @@ env.Library(
     target="index_access_methods",
     source=[
         "2d_access_method.cpp",
+        "all_paths_access_method.cpp",
         "btree_access_method.cpp",
         "fts_access_method.cpp",
         "hash_access_method.cpp",

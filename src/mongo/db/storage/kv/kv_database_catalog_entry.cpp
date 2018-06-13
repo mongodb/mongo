@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/2d_access_method.h"
+#include "mongo/db/index/all_paths_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
@@ -83,6 +84,9 @@ IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* opCtx,
 
     if (IndexNames::GEO_2D == type)
         return new TwoDAccessMethod(index, sdi);
+
+    if (IndexNames::ALLPATHS == type)
+        return new AllPathsAccessMethod(index, sdi);
 
     log() << "Can't find index for keyPattern " << desc->keyPattern();
     MONGO_UNREACHABLE;

@@ -643,6 +643,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
                                     << keyStatus.reason());
     }
 
+    const string pluginName = IndexNames::findPluginName(key);
     std::unique_ptr<CollatorInterface> collator;
     BSONElement collationElement = spec.getField("collation");
     if (collationElement) {
@@ -674,9 +675,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
                                   << "' option"};
         }
 
-        string pluginName = IndexNames::findPluginName(key);
         if ((pluginName != IndexNames::BTREE) && (pluginName != IndexNames::GEO_2DSPHERE) &&
-            (pluginName != IndexNames::HASHED)) {
+            (pluginName != IndexNames::HASHED) && (pluginName != IndexNames::ALLPATHS)) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "Index type '" << pluginName
                                         << "' does not support collation: "
@@ -685,6 +685,26 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     }
 
     const bool isSparse = spec["sparse"].trueValue();
+
+    if (pluginName == IndexNames::ALLPATHS) {
+        if (isSparse) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "Index type '" << pluginName
+                                        << "' does not support the sparse option");
+        }
+
+        if (spec["unique"].trueValue()) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "Index type '" << pluginName
+                                        << "' does not support the unique option");
+        }
+
+        if (spec.getField("expireAfterSeconds")) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream() << "Index type '" << pluginName
+                                        << "' cannot be a TTL index");
+        }
+    }
 
     // Ensure if there is a filter, its valid.
     BSONElement filterElement = spec.getField("partialFilterExpression");

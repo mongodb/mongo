@@ -28,6 +28,7 @@
 
 #include "mongo/db/index_names.h"
 
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -40,17 +41,21 @@ const string IndexNames::GEO_2DSPHERE = "2dsphere";
 const string IndexNames::TEXT = "text";
 const string IndexNames::HASHED = "hashed";
 const string IndexNames::BTREE = "";
+const string IndexNames::ALLPATHS = "allPaths";
 
 // static
 string IndexNames::findPluginName(const BSONObj& keyPattern) {
     BSONObjIterator i(keyPattern);
-
     while (i.more()) {
         BSONElement e = i.next();
-        if (String != e.type()) {
+        string fieldName(e.fieldName());
+        if (String == e.type()) {
+            return e.String();
+        } else if ((fieldName == "$**") ||
+                   (fieldName.size() > 4 && fieldName.substr(e.fieldNameSize() - 5) == ".$**")) {
+            return IndexNames::ALLPATHS;
+        } else
             continue;
-        }
-        return e.String();
     }
 
     return IndexNames::BTREE;
@@ -66,7 +71,8 @@ bool IndexNames::existedBefore24(const string& name) {
 bool IndexNames::isKnownName(const string& name) {
     return name == IndexNames::GEO_2D || name == IndexNames::GEO_2DSPHERE ||
         name == IndexNames::GEO_HAYSTACK || name == IndexNames::TEXT ||
-        name == IndexNames::HASHED || name == IndexNames::BTREE;
+        name == IndexNames::HASHED || name == IndexNames::BTREE ||
+        (getTestCommandsEnabled() && name == IndexNames::ALLPATHS);
 }
 
 // static

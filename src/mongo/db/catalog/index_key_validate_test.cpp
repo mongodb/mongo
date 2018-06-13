@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 
 #include <limits>
 
@@ -233,6 +234,56 @@ TEST(IndexKeyValidateTest, KeyElementNameTextSucceedsOnTextIndex) {
                                               << "text"),
                                      indexVersion));
     }
+}
+
+TEST(IndexKeyValidateTest, KeyElementNameAllPathsSucceedsOnSubPath) {
+    const bool temp = getTestCommandsEnabled();
+    setTestCommandsEnabled(true);
+    ASSERT_OK(validateKeyPattern(BSON("a.$**" << 1), IndexVersion::kV2));
+    setTestCommandsEnabled(temp);
+}
+
+TEST(IndexKeyValidateTest, KeyElementNameAllPathsSucceeds) {
+    const bool temp = getTestCommandsEnabled();
+    setTestCommandsEnabled(true);
+    ASSERT_OK(validateKeyPattern(BSON("$**" << 1), IndexVersion::kV2));
+    setTestCommandsEnabled(temp);
+}
+
+TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnRepeat) {
+    const bool temp = getTestCommandsEnabled();
+    setTestCommandsEnabled(true);
+    auto status = validateKeyPattern(BSON("$**.$**" << 1), IndexVersion::kV2);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    setTestCommandsEnabled(temp);
+}
+
+TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnSubPathRepeat) {
+    const bool temp = getTestCommandsEnabled();
+    setTestCommandsEnabled(true);
+    auto status = validateKeyPattern(BSON("a.$**.$**" << 1), IndexVersion::kV2);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    setTestCommandsEnabled(temp);
+}
+
+TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnCompound) {
+    const bool temp = getTestCommandsEnabled();
+    setTestCommandsEnabled(true);
+    auto status = validateKeyPattern(BSON("$**" << 1 << "a" << 1), IndexVersion::kV2);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    setTestCommandsEnabled(temp);
+}
+
+TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnIncorrectValue) {
+    const bool temp = getTestCommandsEnabled();
+    setTestCommandsEnabled(true);
+    auto status = validateKeyPattern(BSON("$**" << false), IndexVersion::kV2);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    setTestCommandsEnabled(temp);
 }
 
 }  // namespace

@@ -131,6 +131,12 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                                           << static_cast<int>(indexVersion)};
                 }
 
+                if (pluginName == IndexNames::ALLPATHS) {
+                    return {code,
+                            str::stream() << "'" << pluginName
+                                          << "' index plugin is not allowed with index version v:"
+                                          << static_cast<int>(indexVersion)};
+                }
                 break;
             }
             case IndexVersion::kV2: {
@@ -159,9 +165,15 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
             return Status(code, "Can't use more than one index plugin for a single index.");
         }
 
+        // Check if the all paths index is compounded. If it is the key is invalid because
+        // compounded all paths indexes are disallowed.
+        if (pluginName == IndexNames::ALLPATHS && key.nFields() != 1) {
+            return Status(code, "all paths indexes do not allow compounding");
+        }
+
         // Ensure that the fields on which we are building the index are valid: a field must not
-        // begin with a '$' unless it is part of a DBRef or text index, and a field path cannot
-        // contain an empty field. If a field cannot be created or updated, it should not be
+        // begin with a '$' unless it is part of an allPaths, DBRef or text index, and a field path
+        // cannot contain an empty field. If a field cannot be created or updated, it should not be
         // indexable.
 
         FieldRef keyField(keyElement.fieldName());
@@ -171,9 +183,9 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
             return Status(code, "Index keys cannot be an empty field.");
         }
 
-        // "$**" is acceptable for a text index.
+        // "$**" is acceptable for a text index or all paths index.
         if (mongoutils::str::equals(keyElement.fieldName(), "$**") &&
-            keyElement.valuestrsafe() == IndexNames::TEXT)
+            ((keyElement.isNumber()) || (keyElement.valuestrsafe() == IndexNames::TEXT)))
             continue;
 
         if (mongoutils::str::equals(keyElement.fieldName(), "_fts") &&
@@ -198,7 +210,10 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
             const bool mightBePartOfDbRef =
                 (i != 0) && (part == "$db" || part == "$id" || part == "$ref");
 
-            if (!mightBePartOfDbRef) {
+            const bool isPartOfAllPaths =
+                (i == numParts - 1) && (part == "$**") && (pluginName == IndexNames::ALLPATHS);
+
+            if (!mightBePartOfDbRef && !isPartOfAllPaths) {
                 return Status(code,
                               "Index key contains an illegal field name: "
                               "field name starts with '$'.");
