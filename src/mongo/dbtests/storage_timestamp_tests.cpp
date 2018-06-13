@@ -116,7 +116,6 @@ public:
     void onBatchBegin(const repl::OplogApplier::Operations&) final {}
     void onBatchEnd(const StatusWith<repl::OpTime>&, const repl::OplogApplier::Operations&) final {}
     void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
-    void onOperationConsumed(const BSONObj&) final {}
 };
 
 class StorageTimestampTest {

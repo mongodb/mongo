@@ -552,8 +552,6 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
     return Status::OK();
 }
 
-void BackgroundSync::onOperationConsumed(const BSONObj& op) {}
-
 void BackgroundSync::_runRollback(OperationContext* opCtx,
                                   const Status& fetcherReturnStatus,
                                   const HostAndPort& source,

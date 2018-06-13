@@ -177,7 +177,6 @@ public:
     void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>& docs) final {
         _fetchCount->fetchAndAdd(docs.size());
     }
-    void onOperationConsumed(const BSONObj& op) final {}
 
 private:
     AtomicUInt32* const _fetchCount;

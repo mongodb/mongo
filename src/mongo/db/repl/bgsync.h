@@ -147,7 +147,6 @@ public:
     void onBatchBegin(const OplogApplier::Operations&) final {}
     void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
     void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
-    void onOperationConsumed(const BSONObj& op) final;
 
 private:
     bool _inShutdown_inlock() const;

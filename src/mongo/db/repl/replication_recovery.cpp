@@ -82,7 +82,6 @@ public:
 
     void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
     void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
-    void onOperationConsumed(const BSONObj& op) final {}
 
     void complete(const OpTime& applyThroughOpTime) const {
         LOG_FOR_RECOVERY(kRecoveryBatchLogLevel)

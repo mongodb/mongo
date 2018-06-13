@@ -1000,15 +1000,12 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
 void SyncTail::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
     // This is just to get the op off the queue; it's been peeked at and queued for application
     // already.
+    // If we failed to get an op off the queue, this means that shutdown() was called between the
+    // consumer's calls to peek() and consume(). shutdown() cleared the buffer so there is nothing
+    // for us to consume here. Since our postcondition is already met, it is safe to return
+    // successfully.
     BSONObj op;
-    if (oplogBuffer->tryPop(opCtx, &op)) {
-        _observer->onOperationConsumed(op);
-    } else {
-        invariant(inShutdown());
-        // This means that shutdown() was called between the consumer's calls to peek() and
-        // consume(). shutdown() cleared the buffer so there is nothing for us to consume here.
-        // Since our postcondition is already met, it is safe to return successfully.
-    }
+    invariant(oplogBuffer->tryPop(opCtx, &op) || inShutdown());
 }
 
 void SyncTail::shutdown() {

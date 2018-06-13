@@ -110,7 +110,6 @@ public:
     void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>& docs) final {
         numFetched += docs.size();
     }
-    void onOperationConsumed(const BSONObj& op) final {}
 
     std::size_t numFetched = 0U;
 
