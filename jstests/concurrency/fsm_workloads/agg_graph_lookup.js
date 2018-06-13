@@ -54,10 +54,6 @@ var $config = (function() {
         assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
     }
 
-    function teardown(db, collName, cluster) {
-        assertWhenOwnColl(db[collName].drop());
-    }
-
     return {
         threadCount: 10,
         iterations: 100,
@@ -66,6 +62,5 @@ var $config = (function() {
         transitions: transitions,
         data: data,
         setup: setup,
-        teardown: teardown
     };
 })();

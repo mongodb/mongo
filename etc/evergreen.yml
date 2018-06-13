@@ -9710,6 +9710,8 @@ buildvariants:
     - rhel62-large
   - name: lint
   - name: burn_in_tests
+    distros:
+    - rhel62-large
   - name: rollback_fuzzer
   - name: rollback_fuzzer_clean_shutdowns
   - name: rollback_fuzzer_unclean_shutdowns

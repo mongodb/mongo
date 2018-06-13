@@ -9,7 +9,6 @@
  *
  * @tags: [requires_capped]
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = (function() {
 
@@ -77,18 +76,12 @@ var $config = (function() {
 
     var transitions = {init: {rename: 1}, rename: {rename: 1}};
 
-    function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
-        dropCollections(db, pattern);
-    }
-
     return {
         threadCount: 10,
         iterations: 20,
         data: data,
         states: states,
         transitions: transitions,
-        teardown: teardown
     };
 
 })();

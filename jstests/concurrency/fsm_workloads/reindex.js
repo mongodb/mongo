@@ -7,8 +7,6 @@
  * against the collection. Operates on a separate collection for each thread.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
-
 var $config = (function() {
     var data = {
         nIndexes: 3 + 1,  // 3 created and 1 for _id
@@ -99,17 +97,5 @@ var $config = (function() {
         query: {reIndex: 0.5, query: 0.5}
     };
 
-    var teardown = function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '_\\d+$');
-        dropCollections(db, pattern);
-    };
-
-    return {
-        threadCount: 15,
-        iterations: 10,
-        states: states,
-        transitions: transitions,
-        teardown: teardown,
-        data: data
-    };
+    return {threadCount: 15, iterations: 10, states: states, transitions: transitions, data: data};
 })();

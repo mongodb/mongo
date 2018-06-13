@@ -6,8 +6,6 @@
  * Creates multiple unique background indexes in parallel.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
-
 var $config = (function() {
 
     var data = {
@@ -82,12 +80,6 @@ var $config = (function() {
         }
     }
 
-    function teardown(db, collName, cluster) {
-        // Drop all collections from this workload.
-        const pattern = new RegExp('^' + this.prefix + '[0-9]*$');
-        dropCollections(db, pattern);
-    }
-
     return {
         threadCount: 10,
         iterations: 11,
@@ -96,6 +88,5 @@ var $config = (function() {
         startState: 'buildIndex',
         transitions: transitions,
         setup: setup,
-        teardown: teardown,
     };
 })();

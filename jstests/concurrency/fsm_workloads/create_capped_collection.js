@@ -8,7 +8,6 @@
  *
  * @tags: [requires_capped]
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');    // for dropCollections
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 
 var $config = (function() {
@@ -151,18 +150,12 @@ var $config = (function() {
 
     var transitions = {init: {create: 1}, create: {create: 1}};
 
-    function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
-        dropCollections(db, pattern);
-    }
-
     return {
         threadCount: 5,
         iterations: 5,
         data: data,
         states: states,
         transitions: transitions,
-        teardown: teardown
     };
 
 })();

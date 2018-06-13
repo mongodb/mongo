@@ -7,7 +7,6 @@
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = (function() {
 
@@ -37,18 +36,12 @@ var $config = (function() {
 
     var transitions = {init: {distinct: 1}, distinct: {distinct: 1}};
 
-    function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '_\\d+$');
-        dropCollections(db, pattern);
-    }
-
     return {
         data: data,
         threadCount: 10,
         iterations: 20,
         states: states,
         transitions: transitions,
-        teardown: teardown
     };
 
 })();

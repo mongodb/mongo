@@ -7,8 +7,6 @@
  * underlying collection.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
-
 var $config = (function() {
 
     // Use the workload name as a prefix for the view names, since the workload name is assumed
@@ -92,11 +90,6 @@ var $config = (function() {
         }
     }
 
-    function teardown(db, collName, cluster) {
-        const pattern = new RegExp('^' + prefix + '[A-z]*$');
-        dropCollections(db, pattern);
-    }
-
     // This test performs createCollection concurrently from many threads, and createCollection on a
     // sharded cluster takes a distributed lock. Since a distributed lock is acquired by repeatedly
     // attempting to grab the lock every half second for 20 seconds (a max of 40 attempts), it's
@@ -114,7 +107,6 @@ var $config = (function() {
         startState: 'readFromView',
         transitions: transitions,
         setup: setup,
-        teardown: teardown,
     };
 
 })();

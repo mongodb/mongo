@@ -17,6 +17,7 @@
  * should not be any 'hole' because oplogs are applied sequentially in batches.
  *
  */
+
 var $config = (function() {
 
     // Use the workload name as the collection name.
@@ -109,10 +110,6 @@ var $config = (function() {
         return {skip: false};
     };
 
-    var teardown = function teardown(db, collName, cluster) {
-        db[this.collName].drop();
-    };
-
     return {
         threadCount: 50,
         iterations: 40,
@@ -129,6 +126,5 @@ var $config = (function() {
         transitions: transitions,
         setup: setup,
         skip: skip,
-        teardown: teardown
     };
 })();

@@ -8,8 +8,6 @@
  * where a $lookup or $graphLookup view that forms a cycle is created successfully.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
-
 var $config = (function() {
 
     // Use the workload name as a prefix for the view names, since the workload name is assumed
@@ -131,11 +129,6 @@ var $config = (function() {
         }
     }
 
-    function teardown(db, collName, cluster) {
-        const pattern = new RegExp('^' + prefix + '[A-z]*$');
-        dropCollections(db, pattern);
-    }
-
     return {
         threadCount: 20,
         iterations: 100,
@@ -144,6 +137,5 @@ var $config = (function() {
         startState: 'readFromView',
         transitions: transitions,
         setup: setup,
-        teardown: teardown,
     };
 })();

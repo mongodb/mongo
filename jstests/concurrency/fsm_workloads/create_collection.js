@@ -5,7 +5,6 @@
  *
  * Repeatedly creates a collection.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = (function() {
 
@@ -38,18 +37,12 @@ var $config = (function() {
 
     var transitions = {init: {create: 1}, create: {create: 1}};
 
-    function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
-        dropCollections(db, pattern);
-    }
-
     return {
         threadCount: 5,
         iterations: 20,
         data: data,
         states: states,
         transitions: transitions,
-        teardown: teardown
     };
 
 })();

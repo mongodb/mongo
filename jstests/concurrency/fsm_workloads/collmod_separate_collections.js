@@ -9,9 +9,8 @@
  *
  * Each thread updates a TTL index on a separate collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
-load('jstests/concurrency/fsm_workloads/collmod.js');            // for $config
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
+load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_workloads/collmod.js');     // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.prefix = 'collmod_separate_collections';
@@ -27,12 +26,6 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         // no-op: since the init state is used to setup
         // the separate collections on a per-thread basis.
-    };
-
-    $config.teardown = function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '_\\d+$');
-        dropCollections(db, pattern);
-        $super.teardown.apply(this, arguments);
     };
 
     $config.startState = 'init';
