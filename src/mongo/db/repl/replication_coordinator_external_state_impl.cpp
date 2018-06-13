@@ -292,9 +292,6 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     // waiting for an operation to be past the slaveDelay point.
     if (oldOplogBuffer) {
         oldOplogBuffer->clear(opCtx);
-        if (oldBgSync) {
-            oldBgSync->onBufferCleared();
-        }
     }
 
     if (oldBgSync) {

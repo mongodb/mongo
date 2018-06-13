@@ -120,11 +120,6 @@ public:
 
     HostAndPort getSyncTarget() const;
 
-    /**
-     * This is called while shutting down to reset the counters for the OplogBuffer.
-     */
-    void onBufferCleared();
-
     void clearSyncTarget();
 
     // For monitoring
