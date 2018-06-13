@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 import functools
 import json
+import threading
 
 import requests
 
@@ -23,6 +24,20 @@ _SEND_AFTER_SECS = 10
 # Initialized by resmokelib.logging.loggers.configure_loggers()
 BUILDLOGGER_FALLBACK = None
 
+_INCOMPLETE_LOG_OUTPUT = threading.Event()
+
+
+def is_log_output_incomplete():  # noqa: D205,D400
+    """Return true if we failed to write all of the log output to the buildlogger server, and return
+    false otherwise.
+    """
+    return _INCOMPLETE_LOG_OUTPUT.is_set()
+
+
+def set_log_output_incomplete():
+    """Indicate that we failed to write all of the log output to the buildlogger server."""
+    _INCOMPLETE_LOG_OUTPUT.set()
+
 
 def _log_on_error(func):
     """Provide decorator that causes exceptions to be logged by the "buildlogger" Logger instance.
@@ -35,6 +50,10 @@ def _log_on_error(func):
         """Provide wrapper function."""
         try:
             return func(*args, **kwargs)
+        except requests.HTTPError as err:
+            BUILDLOGGER_FALLBACK.error("Encountered an HTTP error: %s", err)
+        except requests.RequestException as err:
+            BUILDLOGGER_FALLBACK.error("Encountered a network error: %s", err)
         except:  # pylint: disable=bare-except
             BUILDLOGGER_FALLBACK.exception("Encountered an error.")
         return None
@@ -155,11 +174,12 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
                         new_max_size)
                     self.max_size = new_max_size
                     return self._append_logs(log_lines_chunk)
-            BUILDLOGGER_FALLBACK.exception("Encountered an error.")
-            return 0
+            BUILDLOGGER_FALLBACK.error("Encountered an HTTP error: %s", err)
+        except requests.RequestException as err:
+            BUILDLOGGER_FALLBACK.error("Encountered a network error: %s", err)
         except:  # pylint: disable=bare-except
             BUILDLOGGER_FALLBACK.exception("Encountered an error.")
-            return 0
+        return 0
 
     def _flush_buffer_with_lock(self, buf, close_called):
         """Ensure all logging output has been flushed to the buildlogger server.
@@ -175,14 +195,17 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
         if nb_sent:
             self.retry_buffer = self.retry_buffer[nb_sent:]
         if close_called and self.retry_buffer:
-            # Request to the buildlogger server returned an error, so use the fallback logger to
-            # avoid losing the log messages entirely.
-            for (_, message) in self.retry_buffer:
-                # TODO: construct an LogRecord instance equivalent to the one passed to the
-                #       process_record() method if we ever decide to log the time when the
-                #       LogRecord was created, e.g. using %(asctime)s in
-                #       _fallback_buildlogger_handler().
-                BUILDLOGGER_FALLBACK.info(message)
+            # The request to the logkeeper returned an error. We discard the log output rather than
+            # writing the messages to the fallback logkeeper to avoid putting additional pressure on
+            # the Evergreen database.
+            BUILDLOGGER_FALLBACK.warning(
+                "Failed to flush all log output (%d messages) to logkeeper.", len(
+                    self.retry_buffer))
+
+            # We set a flag to indicate that we failed to flush all log output to logkeeper so
+            # resmoke.py can exit with a special return code.
+            set_log_output_incomplete()
+
             self.retry_buffer = []
 
 
