@@ -1,6 +1,8 @@
 /**
  * Tests that rollback fixes the transactions table and gets the correct fastcounts for
  * transactions.
+ *
+ * @tags: [uses_transactions]
  */
 (function() {
     "use strict";
