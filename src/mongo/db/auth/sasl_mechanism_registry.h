@@ -306,9 +306,8 @@ public:
             return false;
         }
 
-        invariant(_getMapRef(T::mechanism_type::isInternal)
-                      .emplace(mechName.toString(), std::make_unique<T>())
-                      .second);
+        invariant(
+            _getMapRef(T::isInternal).emplace(mechName.toString(), std::make_unique<T>()).second);
         return true;
     }
 

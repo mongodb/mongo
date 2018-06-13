@@ -42,7 +42,6 @@ template <typename Policy>
 class SaslSCRAMServerMechanism : public MakeServerMechanism<Policy> {
 public:
     using HashBlock = typename Policy::HashBlock;
-    static const bool isInternal = true;
 
     explicit SaslSCRAMServerMechanism(std::string authenticationDatabase)
         : MakeServerMechanism<Policy>(std::move(authenticationDatabase)) {}
@@ -94,6 +93,7 @@ extern template class SaslSCRAMServerMechanism<SCRAMSHA256Policy>;
 template <typename ScramMechanism>
 class SCRAMServerFactory : public MakeServerFactory<ScramMechanism> {
 public:
+    static constexpr bool isInternal = true;
     bool canMakeMechanismForUser(const User* user) const final {
         auto credentials = user->getCredentials();
         return credentials.scram<typename ScramMechanism::HashBlock>().isValid();
