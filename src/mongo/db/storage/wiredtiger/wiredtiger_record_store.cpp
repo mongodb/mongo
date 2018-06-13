@@ -184,7 +184,20 @@ void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
             MONGO_IDLE_THREAD_BLOCK;
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (hasExcessStones_inlock()) {
-                break;
+                // Always truncate the oplog on non-RTT storage engines.
+                if (!_rs->supportsRecoverToStableTimestamp()) {
+                    break;
+                }
+                auto lastStableCheckpointTimestamp = _rs->getLastStableCheckpointTimestamp();
+                auto persistedTimestamp = lastStableCheckpointTimestamp
+                    ? *lastStableCheckpointTimestamp
+                    : Timestamp::min();
+                auto stone = _stones.front();
+                invariant(stone.lastRecord.isNormal());
+                if (static_cast<std::uint64_t>(stone.lastRecord.repr()) <
+                    persistedTimestamp.asULL()) {
+                    break;
+                }
             }
         }
         _oplogReclaimCv.wait(lock);
@@ -936,6 +949,14 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx,
     }
 
     return cappedDeleteAsNeeded_inlock(opCtx, justInserted);
+}
+
+boost::optional<Timestamp> WiredTigerRecordStore::getLastStableCheckpointTimestamp() const {
+    return _kvEngine->getLastStableCheckpointTimestamp();
+}
+
+bool WiredTigerRecordStore::supportsRecoverToStableTimestamp() const {
+    return _kvEngine->supportsRecoverToStableTimestamp();
 }
 
 int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opCtx,
