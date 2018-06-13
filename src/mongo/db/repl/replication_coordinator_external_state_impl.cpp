@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -132,6 +133,16 @@ MONGO_EXPORT_SERVER_PARAMETER(oplogFetcherMaxFetcherRestarts, int, 3)
         return Status::OK();
     });
 
+// The count of items in the buffer
+OplogBuffer::Counters bufferGauge;
+ServerStatusMetricField<Counter64> displayBufferCount("repl.buffer.count", &bufferGauge.count);
+// The size (bytes) of items in the buffer
+ServerStatusMetricField<Counter64> displayBufferSize("repl.buffer.sizeBytes", &bufferGauge.size);
+// The max size (bytes) of the buffer. If the buffer does not have a size constraint, this is
+// set to 0.
+ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxSizeBytes",
+                                                        &bufferGauge.maxSize);
+
 /**
  * Returns new thread pool for thread pool task executor.
  */
@@ -210,7 +221,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     invariant(replCoord);
     invariant(!_bgSync);
     log() << "Starting replication fetcher thread";
-    _oplogBuffer = stdx::make_unique<OplogBufferBlockingQueue>();
+    _oplogBuffer = stdx::make_unique<OplogBufferBlockingQueue>(&bufferGauge);
     _oplogBuffer->startup(opCtx);
 
     _bgSync =

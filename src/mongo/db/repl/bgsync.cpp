@@ -38,7 +38,6 @@
 #include "mongo/client/connection_pool.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
@@ -143,21 +142,6 @@ size_t getSize(const BSONObj& o) {
 // Failpoint which causes rollback to hang before starting.
 MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeStart);
 
-// The count of items in the buffer
-static Counter64 bufferCountGauge;
-static ServerStatusMetricField<Counter64> displayBufferCount("repl.buffer.count",
-                                                             &bufferCountGauge);
-// The size (bytes) of items in the buffer
-static Counter64 bufferSizeGauge;
-static ServerStatusMetricField<Counter64> displayBufferSize("repl.buffer.sizeBytes",
-                                                            &bufferSizeGauge);
-// The max size (bytes) of the buffer. If the buffer does not have a size constraint, this is
-// set to 0.
-static Counter64 bufferMaxSizeGauge;
-static ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxSizeBytes",
-                                                               &bufferMaxSizeGauge);
-
-
 BackgroundSync::BackgroundSync(
     ReplicationCoordinator* replicationCoordinator,
     ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
@@ -166,11 +150,7 @@ BackgroundSync::BackgroundSync(
     : _oplogBuffer(oplogBuffer),
       _replCoord(replicationCoordinator),
       _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
-      _replicationProcess(replicationProcess) {
-    // Update "repl.buffer.maxSizeBytes" server status metric to reflect the current oplog buffer's
-    // max size.
-    bufferMaxSizeGauge.increment(_oplogBuffer->getMaxSize() - bufferMaxSizeGauge.get());
-}
+      _replicationProcess(replicationProcess) {}
 
 void BackgroundSync::startup(OperationContext* opCtx) {
     invariant(!_producerThread);
@@ -558,9 +538,6 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
         LOG(3) << "batch resetting _lastOpTimeFetched: " << _lastOpTimeFetched;
     }
 
-    bufferCountGauge.increment(info.toApplyDocumentCount);
-    bufferSizeGauge.increment(info.toApplyDocumentBytes);
-
     // Check some things periodically (whenever we run out of items in the current cursor batch).
     if (info.networkDocumentBytes > 0 && info.networkDocumentBytes < kSmallBatchLimitBytes) {
         // On a very low latency network, if we don't wait a little, we'll be
@@ -575,10 +552,7 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
     return Status::OK();
 }
 
-void BackgroundSync::onOperationConsumed(const BSONObj& op) {
-    bufferCountGauge.decrement(1);
-    bufferSizeGauge.decrement(getSize(op));
-}
+void BackgroundSync::onOperationConsumed(const BSONObj& op) {}
 
 void BackgroundSync::_runRollback(OperationContext* opCtx,
                                   const Status& fetcherReturnStatus,
@@ -783,12 +757,7 @@ void BackgroundSync::start(OperationContext* opCtx) {
     LOG(1) << "bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastFetchedHash;
 }
 
-void BackgroundSync::onBufferCleared() {
-    const auto count = bufferCountGauge.get();
-    bufferCountGauge.decrement(count);
-    const auto size = bufferSizeGauge.get();
-    bufferSizeGauge.decrement(size);
-}
+void BackgroundSync::onBufferCleared() {}
 
 OpTimeWithHash BackgroundSync::_readLastAppliedOpTimeWithHash(OperationContext* opCtx) {
     BSONObj oplogEntry;
