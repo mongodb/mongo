@@ -59,15 +59,6 @@
 
 namespace mongo {
 
-MONGO_INITIALIZER(RegisterCursorExistsFunction)
-(InitializerContext* const) {
-    Session::registerCursorExistsFunction([](LogicalSessionId lsid, TxnNumber txnNumber) {
-        return CursorManager::hasTransactionCursorReference(lsid, txnNumber);
-    });
-
-    return Status::OK();
-}
-
 using std::vector;
 
 constexpr int CursorManager::kNumPartitions;
@@ -118,27 +109,13 @@ public:
 
     int64_t nextSeed();
 
-    void addTransactionCursorReference(LogicalSessionId lsid,
-                                       TxnNumber txnNumber,
-                                       NamespaceString nss,
-                                       CursorId cursorId);
-
-    void removeTransactionCursorReference(LogicalSessionId lsid,
-                                          TxnNumber txnNumber,
-                                          CursorId cursorId);
-
-    size_t numOpenCursorsForTransaction(LogicalSessionId lsid, TxnNumber txnNumber);
-
 private:
     // '_mutex' must not be held when acquiring a CursorManager mutex to avoid deadlock.
     SimpleMutex _mutex;
 
     using CursorIdToNssMap = stdx::unordered_map<CursorId, NamespaceString>;
-    using TxnNumberToCursorMap = stdx::unordered_map<TxnNumber, CursorIdToNssMap>;
-    using LsidToTxnCursorMap = LogicalSessionIdMap<TxnNumberToCursorMap>;
     using IdToNssMap = stdx::unordered_map<unsigned, NamespaceString>;
 
-    LsidToTxnCursorMap _lsidToTxnCursorMap;
     IdToNssMap _idToNss;
     unsigned _nextId;
 
@@ -170,38 +147,6 @@ int64_t GlobalCursorIdCache::nextSeed() {
     if (!_secureRandom)
         _secureRandom = SecureRandom::create();
     return _secureRandom->nextInt64();
-}
-
-void GlobalCursorIdCache::addTransactionCursorReference(LogicalSessionId lsid,
-                                                        TxnNumber txnNumber,
-                                                        NamespaceString nss,
-                                                        CursorId cursorId) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
-    invariant(_lsidToTxnCursorMap[lsid][txnNumber].insert({cursorId, nss}).second == true,
-              "Expected insert to succeed");
-}
-
-void GlobalCursorIdCache::removeTransactionCursorReference(LogicalSessionId lsid,
-                                                           TxnNumber txnNumber,
-                                                           CursorId cursorId) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
-    invariant(_lsidToTxnCursorMap[lsid][txnNumber].erase(cursorId) == 1);  // cursorId was erased.
-
-    if (_lsidToTxnCursorMap[lsid][txnNumber].size() == 0) {
-        invariant(_lsidToTxnCursorMap[lsid].erase(txnNumber) == 1);
-        if (_lsidToTxnCursorMap[lsid].size() == 0) {
-            invariant(_lsidToTxnCursorMap.erase(lsid) == 1);
-        }
-    }
-}
-
-size_t GlobalCursorIdCache::numOpenCursorsForTransaction(LogicalSessionId lsid,
-                                                         TxnNumber txnNumber) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
-    if (_lsidToTxnCursorMap.count(lsid) == 0 || _lsidToTxnCursorMap[lsid].count(txnNumber) == 0) {
-        return 0;
-    }
-    return _lsidToTxnCursorMap[lsid][txnNumber].size();
 }
 
 uint32_t GlobalCursorIdCache::registerCursorManager(const NamespaceString& nss) {
@@ -415,27 +360,8 @@ std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
     return std::make_pair(visitor.getStatus(), visitor.getCursorsKilled());
 }
 
-void CursorManager::addTransactionCursorReference(LogicalSessionId lsid,
-                                                  TxnNumber txnNumber,
-                                                  NamespaceString nss,
-                                                  CursorId cursorId) {
-    globalCursorIdCache->addTransactionCursorReference(lsid, txnNumber, nss, cursorId);
-}
-
-void CursorManager::removeTransactionCursorReference(const ClientCursor* cursor) {
-    // Remove cursor transaction registration if needed.
-    if (cursor->_lsid && cursor->_txnNumber) {
-        globalCursorIdCache->removeTransactionCursorReference(
-            *cursor->_lsid, *cursor->_txnNumber, cursor->_cursorid);
-    }
-}
-
 std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* opCtx, Date_t now) {
     return globalCursorIdCache->timeoutCursors(opCtx, now);
-}
-
-bool CursorManager::hasTransactionCursorReference(LogicalSessionId lsid, TxnNumber txnNumber) {
-    return globalCursorIdCache->numOpenCursorsForTransaction(lsid, txnNumber) > 0;
 }
 
 int CursorManager::killCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* _ids) {
@@ -536,7 +462,6 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
                 // responsible for cleaning it up.  Otherwise we can immediately dispose of it.
                 if (cursor->_operationUsingCursor) {
                     it = partition.erase(it);
-                    removeTransactionCursorReference(cursor);
                     continue;
                 }
 
@@ -545,7 +470,6 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
                     // will result in a useful error message.
                     ++it;
                 } else {
-                    removeTransactionCursorReference(cursor);
                     toDisposeWithoutMutex.emplace_back(cursor);
                     it = partition.erase(it);
                 }
@@ -602,7 +526,6 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
         for (auto it = lockedPartition->begin(); it != lockedPartition->end();) {
             auto* cursor = it->second;
             if (cursorShouldTimeout_inlock(cursor, now)) {
-                removeTransactionCursorReference(cursor);
                 toDisposeWithoutMutex.emplace_back(cursor);
                 it = lockedPartition->erase(it);
             } else {
@@ -800,8 +723,6 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     // Register this cursor for lookup by transaction.
     if (opCtx->getLogicalSessionId() && opCtx->getTxnNumber()) {
         invariant(opCtx->getLogicalSessionId());
-        addTransactionCursorReference(
-            *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber(), cursorParams.nss, cursorId);
     }
 
     // Transfer ownership of the cursor to '_cursorMap'.
@@ -813,7 +734,6 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
 void CursorManager::deregisterCursor(ClientCursor* cursor) {
     _cursorMap->erase(cursor->cursorid());
-    removeTransactionCursorReference(cursor);
 }
 
 void CursorManager::deregisterAndDestroyCursor(
@@ -823,7 +743,6 @@ void CursorManager::deregisterAndDestroyCursor(
     {
         auto lockWithRestrictedScope = std::move(lk);
         lockWithRestrictedScope->erase(cursor->cursorid());
-        removeTransactionCursorReference(cursor.get());
     }
     // Dispose of the cursor without holding any cursor manager mutexes. Disposal of a cursor can
     // require taking lock manager locks, which we want to avoid while holding a mutex. If we did

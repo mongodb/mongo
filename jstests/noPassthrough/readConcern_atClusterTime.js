@@ -39,72 +39,66 @@ function _getClusterTime(rst) {
     const sessionDb = session.getDatabase(dbName);
 
     const clusterTime = _getClusterTime(rst);
-    let txnNumber = 0;
 
     // 'atClusterTime' can be used with readConcern level 'snapshot'.
-    assert.commandWorked(sessionDb.runCommand({
-        find: collName,
-        readConcern: {level: "snapshot", atClusterTime: clusterTime},
-        txnNumber: NumberLong(txnNumber++)
-    }));
+    session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
+    assert.commandWorked(sessionDb.runCommand({find: collName}));
+    session.commitTransaction();
 
     // 'atClusterTime' cannot be greater than the current cluster time.
     const futureClusterTime = new Timestamp(clusterTime.getTime() + 1000, 1);
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        readConcern: {level: "snapshot", atClusterTime: futureClusterTime},
-        txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+    session.startTransaction({readConcern: {level: "snapshot", atClusterTime: futureClusterTime}});
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // 'atClusterTime' must have type Timestamp.
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        readConcern: {level: "snapshot", atClusterTime: "bad"},
-        txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.TypeMismatch);
+    session.startTransaction({readConcern: {level: "snapshot", atClusterTime: "bad"}});
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.TypeMismatch);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // 'atClusterTime' cannot be used with readConcern level 'majority'.
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(
-            {find: collName, readConcern: {level: "majority", atClusterTime: clusterTime}}),
-        ErrorCodes.InvalidOptions);
+    session.startTransaction({readConcern: {level: "majority", atClusterTime: clusterTime}});
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // 'atClusterTime' cannot be used with readConcern level 'local'.
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(
-            {find: collName, readConcern: {level: "local", atClusterTime: clusterTime}}),
-        ErrorCodes.InvalidOptions);
+    session.startTransaction({readConcern: {level: "local", atClusterTime: clusterTime}});
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // 'atClusterTime' cannot be used with readConcern level 'available'.
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(
-            {find: collName, readConcern: {level: "available", atClusterTime: clusterTime}}),
-        ErrorCodes.InvalidOptions);
+    session.startTransaction({readConcern: {level: "available", atClusterTime: clusterTime}});
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // 'atClusterTime' cannot be used with readConcern level 'linearizable'.
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(
-            {find: collName, readConcern: {level: "linearizable", atClusterTime: clusterTime}}),
-        ErrorCodes.InvalidOptions);
+    session.startTransaction({readConcern: {level: "linearizable", atClusterTime: clusterTime}});
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // 'atClusterTime' cannot be used without readConcern level (level is 'local' by default).
-    assert.commandFailedWithCode(
-        sessionDb.runCommand({find: collName, readConcern: {atClusterTime: clusterTime}}),
-        ErrorCodes.InvalidOptions);
+    session.startTransaction({readConcern: {atClusterTime: clusterTime}});
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // 'atClusterTime' cannot be used with 'afterOpTime'.
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
+    session.startTransaction({
         readConcern: {
             level: "snapshot",
             atClusterTime: clusterTime,
             afterOpTime: {ts: Timestamp(1, 2), t: 1}
-        },
-        txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+        }
+    });
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     // 'atClusterTime' cannot be used outside of a session.
     assert.commandFailedWithCode(
@@ -113,17 +107,19 @@ function _getClusterTime(rst) {
         ErrorCodes.InvalidOptions);
 
     // 'atClusterTime' cannot be used with 'afterClusterTime'.
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        readConcern: {level: "snapshot", atClusterTime: clusterTime, afterClusterTime: clusterTime},
-        txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+    session.startTransaction({
+        readConcern:
+            {level: "snapshot", atClusterTime: clusterTime, afterClusterTime: clusterTime}
+    });
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.endSession();
     rst.stopSet();
 
     // readConcern with 'atClusterTime' should fail when 'enableTestCommands' is set to false.
+    // TODO: SERVER-35643 Allow atClusterTime when enableTestCommands is false.
     {
         jsTest.setOption('enableTestCommands', false);
         let rst = new ReplSetTest({nodes: 1});
@@ -132,12 +128,12 @@ function _getClusterTime(rst) {
         let session =
             rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
         let sessionDb = session.getDatabase(dbName);
-        assert.commandFailedWithCode(sessionDb.runCommand({
-            find: collName,
-            readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)},
-            txnNumber: NumberLong(0)
-        }),
+        session.startTransaction(
+            {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
+        assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
                                      ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
         session.endSession();
         rst.stopSet();
 
@@ -148,11 +144,10 @@ function _getClusterTime(rst) {
         session =
             rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
         sessionDb = session.getDatabase(dbName);
-        assert.commandWorked(sessionDb.runCommand({
-            find: collName,
-            readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)},
-            txnNumber: NumberLong(0)
-        }));
+        session.startTransaction(
+            {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
+        assert.commandWorked(sessionDb.runCommand({find: collName}));
+        session.commitTransaction();
         session.endSession();
         rst.stopSet();
     }

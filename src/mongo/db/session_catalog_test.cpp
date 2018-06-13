@@ -176,7 +176,7 @@ TEST_F(SessionCatalogTest, StashInNestedSessionIsANoop) {
 
     {
         OperationContextSession outerScopedSession(
-            opCtx(), true, boost::none, boost::none, "testDB", "find");
+            opCtx(), true, /* autocommit */ false, /* startTransaction */ true, "testDB", "find");
 
         Locker* originalLocker = opCtx()->lockState();
         RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
@@ -204,10 +204,6 @@ TEST_F(SessionCatalogTest, StashInNestedSessionIsANoop) {
             OperationContextSession innerScopedSession(
                 opCtx(), true, boost::none, boost::none, "testDB", "find");
 
-            // Report to Session that there is a stashed cursor. If we were not in a nested session,
-            // this would ensure that stashing is not a noop.
-            Session::registerCursorExistsFunction([](LogicalSessionId, TxnNumber) { return true; });
-
             OperationContextSession::get(opCtx())->stashTransactionResources(opCtx());
 
             // The stash was a noop, so the locker, RecoveryUnit, and WriteUnitOfWork on the
@@ -225,7 +221,7 @@ TEST_F(SessionCatalogTest, UnstashInNestedSessionIsANoop) {
 
     {
         OperationContextSession outerScopedSession(
-            opCtx(), true, boost::none, boost::none, "testDB", "find");
+            opCtx(), true, /* autocommit */ false, /* startTransaction */ true, "testDB", "find");
 
         Locker* originalLocker = opCtx()->lockState();
         RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();

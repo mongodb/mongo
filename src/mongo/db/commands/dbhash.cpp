@@ -116,10 +116,9 @@ public:
         // change for the snapshot.
         auto lockMode = LockMode::MODE_S;
         auto* session = OperationContextSession::get(opCtx);
-        if (session && session->inSnapshotReadOrMultiDocumentTransaction()) {
-            // However, if we are inside a multi-statement transaction or using snapshot reads to
-            // read from a consistent snapshot, then we only need to lock the database in intent
-            // mode to ensure that none of the collections get dropped.
+        if (session && session->inMultiDocumentTransaction()) {
+            // However, if we are inside a multi-statement transaction, then we only need to lock
+            // the database in intent mode to ensure that none of the collections get dropped.
             lockMode = getLockModeForQuery(opCtx);
         }
         AutoGetDb autoDb(opCtx, ns, lockMode);
@@ -220,11 +219,11 @@ private:
 
         boost::optional<Lock::CollectionLock> collLock;
         auto* session = OperationContextSession::get(opCtx);
-        if (session && session->inSnapshotReadOrMultiDocumentTransaction()) {
-            // When inside a multi-statement transaction or using snapshot reads, we are only
-            // holding the database lock in intent mode. We need to also acquire the collection lock
-            // in intent mode to ensure reading from the consistent snapshot doesn't overlap with
-            // any catalog operations on the collection.
+        if (session && session->inMultiDocumentTransaction()) {
+            // When inside a multi-statement transaction, we are only holding the database lock in
+            // intent mode. We need to also acquire the collection lock in intent mode to ensure
+            // reading from the consistent snapshot doesn't overlap with any catalog operations on
+            // the collection.
             invariant(
                 opCtx->lockState()->isDbLockedForMode(db->name(), getLockModeForQuery(opCtx)));
             collLock.emplace(opCtx->lockState(), fullCollectionName, getLockModeForQuery(opCtx));

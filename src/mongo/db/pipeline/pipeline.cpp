@@ -231,10 +231,9 @@ void Pipeline::validateCommon() const {
                 str::stream() << stage->getSourceName() << " can only be run on mongoS",
                 !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inMongos));
 
-        if (pCtx->inSnapshotReadOrMultiDocumentTransaction) {
+        if (pCtx->inMultiDocumentTransaction) {
             uassert(50742,
-                    str::stream() << "Stage not supported with readConcern level \"snapshot\" "
-                                     "or inside of a multi-document transaction: "
+                    str::stream() << "Stage not supported inside of a multi-document transaction: "
                                   << stage->getSourceName(),
                     constraints.isAllowedInTransaction());
         }

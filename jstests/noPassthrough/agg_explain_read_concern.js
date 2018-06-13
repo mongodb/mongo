@@ -39,8 +39,6 @@
     }));
 
     // Test that explain is illegal with other readConcern levels.
-    // TODO: SERVER-34113 Remove this test when we completely remove snapshot
-    // reads since this command is not supported with transaction api.
     const nonLocalReadConcerns = ["majority", "available", "linearizable"];
     nonLocalReadConcerns.forEach(function(readConcernLevel) {
         let aggCmd = {

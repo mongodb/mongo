@@ -267,12 +267,6 @@ public:
      */
     void unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName);
 
-    // TODO SERVER-34113: Remove the "cursor exists" mechanism from both Session and CursorManager
-    // once snapshot reads outside of multi-statement transcactions are no longer supported.
-    static void registerCursorExistsFunction(CursorExistsFunction cursorExistsFunc) {
-        _cursorExistsFunction = cursorExistsFunc;
-    }
-
     /**
      * Commits the transaction, including committing the write unit of work and updating
      * transaction state.
@@ -315,15 +309,6 @@ public:
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _txnState == MultiDocumentTransactionState::kInProgress;
     };
-
-    /**
-     * Returns whether we are in a read-only or multi-document transaction.
-     */
-    bool inSnapshotReadOrMultiDocumentTransaction() const {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _txnState == MultiDocumentTransactionState::kInProgress ||
-            _txnState == MultiDocumentTransactionState::kInSnapshotRead;
-    }
 
     bool transactionIsCommitted() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -485,7 +470,6 @@ private:
     // the transaction is in any state but kInProgress, no more operations can be collected.
     enum class MultiDocumentTransactionState {
         kNone,
-        kInSnapshotRead,
         kInProgress,
         kCommitting,
         kCommitted,

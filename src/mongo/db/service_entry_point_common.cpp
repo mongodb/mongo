@@ -804,11 +804,9 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        // TODO(SERVER-34113) replace below txnNumber/logicalSessionId checks with
-        // Session::inMultiDocumentTransaction().
-        if (!opCtx->getClient()->isInDirectClient() || !opCtx->getTxnNumber() ||
-            !opCtx->getLogicalSessionId()) {
-            auto session = OperationContextSession::get(opCtx);
+        auto session = OperationContextSession::get(opCtx);
+        if (!opCtx->getClient()->isInDirectClient() || !session ||
+            !session->inMultiDocumentTransaction()) {
             const bool upconvertToSnapshot = session && session->inMultiDocumentTransaction() &&
                 sessionOptions &&
                 (sessionOptions->getStartTransaction() == boost::optional<bool>(true));
@@ -826,12 +824,7 @@ void execCommandDatabase(OperationContext* opCtx,
             auto session = OperationContextSession::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot is only valid in multi-statement transactions",
-                    // With test commands enabled, a read command with readConcern snapshot is
-                    // a valid snapshot read.
-                    (getTestCommandsEnabled() &&
-                     invocation->definition()->getReadWriteType() ==
-                         BasicCommand::ReadWriteType::kRead) ||
-                        (session && session->inMultiDocumentTransaction()));
+                    session && session->inMultiDocumentTransaction());
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot requires a session ID",
                     opCtx->getLogicalSessionId());

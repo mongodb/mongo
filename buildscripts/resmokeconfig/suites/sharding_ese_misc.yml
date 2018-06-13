@@ -366,8 +366,6 @@ selector:
   - jstests/sharding/auth_sharding_cmd_metadata.js
   - jstests/sharding/read_after_optime.js
   - jstests/sharding/auth_repl.js
-  - jstests/sharding/snapshot_aggregate_mongos.js
-  - jstests/sharding/snapshot_find_mongos.js
   - jstests/sharding/sharding_options.js
   - jstests/sharding/advance_cluster_time_action_type.js
   - jstests/sharding/mongos_wait_csrs_initiate.js

@@ -1,5 +1,5 @@
 /**
- * Verify that readConcern: snapshot is not permitted on writes outside transactions.
+ * Verify that readConcern: snapshot is not permitted outside transactions.
  *
  * @tags: [uses_transactions]
  */
@@ -7,7 +7,7 @@
 (function() {
     "use strict";
     const dbName = "test";
-    const collName = "no_snapshot_writes_outside_txn";
+    const collName = "no_read_concern_snapshot_outside_txn";
     const testDB = db.getSiblingDB(dbName);
 
     // Set up the test collection.
@@ -22,14 +22,14 @@
     let txnNumber = 0;
     let stmtId = 0;
 
-    function tryWrites({testDB, useSnapshotReadSyntax, message}) {
+    function tryCommands({testDB, assignTxnNumber, message}) {
         jsTestLog("Verify that inserts cannot use readConcern snapshot " + message);
         let cmd = {
             insert: collName,
             documents: [{_id: 0}],
             readConcern: {level: "snapshot"},
         };
-        if (useSnapshotReadSyntax) {
+        if (assignTxnNumber) {
             Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
         }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
@@ -40,7 +40,7 @@
             updates: [{q: {_id: 0}, u: {$set: {x: 1}}}],
             readConcern: {level: "snapshot"},
         };
-        if (useSnapshotReadSyntax) {
+        if (assignTxnNumber) {
             Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
         }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
@@ -51,7 +51,7 @@
             deletes: [{q: {_id: 0}, limit: 1}],
             readConcern: {level: "snapshot"},
         };
-        if (useSnapshotReadSyntax) {
+        if (assignTxnNumber) {
             Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
         }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
@@ -63,18 +63,32 @@
             remove: true,
             readConcern: {level: "snapshot"},
         };
-        if (useSnapshotReadSyntax) {
+        if (assignTxnNumber) {
+            Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
+        }
+        assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
+
+        jsTestLog("Verify that finds cannot use readConcern snapshot " + message);
+        cmd = {find: collName, readConcern: {level: "snapshot"}};
+        if (assignTxnNumber) {
+            Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
+        }
+        assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
+
+        jsTestLog("Verify that aggregate cannot use readConcern snapshot " + message);
+        cmd = {aggregate: collName, pipeline: [], readConcern: {level: "snapshot"}};
+        if (assignTxnNumber) {
             Object.assign(cmd, {txnNumber: NumberLong(txnNumber++), stmtId: NumberInt(stmtId)});
         }
         assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
     }
-    tryWrites({
+    tryCommands({
         testDB: sessionDb,
-        useSnapshotReadSyntax: true,
+        assignTxnNumber: true,
         message: "in session using snapshot read syntax."
     });
-    tryWrites({testDB: sessionDb, useSnapshotReadSyntax: false, message: "in session."});
-    tryWrites({testDB: testDB, useSnapshotReadSyntax: false, message: "outside session."});
+    tryCommands({testDB: sessionDb, assignTxnNumber: false, message: "in session."});
+    tryCommands({testDB: testDB, assignTxnNumber: false, message: "outside session."});
 
     session.endSession();
 }());

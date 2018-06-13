@@ -61,8 +61,6 @@ selector:
   # Requires killOp to work for local operations on mongos, introduced in v4.0.
   - jstests/sharding/killop.js
   # New 4.0 feature
-  - jstests/sharding/snapshot_aggregate_mongos.js
-  - jstests/sharding/snapshot_find_mongos.js
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/change_stream_metadata_notifications.js
   - jstests/sharding/change_streams.js

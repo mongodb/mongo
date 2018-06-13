@@ -359,8 +359,6 @@ selector:
   - jstests/sharding/empty_cluster_init.js
   - jstests/sharding/addshard6.js
   - jstests/sharding/read_after_optime.js
-  - jstests/sharding/snapshot_aggregate_mongos.js
-  - jstests/sharding/snapshot_find_mongos.js
   - jstests/sharding/sharding_options.js
   - jstests/sharding/config_rs_change.js
   - jstests/sharding/current_op_no_shards.js
