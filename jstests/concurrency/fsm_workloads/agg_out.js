@@ -27,9 +27,6 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.outputCollName = 'agg_out';  // Use the workload name as the collection name
                                               // because it is assumed to be unique.
 
-    $config.data.dbName = 'agg_out';  // Use our own database for this test, since it is using two
-                                      // separate collections.
-
     $config.data.indexSpecs = [{rand: -1, randInt: 1}, {randInt: -1}, {flag: 1}, {padding: 'text'}];
 
     // We'll use document validation so that we can change the collection options in the middle of
@@ -59,8 +56,7 @@ var $config = extendWorkload($config, function($config, $super) {
     /**
      * Runs an aggregate with a $out into '$config.data.outputCollName'.
      */
-    $config.states.query = function query(unusedDB, collName) {
-        const db = unusedDB.getSiblingDB(this.dbName);
+    $config.states.query = function query(db, collName) {
         const res = db[collName].runCommand({
             aggregate: collName,
             pipeline: [{$match: {flag: true}}, {$out: this.outputCollName}],
@@ -78,8 +74,7 @@ var $config = extendWorkload($config, function($config, $super) {
      * Ensures all the indexes exist. This will have no affect unless some thread has already
      * dropped an index.
      */
-    $config.states.ensureIndexes = function ensureIndexes(unusedDB, unusedCollName) {
-        const db = unusedDB.getSiblingDB(this.dbName);
+    $config.states.ensureIndexes = function ensureIndexes(db, unusedCollName) {
         for (var i = 0; i < this.indexSpecs; ++i) {
             assertWhenOwnDB.commandWorked(db[this.outputCollName].ensureIndex(this.indexSpecs[i]));
         }
@@ -88,8 +83,7 @@ var $config = extendWorkload($config, function($config, $super) {
     /**
      * Drops a random index from '$config.data.indexSpecs'.
      */
-    $config.states.dropIndex = function dropIndex(unusedDB, unusedCollName) {
-        const db = unusedDB.getSiblingDB(this.dbName);
+    $config.states.dropIndex = function dropIndex(db, unusedCollName) {
         const indexSpec = this.indexSpecs[Random.randInt(this.indexSpecs.length)];
         db[this.outputCollName].dropIndex(indexSpec);
     };
@@ -97,8 +91,7 @@ var $config = extendWorkload($config, function($config, $super) {
     /**
      * Changes the document validation options for the collection.
      */
-    $config.states.collMod = function collMod(unusedDB, unusedCollName) {
-        const db = unusedDB.getSiblingDB(this.dbName);
+    $config.states.collMod = function collMod(db, unusedCollName) {
         if (Random.rand() < 0.5) {
             // Change the validation level.
             const validationLevels = ['off', 'strict', 'moderate'];
@@ -118,8 +111,7 @@ var $config = extendWorkload($config, function($config, $super) {
      * Converts '$config.data.outputCollName' to a capped collection. This is never undone, and all
      * subsequent $out's to this collection should fail.
      */
-    $config.states.convertToCapped = function convertToCapped(unusedDB, unusedCollName) {
-        const db = unusedDB.getSiblingDB(this.dbName);
+    $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
         if (isMongos(db)) {
             return;  // convertToCapped can't be run against a mongos.
         }
@@ -132,8 +124,7 @@ var $config = extendWorkload($config, function($config, $super) {
      * If being run against a mongos, shards '$config.data.outputCollName'. This is never undone,
      * and all subsequent $out's to this collection should fail.
      */
-    $config.states.shardCollection = function shardCollection(unusedDB, unusedCollName) {
-        const db = unusedDB.getSiblingDB(this.dbName);
+    $config.states.shardCollection = function shardCollection(db, unusedCollName) {
         if (isMongos(db)) {
             db.adminCommand({enableSharding: db.getName()});
             db.adminCommand(
@@ -144,19 +135,8 @@ var $config = extendWorkload($config, function($config, $super) {
     /**
      * Calls the super class' setup but using our own database.
      */
-    $config.setup = function setup(unusedDB, collName, cluster) {
-        const db = unusedDB.getSiblingDB(this.dbName);
+    $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, [db, collName, cluster]);
-    };
-
-    /**
-     * Calls the super class' teardown but using our own database, then drops the
-     * '$config.data.outputCollName' collection.
-     */
-    $config.teardown = function teardown(unusedDB, collName, cluster) {
-        const db = unusedDB.getSiblingDB(this.dbName);
-        $super.teardown.apply(this, [db, collName, cluster]);
-        db[this.outputCollName].drop();
     };
 
     return $config;

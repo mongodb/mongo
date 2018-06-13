@@ -268,10 +268,6 @@ var $config = (function() {
         });
     }
 
-    function teardown(unusedDB, unusedCollName, cluster) {
-        unusedDB.getSiblingDB(this.uniqueDBName).dropDatabase();
-    }
-
     return {
         threadCount: 10,
         iterations: 200,
@@ -280,6 +276,5 @@ var $config = (function() {
         transitions: transitions,
         data: data,
         setup: setup,
-        teardown: teardown
     };
 })();

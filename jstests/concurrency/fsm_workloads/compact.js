@@ -8,7 +8,6 @@
  * for each thread.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');    // for dropCollections
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
 
 var $config = (function() {
@@ -82,11 +81,6 @@ var $config = (function() {
         query: {compact: 0.5, query: 0.5}
     };
 
-    var teardown = function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '_\\d+$');
-        dropCollections(db, pattern);
-    };
-
     var skip = function skip(cluster) {
         if (cluster.isRunningWiredTigerLSM()) {
             // There is a known hang during concurrent FSM workloads with the compact command used
@@ -106,7 +100,6 @@ var $config = (function() {
         iterations: 10,
         states: states,
         transitions: transitions,
-        teardown: teardown,
         data: data,
         skip: skip
     };

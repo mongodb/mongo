@@ -7,8 +7,6 @@
  * built on a shared underlying collection.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
-
 var $config = (function() {
 
     var data = {
@@ -74,11 +72,6 @@ var $config = (function() {
         drop: {create: 1}
     };
 
-    function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '_\\d+$');
-        dropCollections(db, pattern);
-    }
-
     // This test performs createCollection concurrently from many threads, and createCollection on a
     // sharded cluster takes a distributed lock. Since a distributed lock is acquired by repeatedly
     // attempting to grab the lock every half second for 20 seconds (a max of 40 attempts), it's
@@ -94,7 +87,6 @@ var $config = (function() {
         data: data,
         states: states,
         transitions: transitions,
-        teardown: teardown
     };
 
 })();

@@ -34,11 +34,5 @@ var $config = extendWorkload($config, function($config, $super) {
         assertWhenOwnColl.commandWorked(db.runCommand({create: this.getOutCollName(collName)}));
     };
 
-    $config.teardown = function teardown(db, collName, cluster) {
-        $super.teardown.apply(this, arguments);
-
-        assertWhenOwnColl(db[this.getOutCollName(collName)].drop());
-    };
-
     return $config;
 });

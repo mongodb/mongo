@@ -172,9 +172,6 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways.commandWorked(db.adminCommand(
                 {setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024}));
         });
-
-        var myDB = db.getSiblingDB(this.uniqueDBName);
-        myDB.dropDatabase();
     };
 
     return $config;

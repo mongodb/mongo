@@ -131,9 +131,6 @@ var $config = (function() {
         }
     }
 
-    function teardown(db, collName, cluster) {
-    }
-
     const skip = function skip(cluster) {
         // TODO(SERVER-34570) remove isSharded() check once transactions are supported in sharded
         // environments.
@@ -150,7 +147,6 @@ var $config = (function() {
         states: states,
         transitions: transitions,
         setup: setup,
-        teardown: teardown,
         data: data,
         skip: skip
     };
