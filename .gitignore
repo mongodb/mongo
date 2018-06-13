@@ -156,6 +156,9 @@ DriverInclude.wxs
 
 # Gradle
 .gradle
-src/mongo/embedded/java/mongodb-embedded-capi/build/
+src/mongo/embedded/java/build/
+src/mongo/embedded/java/aar/build/
+src/mongo/embedded/java/jar/build/
+local.properties
 
 compile_commands.json

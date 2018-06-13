@@ -3726,21 +3726,21 @@ tasks:
           if [ "${setup_android_toolchain|}" = "true" ]; then
             export ANDROID_HOME=$(pwd)/android_sdk
 
-            cd src/src/mongo/embedded/android
+            cd src/src/mongo/embedded/java
 
             chmod +x gradlew
 
             for arch in arm64-v8a armeabi-v7a x86_64 ; do
                 tar zxvf ../../../../../embedded-sdk-android-$arch.tgz
-                mkdir -p mongodb-embedded-capi/src/main/jniLibs/$arch
-                cp ./mongo-embedded-sdk-${version}/lib/*.so mongodb-embedded-capi/src/main/jniLibs/$arch
+                mkdir -p jniLibs/$arch
+                cp ./mongo-embedded-sdk-${version}/lib/*.so jniLibs/$arch
                 rm -rf ./mongo-embedded-sdk-${version}
             done
 
-            ./gradlew build
+            ./gradlew clean :aar:build :aar:publishMavenAarPublicationToLocalRepository
 
-            mkdir -p ../../../../build/mongo-embedded-sdk-${version}/aar
-            cp mongodb-embedded-capi/build/outputs/aar/*.aar ../../../../build/mongo-embedded-sdk-${version}/aar
+            mkdir -p ../../../../build/mongo-embedded-sdk-${version}/android
+            cp -r aar/build/repo/* ../../../../build/mongo-embedded-sdk-${version}/android
           fi
     - command: shell.exec
       params:
@@ -3754,7 +3754,6 @@ tasks:
           fi
     - command: s3.put
       params:
-        #optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/mongo-embedded-sdk-${version}.tgz"
@@ -3763,6 +3762,132 @@ tasks:
         permissions: public-read
         content_type: application/tar
         display_name: "Embedded SDK Tar Archive"
+
+    # If this is a patch build, blow away the file so our subsequent and optional s3.put
+    # doesn't run. That way, we won't overwrite the latest part in our patches.
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ "${is_patch}" = "true" ]; then
+            rm -f src/build/mongo-embedded-sdk-${version}.tgz
+          fi
+    # A second put, this time to -latest, to give devs a reasonable
+    # way to get the most recent build.
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/mongo-embedded-sdk-${version}.tgz"
+        remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+
+- name: embedded_sdk_multiarch_java_package
+  depends_on:
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-ubuntu-1604-x86_64
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-macosx-10.10
+  commands:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
+    - func: "generate compile expansions"
+    - func: "apply compile expansions"
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-ubuntu-1604-x86_64/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "embedded-sdk-java-linux-x86-64.tgz"
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-macosx-10.10/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "embedded-sdk-java-darwin.tgz"
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ "${setup_android_toolchain|}" = "true" ]; then
+            export ANDROID_HOME=$(pwd)/android_sdk
+
+            cd src/src/mongo/embedded/java
+
+            chmod +x gradlew
+
+            tar zxvf ../../../../../embedded-sdk-java-linux-x86-64.tgz
+            mkdir -p jniLibs/linux-x86-64
+            cp ./mongo-embedded-sdk-${version}/lib/*.so jniLibs/linux-x86-64
+            rm -rf ./mongo-embedded-sdk-${version}
+
+            tar zxvf ../../../../../embedded-sdk-java-darwin.tgz
+            mkdir -p jniLibs/darwin
+            cp ./mongo-embedded-sdk-${version}/lib/*.dylib jniLibs/darwin
+            rm -rf ./mongo-embedded-sdk-${version}
+
+            ./gradlew clean :jar:build :jar:publishMavenPublicationToLocalRepository
+
+            mkdir -p ../../../../build/mongo-embedded-sdk-${version}/java
+            cp -r jar/build/repo/* ../../../../build/mongo-embedded-sdk-${version}/java
+          fi
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ "${setup_android_toolchain|}" = "true" ]; then
+            cd src/build
+            tar zcvf mongo-embedded-sdk-${version}.tgz mongo-embedded-sdk-${version}
+          fi
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/mongo-embedded-sdk-${version}.tgz"
+        remote_file: "${project}/embedded-sdk/embedded-sdk-java-multiarch/${revision}/${version}.tgz"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "Embedded SDK Tar Archive"
+    # If this is a patch build, blow away the file so our subsequent and optional s3.put
+    # doesn't run. That way, we won't overwrite the latest part in our patches.
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ "${is_patch}" = "true" ]; then
+            rm -f src/build/mongo-embedded-sdk-${version}.tgz
+          fi
+    # A second put, this time to -latest, to give devs a reasonable
+    # way to get the most recent build.
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/mongo-embedded-sdk-${version}.tgz"
+        remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
 
 - name: compile_benchmarks
   depends_on: []
@@ -10319,6 +10444,21 @@ buildvariants:
     android_toolchain_api_version: "21"
   tasks:
   - name: embedded_sdk_multiarch_android_package
+
+- name: embedded-sdk-java-multiarch
+  display_name: "Embedded SDK - Java Multiarch Package"
+  run_on:
+  - ubuntu1604-build
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_env: JAVA_HOME=/opt/java/jdk8/
+    setup_android_toolchain: true
+    android_toolchain_system_image_arch: "x86_64"
+    android_system_image_version: 21
+    android_toolchain_target_arch: "x86_64"
+    android_toolchain_api_version: "21"
+  tasks:
+  - name: embedded_sdk_multiarch_java_package
 
 ###########################################
 #          Redhat buildvariants           #
