@@ -67,14 +67,6 @@
         autocommit: false
     }));
 
-    jsTestLog("Check that count accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        count: collName,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-    }));
-
     jsTestLog("Check that delete accepts a statement ID");
     assert.commandWorked(sessionDb.runCommand({
         delete: collName,
@@ -93,6 +85,8 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
+        autocommit: false
     }));
 
     // The doTxn command is intentionally left out.
@@ -203,14 +197,6 @@
         testColl.find({}, {readConcern: {level: "snapshot"}});
         return true;
     });
-    assert.commandWorked(sessionDb.runCommand({
-        geoNear: collName,
-        near: {type: "Point", coordinates: [0, 0]},
-        spherical: true,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0)
-    }));
 
     jsTestLog("Check that geoSearch accepts a statement ID");
     assert.commandWorked(sessionDb.runCommand({

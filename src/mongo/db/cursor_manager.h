@@ -100,12 +100,6 @@ public:
     static std::pair<Status, int> killCursorsWithMatchingSessions(
         OperationContext* opCtx, const SessionKiller::Matcher& matcher);
 
-    /**
-     * Returns true if the CursorManager has cursor references for the given session ID and
-     * transaction number.
-     */
-    static bool hasTransactionCursorReference(LogicalSessionId lsid, TxnNumber txnNumber);
-
     CursorManager(NamespaceString nss);
 
     /**
@@ -261,15 +255,6 @@ private:
     struct PlanExecutorPartitioner {
         std::size_t operator()(const PlanExecutor* exec, std::size_t nPartitions);
     };
-
-    // Adds a CursorId to structure that allows for lookup by LogicalSessionId and TxnNumber.
-    void addTransactionCursorReference(LogicalSessionId lsid,
-                                       TxnNumber txnNumber,
-                                       NamespaceString nss,
-                                       CursorId cursorId);
-
-    // Removes a CursorId from the LogicalSessionId / TxnNumber lookup structure.
-    void removeTransactionCursorReference(const ClientCursor* cursor);
 
     CursorId allocateCursorId_inlock();
 

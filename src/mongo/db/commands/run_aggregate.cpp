@@ -445,8 +445,7 @@ Status runAggregate(OperationContext* opCtx,
                                   uuid));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
         auto session = OperationContextSession::get(opCtx);
-        expCtx->inSnapshotReadOrMultiDocumentTransaction =
-            session && session->inSnapshotReadOrMultiDocumentTransaction();
+        expCtx->inMultiDocumentTransaction = session && session->inMultiDocumentTransaction();
 
         auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
 

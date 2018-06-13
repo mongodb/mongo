@@ -2427,9 +2427,9 @@ TEST_F(PipelineValidateTest, ChangeStreamIsNotValidIfNotFirstStageInFacet) {
     ASSERT(std::string::npos != parseStatus.reason().find("$changeStream"));
 }
 
-class DocumentSourceDisallowedWithSnapshotReads : public DocumentSourceMock {
+class DocumentSourceDisallowedInTransactions : public DocumentSourceMock {
 public:
-    DocumentSourceDisallowedWithSnapshotReads() : DocumentSourceMock({}) {}
+    DocumentSourceDisallowedInTransactions() : DocumentSourceMock({}) {}
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return StageConstraints{StreamType::kStreaming,
@@ -2440,42 +2440,36 @@ public:
                                 TransactionRequirement::kNotAllowed};
     }
 
-    static boost::intrusive_ptr<DocumentSourceDisallowedWithSnapshotReads> create() {
-        return new DocumentSourceDisallowedWithSnapshotReads();
+    static boost::intrusive_ptr<DocumentSourceDisallowedInTransactions> create() {
+        return new DocumentSourceDisallowedInTransactions();
     }
 };
 
-TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalWithSnapshotReads) {
+TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalInTransactions) {
     BSONObj readConcernSnapshot = BSON("readConcern" << BSON("level"
                                                              << "snapshot"));
     auto ctx = getExpCtx();
-    auto&& readConcernArgs = repl::ReadConcernArgs::get(ctx->opCtx);
-    ASSERT_OK(readConcernArgs.initialize(readConcernSnapshot["readConcern"]));
-    ASSERT(readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
-    ctx->inSnapshotReadOrMultiDocumentTransaction = true;
+    ctx->inMultiDocumentTransaction = true;
 
     // Make a pipeline with a legal $match, and then an illegal mock stage, and verify that pipeline
     // creation fails with the expected error code.
     auto matchStage = DocumentSourceMatch::create(BSON("_id" << 3), ctx);
-    auto illegalStage = DocumentSourceDisallowedWithSnapshotReads::create();
+    auto illegalStage = DocumentSourceDisallowedInTransactions::create();
     auto pipeline = Pipeline::create({matchStage, illegalStage}, ctx);
     ASSERT_NOT_OK(pipeline.getStatus());
     ASSERT_EQ(pipeline.getStatus(), ErrorCodes::duplicateCodeForTest(50742));
 }
 
-TEST_F(PipelineValidateTest, FacetPipelineValidatedForStagesIllegalWithSnapshotReads) {
+TEST_F(PipelineValidateTest, FacetPipelineValidatedForStagesIllegalInTransactions) {
     BSONObj readConcernSnapshot = BSON("readConcern" << BSON("level"
                                                              << "snapshot"));
     auto ctx = getExpCtx();
-    auto&& readConcernArgs = repl::ReadConcernArgs::get(ctx->opCtx);
-    ASSERT_OK(readConcernArgs.initialize(readConcernSnapshot["readConcern"]));
-    ASSERT(readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
-    ctx->inSnapshotReadOrMultiDocumentTransaction = true;
+    ctx->inMultiDocumentTransaction = true;
 
     // Make a pipeline with a legal $match, and then an illegal mock stage, and verify that pipeline
     // creation fails with the expected error code.
     auto matchStage = DocumentSourceMatch::create(BSON("_id" << 3), ctx);
-    auto illegalStage = DocumentSourceDisallowedWithSnapshotReads::create();
+    auto illegalStage = DocumentSourceDisallowedInTransactions::create();
     auto pipeline = Pipeline::createFacetPipeline({matchStage, illegalStage}, ctx);
     ASSERT_NOT_OK(pipeline.getStatus());
     ASSERT_EQ(pipeline.getStatus(), ErrorCodes::duplicateCodeForTest(50742));

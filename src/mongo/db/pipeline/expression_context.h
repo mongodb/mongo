@@ -197,7 +197,7 @@ public:
     bool inMongos = false;
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
-    bool inSnapshotReadOrMultiDocumentTransaction = false;
+    bool inMultiDocumentTransaction = false;
 
     NamespaceString ns;
 

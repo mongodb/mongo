@@ -123,7 +123,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         auto session = OperationContextSession::get(opCtx);
         if (curOp->shouldDBProfile(shouldSample)) {
             boost::optional<Session::TxnResources> txnResources;
-            if (session && session->inSnapshotReadOrMultiDocumentTransaction()) {
+            if (session && session->inMultiDocumentTransaction()) {
                 // Stash the current transaction so that writes to the profile collection are not
                 // done as part of the transaction. This must be done under the client lock, since
                 // we are modifying 'opCtx'.
@@ -200,7 +200,7 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
     auto session = OperationContextSession::get(opCtx);
-    auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
+    auto inTransaction = session && session->inMultiDocumentTransaction();
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Cannot create namespace " << ns.ns()
                           << " in multi-document transaction.",
@@ -238,7 +238,7 @@ bool handleError(OperationContext* opCtx,
     }
 
     auto session = OperationContextSession::get(opCtx);
-    if (session && session->inSnapshotReadOrMultiDocumentTransaction()) {
+    if (session && session->inMultiDocumentTransaction()) {
         // If we are in a transaction, we must fail the whole batch.
         throw;
     }
@@ -489,11 +489,11 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 }  // namespace
 
 WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& wholeOp) {
-    // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run under
-    // snapshot read concern or in a transaction.
+    // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
+    // transaction.
     auto session = OperationContextSession::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (session && session->inSnapshotReadOrMultiDocumentTransaction()));
+              (session && session->inMultiDocumentTransaction()));
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
         // This is the only part of finishCurOp we need to do for inserts because they reuse the
@@ -694,11 +694,11 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 }
 
 WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& wholeOp) {
-    // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run under
-    // snapshot read concern or in a transaction.
+    // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
+    // transaction.
     auto session = OperationContextSession::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (session && session->inSnapshotReadOrMultiDocumentTransaction()));
+              (session && session->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(
@@ -839,7 +839,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     // transaction.
     auto session = OperationContextSession::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (session && session->inSnapshotReadOrMultiDocumentTransaction()));
+              (session && session->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(

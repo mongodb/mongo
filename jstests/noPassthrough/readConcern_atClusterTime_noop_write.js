@@ -50,13 +50,14 @@
     // Test reading from the primary.
     const shard1Session =
         st.rs1.getPrimary().getDB("test1").getMongo().startSession({causalConsistency: false});
-    res = shard1Session.getDatabase("test1").runCommand({
-        find: "coll1",
-        readConcern: {level: "snapshot", atClusterTime: clusterTime},
-        txnNumber: NumberLong(0)
-    });
+    shard1Session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
+    res = shard1Session.getDatabase("test1").runCommand({find: "coll1"});
     if (res.ok === 0) {
         assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld);
+        assert.commandFailedWithCode(shard1Session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
+    } else {
+        shard1Session.commitTransaction();
     }
     const shard1PrimaryMajOpTime =
         st.rs1.getReadConcernMajorityOpTimeOrThrow(st.rs1.getPrimary()).ts;
@@ -77,13 +78,14 @@
     // Test reading from the secondary.
     const shard0Session =
         st.rs0.getSecondary().getDB("test0").getMongo().startSession({causalConsistency: false});
-    res = shard0Session.getDatabase("test0").runCommand({
-        find: "coll0",
-        readConcern: {level: "snapshot", atClusterTime: clusterTime},
-        txnNumber: NumberLong(0)
-    });
+    shard0Session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
+    res = shard0Session.getDatabase("test0").runCommand({find: "coll0"});
     if (res.ok === 0) {
         assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld);
+        assert.commandFailedWithCode(shard0Session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
+    } else {
+        shard0Session.commitTransaction();
     }
     const shard0SecondaryMajOpTime =
         st.rs0.getReadConcernMajorityOpTimeOrThrow(st.rs0.getSecondary()).ts;

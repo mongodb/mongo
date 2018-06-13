@@ -23,35 +23,19 @@
         session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
                                      ErrorCodes.IllegalOperation);
-        session.abortTransaction();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
 
         // Transactions without readConcern snapshot fail.
         session.startTransaction();
         assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
                                      ErrorCodes.IllegalOperation);
-        session.abortTransaction();
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
 
         rst.stopSet();
         return;
     }
-    session.endSession();
-    rst.stopSet();
-
-    // TODO: SERVER-34113:
-    // readConcern 'snapshot' should fail for autocommit:true transactions when test
-    // 'enableTestCommands' is set to false.
-    jsTest.setOption('enableTestCommands', false);
-    rst = new ReplSetTest({nodes: 1});
-    rst.startSet();
-    rst.initiate();
-    session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
-    sessionDb = session.getDatabase(dbName);
-    assert.commandWorked(sessionDb.coll.insert({}, {writeConcern: {w: "majority"}}));
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(
-            {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(1)}),
-        ErrorCodes.InvalidOptions);
-    jsTest.setOption('enableTestCommands', true);
     session.endSession();
     rst.stopSet();
 
@@ -63,7 +47,8 @@
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
                                  ErrorCodes.IllegalOperation);
-    session.abortTransaction();
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.IllegalOperation);
     session.endSession();
     MongoRunner.stopMongod(conn);
 
@@ -95,7 +80,8 @@
     session.startTransaction(
         {readConcern: {level: "snapshot", afterOpTime: {ts: Timestamp(1, 2), t: 1}}});
     assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
-    session.abortTransaction();
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
     session.endSession();
 
     // readConcern 'snapshot' is allowed on a replica set secondary.
@@ -155,30 +141,6 @@
         sessionDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}),
         50768);
     assert.commandWorked(session.abortTransaction_forTesting());
-    session.endSession();
-
-    // TODO: SERVER-34113 Remove this test when we completely remove snapshot
-    // reads since this command is not supported with transaction api.
-    // readConcern 'snapshot' is supported by group.
-    session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
-    sessionDb = session.getDatabase(dbName);
-    let txnNumber = 0;
-    assert.commandWorked(sessionDb.runCommand({
-        group: {ns: collName, key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}},
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++)
-    }));
-
-    // TODO: SERVER-34113 Remove this test when we completely remove snapshot
-    // reads since this command is not supported with transaction api.
-    // readConcern 'snapshot' is supported by geoNear.
-    assert.commandWorked(sessionDb.runCommand({
-        geoNear: collName,
-        near: [0, 0],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++)
-    }));
-
     session.endSession();
     rst.stopSet();
 }());
