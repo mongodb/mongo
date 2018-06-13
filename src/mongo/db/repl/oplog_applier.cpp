@@ -111,6 +111,10 @@ OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            Observer* observer)
     : _executor(executor), _oplogBuffer(oplogBuffer), _observer(observer) {}
 
+OplogBuffer* OplogApplier::getBuffer() const {
+    return _oplogBuffer;
+}
+
 Future<void> OplogApplier::startup() {
     auto pf = makePromiseFuture<void>();
     auto callback =

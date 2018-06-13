@@ -122,6 +122,11 @@ public:
     virtual ~OplogApplier() = default;
 
     /**
+     * Returns this applier's buffer.
+     */
+    OplogBuffer* getBuffer() const;
+
+    /**
      * Starts this OplogApplier.
      * Use the Future object to be notified when this OplogApplier has finished shutting down.
      */
