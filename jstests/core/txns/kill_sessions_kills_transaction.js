@@ -6,6 +6,7 @@
     const dbName = "test";
     const collName = "kill_sessions_kills_transaction";
     const testDB = db.getSiblingDB(dbName);
+    const adminDB = db.getSiblingDB("admin");
     const testColl = testDB[collName];
     const sessionOptions = {causalConsistency: false};
 
@@ -45,10 +46,19 @@
     });
 
     // Wait for the drop to have a pending MODE_X lock on the database.
-    assert.soon(function() {
-        return testDB.runCommand({find: collName, maxTimeMS: 100}).code ===
-            ErrorCodes.ExceededTimeLimit;
-    });
+    assert.soon(
+        function() {
+            return adminDB
+                       .aggregate([
+                           {$currentOp: {}},
+                           {$match: {"command.drop": collName, waitingForLock: true}}
+                       ])
+                       .itcount() === 1;
+        },
+        function() {
+            return "Failed to find drop in currentOp output: " +
+                tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
+        });
 
     // killSessions needs to acquire a MODE_IS lock on the collection in order to kill the open
     // cursor. However, the transaction is holding a MODE_IX lock on the collection, which will

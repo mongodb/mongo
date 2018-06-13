@@ -62,7 +62,7 @@
         },
         function() {
             return "Failed to find drop in currentOp output: " +
-                tojson(adminDB.aggregate([{$currentOp: {}}]));
+                tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
         });
 
     // killCursors does not block behind the pending MODE_X lock.
