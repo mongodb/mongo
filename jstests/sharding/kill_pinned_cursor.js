@@ -9,9 +9,6 @@
 (function() {
     "use strict";
 
-    // This test manually simulates a session, which is not compatible with implicit sessions.
-    TestData.disableImplicitSessions = true;
-
     const kFailPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
     const kFailpointOptions = {shouldCheckForInterrupt: true};
 

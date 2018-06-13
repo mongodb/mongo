@@ -209,14 +209,7 @@ var {
         }
 
         function prepareCommandRequest(driverSession, cmdObj) {
-            if (serverSupports(kWireVersionSupportingLogicalSession) &&
-                // Always attach sessionId from explicit sessions.
-                (driverSession._isExplicit ||
-                 // Check that implicit sessions are not disabled. The client must be using read
-                 // commands because aggregations always use runCommand() to establish cursors but
-                 // may use OP_GET_MORE (and therefore not have a session id attached) to retrieve
-                 // subsequent batches.
-                 (!jsTest.options().disableImplicitSessions && client.useReadCommands()))) {
+            if (serverSupports(kWireVersionSupportingLogicalSession)) {
                 cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
             }
 
@@ -842,8 +835,6 @@ var {
             }
 
             this._serverSession = implMethods.createServerSession(client);
-
-            this._isExplicit = true;
 
             this.getClient = function getClient() {
                 return client;

@@ -1,5 +1,4 @@
 // @tags: [
-//     creates_and_authenticates_user
 //     # profile command is not available on embedded
 //     incompatible_with_embedded,
 // ]

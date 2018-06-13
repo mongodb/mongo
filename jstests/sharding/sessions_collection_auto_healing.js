@@ -3,10 +3,6 @@ load('jstests/libs/sessions_collection.js');
 (function() {
     "use strict";
 
-    // This test makes assertions about the number of sessions, which are not compatible with
-    // implicit sessions.
-    TestData.disableImplicitSessions = true;
-
     var st = new ShardingTest({shards: 0});
     var configSvr = st.configRS.getPrimary();
     var configAdmin = configSvr.getDB("admin");

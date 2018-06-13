@@ -2,11 +2,10 @@
 // contents are logged in the profile log.
 //
 // @tags: [
-//   assumes_read_preference_unchanged,
-//   creates_and_authenticates_user,
 //   does_not_support_stepdowns,
 //   requires_eval_command,
 //   requires_non_retryable_commands,
+//   assumes_read_preference_unchanged
 // ]
 
 // Use a reserved database name to avoid a conflict in the parallel test suite.

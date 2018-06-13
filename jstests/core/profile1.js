@@ -1,9 +1,4 @@
-// @tags: [
-//   creates_and_authenticates_user,
-//   does_not_support_stepdowns,
-//   requires_collstats,
-//   requires_non_retryable_commands,
-// ]
+// @tags: [does_not_support_stepdowns, requires_non_retryable_commands, requires_collstats]
 
 (function() {
     "use strict";

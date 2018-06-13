@@ -4,11 +4,6 @@
  * storage engines, do a bunch of random work, and assert that it replicates the same way on all
  * nodes.
  */
-
-// This test randomly generates operations, which may include direct writes against
-// config.transactions, which are not allowed to run under a session.
-TestData.disableImplicitSessions = true;
-
 load('jstests/libs/parallelTester.js');
 load("jstests/replsets/rslib.js");
 
@@ -575,10 +570,6 @@ function assertSameData(primary, conns) {
  * function to pass to a thread to make it start doing random commands/CRUD operations.
  */
 function startCmds(randomOps, host) {
-    // This test randomly generates operations, which may include direct writes against
-    // config.transactions, which are not allowed to run under a session.
-    TestData = {disableImplicitSessions: true};
-
     var ops = [
         "insert",
         "remove",
@@ -605,10 +596,6 @@ function startCmds(randomOps, host) {
  * function to pass to a thread to make it start doing random CRUD operations.
  */
 function startCRUD(randomOps, host) {
-    // This test randomly generates operations, which may include direct writes against
-    // config.transactions, which are not allowed to run under a session.
-    TestData = {disableImplicitSessions: true};
-
     var m = new Mongo(host);
     var numOps = 500;
     Random.setRandomSeed();

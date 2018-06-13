@@ -1,9 +1,6 @@
 // test read/write permissions
 // skip this test on 32-bit platforms
 
-// TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
-TestData.disableImplicitSessions = true;
-
 function setupTest() {
     print("START auth1.js");
     baseName = "jstests_auth_auth1";
