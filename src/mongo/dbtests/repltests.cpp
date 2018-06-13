@@ -1410,7 +1410,7 @@ public:
         // now this should succeed
         FetchAndInsertMissingDocumentObserver observer;
         SyncTest t(&observer);
-        verify(t.fetchAndInsertMissingDocument(&_opCtx, oplogEntry));
+        t.fetchAndInsertMissingDocument(&_opCtx, oplogEntry);
         ASSERT(observer.fetched);
         verify(!_client
                     .findOne(ns(),
@@ -1423,7 +1423,7 @@ public:
 
         // force it not to find an obj
         t.returnEmpty = true;
-        verify(!t.fetchAndInsertMissingDocument(&_opCtx, oplogEntry));
+        t.fetchAndInsertMissingDocument(&_opCtx, oplogEntry);
         ASSERT_FALSE(observer.fetched);
     }
 };

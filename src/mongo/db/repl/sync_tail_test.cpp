@@ -123,7 +123,7 @@ private:
 class SyncTailWithOperationContextChecker : public SyncTail {
 public:
     SyncTailWithOperationContextChecker();
-    bool fetchAndInsertMissingDocument(OperationContext* opCtx,
+    void fetchAndInsertMissingDocument(OperationContext* opCtx,
                                        const OplogEntry& oplogEntry) override;
     bool called = false;
 };
@@ -149,13 +149,12 @@ SyncTailWithOperationContextChecker::SyncTailWithOperationContextChecker()
                nullptr,  // writer pool
                SyncTailTest::makeInitialSyncOptions()) {}
 
-bool SyncTailWithOperationContextChecker::fetchAndInsertMissingDocument(OperationContext* opCtx,
+void SyncTailWithOperationContextChecker::fetchAndInsertMissingDocument(OperationContext* opCtx,
                                                                         const OplogEntry&) {
     ASSERT_FALSE(opCtx->writesAreReplicated());
     ASSERT_FALSE(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
     ASSERT_TRUE(documentValidationDisabled(opCtx));
     called = true;
-    return false;
 }
 
 /**

@@ -1090,7 +1090,7 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplog
                               << source->toString());
 }
 
-bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
+void SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
                                              const OplogEntry& oplogEntry) {
     // Note that using the local UUID/NamespaceString mapping is sufficient for checking
     // whether the collection is capped on the remote because convertToCapped creates a
@@ -1103,7 +1103,7 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
         Collection* const collection = autoColl.getCollection();
         if (collection && collection->isCapped()) {
             log() << "Not fetching missing document in capped collection (" << nss << ")";
-            return false;
+            return;
         }
     }
 
@@ -1119,7 +1119,7 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
                  "field: "
               << redact(oplogEntry.getObject()) << ", o2: " << redact(object2);
 
-        return false;
+        return;
     }
 
     return writeConflictRetry(opCtx, "fetchAndInsertMissingDocument", nss.ns(), [&] {
@@ -1133,7 +1133,7 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
         auto uuid = oplogEntry.getUuid();
         if (!uuid) {
             if (!db) {
-                return false;
+                return;
             }
             coll = db->getOrCreateCollection(opCtx, nss);
         } else {
@@ -1143,7 +1143,7 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
             coll = catalog.lookupCollectionByUUID(*uuid);
             if (!coll) {
                 // TODO(SERVER-30819) insert this UUID into the missing UUIDs set.
-                return false;
+                return;
             }
         }
 
@@ -1163,8 +1163,6 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
             const OplogApplier::Observer::FetchInfo fetchInfo(oplogEntry, missingObj);
             _observer->onMissingDocumentsFetchedAndInserted({fetchInfo});
         }
-
-        return true;
     });
 }
 

@@ -215,9 +215,10 @@ public:
     /**
      * If an update fails, fetches the missing document and inserts it into the local collection.
      *
-     * Returns true if the document was fetched and inserted successfully.
+     * Calls OplogApplier::Observer::onMissingDocumentsFetchedAndInserted() if the document was
+     * fetched and inserted successfully.
      */
-    virtual bool fetchAndInsertMissingDocument(OperationContext* opCtx,
+    virtual void fetchAndInsertMissingDocument(OperationContext* opCtx,
                                                const OplogEntry& oplogEntry);
 
     /**
