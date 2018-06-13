@@ -3540,13 +3540,14 @@ tasks:
         if [ -n "${burn_in_tests_build_variant|}" ]; then
           build_variant=${burn_in_tests_build_variant|}
         fi
-        $python buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=$build_variant --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
+        # Evergreen executable is in $HOME.
+        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=$build_variant --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
         # Copy the results to the src dir.
         cp jstests/new_tests.json ../src/jstests/new_tests.json
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
-      task_path_suffix: /data/multiversion
+      task_path_suffix: /data/multiversion:$HOME
       resmoke_wrapper: $python buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
       resmoke_args: --repeat=2
       run_multiple_jobs: true
@@ -6805,7 +6806,8 @@ tasks:
 
         # We use a small batch size to avoid hitting the load balancer timeout if the Evergreen
         # API query is not fast enough.
-        $python buildscripts/update_test_lifecycle.py                   \
+        # Evergreen executable is in $HOME.
+        PATH=$PATH:$HOME $python buildscripts/update_test_lifecycle.py  \
             --project ${project}                                        \
             --requestBatchSize 20                                       \
             --commit                                                    \
