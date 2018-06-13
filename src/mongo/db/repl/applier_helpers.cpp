@@ -197,7 +197,13 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
             str::stream() << "Error applying inserts in bulk: " << redact(groupedInsertObj)
                           << ". Trying first insert as a lone insert: "
                           << redact(entry.raw));
-        error() << status;
+
+        // It's not an error during initial sync to encounter DuplicateKey errors.
+        if (Mode::kInitialSync == _mode && ErrorCodes::DuplicateKey == status) {
+            LOG(2) << status;
+        } else {
+            error() << status;
+        }
 
         // Avoid quadratic run time from failed insert by not retrying until we
         // are beyond this group of ops.
