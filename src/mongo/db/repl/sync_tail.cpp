@@ -88,7 +88,7 @@ using std::endl;
 
 namespace repl {
 
-AtomicInt32 SyncTail::replBatchLimitOperations{50 * 1000};
+AtomicInt32 SyncTail::replBatchLimitOperations{5 * 1000};
 
 namespace {
 
