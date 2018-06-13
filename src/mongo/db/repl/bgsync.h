@@ -60,7 +60,7 @@ class ReplicationCoordinatorExternalState;
 class ReplicationProcess;
 class StorageInterface;
 
-class BackgroundSync : public OplogApplier::Observer {
+class BackgroundSync {
     MONGO_DISALLOW_COPYING(BackgroundSync);
 
 public:
@@ -137,11 +137,6 @@ public:
     ProducerState getState() const;
     // Starts the producer if it's stopped. Otherwise, let it keep running.
     void startProducerIfStopped();
-
-    // OplogApplier::Observer functions
-    void onBatchBegin(const OplogApplier::Operations&) final {}
-    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
-    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
 
 private:
     bool _inShutdown_inlock() const;

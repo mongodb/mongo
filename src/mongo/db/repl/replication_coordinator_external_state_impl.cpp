@@ -143,6 +143,13 @@ ServerStatusMetricField<Counter64> displayBufferSize("repl.buffer.sizeBytes", &b
 ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxSizeBytes",
                                                         &bufferGauge.maxSize);
 
+class NoopOplogApplierObserver : public repl::OplogApplier::Observer {
+public:
+    void onBatchBegin(const repl::OplogApplier::Operations&) final {}
+    void onBatchEnd(const StatusWith<repl::OpTime>&, const repl::OplogApplier::Operations&) final {}
+    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
+} noopOplogApplierObserver;
+
 /**
  * Returns new thread pool for thread pool task executor.
  */
@@ -233,7 +240,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _oplogApplier =
         stdx::make_unique<OplogApplierImpl>(_oplogApplierTaskExecutor.get(),
                                             _oplogBuffer.get(),
-                                            _bgSync.get(),
+                                            &noopOplogApplierObserver,
                                             replCoord,
                                             _replicationProcess->getConsistencyMarkers(),
                                             _storageInterface,
