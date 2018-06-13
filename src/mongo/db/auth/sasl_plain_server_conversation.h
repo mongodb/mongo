@@ -35,8 +35,6 @@ namespace mongo {
 
 class SASLPlainServerMechanism : public MakeServerMechanism<PLAINPolicy> {
 public:
-    static const bool isInternal = true;
-
     explicit SASLPlainServerMechanism(std::string authenticationDatabase)
         : MakeServerMechanism<PLAINPolicy>(std::move(authenticationDatabase)) {}
 
@@ -47,6 +45,7 @@ private:
 
 class PLAINServerFactory : public MakeServerFactory<SASLPlainServerMechanism> {
 public:
+    static constexpr bool isInternal = true;
     bool canMakeMechanismForUser(const User* user) const final {
         auto credentials = user->getCredentials();
         return !credentials.isExternal && (credentials.scram<SHA1Block>().isValid() ||

@@ -74,10 +74,8 @@ struct FooPolicy {
     }
 };
 
-template <bool argIsInternal>
 class FooMechanism : public MakeServerMechanism<FooPolicy> {
 public:
-    static const bool isInternal = argIsInternal;
     explicit FooMechanism(std::string authenticationDatabase)
         : MakeServerMechanism<FooPolicy>(std::move(authenticationDatabase)) {}
 
@@ -89,8 +87,9 @@ protected:
 };
 
 template <bool argIsInternal>
-class FooMechanismFactory : public MakeServerFactory<FooMechanism<argIsInternal>> {
+class FooMechanismFactory : public MakeServerFactory<FooMechanism> {
 public:
+    static constexpr bool isInternal = argIsInternal;
     bool canMakeMechanismForUser(const User* user) const final {
         return true;
     }
@@ -107,10 +106,8 @@ struct BarPolicy {
     }
 };
 
-template <bool argIsInternal>
 class BarMechanism : public MakeServerMechanism<BarPolicy> {
 public:
-    static const bool isInternal = argIsInternal;
     explicit BarMechanism(std::string authenticationDatabase)
         : MakeServerMechanism<BarPolicy>(std::move(authenticationDatabase)) {}
 
@@ -122,8 +119,9 @@ protected:
 };
 
 template <bool argIsInternal>
-class BarMechanismFactory : public MakeServerFactory<BarMechanism<argIsInternal>> {
+class BarMechanismFactory : public MakeServerFactory<BarMechanism> {
 public:
+    static constexpr bool isInternal = argIsInternal;
     bool canMakeMechanismForUser(const User* user) const final {
         return true;
     }
