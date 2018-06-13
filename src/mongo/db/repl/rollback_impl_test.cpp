@@ -460,9 +460,9 @@ TEST_F(RollbackImplTest, RollbackReturnsNoMatchingDocumentWhenNoCommonPoint) {
 
 TEST_F(RollbackImplTest, RollbackSucceedsIfRollbackPeriodIsWithinTimeLimit) {
 
-    // The default limit is 1800 seconds. The difference here is 1000 seconds.
+    // The default limit is 1 day, so we make the difference be just under a day.
     auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 1, 5 * 1000));
-    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2, 1005 * 1000));
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2, 60 * 60 * 24 * 1000));
 
     _remoteOplog->setOperations({commonPoint});
     ASSERT_OK(_insertOplogEntry(commonPoint.first));
@@ -476,9 +476,9 @@ TEST_F(RollbackImplTest, RollbackSucceedsIfRollbackPeriodIsWithinTimeLimit) {
 
 TEST_F(RollbackImplTest, RollbackFailsIfRollbackPeriodIsTooLong) {
 
-    // The default limit is 1800 seconds. The difference here is 5000 seconds.
+    // The default limit is 1 day, so we make the difference be 2 days.
     auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 1, 5 * 1000));
-    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2, 5005 * 1000));
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2, 2 * 60 * 60 * 24 * 1000));
 
     _remoteOplog->setOperations({commonPoint});
     ASSERT_OK(_insertOplogEntry(commonPoint.first));
