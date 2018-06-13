@@ -193,19 +193,17 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     } catch (...) {
         // The group insert failed, log an error and fall through to the
         // application of an individual op.
-        auto status = mongo::exceptionToStatus();
-        error() << "Error applying inserts in bulk " << causedBy(redact(status)) << ": "
-                << redact(groupedInsertObj)
-                << ". Trying first insert as a lone insert: " << redact(entry.raw);
+        auto status = exceptionToStatus().withContext(
+            str::stream() << "Error applying inserts in bulk: " << redact(groupedInsertObj)
+                          << ". Trying first insert as a lone insert: "
+                          << redact(entry.raw));
+        error() << status;
 
         // Avoid quadratic run time from failed insert by not retrying until we
         // are beyond this group of ops.
         _doNotGroupBeforePoint = endOfGroupableOpsIterator - 1;
 
-        return status.withContext(str::stream() << "Error applying inserts in bulk: "
-                                                << redact(groupedInsertObj)
-                                                << ". Trying first insert as a lone insert: "
-                                                << redact(entry.raw));
+        return status;
     }
 
     MONGO_UNREACHABLE;
