@@ -35,7 +35,7 @@ var $config = (function() {
 
     return {
         threadCount: 5,
-        iterations: 50,
+        iterations: 30,
         startState: 'insert',
         states: states,
         transitions: transitions
