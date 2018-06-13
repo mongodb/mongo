@@ -55,7 +55,7 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replWriterThreadCount, int, 16)
         return Status::OK();
     });
 
-MONGO_EXPORT_SERVER_PARAMETER(replBatchLimitOperations, int, 50 * 1000)
+MONGO_EXPORT_SERVER_PARAMETER(replBatchLimitOperations, int, 5 * 1000)
     ->withValidator([](const int& newVal) {
         if (newVal < 1 || newVal > (1000 * 1000)) {
             return Status(ErrorCodes::BadValue,
