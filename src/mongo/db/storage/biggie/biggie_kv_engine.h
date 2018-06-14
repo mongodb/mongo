@@ -154,10 +154,7 @@ public:
 
 private:
     std::shared_ptr<void> _catalogInfo;
-
     int _cachePressureForTest;
-
-    BSONObj _dummy;
 };
 }  // namespace biggie
 }  // namespace mongo

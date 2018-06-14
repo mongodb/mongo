@@ -50,6 +50,8 @@ class RecordStore : public ::mongo::RecordStore {
     const bool _isCapped;
     const int64_t _cappedMaxSize;
     const int64_t _cappedMaxDocs;
+    std::string _identStr;
+    StringData _ident;
     std::string _prefix;
     std::string _postfix;
     CappedCallback* _cappedCallback;
@@ -129,10 +131,7 @@ public:
                                         long long dataSize);
 
 private:
-    static int64_t extractRecordId(const std::string& keyString);
-    BSONObj _dummy;
     AtomicInt64 _highest_record_id{1};
-
     std::string generateKey(const uint8_t* key, size_t key_len) const;
     /*
      * This gets the next (guaranteed) unique record id.
@@ -142,6 +141,7 @@ private:
     }
     class Cursor final : public SeekableRecordCursor {
         OperationContext* opCtx;
+        StringData _ident;
         std::string _prefix;
         std::string _postfix;
         StringStore::iterator it;
@@ -163,6 +163,7 @@ private:
     };
     class ReverseCursor final : public SeekableRecordCursor {
         OperationContext* opCtx;
+        StringData _ident;
         std::string _prefix;
         std::string _postfix;
         StringStore::reverse_iterator it;
