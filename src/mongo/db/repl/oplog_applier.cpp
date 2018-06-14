@@ -136,7 +136,24 @@ void OplogApplier::shutdown() {
 /**
  * Pushes operations read from sync source into oplog buffer.
  */
-void OplogApplier::enqueue(const Operations& operations) {}
+void OplogApplier::enqueue(OperationContext* opCtx,
+                           Operations::const_iterator begin,
+                           Operations::const_iterator end) {
+    OplogBuffer::Batch batch;
+    for (auto i = begin; i != end; ++i) {
+        batch.push_back(i->raw);
+    }
+    enqueue(opCtx, batch.cbegin(), batch.cend());
+}
+
+void OplogApplier::enqueue(OperationContext* opCtx,
+                           OplogBuffer::Batch::const_iterator begin,
+                           OplogBuffer::Batch::const_iterator end) {
+    OCCASIONALLY {
+        LOG(2) << "oplog buffer has " << _oplogBuffer->getSize() << " bytes";
+    }
+    _oplogBuffer->pushAllNonBlocking(opCtx, begin, end);
+}
 
 StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
     OperationContext* opCtx, const BatchLimits& batchLimits) {

@@ -140,8 +140,16 @@ public:
 
     /**
      * Pushes operations read into oplog buffer.
+     * Accepts both Operations (OplogEntry) and OplogBuffer::Batch (BSONObj) iterators.
+     * This supports current implementations of OplogFetcher and OplogBuffer which work in terms of
+     * BSONObj.
      */
-    void enqueue(const Operations& operations);
+    void enqueue(OperationContext* opCtx,
+                 Operations::const_iterator begin,
+                 Operations::const_iterator end);
+    void enqueue(OperationContext* opCtx,
+                 OplogBuffer::Batch::const_iterator begin,
+                 OplogBuffer::Batch::const_iterator end);
 
     /**
      * Returns a new batch of ops to apply.
