@@ -86,7 +86,7 @@ public:
     BackgroundSync(ReplicationCoordinator* replicationCoordinator,
                    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
                    ReplicationProcess* replicationProcess,
-                   OplogBuffer* oplogBuffer);
+                   OplogApplier* oplogApplier);
 
     // stop syncing (when this node becomes a primary, e.g.)
     // During stepdown, the last fetched optime is not reset in order to keep track of the lastest
@@ -201,8 +201,8 @@ private:
 
     OpTimeWithHash _readLastAppliedOpTimeWithHash(OperationContext* opCtx);
 
-    // This OplogBuffer holds oplog entries fetched from the sync source.
-    OplogBuffer* const _oplogBuffer;
+    // This OplogApplier applies oplog entries fetched from the sync source.
+    OplogApplier* const _oplogApplier;
 
     // A pointer to the replication coordinator running the show.
     ReplicationCoordinator* _replCoord;

@@ -146,8 +146,8 @@ BackgroundSync::BackgroundSync(
     ReplicationCoordinator* replicationCoordinator,
     ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
     ReplicationProcess* replicationProcess,
-    OplogBuffer* oplogBuffer)
-    : _oplogBuffer(oplogBuffer),
+    OplogApplier* oplogApplier)
+    : _oplogApplier(oplogApplier),
       _replCoord(replicationCoordinator),
       _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
       _replicationProcess(replicationProcess) {}
@@ -513,7 +513,7 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
     auto opCtx = cc().makeOperationContext();
 
     // Wait for enough space.
-    _oplogBuffer->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
+    _oplogApplier->getBuffer()->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
 
     {
         // Don't add more to the buffer if we are in shutdown. Continue holding the lock until we
@@ -525,12 +525,8 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
             return Status::OK();
         }
 
-        OCCASIONALLY {
-            LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize() << " bytes";
-        }
-
         // Buffer docs for later application.
-        _oplogBuffer->pushAllNonBlocking(opCtx.get(), begin, end);
+        _oplogApplier->enqueue(opCtx.get(), begin, end);
 
         // Update last fetched info.
         _lastFetchedHash = info.lastDocument.value;
@@ -704,7 +700,7 @@ void BackgroundSync::stop(bool resetLastFetchedOptime) {
 
     _syncSourceHost = HostAndPort();
     if (resetLastFetchedOptime) {
-        invariant(_oplogBuffer->isEmpty());
+        invariant(_oplogApplier->getBuffer()->isEmpty());
         _lastOpTimeFetched = OpTime();
         _lastFetchedHash = 0;
         log() << "Resetting last fetched optimes in bgsync";
@@ -735,7 +731,7 @@ void BackgroundSync::start(OperationContext* opCtx) {
         }
         // If a node steps down during drain mode, then the buffer may not be empty at the beginning
         // of secondary state.
-        if (!_oplogBuffer->isEmpty()) {
+        if (!_oplogApplier->getBuffer()->isEmpty()) {
             log() << "going to start syncing, but buffer is not empty";
         }
         _state = ProducerState::Running;

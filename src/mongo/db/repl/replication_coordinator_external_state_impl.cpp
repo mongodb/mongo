@@ -250,7 +250,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 
     invariant(!_bgSync);
     _bgSync =
-        std::make_unique<BackgroundSync>(replCoord, this, _replicationProcess, _oplogBuffer.get());
+        std::make_unique<BackgroundSync>(replCoord, this, _replicationProcess, _oplogApplier.get());
 
     log() << "Starting replication fetcher thread";
     _bgSync->startup(opCtx);
