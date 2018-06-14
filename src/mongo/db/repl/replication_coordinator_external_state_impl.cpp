@@ -226,17 +226,18 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
         return;
 
     invariant(replCoord);
-    invariant(!_bgSync);
-    log() << "Starting replication fetcher thread";
-    _oplogBuffer = stdx::make_unique<OplogBufferBlockingQueue>(&bufferGauge);
+    _oplogBuffer = std::make_unique<OplogBufferBlockingQueue>(&bufferGauge);
+
+    // No need to log OplogBuffer::startup because the blocking queue implementation
+    // does not start any threads or access the storage layer.
     _oplogBuffer->startup(opCtx);
 
-    _bgSync =
-        stdx::make_unique<BackgroundSync>(replCoord, this, _replicationProcess, _oplogBuffer.get());
-    _bgSync->startup(opCtx);
-
-    log() << "Starting replication applier thread";
     invariant(!_oplogApplier);
+
+    // Using noop observer now that BackgroundSync no longer implements the OplogApplier::Observer
+    // interface. During steady state replication, there is no need to log details on every batch
+    // we apply (recovery); or track missing documents that are fetched from the sync source
+    // (initial sync).
     _oplogApplier =
         stdx::make_unique<OplogApplierImpl>(_oplogApplierTaskExecutor.get(),
                                             _oplogBuffer.get(),
@@ -246,6 +247,15 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
                                             _storageInterface,
                                             OplogApplier::Options(),
                                             _writerPool.get());
+
+    invariant(!_bgSync);
+    _bgSync =
+        std::make_unique<BackgroundSync>(replCoord, this, _replicationProcess, _oplogBuffer.get());
+
+    log() << "Starting replication fetcher thread";
+    _bgSync->startup(opCtx);
+
+    log() << "Starting replication applier thread";
     _oplogApplierShutdownFuture = _oplogApplier->startup();
 
     log() << "Starting replication reporter thread";
