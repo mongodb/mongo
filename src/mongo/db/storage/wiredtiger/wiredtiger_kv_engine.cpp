@@ -75,7 +75,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/background.h"
@@ -186,6 +185,7 @@ void openWiredTiger(const std::string& path,
         return;
     }
 
+    severe() << "Failed to start up WiredTiger under any compatibility version.";
     if (ret == EINVAL) {
         fassertFailedNoTrace(28561);
     }
@@ -448,8 +448,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        bool ephemeral,
                                        bool repair,
                                        bool readOnly)
-    : _eventHandler(WiredTigerUtil::defaultEventHandlers()),
-      _clockSource(cs),
+    : _clockSource(cs),
       _oplogManager(stdx::make_unique<WiredTigerOplogManager>()),
       _canonicalName(canonicalName),
       _path(path),
@@ -517,7 +516,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             string config = ss.str();
             log() << "Detected WT journal files.  Running recovery from last checkpoint.";
             log() << "journal to nojournal transition config: " << config;
-            int ret = wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn);
+            int ret = wiredtiger_open(
+                path.c_str(), _eventHandler.getWtEventHandler(), config.c_str(), &_conn);
             if (ret == EINVAL) {
                 fassertFailedNoTrace(28717);
             } else if (ret != 0) {
@@ -539,7 +539,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     string config = ss.str();
     log() << "wiredtiger_open config: " << config;
-    openWiredTiger(path, &_eventHandler, config, &_conn, &_fileVersion);
+    openWiredTiger(path, _eventHandler.getWtEventHandler(), config, &_conn, &_fileVersion);
+    _eventHandler.setStartupSuccessful();
     _wtOpenConfig = config;
 
     {
@@ -668,7 +669,8 @@ void WiredTigerKVEngine::cleanShutdown() {
     WT_CONNECTION* conn;
     std::stringstream openConfig;
     openConfig << _wtOpenConfig << ",log=(archive=false)";
-    invariantWTOK(wiredtiger_open(_path.c_str(), &_eventHandler, openConfig.str().c_str(), &conn));
+    invariantWTOK(wiredtiger_open(
+        _path.c_str(), _eventHandler.getWtEventHandler(), openConfig.str().c_str(), &conn));
 
     WT_SESSION* session;
     conn->open_session(conn, nullptr, "", &session);
