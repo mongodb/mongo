@@ -367,6 +367,27 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
 }
 
 namespace {
+int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
+                                              WT_SESSION* session,
+                                              int errorCode,
+                                              const char* message) {
+    try {
+        StringData sd(message);
+        error() << "WiredTiger error (" << errorCode << ") " << redact(message)
+                << " Raw: " << message;
+        if (sd.find("this build requires a maximum version of 2, and the file is version 3")) {
+            error()
+                << "An unsupported journal format detected - If you are trying to rollback from "
+                   "version 4.0 to 3.6, please re-start a 4.0 binary and cleanly shut it down so "
+                   "that the journal format will be downgraded.";
+        }
+        fassert(50853, errorCode != WT_PANIC);
+    } catch (...) {
+        std::terminate();
+    }
+    return 0;
+}
+
 int mdb_handle_error(WT_EVENT_HANDLER* handler,
                      WT_SESSION* session,
                      int errorCode,
@@ -401,14 +422,31 @@ int mdb_handle_progress(WT_EVENT_HANDLER* handler,
 
     return 0;
 }
-}
 
-WT_EVENT_HANDLER WiredTigerUtil::defaultEventHandlers() {
+WT_EVENT_HANDLER defaultEventHandlers() {
     WT_EVENT_HANDLER handlers = {};
     handlers.handle_error = mdb_handle_error;
     handlers.handle_message = mdb_handle_message;
     handlers.handle_progress = mdb_handle_progress;
     return handlers;
+}
+}  // namespace
+
+WiredTigerEventHandler::WiredTigerEventHandler() {
+    WT_EVENT_HANDLER* handler = static_cast<WT_EVENT_HANDLER*>(this);
+    invariant((void*)this == (void*)handler);
+
+    handler->handle_error = mdb_handle_error_with_startup_suppression;
+    handler->handle_message = mdb_handle_message;
+    handler->handle_progress = mdb_handle_progress;
+    handler->handle_close = nullptr;
+}
+
+WT_EVENT_HANDLER* WiredTigerEventHandler::getWtEventHandler() {
+    WT_EVENT_HANDLER* ret = static_cast<WT_EVENT_HANDLER*>(this);
+    invariant((void*)this == (void*)ret);
+
+    return ret;
 }
 
 WiredTigerUtil::ErrorAccumulator::ErrorAccumulator(std::vector<std::string>* errors)

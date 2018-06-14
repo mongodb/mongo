@@ -71,7 +71,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/background.h"
@@ -387,7 +386,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        bool repair,
                                        bool readOnly)
     : _keepDataHistory(serverGlobalParams.enableMajorityReadConcern),
-      _eventHandler(WiredTigerUtil::defaultEventHandlers()),
       _clockSource(cs),
       _oplogManager(stdx::make_unique<WiredTigerOplogManager>()),
       _canonicalName(canonicalName),
@@ -454,7 +452,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             string config = ss.str();
             log() << "Detected WT journal files.  Running recovery from last checkpoint.";
             log() << "journal to nojournal transition config: " << config;
-            int ret = wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn);
+            int ret = wiredtiger_open(
+                path.c_str(), _eventHandler.getWtEventHandler(), config.c_str(), &_conn);
             if (ret == EINVAL) {
                 fassertFailedNoTrace(28717);
             } else if (ret != 0) {
@@ -476,7 +475,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     string config = ss.str();
     log() << "wiredtiger_open config: " << config;
     _wtOpenConfig = config;
-    int ret = wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn);
+    int ret =
+        wiredtiger_open(path.c_str(), _eventHandler.getWtEventHandler(), config.c_str(), &_conn);
     // Invalid argument (EINVAL) is usually caused by invalid configuration string.
     // We still fassert() but without a stack trace.
     if (ret == EINVAL) {
@@ -609,8 +609,8 @@ void WiredTigerKVEngine::cleanShutdown() {
             WT_CONNECTION* conn;
             std::stringstream openConfig;
             openConfig << _wtOpenConfig << ",log=(archive=false)";
-            invariantWTOK(
-                wiredtiger_open(_path.c_str(), &_eventHandler, openConfig.str().c_str(), &conn));
+            invariantWTOK(wiredtiger_open(
+                _path.c_str(), _eventHandler.getWtEventHandler(), openConfig.str().c_str(), &conn));
 
             WT_SESSION* session;
             conn->open_session(conn, nullptr, "", &session);
@@ -640,7 +640,7 @@ void WiredTigerKVEngine::cleanShutdown() {
             invariantWTOK(conn->reconfigure(conn, "compatibility=(release=2.9)"));
             invariantWTOK(conn->close(conn, closeConfig));
         }
-    }
+    }  // namespace mongo
 }
 
 Status WiredTigerKVEngine::okToRename(OperationContext* opCtx,
