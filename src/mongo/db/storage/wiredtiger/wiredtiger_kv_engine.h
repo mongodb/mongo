@@ -42,6 +42,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -305,7 +306,7 @@ private:
     void _setOldestTimestamp(Timestamp newOldestTimestamp, bool force);
 
     WT_CONNECTION* _conn;
-    WT_EVENT_HANDLER _eventHandler;
+    WiredTigerEventHandler _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
     ClockSource* const _clockSource;
 

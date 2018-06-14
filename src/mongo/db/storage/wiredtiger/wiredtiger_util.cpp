@@ -386,6 +386,32 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
 }
 
 namespace {
+int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
+                                              WT_SESSION* session,
+                                              int errorCode,
+                                              const char* message) {
+    WiredTigerEventHandler* wtHandler = reinterpret_cast<WiredTigerEventHandler*>(handler);
+
+    try {
+        StringData sd(message);
+        if (!wtHandler->wasStartupSuccessful()) {
+            // During startup, storage tries different WiredTiger compatibility modes to determine
+            // the state of the data files before FCV can be read. Suppress the error messages
+            // regarding expected version compatibility requirements.
+            if (sd.find("Version incompatibility detected:") != std::string::npos) {
+                return 0;
+            }
+        }
+
+        error() << "WiredTiger error (" << errorCode << ") " << redact(message)
+                << " Raw: " << message;
+        fassert(50853, errorCode != WT_PANIC);
+    } catch (...) {
+        std::terminate();
+    }
+    return 0;
+}
+
 int mdb_handle_error(WT_EVENT_HANDLER* handler,
                      WT_SESSION* session,
                      int errorCode,
@@ -420,14 +446,31 @@ int mdb_handle_progress(WT_EVENT_HANDLER* handler,
 
     return 0;
 }
-}
 
-WT_EVENT_HANDLER WiredTigerUtil::defaultEventHandlers() {
+WT_EVENT_HANDLER defaultEventHandlers() {
     WT_EVENT_HANDLER handlers = {};
     handlers.handle_error = mdb_handle_error;
     handlers.handle_message = mdb_handle_message;
     handlers.handle_progress = mdb_handle_progress;
     return handlers;
+}
+}
+
+WiredTigerEventHandler::WiredTigerEventHandler() {
+    WT_EVENT_HANDLER* handler = static_cast<WT_EVENT_HANDLER*>(this);
+    invariant((void*)this == (void*)handler);
+
+    handler->handle_error = mdb_handle_error_with_startup_suppression;
+    handler->handle_message = mdb_handle_message;
+    handler->handle_progress = mdb_handle_progress;
+    handler->handle_close = nullptr;
+}
+
+WT_EVENT_HANDLER* WiredTigerEventHandler::getWtEventHandler() {
+    WT_EVENT_HANDLER* ret = static_cast<WT_EVENT_HANDLER*>(this);
+    invariant((void*)this == (void*)ret);
+
+    return ret;
 }
 
 WiredTigerUtil::ErrorAccumulator::ErrorAccumulator(std::vector<std::string>* errors)
