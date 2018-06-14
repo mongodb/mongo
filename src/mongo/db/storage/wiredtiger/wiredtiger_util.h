@@ -92,6 +92,35 @@ struct WiredTigerItem : public WT_ITEM {
     }
 };
 
+/**
+ * Returns a WT_EVENT_HANDLER with MongoDB's default handlers.
+ * The default handlers just log so it is recommended that you consider calling them even if
+ * you are capturing the output.
+ *
+ * There is no default "close" handler. You only need to provide one if you need to call a
+ * destructor.
+ */
+class WiredTigerEventHandler : private WT_EVENT_HANDLER {
+public:
+    WT_EVENT_HANDLER* getWtEventHandler();
+
+    bool wasStartupSuccessful() {
+        return _startupSuccessful;
+    }
+
+    void setStartupSuccessful() {
+        _startupSuccessful = true;
+    }
+
+private:
+    int suppressibleStartupErrorLog(WT_EVENT_HANDLER* handler,
+                                    WT_SESSION* sesion,
+                                    int errorCode,
+                                    const char* message);
+
+    bool _startupSuccessful = false;
+};
+
 class WiredTigerUtil {
     MONGO_DISALLOW_COPYING(WiredTigerUtil);
 
@@ -202,16 +231,6 @@ public:
      * option chosen or the amount of available memory on the host.
      */
     static size_t getCacheSizeMB(double requestedCacheSizeGB);
-
-    /**
-     * Returns a WT_EVENT_HANDER with MongoDB's default handlers.
-     * The default handlers just log so it is recommended that you consider calling them even if
-     * you are capturing the output.
-     *
-     * There is no default "close" handler. You only need to provide one if you need to call a
-     * destructor.
-     */
-    static WT_EVENT_HANDLER defaultEventHandlers();
 
     class ErrorAccumulator : public WT_EVENT_HANDLER {
     public:
