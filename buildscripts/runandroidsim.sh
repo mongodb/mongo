@@ -1,8 +1,8 @@
 #!/bin/sh
 
-if [ "$#" -lt "4" ]; then
+if [ "$#" -lt "5" ]; then
     echo "usage:"
-    echo "$0 <android-sdk-path> <sysarch> <directory> <test-path-in-directory>"
+    echo "$0 <android-sdk-path> <sysarch> <image-api-version> <directory> <test-path-in-directory>"
     exit 1
 fi
 
@@ -12,6 +12,8 @@ set -o errexit
 ANDROID_SDK=$1
 shift
 ANDROID_SYSTEM_IMAGE_ARCH=$1
+shift
+ANDROID_IMAGE_API_VERSION=$1
 shift
 DIRECTORY=$1
 shift
@@ -40,12 +42,12 @@ cleanup() {
 }
 
 echo "Creating Android virtual device"
-echo no | $ANDROID_SDK/tools/bin/avdmanager create avd --force -k "system-images;android-24;google_apis;$ANDROID_SYSTEM_IMAGE_ARCH" --name android_avd --abi google_apis/$ANDROID_SYSTEM_IMAGE_ARCH -p android_avd
+echo no | $ANDROID_SDK/tools/bin/avdmanager create avd --force -k "system-images;android-$ANDROID_IMAGE_API_VERSION;google_apis;$ANDROID_SYSTEM_IMAGE_ARCH" --name android_avd --abi google_apis/$ANDROID_SYSTEM_IMAGE_ARCH -p android_avd
 
 trap 'cleanup $?' INT TERM EXIT
 
 echo "Starting the virtual device on the emulator"
-$ANDROID_SDK/emulator/emulator @android_avd -no-window -no-audio &
+$ANDROID_SDK/emulator/emulator @android_avd -no-window -no-audio -no-accel &
 EMULATOR_PID=$!
 
 echo "Waiting for the adb service to be ready for commands"

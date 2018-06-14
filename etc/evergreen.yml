@@ -1023,7 +1023,7 @@ functions:
         set -o verbose
         if [ "${setup_android_toolchain|}" = "true" ]; then
             ${activate_virtualenv}
-            PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh ${android_toolchain_system_image_arch} ${android_toolchain_target_arch}
+            PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh ${android_toolchain_target_arch} ${android_toolchain_api_version}
         fi
 
   "scons cache pruning" :
@@ -1455,6 +1455,8 @@ functions:
         exit_status=$?
         # If compile fails we do not run any tests
         if [ $exit_status -ne 0 ]; then
+          echo "Dumping build/scons/config.log"
+          cat build/scons/config.log
           touch ${skip_tests}
         fi
         exit $exit_status
@@ -1733,10 +1735,10 @@ functions:
             ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_mongoc_client_test" --tempPath /data
         elif [ ${enable_embedded_tests|false} = "android_emulator" ]; then
             # strip because the binaries with debug symbols are too big for the default storage on the emulator
-            find build/mongo-embedded-sdk-${version}/bin -type f | xargs $(dirname $(pwd))/android_toolchain/bin/*-linux-android*-strip
-            find build/mongo-embedded-sdk-${version}/lib -type f -name "*.so" | xargs $(dirname $(pwd))/android_toolchain/bin/*-linux-android*-strip
-            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_capi_test" --tempPath /data
-            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_mongoc_client_test" --tempPath /data
+            find build/mongo-embedded-sdk-${version}/bin -type f | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
+            find build/mongo-embedded-sdk-${version}/lib -type f -name "*.so" | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
+            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_capi_test" --tempPath /data
+            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_mongoc_client_test" --tempPath /data
         elif [ ${enable_embedded_tests|false} = "native" ]; then
           "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test"
           "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_mongoc_client_test"
@@ -3371,6 +3373,11 @@ tasks:
           --js-engine=none
           --link-model=dynamic
           --prefix='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
+          --dbg=off
+          --opt=size
+          --enable-free-mon=off
+          --use-system-mongo-c=on
+          --wiredtiger=off
           CPPPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libbson-1.0 $BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libmongoc-1.0'
 
     # Need to sign artifacts on iOS-ish.
@@ -9350,11 +9357,7 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
       --variables-files=etc/scons/xcode_macos.vars
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
@@ -9384,11 +9387,7 @@ buildvariants:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
       --variables-files=etc/scons/xcode_ios.vars
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
@@ -9418,11 +9417,7 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
       --variables-files=etc/scons/xcode_ios_sim.vars
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
@@ -9454,11 +9449,7 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
       --variables-files=etc/scons/xcode_tvos.vars
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
@@ -9487,11 +9478,7 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
       --variables-files=etc/scons/xcode_tvos_sim.vars
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
@@ -9522,12 +9509,8 @@ buildvariants:
     # We need --allocator=system here to work around SERVER-XXXXX
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
       --allocator=system
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags:
         -DCMAKE_C_COMPILER=/opt/mongodbtoolchain/v2/bin/gcc
@@ -9551,20 +9534,16 @@ buildvariants:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
-      --android-toolchain-path=$(dirname $(pwd))/android_toolchain
+      --android-toolchain-path=$(dirname $(pwd))/android_toolchain-arm-21
       --variables-files=etc/scons/android_toolchain.vars
-      --use-system-mongo-c=on
       LIBS=clang_rt.builtins-arm-android
-      LIBPATH="$(dirname $($(dirname $(pwd))/android_toolchain/bin/clang -print-file-name=libclang_rt.builtins-arm-android.a)) \$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
+      LIBPATH="$(dirname $($(dirname $(pwd))/android_toolchain-arm-21/bin/clang -print-file-name=libclang_rt.builtins-arm-android.a)) \$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
-        -DANDROID_NATIVE_API_LEVEL=24
+        -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=armeabi-v7a
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
-        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
+        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain-arm-21;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
         -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
@@ -9576,7 +9555,9 @@ buildvariants:
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "armeabi-v7a"
+    android_system_image_version: "25"
     android_toolchain_target_arch: "arm"
+    android_toolchain_api_version: "21"
   tasks:
   - name: compile_mobile
 
@@ -9591,19 +9572,15 @@ buildvariants:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
-      --android-toolchain-path=$(dirname $(pwd))/android_toolchain
+      --android-toolchain-path=$(dirname $(pwd))/android_toolchain-arm64-21
       --variables-files=etc/scons/android_toolchain.vars
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
-        -DANDROID_NATIVE_API_LEVEL=24
+        -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=arm64-v8a
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
-        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
+        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain-arm64-21;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
         -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
@@ -9615,7 +9592,9 @@ buildvariants:
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "arm64-v8a"
+    android_system_image_version: "25"
     android_toolchain_target_arch: "arm64"
+    android_toolchain_api_version: "21"
   tasks:
   - name: compile_mobile
 
@@ -9630,19 +9609,15 @@ buildvariants:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
-      --android-toolchain-path=$(dirname $(pwd))/android_toolchain
+      --android-toolchain-path=$(dirname $(pwd))/android_toolchain-x86_64-21
       --variables-files=etc/scons/android_toolchain.vars
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
-        -DANDROID_NATIVE_API_LEVEL=24
+        -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=x86_64
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
-        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
+        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain-x86_64-21;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
         -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
@@ -9651,10 +9626,12 @@ buildvariants:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     disable_unit_tests: true
     # The Android x86_64 emulator requires KVM.
-    enable_embedded_tests: false
+    enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "x86_64"
+    android_system_image_version: 21
     android_toolchain_target_arch: "x86_64"
+    android_toolchain_api_version: "21"
   tasks:
   - name: compile_mobile
 

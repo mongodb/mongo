@@ -2468,8 +2468,10 @@ def doConfigure(myenv):
 
         # On 32-bit systems, we need to define this in order to get access to
         # the 64-bit versions of fseek, etc.
+        # except on 32 bit android where it breaks boost
         if not conf.CheckTypeSize('off_t', includes="#include <sys/types.h>", expect=8):
-            myenv.Append(CPPDEFINES=["_FILE_OFFSET_BITS=64"])
+            if not env.TargetOSIs('android'):
+                myenv.Append(CPPDEFINES=["_FILE_OFFSET_BITS=64"])
 
         conf.Finish()
 
