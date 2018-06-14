@@ -67,8 +67,8 @@ void DeathTestImpl::_doTest() {
 #if defined(_WIN32)
     log() << "Skipping death test on Windows";
     return;
-#elif defined(__APPLE__) && TARGET_OS_TV
-    log() << "Skipping death test on tvOS";
+#elif defined(__APPLE__) && (TARGET_OS_TV || TARGET_OS_WATCH)
+    log() << "Skipping death test on tvOS/watchOS";
     return;
 #else
     int pipes[2];
