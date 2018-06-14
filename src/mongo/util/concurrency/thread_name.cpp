@@ -36,7 +36,7 @@
 #endif
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
-#if !TARGET_OS_TV && !TARGET_OS_IOS
+#if !TARGET_OS_TV && !TARGET_OS_IOS && !TARGET_OS_WATCH
 #include <sys/proc_info.h>
 #else
 #include <mach/thread_info.h>

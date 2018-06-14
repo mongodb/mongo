@@ -38,7 +38,7 @@ def env_get_os_name_wrapper(self):
     return self['TARGET_OS']
 
 def is_os_raw(target_os, os_list_to_check):
-    darwin_os_list = [ 'macOS', 'tvOS', 'tvOS-sim', 'iOS', 'iOS-sim' ]
+    darwin_os_list = [ 'macOS', 'tvOS', 'tvOS-sim', 'iOS', 'iOS-sim', 'watchOS', 'watchOS-sim' ]
     linux_os_list = [ 'android', 'linux' ]
     posix_os_list = [ 'openbsd', 'freebsd', 'solaris' ] + darwin_os_list + linux_os_list
 
