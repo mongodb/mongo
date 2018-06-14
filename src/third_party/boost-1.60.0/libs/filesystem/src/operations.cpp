@@ -11,6 +11,12 @@
 //--------------------------------------------------------------------------------------// 
 
 //  define 64-bit offset macros BEFORE including boost/config.hpp (see ticket #5355) 
+//
+//  Mongodb modification:
+//  Don't mess with _FILE_OFFSET_BITS or __USE_FILE_OFFSET64 on android because
+//  it breaks compiling boost against some older android api versions
+//
+#if !(defined(__ANDROID__) && (__ANDROID_API__ < 24))
 #if !(defined(__HP_aCC) && defined(_ILP32) && !defined(_STATVFS_ACPP_PROBLEMS_FIXED))
 #define _FILE_OFFSET_BITS 64 // at worst, these defines may have no effect,
 #endif
@@ -27,6 +33,7 @@
       // systems as well.
 #else
 #define _FILE_OFFSET_BITS 64
+#endif
 #endif
 
 // define BOOST_FILESYSTEM_SOURCE so that <boost/filesystem/config.hpp> knows
