@@ -91,9 +91,6 @@ Timestamp ReplicationConsistencyMarkersMock::getOplogTruncateAfterPoint(
     return _oplogTruncateAfterPoint;
 }
 
-void ReplicationConsistencyMarkersMock::removeOldOplogDeleteFromPointField(
-    OperationContext* opCtx) {}
-
 void ReplicationConsistencyMarkersMock::setAppliedThrough(OperationContext* opCtx,
                                                           const OpTime& optime) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);

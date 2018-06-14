@@ -59,8 +59,6 @@ class StorageInterface;
  *                  ts: <Timestamp>,
  *                  t: <long long>
  *             },                           // field for 'appliedThrough'
- *      oplogDeleteFromPoint: <Timestamp>,  // only exists on unclean upgrade
- *                                          // TODO (SERVER-30556): Remove after 3.6
  * }
  *
  * The oplogTruncateAfterPoint document, in 'local.replset.oplogTruncateAfterPoint', is used to
@@ -160,15 +158,6 @@ public:
     virtual void setOplogTruncateAfterPoint(OperationContext* opCtx,
                                             const Timestamp& timestamp) = 0;
     virtual Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const = 0;
-
-    /**
-     * The oplog delete from point may still exist on upgrade from an unclean shutdown. This
-     * function removes the field so it's gone after 3.6.
-     *
-     * TODO (SERVER-30556): Delete this function in 3.8 because the old oplog delete from point
-     * cannot exist.
-     */
-    virtual void removeOldOplogDeleteFromPointField(OperationContext* opCtx) = 0;
 
     // -------- Applied Through ----------
 

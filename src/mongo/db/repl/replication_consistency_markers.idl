@@ -50,14 +50,6 @@ structs:
                 type: optime
                 optional: true # This field is unset when we want to mark that we are consistent at the top of the oplog
                 description: "The OpTime of the last oplog entry we applied"
-            # TODO (SERVER-30556): Delete this field since it cannot exist after 3.6.
-            oplogDeleteFromPoint:
-                cpp_name: oldOplogDeleteFromPoint
-                type: timestamp
-                optional: true # This field only exists on 3.4 upgrade
-                description: "The timestamp of the first oplog entry in a batch when we are writing
-                              oplog entries to the oplog after which the oplog may be inconsistent.
-                              This field only exists on 3.4 upgrade."
             doingInitialSync:
                 cpp_name: initialSyncFlag
                 type: bool

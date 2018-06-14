@@ -241,17 +241,6 @@ void ReplicationConsistencyMarkersImpl::setMinValidToAtLeast(OperationContext* o
     invariant(status);
 }
 
-void ReplicationConsistencyMarkersImpl::removeOldOplogDeleteFromPointField(
-    OperationContext* opCtx) {
-    TimestampedBSONObj update;
-    update.obj = BSON("$unset" << BSON(MinValidDocument::kOldOplogDeleteFromPointFieldName << 1));
-
-    // This is getting removed in SERVER-30556 before 3.8 is released, so the timestamp does not
-    // matter.
-    update.timestamp = Timestamp();
-    _updateMinValidDocument(opCtx, update);
-}
-
 void ReplicationConsistencyMarkersImpl::setAppliedThrough(OperationContext* opCtx,
                                                           const OpTime& optime) {
     invariant(!optime.isNull());
@@ -342,21 +331,6 @@ Timestamp ReplicationConsistencyMarkersImpl::getOplogTruncateAfterPoint(
 
     LOG(3) << "returning oplog truncate after point: " << out;
     return out;
-}
-
-Timestamp ReplicationConsistencyMarkersImpl::_getOldOplogDeleteFromPoint(
-    OperationContext* opCtx) const {
-    auto doc = _getMinValidDocument(opCtx);
-    invariant(doc);  // Initialized at startup so it should never be missing.
-
-    auto oplogDeleteFromPoint = doc->getOldOplogDeleteFromPoint();
-    if (!oplogDeleteFromPoint) {
-        LOG(3) << "No oplogDeleteFromPoint timestamp set, returning empty timestamp.";
-        return {};
-    }
-
-    LOG(3) << "returning oplog delete from point: " << oplogDeleteFromPoint.get();
-    return oplogDeleteFromPoint.get();
 }
 
 Status ReplicationConsistencyMarkersImpl::createInternalCollections(OperationContext* opCtx) {

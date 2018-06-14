@@ -41,8 +41,6 @@
             t: term,
         },
 
-        oplogDeleteFromPoint: Timestamp(),
-
         // minvalid:
         t: term,
         ts: newTs,

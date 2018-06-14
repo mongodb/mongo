@@ -345,9 +345,6 @@ public:
         ASSERT_EQ(expectedDoc.getAppliedThrough(), doc.getAppliedThrough())
             << "appliedThrough OpTimes weren't equal at " << ts.toString()
             << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
-        ASSERT_EQ(expectedDoc.getOldOplogDeleteFromPoint(), doc.getOldOplogDeleteFromPoint())
-            << "Old oplogDeleteFromPoint timestamps weren't equal at " << ts.toString()
-            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
         ASSERT_EQ(expectedDoc.getInitialSyncFlag(), doc.getInitialSyncFlag())
             << "Initial sync flags weren't equal at " << ts.toString()
             << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();

@@ -71,8 +71,6 @@ public:
     void setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
     Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const override;
 
-    void removeOldOplogDeleteFromPointField(OperationContext* opCtx) override;
-
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
     void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
@@ -100,13 +98,6 @@ private:
      */
     boost::optional<OplogTruncateAfterPointDocument> _getOplogTruncateAfterPointDocument(
         OperationContext* opCtx) const;
-
-    /**
-     * Returns the old oplog delete from point from the minValid document. Returns an empty
-     * timestamp if the field does not exist. This is used to fallback in FCV 3.4 if the oplog
-     * truncate after point document does not exist.
-     */
-    Timestamp _getOldOplogDeleteFromPoint(OperationContext* opCtx) const;
 
     /**
      * Upserts the OplogTruncateAfterPoint document according to the provided update spec. The
