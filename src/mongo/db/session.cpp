@@ -763,7 +763,6 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
         return;
     }
 
-    bool snapshotPreallocated = false;
     {
         // We must lock the Client to change the Locker on the OperationContext and the Session
         // mutex to access Session state. We must lock the Client before the Session mutex, since
@@ -799,45 +798,51 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
 
             _txnResourceStash->release(opCtx);
             _txnResourceStash = boost::none;
-        } else {
-            // Stashed transaction resources do not exist for this transaction.  If this is a
-            // snapshot read or a multi-document transaction, set up the transaction resources on
-            // the opCtx.
-            auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
-                _txnState == MultiDocumentTransactionState::kInProgress) {
-                opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
+            return;
+        }
 
-                // Storage engine transactions may be started in a lazy manner. By explicitly
-                // starting here we ensure that a point-in-time snapshot is established during the
-                // first operation of a transaction.
-                opCtx->recoveryUnit()->preallocateSnapshot();
-                snapshotPreallocated = true;
 
-                if (_txnState == MultiDocumentTransactionState::kInProgress) {
-                    // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
-                    // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
-                    // to acquire a lock. This is to avoid deadlocks and minimize non-transaction
-                    // operation performance degradations.
-                    auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
-                    if (maxTransactionLockMillis >= 0) {
-                        opCtx->lockState()->setMaxLockTimeout(
-                            Milliseconds(maxTransactionLockMillis));
-                    }
-                }
+        // Stashed transaction resources do not exist for this transaction.  If this is a
+        // snapshot read or a multi-document transaction, set up the transaction resources on
+        // the opCtx.
+        auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        if (!(readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
+              _txnState == MultiDocumentTransactionState::kInProgress)) {
+            return;
+        }
+        opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
 
-                if (_txnState != MultiDocumentTransactionState::kInProgress) {
-                    _txnState = MultiDocumentTransactionState::kInSnapshotRead;
-                }
+
+        if (_txnState == MultiDocumentTransactionState::kInProgress) {
+            // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
+            // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
+            // to acquire a lock. This is to avoid deadlocks and minimize non-transaction
+            // operation performance degradations.
+            auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
+            if (maxTransactionLockMillis >= 0) {
+                opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
             }
+        }
+
+        if (_txnState != MultiDocumentTransactionState::kInProgress) {
+            _txnState = MultiDocumentTransactionState::kInSnapshotRead;
         }
     }
 
-    if (snapshotPreallocated) {
-        // The Client lock must not be held when executing this failpoint as it will block currentOp
-        // execution.
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterPreallocateSnapshot);
-    }
+    // Storage engine transactions may be started in a lazy manner. By explicitly
+    // starting here we ensure that a point-in-time snapshot is established during the
+    // first operation of a transaction.
+    //
+    // Active transactions are protected by the locking subsystem, so we must always hold at least a
+    // Global intent lock before starting a transaction.  We pessimistically acquire an intent
+    // exclusive lock here because we might be doing writes in this transaction, and it is currently
+    // not deadlock-safe to upgrade IS to IX.
+    Lock::GlobalLock(opCtx, MODE_IX);
+    opCtx->recoveryUnit()->preallocateSnapshot();
+
+    // The Client lock must not be held when executing this failpoint as it will block currentOp
+    // execution.
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterPreallocateSnapshot);
 }
 
 void Session::abortArbitraryTransaction() {
