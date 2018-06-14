@@ -1506,12 +1506,8 @@ Status InitialSyncer::_enqueueDocuments(Fetcher::Documents::const_iterator begin
     // Gets unblocked on shutdown.
     _oplogBuffer->waitForSpace(makeOpCtx().get(), info.toApplyDocumentBytes);
 
-    OCCASIONALLY {
-        LOG(2) << "bgsync buffer has " << _oplogBuffer->getSize() << " bytes";
-    }
-
     // Buffer docs for later application.
-    _oplogBuffer->pushAllNonBlocking(makeOpCtx().get(), begin, end);
+    _oplogApplier->enqueue(makeOpCtx().get(), begin, end);
 
     _lastFetched = info.lastDocument;
 
