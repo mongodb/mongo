@@ -3518,8 +3518,31 @@ struct __wt_config_parser {
 	    const char *key, WT_CONFIG_ITEM *value);
 };
 
-#endif /* !defined(SWIG) */
 /*! @} */
+
+/*!
+ * @name Support functions
+ * @anchor support_functions
+ * @{
+ */
+
+/*!
+ * Return a buffer's CRC32C checksum.
+ *
+ * The WiredTiger library CRC32C checksum function uses hardware support where
+ * available, else it falls back to a software implementation.
+ *
+ * @snippet ex_all.c Checksum a buffer
+ *
+ * @param buffer a pointer to a buffer
+ * @param len the number of valid bytes in the buffer
+ * @returns the buffer's CRC32C checksum
+ */
+uint32_t wiredtiger_checksum_crc32c(const void *buffer, size_t len)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
+
+/*! @} */
+#endif /* !defined(SWIG) */
 
 /*!
  * Get version information.
@@ -5326,8 +5349,8 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WRITE_COUNT	1193
 /*! log: busy returns attempting to switch slots */
 #define	WT_STAT_CONN_LOG_SLOT_SWITCH_BUSY		1194
-/*! log: force checkpoint calls slept */
-#define	WT_STAT_CONN_LOG_FORCE_CKPT_SLEEP		1195
+/*! log: force archive time sleeping (usecs) */
+#define	WT_STAT_CONN_LOG_FORCE_ARCHIVE_SLEEP		1195
 /*! log: log bytes of payload data */
 #define	WT_STAT_CONN_LOG_BYTES_PAYLOAD			1196
 /*! log: log bytes written */

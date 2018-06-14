@@ -5,6 +5,7 @@
  *
  * See the file LICENSE for redistribution information.
  */
+#define	WT_COMPAT_MSG_PREFIX "Version incompatibility detected: "
 
 #define	WT_DEBUG_POINT	((void *)(uintptr_t)0xdeadbeef)
 #define	WT_DEBUG_BYTE	(0xab)

@@ -1352,5 +1352,15 @@ main(int argc, char *argv[])
 	/*! [Get the WiredTiger library version #2] */
 	}
 
+	{
+	const char *buffer = "some string";
+	size_t len = strlen(buffer);
+	/*! [Checksum a buffer] */
+	uint32_t crc32c;
+	crc32c = wiredtiger_checksum_crc32c(buffer, len);
+	/*! [Checksum a buffer] */
+	(void)crc32c;
+	}
+
 	return (EXIT_SUCCESS);
 }

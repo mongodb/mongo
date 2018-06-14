@@ -49,9 +49,9 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
     min_logv = 2
 
     # Test detecting a not-yet-existing log version. This should
-    # hold us for a couple years.
-    future_logv = 5
-    future_rel = "5.0"
+    # hold us for many years.
+    future_logv = 20
+    future_rel = "20.0"
 
     # The API uses only the major and minor numbers but accepts with
     # and without the patch number. Test one on release and the
@@ -150,10 +150,9 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
             expect_err = False
 
         if (expect_err == True):
-            self.pr("EXPECT ERROR")
-            with self.expectedStderrPattern(''):
-                self.assertRaisesException(wiredtiger.WiredTigerError,
-                    lambda: self.wiredtiger_open('.', restart_config))
+            msg = '/Version incompatibility detected:/'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.wiredtiger_open('.', restart_config), msg)
         else:
             self.pr("EXPECT SUCCESS")
             conn = self.wiredtiger_open('.', restart_config)

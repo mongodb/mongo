@@ -370,7 +370,7 @@ connection_stats = [
     LogStat('log_compress_write_fails', 'log records not compressed'),
     LogStat('log_compress_writes', 'log records compressed'),
     LogStat('log_flush', 'log flush operations'),
-    LogStat('log_force_ckpt_sleep', 'force checkpoint calls slept'),
+    LogStat('log_force_archive_sleep', 'force archive time sleeping (usecs)'),
     LogStat('log_force_write', 'log force write operations'),
     LogStat('log_force_write_skip', 'log force write operations skipped'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale,size'),

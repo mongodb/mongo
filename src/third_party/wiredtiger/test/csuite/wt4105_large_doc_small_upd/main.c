@@ -46,7 +46,7 @@ on_alarm(int signo)
 	/* NOTREACHED */
 }
 
-static int ignore_errors;
+static int ignore_errors = 0;
 
 static int
 handle_error(WT_EVENT_HANDLER *handler,
@@ -82,9 +82,8 @@ main(int argc, char *argv[])
 	WT_ITEM value;
 	WT_MODIFY modify_entry;
 	WT_SESSION *session, *session2;
-
-	char *large_doc;
 	uint64_t i, j, offset;
+	char *large_doc;
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
@@ -106,7 +105,7 @@ main(int argc, char *argv[])
 	    session->open_cursor(session, uri, NULL, NULL, &c));
 
 	/* Value is initialized with 'v' and has not significance to it. */
-	large_doc = (char *)malloc(DATASIZE);
+	large_doc = dmalloc(DATASIZE);
 	memset(large_doc, 'v', DATASIZE);
 	value.data = large_doc;
 	value.size = DATASIZE;
@@ -132,8 +131,7 @@ main(int argc, char *argv[])
 	/* Start another session to perform small updates. */
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session2));
-	testutil_check(
-	    session->open_cursor(session2, uri, NULL, NULL, &c));
+	testutil_check(session2->open_cursor(session2, uri, NULL, NULL, &c));
 
 	j = offset = 0;
 	while (++j < MODIFY_COUNT) {
@@ -159,6 +157,7 @@ main(int argc, char *argv[])
 			printf("modify count %" PRIu64"\n", j * NUM_DOCS);
 	}
 
+	free(large_doc);
 	testutil_cleanup(opts);
 
 	return (EXIT_SUCCESS);

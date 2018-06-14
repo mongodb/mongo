@@ -2748,3 +2748,15 @@ err:	/* Discard the scratch buffers. */
 
 	return (ret);
 }
+
+/*
+ * wiredtiger_checksum_crc32c --
+ *	CRC32C checksum function entry point.
+ */
+uint32_t
+wiredtiger_checksum_crc32c(const void *buffer, size_t len)
+{
+	if (__wt_process.checksum == NULL)
+		__wt_checksum_init();
+	return (__wt_process.checksum(buffer, len));
+}

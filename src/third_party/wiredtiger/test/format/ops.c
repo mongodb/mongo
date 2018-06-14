@@ -127,7 +127,7 @@ wts_ops(int lastrun)
 	if (!SINGLETHREADED)
 		g.rand_log_stop = true;
 
-	/* Open a session. */
+	/* Logging requires a session. */
 	if (g.logging != 0) {
 		testutil_check(conn->open_session(conn, NULL, NULL, &session));
 		(void)g.wt_api->msg_printf(g.wt_api, session,
@@ -241,6 +241,10 @@ wts_ops(int lastrun)
 			fprintf(stderr, "%s\n",
 			    "format run exceeded 15 minutes past the maximum "
 			    "time, aborting the process.");
+
+			(void)conn->debug_info(conn, "txn");
+			(void)conn->debug_info(conn, "cache");
+
 			abort();
 		}
 	}

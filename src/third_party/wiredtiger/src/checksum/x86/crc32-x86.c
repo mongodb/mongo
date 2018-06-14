@@ -124,6 +124,7 @@ __wt_checksum_hw(const void *chunk, size_t len)
  */
 void
 __wt_checksum_init(void)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 #if defined(HAVE_CRC32_HARDWARE)
 #if (defined(__amd64) || defined(__x86_64))
