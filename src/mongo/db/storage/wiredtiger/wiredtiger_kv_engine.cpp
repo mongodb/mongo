@@ -671,9 +671,7 @@ void WiredTigerKVEngine::cleanShutdown() {
     _conn = nullptr;
 
     WT_CONNECTION* conn;
-    std::stringstream openConfig;
-    openConfig << _wtOpenConfig << ",log=(archive=false)";
-    invariantWTOK(wiredtiger_open(_path.c_str(), &_eventHandler, openConfig.str().c_str(), &conn));
+    invariantWTOK(wiredtiger_open(_path.c_str(), &_eventHandler, _wtOpenConfig.c_str(), &conn));
 
     WT_SESSION* session;
     conn->open_session(conn, nullptr, "", &session);
