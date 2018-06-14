@@ -83,6 +83,7 @@ __ckpt_server(void *arg)
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
+	uint64_t checkpoint_gen;
 
 	session = arg;
 	conn = S2C(session);
@@ -101,37 +102,27 @@ __ckpt_server(void *arg)
 		if (!__ckpt_server_run_chk(session))
 			break;
 
+		checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
+		WT_ERR(wt_session->checkpoint(wt_session, NULL));
+
 		/*
-		 * Checkpoint the database if the connection is marked dirty.
-		 * A connection is marked dirty whenever a btree gets marked
-		 * dirty, which reflects upon a change in the database that
-		 * needs to be checkpointed. Said that, there can be short
-		 * instances when a btree gets marked dirty and the connection
-		 * is yet to be. We might skip a checkpoint in that short
-		 * instance, which is okay because by the next time we get to
-		 * checkpoint, the connection would have been marked dirty and
-		 * hence the checkpoint will not be skipped this time.
+		 * Reset the log file size counters if the checkpoint wasn't
+		 * skipped.
 		 */
-		if (conn->modified) {
-			WT_ERR(wt_session->checkpoint(wt_session, NULL));
+		if (checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT) &&
+		    conn->ckpt_logsize) {
+			__wt_log_written_reset(session);
+			conn->ckpt_signalled = false;
 
-			/* Reset. */
-			if (conn->ckpt_logsize) {
-				__wt_log_written_reset(session);
-				conn->ckpt_signalled = false;
-
-				/*
-				 * In case we crossed the log limit during the
-				 * checkpoint and the condition variable was
-				 * already signalled, do a tiny wait to clear
-				 * it so we don't do another checkpoint
-				 * immediately.
-				 */
-				__wt_cond_wait(
-				    session, conn->ckpt_cond, 1, NULL);
-			}
-		} else
-			WT_STAT_CONN_INCR(session, txn_checkpoint_skipped);
+			/*
+			 * In case we crossed the log limit during the
+			 * checkpoint and the condition variable was
+			 * already signalled, do a tiny wait to clear
+			 * it so we don't do another checkpoint
+			 * immediately.
+			 */
+			__wt_cond_wait(session, conn->ckpt_cond, 1, NULL);
+		}
 	}
 
 	if (0) {

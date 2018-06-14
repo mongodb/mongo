@@ -33,6 +33,7 @@ __wt_stat_join_aggregate
 __wt_stat_join_clear_all
 __wt_stream_set_no_buffer
 __wt_try_readlock
+wiredtiger_checksum_crc32c
 wiredtiger_config_parser_open
 wiredtiger_config_validate
 wiredtiger_pack_int

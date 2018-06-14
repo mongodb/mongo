@@ -31,10 +31,12 @@ __conn_compat_parse(WT_SESSION_IMPL *session,
 		    "illegal compatibility release");
 	if (*majorp > WIREDTIGER_VERSION_MAJOR)
 		WT_RET_MSG(session, ENOTSUP,
+		    WT_COMPAT_MSG_PREFIX
 		    "unsupported major version");
 	if (*majorp == WIREDTIGER_VERSION_MAJOR &&
 	    *minorp > WIREDTIGER_VERSION_MINOR)
 		WT_RET_MSG(session, ENOTSUP,
+		    WT_COMPAT_MSG_PREFIX
 		    "unsupported minor version");
 	return (0);
 }
@@ -115,6 +117,7 @@ __wt_conn_compat_config(
 	    (max_major < rel_major ||
 	    (max_major == rel_major && max_minor < rel_minor)))
 		WT_RET_MSG(session, ENOTSUP,
+		    WT_COMPAT_MSG_PREFIX
 		    "required max of %" PRIu16 ".%" PRIu16
 		    "cannot be smaller than compatibility release %"
 		    PRIu16 ".%" PRIu16,
@@ -130,6 +133,7 @@ __wt_conn_compat_config(
 	    (min_major > rel_major ||
 	    (min_major == rel_major && min_minor > rel_minor)))
 		WT_RET_MSG(session, ENOTSUP,
+		    WT_COMPAT_MSG_PREFIX
 		    "required min of %" PRIu16 ".%" PRIu16
 		    "cannot be larger than compatibility release %"
 		    PRIu16 ".%" PRIu16,
@@ -144,6 +148,7 @@ __wt_conn_compat_config(
 	    (conn->req_max_major == rel_major &&
 	    conn->req_max_minor < rel_minor)))
 		WT_RET_MSG(session, ENOTSUP,
+		    WT_COMPAT_MSG_PREFIX
 		    "required max of %" PRIu16 ".%" PRIu16
 		    "cannot be smaller than requested compatibility release %"
 		    PRIu16 ".%" PRIu16,
@@ -159,6 +164,7 @@ __wt_conn_compat_config(
 	    (conn->req_min_major == rel_major &&
 	    conn->req_min_minor > rel_minor)))
 		WT_RET_MSG(session, ENOTSUP,
+		    WT_COMPAT_MSG_PREFIX
 		    "required min of %" PRIu16 ".%" PRIu16
 		    "cannot be larger than requested compatibility release %"
 		    PRIu16 ".%" PRIu16,
@@ -202,6 +208,7 @@ __wt_conn_compat_config(
 		    (max_major < rel_major ||
 		    (max_major == rel_major && max_minor < rel_minor)))
 			WT_ERR_MSG(session, ENOTSUP,
+			    WT_COMPAT_MSG_PREFIX
 			    "required max of %" PRIu16 ".%" PRIu16
 			    "cannot be larger than saved release %"
 			    PRIu16 ".%" PRIu16,
@@ -210,6 +217,7 @@ __wt_conn_compat_config(
 		    (min_major > rel_major ||
 		    (min_major == rel_major && min_minor > rel_minor)))
 			WT_ERR_MSG(session, ENOTSUP,
+			    WT_COMPAT_MSG_PREFIX
 			    "required min of %" PRIu16 ".%" PRIu16
 			    "cannot be larger than saved release %"
 			    PRIu16 ".%" PRIu16,

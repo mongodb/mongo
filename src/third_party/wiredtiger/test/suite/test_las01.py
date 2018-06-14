@@ -92,6 +92,9 @@ class test_las01(wttest.WiredTigerTestCase):
         conn.close()
 
     def test_las(self):
+        if not wiredtiger.timestamp_build():
+            self.skipTest('requires a timestamp build')
+
         # Create a small table.
         uri = "table:test_las01"
         nrows = 100
