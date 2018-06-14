@@ -914,21 +914,22 @@ buildvariants:
         variant: compile-rhel70
   tasks: *3nodetasks
 
-- name: wtdevelop-shard-lite
-  display_name: WT Develop Shard Lite Cluster
-  batchtime: 1440  # 24 hours
-  modules: *modules
-  expansions:
-    setup: shard-lite
-    cluster: shard-lite
-    platform: linux
-    project_dir: *project_dir
-    wtdevelop: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-shard-lite"
-  depends_on:
-      - name: compile_wtdevelop
-        variant: compile-rhel70
-  tasks: *shardlitetasks
+# Disabled: SERVER-35586
+#- name: wtdevelop-shard-lite
+#  display_name: WT Develop Shard Lite Cluster
+#  batchtime: 1440  # 24 hours
+#  modules: *modules
+#  expansions:
+#    setup: shard-lite
+#    cluster: shard-lite
+#    platform: linux
+#    project_dir: *project_dir
+#    wtdevelop: -wtdevelop
+#    authentication: enabled
+#    storageEngine: wiredTiger
+#  run_on:
+#      - "rhel70-perf-shard-lite"
+#  depends_on:
+#      - name: compile_wtdevelop
+#        variant: compile-rhel70
+#  tasks: *shardlitetasks
