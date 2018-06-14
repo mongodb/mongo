@@ -26,23 +26,61 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
+#include "mongo/db/storage/biggie/biggie_kv_engine.h"
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/snapshot_window_options.h"
-#include "mongo/db/storage/biggie/biggie_kv_engine.h"
+#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/platform/basic.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
+
 
 namespace mongo {
+namespace biggie {
 
-bool BiggieKVEngine::isCacheUnderPressure(OperationContext* opCtx) const {
-    return false; // ! might be under cache pressure eventually
-}
-void BiggieKVEngine::setCachePressureForTest(int pressure) {
-    // ! implement
+mongo::RecoveryUnit* KVEngine::newRecoveryUnit() {
+    return new RecoveryUnit(this, nullptr);
 }
 
+void KVEngine::setCachePressureForTest(int pressure) {
+    // TODO : implement.
+}
+
+Status KVEngine::createRecordStore(OperationContext* opCtx,
+                                   StringData ns,
+                                   StringData ident,
+                                   const CollectionOptions& options) {
+    log() << "Creating Ident in KVEngine with ident: " << ident;
+    _idents.insert(ident);
+    return Status::OK();
+}
+
+std::unique_ptr<::mongo::RecordStore> KVEngine::getRecordStore(OperationContext* opCtx,
+                                                               StringData ns,
+                                                               StringData ident,
+                                                               const CollectionOptions& options) {
+    // TODO: deal with options.
+    return std::make_unique<RecordStore>(ns, ident);
+}
+
+void KVEngine::setMaster_inlock(std::unique_ptr<StringStore> newMaster) {
+    _master.reset(newMaster.release());
+}
+
+std::shared_ptr<StringStore> KVEngine::getMaster() const {
+    // TODO : later on this needs to be changed to use their copy function.
+    stdx::lock_guard<stdx::mutex> lk(_masterLock);
+    return _master;
+}
+
+std::shared_ptr<StringStore> KVEngine::getMaster_inlock() const {
+    return _master;
+}
 
 class EmptyRecordCursor final : public SeekableRecordCursor {
 public:
@@ -57,6 +95,7 @@ public:
         return true;
     }
     void detachFromOperationContext() final {}
-    void reattachToOperationContext(OperationContext* opCtx) final {}    
+    void reattachToOperationContext(OperationContext* opCtx) final {}
 };
+}  // namespace biggie
 }  // namespace mongo

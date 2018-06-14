@@ -38,6 +38,7 @@
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
+namespace biggie {
 
 namespace {
 class BiggieStorageEngineFactory : public StorageEngine::Factory {
@@ -47,7 +48,7 @@ public:
         KVStorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
-        return new KVStorageEngine(new BiggieKVEngine(), options);
+        return new KVStorageEngine(new KVEngine(), options);
     }
 
     virtual StringData getCanonicalName() const {
@@ -71,4 +72,5 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(BiggieEngineInit, ("ServiceContext"))
                           std::make_unique<BiggieStorageEngineFactory>());
     return Status::OK();
 }
+}  // namespace biggie
 }  // namespace mongo

@@ -57,8 +57,13 @@ public:
     // ---------
 
     /**
-     * Having multiple out for the same ns is a rules violation; Calling on a non-created ident is
-     * invalid and may crash.
+     * Requesting multiple copies for the same ns/ident is a rules violation; Calling on a
+     * non-created ident is invalid and may crash.
+     *
+     * Trying to access this record store in the future will retreive the pointer from the
+     * collection object, and therefore this function can only be called once per namespace.
+     *
+     * @param ident Will be created if it does not already exist.
      */
     virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                         StringData ns,

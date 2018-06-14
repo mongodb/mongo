@@ -25,90 +25,117 @@
  * delete this exception statement from all source files in the program,
  * then also delete it in the license file.
  */
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
+
 #include <set>
 
-#include "mongo/platform/basic.h"
-#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace biggie {
 
-Status BiggieSortedBuilderImpl::addKey(const BSONObj& key, const RecordId& loc) {
+Status SortedDataBuilderInterface::addKey(const BSONObj& key, const RecordId& loc) {
     return Status::OK();
 }
 
-SortedDataBuilderInterface* BiggieSortedImpl::getBulkBuilder(OperationContext *opCtx, bool dupsAllowed) {
-    return new BiggieSortedBuilderImpl(); //TODO: return real thing
+SortedDataBuilderInterface* SortedDataInterface::getBulkBuilder(OperationContext* opCtx,
+                                                                bool dupsAllowed) {
+    return new SortedDataBuilderInterface();  // TODO: return real thing.
 }
 
-Status BiggieSortedImpl::insert(OperationContext *opCtx, const BSONObj &key, const RecordId &loc, bool dupsAllowed) {
-    return Status::OK(); //TODO: Implement
+Status SortedDataInterface::insert(OperationContext* opCtx,
+                                   const BSONObj& key,
+                                   const RecordId& loc,
+                                   bool dupsAllowed) {
+    return Status::OK();  // TODO: Implement.
 }
-void BiggieSortedImpl::unindex(OperationContext *opCtx, const BSONObj &key, const RecordId &loc, bool dupsAllowed) {
-    return; //TODO: Implement
+
+void SortedDataInterface::unindex(OperationContext* opCtx,
+                                  const BSONObj& key,
+                                  const RecordId& loc,
+                                  bool dupsAllowed) {
+    return;  // TODO: Implement.
 }
-Status BiggieSortedImpl::dupKeyCheck(OperationContext *opCtx, const BSONObj &key, const RecordId &loc) {
+
+Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx,
+                                        const BSONObj& key,
+                                        const RecordId& loc) {
     return Status::OK();
-     //TODO: Implement
-}
-void BiggieSortedImpl::fullValidate(OperationContext *opCtx, long long *numKeysOut, ValidateResults *fullResults) const {
- //TODO: Implement
-}
-bool BiggieSortedImpl::appendCustomStats(OperationContext *opCtx, BSONObjBuilder *output, double scale) const {
-    return false; //TODO: Implement
-}
-long long BiggieSortedImpl::getSpaceUsedBytes(OperationContext *opCtx) const {
-    return -1; //TODO: Implement
-}
-bool BiggieSortedImpl::isEmpty (OperationContext *opCtx) {
-    return true; //TODO: Implement
+    // TODO: Implement.
 }
 
-std::unique_ptr<SortedDataInterface::Cursor> BiggieSortedImpl::newCursor(OperationContext *opCtx, bool isForward) const {
-    return std::make_unique<BiggieSortedImpl::Cursor>(opCtx, isForward); //TODO: Implement
+void SortedDataInterface::fullValidate(OperationContext* opCtx,
+                                       long long* numKeysOut,
+                                       ValidateResults* fullResults) const {
+    // TODO: Implement.
 }
-Status BiggieSortedImpl::initAsEmpty(OperationContext *opCtx) {
-    return Status::OK(); //TODO: Implement
+
+bool SortedDataInterface::appendCustomStats(OperationContext* opCtx,
+                                            BSONObjBuilder* output,
+                                            double scale) const {
+    return false;  // TODO: Implement.
+}
+
+long long SortedDataInterface::getSpaceUsedBytes(OperationContext* opCtx) const {
+    return -1;  // TODO: Implement.
+}
+
+bool SortedDataInterface::isEmpty(OperationContext* opCtx) {
+    return true;  // TODO: Implement.
+}
+
+std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterface::newCursor(
+    OperationContext* opCtx, bool isForward) const {
+    return std::make_unique<SortedDataInterface::Cursor>(opCtx, isForward);  // TODO: Implement.
+}
+
+Status SortedDataInterface::initAsEmpty(OperationContext* opCtx) {
+    return Status::OK();  // TODO: Implement.
 }
 
 // Cursor
-BiggieSortedImpl::Cursor::Cursor(OperationContext* opCtx, bool isForward) : _opCtx(opCtx), _isForward(isForward) {}
+SortedDataInterface::Cursor::Cursor(OperationContext* opCtx, bool isForward)
+    : _opCtx(opCtx), _isForward(isForward) {}
 
-void BiggieSortedImpl::Cursor::setEndPosition(const BSONObj& key, bool inclusive) {
+void SortedDataInterface::Cursor::setEndPosition(const BSONObj& key, bool inclusive) {
     return;
 }
 
-boost::optional<IndexKeyEntry> BiggieSortedImpl::Cursor::next(RequestedInfo parts) {
+boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::next(RequestedInfo parts) {
     return boost::none;
 }
 
-boost::optional<IndexKeyEntry> BiggieSortedImpl::Cursor::seek(const BSONObj& key,
-                                                    bool inclusive,
-                                                    RequestedInfo parts) {
+boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seek(const BSONObj& key,
+                                                                 bool inclusive,
+                                                                 RequestedInfo parts) {
     return boost::none;
 }
 
-boost::optional<IndexKeyEntry> BiggieSortedImpl::Cursor::seek(const IndexSeekPoint& seekPoint, RequestedInfo parts) {
+boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seek(const IndexSeekPoint& seekPoint,
+                                                                 RequestedInfo parts) {
     return boost::none;
 }
 
-void BiggieSortedImpl::Cursor::save() {
+void SortedDataInterface::Cursor::save() {
     return;
 }
 
-void BiggieSortedImpl::Cursor::restore() {
+void SortedDataInterface::Cursor::restore() {
     return;
 }
 
-void BiggieSortedImpl::Cursor::detachFromOperationContext() {
+void SortedDataInterface::Cursor::detachFromOperationContext() {
     return;
 }
 
-void BiggieSortedImpl::Cursor::reattachToOperationContext(OperationContext* opCtx) {
+void SortedDataInterface::Cursor::reattachToOperationContext(OperationContext* opCtx) {
     return;
 }
 
-}
+}  // namespace biggie
+}  // namespace mongo

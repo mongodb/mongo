@@ -67,6 +67,8 @@ public:
         using pointer = pointer_type;
         using reference = reference_type;
 
+        store_iterator() = default;
+
         store_iterator& operator++() {
             ++this->iter;
             return *this;
@@ -293,5 +295,7 @@ public:
         return typename iterator::difference_type(std::distance(iter1.iter, iter2.iter));
     };
 };
+
+using StringStore = Store<std::string, std::string>;
 }
 }

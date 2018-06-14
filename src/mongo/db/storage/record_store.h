@@ -144,7 +144,7 @@ public:
 
     /**
      * Moves forward and returns the new data or boost::none if there is no more data.
-     * Continues returning boost::none once it reaches EOF.
+     * Continues returning boost::none once it reaches EOF unlike stl iterators.
      */
     virtual boost::optional<Record> next() = 0;
 
@@ -164,9 +164,10 @@ public:
     /**
      * Recovers from potential state changes in underlying data.
      *
-     * Returns false if it is invalid to continue using this iterator. This usually means that
-     * capped deletes have caught up to the position of this iterator and continuing could
-     * result in missed data.
+     * Returns false if it is invalid to continue using this Cursor. This usually means that
+     * capped deletes have caught up to the position of this Cursor and continuing could
+     * result in missed data. Note that Cursors, unlike iterators can continue to iterate past the
+     * "end"
      *
      * If the former position no longer exists, but it is safe to continue iterating, the
      * following call to next() will return the next closest position in the direction of the
@@ -440,7 +441,7 @@ public:
     /**
      * Updates the record positioned at 'loc' in-place using the deltas described by 'damages'. The
      * 'damages' vector describes contiguous ranges of 'damageSource' from which to copy and apply
-     * byte-level changes to the data.
+     * byte-level changes to the data. Behavior is undefined for calling this on a non-existant loc.
      *
      * @return the updated version of the record. If unowned data is returned, then it is valid
      * until the next modification of this Record or the lock on the collection has been released.

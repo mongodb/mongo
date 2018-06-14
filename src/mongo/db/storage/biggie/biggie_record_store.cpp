@@ -30,202 +30,399 @@
  */
 
 
-// ALERT: need to remodify db.cpp to actually create an fcv on line about 422 (!storageGlobalParams.readOnly && (storageGlobalParams.engine != "devnull");)
+// ALERT: need to remodify db.cpp to actually create an fcv on line about 422.
+// (!storageGlobalParams.readOnly && (storageGlobalParams.engine != "devnull");)
 // once this stuff actually gets implemented!!!
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/db/storage/biggie/biggie_record_store.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/biggie/biggie_store.h"
-#include "mongo/db/storage/biggie/store.h"
-#include "mongo/stdx/memory.h"
 
 #include <cstring>
+#include <iomanip>
 #include <memory>
+#include <sstream>
 #include <utility>
 
-// #include "mongo/db/jsobj.h"
-// #include "mongo/db/namespace_string.h"
-// #inclu de "mongo/db/storage/oplog_hack.h"
-// #include "mongo/db/storage/recovery_unit.h"
-// #include "mongo/util/log.h"
-// #include "mongo/util/mongoutils/str.h"
-// #include "mongo/util/unowned_ptr.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/biggie/biggie_recovery_unit.h"
+#include "mongo/db/storage/biggie/store.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+namespace biggie {
+namespace {
+std::string fixedLengthInt(int64_t i) {
+    std::ostringstream ostr;
+    if (i < 0) {
+        ostr << '-';
+    }
+    ostr << std::setfill('0') << std::setw(10) << (i < 0 ? -i : i);
+    return ostr.str();
+}
 
-BiggieRecordStore::BiggieRecordStore(StringData ns,
-                                     std::shared_ptr<BiggieStore> data,
-                                     bool isCapped,
-                                     int64_t cappedMaxSize,
-                                     int64_t cappedMaxDocs,
-                                     CappedCallback* cappedCallback)
-    : RecordStore(ns),
-      _data(data),
+StringStore* getRecoveryUnitBranch_forking(OperationContext* opCtx) {
+    RecoveryUnit* biggieRCU = checked_cast<RecoveryUnit*>(opCtx->recoveryUnit());
+    invariant(biggieRCU);
+    biggieRCU->forkIfNeeded();
+    return biggieRCU->getWorkingCopy();
+}
+}
+RecordStore::RecordStore(StringData ns,
+                         StringData ident,
+                         bool isCapped,
+                         int64_t cappedMaxSize,
+                         int64_t cappedMaxDocs,
+                         CappedCallback* cappedCallback)
+    : mongo::RecordStore(ns),
       _isCapped(isCapped),
       _cappedMaxSize(cappedMaxSize),
       _cappedMaxDocs(cappedMaxDocs),
+      _prefix(ident.toString().append(1, '\0')),
+      _postfix(ident.toString().append(1, ('\0' + 1))),
       _cappedCallback(cappedCallback) {
-        _dummy = BSON("_id" << 1);
-    }
+    _dummy = BSON("_id" << 1);
+}
 
-const char* BiggieRecordStore::name() const {
+const char* RecordStore::name() const {
     return "biggie";
 }
 
-long long BiggieRecordStore::dataSize(OperationContext* opCtx) const {
-    // TODO: Understand what this should return
-    return -1;
+const std::string& RecordStore::getIdent() const {
+    return _prefix;  // TODO: will change in SERVER-35949
 }
 
-long long BiggieRecordStore::numRecords(OperationContext* opCtx) const {
-    // TODO: Return a real answer here
-    return 0; //// (long long)_data->size();
+long long RecordStore::dataSize(OperationContext* opCtx) const {
+    const StringStore* str = getRecoveryUnitBranch_forking(opCtx);
+    size_t totalSize = 0;
+    StringStore::const_iterator it = str->lower_bound(_prefix);
+    StringStore::const_iterator end = str->upper_bound(_postfix);
+    while (it != end) {
+        totalSize += it->second.length();
+        ++it;
+    }
+    return totalSize;
 }
 
-bool BiggieRecordStore::isCapped() const {
+
+long long RecordStore::numRecords(OperationContext* opCtx) const {
+    StringStore* str = getRecoveryUnitBranch_forking(opCtx);
+    return str->distance(str->lower_bound(_prefix), str->upper_bound(_postfix));
+}
+
+bool RecordStore::isCapped() const {
     return _isCapped;
 }
-int64_t BiggieRecordStore::storageSize(OperationContext* opCtx,
-                                       BSONObjBuilder* extraInfo,
-                                       int infoLevel) const {
-    return 100;  //? Is this implemented here, or by BiggieStore
+
+int64_t RecordStore::storageSize(OperationContext* opCtx,
+                                 BSONObjBuilder* extraInfo,
+                                 int infoLevel) const {
+    return dataSize(opCtx);
 }
 
-RecordData BiggieRecordStore::dataFor(OperationContext* opCtx, const RecordId& loc) const {
-    // TODO : needs to be changed
-    return RecordData(_dummy.objdata(), _dummy.objsize());
+RecordData RecordStore::dataFor(OperationContext* opCtx, const RecordId& loc) const {
+    RecordData rd;
+    invariant(findRecord(opCtx, loc, &rd));
+    return rd;
 }
 
-bool BiggieRecordStore::findRecord(OperationContext* opCtx,
-                                   const RecordId& loc,
-                                   RecordData* rd) const {
-    // TODO: We should probably find a record
-    // can't do this without a find
-    // Key key(&(loc.repr()), 8);
-    return false;
-}
-void BiggieRecordStore::deleteRecord(OperationContext* opCtx, const RecordId&) {
-    // TODO: need to iterate through our store and delete the record
-    return;
+bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const {
+    std::string key = std::string(_prefix).append(fixedLengthInt(loc.repr()));
+    const StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore::const_iterator it = workingCopy->find(key);
+    if (it == workingCopy->end()) {
+        return false;
+    }
+    *rd = RecordData(it->second.c_str(), it->second.length());
+    return true;
 }
 
-StatusWith<RecordId> BiggieRecordStore::insertRecord(
-    OperationContext* opCtx, const char* data, int len, Timestamp, bool enforceQuota) {
-    size_t num_chunks = 64 / sizeof(uint8_t);
-    uint8_t* key_ptr = (uint8_t*)std::malloc(num_chunks);
-    uint64_t thisRecordId = ++nextRecordId;
-    std::memcpy(key_ptr, &thisRecordId, num_chunks);
+void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
+    std::string key = std::string(_prefix).append(fixedLengthInt(dl.repr()));
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    auto numElementsRemoved = workingCopy->erase(key);
+    invariant(numElementsRemoved == 1);
+}
 
-    Key key(key_ptr, num_chunks);
-    Store::Value v(key, std::string(data, len));
-    // _data->insert(std::move(v));
-
+StatusWith<RecordId> RecordStore::insertRecord(OperationContext* opCtx,
+                                               const char* data,
+                                               int len,
+                                               Timestamp) {
+    int64_t thisRecordId = nextRecordId();
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    std::string key = std::string(_prefix).append(fixedLengthInt(thisRecordId));
+    StringStore::value_type vt{key, std::string(data, len)};
+    workingCopy->insert(std::move(vt));
     RecordId rID(thisRecordId);
     return StatusWith<RecordId>(rID);
 }
 
-Status BiggieRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
-                                                     const DocWriter* const* docs,
-                                                     const Timestamp*,
-                                                     size_t nDocs,
-                                                     RecordId* idsOut) {
-    // TODO: Implement
+Status RecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
+                                               const DocWriter* const* docs,
+                                               const Timestamp*,
+                                               size_t nDocs,
+                                               RecordId* idsOut) {
+    // TODO : make this an actual optimization
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    for (size_t i = 0; i < nDocs; i++) {
+        int64_t thisRecordId = nextRecordId();
+        std::string key = std::string(_prefix).append(fixedLengthInt(thisRecordId));
+        const size_t len = docs[i]->documentSize();
+        StringStore::value_type vt{key, std::string(len, '\0')};
+        // TODO: change to .data() in c++17 once that is in the codebase
+        docs[i]->writeDocument(&vt.second[0]);
+        workingCopy->insert(std::move(vt));
+        idsOut[i] = RecordId(thisRecordId);
+    }
     return Status::OK();
 }
 
-Status BiggieRecordStore::updateRecord(OperationContext* opCtx,
-                                       const RecordId& oldLocation,
-                                       const char* data,
-                                       int len,
-                                       bool enforceQuota,
-                                       UpdateNotifier* notifier) {
-    // TODO Implement
+Status RecordStore::updateRecord(OperationContext* opCtx,
+                                 const RecordId& oldLocation,
+                                 const char* data,
+                                 int len,
+                                 UpdateNotifier* notifier) {
+    std::string key = std::string(_prefix).append(fixedLengthInt(oldLocation.repr()));
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore::iterator it = workingCopy->find(key);
+    invariant(it != workingCopy->end());
+    it->second = std::string(data, len);
     return Status::OK();
 }
 
-bool BiggieRecordStore::updateWithDamagesSupported() const {
-    // TODO : Implement
+bool RecordStore::updateWithDamagesSupported() const {
+    // TODO : Implement.
     return false;
 }
 
-StatusWith<RecordData> BiggieRecordStore::updateWithDamages(
-    OperationContext* opCtx,
-    const RecordId& loc,
-    const RecordData& oldRec,
-    const char* damageSource,
-    const mutablebson::DamageVector& damages) {
-    // TODO: Implement
+StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
+                                                      const RecordId& loc,
+                                                      const RecordData& oldRec,
+                                                      const char* damageSource,
+                                                      const mutablebson::DamageVector& damages) {
+    // TODO: Implement.
     return StatusWith<RecordData>(oldRec);
 }
 
-std::unique_ptr<SeekableRecordCursor> BiggieRecordStore::getCursor(OperationContext* opCtx,
-                                                                   bool forward) const {
-    // TODO : implement
-    return std::make_unique<Cursor>(opCtx, *this);
+std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* opCtx,
+                                                             bool forward) const {
+    if (forward)
+        return std::make_unique<Cursor>(opCtx, *this);
+    return std::make_unique<ReverseCursor>(opCtx, *this);
 }
 
-Status BiggieRecordStore::truncate(OperationContext* opCtx) {
-    // TODO : implement
+Status RecordStore::truncate(OperationContext* opCtx) {
+    StringStore* str = getRecoveryUnitBranch_forking(opCtx);
+    StringStore::iterator it = str->lower_bound(_prefix);
+    StringStore::iterator end = str->upper_bound(_postfix);
+    std::vector<std::string> keysToErase;
+    while (it != end) {
+        keysToErase.push_back(it->first);
+        ++it;
+    }
+    for (auto k : keysToErase) {
+        str->erase(k);
+    }
     return Status::OK();
 }
 
-void BiggieRecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
-    // TODO : implement
+void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
+    // TODO : implement.
 }
 
-Status BiggieRecordStore::validate(OperationContext* opCtx,
-                                   ValidateCmdLevel level,
-                                   ValidateAdaptor* adaptor,
-                                   ValidateResults* results,
-                                   BSONObjBuilder* output) {
-    // TODO : implement
+Status RecordStore::validate(OperationContext* opCtx,
+                             ValidateCmdLevel level,
+                             ValidateAdaptor* adaptor,
+                             ValidateResults* results,
+                             BSONObjBuilder* output) {
+    results->valid = true;
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    auto it = workingCopy->lower_bound(_prefix);
+    auto end = workingCopy->upper_bound(_postfix);
+    size_t distance = workingCopy->distance(it, end);
+    for (size_t i = 0; i < distance; i++) {
+        std::string rec = it->second;
+        size_t dataSize;
+        RecordId rid;
+        rid = RecordId(extractRecordId(it->first));
+        RecordData rd = RecordData(rec.c_str(), rec.length() - 1);
+        const Status status = adaptor->validate(rid, rd, &dataSize);
+        if (!status.isOK()) {
+            if (results->valid) {
+                results->errors.push_back("detected one or more invalid documents (see logs)");
+            }
+            results->valid = false;
+            log() << "Invalid object detected in " << _prefix << " with id" << std::to_string(i)
+                  << ": " << status.reason();
+        }
+        ++it;
+    }
+    output->appendNumber("nrecords", distance);
     return Status::OK();
 }
 
-void BiggieRecordStore::appendCustomStats(OperationContext* opCtx,
-                                          BSONObjBuilder* result,
-                                          double scale) const {
-    // TODO: Implement
+void RecordStore::appendCustomStats(OperationContext* opCtx,
+                                    BSONObjBuilder* result,
+                                    double scale) const {
+    // TODO: Implement.
 }
 
-Status BiggieRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
-    // TODO : implement
+Status RecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
+    // TODO : implement.
     return Status::OK();
 }
 
-void BiggieRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
-    // TODO : implement
+void RecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
+    // TODO : implement.
 }
 
-void BiggieRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
-                                               long long numRecords,
-                                               long long dataSize) {
-    // TODO: Implement
+void RecordStore::updateStatsAfterRepair(OperationContext* opCtx,
+                                         long long numRecords,
+                                         long long dataSize) {
+    // TODO: Implement.
 }
 
+RecordStore::Cursor::Cursor(OperationContext* opCtx, const RecordStore& rs) : opCtx(opCtx) {
+    _savedPosition = boost::none;
+    _prefix = rs._prefix;
+    _postfix = rs._postfix;
+}
 
-BiggieRecordStore::Cursor::Cursor(OperationContext* opCtx, const BiggieRecordStore& rs) {}
+boost::optional<Record> RecordStore::Cursor::next() {
+    _savedPosition = boost::none;
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    if (_needFirstSeek) {
+        _needFirstSeek = false;
+        it = workingCopy->lower_bound(_prefix);
+    } else if (it != workingCopy->end()) {
+        ++it;
+    } else {
+        return boost::none;
+    }
 
-boost::optional<Record> BiggieRecordStore::Cursor::next() {
+    if (it != workingCopy->end() && inPrefix(it->first)) {
+        _savedPosition = it->first;
+        Record nextRecord;
+        nextRecord.id = RecordId(extractRecordId(it->first));
+        nextRecord.data = RecordData(it->second.c_str(), it->second.length());
+        return nextRecord;
+    }
     return boost::none;
 }
 
-boost::optional<Record> BiggieRecordStore::Cursor::seekExact(const RecordId& id) {
+boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
+    _needFirstSeek = false;
+    _savedPosition = boost::none;
+    std::string key = std::string(_prefix).append(fixedLengthInt(id.repr()));
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    it = workingCopy->find(key);
+    if (it == workingCopy->end() || !inPrefix(it->first)) {
+        return boost::none;
+    }
+    _savedPosition = it->first;
+    return Record{id, RecordData(it->second.c_str(), it->second.length())};
+}
+
+void RecordStore::Cursor::save() {}
+
+void RecordStore::Cursor::saveUnpositioned() {}
+
+bool RecordStore::Cursor::restore() {
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    it = (_savedPosition) ? workingCopy->find(_savedPosition.value()) : workingCopy->end();
+    return true;
+}
+
+void RecordStore::Cursor::detachFromOperationContext() {
+    invariant(opCtx != nullptr);
+    opCtx = nullptr;
+}
+
+void RecordStore::Cursor::reattachToOperationContext(OperationContext* opCtx) {
+    invariant(opCtx != nullptr);
+    this->opCtx = opCtx;
+}
+
+bool RecordStore::Cursor::inPrefix(const std::string& key_string) {
+    return (key_string > _prefix) && (key_string < _postfix);
+}
+
+// Reverse Cursor
+RecordStore::ReverseCursor::ReverseCursor(OperationContext* opCtx, const RecordStore& rs)
+    : opCtx(opCtx) {
+    _savedPosition = boost::none;
+    _prefix = rs._prefix;
+    _postfix = rs._postfix;
+}
+
+boost::optional<Record> RecordStore::ReverseCursor::next() {
+    _savedPosition = boost::none;
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    if (_needFirstSeek) {
+        _needFirstSeek = false;
+        it = StringStore::reverse_iterator(workingCopy->upper_bound(_postfix));
+    } else if (it != workingCopy->rend()) {
+        ++it;
+    } else {
+        return boost::none;
+    }
+
+    if (it != workingCopy->rend() && inPrefix(it->first)) {
+        _savedPosition = it->first;
+        Record nextRecord;
+        nextRecord.id = RecordId(extractRecordId(it->first));
+        nextRecord.data = RecordData(it->second.c_str(), it->second.length());
+        return nextRecord;
+    }
     return boost::none;
 }
 
-void BiggieRecordStore::Cursor::save() {}
-
-void BiggieRecordStore::Cursor::saveUnpositioned() {}
-
-bool BiggieRecordStore::Cursor::restore() {
-    return false;
+boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id) {
+    _needFirstSeek = false;
+    _savedPosition = boost::none;
+    std::string key = std::string(_prefix).append(fixedLengthInt(id.repr()));
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    StringStore::iterator canFind = workingCopy->find(key);
+    if (canFind == workingCopy->end() || !inPrefix(canFind->first)) {
+        it = workingCopy->rend();
+        return boost::none;
+    }
+    it = StringStore::reverse_iterator(++canFind);  // reverse iterator returns item 1 before
+    _savedPosition = it->first;
+    return Record{id, RecordData(it->second.c_str(), it->second.length())};
 }
 
-void BiggieRecordStore::Cursor::detachFromOperationContext() {}
-void BiggieRecordStore::Cursor::reattachToOperationContext(OperationContext* opCtx) {}
+void RecordStore::ReverseCursor::save() {}
 
+void RecordStore::ReverseCursor::saveUnpositioned() {}
 
+bool RecordStore::ReverseCursor::restore() {
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    it = _savedPosition
+        ? StringStore::reverse_iterator(workingCopy->upper_bound(_savedPosition.value()))
+        : workingCopy->rend();
+    return true;
+}
+
+void RecordStore::ReverseCursor::detachFromOperationContext() {
+    invariant(opCtx != nullptr);
+    opCtx = nullptr;
+}
+
+void RecordStore::ReverseCursor::reattachToOperationContext(OperationContext* opCtx) {
+    invariant(opCtx != nullptr);
+    this->opCtx = opCtx;
+}
+
+bool RecordStore::ReverseCursor::inPrefix(const std::string& key_string) {
+    return (key_string > _prefix) && (key_string < _postfix);
+}
+
+int64_t RecordStore::extractRecordId(const std::string& keyString) {
+    size_t pos = keyString.find('\0');
+    return std::stol(keyString.substr(pos + 1));
+}
+
+}  // namespace biggie
 }  // namespace mongo

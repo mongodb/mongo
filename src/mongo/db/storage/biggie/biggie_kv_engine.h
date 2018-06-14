@@ -29,48 +29,41 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
+#include <set>
 
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/biggie/biggie_record_store.h"
 #include "mongo/db/storage/biggie/biggie_sorted_impl.h"
+#include "mongo/db/storage/biggie/store.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 
 namespace mongo {
-
+namespace biggie {
 class JournalListener;
-
 /**
  * The biggie storage engine is intended for unit and performance testing.
  */
-class BiggieKVEngine : public KVEngine {
-    std::shared_ptr<BiggieStore> _store; //ALL our data
+class KVEngine : public ::mongo::KVEngine {
+    std::shared_ptr<StringStore> _master = std::make_shared<StringStore>();
+    std::set<StringData> _idents;  // TODO : replace with a query to _master.
+    mutable stdx::mutex _masterLock;
+
 public:
+    KVEngine() : ::mongo::KVEngine() {}
 
-    BiggieKVEngine() : KVEngine() {}
-   
-    virtual ~BiggieKVEngine() {}
+    virtual ~KVEngine() {}
 
-    virtual RecoveryUnit* newRecoveryUnit() {
-        return new RecoveryUnitNoop();
-    }
+    virtual mongo::RecoveryUnit* newRecoveryUnit();
 
     virtual Status createRecordStore(OperationContext* opCtx,
                                      StringData ns,
                                      StringData ident,
-                                     const CollectionOptions& options) {
-        // TODO: implement
-        return Status::OK();
-    }
+                                     const CollectionOptions& options);
 
-    virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
-                                                        StringData ns,
-                                                        StringData ident,
-                                                        const CollectionOptions& options) {
-        // The engine passes it a new RecordStore based on the single instance
-        // of the underlying data structure
-        // why is this a unique pointer
-        return std::make_unique<BiggieRecordStore>(ns, _store); // TODO deal with ident, options
-    }
+    virtual std::unique_ptr<::mongo::RecordStore> getRecordStore(OperationContext* opCtx,
+                                                                 StringData ns,
+                                                                 StringData ident,
+                                                                 const CollectionOptions& options);
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
@@ -78,10 +71,10 @@ public:
         return Status::OK();
     }
 
-    virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                        StringData ident,
-                                                        const IndexDescriptor* desc) {
-        return new BiggieSortedImpl(); // TODO : implement later                                                            
+    virtual mongo::SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
+                                                               StringData ident,
+                                                               const IndexDescriptor* desc) {
+        return new SortedDataInterface();  // TODO : implement later.
     }
 
     virtual Status dropIdent(OperationContext* opCtx, StringData ident) {
@@ -89,19 +82,19 @@ public:
     }
 
     virtual bool supportsDocLocking() const {
-        return true;
+        return false;  // TODO : do this later.
     }
 
     virtual bool supportsDirectoryPerDB() const {
-        return false;
+        return false;  // TODO : do this later.
     }
 
     virtual bool supportsCappedCollections() const {
-        return false;
+        return false;  // TODO : do this later.
     }
 
     /**
-     * biggie does no journaling, so don't report the engine as durable.
+     * Biggie does not write to disk.
      */
     virtual bool isDurable() const {
         return false;
@@ -111,12 +104,14 @@ public:
         return true;
     }
 
-    virtual bool isCacheUnderPressure(OperationContext* opCtx) const override;
+    virtual bool isCacheUnderPressure(OperationContext* opCtx) const override {
+        return false;
+    }
 
     virtual void setCachePressureForTest(int pressure) override;
 
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) {
-        return 1;
+        return 1;  // TODO : implement.
     }
 
     virtual Status repairIdent(OperationContext* opCtx, StringData ident) {
@@ -133,10 +128,28 @@ public:
 
     virtual void cleanShutdown(){};
 
-    void setJournalListener(JournalListener* jl) final {}
+    void setJournalListener(mongo::JournalListener* jl) final {}
 
     virtual Timestamp getAllCommittedTimestamp() const override {
         return Timestamp();
+    }
+
+    // Biggie Specific
+
+    /**
+     * Used to replace the master branch of the store with an updated copy.
+     * Appropriate lock must be taken externally.
+     */
+    // TODO: should possibly check store version numbers before setting.
+    void setMaster_inlock(std::unique_ptr<StringStore> newMaster);
+
+    std::shared_ptr<StringStore> getMaster() const;
+    std::shared_ptr<StringStore> getMaster_inlock() const;
+    /**
+     * Get the lock around the master branch.
+     */
+    stdx::mutex& getMasterLock() {
+        return _masterLock;
     }
 
 private:
@@ -146,4 +159,5 @@ private:
 
     BSONObj _dummy;
 };
-}
+}  // namespace biggie
+}  // namespace mongo

@@ -30,57 +30,58 @@
 
 #pragma once
 
+#include <atomic>
 #include <boost/shared_array.hpp>
 #include <map>
 
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/storage/biggie/biggie_store.h"
+#include "mongo/db/storage/biggie/store.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
-
+namespace biggie {
 /**
  * A RecordStore that stores all data in-memory.
- *
- * @param cappedMaxSize - required if isCapped. limit uses dataSize() in this impl.
  */
-class BiggieRecordStore : public RecordStore {
-    std::shared_ptr<BiggieStore> _data;
+class RecordStore : public ::mongo::RecordStore {
     const bool _isCapped;
     const int64_t _cappedMaxSize;
     const int64_t _cappedMaxDocs;
+    std::string _prefix;
+    std::string _postfix;
     CappedCallback* _cappedCallback;
-    
-
 
 public:
-    explicit BiggieRecordStore(StringData ns,
-                                         std::shared_ptr<BiggieStore> data,
-                                         bool isCapped = false,
-                                         int64_t cappedMaxSize = -1,
-                                         int64_t cappedMaxDocs = -1,
-                                         CappedCallback* cappedCallback = nullptr);
+    explicit RecordStore(StringData ns,
+                         StringData ident,
+                         bool isCapped = false,
+                         int64_t cappedMaxSize = -1,
+                         int64_t cappedMaxDocs = -1,
+                         CappedCallback* cappedCallback = nullptr);
 
     virtual const char* name() const;
-
-    virtual long long dataSize(OperationContext* opCtx) const; 
+    virtual const std::string& getIdent() const;
+    virtual long long dataSize(OperationContext* opCtx) const;
     virtual long long numRecords(OperationContext* opCtx) const;
     virtual bool isCapped() const;
     virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = NULL,
                                 int infoLevel = 0) const;
-    
+
     virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const;
 
     virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const;
 
     virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl);
 
-    virtual StatusWith<RecordId> insertRecord(
-        OperationContext* opCtx, const char* data, int len, Timestamp, bool enforceQuota);
-    
+    virtual StatusWith<RecordId> insertRecord(OperationContext* opCtx,
+                                              const char* data,
+                                              int len,
+                                              Timestamp);
+
 
     virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                               const DocWriter* const* docs,
@@ -92,7 +93,6 @@ public:
                                 const RecordId& oldLocation,
                                 const char* data,
                                 int len,
-                                bool enforceQuota,
                                 UpdateNotifier* notifier);
 
     virtual bool updateWithDamagesSupported() const;
@@ -122,60 +122,34 @@ public:
 
     virtual Status touch(OperationContext* opCtx, BSONObjBuilder* output) const;
 
-    // Use default implementation which returns boost::none
-    // virtual boost::optional<RecordId> oplogStartHack(OperationContext* opCtx, const RecordId& startingPosition) const;
-
-    // virtual void increaseStorageSize(OperationContext* opCtx, int size, bool enforceQuota);
-
-
-
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const;
 
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize);
 
-protected:
-    uint64_t nextRecordId = 0; //TODO: make atomic for thread safety
-    // struct BiggieRecord {
-    //     BiggieRecord() : size(0) {}
-    //     BiggieRecord(int size) : size(size), data(new char[size]) {}
-
-    //     RecordData toRecordData() const {
-    //         return RecordData(data.get(), size);
-    //     }
-
-    //     int size;
-    //     boost::shared_array<char> data;
-    // };
-
-    // virtual const BiggieRecord* recordFor(const RecordId& loc) const;
-    // virtual BiggieRecord* recordFor(const RecordId& loc);
-
-// public:
-//     //
-//     // Not in RecordStore interface
-//     //
-
-//     typedef std::map<RecordId, BiggieRecord> Records;
-
-//     bool isCapped() const {
-//         return _isCapped;
-//     }
-//     void setCappedCallback(CappedCallback* cb) {
-//         _cappedCallback = cb;
-//     }
-
 private:
-    // TODO : needs to be changed
+    static int64_t extractRecordId(const std::string& keyString);
     BSONObj _dummy;
-//     class InsertChange;
-//     class RemoveChange;
-//     class TruncateChange;
+    AtomicInt64 _highest_record_id{1};
 
+    std::string generateKey(const uint8_t* key, size_t key_len) const;
+    /*
+     * This gets the next (guaranteed) unique record id.
+     */
+    inline int64_t nextRecordId() {
+        return _highest_record_id.fetchAndAdd(1);
+    }
     class Cursor final : public SeekableRecordCursor {
+        OperationContext* opCtx;
+        std::string _prefix;
+        std::string _postfix;
+        StringStore::iterator it;
+        boost::optional<std::string> _savedPosition;
+        bool _needFirstSeek{true};
+
     public:
-        Cursor(OperationContext* opCtx, const BiggieRecordStore& rs);
+        Cursor(OperationContext* opCtx, const RecordStore& rs);
         boost::optional<Record> next() final;
         boost::optional<Record> seekExact(const RecordId& id) final override;
         void save() final;
@@ -183,32 +157,31 @@ private:
         bool restore() final;
         void detachFromOperationContext() final;
         void reattachToOperationContext(OperationContext* opCtx) final;
+
+    private:
+        bool inPrefix(const std::string& key_string);
     };
-//     class ReverseCursor;
+    class ReverseCursor final : public SeekableRecordCursor {
+        OperationContext* opCtx;
+        std::string _prefix;
+        std::string _postfix;
+        StringStore::reverse_iterator it;
+        boost::optional<std::string> _savedPosition;
+        bool _needFirstSeek{true};
 
-//     StatusWith<RecordId> extractAndCheckLocForOplog(const char* data, int len) const;
+    public:
+        ReverseCursor(OperationContext* opCtx, const RecordStore& rs);
+        boost::optional<Record> next() final;
+        boost::optional<Record> seekExact(const RecordId& id) final override;
+        void save() final;
+        void saveUnpositioned() final override;
+        bool restore() final;
+        void detachFromOperationContext() final;
+        void reattachToOperationContext(OperationContext* opCtx) final;
 
-//     RecordId allocateLoc();
-//     bool cappedAndNeedDelete_inlock(OperationContext* opCtx) const;
-//     void cappedDeleteAsNeeded_inlock(OperationContext* opCtx);
-//     void deleteRecord_inlock(OperationContext* opCtx, const RecordId& dl);
-
-//     // TODO figure out a proper solution to metadata
-
-
-//     // This is the "persistent" data.
-//     struct Data {
-//         Data(StringData ns, bool isOplog)
-//             : dataSize(0), recordsMutex(), nextId(1), isOplog(isOplog) {}
-
-//         int64_t dataSize;
-//         stdx::recursive_mutex recordsMutex;
-//         Records records;
-//         int64_t nextId;
-//         const bool isOplog;
-//     };
-
-//     Data* const _data;
+    private:
+        bool inPrefix(const std::string& key_string);
+    };
 };
-
+}  // namespace biggie
 }  // namespace mongo
