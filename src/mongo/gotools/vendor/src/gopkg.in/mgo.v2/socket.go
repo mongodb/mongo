@@ -497,7 +497,12 @@ func (socket *mongoSocket) Query(ops ...interface{}) (err error) {
 		for i := 0; i != requestCount; i++ {
 			request := &requests[i]
 			if request.replyFunc != nil {
-				request.replyFunc(dead, nil, -1, nil)
+				// replyFunc expects to be called in socket.readLoop in a
+				// separate goroutine.  We do the same here to preserve
+				// synchronization expectations and avoid deadlocks.
+				go func() {
+					request.replyFunc(dead, nil, -1, nil)
+				}()
 			}
 		}
 		return dead
