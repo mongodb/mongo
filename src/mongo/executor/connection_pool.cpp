@@ -316,7 +316,7 @@ void ConnectionPool::shutdown() {
     for (const auto& pool : pools) {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         pool->processFailure(
-            Status(ErrorCodes::ShutdownInProgress, "Shuting down the connection pool"),
+            Status(ErrorCodes::ShutdownInProgress, "Shutting down the connection pool"),
             std::move(lk));
     }
 }
