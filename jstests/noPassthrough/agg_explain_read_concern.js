@@ -56,7 +56,7 @@
 
         let cmdRes = sessionDB.runCommand(aggCmd);
         assert.commandFailedWithCode(cmdRes, ErrorCodes.InvalidOptions, tojson(cmdRes));
-        let expectedErrStr = "aggregate command does not support non-local readConcern";
+        let expectedErrStr = "aggregate command cannot run with a readConcern other than 'local'";
         assert.neq(cmdRes.errmsg.indexOf(expectedErrStr), -1, tojson(cmdRes));
 
         cmdRes = sessionDB.runCommand(explainCmd);

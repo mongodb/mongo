@@ -329,8 +329,19 @@ Status runAggregate(OperationContext* opCtx,
     {
         const LiteParsedPipeline liteParsedPipeline(request);
 
-        // Check whether the parsed pipeline supports the given read concern.
-        liteParsedPipeline.assertSupportsReadConcern(opCtx, request.getExplain());
+        try {
+            // Check whether the parsed pipeline supports the given read concern.
+            liteParsedPipeline.assertSupportsReadConcern(opCtx, request.getExplain());
+        } catch (const DBException& ex) {
+            auto session = OperationContextSession::get(opCtx);
+            // If we are in a multi-document transaction, we intercept the 'readConcern'
+            // assertion in order to provide a more descriptive error message and code.
+            if (session && session->inMultiDocumentTransaction()) {
+                return {ErrorCodes::OperationNotSupportedInTransaction,
+                        ex.toStatus("Operation not permitted in transaction").reason()};
+            }
+            return ex.toStatus();
+        }
 
         if (liteParsedPipeline.hasChangeStream()) {
             nss = NamespaceString::kRsOplogNamespace;

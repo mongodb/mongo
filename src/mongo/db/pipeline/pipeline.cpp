@@ -232,7 +232,7 @@ void Pipeline::validateCommon() const {
                 !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inMongos));
 
         if (pCtx->inMultiDocumentTransaction) {
-            uassert(50742,
+            uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     str::stream() << "Stage not supported inside of a multi-document transaction: "
                                   << stage->getSourceName(),
                     constraints.isAllowedInTransaction());

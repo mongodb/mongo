@@ -2457,7 +2457,7 @@ TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalInTransact
     auto illegalStage = DocumentSourceDisallowedInTransactions::create();
     auto pipeline = Pipeline::create({matchStage, illegalStage}, ctx);
     ASSERT_NOT_OK(pipeline.getStatus());
-    ASSERT_EQ(pipeline.getStatus(), ErrorCodes::duplicateCodeForTest(50742));
+    ASSERT_EQ(pipeline.getStatus(), ErrorCodes::OperationNotSupportedInTransaction);
 }
 
 TEST_F(PipelineValidateTest, FacetPipelineValidatedForStagesIllegalInTransactions) {
@@ -2472,7 +2472,7 @@ TEST_F(PipelineValidateTest, FacetPipelineValidatedForStagesIllegalInTransaction
     auto illegalStage = DocumentSourceDisallowedInTransactions::create();
     auto pipeline = Pipeline::createFacetPipeline({matchStage, illegalStage}, ctx);
     ASSERT_NOT_OK(pipeline.getStatus());
-    ASSERT_EQ(pipeline.getStatus(), ErrorCodes::duplicateCodeForTest(50742));
+    ASSERT_EQ(pipeline.getStatus(), ErrorCodes::OperationNotSupportedInTransaction);
 }
 
 }  // namespace pipeline_validate

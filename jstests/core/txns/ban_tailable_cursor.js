@@ -30,7 +30,7 @@
         pipeline: [{$changeStream: {}}],
         cursor: {batchSize: 0},
     }),
-                                 ErrorCodes.InvalidOptions);
+                                 ErrorCodes.OperationNotSupportedInTransaction);
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 

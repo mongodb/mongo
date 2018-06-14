@@ -31,7 +31,8 @@
     assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
 
     session.startTransaction({writeConcern: {w: "majority"}});
-    assert.commandFailedWithCode(sessionColl.insert({_id: "doc"}), ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(sessionColl.insert({_id: "doc"}),
+                                 ErrorCodes.OperationNotSupportedInTransaction);
 
     // Committing the transaction should fail, since it should never have been started.
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
@@ -55,7 +56,7 @@
     session.startTransaction({writeConcern: {w: "majority"}});
     assert.commandFailedWithCode(
         sessionColl.update({_id: "doc"}, {$set: {updated: true}}, {upsert: true}),
-        ErrorCodes.NamespaceNotFound);
+        ErrorCodes.OperationNotSupportedInTransaction);
 
     // Committing the transaction should fail, since it should never have been started.
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
@@ -88,7 +89,7 @@
     session.startTransaction({writeConcern: {w: "majority"}});
     res = assert.throws(() => sessionColl.findAndModify(
                             {query: {_id: "doc"}, update: {$set: {updated: true}}, upsert: true}));
-    assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(res, ErrorCodes.OperationNotSupportedInTransaction);
 
     // Committing the transaction should fail, since it should never have been started.
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),

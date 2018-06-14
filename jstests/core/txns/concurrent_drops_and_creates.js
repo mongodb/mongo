@@ -39,7 +39,8 @@
     // collections in transactions. The collection drop is visible to the transaction in this way,
     // since our implementation of the in-memory collection catalog always has the most recent
     // collection metadata.
-    assert.commandFailedWithCode(sessionCollB.insert({}), ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(sessionCollB.insert({}),
+                                 ErrorCodes.OperationNotSupportedInTransaction);
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 

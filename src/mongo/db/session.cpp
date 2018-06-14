@@ -339,18 +339,18 @@ void Session::beginOrContinueTxn(OperationContext* opCtx,
 
     invariant(!opCtx->lockState()->isLocked());
 
-    uassert(50851,
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "Cannot run 'count' in a multi-document transaction. Please see "
             "http://dochub.mongodb.org/core/transaction-count for a recommended alternative.",
             !autocommit || cmdName != "count"_sd);
 
-    uassert(50767,
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
             !autocommit || txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend() ||
                 (getTestCommandsEnabled() &&
                  txnCmdForTestingWhitelist.find(cmdName) != txnCmdForTestingWhitelist.cend()));
 
-    uassert(50844,
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run command against the '" << dbName
                           << "' database in a transaction",
             !autocommit || (dbName != "config"_sd && dbName != "local"_sd &&
