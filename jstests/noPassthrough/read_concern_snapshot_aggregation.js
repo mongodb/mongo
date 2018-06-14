@@ -10,7 +10,6 @@
     const kCollName = "coll";
     const kConfigDB = "config";
     const kDBName = "test";
-    const kIllegalStageForSnapshotReadCode = 50742;
     const kWCMajority = {writeConcern: {w: "majority"}};
 
     let rst = new ReplSetTest({nodes: 1});
@@ -38,34 +37,42 @@
         assert.commandWorked(sessionDB.runCommand(cmd));
     }
 
-    // Test that $changeStream is disallowed with snapshot reads.
-    testSnapshotAggFailsWithCode(kCollName, [{$changeStream: {}}], ErrorCodes.InvalidOptions);
+    // Test that $changeStream is disallowed with transactions.
+    testSnapshotAggFailsWithCode(
+        kCollName, [{$changeStream: {}}], ErrorCodes.OperationNotSupportedInTransaction);
 
-    // Test that $collStats is disallowed with snapshot reads.
-    testSnapshotAggFailsWithCode(kCollName, [{$collStats: {}}], kIllegalStageForSnapshotReadCode);
+    // Test that $collStats is disallowed with transactions.
+    testSnapshotAggFailsWithCode(
+        kCollName, [{$collStats: {}}], ErrorCodes.OperationNotSupportedInTransaction);
 
-    // Test that $indexStats is disallowed with snapshot reads.
-    testSnapshotAggFailsWithCode(kCollName, [{$indexStats: {}}], kIllegalStageForSnapshotReadCode);
+    // Test that $indexStats is disallowed with transactions.
+    testSnapshotAggFailsWithCode(
+        kCollName, [{$indexStats: {}}], ErrorCodes.OperationNotSupportedInTransaction);
 
-    // Test that $listLocalCursors is disallowed with snapshot reads.
-    testSnapshotAggFailsWithCode(1, [{$listLocalCursors: {}}], ErrorCodes.InvalidOptions);
+    // Test that $listLocalCursors is disallowed with transactions.
+    testSnapshotAggFailsWithCode(
+        1, [{$listLocalCursors: {}}], ErrorCodes.OperationNotSupportedInTransaction);
 
-    // Test that $listLocalSessions is disallowed with snapshot reads.
-    testSnapshotAggFailsWithCode(1, [{$listLocalSessions: {}}], ErrorCodes.InvalidOptions);
+    // Test that $listLocalSessions is disallowed with transactions.
+    testSnapshotAggFailsWithCode(
+        1, [{$listLocalSessions: {}}], ErrorCodes.OperationNotSupportedInTransaction);
 
-    // Test that $out is disallowed with snapshot reads.
-    testSnapshotAggFailsWithCode(kCollName, [{$out: "out"}], ErrorCodes.InvalidOptions);
+    // Test that $out is disallowed with transactions.
+    testSnapshotAggFailsWithCode(
+        kCollName, [{$out: "out"}], ErrorCodes.OperationNotSupportedInTransaction);
 
-    // Test that $listSessions is disallowed with snapshot reads. This stage must be run against
+    // Test that $listSessions is disallowed with transactions. This stage must be run against
     // 'system.sessions' in the config database, which cannot be queried in a transaction.
     sessionDB = session.getDatabase(kConfigDB);
-    testSnapshotAggFailsWithCode("system.sessions", [{$listSessions: {}}], 50844);
+    testSnapshotAggFailsWithCode(
+        "system.sessions", [{$listSessions: {}}], ErrorCodes.OperationNotSupportedInTransaction);
 
-    // Test that $currentOp is disallowed with snapshot reads. We have to reassign 'sessionDB' to
+    // Test that $currentOp is disallowed with transactions. We have to reassign 'sessionDB' to
     // refer to the admin database, because $currentOp pipelines are required to run against
     // 'admin'. Queries against 'admin' are not permitted in a transaction.
     sessionDB = session.getDatabase(kAdminDB);
-    testSnapshotAggFailsWithCode(1, [{$currentOp: {}}], 50844);
+    testSnapshotAggFailsWithCode(
+        1, [{$currentOp: {}}], ErrorCodes.OperationNotSupportedInTransaction);
     sessionDB = session.getDatabase(kDBName);
 
     // Helper for testing that aggregation stages which involve a local and foreign collection

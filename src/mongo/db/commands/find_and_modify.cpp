@@ -463,7 +463,7 @@ public:
                 // Create the collection if it does not exist when performing an upsert because the
                 // update stage does not create its own collection
                 if (!collection && args.isUpsert()) {
-                    uassert(ErrorCodes::NamespaceNotFound,
+                    uassert(ErrorCodes::OperationNotSupportedInTransaction,
                             str::stream() << "Cannot create namespace " << nsString.ns()
                                           << " in multi-document transaction.",
                             !inTransaction);

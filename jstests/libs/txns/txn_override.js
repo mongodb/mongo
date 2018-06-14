@@ -189,10 +189,12 @@
         if (res.ok !== 1) {
             abortTransaction(conn, commandObj.lsid, txnOptions.txnNumber);
             if (kCmdsThatInsert.has(cmdNameUnwrapped)) {
-                // If the command inserted data, we check if it failed because the collection did
-                // not exist; if so, create the collection and retry the command. Tests that
-                // expect collections to not exist will have to be skipped.
-                if (res.code === ErrorCodes.NamespaceNotFound) {
+                // If the command inserted data and is not supported in a transaction, we assume it
+                // failed because the collection did not exist. We will create the collection and
+                // retry the command. If the collection did exist, we'll return the original
+                // response because it failed for a different reason. Tests that expect collections
+                // to not exist will have to be skipped.
+                if (res.code === ErrorCodes.OperationNotSupportedInTransaction) {
                     const createCmdRes =
                         runCommandOriginal.call(conn,
                                                 dbName,

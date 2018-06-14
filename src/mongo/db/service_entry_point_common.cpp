@@ -341,6 +341,12 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* i
     }
 
     if (!invocation->supportsReadConcern(readConcernArgs.getLevel())) {
+        // We must be in a transaction if the readConcern level was upconverted to snapshot and the
+        // command must support readConcern level snapshot in order to be supported in transactions.
+        if (upconvertToSnapshot) {
+            return {ErrorCodes::OperationNotSupportedInTransaction,
+                    str::stream() << "Command is not supported in a transaction"};
+        }
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Command does not support read concern "
                               << readConcernArgs.toString()};
@@ -679,6 +685,10 @@ void execCommandDatabase(OperationContext* opCtx,
         // the Session. Do not check this if we are in DBDirectClient because the outer command is
         // responsible for checking out the Session.
         if (!opCtx->getClient()->isInDirectClient()) {
+            uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                    str::stream() << "It is illegal to run command " << command->getName()
+                                  << " in a multi-document transaction.",
+                    shouldCheckoutSession || !autocommitVal || command->getName() == "doTxn");
             uassert(50768,
                     str::stream() << "It is illegal to provide a txnNumber for command "
                                   << command->getName(),

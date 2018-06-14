@@ -125,10 +125,12 @@ public:
     void assertSupportsReadConcern(OperationContext* opCtx,
                                    boost::optional<ExplainOptions::Verbosity> explain) const {
         auto readConcern = repl::ReadConcernArgs::get(opCtx);
+
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Explain for the aggregate command "
-                                 "does not support non-local "
-                                 "readConcern levels",
+                str::stream() << "Explain for the aggregate command cannot run with a readConcern "
+                              << "other than 'local', or in a multi-document transaction. Current "
+                              << "readConcern: "
+                              << readConcern.toString(),
                 !explain || readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
 
         for (auto&& spec : _stageSpecs) {

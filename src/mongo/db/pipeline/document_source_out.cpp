@@ -223,11 +223,14 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
             str::stream() << "$out only supports a string argument, not " << typeName(elem.type()),
             elem.type() == String);
 
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            "$out cannot be used in a transaction",
+            !pExpCtx->inMultiDocumentTransaction);
+
     auto readConcernLevel = repl::ReadConcernArgs::get(pExpCtx->opCtx).getLevel();
     uassert(ErrorCodes::InvalidOptions,
-            "$out can not be used with either a 'majority' or 'snapshot' read concern level",
-            readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&
-                readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+            "$out cannot be used with a 'majority' read concern level",
+            readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern);
 
     NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + elem.str());
     uassert(17385, "Can't $out to special collection: " + elem.str(), !outputNs.isSpecial());
