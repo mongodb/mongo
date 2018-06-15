@@ -1339,7 +1339,8 @@ void throwCursorStale(DBClientCursor* cursor) {
     if (cursor->hasResultFlag(ResultFlag_ShardConfigStale)) {
         BSONObj error;
         cursor->peekError(&error);
-        uasserted(StaleConfigInfo(error), "query returned a stale config error");
+        uasserted(StaleConfigInfo::parseFromCommandError(error),
+                  "query returned a stale config error");
     }
 
     if (NamespaceString(cursor->getns()).isCommand()) {

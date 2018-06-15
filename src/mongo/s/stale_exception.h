@@ -41,8 +41,6 @@ public:
     StaleConfigInfo(NamespaceString nss, ChunkVersion received, ChunkVersion wanted)
         : _nss(std::move(nss)), _received(received), _wanted(wanted) {}
 
-    StaleConfigInfo(const BSONObj& commandError);
-
     const auto& getNss() const {
         return _nss;
     }
@@ -57,6 +55,7 @@ public:
 
     void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
+    static StaleConfigInfo parseFromCommandError(const BSONObj& commandError);
 
 private:
     NamespaceString _nss;
@@ -74,8 +73,6 @@ public:
                           boost::optional<DatabaseVersion> wanted)
         : _db(std::move(db)), _received(received), _wanted(wanted) {}
 
-    StaleDbRoutingVersion(const BSONObj& commandError);
-
     const auto& getDb() const {
         return _db;
     }
@@ -90,6 +87,7 @@ public:
 
     void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
+    static StaleDbRoutingVersion parseFromCommandError(const BSONObj& commandError);
 
 private:
     std::string _db;

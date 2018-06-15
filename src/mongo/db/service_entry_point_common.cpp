@@ -170,9 +170,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
     err.append("code", exception->code());
     if (scex) {
         err.append("ok", 0.0);
-        err.append("ns", scex->getNss().ns());
-        scex->getVersionReceived().appendLegacyWithField(&err, "vReceived");
-        scex->getVersionWanted().appendLegacyWithField(&err, "vWanted");
+        scex->serialize(&err);
     }
     BSONObj errObj = err.done();
 

@@ -36,6 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -56,12 +57,18 @@ LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
     invariant(_state == State::kCommandReply);
     if (nonOKStatus == ErrorCodes::StaleConfig) {
         _staleConfigError = true;
+        auto scex = nonOKStatus.extraInfo<StaleConfigInfo>();
+
         // Need to use the special $err format for StaleConfig errors to be backwards
         // compatible.
         BSONObjBuilder err;
+
         // $err must be the first field in object.
         err.append("$err", nonOKStatus.reason());
         err.append("code", nonOKStatus.code());
+        if (scex) {
+            scex->serialize(&err);
+        }
         err.appendElements(extraErrorInfo);
         setRawCommandReply(err.done());
     } else {

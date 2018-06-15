@@ -48,11 +48,6 @@ ChunkVersion extractOptionalVersion(const BSONObj& obj, StringData field) {
 
 }  // namespace
 
-StaleConfigInfo::StaleConfigInfo(const BSONObj& obj)
-    : StaleConfigInfo(NamespaceString(obj["ns"].type() == String ? obj["ns"].String() : ""),
-                      extractOptionalVersion(obj, "vReceived"),
-                      extractOptionalVersion(obj, "vWanted")) {}
-
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("ns", _nss.ns());
     _received.appendLegacyWithField(bob, "vReceived");
@@ -60,18 +55,14 @@ void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
-    return std::make_shared<StaleConfigInfo>(obj);
+    return std::make_shared<StaleConfigInfo>(parseFromCommandError(obj));
 }
 
-StaleDbRoutingVersion::StaleDbRoutingVersion(const BSONObj& obj)
-    : StaleDbRoutingVersion(
-          obj["db"].String(),
-          DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vReceived"),
-                                 obj["vReceived"].Obj()),
-          !obj["vWanted"].eoo()
-              ? DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vWanted"),
-                                       obj["vWanted"].Obj())
-              : boost::optional<DatabaseVersion>{}) {}
+StaleConfigInfo StaleConfigInfo::parseFromCommandError(const BSONObj& obj) {
+    return StaleConfigInfo(NamespaceString(obj["ns"].str()),
+                           extractOptionalVersion(obj, "vReceived"),
+                           extractOptionalVersion(obj, "vWanted"));
+}
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
     bob->append("db", _db);
@@ -82,7 +73,18 @@ void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleDbRoutingVersion::parse(const BSONObj& obj) {
-    return std::make_shared<StaleDbRoutingVersion>(obj);
+    return std::make_shared<StaleDbRoutingVersion>(parseFromCommandError(obj));
+}
+
+StaleDbRoutingVersion StaleDbRoutingVersion::parseFromCommandError(const BSONObj& obj) {
+    return StaleDbRoutingVersion(
+        obj["db"].String(),
+        DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vReceived"),
+                               obj["vReceived"].Obj()),
+        !obj["vWanted"].eoo()
+            ? DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vWanted"),
+                                     obj["vWanted"].Obj())
+            : boost::optional<DatabaseVersion>{});
 }
 
 }  // namespace mongo

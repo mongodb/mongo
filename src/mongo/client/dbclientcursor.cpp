@@ -340,7 +340,7 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
     if (qr.getResultFlags() & ResultFlag_ShardConfigStale) {
         BSONObj error;
         verify(peekError(&error));
-        uasserted(StaleConfigInfo(error), "stale config on lazy receive");
+        uasserted(StaleConfigInfo::parseFromCommandError(error), "stale config on lazy receive");
     }
 
     /* this assert would fire the way we currently work:
