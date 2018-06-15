@@ -37,6 +37,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
@@ -77,32 +78,43 @@ public:
             return false;
         }
 
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
+        const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
 
         try {
-            AutoGetDb autoDb(&opCtx, _ns.db(), MODE_IX);
-            Database* db = autoDb.getDb();
-            if (!db) {
-                LOG(2) << "no local database yet";
-                return false;
+            // A Global IX lock should be good enough to protect the oplog truncation from
+            // interruptions such as restartCatalog. PBWM, database lock or collection lock is not
+            // needed. This improves concurrency if oplog truncation takes long time.
+            ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+                opCtx.get()->lockState());
+            Lock::GlobalLock lk(opCtx.get(), MODE_IX);
+
+            WiredTigerRecordStore* rs = nullptr;
+            {
+                // Release the database lock right away because we don't want to
+                // block other operations on the local database and given the
+                // fact that oplog collection is so special, Global IX lock can
+                // make sure the collection exists.
+                Lock::DBLock dbLock(opCtx.get(), _ns.db(), MODE_IX);
+                Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx.get(), _ns.db());
+                if (!db) {
+                    LOG(2) << "no local database yet";
+                    return false;
+                }
+                // We need to hold the database lock while getting the collection. Otherwise a
+                // concurrent collection creation would write to the map in the Database object
+                // while we concurrently read the map.
+                Collection* collection = db->getCollection(opCtx.get(), _ns);
+                if (!collection) {
+                    LOG(2) << "no collection " << _ns;
+                    return false;
+                }
+                rs = checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
             }
 
-            Lock::CollectionLock collectionLock(opCtx.lockState(), _ns.ns(), MODE_IX);
-            Collection* collection = db->getCollection(&opCtx, _ns);
-            if (!collection) {
-                LOG(2) << "no collection " << _ns;
-                return false;
-            }
-
-            OldClientContext ctx(&opCtx, _ns.ns(), false);
-            WiredTigerRecordStore* rs =
-                checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
-
-            if (!rs->yieldAndAwaitOplogDeletionRequest(&opCtx)) {
+            if (!rs->yieldAndAwaitOplogDeletionRequest(opCtx.get())) {
                 return false;  // Oplog went away.
             }
-            rs->reclaimOplog(&opCtx);
+            rs->reclaimOplog(opCtx.get());
         } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
             return false;
         } catch (const std::exception& e) {
