@@ -254,16 +254,26 @@ void ReplicationCoordinatorImpl::WaiterList::add_inlock(WaiterType waiter) {
     _list.push_back(waiter);
 }
 
-void ReplicationCoordinatorImpl::WaiterList::signalAndRemoveIf_inlock(
+void ReplicationCoordinatorImpl::WaiterList::signalIf_inlock(
     stdx::function<bool(WaiterType)> func) {
-    // Only advance iterator when the element doesn't match.
     for (auto it = _list.begin(); it != _list.end();) {
         if (!func(*it)) {
+            // This element doesn't match, so we advance the iterator to the next one.
             ++it;
             continue;
         }
 
+        if (!(*it)->runs_once()) {
+            (*it)->notify_inlock();
+            // Keep the waiter on the list and let the guard remove it instead. Advance the
+            // iterator since we are skipping the removal.
+            ++it;
+            continue;
+        }
+
+        // Remove the waiter from the list if it was only meant to be notified once.
         WaiterType waiter = std::move(*it);
+
         if (it == std::prev(_list.end())) {
             // Iterator will be invalid after erasing the last element, so set it to the
             // next one (i.e. end()).
@@ -273,19 +283,15 @@ void ReplicationCoordinatorImpl::WaiterList::signalAndRemoveIf_inlock(
             std::swap(*it, _list.back());
             _list.pop_back();
         }
-
         // It's important to call notify() after the waiter has been removed from the list
         // since notify() might remove the waiter itself.
         waiter->notify_inlock();
     }
 }
 
-void ReplicationCoordinatorImpl::WaiterList::signalAndRemoveAll_inlock() {
-    std::vector<WaiterType> list = std::move(_list);
-    // Call notify() after removing the waiters from the list.
-    for (auto& waiter : list) {
-        waiter->notify_inlock();
-    }
+
+void ReplicationCoordinatorImpl::WaiterList::signalAll_inlock() {
+    this->signalIf_inlock([](Waiter* waiter) { return true; });
 }
 
 bool ReplicationCoordinatorImpl::WaiterList::remove_inlock(WaiterType waiter) {
@@ -814,8 +820,8 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
             lk.lock();
             fassert(18823, _rsConfigState != kConfigStartingUp);
         }
-        _replicationWaiterList.signalAndRemoveAll_inlock();
-        _opTimeWaiterList.signalAndRemoveAll_inlock();
+        _replicationWaiterList.signalAll_inlock();
+        _opTimeWaiterList.signalAll_inlock();
         _currentCommittedSnapshotCond.notify_all();
         _initialSyncer.swap(initialSyncerCopy);
         _stepDownWaiters.notify_all();
@@ -1116,7 +1122,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     }
 
     // Signal anyone waiting on optime changes.
-    _opTimeWaiterList.signalAndRemoveIf_inlock(
+    _opTimeWaiterList.signalIf_inlock(
         [opTime](Waiter* waiter) { return waiter->opTime <= opTime; });
 
     if (opTime.isNull()) {
@@ -2476,9 +2482,9 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
     PostMemberStateUpdateAction result;
     if (_memberState.primary() || newState.removed() || newState.rollback()) {
         // Wake up any threads blocked in awaitReplication, close connections, etc.
-        _replicationWaiterList.signalAndRemoveAll_inlock();
+        _replicationWaiterList.signalAll_inlock();
         // Wake up the optime waiter that is waiting for primary catch-up to finish.
-        _opTimeWaiterList.signalAndRemoveAll_inlock();
+        _opTimeWaiterList.signalAll_inlock();
         // If there are any pending stepdown command requests wake them up.
         _stepDownWaiters.notify_all();
 
@@ -2870,7 +2876,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
 }
 
 void ReplicationCoordinatorImpl::_wakeReadyWaiters_inlock() {
-    _replicationWaiterList.signalAndRemoveIf_inlock([this](Waiter* waiter) {
+    _replicationWaiterList.signalIf_inlock([this](Waiter* waiter) {
         return _doneWaitingForReplication_inlock(waiter->opTime, *waiter->writeConcern);
     });
 }
