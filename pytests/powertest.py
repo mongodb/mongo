@@ -1137,6 +1137,10 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
             except IOError:
                 pass
 
+        elif operation == "kill_mongod":
+            # Unconditional kill of mongod
+            ret, output = kill_mongod()
+
         elif operation == "install_mongod":
             ret, output = mongod.install(root_dir, options.tarball_url)
             LOGGER.info(output)
@@ -1263,6 +1267,16 @@ def rsync(src_dir, dest_dir, exclude_files=None):
     return ret, output
 
 
+def kill_mongod():
+    """Kill all mongod processes uncondtionally."""
+    if _IS_WINDOWS:
+        cmds = "taskkill /f /im mongod.exe"
+    else:
+        cmds = "pkill -9 mongod"
+    ret, output = execute_cmd(cmds, use_file=True)
+    return ret, output
+
+
 def internal_crash(use_sudo=False, crash_option=None):
     """Internally crash the host this excutes on."""
 
@@ -1296,12 +1310,13 @@ def internal_crash(use_sudo=False, crash_option=None):
     return 1, "Crash did not occur"
 
 
-def crash_server(  # pylint: disable=too-many-arguments
+def crash_server_or_kill_mongod(  # pylint: disable=too-many-arguments,,too-many-locals
         options, crash_canary, canary_port, local_ops, script_name, client_args):
-    """Crash server and optionally writes canary doc before crash. Return tuple (ret, output)."""
+    """Crash server or kill mongod and optionally write canary doc. Return tuple (ret, output)."""
 
     crash_wait_time = options.crash_wait_time + random.randint(0, options.crash_wait_time_jitter)
-    LOGGER.info("Crashing server in %d seconds", crash_wait_time)
+    message_prefix = "Killing mongod" if options.crash_method == "kill" else "Crashing server"
+    LOGGER.info("%s in %d seconds", message_prefix, crash_wait_time)
     time.sleep(crash_wait_time)
 
     if options.crash_method == "mpower":
@@ -1317,7 +1332,8 @@ def crash_server(  # pylint: disable=too-many-arguments
                                             ssh_connection_options=options.ssh_crash_option,
                                             shell_binary="/bin/sh")
 
-    elif options.crash_method == "internal":
+    elif options.crash_method == "internal" or options.crash_method == "kill":
+        crash_cmd = "crash_server" if options.crash_method == "internal" else "kill_mongod"
         if options.canary == "remote":
             # The crash canary function executes remotely, only if the
             # crash_method is 'internal'.
@@ -1329,8 +1345,8 @@ def crash_server(  # pylint: disable=too-many-arguments
             canary_cmd = ""
         crash_func = local_ops.shell
         crash_args = [
-            "{} {} --remoteOperation {} {} {} crash_server".format(
-                options.remote_python, script_name, client_args, canary, canary_cmd)
+            "{} {} --remoteOperation {} {} {} {}".format(options.remote_python, script_name,
+                                                         client_args, canary, canary_cmd, crash_cmd)
         ]
 
     elif options.crash_method == "aws_ec2":
@@ -1695,10 +1711,16 @@ Examples:
                             "'majority'", default=None)
 
     # Crash options
-    crash_methods = ["aws_ec2", "internal", "mpower"]
+    crash_methods = ["aws_ec2", "internal", "kill", "mpower"]
     crash_options.add_option("--crashMethod", dest="crash_method", choices=crash_methods,
-                             help="Crash methods: {} [default: '%default']".format(crash_methods),
-                             default="internal")
+                             help="Crash methods: {} [default: '%default']."
+                             " Select 'aws_ec2' to force-stop/start an AWS instance."
+                             " Select 'internal' to crash the remote server through an"
+                             " internal command, i.e., sys boot (Linux) or notmyfault (Windows)."
+                             " Select 'kill' to perform an unconditional kill of mongod,"
+                             " which will keep the remote server running."
+                             " Select 'mpower' to use the mFi mPower to cutoff power to"
+                             " the remote server.".format(crash_methods), default="internal")
 
     aws_address_types = [
         "private_ip_address", "public_ip_address", "private_dns_name", "public_dns_name"
@@ -2077,9 +2099,11 @@ Examples:
         LOGGER.error("Cannot create and validate canary documents if the mongod option"
                      " '--nojournal' is used.")
         sys.exit(1)
-    if options.canary == "remote" and options.crash_method != "internal":
+
+    internal_crash_options = ["internal", "kill"]
+    if options.canary == "remote" and options.crash_method not in internal_crash_options:
         parser.error("The option --canary can only be specified as 'remote' if --crashMethod"
-                     " is 'internal'")
+                     " is one of {}".format(internal_crash_options))
     orig_canary_doc = canary_doc = ""
     validate_canary_cmd = ""
 
@@ -2321,14 +2345,16 @@ Examples:
                 socket_timeout_ms=one_hour_ms))
             crash_canary["function"] = mongo_insert_canary
             crash_canary["args"] = [mongo, options.db_name, options.collection_name, canary_doc]
-        ret, output = crash_server(options, crash_canary, standard_port, local_ops, script_name,
-                                   client_args)
+        ret, output = crash_server_or_kill_mongod(options, crash_canary, standard_port, local_ops,
+                                                  script_name, client_args)
         # For internal crashes 'ret' is non-zero, because the ssh session unexpectedly terminates.
         if options.crash_method != "internal" and ret:
             raise Exception("Crash of server failed: {}".format(output))
-        # Wait a bit after sending command to crash the server to avoid connecting to the
-        # server before the actual crash occurs.
-        time.sleep(10)
+
+        if options.crash_method != "kill":
+            # Wait a bit after sending command to crash the server to avoid connecting to the
+            # server before the actual crash occurs.
+            time.sleep(10)
 
         # Kill any running clients and cleanup temporary files.
         Processes.kill_all()
