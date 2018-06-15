@@ -225,12 +225,17 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
         chunk.setNS(nss);
         chunk.setMin(min);
         chunk.setMax(max);
-        chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
+
+        // It's possible there are no split points or fewer split points than total number of
+        // shards, and we need to be sure that at least one chunk is placed on the primary shard.
+        auto shardId = (i == 0) ? primaryShardId : shardIds[i % shardIds.size()];
+        chunk.setShard(shardId);
+
         if (serverGlobalParams.featureCompatibility.getVersion() >=
             ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
             std::vector<ChunkHistory> initialHistory;
-            initialHistory.emplace_back(ChunkHistory(validAfter, shardIds[i % shardIds.size()]));
+            initialHistory.emplace_back(ChunkHistory(validAfter, shardId));
             chunk.setHistory(std::move(initialHistory));
         }
 
