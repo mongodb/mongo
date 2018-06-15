@@ -262,10 +262,6 @@ public:
 
     static bool useTableLogging(NamespaceString ns, bool replEnabled);
 
-    static Status setTableLogging(OperationContext* opCtx, const std::string& uri, bool on);
-
-    static Status setTableLogging(WT_SESSION* session, const std::string& uri, bool on);
-
 private:
     /**
      * Casts unsigned 64-bit statistics value to T.

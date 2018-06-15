@@ -56,7 +56,7 @@ class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 
 struct WiredTigerFileVersion {
-    enum class StartupVersion { IS_34, IS_36, IS_40 };
+    enum class StartupVersion { IS_34, IS_36, IS_40, IS_42 };
 
     StartupVersion _startupVersion;
     bool shouldDowngrade(bool readOnly, bool repairMode, bool hasRecoveryTimestamp);

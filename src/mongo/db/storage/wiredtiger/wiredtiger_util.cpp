@@ -538,43 +538,6 @@ bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
     return true;
 }
 
-Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::string& uri, bool on) {
-    // Try to close as much as possible to avoid EBUSY errors.
-    WiredTigerRecoveryUnit::get(opCtx)->getSession()->closeAllCursors(uri);
-    WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
-    sessionCache->closeAllCursors(uri);
-
-    // Use a dedicated session for alter operations to avoid transaction issues.
-    WiredTigerSession session(sessionCache->conn());
-    return setTableLogging(session.getSession(), uri, on);
-}
-
-Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {
-    std::string setting;
-    if (on) {
-        setting = "log=(enabled=true)";
-    } else {
-        setting = "log=(enabled=false)";
-    }
-
-    int ret = session->alter(session, uri.c_str(), setting.c_str());
-    if (ret) {
-        // `setTableLogging` can be called even when the table is in the desired state. WT can
-        // return EBUSY if it cannot access the table to be altered before it knows whether
-        // there's anything to change.  Assert that if alter call returned an error, the table is
-        // in the expected state.
-        std::string existingMetadata = getMetadataRaw(session, uri).getValue();
-        if (existingMetadata.find(setting) == std::string::npos) {
-            severe() << "Failed to update log setting. Uri: " << uri << " Enable? " << on
-                     << " Ret: " << ret << " MD: " << redact(existingMetadata)
-                     << " Msg: " << session->strerror(session, ret);
-            fassertFailed(50756);
-        }
-    }
-
-    return Status::OK();
-}
-
 Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                          const std::string& uri,
                                          const std::string& config,

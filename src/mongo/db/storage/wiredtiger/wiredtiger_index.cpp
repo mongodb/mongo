@@ -301,15 +301,6 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                          _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2)
         ? KeyString::Version::V1
         : KeyString::Version::V0;
-
-    if (!isReadOnly) {
-        bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
-            repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
-        uassertStatusOK(WiredTigerUtil::setTableLogging(
-            ctx,
-            uri,
-            WiredTigerUtil::useTableLogging(NamespaceString(desc->parentNS()), replicatedWrites)));
-    }
 }
 
 Status WiredTigerIndex::insert(OperationContext* opCtx,
