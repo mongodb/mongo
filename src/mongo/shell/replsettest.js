@@ -200,21 +200,25 @@ var ReplSetTest = function(opts) {
      * @param states is a single state or list of states
      * @param ind is the indicator specified
      * @param timeout how long to wait for the state to be reached
+     * @param reconnectNode indicates that we should reconnect to a node that stepped down
      */
-    function _waitForIndicator(node, states, ind, timeout) {
+    function _waitForIndicator(node, states, ind, timeout, reconnectNode) {
+        timeout = timeout || self.kDefaultTimeoutMS;
+        if (reconnectNode === undefined) {
+            reconnectNode = true;
+        }
+
         if (node.length) {
             var nodes = node;
             for (var i = 0; i < nodes.length; i++) {
                 if (states.length)
-                    _waitForIndicator(nodes[i], states[i], ind, timeout);
+                    _waitForIndicator(nodes[i], states[i], ind, timeout, reconnectNode);
                 else
-                    _waitForIndicator(nodes[i], states, ind, timeout);
+                    _waitForIndicator(nodes[i], states, ind, timeout, reconnectNode);
             }
 
             return;
         }
-
-        timeout = timeout || self.kDefaultTimeoutMS;
 
         if (!node.getDB) {
             node = self.nodes[node];
@@ -232,6 +236,7 @@ var ReplSetTest = function(opts) {
         var currTime = new Date().getTime();
         var status;
 
+        let foundState;
         assert.soon(function() {
             try {
                 var conn = _callIsMaster();
@@ -285,6 +290,7 @@ var ReplSetTest = function(opts) {
                                             ", value:" + states[j]);
                         }
                         if (status.members[i][ind] == states[j]) {
+                            foundState = states[j];
                             return true;
                         }
                     }
@@ -294,6 +300,20 @@ var ReplSetTest = function(opts) {
             return false;
 
         }, "waiting for state indicator " + ind + " for " + timeout + "ms", timeout);
+
+        // If we were waiting for the node to step down, wait until we can connect to it again,
+        // since primaries close external connections upon stepdown. This ensures that the
+        // connection to the node is usable after the function returns.
+        if (reconnectNode && foundState === ReplSetTest.State.SECONDARY) {
+            assert.soon(function() {
+                try {
+                    node.getDB("foo").bar.stats();
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }, "timed out waiting to reconnect to node " + node.name);
+        }
 
         print("ReplSetTest waitForIndicator final status:");
         printjson(status);
@@ -2418,10 +2438,12 @@ var ReplSetTest = function(opts) {
      *
      * @param node is a single node or list of nodes, by id or conn
      * @param state is a single state or list of states
+     * @param timeout how long to wait for the state to be reached
+     * @param reconnectNode indicates that we should reconnect to a node that stepped down
      *
      */
-    this.waitForState = function(node, state, timeout) {
-        _waitForIndicator(node, state, "state", timeout);
+    this.waitForState = function(node, state, timeout, reconnectNode) {
+        _waitForIndicator(node, state, "state", timeout, reconnectNode);
     };
 
     /**

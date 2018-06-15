@@ -35,8 +35,10 @@
 
         // We wait for the primary to transition to the SECONDARY state to ensure we're waiting
         // until after the parallel shell has started the replSetStepDown command and the server is
-        // paused at the failpoint.
-        rst.waitForState(directConn, ReplSetTest.State.SECONDARY);
+        // paused at the failpoint.Do not attempt to reconnect to the node, since the node will be
+        // holding the global X lock at the failpoint.
+        const reconnectNode = false;
+        rst.waitForState(directConn, ReplSetTest.State.SECONDARY, null, reconnectNode);
 
         return awaitShell;
     }
