@@ -476,6 +476,9 @@ private:
 
         BSONObj toBSON() const;
         std::string toString() const;
+        // Controls whether or not this Waiter should stay on the WaiterList upon notification.
+        virtual bool runs_once() const = 0;
+
         // It is invalid to call notify_inlock() unless holding ReplicationCoordinatorImpl::_mutex.
         virtual void notify_inlock() = 0;
 
@@ -492,6 +495,9 @@ private:
                      const WriteConcernOptions* _writeConcern,
                      stdx::condition_variable* _condVar);
         void notify_inlock() override;
+        bool runs_once() const override {
+            return false;
+        }
 
         stdx::condition_variable* condVar = nullptr;
     };
@@ -505,6 +511,9 @@ private:
 
         CallbackWaiter(OpTime _opTime, FinishFunc _finishCallback);
         void notify_inlock() override;
+        bool runs_once() const override {
+            return true;
+        }
 
         // The callback that will be called when this waiter is notified.
         FinishFunc finishCallback = nullptr;
@@ -520,10 +529,10 @@ private:
         void add_inlock(WaiterType waiter);
         // Returns whether waiter is found and removed.
         bool remove_inlock(WaiterType waiter);
-        // Signals and removes all waiters that satisfy the condition.
-        void signalAndRemoveIf_inlock(stdx::function<bool(WaiterType)> fun);
-        // Signals and removes all waiters from the list.
-        void signalAndRemoveAll_inlock();
+        // Signals all waiters that satisfy the condition.
+        void signalIf_inlock(stdx::function<bool(WaiterType)> fun);
+        // Signals all waiters from the list.
+        void signalAll_inlock();
 
     private:
         std::vector<WaiterType> _list;
