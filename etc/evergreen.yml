@@ -9508,8 +9508,8 @@ buildvariants:
   tasks:
   - name: compile_mobile
 
-- name: embedded-sdk-watchos-4.3
-  display_name: "Embedded SDK - watchOS 4.3"
+- name: embedded-sdk-watchos-4.2
+  display_name: "Embedded SDK - watchOS 4.2"
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -9534,15 +9534,15 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_C_FLAGS="-arch armv7k -isysroot $(xcrun --sdk watchos --show-sdk-path) -mwatchos-version-min=4.3"
-        -DCMAKE_LINKER_FLAGS="-arch armv7k -isysroot $(xcrun --sdk watchos --show-sdk-path) -mwatchos-version-min=4.3"
+        -DCMAKE_C_FLAGS="-arch armv7k -isysroot $(xcrun --sdk watchos --show-sdk-path) -mwatchos-version-min=4.2"
+        -DCMAKE_LINKER_FLAGS="-arch armv7k -isysroot $(xcrun --sdk watchos --show-sdk-path) -mwatchos-version-min=4.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
   tasks:
   - name: compile_mobile
 
-- name: embedded-sdk-watchsimulator-4.3
-  display_name: "Embedded SDK - watchOS Simulator 4.3"
+- name: embedded-sdk-watchsimulator-4.2
+  display_name: "Embedded SDK - watchOS Simulator 4.2"
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -9567,13 +9567,13 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_C_FLAGS="-arch i386 -isysroot $(xcrun --sdk watchsimulator --show-sdk-path) -mwatchos-version-min=4.3"
-        -DCMAKE_LINKER_FLAGS="-arch i386 -isysroot $(xcrun --sdk watchsimulator --show-sdk-path) -mwatchos-version-min=4.3"
+        -DCMAKE_C_FLAGS="-arch i386 -isysroot $(xcrun --sdk watchsimulator --show-sdk-path) -mwatchos-version-min=4.2"
+        -DCMAKE_LINKER_FLAGS="-arch i386 -isysroot $(xcrun --sdk watchsimulator --show-sdk-path) -mwatchos-version-min=4.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
-    enable_embedded_tests: ios_watchos_simulator
+    enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: Apple-Watch-Series-3-42mm
-    ios_sim_runtime: watchOS-4-3
+    ios_sim_runtime: watchOS-4-2
   tasks:
   - name: compile_mobile
 
