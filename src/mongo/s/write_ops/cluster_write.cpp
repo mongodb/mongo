@@ -237,7 +237,7 @@ void ClusterWriter::write(OperationContext* opCtx,
 void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
                                            ChunkManager* manager,
                                            Chunk chunk,
-                                           long dataWritten) {
+                                           long chunkBytesWritten) {
     // Disable lastError tracking so that any errors, which occur during auto-split do not get
     // bubbled up on the client connection doing a write
     LastError::Disabled disableLastError(&LastError::get(opCtx->getClient()));
@@ -249,11 +249,11 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
     const bool maxIsInf =
         (0 == manager->getShardKeyPattern().getKeyPattern().globalMax().woCompare(chunk.getMax()));
 
-    const uint64_t chunkBytesWritten = chunk.addBytesWritten(dataWritten);
+    chunk.addBytesWritten(chunkBytesWritten);
 
     const uint64_t desiredChunkSize = balancerConfig->getMaxChunkSizeBytes();
 
-    if (!chunk.shouldSplit(desiredChunkSize, minIsInf, maxIsInf)) {
+    if (!chunk.shouldSplit(desiredChunkSize)) {
         return;
     }
 
@@ -287,7 +287,8 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
                 // The current desired chunk size will split the chunk into lots of small chunk and
                 // at the worst case this can result into thousands of chunks. So check and see if a
                 // bigger value can be used.
-                return std::min(chunkBytesWritten, balancerConfig->getMaxChunkSizeBytes());
+                return std::min((uint64_t)chunkBytesWritten,
+                                balancerConfig->getMaxChunkSizeBytes());
             } else {
                 return desiredChunkSize;
             }

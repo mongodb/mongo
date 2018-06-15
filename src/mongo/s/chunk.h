@@ -35,6 +35,7 @@
 namespace mongo {
 
 class BSONObj;
+class ChunkWritesTracker;
 
 /**
  * Represents a cache entry for a single Chunk. Owned by a RoutingTableHistory.
@@ -80,10 +81,10 @@ public:
      * Get/increment/set the estimation of how much data was written for this chunk.
      */
     uint64_t getBytesWritten() const;
-    uint64_t addBytesWritten(uint64_t bytesWrittenIncrement);
+    void addBytesWritten(uint64_t bytesWrittenIncrement);
     void clearBytesWritten();
 
-    bool shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const;
+    bool shouldSplit(uint64_t desiredChunkSize) const;
 
     /**
      * Marks this chunk as jumbo. Only moves from false to true once and is used by the balancer.
@@ -103,15 +104,14 @@ private:
     // split
     mutable bool _jumbo;
 
-    // Statistics for the approximate data written to this chunk
-    mutable uint64_t _dataWritten;
+    // Used for tracking writes to this chunk, to estimate its size for the autosplitter. Since
+    // ChunkInfo obejcts are always treated as const, and this contains metadata about the chunk
+    // that needs to change, it's okay (and necessary) to mark it mutable
+    mutable std::shared_ptr<ChunkWritesTracker> _writesTracker;
 };
 
 class Chunk {
 public:
-    // Test whether we should split once data * kSplitTestFactor > chunkSize (approximately)
-    static const uint64_t kSplitTestFactor = 5;
-
     Chunk(ChunkInfo& chunkInfo, const boost::optional<Timestamp>& atClusterTime)
         : _chunkInfo(chunkInfo), _atClusterTime(atClusterTime) {}
 
@@ -160,15 +160,15 @@ public:
     uint64_t getBytesWritten() const {
         return _chunkInfo.getBytesWritten();
     }
-    uint64_t addBytesWritten(uint64_t bytesWrittenIncrement) {
-        return _chunkInfo.addBytesWritten(bytesWrittenIncrement);
+    void addBytesWritten(uint64_t bytesWrittenIncrement) {
+        _chunkInfo.addBytesWritten(bytesWrittenIncrement);
     }
     void clearBytesWritten() {
         _chunkInfo.clearBytesWritten();
     }
 
-    bool shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const {
-        return _chunkInfo.shouldSplit(desiredChunkSize, minIsInf, maxIsInf);
+    bool shouldSplit(uint64_t desiredChunkSize) const {
+        return _chunkInfo.shouldSplit(desiredChunkSize);
     }
 
     /**

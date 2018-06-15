@@ -33,6 +33,7 @@
 #include "mongo/s/chunk.h"
 
 #include "mongo/platform/random.h"
+#include "mongo/s/chunk_writes_tracker.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -43,7 +44,7 @@ PseudoRandom prng(static_cast<int64_t>(time(0)));
 
 // Assume user has 64MB chunkSize setting. It is ok if this assumption is wrong since it is only
 // a heuristic.
-const int64_t kMaxDataWritten = 64 / Chunk::kSplitTestFactor;
+const int64_t kMaxDataWritten = 64 / ChunkWritesTracker::kSplitTestFactor;
 
 /**
  * Generates a random value for _dataWritten so that a mongos restart wouldn't cause delay in
@@ -61,11 +62,12 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
       _lastmod(from.getVersion()),
       _history(from.getHistory()),
       _jumbo(from.getJumbo()),
-      _dataWritten(mkDataWritten()) {
+      _writesTracker(std::make_shared<ChunkWritesTracker>()) {
     invariant(from.validate());
     if (!_history.empty()) {
         invariant(_shardId == _history.front().getShard());
     }
+    _writesTracker->addBytesWritten(mkDataWritten());
 }
 
 const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {
@@ -97,27 +99,20 @@ bool ChunkInfo::containsKey(const BSONObj& shardKey) const {
 }
 
 uint64_t ChunkInfo::getBytesWritten() const {
-    return _dataWritten;
+    return _writesTracker->getBytesWritten();
 }
 
-uint64_t ChunkInfo::addBytesWritten(uint64_t bytesWrittenIncrement) {
-    _dataWritten += bytesWrittenIncrement;
-    return _dataWritten;
+void ChunkInfo::addBytesWritten(uint64_t bytesWrittenIncrement) {
+    _writesTracker->addBytesWritten(bytesWrittenIncrement);
 }
 
 void ChunkInfo::clearBytesWritten() {
-    _dataWritten = 0;
+    _writesTracker->clearBytesWritten();
 }
 
-bool ChunkInfo::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const {
-    // If this chunk is at either end of the range, trigger auto-split at 10% less data written in
-    // order to trigger the top-chunk optimization.
-    const uint64_t splitThreshold = (minIsInf || maxIsInf)
-        ? static_cast<uint64_t>((double)desiredChunkSize * 0.9)
-        : desiredChunkSize;
-
+bool ChunkInfo::shouldSplit(uint64_t maxChunkSize) const {
     // Check if there are enough estimated bytes written to warrant a split
-    return _dataWritten >= splitThreshold / Chunk::kSplitTestFactor;
+    return _writesTracker->shouldSplit(maxChunkSize);
 }
 
 std::string ChunkInfo::toString() const {
