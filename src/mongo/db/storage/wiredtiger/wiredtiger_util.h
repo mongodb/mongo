@@ -167,6 +167,11 @@ public:
                                              BSONObjBuilder* bob);
 
     /**
+     * Gets entire metadata string for collection/index at URI with the provided session.
+     */
+    static StatusWith<std::string> getMetadataRaw(WT_SESSION* session, StringData uri);
+
+    /**
      * Gets entire metadata string for collection/index at URI.
      */
     static StatusWith<std::string> getMetadata(OperationContext* opCtx, StringData uri);

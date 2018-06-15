@@ -282,7 +282,7 @@ private:
     class WiredTigerCheckpointThread;
 
     Status _salvageIfNeeded(const char* uri);
-    void _checkIdentPath(StringData ident);
+    void _ensureIdentPath(StringData ident);
 
     bool _hasUri(WT_SESSION* session, const std::string& uri) const;
 

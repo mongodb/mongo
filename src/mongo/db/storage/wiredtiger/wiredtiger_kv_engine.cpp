@@ -570,7 +570,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         _checkpointThread->go();
     }
 
-    _sizeStorerUri = "table:sizeStorer";
+    _sizeStorerUri = _uri("sizeStorer");
     WiredTigerSession session(_conn);
     if (!_readOnly && repair && _hasUri(session.getSession(), _sizeStorerUri)) {
         log() << "Repairing size cache";
@@ -687,6 +687,7 @@ Status WiredTigerKVEngine::repairIdent(OperationContext* opCtx, StringData ident
     if (isEphemeral()) {
         return Status::OK();
     }
+    _ensureIdentPath(ident);
     return _salvageIfNeeded(uri.c_str());
 }
 
@@ -709,6 +710,31 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
             << "Verify on " << uri << " failed with EBUSY. "
             << "This means the collection was being accessed. No repair is necessary unless other "
                "errors are reported.";
+        return Status::OK();
+    }
+
+    if (rc == ENOENT) {
+        warning() << "Data file is missing for " << uri
+                  << ". Attempting to drop and re-create the collection.";
+
+        auto swMetadata = WiredTigerUtil::getMetadataRaw(session, uri);
+        if (!swMetadata.isOK()) {
+            error() << "Failed to get metadata for " << uri;
+            return swMetadata.getStatus();
+        }
+
+        rc = session->drop(session, uri, NULL);
+        if (rc != 0) {
+            error() << "Failed to drop " << uri;
+            return wtRCToStatus(rc);
+        }
+
+        rc = session->create(session, uri, swMetadata.getValue().c_str());
+        if (rc != 0) {
+            error() << "Failed to create " << uri << " with config: " << swMetadata.getValue();
+            return wtRCToStatus(rc);
+        }
+        log() << "Successfully re-created " << uri << ".";
         return Status::OK();
     }
 
@@ -783,7 +809,7 @@ Status WiredTigerKVEngine::createGroupedRecordStore(OperationContext* opCtx,
                                                     StringData ident,
                                                     const CollectionOptions& options,
                                                     KVPrefix prefix) {
-    _checkIdentPath(ident);
+    _ensureIdentPath(ident);
     WiredTigerSession session(_conn);
 
     const bool prefixed = prefix.isPrefixed();
@@ -849,7 +875,7 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
                                                             StringData ident,
                                                             const IndexDescriptor* desc,
                                                             KVPrefix prefix) {
-    _checkIdentPath(ident);
+    _ensureIdentPath(ident);
 
     std::string collIndexOptions;
     const Collection* collection = desc->getCollection();
@@ -1082,7 +1108,7 @@ int WiredTigerKVEngine::reconfigure(const char* str) {
     return _conn->reconfigure(_conn, str);
 }
 
-void WiredTigerKVEngine::_checkIdentPath(StringData ident) {
+void WiredTigerKVEngine::_ensureIdentPath(StringData ident) {
     size_t start = 0;
     size_t idx;
     while ((idx = ident.find('/', start)) != string::npos) {

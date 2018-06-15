@@ -53,32 +53,6 @@ namespace mongo {
 
 using std::string;
 
-namespace {
-StatusWith<std::string> getMetadataRaw(WT_SESSION* session, StringData uri) {
-    WT_CURSOR* cursor;
-    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor));
-    invariant(cursor);
-    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
-
-    std::string strUri = uri.toString();
-    cursor->set_key(cursor, strUri.c_str());
-    int ret = cursor->search(cursor);
-    if (ret == WT_NOTFOUND) {
-        return StatusWith<std::string>(ErrorCodes::NoSuchKey,
-                                       str::stream() << "Unable to find metadata for " << uri);
-    } else if (ret != 0) {
-        return StatusWith<std::string>(wtRCToStatus(ret));
-    }
-    const char* metadata = NULL;
-    ret = cursor->get_value(cursor, &metadata);
-    if (ret != 0) {
-        return StatusWith<std::string>(wtRCToStatus(ret));
-    }
-    invariant(metadata);
-    return StatusWith<std::string>(metadata);
-}
-}  // namespace
-
 Status wtRCToStatus_slow(int retCode, const char* prefix) {
     if (retCode == 0)
         return Status::OK();
@@ -128,6 +102,30 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
     invariant(parser.get("source", &sourceItem) == 0);
     invariant(sourceItem.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING);
     *source = std::string(sourceItem.str, sourceItem.len);
+}
+
+StatusWith<std::string> WiredTigerUtil::getMetadataRaw(WT_SESSION* session, StringData uri) {
+    WT_CURSOR* cursor;
+    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor));
+    invariant(cursor);
+    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
+
+    std::string strUri = uri.toString();
+    cursor->set_key(cursor, strUri.c_str());
+    int ret = cursor->search(cursor);
+    if (ret == WT_NOTFOUND) {
+        return StatusWith<std::string>(ErrorCodes::NoSuchKey,
+                                       str::stream() << "Unable to find metadata for " << uri);
+    } else if (ret != 0) {
+        return StatusWith<std::string>(wtRCToStatus(ret));
+    }
+    const char* metadata = NULL;
+    ret = cursor->get_value(cursor, &metadata);
+    if (ret != 0) {
+        return StatusWith<std::string>(wtRCToStatus(ret));
+    }
+    invariant(metadata);
+    return StatusWith<std::string>(metadata);
 }
 
 StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, StringData uri) {
