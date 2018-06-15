@@ -171,8 +171,12 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
         chunk.setNS(nss.ns());
         chunk.setMin(min);
         chunk.setMax(max);
-        chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
+
+        // It's possible there are no split points or fewer split points than total number of
+        // shards, and we need to be sure that at least one chunk is placed on the primary shard.
+        auto shardId = (i == 0) ? primaryShardId : shardIds[i % shardIds.size()];
+        chunk.setShard(shardId);
 
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,
