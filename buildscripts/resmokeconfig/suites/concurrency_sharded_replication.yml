@@ -103,12 +103,13 @@ selector:
   # stagedebug can only be run against a standalone mongod
   - jstests/concurrency/fsm_workloads/yield_and_hashed.js
   - jstests/concurrency/fsm_workloads/yield_and_sorted.js
-  exclude_with_any_tags:
-  - uses_transactions
-  - requires_replication
 
   # TODO Unblacklist (SERVER-35538).
   - jstests/concurrency/fsm_workloads/database_versioning.js
+
+  exclude_with_any_tags:
+  - uses_transactions
+  - requires_replication
 
 executor:
   archive:
