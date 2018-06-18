@@ -428,7 +428,7 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
         auto signedTime = SignedLogicalTime(
             LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
 
-        invariant(signedTime.getTime() >= operationTime);
+        // TODO SERVER-35663: invariant that signedTime.getTime() >= operationTime.
         rpc::LogicalTimeMetadata(signedTime).writeToMetadata(metadataBob);
         operationTime.appendAsOperationTime(commandBodyFieldsBob);
 
@@ -450,7 +450,7 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
         return;
     }
 
-    invariant(signedTime.getTime() >= operationTime);
+    // TODO SERVER-35663: invariant that signedTime.getTime() >= operationTime.
     rpc::LogicalTimeMetadata(signedTime).writeToMetadata(metadataBob);
     operationTime.appendAsOperationTime(commandBodyFieldsBob);
 }
