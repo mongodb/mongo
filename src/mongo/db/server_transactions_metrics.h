@@ -46,9 +46,19 @@ public:
     static ServerTransactionsMetrics* get(ServiceContext* service);
     static ServerTransactionsMetrics* get(OperationContext* opCtx);
 
+<<<<<<< HEAD
     unsigned long long getCurrentOpen() const;
     void decrementCurrentOpen();
     void incrementCurrentOpen();
+=======
+    unsigned long long getCurrentActive() const;
+    void decrementCurrentActive();
+    void incrementCurrentActive();
+
+    unsigned long long getCurrentInactive() const;
+    void decrementCurrentInactive();
+    void incrementCurrentInactive();
+>>>>>>> 40c317ccbb... added to class
 
     unsigned long long getTotalStarted() const;
     void incrementTotalStarted();
@@ -65,6 +75,12 @@ public:
     void updateStats(TransactionsStats* stats);
 
 private:
+    // The number of multi-document transactions currently active.
+    AtomicUInt64 _currentActive{0};
+
+    // The number of multi-document transactions currently inactive.
+    AtomicUInt64 _currentInactive{0};
+
     // The total number of open transactions.
     AtomicUInt64 _currentOpen{0};
 
