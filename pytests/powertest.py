@@ -292,6 +292,13 @@ def get_extension(filename):
     return os.path.splitext(filename)[-1]
 
 
+def executable_extension():
+    """Return executable file extension."""
+    if _IS_WINDOWS:
+        return ".exe"
+    return ""
+
+
 def abs_path(path):
     """Returns absolute path for 'path'. Raises an exception on failure."""
     if _IS_WINDOWS:
@@ -968,9 +975,10 @@ class PosixService(object):
 class MongodControl(object):
     """ Control mongod process. """
 
-    def __init__(self, bin_dir, db_path, log_path, port, options=None):
-        extension = ".exe" if _IS_WINDOWS else ""
-        self.process_name = "mongod{}".format(extension)
+    def __init__(  # pylint: disable=too-many-arguments
+            self, bin_dir, db_path, log_path, port, options=None):
+        """Initialize MongodControl."""
+        self.process_name = "mongod{}".format(executable_extension())
 
         self.bin_dir = bin_dir
         if self.bin_dir:
@@ -1060,6 +1068,10 @@ class MongodControl(object):
     def stop(self):
         """ Returns tuple (ret, ouput). """
         return self.service.stop()
+
+    def status(self):
+        """Return status of the process."""
+        return self.service.status()
 
     def get_pids(self):
         """ Return list of pids for process. """
@@ -1194,7 +1206,7 @@ def remote_handler(options, operations):
         elif operation == "stop_mongod":
             ret, output = mongod.stop()
             LOGGER.info(output)
-            ret = wait_for_mongod_shutdown(options.db_path)
+            ret = wait_for_mongod_shutdown(mongod)
 
         elif operation == "shutdown_mongod":
             mongo = pymongo.MongoClient(**mongo_client_opts)
@@ -1202,7 +1214,7 @@ def remote_handler(options, operations):
                 mongo.admin.command("shutdown", force=True)
             except pymongo.errors.AutoReconnect:
                 pass
-            ret = wait_for_mongod_shutdown(options.db_path)
+            ret = wait_for_mongod_shutdown(mongod)
 
         elif operation == "rsync_data":
             ret, output = rsync(options.db_path, options.rsync_dest, options.rsync_exclude_files)
@@ -1367,20 +1379,23 @@ def crash_server(options, crash_canary, canary_port, local_ops, script_name, cli
     return ret, output
 
 
-def wait_for_mongod_shutdown(data_dir, timeout=120):
-    """ Waits for for mongod to shutdown.
-
-        Returns 0 if shutdown occurs within 'timeout', else 1. """
-
-    lock_file = os.path.join(data_dir, "mongod.lock")
-    LOGGER.info("Waiting for mongod to release lockfile %s", lock_file)
+def wait_for_mongod_shutdown(mongod_control, timeout=120):
+    """Wait for for mongod to shutdown; return 0 if shutdown occurs within 'timeout', else 1."""
     start = time.time()
-    while os.path.exists(lock_file) and os.stat(lock_file).st_size:
-        time.sleep(3)
+    status = mongod_control.status()
+    while status != "stopped":
         if time.time() - start >= timeout:
-            LOGGER.error("The mongod lockfile %s has not been released, exiting", lock_file)
+            LOGGER.error("The mongod process has not stopped, current status is %s", status)
             return 1
-    LOGGER.info("The mongod lockfile %s has been released", lock_file)
+        LOGGER.info("Waiting for mongod process to stop, current status is %s ", status)
+        time.sleep(3)
+        status = mongod_control.status()
+    LOGGER.info("The mongod process has stopped")
+
+    # We wait a bit, since files could still be flushed to disk, which was causing
+    # rsync "file has vanished" errors.
+    time.sleep(5)
+
     return 0
 
 
