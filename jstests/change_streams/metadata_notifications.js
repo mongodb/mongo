@@ -8,6 +8,7 @@
     load("jstests/libs/change_stream_util.js");
     load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load("jstests/libs/fixture_helpers.js");           // For isSharded.
 
     db = db.getSiblingDB(jsTestName());
     let cst = new ChangeStreamTest(db);
@@ -18,6 +19,17 @@
     // exist.
     const collName = "test";
     assertDropCollection(db, collName);
+
+    // Asserts that resuming a change stream with 'spec' and an explicit simple collation returns
+    // the results specified by 'expected'.
+    function assertResumeExpected({coll, spec, expected}) {
+        const cursor = cst.startWatchingChanges({
+            collection: coll,
+            pipeline: [{$changeStream: spec}],
+            aggregateOptions: {collation: {locale: "simple"}}
+        });
+        cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
+    }
 
     // Cursor creation succeeds, but there are no results. We do not expect to see a notification
     // for collection creation.
@@ -50,21 +62,20 @@
     assert.writeOK(coll.remove({_id: 1}));
     assertDropCollection(db, coll.getName());
 
-    // Get a valid resume token that the next aggregate command can use.
-    change = cst.getOneChange(cursor);
-    assert.eq(change.operationType, "insert");
-    const resumeToken = change._id;
-
-    // We should get 4 oplog entries of type update, delete, drop, and invalidate. The cursor should
-    // be closed.
+    // We should get oplog entries of type insert, update, delete, drop, and invalidate. The cursor
+    // should be closed.
     let expectedChanges = [
+        {operationType: "insert"},
         {operationType: "update"},
         {operationType: "delete"},
         {operationType: "drop"},
         {operationType: "invalidate"},
     ];
-    const changes = cst.assertNextChangesEqual(
+    let changes = cst.assertNextChangesEqual(
         {cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: true});
+    const resumeToken = changes[0]._id;
+    const resumeTokenDrop = changes[3]._id;
+    const resumeTokenInvalidate = changes[4]._id;
 
     // It should not be possible to resume a change stream after a collection drop without an
     // explicit collation, even if the invalidate has not been received.
@@ -77,23 +88,31 @@
 
     // Recreate the collection.
     coll = assertCreateCollection(db, collName);
-    assert.writeOK(coll.insert({_id: 0}));
+    assert.writeOK(coll.insert({_id: "after recreate"}));
 
-    // Test resuming the change stream from the collection drop.
+    // Test resuming the change stream from the collection drop using 'resumeAfter'.
+    // If running in a sharded passthrough suite, resuming from the drop will first return the drop
+    // from the other shard before returning an invalidate.
     cursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: changes[2]._id}}],
-        collection: collName,
-        aggregateOptions: {cursor: {batchSize: 0}, collation: {locale: "simple"}},
+        collection: coll,
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenDrop}}],
+        aggregateOptions: {collation: {locale: "simple"}, cursor: {batchSize: 0}}
     });
-    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [{operationType: "invalidate"}]});
+    cst.consumeDropUpTo({
+        cursor: cursor,
+        dropType: "drop",
+        expectedNext: {operationType: "invalidate"},
+        expectInvalidate: true
+    });
 
-    // Test resuming the change stream from the invalidate after the drop.
-    cursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: changes[3]._id}}],
-        collection: collName,
-        aggregateOptions: {cursor: {batchSize: 0}, collation: {locale: "simple"}},
-    });
-    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [{operationType: "invalidate"}]});
+    // Test resuming the change stream from the invalidate after the drop using 'resumeAfter'.
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenInvalidate}}],
+        cursor: {},
+        collation: {locale: "simple"},
+    }),
+                                 ErrorCodes.InvalidResumeToken);
 
     // Test that renaming a collection being watched generates a "rename" entry followed by an
     // "invalidate". This is true if the change stream is on the source or target collection of the
@@ -102,7 +121,7 @@
         cursor = cst.startWatchingChanges({collection: collName, pipeline: [{$changeStream: {}}]});
         assertDropCollection(db, "renamed_coll");
         assert.writeOK(coll.renameCollection("renamed_coll"));
-        let expected = [
+        expectedChanges = [
             {
               operationType: "rename",
               ns: {db: db.getName(), coll: collName},
@@ -111,14 +130,14 @@
             {operationType: "invalidate"}
         ];
         cst.assertNextChangesEqual(
-            {cursor: cursor, expectedChanges: expected, expectInvalidate: true});
+            {cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: true});
 
         coll = db["renamed_coll"];
 
         // Repeat the test, this time with a change stream open on the target.
         cursor = cst.startWatchingChanges({collection: collName, pipeline: [{$changeStream: {}}]});
         assert.writeOK(coll.renameCollection(collName));
-        expected = [
+        expectedChanges = [
             {
               operationType: "rename",
               ns: {db: db.getName(), coll: "renamed_coll"},
@@ -126,26 +145,28 @@
             },
             {operationType: "invalidate"}
         ];
-        const changes = cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
+        const changes =
+            cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedChanges});
+        const resumeTokenRename = changes[0]._id;
+        const resumeTokenInvalidate = changes[1]._id;
 
         coll = db[collName];
+        assert.writeOK(coll.insert({_id: "after rename"}));
 
-        // TODO SERVER-34789: The code below should throw an error. We exercise this behavior here
-        // to be sure that it doesn't crash the server, but the ability to resume a change stream
-        // after an invalidate is a bug, not a feature.
-
-        // Test resuming the change stream from the collection rename.
-        assert.doesNotThrow(function() {
-            const resumeTokenRename = changes[0]._id;
-            const resumeCursor =
-                coll.watch([], {resumeAfter: resumeTokenRename, collation: {locale: "simple"}});
+        // Test resuming the change stream from the collection rename using 'resumeAfter'.
+        assertResumeExpected({
+            coll: coll.getName(),
+            spec: {resumeAfter: resumeTokenRename},
+            expected: [{operationType: "invalidate"}]
         });
-        // Test resuming the change stream from the invalidate after the drop.
-        assert.doesNotThrow(function() {
-            const resumeTokenInvalidate = changes[1]._id;
-            const resumeCursor =
-                coll.watch([], {resumeAfter: resumeTokenInvalidate, collation: {locale: "simple"}});
-        });
+        // Test resuming the change stream from the invalidate after the rename using 'resumeAfter'.
+        assert.commandFailedWithCode(db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [{$changeStream: {resumeAfter: resumeTokenInvalidate}}],
+            cursor: {},
+            collation: {locale: "simple"},
+        }),
+                                     ErrorCodes.InvalidResumeToken);
 
         assertDropAndRecreateCollection(db, "renamed_coll");
         assert.writeOK(db.renamed_coll.insert({_id: 0}));
@@ -155,7 +176,7 @@
         cursor =
             cst.startWatchingChanges({collection: "renamed_coll", pipeline: [{$changeStream: {}}]});
         assert.writeOK(coll.renameCollection("renamed_coll", true /* dropTarget */));
-        expected = [
+        expectedChanges = [
             {
               operationType: "rename",
               ns: {db: db.getName(), coll: collName},
@@ -164,7 +185,7 @@
             {operationType: "invalidate"}
         ];
         cst.assertNextChangesEqual(
-            {cursor: cursor, expectedChanges: expected, expectInvalidate: true});
+            {cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: true});
 
         coll = db["renamed_coll"];
 

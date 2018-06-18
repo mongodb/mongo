@@ -7,6 +7,7 @@
 
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
     load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
+    load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
     // Drop and recreate the collections to be used in this set of tests.
     const testDB = db.getSiblingDB(jsTestName());
@@ -58,8 +59,51 @@
     });
     assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
 
+    // Rename the collection and attempt to resume from the 'rename' notification. Skip this
+    // test when running on a sharded collection, since these cannot be renamed.
+    if (!FixtureHelpers.isSharded(coll)) {
+        assertDropAndRecreateCollection(coll.getDB(), coll.getName());
+        const renameColl = coll.getDB().getCollection("rename_coll");
+        assertDropCollection(renameColl.getDB(), renameColl.getName());
+
+        resumeCursor = cst.startWatchingChanges({collection: 1, pipeline: [{$changeStream: {}}]});
+        assert.writeOK(coll.renameCollection(renameColl.getName()));
+
+        const renameChanges = cst.assertNextChangesEqual({
+            cursor: resumeCursor,
+            expectedChanges: [
+                {
+                  operationType: "rename",
+                  ns: {db: coll.getDB().getName(), coll: coll.getName()},
+                  to: {db: renameColl.getDB().getName(), coll: renameColl.getName()}
+                },
+            ]
+        });
+        const resumeTokenRename = renameChanges[0]._id;
+
+        // Insert into the renamed collection.
+        assert.writeOK(renameColl.insert({_id: "after rename"}));
+
+        // Resume from the rename notification using 'resumeAfter' and verify that the change stream
+        // returns the next insert.
+        let expectedInsert = {
+            operationType: "insert",
+            ns: {db: renameColl.getDB().getName(), coll: renameColl.getName()},
+            fullDocument: {_id: "after rename"},
+            documentKey: {_id: "after rename"}
+        };
+        resumeCursor = cst.startWatchingChanges(
+            {collection: 1, pipeline: [{$changeStream: {resumeAfter: resumeTokenRename}}]});
+        cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
+
+        // Rename back to the original collection for reliability of the collection drops when
+        // dropping the database.
+        assert.writeOK(renameColl.renameCollection(coll.getName()));
+    }
+
     // Explicitly drop one collection to ensure reliability of the order of notifications from the
     // dropDatabase command.
+    resumeCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
     assertDropCollection(testDB, otherColl.getName());
     const firstCollDrop = cst.getOneChange(resumeCursor);
     assert.eq(firstCollDrop.operationType, "drop", tojson(firstCollDrop));
@@ -68,51 +112,50 @@
     // Dropping a database should generate a 'drop' notification for each collection, a
     // 'dropDatabase' notification, and finally an 'invalidate'.
     assert.commandWorked(testDB.dropDatabase());
-    const expectedChangesAfterFirstDrop = [
-        {operationType: "drop", ns: {db: testDB.getName(), coll: coll.getName()}},
-        {operationType: "dropDatabase", ns: {db: testDB.getName()}},
-        {operationType: "invalidate"}
-    ];
-    const dropDbChanges = cst.assertNextChangesEqual(
-        {cursor: resumeCursor, expectedChanges: expectedChangesAfterFirstDrop});
+    const dropDbChanges = cst.assertDatabaseDrop({cursor: resumeCursor, db: testDB});
+    const secondCollDrop = dropDbChanges[0];
+    // For sharded passthrough suites, we know that the last entry will be a 'dropDatabase' however
+    // there may be multiple collection drops in 'dropDbChanges' depending on the number of involved
+    // shards.
+    const resumeTokenDropDb = dropDbChanges[dropDbChanges.length - 1]._id;
+    const resumeTokenInvalidate =
+        cst.assertNextChangesEqual(
+               {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]})[0]
+            ._id;
 
-    // Resume from the first collection drop.
-    resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: firstCollDrop._id}}],
-        collection: 1,
+    // Test resuming from the first collection drop and the second collection drop as a result of
+    // dropping the database.
+    [firstCollDrop, secondCollDrop].forEach(token => {
+        resumeCursor = cst.startWatchingChanges({
+            pipeline: [{$changeStream: {resumeAfter: token._id}}],
+            collection: 1,
+            aggregateOptions: {cursor: {batchSize: 0}},
+        });
+        cst.assertDatabaseDrop({cursor: resumeCursor, db: testDB});
+        cst.assertNextChangesEqual(
+            {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
     });
-    cst.assertNextChangesEqual(
-        {cursor: resumeCursor, expectedChanges: expectedChangesAfterFirstDrop});
-
-    // Resume from the second collection drop.
-    resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[0]._id}}],
-        collection: 1,
-    });
-    cst.assertNextChangesEqual(
-        {cursor: resumeCursor, expectedChanges: expectedChangesAfterFirstDrop.slice(1)});
 
     // Recreate the test collection.
-    coll = assertCreateCollection(testDB, coll.getName());
-    assert.writeOK(coll.insert({_id: 0}));
+    assert.writeOK(coll.insert({_id: "after recreate"}));
 
-    // Test resuming from the 'dropDatabase' entry.
+    // Test resuming from the 'dropDatabase' entry using 'resumeAfter'.
     resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[1]._id}}],
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenDropDb}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     cst.assertNextChangesEqual(
         {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
 
-    // Test resuming from the 'invalidate' entry.
-    resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[2]._id}}],
-        collection: 1,
-        aggregateOptions: {cursor: {batchSize: 0}},
-    });
-    cst.assertNextChangesEqual(
-        {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
+    // Test resuming from the 'invalidate' entry using 'resumeAfter'.
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: 1,
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenInvalidate}}],
+        cursor: {},
+        collation: {locale: "simple"},
+    }),
+                                 ErrorCodes.InvalidResumeToken);
 
     cst.cleanUp();
 })();

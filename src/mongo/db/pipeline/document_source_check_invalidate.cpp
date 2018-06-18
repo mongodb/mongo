@@ -78,9 +78,22 @@ DocumentSource::GetNextResult DocumentSourceCheckInvalidate::getNext() {
     auto operationType = doc[kOperationTypeField].getString();
 
     // If this command should invalidate the stream, generate an invalidate entry and queue it up
-    // to be returned after the notification of this command.
+    // to be returned after the notification of this command. The new entry will have a nearly
+    // identical resume token to the notification for the command, except with an extra flag
+    // indicating that the token is from an invalidate. This flag is necessary to disambiguate
+    // the two tokens, and thus preserve a total ordering on the stream.
     if (isInvalidatingCommand(pExpCtx, operationType)) {
-        MutableDocument result(Document{{DSCS::kIdField, doc[DSCS::kIdField]},
+        // If we are using the 3.6 BinData format, then leave the resume token as-is, since the
+        // 'fromInvalidate' field does not exist. Otherwise, fill in the 'fromInvalidate' value.
+        auto resumeToken = doc[DSCS::kIdField].getDocument();
+        if (resumeToken[ResumeToken::kDataFieldName].getType() == BSONType::String) {
+            auto resumeTokenData = ResumeToken::parse(resumeToken).getData();
+            resumeTokenData.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
+            resumeToken = ResumeToken(resumeTokenData)
+                              .toDocument(ResumeToken::SerializationFormat::kHexString);
+        }
+
+        MutableDocument result(Document{{DSCS::kIdField, resumeToken},
                                         {DSCS::kOperationTypeField, DSCS::kInvalidateOpType},
                                         {DSCS::kClusterTimeField, doc[DSCS::kClusterTimeField]}});
 

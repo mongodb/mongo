@@ -320,8 +320,7 @@ void assertResumeAllowed(const intrusive_ptr<ExpressionContext>& expCtx,
     const auto cannotResumeErrMsg =
         "Attempted to resume a stream on a collection which has been dropped. The change stream's "
         "pipeline may need to make comparisons which should respect the collection's default "
-        "collation, which can no longer be determined. If you wish to resume this change stream "
-        "you must specify a collation with the request.";
+        "collation, which can no longer be determined.";
     // Verify that the UUID on the expression context matches the UUID in the resume token.
     // TODO SERVER-35254: If we're on a stale mongos, this check may incorrectly reject a valid
     // resume token since the UUID on the expression context could be for a previous version of the
@@ -354,6 +353,12 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(
     if (auto resumeAfter = spec.getResumeAfter()) {
         ResumeToken token = resumeAfter.get();
         ResumeTokenData tokenData = token.getData();
+
+        // Cannot resume a change stream using a 'fromInvalidate' resume token.
+        uassert(ErrorCodes::InvalidResumeToken,
+                "Attempting to resume a change stream using 'resumeAfter' is not allowed from an "
+                "invalidate notification.",
+                !tokenData.fromInvalidate);
 
         // Verify that the requested resume attempt is possible based on the stream type, resume
         // token UUID, and collation.

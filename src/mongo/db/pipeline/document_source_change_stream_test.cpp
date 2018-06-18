@@ -202,10 +202,13 @@ public:
 
     Document makeResumeToken(Timestamp ts,
                              ImplicitValue uuid = Value(),
-                             ImplicitValue docKey = Value()) {
+                             ImplicitValue docKey = Value(),
+                             ResumeTokenData::FromInvalidate fromInvalidate =
+                                 ResumeTokenData::FromInvalidate::kNotFromInvalidate) {
         ResumeTokenData tokenData;
         tokenData.clusterTime = ts;
         tokenData.documentKey = docKey;
+        tokenData.fromInvalidate = fromInvalidate;
         if (!uuid.missing())
             tokenData.uuid = uuid.getUuid();
         return ResumeToken(tokenData).toDocument(ResumeToken::SerializationFormat::kHexString);
@@ -632,7 +635,9 @@ TEST_F(ChangeStreamStageTest, TransformDrop) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
@@ -654,7 +659,9 @@ TEST_F(ChangeStreamStageTest, TransformRename) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
@@ -694,7 +701,9 @@ TEST_F(ChangeStreamStageTest, TransformRenameTarget) {
         {DSChangeStream::kNamespaceField, D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
     };
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
@@ -1023,7 +1032,9 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
@@ -1193,7 +1204,9 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromDropShouldReturnInvalidate
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
@@ -1202,6 +1215,29 @@ TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromDropShouldReturnInvalidate
                         {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
                         BSON("$changeStream" << BSON("resumeAfter" << resumeTokenDrop)),
                         expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
+    auto expCtx = getExpCtx();
+
+    // Need to put the collection in the UUID catalog so the resume token is valid.
+    Collection collection(stdx::make_unique<CollectionMock>(nss));
+    UUIDCatalog::get(expCtx->opCtx).onCreateCollection(expCtx->opCtx, &collection, testUuid());
+
+    const auto resumeTokenInvalidate =
+        makeResumeToken(kDefaultTs,
+                        testUuid(),
+                        BSON("x" << 2 << "_id" << 1),
+                        ResumeTokenData::FromInvalidate::kFromInvalidate);
+
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
+                           BSON(DSChangeStream::kStageName << BSON(
+                                    "resumeAfter" << resumeTokenInvalidate << "startAtOperationTime"
+                                                  << kDefaultTs))
+                               .firstElement(),
+                           expCtx),
+                       AssertionException,
+                       ErrorCodes::InvalidResumeToken);
 }
 
 //
@@ -1445,7 +1481,9 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
     };
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs)},
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, Value(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
@@ -1636,17 +1674,20 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabaseShouldReturn
     UUIDCatalog::get(getExpCtx()->opCtx).onCreateCollection(getExpCtx()->opCtx, &collection, uuid);
 
     // Create a resume token from only the timestamp, similar to a 'dropDatabase' entry.
-    auto resumeToken = makeResumeToken(kDefaultTs);
+    auto dropDBResumeToken = makeResumeToken(kDefaultTs);
     OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
 
     Document expectedDropDatabase{
-        {DSChangeStream::kIdField, resumeToken},
+        {DSChangeStream::kIdField, dropDBResumeToken},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropDatabaseOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
     };
+
+    auto fromInvalidateResumeToken = makeResumeToken(
+        kDefaultTs, Value(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate);
     Document expectedInvalidate{
-        {DSChangeStream::kIdField, resumeToken},
+        {DSChangeStream::kIdField, fromInvalidateResumeToken},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
@@ -1654,8 +1695,30 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabaseShouldReturn
     checkTransformation(dropDB,
                         expectedDropDatabase,
                         {{"_id"}},  // Mock the 'collectDocumentKeyFields' response.
-                        BSON("$changeStream" << BSON("resumeAfter" << resumeToken)),
+                        BSON("$changeStream" << BSON("resumeAfter" << dropDBResumeToken)),
                         expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromInvalidateShouldFail) {
+    auto expCtx = getExpCtx();
+
+    // Need to put the collection in the UUID catalog so the resume token is valid.
+    Collection collection(stdx::make_unique<CollectionMock>(nss));
+    UUIDCatalog::get(expCtx->opCtx).onCreateCollection(expCtx->opCtx, &collection, testUuid());
+
+    const auto resumeTokenInvalidate =
+        makeResumeToken(kDefaultTs,
+                        testUuid(),
+                        BSON("x" << 2 << "_id" << 1),
+                        ResumeTokenData::FromInvalidate::kFromInvalidate);
+
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON("resumeAfter" << resumeTokenInvalidate))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::InvalidResumeToken);
 }
 
 }  // namespace

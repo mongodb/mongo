@@ -73,19 +73,21 @@ TEST(ResumeToken, ShouldRoundTripThroughHexStringEncoding) {
     UUID testUuid = UUID::gen();
     Document documentKey{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
 
-    ResumeTokenData resumeTokenDataIn(ts, 0, 0, Value(documentKey), testUuid);
+    for (int version = 0; version <= 1; ++version) {
+        ResumeTokenData resumeTokenDataIn(ts, version, 0, Value(documentKey), testUuid);
 
-    // Test serialization/parsing through Document.
-    auto rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString));
-    ResumeTokenData tokenData = rtToken.getData();
-    ASSERT_EQ(resumeTokenDataIn, tokenData);
+        // Test serialization/parsing through Document.
+        auto rtToken =
+            ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString));
+        ResumeTokenData tokenData = rtToken.getData();
+        ASSERT_EQ(resumeTokenDataIn, tokenData);
 
-    // Test serialization/parsing through BSON.
-    rtToken =
-        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
-    tokenData = rtToken.getData();
-    ASSERT_EQ(resumeTokenDataIn, tokenData);
+        // Test serialization/parsing through BSON.
+        rtToken = ResumeToken::parse(
+            ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+        tokenData = rtToken.getData();
+        ASSERT_EQ(resumeTokenDataIn, tokenData);
+    }
 }
 
 TEST(ResumeToken, ShouldRoundTripThroughBinDataEncoding) {
@@ -93,7 +95,8 @@ TEST(ResumeToken, ShouldRoundTripThroughBinDataEncoding) {
     UUID testUuid = UUID::gen();
     Document documentKey{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
 
-    ResumeTokenData resumeTokenDataIn(ts, 0, 0, Value(documentKey), testUuid);
+    // BinData format does not have a 'version' field, so we default to 1.
+    ResumeTokenData resumeTokenDataIn(ts, 1, 0, Value(documentKey), testUuid);
 
     // Test serialization/parsing through Document.
     auto rtToken =
@@ -258,18 +261,28 @@ TEST(ResumeToken, WrongVersionToken) {
     ResumeTokenData resumeTokenDataIn;
     resumeTokenDataIn.clusterTime = ts;
     resumeTokenDataIn.version = 0;
+    resumeTokenDataIn.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
 
-    // This one with version 0 should succeed.
+    // This one with version 0 should succeed. Version 0 cannot encode the fromInvalidate bool, so
+    // we expect it to be set to the default 'kNotFromInvalidate' after serialization.
     auto rtToken =
         ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
     ResumeTokenData tokenData = rtToken.getData();
+    ASSERT_NE(resumeTokenDataIn, tokenData);
+    tokenData.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 
-    // With version 1 it should fail.
+    // Version 1 should include the 'fromInvalidate' bool through serialization.
     resumeTokenDataIn.version = 1;
     rtToken =
         ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
 
+    // With version 2 it should fail - the maximum supported version is 1.
+    resumeTokenDataIn.version = 2;
+    rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
     ASSERT_THROWS(rtToken.getData(), AssertionException);
 }
 

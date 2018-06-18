@@ -82,13 +82,21 @@ std::pair<Value, Value> encodeInBinDataFormat(const ResumeTokenData& data) {
 }  // namespace
 
 bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
-    return clusterTime == other.clusterTime &&
-        (Value::compare(this->documentKey, other.documentKey, nullptr) == 0) && uuid == other.uuid;
+    return clusterTime == other.clusterTime && version == other.version &&
+        applyOpsIndex == other.applyOpsIndex && fromInvalidate == other.fromInvalidate &&
+        uuid == other.uuid && (Value::compare(this->documentKey, other.documentKey, nullptr) == 0);
 }
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
-    return out << "{clusterTime: " << tokenData.clusterTime.toString()
-               << "  documentKey: " << tokenData.documentKey << "  uuid: " << tokenData.uuid << "}";
+    out << "{clusterTime: " << tokenData.clusterTime.toString();
+    out << ", version: " << tokenData.version;
+    out << ", applyOpsIndex: " << tokenData.applyOpsIndex;
+    if (tokenData.version > 0) {
+        out << ", fromInvalidate: " << static_cast<bool>(tokenData.fromInvalidate);
+    }
+    out << ", uuid: " << tokenData.uuid;
+    out << ", documentKey: " << tokenData.documentKey << "}";
+    return out;
 }
 
 ResumeToken::ResumeToken(const Document& resumeDoc) {
@@ -107,13 +115,16 @@ ResumeToken::ResumeToken(const Document& resumeDoc) {
 }
 
 // We encode the resume token as a KeyString with the sequence:
-// clusterTime, version, applyOpsIndex, uuid, documentKey
-// Only the clusterTime is required.
+// clusterTime, version, applyOpsIndex, fromInvalidate, uuid, documentKey
+// Only the clusterTime, version, applyOpsIndex, and fromInvalidate are required.
 ResumeToken::ResumeToken(const ResumeTokenData& data) {
     BSONObjBuilder builder;
     builder.append("", data.clusterTime);
     builder.append("", data.version);
     builder.appendNumber("", data.applyOpsIndex);
+    if (data.version >= 1) {
+        builder.appendBool("", data.fromInvalidate);
+    }
     uassert(50788,
             "Unexpected resume token with a documentKey but no UUID",
             data.uuid || data.documentKey.missing());
@@ -180,6 +191,7 @@ ResumeTokenData ResumeToken::getData() const {
     ResumeTokenData result;
     uassert(40649, "invalid empty resume token", i.more());
     result.clusterTime = i.next().timestamp();
+
     if (!i.more()) {
         // There was nothing other than the timestamp.
         return result;
@@ -195,17 +207,21 @@ ResumeTokenData ResumeToken::getData() const {
         }
         case BSONType::String: {
             // Next comes the resume token version.
+            uassert(50796, "Resume Token does not contain version", i.more());
             auto versionElt = i.next();
-            uassert(50796,
-                    "Resume Token does not contain applyOpsIndex",
+            uassert(50854,
+                    "Invalid resume token: wrong type for version",
                     versionElt.type() == BSONType::NumberInt);
             result.version = versionElt.numberInt();
-            uassert(50795, "Invalid Resume Token: only supports version 0", result.version == 0);
+            uassert(50795,
+                    "Invalid Resume Token: only supports version 0 or 1",
+                    result.version == 0 || result.version == 1);
 
-            // The new format has applyOpsIndex next.
+            // Next comes the applyOps index.
+            uassert(50793, "Resume Token does not contain applyOpsIndex", i.more());
             auto applyOpsElt = i.next();
-            uassert(50793,
-                    "Resume Token does not contain applyOpsIndex",
+            uassert(50855,
+                    "Resume Token applyOpsIndex is not an integer",
                     applyOpsElt.type() == BSONType::NumberInt);
             const int applyOpsInd = applyOpsElt.numberInt();
             uassert(50794,
@@ -213,7 +229,18 @@ ResumeTokenData ResumeToken::getData() const {
                     applyOpsInd >= 0);
             result.applyOpsIndex = applyOpsInd;
 
-            // The the UUID and documentKey are not required.
+            if (result.version >= 1) {
+                // The 'fromInvalidate' bool was added in version 1 resume tokens. We don't expect
+                // to see it on version 0. After this bool, the remaining fields should be the same.
+                uassert(50872, "Resume Token does not contain fromInvalidate", i.more());
+                auto fromInvalidate = i.next();
+                uassert(50870,
+                        "Resume Token fromInvalidate is not a boolean.",
+                        fromInvalidate.type() == BSONType::Bool);
+                result.fromInvalidate = ResumeTokenData::FromInvalidate(fromInvalidate.boolean());
+            }
+
+            // The UUID and documentKey are not required.
             if (!i.more()) {
                 return result;
             }
@@ -227,6 +254,7 @@ ResumeTokenData ResumeToken::getData() const {
         }
         default: { MONGO_UNREACHABLE }
     }
+
     uassert(40646, "invalid oversized resume token", !i.more());
     return result;
 }
