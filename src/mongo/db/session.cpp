@@ -601,14 +601,19 @@ void Session::_beginOrContinueTxn(WithLock wl,
         _setActiveTxn(wl, txnNumber);
         _autocommit = false;
         _txnState = MultiDocumentTransactionState::kInProgress;
+        // Tracks various transactions metrics.
+        _singleTransactionStats = SingleTransactionStats();
+        _singleTransactionStats->setStartTime(curTimeMicros64());
         _transactionExpireDate =
-            Date_t::now() + stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
+            Date_t::fromMillisSinceEpoch(_singleTransactionStats->getStartTime() / 1000) +
+            stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
     } else {
         // Execute a retryable write.
         invariant(startTransaction == boost::none);
         _setActiveTxn(wl, txnNumber);
         _autocommit = true;
         _txnState = MultiDocumentTransactionState::kNone;
+        // SingleTransactionStats are only for multi-document transactions.
         _singleTransactionStats = boost::none;
     }
 
@@ -845,11 +850,15 @@ void Session::_abortTransaction(WithLock wl) {
         _txnState == MultiDocumentTransactionState::kCommitted) {
         return;
     }
+    const bool isMultiDocumentTransaction = _txnState == MultiDocumentTransactionState::kInProgress;
     _txnResourceStash = boost::none;
     _transactionOperationBytes = 0;
     _transactionOperations.clear();
     _txnState = MultiDocumentTransactionState::kAborted;
     _speculativeTransactionReadOpTime = repl::OpTime();
+    if (isMultiDocumentTransaction) {
+        _singleTransactionStats->setEndTime(curTimeMicros64());
+    }
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
@@ -955,6 +964,8 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
             // Make sure the transaction didn't change because of chunk migration.
             if (opCtx->getTxnNumber() == _activeTxnNumber) {
                 _txnState = MultiDocumentTransactionState::kAborted;
+                // After the transaction has been aborted, we must update the end time.
+                _singleTransactionStats->setEndTime(curTimeMicros64());
             }
         }
         // We must clear the recovery unit and locker so any post-transaction writes can run without
@@ -979,6 +990,10 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
     _txnState = MultiDocumentTransactionState::kCommitted;
+    // After the transaction has been committed, we must update the end time.
+    if (isMultiDocumentTransaction) {
+        _singleTransactionStats->setEndTime(curTimeMicros64());
+    }
 }
 
 BSONObj Session::reportStashedState() const {
