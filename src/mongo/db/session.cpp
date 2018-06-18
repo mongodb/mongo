@@ -33,7 +33,6 @@
 #include "mongo/db/session.h"
 
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -47,7 +46,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/retryable_writes_stats.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/stats/fill_locker_info.h"
@@ -598,18 +596,6 @@ void Session::_beginOrContinueTxn(WithLock wl,
                 str::stream() << "Given transaction number " << txnNumber
                               << " does not match any in-progress transactions.",
                 startTransaction != boost::none);
-
-        // Check for FCV 4.0. The presence of an autocommit field distiguishes this as a
-        // multi-statement transaction vs a retryable write.
-        uassert(
-            50773,
-            str::stream() << "Transactions are only supported in featureCompatibilityVersion 4.0. "
-                          << "See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-             serverGlobalParams.featureCompatibility.getVersion() ==
-                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40));
 
         _setActiveTxn(wl, txnNumber);
         _autocommit = false;
