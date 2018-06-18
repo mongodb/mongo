@@ -1976,7 +1976,7 @@ var ReplSetTest = function(opts) {
 
     this.checkOplogs = function(msgPrefix) {
         var liveSlaves = _determineLiveSlaves();
-        this.checkReplicaSet(checkOplogs, liveSlaves, this, msgPrefix);
+        this.checkReplicaSet(checkOplogs, liveSlaves, this, liveSlaves, msgPrefix);
     };
 
     /**
@@ -1984,7 +1984,8 @@ var ReplSetTest = function(opts) {
      * collection, each node may not contain the same number of entries and stop if the cursor
      * is exhausted on any node being checked.
      */
-    function checkOplogs(rst, msgPrefix = 'checkOplogs') {
+    function checkOplogs(rst, slaves, msgPrefix = 'checkOplogs') {
+        slaves = slaves || rst._slaves;
         var OplogReader = function(mongo) {
             this.next = function() {
                 if (!this.cursor)
@@ -2037,7 +2038,7 @@ var ReplSetTest = function(opts) {
             this.mongo = mongo;
         };
 
-        if (rst.nodes.length && rst.nodes.length > 1) {
+        if (slaves.length >= 1) {
             var readers = [];
             var smallestTS = new Timestamp(Math.pow(2, 32) - 1, Math.pow(2, 32) - 1);
             var nodes = rst.nodes;
@@ -2046,8 +2047,7 @@ var ReplSetTest = function(opts) {
             for (var i = 0; i < rsSize; i++) {
                 const node = nodes[i];
 
-                // Only look at nodes that are up.
-                if (rst.master !== node && !rst._liveNodes.includes(node)) {
+                if (rst._master !== node && !slaves.includes(node)) {
                     continue;
                 }
 
