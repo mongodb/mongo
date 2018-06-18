@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
+#include "mongo/db/pipeline/document_source_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
@@ -318,25 +319,25 @@ void assertResumeAllowed(const intrusive_ptr<ExpressionContext>& expCtx,
             expCtx->uuid && tokenData.uuid && expCtx->uuid.get() == tokenData.uuid.get());
 }
 
-/**
- * Parses the resume options in 'spec', optionally populating the resume stage and cluster time to
- * start from.  Throws an AssertionException if not running on a replica set or multiple resume
- * options are specified.
- */
-void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
-                        const DocumentSourceChangeStreamSpec& spec,
-                        ServerGlobalParams::FeatureCompatibility::Version fcv,
-                        intrusive_ptr<DocumentSource>* resumeStageOut,
-                        boost::optional<Timestamp>* startFromOut) {
-    if (!expCtx->inMongos) {
-        auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
-        uassert(40573,
-                "The $changeStream stage is only supported on replica sets",
-                replCoord &&
-                    replCoord->getReplicationMode() ==
-                        repl::ReplicationCoordinator::Mode::modeReplSet);
-        *startFromOut = replCoord->getMyLastAppliedOpTime().getTimestamp();
-    }
+intrusive_ptr<DocumentSource> createTransformationStage(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    BSONObj changeStreamSpec,
+    ServerGlobalParams::FeatureCompatibility::Version fcv) {
+    // Mark the transformation stage as independent of any collection if the change stream is
+    // watching all collections in the database.
+    const bool isIndependentOfAnyCollection = expCtx->ns.isCollectionlessAggregateNS();
+    return intrusive_ptr<DocumentSource>(new DocumentSourceChangeStreamTransform(
+        expCtx, changeStreamSpec, fcv, isIndependentOfAnyCollection));
+}
+
+list<intrusive_ptr<DocumentSource>> buildPipeline(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const DocumentSourceChangeStreamSpec spec,
+    ServerGlobalParams::FeatureCompatibility::Version fcv,
+    BSONElement elem) {
+    list<intrusive_ptr<DocumentSource>> stages;
+    boost::optional<Timestamp> startFrom;
+    intrusive_ptr<DocumentSource> resumeStage = nullptr;
 
     if (auto resumeAfter = spec.getResumeAfter()) {
         ResumeToken token = resumeAfter.get();
@@ -346,13 +347,12 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
         // token UUID, and collation.
         assertResumeAllowed(expCtx, tokenData);
 
-        *startFromOut = tokenData.clusterTime;
+        startFrom = tokenData.clusterTime;
         if (expCtx->needsMerge) {
-            *resumeStageOut =
+            resumeStage =
                 DocumentSourceShardCheckResumability::create(expCtx, tokenData.clusterTime);
         } else {
-            *resumeStageOut =
-                DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
+            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
         }
     }
 
@@ -361,14 +361,14 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
 
     uassert(40674,
             "Only one type of resume option is allowed, but multiple were found.",
-            !(*resumeStageOut) || (!resumeAfterClusterTime && !startAtOperationTime));
+            !resumeStage || (!resumeAfterClusterTime && !startAtOperationTime));
 
     if (resumeAfterClusterTime) {
         if (fcv >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
             warning() << "The '$_resumeAfterClusterTime' option is deprecated, please use "
                          "'startAtOperationTime' instead.";
         }
-        *startFromOut = resumeAfterClusterTime->getTimestamp();
+        startFrom = resumeAfterClusterTime->getTimestamp();
     }
 
     // New field name starting in 4.0 is 'startAtOperationTime'.
@@ -381,9 +381,41 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
                     << DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeDeprecatedFieldName
                     << " in a $changeStream stage.",
                 !resumeAfterClusterTime);
-        *startFromOut = *startAtOperationTime;
-        *resumeStageOut = DocumentSourceShardCheckResumability::create(expCtx, **startFromOut);
+        startFrom = *startAtOperationTime;
+        resumeStage = DocumentSourceShardCheckResumability::create(expCtx, *startFrom);
     }
+
+    // There might not be a starting point if we're on mongos, otherwise we should either have a
+    // 'resumeAfter' starting point, or should start from the latest majority committed operation.
+    auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
+    uassert(40573,
+            "The $changeStream stage is only supported on replica sets",
+            expCtx->inMongos || (replCoord &&
+                                 replCoord->getReplicationMode() ==
+                                     repl::ReplicationCoordinator::Mode::modeReplSet));
+    if (!startFrom && !expCtx->inMongos) {
+        startFrom = replCoord->getMyLastAppliedOpTime().getTimestamp();
+    }
+
+    if (startFrom) {
+        const bool startFromInclusive = (resumeStage != nullptr);
+        stages.push_back(DocumentSourceOplogMatch::create(
+            DocumentSourceChangeStream::buildMatchFilter(expCtx, *startFrom, startFromInclusive),
+            expCtx));
+    }
+
+    stages.push_back(createTransformationStage(expCtx, elem.embeddedObject(), fcv));
+    stages.push_back(DocumentSourceCheckInvalidate::create(expCtx));
+
+    // Resume stage must come after the check invalidate stage to ensure that resuming from an
+    // invalidate or an invalidating command will not ignore the invalidation. Putting the check
+    // invalidate stage first will see the resume token before it is ignored, thereby remembering
+    // that the stream cannot continue.
+    if (resumeStage) {
+        stages.push_back(resumeStage);
+    }
+
+    return stages;
 }
 
 }  // namespace
@@ -404,10 +436,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     // Make sure that it is legal to run this $changeStream before proceeding.
     DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec, fcv);
 
-    boost::optional<Timestamp> startFrom;
-    intrusive_ptr<DocumentSource> resumeStage = nullptr;
-    parseResumeOptions(expCtx, spec, fcv, &resumeStage, &startFrom);
-
     auto fullDocOption = spec.getFullDocument();
     uassert(40575,
             str::stream() << "unrecognized value for the 'fullDocument' option to the "
@@ -419,21 +447,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
 
     const bool shouldLookupPostImage = (fullDocOption == "updateLookup"_sd);
 
-    list<intrusive_ptr<DocumentSource>> stages;
-
-    // There might not be a starting point if we're on mongos, otherwise we should either have a
-    // 'resumeAfter' starting point, or should start from the latest majority committed operation.
-    invariant(expCtx->inMongos || static_cast<bool>(startFrom));
-    if (startFrom) {
-        const bool startFromInclusive = (resumeStage != nullptr);
-        stages.push_back(DocumentSourceOplogMatch::create(
-            buildMatchFilter(expCtx, *startFrom, startFromInclusive), expCtx));
-    }
-
-    stages.push_back(createTransformationStage(expCtx, elem.embeddedObject(), fcv));
-    if (resumeStage) {
-        stages.push_back(resumeStage);
-    }
+    auto stages = buildPipeline(expCtx, spec, fcv, elem);
     if (!expCtx->needsMerge) {
         // There should only be one close cursor stage. If we're on the shards and producing input
         // to be merged, do not add a close cursor stage, since the mongos will already have one.
@@ -507,14 +521,4 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             !expCtx->ns.isSystem());
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationStage(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    BSONObj changeStreamSpec,
-    ServerGlobalParams::FeatureCompatibility::Version fcv) {
-    // Mark the transformation stage as independent of any collection if the change stream is
-    // watching all collections in the database.
-    const bool isIndependentOfAnyCollection = expCtx->ns.isCollectionlessAggregateNS();
-    return intrusive_ptr<DocumentSource>(new DocumentSourceChangeStreamTransform(
-        expCtx, changeStreamSpec, fcv, isIndependentOfAnyCollection));
-}
 }  // namespace mongo

@@ -26,11 +26,17 @@
  * then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_check_invalidate.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+using DSCS = DocumentSourceChangeStream;
 
 namespace {
 
@@ -39,11 +45,11 @@ namespace {
 bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                            StringData operationType) {
     if (pExpCtx->isSingleNamespaceAggregation()) {
-        return operationType == DocumentSourceChangeStream::kDropCollectionOpType ||
-            operationType == DocumentSourceChangeStream::kRenameCollectionOpType ||
-            operationType == DocumentSourceChangeStream::kDropDatabaseOpType;
+        return operationType == DSCS::kDropCollectionOpType ||
+            operationType == DSCS::kRenameCollectionOpType ||
+            operationType == DSCS::kDropDatabaseOpType;
     } else if (!pExpCtx->isClusterAggregation()) {
-        return operationType == DocumentSourceChangeStream::kDropDatabaseOpType;
+        return operationType == DSCS::kDropDatabaseOpType;
     } else {
         return false;
     }
@@ -51,12 +57,15 @@ bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCt
 
 }  // namespace
 
-DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
+DocumentSource::GetNextResult DocumentSourceCheckInvalidate::getNext() {
     pExpCtx->checkForInterrupt();
 
-    // Close cursor if we have returned an invalidate entry.
-    if (_shouldCloseCursor) {
-        uasserted(ErrorCodes::CloseChangeStream, "Change stream has been invalidated");
+    invariant(!pExpCtx->inMongos);
+
+    if (_queuedInvalidate) {
+        const auto res = DocumentSource::GetNextResult(std::move(_queuedInvalidate.get()));
+        _queuedInvalidate.reset();
+        return res;
     }
 
     auto nextInput = pSource->getNext();
@@ -64,15 +73,22 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
         return nextInput;
 
     auto doc = nextInput.getDocument();
-    const auto& kOperationTypeField = DocumentSourceChangeStream::kOperationTypeField;
-    DocumentSourceChangeStream::checkValueType(
-        doc[kOperationTypeField], kOperationTypeField, BSONType::String);
+    const auto& kOperationTypeField = DSCS::kOperationTypeField;
+    DSCS::checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::String);
     auto operationType = doc[kOperationTypeField].getString();
-    if (operationType == DocumentSourceChangeStream::kInvalidateOpType) {
-        // Pass the invalidation forward, so that it can be included in the results, or
-        // filtered/transformed by further stages in the pipeline, then throw an exception
-        // to close the cursor on the next call to getNext().
-        _shouldCloseCursor = true;
+
+    // If this command should invalidate the stream, generate an invalidate entry and queue it up
+    // to be returned after the notification of this command.
+    if (isInvalidatingCommand(pExpCtx, operationType)) {
+        MutableDocument result(Document{{DSCS::kIdField, doc[DSCS::kIdField]},
+                                        {DSCS::kOperationTypeField, DSCS::kInvalidateOpType},
+                                        {DSCS::kClusterTimeField, doc[DSCS::kClusterTimeField]}});
+
+        // If we're in a sharded environment, we'll need to merge the results by their sort key, so
+        // add that as metadata.
+        result.copyMetaDataFrom(doc);
+
+        _queuedInvalidate = result.freeze();
     }
 
     return nextInput;

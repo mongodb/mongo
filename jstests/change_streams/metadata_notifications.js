@@ -79,30 +79,21 @@
     coll = assertCreateCollection(db, collName);
     assert.writeOK(coll.insert({_id: 0}));
 
-    // TODO SERVER-34789: The code below should throw an error. We exercise this behavior here to
-    // be sure that it doesn't crash the server, but the ability to resume a change stream after an
-    // invalidate is a bug, not a feature.
-
     // Test resuming the change stream from the collection drop.
-    assert.doesNotThrow(function() {
-        const resumeTokenDrop = changes[2]._id;
-        const resumeCursor =
-            coll.watch([], {resumeAfter: resumeTokenDrop, collation: {locale: "simple"}});
-        assert.soon(() => resumeCursor.hasNext());
-        // Not checking the contents of the document returned, because we do not technically
-        // support this behavior.
-        resumeCursor.next();
+    cursor = cst.startWatchingChanges({
+        pipeline: [{$changeStream: {resumeAfter: changes[2]._id}}],
+        collection: collName,
+        aggregateOptions: {cursor: {batchSize: 0}, collation: {locale: "simple"}},
     });
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [{operationType: "invalidate"}]});
+
     // Test resuming the change stream from the invalidate after the drop.
-    assert.doesNotThrow(function() {
-        const resumeTokenInvalidate = changes[3]._id;
-        const resumeCursor =
-            coll.watch([], {resumeAfter: resumeTokenInvalidate, collation: {locale: "simple"}});
-        assert.soon(() => resumeCursor.hasNext());
-        // Not checking the contents of the document returned, because we do not technically
-        // support this behavior.
-        resumeCursor.next();
+    cursor = cst.startWatchingChanges({
+        pipeline: [{$changeStream: {resumeAfter: changes[3]._id}}],
+        collection: collName,
+        aggregateOptions: {cursor: {batchSize: 0}, collation: {locale: "simple"}},
     });
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [{operationType: "invalidate"}]});
 
     // Test that renaming a collection being watched generates a "rename" entry followed by an
     // "invalidate". This is true if the change stream is on the source or target collection of the

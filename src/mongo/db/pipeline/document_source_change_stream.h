@@ -175,11 +175,6 @@ public:
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    static boost::intrusive_ptr<DocumentSource> createTransformationStage(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        BSONObj changeStreamSpec,
-        ServerGlobalParams::FeatureCompatibility::Version fcv);
-
     /**
      * Given a BSON object containing an aggregation command with a $changeStream stage, and a
      * resume token, returns a new BSON object with the same command except with the addition of a

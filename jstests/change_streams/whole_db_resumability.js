@@ -97,30 +97,22 @@
     assert.writeOK(coll.insert({_id: 0}));
 
     // Test resuming from the 'dropDatabase' entry.
-    // TODO SERVER-34789: Resuming from the 'dropDatabase' should return a single invalidate
-    // notification.
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: dropDbChanges[1]._id}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
-    let change = cst.getOneChange(resumeCursor);
-    assert.eq(change.operationType, "insert", tojson(change));
-    assert.eq(change.fullDocument, {_id: 0}, tojson(change));
-    assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()}, tojson(change));
+    cst.assertNextChangesEqual(
+        {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
 
     // Test resuming from the 'invalidate' entry.
-    // TODO SERVER-34789: Resuming from an invalidate should error or return an invalidate
-    // notification.
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: dropDbChanges[2]._id}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
-    change = cst.getOneChange(resumeCursor);
-    assert.eq(change.operationType, "insert", tojson(change));
-    assert.eq(change.fullDocument, {_id: 0}, tojson(change));
-    assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()}, tojson(change));
+    cst.assertNextChangesEqual(
+        {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
 
     cst.cleanUp();
 })();
