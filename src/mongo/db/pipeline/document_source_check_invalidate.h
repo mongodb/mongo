@@ -28,34 +28,28 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_sort.h"
 
 namespace mongo {
 
 /**
- * This stage is used internally for change notifications to close cursor after returning
- * "invalidate" entries.
- * It is not intended to be created by the user.
+ * This stage is used internally for change stream notifications to artifically generate an
+ * "invalidate" entry for commands that should invalidate the change stream (e.g. collection drop
+ * for a single-collection change stream). It is not intended to be created by the user.
  */
-class DocumentSourceCloseCursor final : public DocumentSource, public NeedsMergerDocumentSource {
+class DocumentSourceCheckInvalidate final : public DocumentSource {
 public:
     GetNextResult getNext() final;
 
     const char* getSourceName() const final {
         // This is used in error reporting.
-        return "$changeStream";
+        return "$_checkInvalidate";
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        // This stage should never be in the shards part of a split pipeline.
-        invariant(pipeState != Pipeline::SplitState::kSplitForShards);
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                (pipeState == Pipeline::SplitState::kUnsplit ? HostTypeRequirement::kNone
-                                                             : HostTypeRequirement::kMongoS),
+                HostTypeRequirement::kNone,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,
@@ -63,44 +57,24 @@ public:
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        // This stage is created by the DocumentSourceChangeStream stage, so serializing it
-        // here would result in it being created twice.
+        // This stage is created by the DocumentSourceChangeStream stage, so serializing it here
+        // would result in it being created twice.
         return Value();
     }
 
-    static boost::intrusive_ptr<DocumentSourceCloseCursor> create(
+    static boost::intrusive_ptr<DocumentSourceCheckInvalidate> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceCloseCursor(expCtx);
-    }
-
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return nullptr;
-    }
-
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
-        // This stage must run on mongos to ensure it sees any invalidation in the correct order,
-        // and to ensure that all remote cursors are cleaned up properly. We also must include a
-        // mergingPresorted $sort stage to communicate to the AsyncResultsMerger that we need to
-        // merge the streams in a particular order.
-        const bool mergingPresorted = true;
-        const long long noLimit = -1;
-        auto sortMergingPresorted =
-            DocumentSourceSort::create(pExpCtx,
-                                       change_stream_constants::kSortSpec,
-                                       noLimit,
-                                       DocumentSourceSort::kMaxMemoryUsageBytes,
-                                       mergingPresorted);
-        return {sortMergingPresorted, this};
+        return new DocumentSourceCheckInvalidate(expCtx);
     }
 
 private:
     /**
-     * Use the create static method to create a DocumentSourceCloseCursor.
+     * Use the create static method to create a DocumentSourceCheckInvalidate.
      */
-    DocumentSourceCloseCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceCheckInvalidate(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(expCtx) {}
 
-    bool _shouldCloseCursor = false;
+    boost::optional<Document> _queuedInvalidate;
 };
 
 }  // namespace mongo
