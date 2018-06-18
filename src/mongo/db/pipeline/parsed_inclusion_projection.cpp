@@ -43,7 +43,8 @@ using std::unique_ptr;
 // InclusionNode
 //
 
-InclusionNode::InclusionNode(std::string pathToNode) : _pathToNode(std::move(pathToNode)) {}
+InclusionNode::InclusionNode(ProjectionArrayRecursionPolicy recursionPolicy, std::string pathToNode)
+    : _arrayRecursionPolicy(recursionPolicy), _pathToNode(std::move(pathToNode)) {}
 
 void InclusionNode::optimize() {
     for (auto&& expressionIt : _expressions) {
@@ -129,7 +130,11 @@ Value InclusionNode::applyInclusionsToValue(Value inputValue) const {
     } else if (inputValue.getType() == BSONType::Array) {
         std::vector<Value> values = inputValue.getArray();
         for (auto it = values.begin(); it != values.end(); ++it) {
-            *it = applyInclusionsToValue(*it);
+            // If this is a nested array and our policy is to not recurse, remove the array.
+            // Otherwise, descend into the array and project each element individually.
+            const bool shouldSkip = it->isArray() &&
+                _arrayRecursionPolicy == ProjectionArrayRecursionPolicy::kDoNotRecurseNestedArrays;
+            *it = (shouldSkip ? Value() : applyInclusionsToValue(*it));
         }
         return Value(std::move(values));
     } else {
@@ -222,8 +227,9 @@ InclusionNode* InclusionNode::addChild(string field) {
     invariant(!str::contains(field, "."));
     _orderToProcessAdditionsAndChildren.push_back(field);
     auto childPath = FieldPath::getFullyQualifiedPath(_pathToNode, field);
-    auto insertedPair = _children.emplace(
-        std::make_pair(std::move(field), stdx::make_unique<InclusionNode>(std::move(childPath))));
+    auto insertedPair = _children.emplace(std::make_pair(
+        std::move(field),
+        stdx::make_unique<InclusionNode>(_arrayRecursionPolicy, std::move(childPath))));
     return insertedPair.first->second.get();
 }
 
@@ -262,15 +268,15 @@ void InclusionNode::addComputedPaths(std::set<std::string>* computedPaths,
 //
 
 void ParsedInclusionProjection::parse(const BSONObj& spec) {
-    // It is illegal to specify a projection with no output fields.
+    // It is illegal to specify an inclusion with no output fields.
     bool atLeastOneFieldInOutput = false;
 
-    // Tracks whether or not we should implicitly include "_id".
+    // Tracks whether or not we should apply the default _id projection policy.
     bool idSpecified = false;
 
     for (auto elem : spec) {
         auto fieldName = elem.fieldNameStringData();
-        idSpecified = idSpecified || fieldName == "_id" || fieldName.startsWith("_id.");
+        idSpecified = idSpecified || fieldName == "_id"_sd || fieldName.startsWith("_id."_sd);
         if (fieldName == "_id") {
             const bool idIsExcluded = (!elem.trueValue() && (elem.isNumber() || elem.isBoolean()));
             if (idIsExcluded) {
@@ -327,9 +333,13 @@ void ParsedInclusionProjection::parse(const BSONObj& spec) {
     }
 
     if (!idSpecified) {
-        // "_id" wasn't specified, so include it by default.
-        atLeastOneFieldInOutput = true;
-        _root->addIncludedField(FieldPath("_id"));
+        // _id wasn't specified, so apply the default _id projection policy here.
+        if (_defaultIdPolicy == ProjectionDefaultIdPolicy::kExcludeId) {
+            _idExcluded = true;
+        } else {
+            atLeastOneFieldInOutput = true;
+            _root->addIncludedField(FieldPath("_id"));
+        }
     }
 
     uassert(16403,

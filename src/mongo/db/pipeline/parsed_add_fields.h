@@ -51,8 +51,15 @@ namespace parsed_aggregation_projection {
  */
 class ParsedAddFields : public ParsedAggregationProjection {
 public:
+    /**
+     * TODO SERVER-25510: The ParsedAggregationProjection _id and array-recursion policies are not
+     * applicable to the $addFields "projection" stage. We make them non-configurable here.
+     */
     ParsedAddFields(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ParsedAggregationProjection(expCtx), _root(new InclusionNode()) {}
+        : ParsedAggregationProjection(expCtx,
+                                      ProjectionDefaultIdPolicy::kIncludeId,
+                                      ProjectionArrayRecursionPolicy::kRecurseNestedArrays),
+          _root(new InclusionNode(_arrayRecursionPolicy)) {}
 
     /**
      * Creates the data needed to perform an AddFields.

@@ -28,14 +28,15 @@
 
 #pragma once
 
+#include "mongo/db/index/all_paths_key_generator.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
 /**
- * The IndexAccessMethod for an AllPaths index.
- * Any index created with {"field.$**": 1} or {"$**": 1} uses this.
+ * Class which is responsible for generating and providing access to AllPaths index keys. Any index
+ * created with { "$**": ±1 } or { "path.$**": ±1 } uses this class.
  */
 class AllPathsAccessMethod : public IndexAccessMethod {
 public:
@@ -43,6 +44,7 @@ public:
 
 private:
     void doGetKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
-};
 
+    const AllPathsKeyGenerator _keyGen;
+};
 }  // namespace mongo

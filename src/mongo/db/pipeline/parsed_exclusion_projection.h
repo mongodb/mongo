@@ -49,7 +49,10 @@ namespace parsed_aggregation_projection {
  */
 class ExclusionNode {
 public:
-    ExclusionNode(std::string pathToNode = "");
+    using ProjectionArrayRecursionPolicy =
+        ParsedAggregationProjection::ProjectionArrayRecursionPolicy;
+
+    ExclusionNode(ProjectionArrayRecursionPolicy recursionPolicy, std::string pathToNode = "");
 
     /**
      * Serialize this exclusion.
@@ -84,6 +87,8 @@ private:
     // Fields excluded at this level.
     stdx::unordered_set<std::string> _excludedFields;
 
+    ProjectionArrayRecursionPolicy _arrayRecursionPolicy;
+
     std::string _pathToNode;
     stdx::unordered_map<std::string, std::unique_ptr<ExclusionNode>> _children;
 };
@@ -97,8 +102,11 @@ private:
  */
 class ParsedExclusionProjection : public ParsedAggregationProjection {
 public:
-    ParsedExclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ParsedAggregationProjection(expCtx), _root(new ExclusionNode()) {}
+    ParsedExclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              ProjectionDefaultIdPolicy defaultIdPolicy,
+                              ProjectionArrayRecursionPolicy arrayRecursionPolicy)
+        : ParsedAggregationProjection(expCtx, defaultIdPolicy, arrayRecursionPolicy),
+          _root(new ExclusionNode(_arrayRecursionPolicy)) {}
 
     TransformerType getType() const final {
         return TransformerType::kExclusionProjection;

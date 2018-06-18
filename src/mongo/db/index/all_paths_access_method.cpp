@@ -26,24 +26,26 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index/all_paths_access_method.h"
 
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-// Standard AllPaths implementation below.
 AllPathsAccessMethod::AllPathsAccessMethod(IndexCatalogEntry* allPathsState,
                                            SortedDataInterface* btree)
-    : IndexAccessMethod(allPathsState, btree) {
-    // TODO: SERVER-35325: Implement AllPathsAcessMethod.
-}
+    : IndexAccessMethod(allPathsState, btree),
+      _keyGen(
+          _descriptor->keyPattern(), _descriptor->pathProjection(), _btreeState->getCollator()) {}
 
 void AllPathsAccessMethod::doGetKeys(const BSONObj& obj,
                                      BSONObjSet* keys,
                                      MultikeyPaths* multikeyPaths) const {
-    // TODO: SERVER-35325: Implement AllPathsAcessMethod.
+    // TODO SERVER-35748: Until MultikeyPaths has been updated to facilitate 'allPaths' indexes, we
+    // use AllPathsKeyGenerator::MultikeyPathsMock to separate multikey paths from RecordId keys.
+    auto multikeyPathsMock = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    _keyGen.generateKeys(obj, keys, &multikeyPathsMock);
 }
-
 }  // namespace mongo

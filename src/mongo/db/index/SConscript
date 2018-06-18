@@ -19,6 +19,7 @@ env.Library(
 env.Library(
         target='key_generator',
         source=[
+            'all_paths_key_generator.cpp',
             'btree_key_generator.cpp',
             'expression_keys_private.cpp',
             'sort_key_generator.cpp',
@@ -30,6 +31,7 @@ env.Library(
             '$BUILD_DIR/mongo/db/geo/geoparser',
             '$BUILD_DIR/mongo/db/index_names',
             '$BUILD_DIR/mongo/db/mongohasher',
+            '$BUILD_DIR/mongo/db/projection_exec_agg',
             '$BUILD_DIR/mongo/db/query/collation/collator_interface',
             '$BUILD_DIR/third_party/s2/s2',
             'expression_params',
@@ -57,6 +59,7 @@ env.Library(
 env.CppUnitTest(
         target='key_generator_test',
         source=[
+            'all_paths_key_generator_test.cpp',
             '2d_key_generator_test.cpp',
             'btree_key_generator_test.cpp',
             'hash_key_generator_test.cpp',

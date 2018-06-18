@@ -43,7 +43,8 @@ namespace parsed_aggregation_projection {
 // ExclusionNode.
 //
 
-ExclusionNode::ExclusionNode(std::string pathToNode) : _pathToNode(std::move(pathToNode)) {}
+ExclusionNode::ExclusionNode(ProjectionArrayRecursionPolicy recursionPolicy, std::string pathToNode)
+    : _arrayRecursionPolicy(recursionPolicy), _pathToNode(std::move(pathToNode)) {}
 
 Document ExclusionNode::serialize() const {
     MutableDocument output;
@@ -90,8 +91,8 @@ ExclusionNode* ExclusionNode::getChild(std::string field) const {
 ExclusionNode* ExclusionNode::addChild(std::string field) {
     auto pathToChild = _pathToNode.empty() ? field : _pathToNode + "." + field;
 
-    auto emplacedPair = _children.emplace(
-        std::make_pair(std::move(field), stdx::make_unique<ExclusionNode>(pathToChild)));
+    auto emplacedPair = _children.emplace(std::make_pair(
+        std::move(field), stdx::make_unique<ExclusionNode>(_arrayRecursionPolicy, pathToChild)));
 
     // emplacedPair is a pair<iterator position, bool inserted>.
     invariant(emplacedPair.second);
@@ -112,7 +113,12 @@ Value ExclusionNode::applyProjectionToValue(Value val) const {
             // instead will result in {a: [{b: 0}, {b: 1}]}.
             std::vector<Value> values = val.getArray();
             for (auto it = values.begin(); it != values.end(); it++) {
-                *it = applyProjectionToValue(*it);
+                // If this is a nested array and our policy is to not recurse, leave the array
+                // as-is. Otherwise, descend into the array and project each element individually.
+                const bool shouldSkip = it->isArray() &&
+                    _arrayRecursionPolicy ==
+                        ProjectionArrayRecursionPolicy::kDoNotRecurseNestedArrays;
+                *it = (shouldSkip ? *it : applyProjectionToValue(*it));
             }
             return Value(std::move(values));
         }
@@ -145,12 +151,16 @@ Document ParsedExclusionProjection::applyProjection(const Document& inputDoc) co
 }
 
 void ParsedExclusionProjection::parse(const BSONObj& spec, ExclusionNode* node, size_t depth) {
-    for (auto elem : spec) {
-        const auto fieldName = elem.fieldNameStringData().toString();
+    bool idSpecified = false;
 
-        // A $ should have been detected in ParsedAggregationProjection's parsing before we get
-        // here.
+    for (auto elem : spec) {
+        const auto fieldName = elem.fieldNameStringData();
+
+        // A $ should have been detected by ParsedAggregationProjection before we get here.
         invariant(fieldName[0] != '$');
+
+        // Track whether the projection spec specifies a desired behavior for the _id field.
+        idSpecified = idSpecified || fieldName == "_id"_sd || fieldName.startsWith("_id."_sd);
 
         switch (elem.type()) {
             case BSONType::Bool:
@@ -158,10 +168,12 @@ void ParsedExclusionProjection::parse(const BSONObj& spec, ExclusionNode* node, 
             case BSONType::NumberLong:
             case BSONType::NumberDouble:
             case BSONType::NumberDecimal: {
-                // We have already verified this is an exclusion projection.
-                invariant(!elem.trueValue());
-
-                node->excludePath(FieldPath(fieldName));
+                // We have already verified this is an exclusion projection. _id is the only field
+                // which is permitted to be explicitly included here.
+                invariant(!elem.trueValue() || elem.fieldNameStringData() == "_id"_sd);
+                if (!elem.trueValue()) {
+                    node->excludePath(FieldPath(fieldName));
+                }
                 break;
             }
             case BSONType::Object: {
@@ -194,6 +206,12 @@ void ParsedExclusionProjection::parse(const BSONObj& spec, ExclusionNode* node, 
             }
             default: { MONGO_UNREACHABLE; }
         }
+    }
+
+    // If _id was not specified, then doing nothing will cause it to be included. If the default _id
+    // policy is kExcludeId, we add a new entry for _id to the ExclusionNode tree here.
+    if (!idSpecified && _defaultIdPolicy == ProjectionDefaultIdPolicy::kExcludeId) {
+        _root->excludePath({FieldPath("_id")});
     }
 }
 

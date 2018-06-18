@@ -38,9 +38,20 @@
 namespace mongo {
 namespace {
 
+using ArrayRecursionPolicy = ProjectionExecAgg::ArrayRecursionPolicy;
+using DefaultIdPolicy = ProjectionExecAgg::DefaultIdPolicy;
+
 template <typename T>
 BSONObj wrapInLiteral(const T& arg) {
     return BSON("$literal" << arg);
+}
+
+// Helper to simplify the creation of a ProjectionExecAgg which includes _id and recurses nested
+// arrays by default.
+std::unique_ptr<ProjectionExecAgg> makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+    BSONObj projSpec) {
+    return ProjectionExecAgg::create(
+        projSpec, DefaultIdPolicy::kIncludeId, ArrayRecursionPolicy::kRecurseNestedArrays);
 }
 
 //
@@ -48,59 +59,67 @@ BSONObj wrapInLiteral(const T& arg) {
 //
 
 TEST(ProjectionExecAggErrors, ShouldRejectMixOfInclusionAndComputedFields) {
-    ASSERT_THROWS(ProjectionExecAgg::create(BSON("a" << true << "b" << wrapInLiteral(1))),
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a" << true << "b" << wrapInLiteral(1))),
                   AssertionException);
 
-    ASSERT_THROWS(ProjectionExecAgg::create(BSON("a" << wrapInLiteral(1) << "b" << true)),
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a" << wrapInLiteral(1) << "b" << true)),
                   AssertionException);
 
-    ASSERT_THROWS(ProjectionExecAgg::create(BSON("a.b" << true << "a.c" << wrapInLiteral(1))),
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a.b" << true << "a.c" << wrapInLiteral(1))),
                   AssertionException);
 
-    ASSERT_THROWS(ProjectionExecAgg::create(BSON("a.b" << wrapInLiteral(1) << "a.c" << true)),
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a.b" << wrapInLiteral(1) << "a.c" << true)),
                   AssertionException);
 
-    ASSERT_THROWS(
-        ProjectionExecAgg::create(BSON("a" << BSON("b" << true << "c" << wrapInLiteral(1)))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a" << BSON("b" << true << "c" << wrapInLiteral(1)))),
+                  AssertionException);
 
-    ASSERT_THROWS(
-        ProjectionExecAgg::create(BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << true))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << true))),
+                  AssertionException);
 }
 
 TEST(ProjectionExecAggErrors, ShouldRejectMixOfExclusionAndComputedFields) {
-    ASSERT_THROWS(ProjectionExecAgg::create(BSON("a" << false << "b" << wrapInLiteral(1))),
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a" << false << "b" << wrapInLiteral(1))),
                   AssertionException);
 
-    ASSERT_THROWS(ProjectionExecAgg::create(BSON("a" << wrapInLiteral(1) << "b" << false)),
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a" << wrapInLiteral(1) << "b" << false)),
                   AssertionException);
 
-    ASSERT_THROWS(ProjectionExecAgg::create(BSON("a.b" << false << "a.c" << wrapInLiteral(1))),
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a.b" << false << "a.c" << wrapInLiteral(1))),
                   AssertionException);
 
-    ASSERT_THROWS(ProjectionExecAgg::create(BSON("a.b" << wrapInLiteral(1) << "a.c" << false)),
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a.b" << wrapInLiteral(1) << "a.c" << false)),
                   AssertionException);
 
-    ASSERT_THROWS(
-        ProjectionExecAgg::create(BSON("a" << BSON("b" << false << "c" << wrapInLiteral(1)))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a" << BSON("b" << false << "c" << wrapInLiteral(1)))),
+                  AssertionException);
 
-    ASSERT_THROWS(
-        ProjectionExecAgg::create(BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << false))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << false))),
+                  AssertionException);
 }
 
 TEST(ProjectionExecAggErrors, ShouldRejectOnlyComputedFields) {
-    ASSERT_THROWS(
-        ProjectionExecAgg::create(BSON("a" << wrapInLiteral(1) << "b" << wrapInLiteral(1))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a" << wrapInLiteral(1) << "b" << wrapInLiteral(1))),
+                  AssertionException);
 
-    ASSERT_THROWS(
-        ProjectionExecAgg::create(BSON("a.b" << wrapInLiteral(1) << "a.c" << wrapInLiteral(1))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+                      BSON("a.b" << wrapInLiteral(1) << "a.c" << wrapInLiteral(1))),
+                  AssertionException);
 
-    ASSERT_THROWS(ProjectionExecAgg::create(
+    ASSERT_THROWS(makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
                       BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << wrapInLiteral(1)))),
                   AssertionException);
 }
@@ -108,39 +127,50 @@ TEST(ProjectionExecAggErrors, ShouldRejectOnlyComputedFields) {
 // Valid projections.
 
 TEST(ProjectionExecAggType, ShouldAcceptInclusionProjection) {
-    auto parsedProject = ProjectionExecAgg::create(BSON("a" << true));
+    auto parsedProject =
+        makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(BSON("a" << true));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
 
-    parsedProject = ProjectionExecAgg::create(BSON("_id" << false << "a" << true));
+    parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        BSON("_id" << false << "a" << true));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
 
-    parsedProject = ProjectionExecAgg::create(BSON("_id" << false << "a.b.c" << true));
+    parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        BSON("_id" << false << "a.b.c" << true));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
 
-    parsedProject = ProjectionExecAgg::create(BSON("_id.x" << true));
+    parsedProject =
+        makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(BSON("_id.x" << true));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
 
-    parsedProject = ProjectionExecAgg::create(BSON("_id" << BSON("x" << true)));
+    parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        BSON("_id" << BSON("x" << true)));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
 
-    parsedProject = ProjectionExecAgg::create(BSON("x" << BSON("_id" << true)));
+    parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        BSON("x" << BSON("_id" << true)));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
 }
 
 TEST(ProjectionExecAggType, ShouldAcceptExclusionProjection) {
-    auto parsedProject = ProjectionExecAgg::create(BSON("a" << false));
+    auto parsedProject =
+        makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(BSON("a" << false));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
 
-    parsedProject = ProjectionExecAgg::create(BSON("_id.x" << false));
+    parsedProject =
+        makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(BSON("_id.x" << false));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
 
-    parsedProject = ProjectionExecAgg::create(BSON("_id" << BSON("x" << false)));
+    parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        BSON("_id" << BSON("x" << false)));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
 
-    parsedProject = ProjectionExecAgg::create(BSON("x" << BSON("_id" << false)));
+    parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        BSON("x" << BSON("_id" << false)));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
 
-    parsedProject = ProjectionExecAgg::create(BSON("_id" << false));
+    parsedProject =
+        makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(BSON("_id" << false));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
 }
 

@@ -44,11 +44,24 @@ namespace mongo {
 namespace parsed_aggregation_projection {
 namespace {
 
+using ProjectionArrayRecursionPolicy = ParsedAggregationProjection::ProjectionArrayRecursionPolicy;
+using ProjectionDefaultIdPolicy = ParsedAggregationProjection::ProjectionDefaultIdPolicy;
 using ProjectionParseMode = ParsedAggregationProjection::ProjectionParseMode;
 
 template <typename T>
 BSONObj wrapInLiteral(const T& arg) {
     return BSON("$literal" << arg);
+}
+
+// Helper to simplify the creation of a ParsedAggregationProjection which includes _id and recurses
+// nested arrays by default.
+std::unique_ptr<ParsedAggregationProjection> makeProjectionWithDefaultPolicies(BSONObj projSpec) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    return ParsedAggregationProjection::create(
+        expCtx,
+        projSpec,
+        ProjectionDefaultIdPolicy::kIncludeId,
+        ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
 }
 
 //
@@ -58,73 +71,69 @@ BSONObj wrapInLiteral(const T& arg) {
 TEST(ParsedAggregationProjectionErrors, ShouldRejectDuplicateFieldNames) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Include/exclude the same field twice.
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << true << "a" << true)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << true << "a" << true)),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << false << "a" << false)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << false << "a" << false)),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << BSON("b" << false << "b" << false))),
-                  AssertionException);
+    ASSERT_THROWS(
+        makeProjectionWithDefaultPolicies(BSON("a" << BSON("b" << false << "b" << false))),
+        AssertionException);
 
     // Mix of include/exclude and adding a field.
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("a" << wrapInLiteral(1) << "a" << true)),
-        AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("a" << false << "a" << wrapInLiteral(0))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << wrapInLiteral(1) << "a" << true)),
+                  AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << false << "a" << wrapInLiteral(0))),
+                  AssertionException);
 
     // Adding the same field twice.
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << wrapInLiteral(1) << "a" << wrapInLiteral(0))),
-                  AssertionException);
+    ASSERT_THROWS(
+        makeProjectionWithDefaultPolicies(BSON("a" << wrapInLiteral(1) << "a" << wrapInLiteral(0))),
+        AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldRejectDuplicateIds) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Include/exclude _id twice.
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("_id" << true << "_id" << true)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("_id" << true << "_id" << true)),
                   AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("_id" << false << "_id" << false)),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("_id" << false << "_id" << false)),
+                  AssertionException);
 
     // Mix of including/excluding and adding _id.
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("_id" << wrapInLiteral(1) << "_id" << true)),
-                  AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("_id" << false << "_id" << wrapInLiteral(0))),
-                  AssertionException);
+    ASSERT_THROWS(
+        makeProjectionWithDefaultPolicies(BSON("_id" << wrapInLiteral(1) << "_id" << true)),
+        AssertionException);
+    ASSERT_THROWS(
+        makeProjectionWithDefaultPolicies(BSON("_id" << false << "_id" << wrapInLiteral(0))),
+        AssertionException);
 
     // Adding _id twice.
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("_id" << wrapInLiteral(1) << "_id" << wrapInLiteral(0))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("_id" << wrapInLiteral(1) << "_id" << wrapInLiteral(0))),
                   AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldRejectFieldsWithSharedPrefix) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Include/exclude Fields with a shared prefix.
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << true << "a.b" << true)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << true << "a.b" << true)),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a.b" << false << "a" << false)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a.b" << false << "a" << false)),
                   AssertionException);
 
     // Mix of include/exclude and adding a shared prefix.
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("a" << wrapInLiteral(1) << "a.b" << true)),
-        AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a.b" << false << "a" << wrapInLiteral(0))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << wrapInLiteral(1) << "a.b" << true)),
                   AssertionException);
+    ASSERT_THROWS(
+        makeProjectionWithDefaultPolicies(BSON("a.b" << false << "a" << wrapInLiteral(0))),
+        AssertionException);
 
     // Adding a shared prefix twice.
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << wrapInLiteral(1) << "a.b" << wrapInLiteral(0))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << wrapInLiteral(1) << "a.b" << wrapInLiteral(0))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a.b.c.d" << wrapInLiteral(1) << "a.b.c" << wrapInLiteral(0))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a.b.c.d" << wrapInLiteral(1) << "a.b.c" << wrapInLiteral(0))),
                   AssertionException);
 }
 
@@ -132,44 +141,39 @@ TEST(ParsedAggregationProjectionErrors, ShouldRejectPathConflictsWithNonAlphaNum
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Include/exclude non-alphanumeric fields with a shared prefix. First assert that the non-
     // alphanumeric fields are accepted when no prefixes are present.
-    ASSERT(ParsedAggregationProjection::create(
-        expCtx, BSON("a.b-c" << true << "a.b" << true << "a.b?c" << true << "a.b c" << true)));
-    ASSERT(ParsedAggregationProjection::create(
-        expCtx, BSON("a.b c" << false << "a.b?c" << false << "a.b" << false << "a.b-c" << false)));
+    ASSERT(makeProjectionWithDefaultPolicies(
+        BSON("a.b-c" << true << "a.b" << true << "a.b?c" << true << "a.b c" << true)));
+    ASSERT(makeProjectionWithDefaultPolicies(
+        BSON("a.b c" << false << "a.b?c" << false << "a.b" << false << "a.b-c" << false)));
 
     // Then assert that we throw when we introduce a prefixed field.
     ASSERT_THROWS(
-        ParsedAggregationProjection::create(
-            expCtx,
+        makeProjectionWithDefaultPolicies(
             BSON("a.b-c" << true << "a.b" << true << "a.b?c" << true << "a.b c" << true << "a.b.d"
                          << true)),
         AssertionException);
     ASSERT_THROWS(
-        ParsedAggregationProjection::create(
-            expCtx,
-            BSON("a.b.d" << false << "a.b c" << false << "a.b?c" << false << "a.b" << false
-                         << "a.b-c"
-                         << false)),
+        makeProjectionWithDefaultPolicies(BSON(
+            "a.b.d" << false << "a.b c" << false << "a.b?c" << false << "a.b" << false << "a.b-c"
+                    << false)),
         AssertionException);
 
     // Adding the same field twice.
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a.b?c" << wrapInLiteral(1) << "a.b?c" << wrapInLiteral(0))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a.b?c" << wrapInLiteral(1) << "a.b?c" << wrapInLiteral(0))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a.b c" << wrapInLiteral(0) << "a.b c" << wrapInLiteral(1))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a.b c" << wrapInLiteral(0) << "a.b c" << wrapInLiteral(1))),
                   AssertionException);
 
     // Mix of include/exclude and adding a shared prefix.
     ASSERT_THROWS(
-        ParsedAggregationProjection::create(
-            expCtx,
+        makeProjectionWithDefaultPolicies(
             BSON("a.b-c" << true << "a.b" << wrapInLiteral(1) << "a.b?c" << true << "a.b c" << true
                          << "a.b.d"
                          << true)),
         AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx,
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
                       BSON("a.b.d" << false << "a.b c" << false << "a.b?c" << false << "a.b"
                                    << wrapInLiteral(0)
                                    << "a.b-c"
@@ -177,8 +181,7 @@ TEST(ParsedAggregationProjectionErrors, ShouldRejectPathConflictsWithNonAlphaNum
                   AssertionException);
 
     // Adding a shared prefix twice.
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx,
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
                       BSON("a.b-c" << wrapInLiteral(1) << "a.b" << wrapInLiteral(1) << "a.b?c"
                                    << wrapInLiteral(1)
                                    << "a.b c"
@@ -186,8 +189,7 @@ TEST(ParsedAggregationProjectionErrors, ShouldRejectPathConflictsWithNonAlphaNum
                                    << "a.b.d"
                                    << wrapInLiteral(0))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx,
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
                       BSON("a.b.d" << wrapInLiteral(1) << "a.b c" << wrapInLiteral(1) << "a.b?c"
                                    << wrapInLiteral(1)
                                    << "a.b"
@@ -200,232 +202,206 @@ TEST(ParsedAggregationProjectionErrors, ShouldRejectPathConflictsWithNonAlphaNum
 TEST(ParsedAggregationProjectionErrors, ShouldRejectMixOfIdAndSubFieldsOfId) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Include/exclude _id twice.
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("_id" << true << "_id.x" << true)),
-        AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("_id.x" << false << "_id" << false)),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("_id" << true << "_id.x" << true)),
+                  AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("_id.x" << false << "_id" << false)),
+                  AssertionException);
 
     // Mix of including/excluding and adding _id.
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("_id" << wrapInLiteral(1) << "_id.x" << true)),
-                  AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("_id.x" << false << "_id" << wrapInLiteral(0))),
-                  AssertionException);
+    ASSERT_THROWS(
+        makeProjectionWithDefaultPolicies(BSON("_id" << wrapInLiteral(1) << "_id.x" << true)),
+        AssertionException);
+    ASSERT_THROWS(
+        makeProjectionWithDefaultPolicies(BSON("_id.x" << false << "_id" << wrapInLiteral(0))),
+        AssertionException);
 
     // Adding _id twice.
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("_id" << wrapInLiteral(1) << "_id.x" << wrapInLiteral(0))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("_id" << wrapInLiteral(1) << "_id.x" << wrapInLiteral(0))),
                   AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(
-            expCtx, BSON("_id.b.c.d" << wrapInLiteral(1) << "_id.b.c" << wrapInLiteral(0))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("_id.b.c.d" << wrapInLiteral(1) << "_id.b.c" << wrapInLiteral(0))),
+                  AssertionException);
+}
+
+TEST(ParsedAggregationProjectionErrors, ShouldAllowMixOfIdInclusionAndExclusion) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    // Mixing "_id" inclusion with exclusion.
+    auto parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << true << "a" << false));
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
+
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("a" << false << "_id" << true));
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
+
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << true << "a.b.c" << false));
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldRejectMixOfInclusionAndExclusion) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Simple mix.
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << true << "b" << false)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << true << "b" << false)),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << false << "b" << true)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << false << "b" << true)),
                   AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("a" << BSON("b" << false << "c" << true))),
-        AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("_id" << BSON("b" << false << "c" << true))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << BSON("b" << false << "c" << true))),
                   AssertionException);
     ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("_id.b" << false << "a.c" << true)),
+        makeProjectionWithDefaultPolicies(BSON("_id" << BSON("b" << false << "c" << true))),
         AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("_id.b" << false << "a.c" << true)),
+                  AssertionException);
 
     // Mix while also adding a field.
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << true << "b" << wrapInLiteral(1) << "c" << false)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << true << "b" << wrapInLiteral(1) << "c" << false)),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << false << "b" << wrapInLiteral(1) << "c" << true)),
-                  AssertionException);
-
-    // Mixing "_id" inclusion with exclusion.
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("_id" << true << "a" << false)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << false << "b" << wrapInLiteral(1) << "c" << true)),
                   AssertionException);
 
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << false << "_id" << true)),
+    // Mix of "_id" subfield inclusion and exclusion.
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("_id.x" << true << "a.b.c" << false)),
                   AssertionException);
-
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("_id" << true << "a.b.c" << false)),
-        AssertionException);
-
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("_id.x" << true << "a.b.c" << false)),
-        AssertionException);
 }
 
-TEST(ParsedAggregationProjectionType, ShouldRejectMixOfExclusionAndComputedFields) {
+TEST(ParsedAggregationProjectionErrors, ShouldRejectMixOfExclusionAndComputedFields) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << false << "b" << wrapInLiteral(1))),
+                  AssertionException);
+
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << wrapInLiteral(1) << "b" << false)),
+                  AssertionException);
+
     ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("a" << false << "b" << wrapInLiteral(1))),
+        makeProjectionWithDefaultPolicies(BSON("a.b" << false << "a.c" << wrapInLiteral(1))),
         AssertionException);
 
     ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("a" << wrapInLiteral(1) << "b" << false)),
+        makeProjectionWithDefaultPolicies(BSON("a.b" << wrapInLiteral(1) << "a.c" << false)),
         AssertionException);
 
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a.b" << false << "a.c" << wrapInLiteral(1))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << BSON("b" << false << "c" << wrapInLiteral(1)))),
                   AssertionException);
 
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a.b" << wrapInLiteral(1) << "a.c" << false)),
-                  AssertionException);
-
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << BSON("b" << false << "c" << wrapInLiteral(1)))),
-                  AssertionException);
-
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << false))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << false))),
                   AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldRejectDottedFieldInSubDocument) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << BSON("b.c" << true))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << BSON("b.c" << true))),
                   AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("a" << BSON("b.c" << wrapInLiteral(1)))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << BSON("b.c" << wrapInLiteral(1)))),
+                  AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldRejectFieldNamesStartingWithADollar) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("$dollar" << 0)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("$dollar" << 0)), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("$dollar" << 1)), AssertionException);
+
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("b.$dollar" << 0)), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("b.$dollar" << 1)), AssertionException);
+
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("b" << BSON("$dollar" << 0))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("$dollar" << 1)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("b" << BSON("$dollar" << 1))),
                   AssertionException);
 
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("b.$dollar" << 0)),
-                  AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("b.$dollar" << 1)),
-                  AssertionException);
-
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("b" << BSON("$dollar" << 0))),
-                  AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("b" << BSON("$dollar" << 1))),
-                  AssertionException);
-
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("$add" << 0)),
-                  AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("$add" << 1)),
-                  AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("$add" << 0)), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("$add" << 1)), AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldRejectTopLevelExpressions) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("$add" << BSON_ARRAY(4 << 2))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("$add" << BSON_ARRAY(4 << 2))),
                   AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldRejectExpressionWithMultipleFieldNames) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << BSON("$add" << BSON_ARRAY(4 << 2) << "b" << 1))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << BSON("$add" << BSON_ARRAY(4 << 2) << "b" << 1))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << BSON("b" << 1 << "$add" << BSON_ARRAY(4 << 2)))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << BSON("b" << 1 << "$add" << BSON_ARRAY(4 << 2)))),
                   AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(
-            expCtx, BSON("a" << BSON("b" << BSON("c" << 1 << "$add" << BSON_ARRAY(4 << 2))))),
-        AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(
-            expCtx, BSON("a" << BSON("b" << BSON("$add" << BSON_ARRAY(4 << 2) << "c" << 1)))),
-        AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << BSON("b" << BSON("c" << 1 << "$add" << BSON_ARRAY(4 << 2))))),
+                  AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << BSON("b" << BSON("$add" << BSON_ARRAY(4 << 2) << "c" << 1)))),
+                  AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldRejectEmptyProjection) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSONObj()), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSONObj()), AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldRejectEmptyNestedObject) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << BSONObj())),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << BSONObj())), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << false << "b" << BSONObj())),
                   AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("a" << false << "b" << BSONObj())),
-        AssertionException);
-    ASSERT_THROWS(
-        ParsedAggregationProjection::create(expCtx, BSON("a" << true << "b" << BSONObj())),
-        AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a.b" << BSONObj())),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << true << "b" << BSONObj())),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << BSON("b" << BSONObj()))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a.b" << BSONObj())), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << BSON("b" << BSONObj()))),
                   AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldErrorOnInvalidExpression) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << false << "b" << BSON("$unknown" << BSON_ARRAY(4 << 2)))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << false << "b" << BSON("$unknown" << BSON_ARRAY(4 << 2)))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(
-                      expCtx, BSON("a" << true << "b" << BSON("$unknown" << BSON_ARRAY(4 << 2)))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(
+                      BSON("a" << true << "b" << BSON("$unknown" << BSON_ARRAY(4 << 2)))),
                   AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldErrorOnInvalidFieldPath) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Empty field names.
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("" << wrapInLiteral(2))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("" << wrapInLiteral(2))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("" << true)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("" << true)), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("" << false)), AssertionException);
+
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << BSON("" << true))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("" << false)),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a" << BSON("" << false))),
                   AssertionException);
 
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << BSON("" << true))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("" << BSON("a" << true))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a" << BSON("" << false))),
-                  AssertionException);
-
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("" << BSON("a" << true))),
-                  AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("" << BSON("a" << false))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("" << BSON("a" << false))),
                   AssertionException);
 
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a." << true)),
-                  AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("a." << false)),
-                  AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a." << true)), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("a." << false)), AssertionException);
 
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON(".a" << true)),
-                  AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON(".a" << false)),
-                  AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON(".a" << true)), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON(".a" << false)), AssertionException);
 
     // Not testing field names with null bytes, since that is invalid BSON, and won't make it to the
     // $project stage without a previous error.
 
     // Field names starting with '$'.
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("$x" << wrapInLiteral(2))),
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("$x" << wrapInLiteral(2))),
                   AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("c.$d" << true)),
-                  AssertionException);
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx, BSON("c.$d" << false)),
-                  AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("c.$d" << true)), AssertionException);
+    ASSERT_THROWS(makeProjectionWithDefaultPolicies(BSON("c.$d" << false)), AssertionException);
 }
 
 TEST(ParsedAggregationProjectionErrors, ShouldNotErrorOnTwoNestedFields) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedAggregationProjection::create(expCtx, BSON("a.b" << true << "a.c" << true));
-    ParsedAggregationProjection::create(expCtx, BSON("a.b" << true << "a" << BSON("c" << true)));
+    makeProjectionWithDefaultPolicies(BSON("a.b" << true << "a.c" << true));
+    makeProjectionWithDefaultPolicies(BSON("a.b" << true << "a" << BSON("c" << true)));
 }
 
 //
@@ -434,202 +410,259 @@ TEST(ParsedAggregationProjectionErrors, ShouldNotErrorOnTwoNestedFields) {
 
 TEST(ParsedAggregationProjectionType, ShouldDefaultToInclusionProjection) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << true));
+    auto parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << true));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << wrapInLiteral(1)));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << wrapInLiteral(1)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("a" << wrapInLiteral(1)));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("a" << wrapInLiteral(1)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionType, ShouldDetectExclusionProjection) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto parsedProject = ParsedAggregationProjection::create(expCtx, BSON("a" << false));
+    auto parsedProject = makeProjectionWithDefaultPolicies(BSON("a" << false));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id.x" << false));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id.x" << false));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << BSON("x" << false)));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << BSON("x" << false)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("x" << BSON("_id" << false)));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("x" << BSON("_id" << false)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << false));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << false));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionType, ShouldDetectInclusionProjection) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto parsedProject = ParsedAggregationProjection::create(expCtx, BSON("a" << true));
+    auto parsedProject = makeProjectionWithDefaultPolicies(BSON("a" << true));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject =
-        ParsedAggregationProjection::create(expCtx, BSON("_id" << false << "a" << true));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << false << "a" << true));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject =
-        ParsedAggregationProjection::create(expCtx, BSON("_id" << false << "a.b.c" << true));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << false << "a.b.c" << true));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id.x" << true));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id.x" << true));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id" << BSON("x" << true)));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << BSON("x" << true)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("x" << BSON("_id" << true)));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("x" << BSON("_id" << true)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionType, ShouldTreatOnlyComputedFieldsAsAnInclusionProjection) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto parsedProject = ParsedAggregationProjection::create(expCtx, BSON("a" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
-
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("_id" << false << "a" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
-
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("_id" << false << "a.b.c" << wrapInLiteral(1)));
-    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
-
-    parsedProject = ParsedAggregationProjection::create(expCtx, BSON("_id.x" << wrapInLiteral(1)));
+    auto parsedProject = makeProjectionWithDefaultPolicies(BSON("a" << wrapInLiteral(1)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject =
-        ParsedAggregationProjection::create(expCtx, BSON("_id" << BSON("x" << wrapInLiteral(1))));
+        makeProjectionWithDefaultPolicies(BSON("_id" << false << "a" << wrapInLiteral(1)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
     parsedProject =
-        ParsedAggregationProjection::create(expCtx, BSON("x" << BSON("_id" << wrapInLiteral(1))));
+        makeProjectionWithDefaultPolicies(BSON("_id" << false << "a.b.c" << wrapInLiteral(1)));
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id.x" << wrapInLiteral(1)));
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("_id" << BSON("x" << wrapInLiteral(1))));
+    ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
+
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("x" << BSON("_id" << wrapInLiteral(1))));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 }
 
 TEST(ParsedAggregationProjectionType, ShouldAllowMixOfInclusionAndComputedFields) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto parsedProject =
-        ParsedAggregationProjection::create(expCtx, BSON("a" << true << "b" << wrapInLiteral(1)));
+        makeProjectionWithDefaultPolicies(BSON("a" << true << "b" << wrapInLiteral(1)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("a.b" << true << "a.c" << wrapInLiteral(1)));
+    parsedProject =
+        makeProjectionWithDefaultPolicies(BSON("a.b" << true << "a.c" << wrapInLiteral(1)));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("a" << BSON("b" << true << "c" << wrapInLiteral(1))));
+    parsedProject = makeProjectionWithDefaultPolicies(
+        BSON("a" << BSON("b" << true << "c" << wrapInLiteral(1))));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(expCtx,
-                                                        BSON("a" << BSON("b" << true << "c"
-                                                                             << "stringLiteral")));
+    parsedProject = makeProjectionWithDefaultPolicies(BSON("a" << BSON("b" << true << "c"
+                                                                           << "stringLiteral")));
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 }
 
-TEST(ParsedAggregationProjectionType, ShouldRejectMixOfInclusionAndComputedFieldsInStrictMode) {
+TEST(ParsedAggregationProjectionType, ShouldRejectMixOfInclusionAndBannedComputedFields) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx,
-                                                      BSON("a" << true << "b" << wrapInLiteral(1)),
-                                                      ProjectionParseMode::kBanComputedFields),
-                  AssertionException);
+    ASSERT_THROWS(
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("a" << true << "b" << wrapInLiteral(1)),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields),
+        AssertionException);
 
     ASSERT_THROWS(
         ParsedAggregationProjection::create(expCtx,
                                             BSON("a.b" << true << "a.c" << wrapInLiteral(1)),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
                                             ProjectionParseMode::kBanComputedFields),
         AssertionException);
 
     ASSERT_THROWS(ParsedAggregationProjection::create(
                       expCtx,
                       BSON("a" << BSON("b" << true << "c" << wrapInLiteral(1))),
+                      ProjectionDefaultIdPolicy::kIncludeId,
+                      ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
                       ProjectionParseMode::kBanComputedFields),
                   AssertionException);
 
-    ASSERT_THROWS(ParsedAggregationProjection::create(expCtx,
-                                                      BSON("a" << BSON("b" << true << "c"
-                                                                           << "stringLiteral")),
-                                                      ProjectionParseMode::kBanComputedFields),
-                  AssertionException);
+    ASSERT_THROWS(
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("a" << BSON("b" << true << "c"
+                                                                 << "stringLiteral")),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields),
+        AssertionException);
 }
 
-TEST(ParsedAggregationProjectionType, ShouldRejectOnlyComputedFieldsInStrictMode) {
+TEST(ParsedAggregationProjectionType, ShouldRejectOnlyComputedFieldsWhenComputedFieldsAreBanned) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_THROWS(ParsedAggregationProjection::create(
                       expCtx,
                       BSON("a" << wrapInLiteral(1) << "b" << wrapInLiteral(2)),
+                      ProjectionDefaultIdPolicy::kIncludeId,
+                      ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
                       ProjectionParseMode::kBanComputedFields),
                   AssertionException);
 
     ASSERT_THROWS(ParsedAggregationProjection::create(
                       expCtx,
                       BSON("a.b" << wrapInLiteral(1) << "a.c" << wrapInLiteral(2)),
+                      ProjectionDefaultIdPolicy::kIncludeId,
+                      ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
                       ProjectionParseMode::kBanComputedFields),
                   AssertionException);
 
     ASSERT_THROWS(ParsedAggregationProjection::create(
                       expCtx,
                       BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << wrapInLiteral(2))),
+                      ProjectionDefaultIdPolicy::kIncludeId,
+                      ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
                       ProjectionParseMode::kBanComputedFields),
                   AssertionException);
 
     ASSERT_THROWS(ParsedAggregationProjection::create(
                       expCtx,
                       BSON("a" << BSON("b" << wrapInLiteral(1) << "c" << wrapInLiteral(2))),
+                      ProjectionDefaultIdPolicy::kIncludeId,
+                      ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
                       ProjectionParseMode::kBanComputedFields),
                   AssertionException);
 }
 
-TEST(ParsedAggregationProjectionType, ShouldAcceptInclusionProjectionInStrictMode) {
+TEST(ParsedAggregationProjectionType, ShouldAcceptInclusionProjectionWhenComputedFieldsAreBanned) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("a" << true), ProjectionParseMode::kBanComputedFields);
+    auto parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("a" << true),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("_id" << false << "a" << true), ProjectionParseMode::kBanComputedFields);
+    parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("_id" << false << "a" << true),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("_id" << false << "a.b.c" << true), ProjectionParseMode::kBanComputedFields);
+    parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("_id" << false << "a.b.c" << true),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("_id.x" << true), ProjectionParseMode::kBanComputedFields);
+    parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("_id.x" << true),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("_id" << BSON("x" << true)), ProjectionParseMode::kBanComputedFields);
+    parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("_id" << BSON("x" << true)),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("x" << BSON("_id" << true)), ProjectionParseMode::kBanComputedFields);
+    parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("x" << BSON("_id" << true)),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kInclusionProjection);
 }
 
-TEST(ParsedAggregationProjectionType, ShouldAcceptExclusionProjectionInStrictMode) {
+TEST(ParsedAggregationProjectionType, ShouldAcceptExclusionProjectionWhenComputedFieldsAreBanned) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("a" << false), ProjectionParseMode::kBanComputedFields);
+    auto parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("a" << false),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("_id.x" << false), ProjectionParseMode::kBanComputedFields);
+    parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("_id.x" << false),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("_id" << BSON("x" << false)), ProjectionParseMode::kBanComputedFields);
+    parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("_id" << BSON("x" << false)),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("x" << BSON("_id" << false)), ProjectionParseMode::kBanComputedFields);
+    parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("x" << BSON("_id" << false)),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 
-    parsedProject = ParsedAggregationProjection::create(
-        expCtx, BSON("_id" << false), ProjectionParseMode::kBanComputedFields);
+    parsedProject =
+        ParsedAggregationProjection::create(expCtx,
+                                            BSON("_id" << false),
+                                            ProjectionDefaultIdPolicy::kIncludeId,
+                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays,
+                                            ProjectionParseMode::kBanComputedFields);
     ASSERT(parsedProject->getType() == TransformerInterface::TransformerType::kExclusionProjection);
 }
 
@@ -637,8 +670,7 @@ TEST(ParsedAggregationProjectionType, ShouldCoerceNumericsToBools) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     std::vector<Value> zeros = {Value(0), Value(0LL), Value(0.0), Value(Decimal128(0))};
     for (auto&& zero : zeros) {
-        auto parsedProject =
-            ParsedAggregationProjection::create(expCtx, Document{{"a", zero}}.toBson());
+        auto parsedProject = makeProjectionWithDefaultPolicies(Document{{"a", zero}}.toBson());
         ASSERT(parsedProject->getType() ==
                TransformerInterface::TransformerType::kExclusionProjection);
     }
@@ -646,8 +678,7 @@ TEST(ParsedAggregationProjectionType, ShouldCoerceNumericsToBools) {
     std::vector<Value> nonZeroes = {
         Value(1), Value(-1), Value(3), Value(1LL), Value(1.0), Value(Decimal128(1))};
     for (auto&& nonZero : nonZeroes) {
-        auto parsedProject =
-            ParsedAggregationProjection::create(expCtx, Document{{"a", nonZero}}.toBson());
+        auto parsedProject = makeProjectionWithDefaultPolicies(Document{{"a", nonZero}}.toBson());
         ASSERT(parsedProject->getType() ==
                TransformerInterface::TransformerType::kInclusionProjection);
     }

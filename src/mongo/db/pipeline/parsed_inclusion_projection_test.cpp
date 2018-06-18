@@ -40,11 +40,16 @@
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace parsed_aggregation_projection {
 namespace {
+
+using ProjectionArrayRecursionPolicy = ParsedAggregationProjection::ProjectionArrayRecursionPolicy;
+using ProjectionDefaultIdPolicy = ParsedAggregationProjection::ProjectionDefaultIdPolicy;
+
 using std::vector;
 
 template <typename T>
@@ -52,23 +57,43 @@ BSONObj wrapInLiteral(const T& arg) {
     return BSON("$literal" << arg);
 }
 
-TEST(InclusionProjection, ShouldThrowWhenParsingInvalidExpression) {
+// Helper to simplify the creation of a ParsedInclusionProjection which includes _id and recurses
+// nested arrays by default.
+ParsedInclusionProjection makeInclusionProjectionWithDefaultPolicies() {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    return ParsedInclusionProjection(expCtx,
+                                     ProjectionDefaultIdPolicy::kIncludeId,
+                                     ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
+}
+
+DEATH_TEST(InclusionProjection,
+           ShouldFailWhenGivenExcludedNonIdField,
+           "Invariant failure elem.trueValue()") {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
+    inclusion.parse(BSON("a" << false));
+}
+
+DEATH_TEST(InclusionProjection,
+           ShouldFailWhenGivenIncludedIdSubfield,
+           "Invariant failure elem.trueValue()") {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
+    inclusion.parse(BSON("_id.id1" << false));
+}
+
+TEST(InclusionProjection, ShouldThrowWhenParsingInvalidExpression) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     ASSERT_THROWS(inclusion.parse(BSON("a" << BSON("$gt" << BSON("bad"
                                                                  << "arguments")))),
                   AssertionException);
 }
 
 TEST(InclusionProjection, ShouldRejectProjectionWithNoOutputFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     ASSERT_THROWS(inclusion.parse(BSON("_id" << false)), AssertionException);
 }
 
 TEST(InclusionProjection, ShouldAddIncludedFieldsToDependencies) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("_id" << false << "a" << true << "x.y" << true));
 
     DepsTracker deps;
@@ -81,8 +106,7 @@ TEST(InclusionProjection, ShouldAddIncludedFieldsToDependencies) {
 }
 
 TEST(InclusionProjection, ShouldAddIdToDependenciesIfNotSpecified) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true));
 
     DepsTracker deps;
@@ -94,8 +118,7 @@ TEST(InclusionProjection, ShouldAddIdToDependenciesIfNotSpecified) {
 }
 
 TEST(InclusionProjection, ShouldAddDependenciesOfComputedFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a"
                          << "$a"
                          << "x"
@@ -111,8 +134,7 @@ TEST(InclusionProjection, ShouldAddDependenciesOfComputedFields) {
 }
 
 TEST(InclusionProjection, ShouldAddPathToDependenciesForNestedComputedFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("x.y"
                          << "$z"));
 
@@ -129,8 +151,7 @@ TEST(InclusionProjection, ShouldAddPathToDependenciesForNestedComputedFields) {
 }
 
 TEST(InclusionProjection, ShouldSerializeToEquivalentProjection) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(fromjson("{a: {$add: ['$a', 2]}, b: {d: 3}, 'x.y': {$literal: 4}}"));
 
     // Adds implicit "_id" inclusion, converts numbers to bools, serializes expressions.
@@ -148,8 +169,7 @@ TEST(InclusionProjection, ShouldSerializeToEquivalentProjection) {
 }
 
 TEST(InclusionProjection, ShouldSerializeExplicitExclusionOfId) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("_id" << false << "a" << true));
 
     // Adds implicit "_id" inclusion, converts numbers to bools, serializes expressions.
@@ -167,8 +187,7 @@ TEST(InclusionProjection, ShouldSerializeExplicitExclusionOfId) {
 
 
 TEST(InclusionProjection, ShouldOptimizeTopLevelExpressions) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << BSON("$add" << BSON_ARRAY(1 << 2))));
 
     inclusion.optimize();
@@ -186,8 +205,7 @@ TEST(InclusionProjection, ShouldOptimizeTopLevelExpressions) {
 }
 
 TEST(InclusionProjection, ShouldOptimizeNestedExpressions) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.b" << BSON("$add" << BSON_ARRAY(1 << 2))));
 
     inclusion.optimize();
@@ -206,8 +224,7 @@ TEST(InclusionProjection, ShouldOptimizeNestedExpressions) {
 }
 
 TEST(InclusionProjection, ShouldReportThatAllExceptIncludedFieldsAreModified) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON(
         "a" << wrapInLiteral("computedVal") << "b.c" << wrapInLiteral("computedVal") << "d" << true
             << "e.f"
@@ -226,8 +243,7 @@ TEST(InclusionProjection, ShouldReportThatAllExceptIncludedFieldsAreModified) {
 }
 
 TEST(InclusionProjection, ShouldReportThatAllExceptIncludedFieldsAreModifiedWithIdExclusion) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("_id" << false << "a" << wrapInLiteral("computedVal") << "b.c"
                                << wrapInLiteral("computedVal")
                                << "d"
@@ -254,8 +270,7 @@ TEST(InclusionProjection, ShouldReportThatAllExceptIncludedFieldsAreModifiedWith
 //
 
 TEST(InclusionProjectionExecutionTest, ShouldIncludeTopLevelField) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true));
 
     // More than one field in document.
@@ -280,8 +295,7 @@ TEST(InclusionProjectionExecutionTest, ShouldIncludeTopLevelField) {
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldAddComputedTopLevelField) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("newField" << wrapInLiteral("computedVal")));
     auto result = inclusion.applyProjection(Document{});
     auto expectedResult = Document{{"newField", "computedVal"_sd}};
@@ -294,8 +308,7 @@ TEST(InclusionProjectionExecutionTest, ShouldAddComputedTopLevelField) {
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldApplyBothInclusionsAndComputedFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "newField" << wrapInLiteral("computedVal")));
     auto result = inclusion.applyProjection(Document{{"a", 1}});
     auto expectedResult = Document{{"a", 1}, {"newField", "computedVal"_sd}};
@@ -303,8 +316,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyBothInclusionsAndComputedField
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldIncludeFieldsInOrderOfInputDoc) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("first" << true << "second" << true << "third" << true));
     auto inputDoc = Document{{"second", 1}, {"first", 0}, {"third", 2}};
     auto result = inclusion.applyProjection(inputDoc);
@@ -312,8 +324,7 @@ TEST(InclusionProjectionExecutionTest, ShouldIncludeFieldsInOrderOfInputDoc) {
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldApplyComputedFieldsInOrderSpecified) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("firstComputed" << wrapInLiteral("FIRST") << "secondComputed"
                                          << wrapInLiteral("SECOND")));
     auto result = inclusion.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}});
@@ -322,8 +333,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyComputedFieldsInOrderSpecified
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true));
     auto result = inclusion.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}});
     auto expectedResult = Document{{"_id", "ID"_sd}, {"a", 1}};
@@ -336,8 +346,7 @@ TEST(InclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldImplicitlyIncludeIdWithComputedFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("newField" << wrapInLiteral("computedVal")));
     auto result = inclusion.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}});
     auto expectedResult = Document{{"_id", "ID"_sd}, {"newField", "computedVal"_sd}};
@@ -345,8 +354,7 @@ TEST(InclusionProjectionExecutionTest, ShouldImplicitlyIncludeIdWithComputedFiel
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldIncludeIdIfExplicitlyIncluded) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "_id" << true << "b" << true));
     auto result =
         inclusion.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}, {"c", 3}});
@@ -355,8 +363,7 @@ TEST(InclusionProjectionExecutionTest, ShouldIncludeIdIfExplicitlyIncluded) {
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "_id" << false));
     auto result = inclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
     auto expectedResult = Document{{"a", 1}};
@@ -364,8 +371,7 @@ TEST(InclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldReplaceIdWithComputedId) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("_id" << wrapInLiteral("newId")));
     auto result = inclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
     auto expectedResult = Document{{"_id", "newId"_sd}};
@@ -377,8 +383,7 @@ TEST(InclusionProjectionExecutionTest, ShouldReplaceIdWithComputedId) {
 //
 
 TEST(InclusionProjectionExecutionTest, ShouldIncludeSimpleDottedFieldFromSubDoc) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.b" << true));
 
     // More than one field in sub document.
@@ -403,8 +408,7 @@ TEST(InclusionProjectionExecutionTest, ShouldIncludeSimpleDottedFieldFromSubDoc)
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedIncludedFieldDoesNotExist) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("sub.target" << true));
 
     // Should not add the path if it doesn't exist.
@@ -419,8 +423,7 @@ TEST(InclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedIncludedFiel
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldApplyDottedInclusionToEachElementInArray) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.b" << true));
 
     vector<Value> nestedValues = {Value(1),
@@ -444,8 +447,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyDottedInclusionToEachElementIn
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldAddComputedDottedFieldToSubDocument) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("sub.target" << wrapInLiteral("computedVal")));
 
     // Other fields exist in sub document, one of which is the specified field.
@@ -465,8 +467,7 @@ TEST(InclusionProjectionExecutionTest, ShouldAddComputedDottedFieldToSubDocument
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldCreateSubDocIfDottedComputedFieldDoesntExist) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("sub.target" << wrapInLiteral("computedVal")));
 
     // Should add the path if it doesn't exist.
@@ -480,8 +481,7 @@ TEST(InclusionProjectionExecutionTest, ShouldCreateSubDocIfDottedComputedFieldDo
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldCreateNestedSubDocumentsAllTheWayToComputedField) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.b.c.d" << wrapInLiteral("computedVal")));
 
     // Should add the path if it doesn't exist.
@@ -496,8 +496,7 @@ TEST(InclusionProjectionExecutionTest, ShouldCreateNestedSubDocumentsAllTheWayTo
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldAddComputedDottedFieldToEachElementInArray) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.b" << wrapInLiteral("COMPUTED")));
 
     vector<Value> nestedValues = {Value(1),
@@ -520,8 +519,7 @@ TEST(InclusionProjectionExecutionTest, ShouldAddComputedDottedFieldToEachElement
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldApplyInclusionsAndAdditionsToEachElementInArray) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.inc" << true << "a.comp" << wrapInLiteral("COMPUTED")));
 
     vector<Value> nestedValues = {Value(1),
@@ -548,8 +546,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyInclusionsAndAdditionsToEachEl
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldAddOrIncludeSubFieldsOfId) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("_id.X" << true << "_id.Z" << wrapInLiteral("NEW")));
     auto result = inclusion.applyProjection(Document{{"_id", Document{{"X", 1}, {"Y", 2}}}});
     auto expectedResult = Document{{"_id", Document{{"X", 1}, {"Z", "NEW"_sd}}}};
@@ -557,8 +554,7 @@ TEST(InclusionProjectionExecutionTest, ShouldAddOrIncludeSubFieldsOfId) {
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     // Include all of "a.b", "a.c", "a.d", and "a.e".
     // Add new computed fields "a.W", "a.X", "a.Y", and "a.Z".
     inclusion.parse(BSON(
@@ -582,8 +578,7 @@ TEST(InclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldApplyNestedComputedFieldsInOrderSpecified) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << wrapInLiteral("FIRST") << "b.c" << wrapInLiteral("SECOND")));
     auto result = inclusion.applyProjection(Document{});
     auto expectedResult = Document{{"a", "FIRST"_sd}, {"b", Document{{"c", "SECOND"_sd}}}};
@@ -591,8 +586,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyNestedComputedFieldsInOrderSpe
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldApplyComputedFieldsAfterAllInclusions) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("b.c" << wrapInLiteral("NEW") << "a" << true));
     auto result = inclusion.applyProjection(Document{{"a", 1}});
     auto expectedResult = Document{{"a", 1}, {"b", Document{{"c", "NEW"_sd}}}};
@@ -611,8 +605,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyComputedFieldsAfterAllInclusio
 }
 
 TEST(InclusionProjectionExecutionTest, ComputedFieldReplacingExistingShouldAppearAfterInclusions) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("b" << wrapInLiteral("NEW") << "a" << true));
     auto result = inclusion.applyProjection(Document{{"b", 1}, {"a", 1}});
     auto expectedResult = Document{{"a", 1}, {"b", "NEW"_sd}};
@@ -623,12 +616,252 @@ TEST(InclusionProjectionExecutionTest, ComputedFieldReplacingExistingShouldAppea
 }
 
 //
+// _id inclusion policy.
+//
+
+TEST(InclusionProjectionExecutionTest, ShouldIncludeIdByDefault) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
+    inclusion.parse(BSON("a" << true));
+
+    auto result = inclusion.applyProjection(Document{{"_id", 2}, {"a", 3}});
+    auto expectedResult = Document{{"_id", 2}, {"a", 3}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldIncludeIdWithIncludePolicy) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kIncludeId,
+                                        ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
+    inclusion.parse(BSON("a" << true));
+
+    auto result = inclusion.applyProjection(Document{{"_id", 2}, {"a", 3}});
+    auto expectedResult = Document{{"_id", 2}, {"a", 3}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldExcludeIdWithExcludePolicy) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kExcludeId,
+                                        ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
+    inclusion.parse(BSON("a" << true));
+
+    auto result = inclusion.applyProjection(Document{{"_id", 2}, {"a", 3}});
+    auto expectedResult = Document{{"a", 3}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldOverrideIncludePolicyWithExplicitExcludeIdSpec) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kIncludeId,
+                                        ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
+    inclusion.parse(BSON("_id" << false << "a" << true));
+
+    auto result = inclusion.applyProjection(Document{{"_id", 2}, {"a", 3}});
+    auto expectedResult = Document{{"a", 3}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldOverrideExcludePolicyWithExplicitIncludeIdSpec) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kExcludeId,
+                                        ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
+    inclusion.parse(BSON("_id" << true << "a" << true));
+
+    auto result = inclusion.applyProjection(Document{{"_id", 2}, {"a", 3}});
+    auto expectedResult = Document{{"_id", 2}, {"a", 3}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldAllowInclusionOfIdSubfieldWithDefaultIncludePolicy) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kIncludeId,
+                                        ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
+    inclusion.parse(BSON("_id.id1" << true << "a" << true));
+
+    auto result = inclusion.applyProjection(
+        Document{{"_id", Document{{"id1", 1}, {"id2", 2}}}, {"a", 3}, {"b", 4}});
+    auto expectedResult = Document{{"_id", Document{{"id1", 1}}}, {"a", 3}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldAllowInclusionOfIdSubfieldWithDefaultExcludePolicy) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kExcludeId,
+                                        ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
+    inclusion.parse(BSON("_id.id1" << true << "a" << true));
+
+    auto result = inclusion.applyProjection(
+        Document{{"_id", Document{{"id1", 1}, {"id2", 2}}}, {"a", 3}, {"b", 4}});
+    auto expectedResult = Document{{"_id", Document{{"id1", 1}}}, {"a", 3}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+//
+// Nested array recursion.
+//
+
+TEST(InclusionProjectionExecutionTest, ShouldRecurseNestedArraysByDefault) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
+    inclusion.parse(BSON("a.b" << true));
+
+    // {a: [1, {b: 2, c: 3}, [{b: 4, c: 5}], {d: 6}]} => {a: [{b: 2}, [{b: 4}], {}]}
+    auto result = inclusion.applyProjection(
+        Document{{"a",
+                  vector<Value>{Value(1),
+                                Value(Document{{"b", 2}, {"c", 3}}),
+                                Value(vector<Value>{Value(Document{{"b", 4}, {"c", 5}})}),
+                                Value(Document{{"d", 6}})}}});
+
+    auto expectedResult = Document{{"a",
+                                    vector<Value>{Value(),
+                                                  Value(Document{{"b", 2}}),
+                                                  Value(vector<Value>{Value(Document{{"b", 4}})}),
+                                                  Value(Document{})}}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldRecurseNestedArraysForExplicitProRecursePolicy) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kIncludeId,
+                                        ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
+    inclusion.parse(BSON("a.b" << true));
+
+    // {a: [1, {b: 2, c: 3}, [{b: 4, c: 5}], {d: 6}]} => {a: [{b: 2}, [{b: 4}], {}]}
+    auto result = inclusion.applyProjection(
+        Document{{"a",
+                  vector<Value>{Value(1),
+                                Value(Document{{"b", 2}, {"c", 3}}),
+                                Value(vector<Value>{Value(Document{{"b", 4}, {"c", 5}})}),
+                                Value(Document{{"d", 6}})}}});
+
+    auto expectedResult = Document{{"a",
+                                    vector<Value>{Value(),
+                                                  Value(Document{{"b", 2}}),
+                                                  Value(vector<Value>{Value(Document{{"b", 4}})}),
+                                                  Value(Document{})}}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldNotRecurseNestedArraysForNoRecursePolicy) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kIncludeId,
+                                        ProjectionArrayRecursionPolicy::kDoNotRecurseNestedArrays);
+    inclusion.parse(BSON("a.b" << true));
+
+    // {a: [1, {b: 2, c: 3}, [{b: 4, c: 5}], {d: 6}]} => {a: [{b: 2}, {}]}
+    auto result = inclusion.applyProjection(
+        Document{{"a",
+                  vector<Value>{Value(1),
+                                Value(Document{{"b", 2}, {"c", 3}}),
+                                Value(vector<Value>{Value(Document{{"b", 4}, {"c", 5}})}),
+                                Value(Document{{"d", 6}})}}});
+
+    auto expectedResult = Document{
+        {"a", vector<Value>{Value(), Value(Document{{"b", 2}}), Value(), Value(Document{})}}};
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ShouldRetainNestedArraysIfNoRecursionNeeded) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kIncludeId,
+                                        ProjectionArrayRecursionPolicy::kDoNotRecurseNestedArrays);
+    inclusion.parse(BSON("a" << true));
+
+    // {a: [1, {b: 2, c: 3}, [{b: 4, c: 5}], {d: 6}]} => [output doc identical to input]
+    const auto inputDoc =
+        Document{{"a",
+                  vector<Value>{Value(1),
+                                Value(Document{{"b", 2}, {"c", 3}}),
+                                Value(vector<Value>{Value(Document{{"b", 4}, {"c", 5}})}),
+                                Value(Document{{"d", 6}})}}};
+
+    auto result = inclusion.applyProjection(inputDoc);
+    const auto& expectedResult = inputDoc;
+
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ComputedFieldIsAddedToNestedArrayElementsForRecursePolicy) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kIncludeId,
+                                        ProjectionArrayRecursionPolicy::kRecurseNestedArrays);
+    inclusion.parse(BSON("a.b" << wrapInLiteral("COMPUTED")));
+
+    vector<Value> nestedValues = {Value(1),
+                                  Value(Document{}),
+                                  Value(Document{{"b", 1}}),
+                                  Value(Document{{"b", 1}, {"c", 2}}),
+                                  Value(vector<Value>{}),
+                                  Value(vector<Value>{Value(1), Value(Document{{"c", 1}})})};
+    vector<Value> expectedNestedValues = {
+        Value(Document{{"b", "COMPUTED"_sd}}),
+        Value(Document{{"b", "COMPUTED"_sd}}),
+        Value(Document{{"b", "COMPUTED"_sd}}),
+        Value(Document{{"b", "COMPUTED"_sd}}),
+        Value(vector<Value>{}),
+        Value(vector<Value>{Value(Document{{"b", "COMPUTED"_sd}}),
+                            Value(Document{{"b", "COMPUTED"_sd}})})};
+    auto result = inclusion.applyProjection(Document{{"a", nestedValues}});
+    auto expectedResult = Document{{"a", expectedNestedValues}};
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(InclusionProjectionExecutionTest, ComputedFieldShouldReplaceNestedArrayForNoRecursePolicy) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx,
+                                        ProjectionDefaultIdPolicy::kIncludeId,
+                                        ProjectionArrayRecursionPolicy::kDoNotRecurseNestedArrays);
+    inclusion.parse(BSON("a.b" << wrapInLiteral("COMPUTED")));
+
+    // For kRecurseNestedArrays, the computed field (1) replaces any scalar values in the array with
+    // a subdocument containing the new field, and (2) is added to each element of the array and all
+    // nested arrays individually. With kDoNotRecurseNestedArrays, the nested arrays are replaced
+    // rather than being traversed, in exactly the same way as scalar values.
+    vector<Value> nestedValues = {Value(1),
+                                  Value(Document{}),
+                                  Value(Document{{"b", 1}}),
+                                  Value(Document{{"b", 1}, {"c", 2}}),
+                                  Value(vector<Value>{}),
+                                  Value(vector<Value>{Value(1), Value(Document{{"c", 1}})})};
+
+    vector<Value> expectedNestedValues = {Value(Document{{"b", "COMPUTED"_sd}}),
+                                          Value(Document{{"b", "COMPUTED"_sd}}),
+                                          Value(Document{{"b", "COMPUTED"_sd}}),
+                                          Value(Document{{"b", "COMPUTED"_sd}}),
+                                          Value(Document{{"b", "COMPUTED"_sd}}),
+                                          Value(Document{{"b", "COMPUTED"_sd}})};
+
+    auto result = inclusion.applyProjection(Document{{"a", nestedValues}});
+    auto expectedResult = Document{{"a", expectedNestedValues}};
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+//
 // Misc.
 //
 
 TEST(InclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true));
 
     MutableDocument inputDocBuilder(Document{{"a", 1}});
@@ -648,8 +881,7 @@ TEST(InclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
 //
 
 TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForIdenticalProjection) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "b" << true));
 
     auto proj = BSON("_id" << false << "a" << true << "b" << true);
@@ -658,8 +890,7 @@ TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForIdenticalProjection) {
 }
 
 TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForSupersetProjection) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "b" << true));
 
     auto proj = BSON("_id" << false << "a" << true << "b" << true << "c" << true);
@@ -668,8 +899,7 @@ TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForSupersetProjection) {
 }
 
 TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForIdenticalNestedProjection) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.b" << true));
 
     auto proj = BSON("_id" << false << "a.b" << true);
@@ -678,8 +908,7 @@ TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForIdenticalNestedProjecti
 }
 
 TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForSupersetProjectionWithNestedFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "c" << BSON("d" << true)));
 
     auto proj = BSON("_id" << false << "a" << true << "b" << true << "c.d" << true);
@@ -688,8 +917,7 @@ TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForSupersetProjectionWithN
 }
 
 TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithMissingFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "b" << true));
 
     auto proj = BSON("_id" << false << "a" << true);
@@ -701,8 +929,7 @@ TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithMissin
 
 TEST(InclusionProjectionSubsetTest,
      ShouldDetectNonSubsetForSupersetProjectionWithoutComputedFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true << "b" << true << "c" << BSON("$literal" << 1)));
 
     auto proj = BSON("_id" << false << "a" << true << "b" << true);
@@ -711,8 +938,7 @@ TEST(InclusionProjectionSubsetTest,
 }
 
 TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithMissingNestedFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a.b" << true << "a.c" << true));
 
     auto proj = BSON("_id" << false << "a.b" << true);
@@ -721,8 +947,7 @@ TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithMissin
 }
 
 TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithRenamedFields) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a"
                          << "$b"));
 
@@ -732,8 +957,7 @@ TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithRename
 }
 
 TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithMissingIdField) {
-    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ParsedInclusionProjection inclusion(expCtx);
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies();
     inclusion.parse(BSON("a" << true));
 
     auto proj = BSON("a" << true);

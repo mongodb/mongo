@@ -52,7 +52,10 @@ namespace parsed_aggregation_projection {
  */
 class InclusionNode {
 public:
-    InclusionNode(std::string pathToNode = "");
+    using ProjectionArrayRecursionPolicy =
+        ParsedAggregationProjection::ProjectionArrayRecursionPolicy;
+
+    InclusionNode(ProjectionArrayRecursionPolicy recursionPolicy, std::string pathToNode = "");
 
     /**
      * Optimize any computed expressions.
@@ -156,6 +159,8 @@ private:
      */
     bool subtreeContainsComputedFields() const;
 
+    ProjectionArrayRecursionPolicy _arrayRecursionPolicy;
+
     std::string _pathToNode;
 
     // Our projection semantics are such that all field additions need to be processed in the order
@@ -184,8 +189,11 @@ private:
  */
 class ParsedInclusionProjection : public ParsedAggregationProjection {
 public:
-    ParsedInclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ParsedAggregationProjection(expCtx), _root(new InclusionNode()) {}
+    ParsedInclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              ProjectionDefaultIdPolicy defaultIdPolicy,
+                              ProjectionArrayRecursionPolicy arrayRecursionPolicy)
+        : ParsedAggregationProjection(expCtx, defaultIdPolicy, arrayRecursionPolicy),
+          _root(new InclusionNode(_arrayRecursionPolicy)) {}
 
     TransformerType getType() const final {
         return TransformerType::kInclusionProjection;

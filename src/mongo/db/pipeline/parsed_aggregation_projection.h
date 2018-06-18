@@ -140,6 +140,20 @@ private:
  */
 class ParsedAggregationProjection : public TransformerInterface {
 public:
+    // Allows the caller to indicate whether the projection should default to including or excluding
+    // the _id field in the event that the projection spec does not specify the desired behavior.
+    // For instance, given a projection {a: 1}, specifying 'kExcludeId' is equivalent to projecting
+    // {a: 1, _id: 0} while 'kIncludeId' is equivalent to the projection {a: 1, _id: 1}. If the user
+    // explicitly specifies a projection on _id, then this will override the default policy; for
+    // instance, {a: 1, _id: 0} will exclude _id for both 'kExcludeId' and 'kIncludeId'.
+    enum class ProjectionDefaultIdPolicy { kIncludeId, kExcludeId };
+
+    // Allows the caller to specify how the projection should handle nested arrays; that is, an
+    // array whose immediate parent is itself an array. For example, in the case of sample document
+    // {a: [1, 2, [3, 4], {b: [5, 6]}]} the array [3, 4] is a nested array. The array [5, 6] is not,
+    // because there is an intervening object between it and its closest array ancestor.
+    enum class ProjectionArrayRecursionPolicy { kRecurseNestedArrays, kDoNotRecurseNestedArrays };
+
     // Allows the caller to specify whether computed fields should be allowed within inclusion
     // projections; they are implicitly prohibited within exclusion projections.
     enum class ProjectionParseMode {
@@ -155,6 +169,8 @@ public:
     static std::unique_ptr<ParsedAggregationProjection> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const BSONObj& spec,
+        ProjectionDefaultIdPolicy defaultIdPolicy,
+        ProjectionArrayRecursionPolicy arrayRecursionPolicy,
         ProjectionParseMode parseRules = ProjectionParseMode::kAllowComputedFields);
 
     virtual ~ParsedAggregationProjection() = default;
@@ -187,8 +203,12 @@ public:
     }
 
 protected:
-    ParsedAggregationProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : _expCtx(expCtx){};
+    ParsedAggregationProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                ProjectionDefaultIdPolicy defaultIdPolicy,
+                                ProjectionArrayRecursionPolicy arrayRecursionPolicy)
+        : _expCtx(expCtx),
+          _arrayRecursionPolicy(arrayRecursionPolicy),
+          _defaultIdPolicy(defaultIdPolicy){};
 
     /**
      * Apply the projection to 'input'.
@@ -196,6 +216,9 @@ protected:
     virtual Document applyProjection(const Document& input) const = 0;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
+
+    ProjectionArrayRecursionPolicy _arrayRecursionPolicy;
+    ProjectionDefaultIdPolicy _defaultIdPolicy;
 };
 }  // namespace parsed_aggregation_projection
 }  // namespace mongo

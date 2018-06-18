@@ -236,19 +236,30 @@ private:
                 elem.isBoolean() || elem.isNumber() ||
                     _parseMode != ProjectionParseMode::kBanComputedFields);
 
-        if ((elem.isBoolean() || elem.isNumber()) && !elem.trueValue()) {
-            // A top-level exclusion of "_id" is allowed in either an inclusion projection or an
-            // exclusion projection, so doesn't affect '_parsedType'.
-            if (pathToElem.fullPath() != "_id") {
-                uassert(40178,
-                        str::stream() << "Bad projection specification, cannot exclude fields "
-                                         "other than '_id' in an inclusion projection: "
+        if (pathToElem.fullPath() == "_id") {
+            // If the _id field is a computed value, then this must be an inclusion projection. If
+            // it is numeric or boolean, then this does not determine the projection type, due to
+            // the fact that inclusions may explicitly exclude _id and exclusions may include _id.
+            if (!elem.isBoolean() && !elem.isNumber()) {
+                uassert(ErrorCodes::FailedToParse,
+                        str::stream() << "Bad projection specification, '_id' may not be a "
+                                         "computed field in an exclusion projection: "
                                       << _rawObj.toString(),
                         !_parsedType ||
-                            (*_parsedType ==
-                             TransformerInterface::TransformerType::kExclusionProjection));
-                _parsedType = TransformerInterface::TransformerType::kExclusionProjection;
+                            _parsedType ==
+                                TransformerInterface::TransformerType::kInclusionProjection);
+                _parsedType = TransformerInterface::TransformerType::kInclusionProjection;
             }
+        } else if ((elem.isBoolean() || elem.isNumber()) && !elem.trueValue()) {
+            // If this is an excluded field other than '_id', ensure that the projection type has
+            // not already been set to kInclusionProjection.
+            uassert(40178,
+                    str::stream() << "Bad projection specification, cannot exclude fields "
+                                     "other than '_id' in an inclusion projection: "
+                                  << _rawObj.toString(),
+                    !_parsedType || (*_parsedType ==
+                                     TransformerInterface::TransformerType::kExclusionProjection));
+            _parsedType = TransformerInterface::TransformerType::kExclusionProjection;
         } else {
             // A boolean true, a truthy numeric value, or any expression can only be used with an
             // inclusion projection. Note that literal values like "string" or null are also treated
@@ -310,6 +321,8 @@ private:
 std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& spec,
+    ProjectionDefaultIdPolicy defaultIdPolicy,
+    ProjectionArrayRecursionPolicy arrayRecursionPolicy,
     ProjectionParseMode parseMode) {
     // Check that the specification was valid. Status returned is unspecific because validate()
     // is used by the $addFields stage as well as $project.
@@ -325,8 +338,10 @@ std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create
     // We can't use make_unique() here, since the branches have different types.
     std::unique_ptr<ParsedAggregationProjection> parsedProject(
         projectionType == TransformerType::kInclusionProjection
-            ? static_cast<ParsedAggregationProjection*>(new ParsedInclusionProjection(expCtx))
-            : static_cast<ParsedAggregationProjection*>(new ParsedExclusionProjection(expCtx)));
+            ? static_cast<ParsedAggregationProjection*>(
+                  new ParsedInclusionProjection(expCtx, defaultIdPolicy, arrayRecursionPolicy))
+            : static_cast<ParsedAggregationProjection*>(
+                  new ParsedExclusionProjection(expCtx, defaultIdPolicy, arrayRecursionPolicy)));
 
     // Actually parse the specification.
     parsedProject->parse(spec);

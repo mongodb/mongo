@@ -42,13 +42,35 @@ public:
     using ProjectionParseMode = ParsedAggregationProjection::ProjectionParseMode;
     using TransformerType = TransformerInterface::TransformerType;
 
-    ProjectionExecutor(BSONObj projSpec) {
+    ProjectionExecutor(BSONObj projSpec,
+                       DefaultIdPolicy defaultIdPolicy,
+                       ArrayRecursionPolicy arrayRecursionPolicy) {
         // Construct a dummy ExpressionContext for ParsedAggregationProjection. It's OK to set the
         // ExpressionContext's OperationContext and CollatorInterface to 'nullptr' here; since we
         // ban computed fields from the projection, the ExpressionContext will never be used.
         boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(nullptr, nullptr));
+
+        // Default projection behaviour is to include _id if the projection spec omits it. If the
+        // caller has specified that we should *exclude* _id by default, do so here. We translate
+        // DefaultIdPolicy to ParsedAggregationProjection::ProjectionDefaultIdPolicy in order to
+        // avoid exposing internal aggregation types to the query system.
+        ParsedAggregationProjection::ProjectionDefaultIdPolicy idPolicy =
+            (defaultIdPolicy == ProjectionExecAgg::DefaultIdPolicy::kIncludeId
+                 ? ParsedAggregationProjection::ProjectionDefaultIdPolicy::kIncludeId
+                 : ParsedAggregationProjection::ProjectionDefaultIdPolicy::kExcludeId);
+
+        // By default, $project will recurse through nested arrays. If the caller has specified that
+        // it should not, we inhibit it from doing so here. We separate this class' internal enum
+        // ArrayRecursionPolicy from ParsedAggregationProjection::ProjectionArrayRecursionPolicy
+        // in order to avoid exposing aggregation types to the query system.
+        ParsedAggregationProjection::ProjectionArrayRecursionPolicy recursionPolicy =
+            (arrayRecursionPolicy == ArrayRecursionPolicy::kRecurseNestedArrays
+                 ? ParsedAggregationProjection::ProjectionArrayRecursionPolicy::kRecurseNestedArrays
+                 : ParsedAggregationProjection::ProjectionArrayRecursionPolicy::
+                       kDoNotRecurseNestedArrays);
+
         _projection = ParsedAggregationProjection::create(
-            expCtx, projSpec, ProjectionParseMode::kBanComputedFields);
+            expCtx, projSpec, idPolicy, recursionPolicy, ProjectionParseMode::kBanComputedFields);
     }
 
     ProjectionType getType() const {
@@ -73,9 +95,12 @@ ProjectionExecAgg::ProjectionExecAgg(BSONObj projSpec, std::unique_ptr<Projectio
 
 ProjectionExecAgg::~ProjectionExecAgg() = default;
 
-std::unique_ptr<ProjectionExecAgg> ProjectionExecAgg::create(BSONObj projSpec) {
-    return std::unique_ptr<ProjectionExecAgg>(
-        new ProjectionExecAgg(projSpec, std::make_unique<ProjectionExecutor>(projSpec)));
+std::unique_ptr<ProjectionExecAgg> ProjectionExecAgg::create(BSONObj projSpec,
+                                                             DefaultIdPolicy defaultIdPolicy,
+                                                             ArrayRecursionPolicy recursionPolicy) {
+    return std::unique_ptr<ProjectionExecAgg>(new ProjectionExecAgg(
+        projSpec,
+        std::make_unique<ProjectionExecutor>(projSpec, defaultIdPolicy, recursionPolicy)));
 }
 
 ProjectionExecAgg::ProjectionType ProjectionExecAgg::getType() const {
