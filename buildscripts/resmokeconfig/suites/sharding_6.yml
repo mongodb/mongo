@@ -19,7 +19,6 @@ selector:
   - jstests/sharding/all_config_servers_blackholed_from_mongos.js
   - jstests/sharding/authCommands.js
   - jstests/sharding/addshard4.js
-  - jstests/sharding/remove4.js
   - jstests/sharding/split_with_force.js
   - jstests/sharding/auto_rebalance_parallel_replica_sets.js
   - jstests/sharding/database_and_shard_versioning_all_commands.js

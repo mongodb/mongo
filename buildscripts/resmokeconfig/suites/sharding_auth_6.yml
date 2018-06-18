@@ -18,7 +18,6 @@ selector:
   #   14 minutes to run on linux-64-debug
   #   18 minutes to run on enterprise-windows-64-2k8
   roots:
-  - jstests/sharding/remove4.js
   - jstests/sharding/mongos_no_replica_set_refresh.js
   - jstests/sharding/repl_monitor_refresh.js
   - jstests/sharding/bouncing_count.js
