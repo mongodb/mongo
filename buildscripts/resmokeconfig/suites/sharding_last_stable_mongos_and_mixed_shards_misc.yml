@@ -132,7 +132,6 @@ selector:
   - jstests/sharding/sharding_multiple_ns_rs.js
   - jstests/sharding/shard_aware_init.js
   - jstests/sharding/balance_repl.js
-  - jstests/sharding/remove4.js
   - jstests/sharding/authCommands.js
   - jstests/sharding/test_stacked_migration_cleanup.js
   - jstests/sharding/shard_aware_primary_failover.js

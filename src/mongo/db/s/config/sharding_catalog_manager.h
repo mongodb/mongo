@@ -473,16 +473,6 @@ private:
     void _appendReadConcern(BSONObjBuilder* builder);
 
     /**
-     * Creates the first chunks of a new sharded collection.
-     */
-    ChunkVersion _createFirstChunks(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const ShardKeyPattern& shardKeyPattern,
-                                    const ShardId& primaryShardId,
-                                    const std::vector<BSONObj>& initPoints,
-                                    const bool distributeInitialChunks);
-
-    /**
      * Retrieve the full chunk description from the config.
      */
     StatusWith<ChunkType> _findChunkOnConfig(OperationContext* opCtx,

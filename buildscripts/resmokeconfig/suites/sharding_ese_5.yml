@@ -26,7 +26,6 @@ selector:
   - jstests/sharding/drop_sharded_db.js
   - jstests/sharding/bouncing_count.js
   - jstests/sharding/find_and_modify_after_multi_write.js
-  - jstests/sharding/remove4.js
 
 executor:
   config:

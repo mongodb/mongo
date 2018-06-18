@@ -84,41 +84,6 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 const char kWriteConcernField[] = "writeConcern";
 
-void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
-    BSONObjBuilder countBuilder;
-    countBuilder.append("count", ChunkType::ConfigNS.coll());
-    countBuilder.append("query", BSON(ChunkType::ns(nss.ns())));
-
-    // OK to use limit=1, since if any chunks exist, we will fail.
-    countBuilder.append("limit", 1);
-
-    // Use readConcern local to guarantee we see any chunks that have been written and may
-    // become committed; readConcern majority will not see the chunks if they have not made it
-    // to the majority snapshot.
-    repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kLocalReadConcern);
-    readConcern.appendInfo(&countBuilder);
-
-    auto cmdResponse = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            kConfigReadSelector,
-            ChunkType::ConfigNS.db().toString(),
-            countBuilder.done(),
-            Shard::kDefaultConfigCommandTimeout,
-            Shard::RetryPolicy::kIdempotent));
-    uassertStatusOK(cmdResponse.commandStatus);
-
-    long long numChunks;
-    uassertStatusOK(bsonExtractIntegerField(cmdResponse.response, "n", &numChunks));
-    uassert(ErrorCodes::ManualInterventionRequired,
-            str::stream() << "A previous attempt to shard collection " << nss.ns()
-                          << " failed after writing some initial chunks to config.chunks. Please "
-                             "manually delete the partially written chunks for collection "
-                          << nss.ns()
-                          << " from config.chunks",
-            numChunks == 0);
-}
-
 boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
                                              Shard* shard,
                                              const NamespaceString& ns,
@@ -168,40 +133,17 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
  * Creates and writes to the config server the first chunks for a newly sharded collection. Returns
  * the version generated for the collection.
  */
-ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        const ShardKeyPattern& shardKeyPattern,
-                                                        const ShardId& primaryShardId,
-                                                        const std::vector<BSONObj>& initPoints,
-                                                        const bool distributeInitialChunks) {
+ChunkVersion createFirstChunks(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const ShardKeyPattern& shardKeyPattern,
+                               const ShardId& primaryShardId,
+                               const std::vector<BSONObj>& initPoints,
+                               const bool distributeInitialChunks) {
 
     const KeyPattern keyPattern = shardKeyPattern.getKeyPattern();
 
     vector<BSONObj> splitPoints;
     vector<ShardId> shardIds;
-
-    std::string primaryShardName = primaryShardId.toString();
-    auto drainingCount = uassertStatusOK(_runCountCommandOnConfig(
-        opCtx,
-        NamespaceString(ShardType::ConfigNS),
-        BSON(ShardType::name() << primaryShardName << ShardType::draining(true))));
-
-    const bool primaryDraining = (drainingCount > 0);
-    auto getPrimaryOrFirstNonDrainingShard = [&opCtx, primaryShardId, primaryDraining]() {
-        if (primaryDraining) {
-            vector<ShardId> allShardIds;
-            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
-
-            auto dbShardId = allShardIds[0];
-            if (allShardIds[0] == primaryShardId && allShardIds.size() > 1) {
-                dbShardId = allShardIds[1];
-            }
-
-            return dbShardId;
-        } else {
-            return primaryShardId;
-        }
-    };
 
     if (initPoints.empty()) {
         // If no split points were specified use the shard's data distribution to determine them
@@ -238,12 +180,8 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         // otherwise defer to passed-in distribution option.
         if (numObjects == 0 && distributeInitialChunks) {
             Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
-            if (primaryDraining && shardIds.size() > 1) {
-                shardIds.erase(std::remove(shardIds.begin(), shardIds.end(), primaryShardId),
-                               shardIds.end());
-            }
         } else {
-            shardIds.push_back(getPrimaryOrFirstNonDrainingShard());
+            shardIds.push_back(primaryShardId);
         }
     } else {
         // Make sure points are unique and ordered
@@ -259,12 +197,8 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
 
         if (distributeInitialChunks) {
             Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
-            if (primaryDraining) {
-                shardIds.erase(std::remove(shardIds.begin(), shardIds.end(), primaryShardId),
-                               shardIds.end());
-            }
         } else {
-            shardIds.push_back(getPrimaryOrFirstNonDrainingShard());
+            shardIds.push_back(primaryShardId);
         }
     }
 
@@ -308,6 +242,41 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
     }
 
     return version;
+}
+
+void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
+    BSONObjBuilder countBuilder;
+    countBuilder.append("count", ChunkType::ConfigNS.coll());
+    countBuilder.append("query", BSON(ChunkType::ns(nss.ns())));
+
+    // OK to use limit=1, since if any chunks exist, we will fail.
+    countBuilder.append("limit", 1);
+
+    // Use readConcern local to guarantee we see any chunks that have been written and may
+    // become committed; readConcern majority will not see the chunks if they have not made it
+    // to the majority snapshot.
+    repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kLocalReadConcern);
+    readConcern.appendInfo(&countBuilder);
+
+    auto cmdResponse = uassertStatusOK(
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+            opCtx,
+            kConfigReadSelector,
+            ChunkType::ConfigNS.db().toString(),
+            countBuilder.done(),
+            Shard::kDefaultConfigCommandTimeout,
+            Shard::RetryPolicy::kIdempotent));
+    uassertStatusOK(cmdResponse.commandStatus);
+
+    long long numChunks;
+    uassertStatusOK(bsonExtractIntegerField(cmdResponse.response, "n", &numChunks));
+    uassert(ErrorCodes::ManualInterventionRequired,
+            str::stream() << "A previous attempt to shard collection " << nss.ns()
+                          << " failed after writing some initial chunks to config.chunks. Please "
+                             "manually delete the partially written chunks for collection "
+                          << nss.ns()
+                          << " from config.chunks",
+            numChunks == 0);
 }
 
 Status ShardingCatalogManager::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
@@ -537,7 +506,7 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                               ->makeFromBSON(defaultCollation));
     }
 
-    const auto& collVersion = _createFirstChunks(
+    const auto& collVersion = createFirstChunks(
         opCtx, nss, fieldsAndOrder, dbPrimaryShardId, initPoints, distributeInitialChunks);
 
     {
