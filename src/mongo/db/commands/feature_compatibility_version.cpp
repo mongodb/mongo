@@ -163,14 +163,6 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
         updateMinWireVersion();
 
-        if (ShardingState::get(opCtx)->enabled() &&
-            (newVersion ==
-                 ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36 ||
-             newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40)) {
-            CollectionShardingState::resetAll(opCtx);
-            Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
-        }
-
         if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
             // Close all incoming connections from internal clients with binary versions lower than
             // ours.

@@ -738,23 +738,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Add all databases which were discovered on the new shard
     for (const auto& dbName : dbNamesStatus.getValue()) {
-        DatabaseType dbt(dbName, shardType.getName(), false);
+        DatabaseType dbt(dbName, shardType.getName(), false, databaseVersion::makeNew());
 
         {
-            // Hold the Global IX lock across checking the FCV and writing the database entry.
-            // Because of the Global S lock barrier in setFCV, this ensures either the setFCV schema
-            // upgrade/downgrade will block until we have written the entry, or we will write the
-            // entry in the target FCV's schema.
-            Lock::GlobalLock lk(opCtx, MODE_IX);
-
-            // If we're in FCV 4.0, we should add a version to each database.
-            if (serverGlobalParams.featureCompatibility.getVersion() ==
-                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40 ||
-                serverGlobalParams.featureCompatibility.getVersion() ==
-                    ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
-                dbt.setVersion(databaseVersion::makeNew());
-            }
-
             const auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
                 opCtx,
                 DatabaseType::ConfigNS,
