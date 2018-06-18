@@ -131,7 +131,7 @@ private:
     /**
      * Parses the update-descriptor portion of the update request.
      */
-    Status parseUpdate();
+    void parseUpdate();
 
     /**
      * Parses the array filters portion of the update request.

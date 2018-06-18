@@ -186,12 +186,10 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
     UpdateDriver driver(std::move(expCtx));
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    Status status = driver.parse(updatePattern, arrayFilters);
-    if (!status.isOK())
-        return status;
+    driver.parse(updatePattern, arrayFilters);
 
     BSONObjCollection::iterator iter;
-    status = _findOneIter(opCtx, collectionName, query, &iter);
+    Status status = _findOneIter(opCtx, collectionName, query, &iter);
     mmb::Document document;
     if (status.isOK()) {
         document.reset(*iter, mmb::Document::kInPlaceDisabled);

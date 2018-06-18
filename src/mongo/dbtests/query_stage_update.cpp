@@ -54,6 +54,15 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
 
+#define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
+    try {                                                                          \
+        EXPRESSION;                                                                \
+    } catch (const AssertionException& e) {                                        \
+        ::mongoutils::str::stream err;                                             \
+        err << "Threw an exception incorrectly: " << e.toString();                 \
+        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
+    }
+
 namespace QueryStageUpdate {
 
 using std::unique_ptr;
@@ -210,7 +219,8 @@ public:
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-            ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
+            ASSERT_DOES_NOT_THROW(
+                driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
             // Setup update params.
             UpdateStageParams params(&request, &driver, opDebug);
@@ -284,7 +294,8 @@ public:
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-            ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
+            ASSERT_DOES_NOT_THROW(
+                driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
             // Configure the scan.
             CollectionScanParams collScanParams;
@@ -400,7 +411,7 @@ public:
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-        ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
+        ASSERT_DOES_NOT_THROW(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
@@ -491,7 +502,7 @@ public:
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-        ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
+        ASSERT_DOES_NOT_THROW(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
@@ -572,7 +583,7 @@ public:
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-        ASSERT_OK(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
+        ASSERT_DOES_NOT_THROW(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
 
         // Configure a QueuedDataStage to pass an OWNED_OBJ to the update stage.
         auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());

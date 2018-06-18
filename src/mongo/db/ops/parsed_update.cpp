@@ -72,9 +72,7 @@ Status ParsedUpdate::parseRequest() {
     // may determine whether or not we need to produce a CanonicalQuery at all.  For example, if
     // the update involves the positional-dollar operator, we must have a CanonicalQuery even if
     // it isn't required for query execution.
-    status = parseUpdate();
-    if (!status.isOK())
-        return status;
+    parseUpdate();
     status = parseQuery();
     if (!status.isOK())
         return status;
@@ -139,12 +137,12 @@ Status ParsedUpdate::parseQueryToCQ() {
     return statusWithCQ.getStatus();
 }
 
-Status ParsedUpdate::parseUpdate() {
+void ParsedUpdate::parseUpdate() {
     _driver.setCollator(_collator.get());
     _driver.setLogOp(true);
     _driver.setFromOplogApplication(_request->isFromOplogApplication());
 
-    return _driver.parse(_request->getUpdates(), _arrayFilters, _request->isMulti());
+    _driver.parse(_request->getUpdates(), _arrayFilters, _request->isMulti());
 }
 
 Status ParsedUpdate::parseArrayFilters() {

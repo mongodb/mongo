@@ -51,13 +51,12 @@ public:
     UpdateDriver(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Parses the 'updateExpr' update expression into the '_root' member variable. Uasserts or
-     * returns a non-ok status if 'updateExpr' fails to parse.
+     * Parses the 'updateExpr' update expression into the '_root' member variable. Uasserts
+     * if 'updateExpr' fails to parse.
      */
-    Status parse(
-        const BSONObj& updateExpr,
-        const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
-        const bool multi = false);
+    void parse(const BSONObj& updateExpr,
+               const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
+               const bool multi = false);
 
     /**
      * Fills in document with any fields in the query which are valid.

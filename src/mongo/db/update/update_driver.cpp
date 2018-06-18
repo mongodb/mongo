@@ -149,7 +149,7 @@ bool parseUpdateExpression(
 UpdateDriver::UpdateDriver(const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : _expCtx(expCtx) {}
 
-Status UpdateDriver::parse(
+void UpdateDriver::parse(
     const BSONObj& updateExpr,
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
     const bool multi) {
@@ -157,16 +157,14 @@ Status UpdateDriver::parse(
 
     // Check if the update expression is a full object replacement.
     if (isDocReplacement(updateExpr)) {
-        if (multi) {
-            return Status(ErrorCodes::FailedToParse, "multi update only works with $ operators");
-        }
+        uassert(ErrorCodes::FailedToParse, "multi update only works with $ operators", !multi);
 
         _root = stdx::make_unique<ObjectReplaceNode>(updateExpr);
 
         // Register the fact that this driver will only do full object replacements.
         _replacementMode = true;
 
-        return Status::OK();
+        return;
     }
 
     // Register the fact that this driver is not doing a full object replacement.
@@ -178,20 +176,16 @@ Status UpdateDriver::parse(
     // we parse $v and check its value for compatibility.
     BSONElement updateSemanticsElement = updateExpr[LogBuilder::kUpdateSemanticsFieldName];
     if (updateSemanticsElement) {
-        if (!_fromOplogApplication) {
-            return {ErrorCodes::FailedToParse, "The $v update field is only recognized internally"};
-        }
-        auto statusWithUpdateSemantics = updateSemanticsFromElement(updateSemanticsElement);
-        if (!statusWithUpdateSemantics.isOK()) {
-            return statusWithUpdateSemantics.getStatus();
-        }
+        uassert(ErrorCodes::FailedToParse,
+                "The $v update field is only recognized internally",
+                _fromOplogApplication);
+
+        uassertStatusOK(updateSemanticsFromElement(updateSemanticsElement));
     }
 
     auto root = stdx::make_unique<UpdateObjectNode>();
     _positional = parseUpdateExpression(updateExpr, root.get(), _expCtx, arrayFilters);
     _root = std::move(root);
-
-    return Status::OK();
 }
 
 Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,

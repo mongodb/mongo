@@ -45,6 +45,15 @@
 #include "mongo/db/update_index_data.h"
 #include "mongo/unittest/unittest.h"
 
+#define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
+    try {                                                                          \
+        EXPRESSION;                                                                \
+    } catch (const AssertionException& e) {                                        \
+        ::mongoutils::str::stream err;                                             \
+        err << "Threw an exception incorrectly: " << e.toString();                 \
+        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
+    }
+
 namespace mongo {
 namespace {
 
@@ -54,7 +63,7 @@ TEST(Parse, Normal) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_OK(driver.parse(fromjson("{$set:{a:1}}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$set:{a:1}}"), arrayFilters));
     ASSERT_FALSE(driver.isDocReplacement());
 }
 
@@ -62,7 +71,7 @@ TEST(Parse, MultiMods) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_OK(driver.parse(fromjson("{$set:{a:1, b:1}}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$set:{a:1, b:1}}"), arrayFilters));
     ASSERT_FALSE(driver.isDocReplacement());
 }
 
@@ -70,7 +79,7 @@ TEST(Parse, MixingMods) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_OK(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}"), arrayFilters));
     ASSERT_FALSE(driver.isDocReplacement());
 }
 
@@ -78,7 +87,7 @@ TEST(Parse, ObjectReplacment) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_OK(driver.parse(fromjson("{obj: \"obj replacement\"}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{obj: \"obj replacement\"}"), arrayFilters));
     ASSERT_TRUE(driver.isDocReplacement());
 }
 
@@ -87,7 +96,7 @@ TEST(Parse, EmptyMod) {
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
-        driver.parse(fromjson("{$set:{}}"), arrayFilters).transitional_ignore(),
+        driver.parse(fromjson("{$set:{}}"), arrayFilters),
         AssertionException,
         ErrorCodes::FailedToParse,
         "'$set' is empty. You must specify a field like so: {$set: {<field>: ...}}");
@@ -97,23 +106,21 @@ TEST(Parse, WrongMod) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_THROWS_CODE_AND_WHAT(
-        driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters).transitional_ignore(),
-        AssertionException,
-        ErrorCodes::FailedToParse,
-        "Unknown modifier: $xyz");
+    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "Unknown modifier: $xyz");
 }
 
 TEST(Parse, WrongType) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_THROWS_CODE_AND_WHAT(
-        driver.parse(fromjson("{$set:[{a:1}]}"), arrayFilters).transitional_ignore(),
-        AssertionException,
-        ErrorCodes::FailedToParse,
-        "Modifiers operate on fields but we found type array instead. For "
-        "example: {$mod: {<field>: ...}} not {$set: [ { a: 1 } ]}");
+    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(fromjson("{$set:[{a:1}]}"), arrayFilters),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "Modifiers operate on fields but we found type array instead. For "
+                                "example: {$mod: {<field>: ...}} not {$set: [ { a: 1 } ]}");
 }
 
 TEST(Parse, ModsWithLaterObjReplacement) {
@@ -121,8 +128,7 @@ TEST(Parse, ModsWithLaterObjReplacement) {
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
-        driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}"), arrayFilters)
-            .transitional_ignore(),
+        driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}"), arrayFilters),
         AssertionException,
         ErrorCodes::FailedToParse,
         "Unknown modifier: obj");
@@ -132,7 +138,7 @@ TEST(Parse, SetOnInsert) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_OK(driver.parse(fromjson("{$setOnInsert:{a:1}}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$setOnInsert:{a:1}}"), arrayFilters));
     ASSERT_FALSE(driver.isDocReplacement());
 }
 
@@ -143,7 +149,7 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-    ASSERT_OK(driver.parse(updateDocument, arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(updateDocument, arrayFilters));
 
     const bool validateForStorage = true;
     const FieldRefSet emptyImmutablePaths;
@@ -169,8 +175,8 @@ public:
         : _opCtx(_serviceContext.makeOperationContext()),
           _driverOps(new UpdateDriver(new ExpressionContext(_opCtx.get(), nullptr))),
           _driverRepl(new UpdateDriver(new ExpressionContext(_opCtx.get(), nullptr))) {
-        _driverOps->parse(fromjson("{$set:{'_':1}}"), _arrayFilters).transitional_ignore();
-        _driverRepl->parse(fromjson("{}"), _arrayFilters).transitional_ignore();
+        _driverOps->parse(fromjson("{$set:{'_':1}}"), _arrayFilters);
+        _driverRepl->parse(fromjson("{}"), _arrayFilters);
     }
 
     mutablebson::Document& doc() {

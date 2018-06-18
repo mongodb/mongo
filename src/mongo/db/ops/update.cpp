@@ -114,19 +114,14 @@ BSONObj applyUpdateOperators(OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
     UpdateDriver driver(std::move(expCtx));
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    Status status = driver.parse(operators, arrayFilters);
-    if (!status.isOK()) {
-        uasserted(16838, status.reason());
-    }
+    driver.parse(operators, arrayFilters);
 
     mutablebson::Document doc(from, mutablebson::Document::kInPlaceDisabled);
 
     const bool validateForStorage = false;
     const FieldRefSet emptyImmutablePaths;
-    status = driver.update(StringData(), &doc, validateForStorage, emptyImmutablePaths);
-    if (!status.isOK()) {
-        uasserted(16839, status.reason());
-    }
+
+    uassertStatusOK(driver.update(StringData(), &doc, validateForStorage, emptyImmutablePaths));
 
     return doc.getObject();
 }

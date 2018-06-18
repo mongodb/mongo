@@ -208,9 +208,7 @@ Status handleOplogUpdate(OperationContext* opCtx,
 
     // Oplog updates do not have array filters.
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    status = driver.parse(updatePattern, arrayFilters);
-    if (!status.isOK())
-        return status;
+    driver.parse(updatePattern, arrayFilters);
 
     mutablebson::Document roleDocument;
     status = RoleGraph::getBSONForRole(roleGraph, roleToUpdate, roleDocument.root());
