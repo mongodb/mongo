@@ -69,6 +69,9 @@
 namespace mongo {
 
 namespace {
+
+constexpr Seconds kDefaultMetricsGatherInterval(60);
+
 /**
  * Expose cloudFreeMonitoringEndpointURL set parameter to URL for free monitoring.
  */
@@ -360,7 +363,9 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
         registrationType = RegistrationType::RegisterAfterOnTransitionToPrimaryIfEnabled;
     }
 
-    controllerPtr->start(registrationType, globalFreeMonParams.freeMonitoringTags);
+    controllerPtr->start(registrationType,
+                         globalFreeMonParams.freeMonitoringTags,
+                         Seconds(kDefaultMetricsGatherInterval));
 }
 
 void stopFreeMonitoring() {

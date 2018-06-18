@@ -134,7 +134,9 @@ void FreeMonController::_enqueue(std::shared_ptr<FreeMonMessage> msg) {
     _processor->enqueue(std::move(msg));
 }
 
-void FreeMonController::start(RegistrationType registrationType, std::vector<std::string>& tags) {
+void FreeMonController::start(RegistrationType registrationType,
+                              std::vector<std::string>& tags,
+                              Seconds gatherMetricsInterval) {
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
 
@@ -142,8 +144,11 @@ void FreeMonController::start(RegistrationType registrationType, std::vector<std
     }
 
     // Start the agent
-    _processor = std::make_shared<FreeMonProcessor>(
-        _registrationCollectors, _metricCollectors, _network.get(), _useCrankForTest);
+    _processor = std::make_shared<FreeMonProcessor>(_registrationCollectors,
+                                                    _metricCollectors,
+                                                    _network.get(),
+                                                    _useCrankForTest,
+                                                    gatherMetricsInterval);
 
     _thread = stdx::thread([this] { _processor->run(); });
 

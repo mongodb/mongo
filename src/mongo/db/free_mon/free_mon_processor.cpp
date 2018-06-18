@@ -60,10 +60,8 @@ constexpr auto kInformationalURLMaxLength = 4096;
 constexpr auto kInformationalMessageMaxLength = 4096;
 constexpr auto kUserReminderMaxLength = 4096;
 
-constexpr Seconds kDefaultMetricsGatherInterval(1);
-
-constexpr auto kReportingIntervalMinutesMin = 1;
-constexpr auto kReportingIntervalMinutesMax = 60 * 60 * 24;
+constexpr auto kReportingIntervalSecondsMin = 1;
+constexpr auto kReportingIntervalSecondsMax = 30 * 60 * 60 * 24;
 
 constexpr auto kMetricsRequestArrayElement = "data"_sd;
 
@@ -123,14 +121,15 @@ bool MetricsRetryCounter::incrementError() {
 FreeMonProcessor::FreeMonProcessor(FreeMonCollectorCollection& registration,
                                    FreeMonCollectorCollection& metrics,
                                    FreeMonNetworkInterface* network,
-                                   bool useCrankForTest)
+                                   bool useCrankForTest,
+                                   Seconds metricsGatherInterval)
     : _registration(registration),
       _metrics(metrics),
       _network(network),
       _random(Date_t::now().asInt64()),
       _registrationRetry(RegistrationRetryCounter(_random)),
       _metricsRetry(MetricsRetryCounter(_random)),
-      _metricsGatherInterval(kDefaultMetricsGatherInterval),
+      _metricsGatherInterval(metricsGatherInterval),
       _queue(useCrankForTest) {
     _registrationRetry->reset();
     _metricsRetry->reset();
@@ -495,14 +494,14 @@ Status FreeMonProcessor::validateRegistrationResponse(const FreeMonRegistrationR
                                     << "'");
     }
 
-    if (resp.getReportingInterval() < kReportingIntervalMinutesMin ||
-        resp.getReportingInterval() > kReportingIntervalMinutesMax) {
+    if (resp.getReportingInterval() < kReportingIntervalSecondsMin ||
+        resp.getReportingInterval() > kReportingIntervalSecondsMax) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "Reporting Interval '" << resp.getReportingInterval()
                                     << "' must be in the range ["
-                                    << kReportingIntervalMinutesMin
+                                    << kReportingIntervalSecondsMin
                                     << ","
-                                    << kReportingIntervalMinutesMax
+                                    << kReportingIntervalSecondsMax
                                     << "]");
     }
 
@@ -571,14 +570,14 @@ Status FreeMonProcessor::validateMetricsResponse(const FreeMonMetricsResponse& r
                                     << "'");
     }
 
-    if (resp.getReportingInterval() < kReportingIntervalMinutesMin ||
-        resp.getReportingInterval() > kReportingIntervalMinutesMax) {
+    if (resp.getReportingInterval() < kReportingIntervalSecondsMin ||
+        resp.getReportingInterval() > kReportingIntervalSecondsMax) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream() << "Reporting Interval '" << resp.getReportingInterval()
                                     << "' must be in the range ["
-                                    << kReportingIntervalMinutesMin
+                                    << kReportingIntervalSecondsMin
                                     << ","
-                                    << kReportingIntervalMinutesMax
+                                    << kReportingIntervalSecondsMax
                                     << "]");
     }
 
