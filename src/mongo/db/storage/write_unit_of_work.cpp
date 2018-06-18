@@ -71,7 +71,6 @@ WriteUnitOfWork::RecoveryUnitState WriteUnitOfWork::release() {
     invariant(ruState == RecoveryUnitState::kActiveUnitOfWork ||
               ruState == RecoveryUnitState::kFailedUnitOfWork);
     invariant(!_committed);
-    invariant(!_prepared);
     invariant(_toplevel);
 
     _released = true;

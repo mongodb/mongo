@@ -837,20 +837,12 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterPreallocateSnapshot);
 }
 
-MONGO_FAIL_POINT_DEFINE(pauseAfterTransactionPrepare);
-
 void Session::prepareTransaction(OperationContext* opCtx) {
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
     opObserver->onTransactionPrepare(opCtx);
 
-    // For testing purposes, this command prepares and immediately aborts the transaction,
-    // Running commit after prepare is not allowed yet.
-    // Prepared units of work cannot be released by the session, so we immediately abort here.
     opCtx->getWriteUnitOfWork()->prepare();
-    // This failpoint will cause readers of prepared documents to return prepare conflicts.
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseAfterTransactionPrepare);
-    abortActiveTransaction(opCtx);
 }
 
 void Session::abortArbitraryTransaction() {
