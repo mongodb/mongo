@@ -101,7 +101,7 @@ Status MobileIndex::doInsert(OperationContext* opCtx,
                              bool isTransactional) {
     MobileSession* session;
     if (isTransactional) {
-        session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
+        session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
     } else {
         session = MobileRecoveryUnit::get(opCtx)->getSessionNoTxn(opCtx);
     }
@@ -143,7 +143,7 @@ void MobileIndex::unindex(OperationContext* opCtx,
 }
 
 void MobileIndex::_doDelete(OperationContext* opCtx, const KeyString& key, KeyString* value) {
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
+    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
 
     str::stream deleteQuery;
     deleteQuery << "DELETE FROM \"" << _ident << "\" WHERE key = ?";

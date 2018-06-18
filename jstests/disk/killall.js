@@ -4,7 +4,6 @@
  *
  * For our purposes, "prompt" is defined as "before stopMongod() decides to send a SIGKILL", which
  * would not result in a zero return code.
- * @tags: [SERVER-32997]
  */
 
 var baseName = "jstests_disk_killall";

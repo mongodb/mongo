@@ -32,12 +32,21 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
 
+#define MOBILE_LOG_LEVEL_LOW 2
+#define MOBILE_LOG_LEVEL_HIGH 5
+#define MOBILE_TRACE_LEVEL MOBILE_LOG_LEVEL_HIGH
+
 namespace mongo {
 
 /**
  * Converts SQLite return codes to MongoDB statuses.
  */
 Status sqliteRCToStatus(int retCode, const char* prefix = NULL);
+
+/**
+ * Converts SQLite return codes to string equivalents.
+ */
+const char* sqliteStatusToStr(int retStatus);
 
 /**
  * Checks if retStatus == desiredStatus; else calls fassert.

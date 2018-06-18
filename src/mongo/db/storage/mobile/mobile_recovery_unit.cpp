@@ -26,24 +26,38 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include <string>
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mobile/mobile_recovery_unit.h"
 #include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
 #include "mongo/db/storage/mobile/mobile_util.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/log.h"
+
+#define RECOVERY_UNIT_TRACE() LOG(MOBILE_TRACE_LEVEL) << "MobileSE: RecoveryUnit ID:" << _id << " "
 
 namespace mongo {
 
+AtomicInt64 MobileRecoveryUnit::_nextID(0);
+
 MobileRecoveryUnit::MobileRecoveryUnit(MobileSessionPool* sessionPool)
-    : _inUnitOfWork(false), _active(false), _sessionPool(sessionPool) {}
+    : _inUnitOfWork(false), _active(false), _isReadOnly(true), _sessionPool(sessionPool) {
+    // Increment the global instance count and assign this instance an id.
+    _id = _nextID.addAndFetch(1);
+
+    RECOVERY_UNIT_TRACE() << " Created.";
+}
 
 MobileRecoveryUnit::~MobileRecoveryUnit() {
     invariant(!_inUnitOfWork);
     _abort();
+    RECOVERY_UNIT_TRACE() << " Destroyed.";
 }
 
 void MobileRecoveryUnit::_commit() {
@@ -79,17 +93,34 @@ void MobileRecoveryUnit::_abort() {
 void MobileRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     invariant(!_areWriteUnitOfWorksBanned);
     invariant(!_inUnitOfWork);
+
+    RECOVERY_UNIT_TRACE() << " Unit of work Active.";
+
+    if (_active) {
+        // Confirm a write transaction is not running
+        invariant(_isReadOnly);
+
+        // Rollback read transaction running outside wuow
+        _txnClose(false);
+    }
+    _txnOpen(opCtx, false);
     _inUnitOfWork = true;
 }
 
 void MobileRecoveryUnit::commitUnitOfWork() {
     invariant(_inUnitOfWork);
+
+    RECOVERY_UNIT_TRACE() << " Unit of work commited, marked inactive.";
+
     _inUnitOfWork = false;
     _commit();
 }
 
 void MobileRecoveryUnit::abortUnitOfWork() {
     invariant(_inUnitOfWork);
+
+    RECOVERY_UNIT_TRACE() << " Unit of work aborted, marked inactive.";
+
     _inUnitOfWork = false;
     _abort();
 }
@@ -108,10 +139,14 @@ void MobileRecoveryUnit::registerChange(Change* change) {
     _changes.push_back(std::unique_ptr<Change>{change});
 }
 
-MobileSession* MobileRecoveryUnit::getSession(OperationContext* opCtx) {
+MobileSession* MobileRecoveryUnit::getSession(OperationContext* opCtx, bool readOnly) {
+    RECOVERY_UNIT_TRACE() << " getSession called with readOnly:" << (readOnly ? "TRUE" : "FALSE");
+
+    invariant(_inUnitOfWork || readOnly);
     if (!_active) {
-        _txnOpen(opCtx);
+        _txnOpen(opCtx, readOnly);
     }
+
     return _session.get();
 }
 
@@ -125,13 +160,15 @@ void MobileRecoveryUnit::assertInActiveTxn() const {
 }
 
 void MobileRecoveryUnit::_ensureSession(OperationContext* opCtx) {
+    RECOVERY_UNIT_TRACE() << " Creating new session:" << (_session ? "NO" : "YES");
     if (!_session) {
         _session = _sessionPool->getSession(opCtx);
     }
 }
 
-void MobileRecoveryUnit::_txnOpen(OperationContext* opCtx) {
+void MobileRecoveryUnit::_txnOpen(OperationContext* opCtx, bool readOnly) {
     invariant(!_active);
+    RECOVERY_UNIT_TRACE() << " _txnOpen called with readOnly:" << (readOnly ? "TRUE" : "FALSE");
     _ensureSession(opCtx);
 
     /*
@@ -143,13 +180,33 @@ void MobileRecoveryUnit::_txnOpen(OperationContext* opCtx) {
      * tries to create a transaction in parallel, it receives a busy error and then retries.
      * Reads outside these explicit transactions proceed unaffected.
      */
-    SqliteStatement::execQuery(_session.get(), "BEGIN IMMEDIATE");
 
+    // Check for correct locking at higher levels
+    if (readOnly) {
+        // Confirm that this reader has taken a shared lock
+        if (!opCtx->lockState()->isLockHeldForMode(
+                ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL), MODE_S)) {
+            opCtx->lockState()->dump();
+            invariant(!"Reading without a shared lock");
+        }
+        SqliteStatement::execQuery(_session.get(), "BEGIN");
+    } else {
+        // Single writer allowed at a time, confirm a global write lock has been taken
+        if (!opCtx->lockState()->isLockHeldForMode(
+                ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL), MODE_X)) {
+            opCtx->lockState()->dump();
+            invariant(!"Writing without an exclusive lock");
+        }
+        SqliteStatement::execQuery(_session.get(), "BEGIN EXCLUSIVE");
+    }
+
+    _isReadOnly = readOnly;
     _active = true;
 }
 
 void MobileRecoveryUnit::_txnClose(bool commit) {
     invariant(_active);
+    RECOVERY_UNIT_TRACE() << " _txnClose called with " << (commit ? "commit " : "rollback ");
 
     if (commit) {
         SqliteStatement::execQuery(_session.get(), "COMMIT");
@@ -158,6 +215,7 @@ void MobileRecoveryUnit::_txnClose(bool commit) {
     }
 
     _active = false;
+    _isReadOnly = true;  // I don't suppose we need this, but no harm in doing so
 }
 
 void MobileRecoveryUnit::enqueueFailedDrop(std::string& dropQuery) {

@@ -87,6 +87,44 @@ Status sqliteRCToStatus(int retCode, const char* prefix) {
     }
 }
 
+const char* sqliteStatusToStr(int retStatus) {
+    const char* msg = NULL;
+
+    switch (retStatus) {
+        case SQLITE_OK:
+            msg = "SQLITE_OK";
+            break;
+        case SQLITE_ERROR:
+            msg = "SQLITE_ERROR";
+            break;
+        case SQLITE_BUSY:
+            msg = "SQLITE_BUSY";
+            break;
+        case SQLITE_LOCKED:
+            msg = "SQLITE_LOCKED";
+            break;
+        case SQLITE_NOTFOUND:
+            msg = "SQLITE_NOTFOUND";
+            break;
+        case SQLITE_FULL:
+            msg = "SQLITE_FULL";
+            break;
+        case SQLITE_MISUSE:
+            msg = "SQLITE_MISUSE";
+            break;
+        case SQLITE_ROW:
+            msg = "SQLITE_ROW";
+            break;
+        case SQLITE_DONE:
+            msg = "SQLITE_DONE";
+            break;
+        default:
+            msg = "Status not converted";
+            break;
+    }
+    return msg;
+}
+
 void checkStatus(int retStatus, int desiredStatus, const char* fnName, const char* errMsg) {
     if (retStatus != desiredStatus) {
         std::stringstream s;

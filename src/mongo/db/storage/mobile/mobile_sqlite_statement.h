@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/storage/mobile/mobile_session.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -115,7 +116,10 @@ public:
      */
     static void execQuery(MobileSession* session, const std::string& query);
 
+    uint64_t _id;
+
 private:
+    static AtomicInt64 _nextID;
     sqlite3_stmt* _stmt;
 
     // If the most recent call to sqlite3_step on this statement returned an error, the error is

@@ -303,7 +303,7 @@ bool MobileRecordStore::findRecord(OperationContext* opCtx,
 void MobileRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& recId) {
     invariant(!_isCapped);
 
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
+    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
     std::string dataSizeQuery =
         "SELECT IFNULL(LENGTH(data), 0) FROM \"" + _ident + "\" WHERE rec_id = ?;";
     SqliteStatement dataSizeStmt(*session, dataSizeQuery);
@@ -342,12 +342,13 @@ void MobileRecordStore::_doCappedDelete(OperationContext* opCtx,
                                         SqliteStatement& stmt,
                                         const std::string& direction,
                                         int64_t startRecId) {
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-
     bool isStartRecIdKnown = startRecId;
-
     int64_t numRecs = numRecords(opCtx), numBytes = dataSize(opCtx);
     int64_t numRecsRemoved = 0, numBytesRemoved = 0;
+
+    WriteUnitOfWork wuow(opCtx);
+    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
+
     {
         stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
 
@@ -373,8 +374,6 @@ void MobileRecordStore::_doCappedDelete(OperationContext* opCtx,
         }
     }
 
-    WriteUnitOfWork wuow(opCtx);
-
     _changeNumRecs(opCtx, -numRecsRemoved);
     _changeDataSize(opCtx, -numBytesRemoved);
 
@@ -392,7 +391,7 @@ void MobileRecordStore::_cappedDeleteIfNeeded(OperationContext* opCtx) {
         return;
     }
 
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
+    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
 
     std::string recordRemovalQuery =
         "SELECT rec_id, data FROM \"" + _ident + "\" ORDER BY rec_id ASC;";
@@ -404,7 +403,7 @@ void MobileRecordStore::_cappedDeleteIfNeeded(OperationContext* opCtx) {
 StatusWith<RecordId> MobileRecordStore::insertRecord(
     OperationContext* opCtx, const char* data, int len, Timestamp, bool enforceQuota) {
     // Inserts record into SQLite table (or replaces if duplicate record id).
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
+    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
 
     if (_isCapped && len > _cappedMaxSize) {
         return Status(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
@@ -456,7 +455,7 @@ Status MobileRecordStore::updateRecord(OperationContext* opCtx,
                                        int len,
                                        bool enforceQuota,
                                        UpdateNotifier* notifier) {
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
+    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
     std::string dataSizeQuery =
         "SELECT IFNULL(LENGTH(data), 0) FROM \"" + _ident + "\" WHERE rec_id = ?;";
     SqliteStatement dataSizeStmt(*session, dataSizeQuery);
@@ -501,20 +500,20 @@ std::unique_ptr<SeekableRecordCursor> MobileRecordStore::getCursor(OperationCont
 }
 
 /**
- * SQLite does not directly support truncate. The SQLite documentation recommends dropping then
- * recreating the table rather than deleting all the contents of a table.
+ * SQLite does not directly support truncate. The SQLite documentation recommends a DELETE
+ * statement without a WHERE clause. A Truncate Optimizer deletes all of the table content
+ * without having to visit each row of the table individually.
  */
 Status MobileRecordStore::truncate(OperationContext* opCtx) {
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
+    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
 
     int64_t numRecsBefore = numRecords(opCtx);
     _changeNumRecs(opCtx, -numRecsBefore);
     int64_t dataSizeBefore = dataSize(opCtx);
     _changeDataSize(opCtx, -dataSizeBefore);
 
-    std::string dropQuery = "DROP TABLE \"" + _ident + "\";";
-    SqliteStatement::execQuery(session, dropQuery);
-    MobileRecordStore::create(opCtx, _ident);
+    std::string deleteForTruncateQuery = "DELETE FROM \"" + _ident + "\";";
+    SqliteStatement::execQuery(session, deleteForTruncateQuery);
 
     return Status::OK();
 }

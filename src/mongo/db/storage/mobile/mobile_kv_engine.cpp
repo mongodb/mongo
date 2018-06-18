@@ -168,8 +168,9 @@ Status MobileKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
     } catch (const WriteConflictException&) {
         // It is possible that this drop fails because of transaction running in parallel.
         // We pretend that it succeeded, queue it for now and keep retrying later.
-        LOG(2) << "MobileSE: Caught WriteConflictException while dropping table, queuing to retry "
-                  "later";
+        LOG(MOBILE_LOG_LEVEL_LOW)
+            << "MobileSE: Caught WriteConflictException while dropping table, "
+               "queuing to retry later";
         MobileRecoveryUnit::get(opCtx)->enqueueFailedDrop(dropQuery);
     }
     return Status::OK();
