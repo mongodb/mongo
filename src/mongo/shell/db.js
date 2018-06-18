@@ -1927,7 +1927,7 @@ var DB;
             // but is not allowed to inspect it.
             print("Successfully initiated free monitoring, but unable to determine status " +
                   "as you lack the 'checkFreeMonitoringStatus' privilege.");
-            return null;
+            return;
         }
         assert.commandWorked(cmd);
 
@@ -1935,10 +1935,10 @@ var DB;
             print("Successfully initiated free monitoring. The registration is " +
                   "proceeding in the background. ");
             print("Run db.getFreeMonitoringStatus() at any time to check on the progress.");
-            return null;
+            return;
         }
 
-        return cmd;
+        print(tojson(cmd));
     };
 
     DB.prototype.disableFreeMonitoring = function() {
