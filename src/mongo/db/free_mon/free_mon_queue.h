@@ -52,6 +52,41 @@ struct FreeMonMessageGreater {
 };
 
 /**
+ * Priority Queue with ability to remove items by filter.
+ */
+class FreeMonPriorityQueue {
+public:
+    bool empty() const {
+        return _vector.empty();
+    }
+
+    /**
+     * Return the message at the top of the priority queue.
+     */
+    std::shared_ptr<FreeMonMessage> top() const;
+
+    /**
+     * Pop the message at the top of the priority queue.
+     */
+    void pop();
+
+    /**
+     * Push a message into the priority queue.
+     */
+    void push(std::shared_ptr<FreeMonMessage> item);
+
+    /**
+     * Erase messages of a given type from the queue.
+     */
+    void eraseByType(FreeMonMessageType type);
+
+private:
+    // Using shared_ptr because std::pop_heap does not support move-only types
+    std::vector<std::shared_ptr<FreeMonMessage>> _vector;
+    FreeMonMessageGreater _comp;
+};
+
+/**
  * A multi-producer, single-consumer queue with deadlines.
  *
  * The smallest deadline sorts first. Messages with deadlines can be use as a timer mechanism.
@@ -95,11 +130,7 @@ private:
     bool _stop{false};
 
     // Priority queue of messages with shortest deadline first
-    // Using shared_ptr because priority_queue does not support move-only types
-    std::priority_queue<std::shared_ptr<FreeMonMessage>,
-                        std::vector<std::shared_ptr<FreeMonMessage>>,
-                        FreeMonMessageGreater>
-        _queue;
+    FreeMonPriorityQueue _queue;
 
     // Use manual crank to process messages in-order instead of based on deadlines.
     bool _useCrank{false};

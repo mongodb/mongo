@@ -37,6 +37,38 @@
 
 namespace mongo {
 
+std::shared_ptr<FreeMonMessage> FreeMonPriorityQueue::top() const {
+    return _vector.front();
+}
+
+void FreeMonPriorityQueue::pop() {
+    std::pop_heap(_vector.begin(), _vector.end(), _comp);
+    _vector.pop_back();
+}
+
+void FreeMonPriorityQueue::push(std::shared_ptr<FreeMonMessage> item) {
+    _vector.push_back(item);
+    std::push_heap(_vector.begin(), _vector.end(), _comp);
+}
+
+void FreeMonPriorityQueue::eraseByType(FreeMonMessageType type) {
+
+    while (true) {
+        auto it = std::find_if(_vector.begin(), _vector.end(), [type](const auto& item) {
+            return item->getType() == type;
+        });
+
+        if (it == _vector.end()) {
+            break;
+        }
+
+        _vector.erase(it);
+    }
+
+    std::make_heap(_vector.begin(), _vector.end(), _comp);
+}
+
+
 FreeMonMessage::~FreeMonMessage() {}
 
 void FreeMonMessageQueue::enqueue(std::shared_ptr<FreeMonMessage> msg) {
@@ -48,7 +80,11 @@ void FreeMonMessageQueue::enqueue(std::shared_ptr<FreeMonMessage> msg) {
             return;
         }
 
-        _queue.emplace(msg);
+        if (msg->getType() == FreeMonMessageType::MetricsSend) {
+            _queue.eraseByType(FreeMonMessageType::MetricsSend);
+        }
+
+        _queue.push(msg);
 
         // Signal the dequeue
         _condvar.notify_one();
