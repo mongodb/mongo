@@ -133,33 +133,35 @@
     assertIndexHasCollation({c: 1}, {locale: "simple"});
 
     // Test that all indexes retain their current collation when the collection is re-indexed.
-    assert.commandWorked(coll.reIndex());
-    assertIndexHasCollation({a: 1}, {
-        locale: "fr_CA",
-        caseLevel: false,
-        caseFirst: "off",
-        strength: 3,
-        numericOrdering: false,
-        alternate: "non-ignorable",
-        maxVariable: "punct",
-        normalization: false,
-        backwards: true,
-        version: "57.1",
-    });
-    assertIndexHasCollation({b: 1}, {
-        locale: "en_US",
-        caseLevel: false,
-        caseFirst: "off",
-        strength: 3,
-        numericOrdering: false,
-        alternate: "non-ignorable",
-        maxVariable: "punct",
-        normalization: false,
-        backwards: false,
-        version: "57.1",
-    });
-    assertIndexHasCollation({d: 1}, {locale: "simple"});
-    assertIndexHasCollation({c: 1}, {locale: "simple"});
+    if (!isMongos) {
+        assert.commandWorked(coll.reIndex());
+        assertIndexHasCollation({a: 1}, {
+            locale: "fr_CA",
+            caseLevel: false,
+            caseFirst: "off",
+            strength: 3,
+            numericOrdering: false,
+            alternate: "non-ignorable",
+            maxVariable: "punct",
+            normalization: false,
+            backwards: true,
+            version: "57.1",
+        });
+        assertIndexHasCollation({b: 1}, {
+            locale: "en_US",
+            caseLevel: false,
+            caseFirst: "off",
+            strength: 3,
+            numericOrdering: false,
+            alternate: "non-ignorable",
+            maxVariable: "punct",
+            normalization: false,
+            backwards: false,
+            version: "57.1",
+        });
+        assertIndexHasCollation({d: 1}, {locale: "simple"});
+        assertIndexHasCollation({c: 1}, {locale: "simple"});
+    }
 
     coll.drop();
 

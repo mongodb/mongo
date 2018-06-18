@@ -93,7 +93,9 @@
         assert.commandWorked(viewsDB.collection.createIndex({x: 1}),
                              makeErrorMessage("createIndexes"));
 
-        assert.commandWorked(viewsDB.collection.reIndex(), makeErrorMessage("reIndex"));
+        if (!isMongos) {
+            assert.commandWorked(viewsDB.collection.reIndex(), makeErrorMessage("reIndex"));
+        }
 
         const storageEngine = jsTest.options().storageEngine;
         if (isMongos || storageEngine === "ephemeralForTest" || storageEngine === "inMemory") {

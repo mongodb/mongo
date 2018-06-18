@@ -317,8 +317,10 @@
         isNotAdminCommand);
 
     // Test reIndex fails with an invalid collection name.
-    assertFailsWithInvalidNamespacesForField(
-        "reIndex", {reIndex: ""}, isNotFullyQualified, isNotAdminCommand);
+    if (!isMongos) {
+        assertFailsWithInvalidNamespacesForField(
+            "reIndex", {reIndex: ""}, isNotFullyQualified, isNotAdminCommand);
+    }
 
     // Test collStats fails with an invalid collection name.
     assertFailsWithInvalidNamespacesForField(

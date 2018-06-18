@@ -357,18 +357,6 @@
             }
         },
         profile: {skip: "not supported in mongos"},
-        reIndex: {
-            sendsDbVersion: true,
-            sendsShardVersion: true,
-            setUp: function(mongosConn) {
-                // Expects the collection to exist, and doesn't implicitly create it.
-                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
-            },
-            command: {reIndex: collName},
-            cleanUp: function(mongosConn) {
-                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
-            }
-        },
         reapLogicalSessionCacheNow: {skip: "is a no-op on mongos"},
         refreshLogicalSessionCacheNow: {skip: "goes through the cluster write path"},
         refreshSessions: {skip: "executes locally on mongos (not sent to any remote node)"},

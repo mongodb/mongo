@@ -83,6 +83,9 @@ selector:
   # cannot ensureIndex after dropDatabase without sharding first
   - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
 
+  # reIndex is not supported in mongos.
+  - jstests/concurrency/fsm_workloads/reindex.js
+
   # our .remove(query, {justOne: true}) calls lack shard keys
   - jstests/concurrency/fsm_workloads/remove_single_document.js
 

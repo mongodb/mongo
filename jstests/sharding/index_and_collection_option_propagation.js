@@ -130,15 +130,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         res.raw[st.shard2.host].code, ErrorCodes.CannotImplicitlyCreateCollection, tojson(res));
     checkShardIndexes("idx2", [st.shard0, st.shard1], [st.shard2]);
 
-    // reIndex
-    res = st.s.getDB(dbName).getCollection(collName).reIndex();
-    assert.commandWorked(res);
-    assert.eq(res.raw[st.shard0.host].ok, 1, tojson(res));
-    assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
-    assert.eq(res.raw[st.shard2.host].code, ErrorCodes.NamespaceNotFound, tojson(res));
-    checkShardIndexes("idx1", [st.shard0, st.shard1], [st.shard2]);
-    checkShardIndexes("idx2", [st.shard0, st.shard1], [st.shard2]);
-
     // dropIndex
     res = st.s.getDB(dbName).getCollection(collName).dropIndex("idx1_1");
     assert.commandWorked(res);

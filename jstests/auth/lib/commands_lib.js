@@ -5117,6 +5117,7 @@ var authCommandsLib = {
         {
           testname: "reIndex",
           command: {reIndex: "x"},
+          skipSharded: true,
           setup: function(db) {
               db.x.save({});
           },
