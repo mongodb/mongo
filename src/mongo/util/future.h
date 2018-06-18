@@ -730,9 +730,7 @@ public:
      * timeouts, that is unnecessary if the Future is ready already.
      */
     bool isReady() const {
-        // This can be a relaxed load because callers are not allowed to use it to establish
-        // ordering.
-        return immediate || shared->state.load(std::memory_order_relaxed) == SSBState::kFinished;
+        return immediate || shared->state.load(std::memory_order_acquire) == SSBState::kFinished;
     }
 
     /**
