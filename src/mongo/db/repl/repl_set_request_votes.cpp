@@ -83,8 +83,10 @@ private:
         ReplSetRequestVotesResponse response;
         status = getGlobalReplicationCoordinator()->processReplSetRequestVotes(
             txn, parsedArgs, &response);
+        uassertStatusOK(status);
+
         response.addToBSON(&result);
-        return appendCommandStatus(result, status);
+        return true;
     }
 } cmdReplSetRequestVotes;
 
