@@ -1,9 +1,4 @@
-// @tags: [
-//     requires_non_retryable_writes,
-//
-//     # Fails on embedded, causes a WriteConflict assert in storage.
-//     SERVER-32997,
-// ]
+// @tags: [requires_non_retryable_writes]
 
 // Sanity test for removing documents with adjacent index keys.  SERVER-2008
 

@@ -1,5 +1,4 @@
 // SERVER-16262: Write-conflict during map-reduce operations
-// @tags: [SERVER-32997]
 
 (function() {
     "use strict";

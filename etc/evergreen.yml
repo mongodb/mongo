@@ -4414,7 +4414,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --mongod=./mongoed --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_eval_command,requires_background_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication,requires_capped,requires_profiling,SERVER-32997
+      resmoke_args: --suites=core --mongod=./mongoed --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_eval_command,requires_background_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication,requires_capped,requires_profiling
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -11920,7 +11920,7 @@ buildvariants:
     test_flags: >-
       --storageEngine=mobile
       --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
-      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
+      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --mobile-se=on
@@ -11943,7 +11943,8 @@ buildvariants:
   - name: aggregation_facet_unwind_passthrough
   - name: auth
   - name: dbtest
-  # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
+  # TODO SERVER-32993: Re-enable the concurrency and concurrency_simultaneous suite on the
+  # mobile storage engine builders.
   # - name: concurrency
   # - name: concurrency_simultaneous
   - name: disk_mobile
@@ -11959,6 +11960,7 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsonSchema
   - name: jstestfuzz
+  - name: jstestfuzz_concurrent
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
@@ -11975,7 +11977,7 @@ buildvariants:
     test_flags: >-
       --storageEngine=mobile
       --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
-      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
+      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993
     compile_flags: >-
         -j$(grep -c ^processor /proc/cpuinfo)
         --mobile-se=on
@@ -11998,7 +12000,8 @@ buildvariants:
   - name: aggregation_facet_unwind_passthrough
   - name: auth
   - name: dbtest
-  # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
+  # TODO SERVER-32993: Re-enable the concurrency and concurrency_simultaneous suite on the
+  # mobile storage engine builders.
   # - name: concurrency
   # - name: concurrency_simultaneous
   - name: disk_mobile
@@ -12014,6 +12017,7 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsonSchema
   - name: jstestfuzz
+  - name: jstestfuzz_concurrent
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
@@ -12057,7 +12061,7 @@ buildvariants:
     test_flags: >-
       --storageEngine=mobile
       --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
-      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
+      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
@@ -12080,7 +12084,8 @@ buildvariants:
   - name: aggregation_facet_unwind_passthrough
   - name: auth
   - name: dbtest
-  # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
+  # TODO SERVER-32993: Re-enable the concurrency and concurrency_simultaneous suite on the
+  # mobile storage engine builders.
   # - name: concurrency
   # - name: concurrency_simultaneous
   - name: disk_mobile
@@ -12096,6 +12101,7 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsonSchema
   - name: jstestfuzz
+  - name: jstestfuzz_concurrent
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel

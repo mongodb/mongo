@@ -357,7 +357,15 @@ LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(OperationContext* opCtx,
         }
         _modeForTicket = mode;
     }
-    const LockResult result = lockBegin(opCtx, resourceIdGlobal, mode);
+
+    LockMode actualLockMode = mode;
+    if (opCtx) {
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        if (storageEngine && !storageEngine->supportsDBLocking()) {
+            actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;
+        }
+    }
+    const LockResult result = lockBegin(opCtx, resourceIdGlobal, actualLockMode);
     if (result == LOCK_OK)
         return LOCK_OK;
 

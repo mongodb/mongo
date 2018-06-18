@@ -3,7 +3,6 @@
  *  dummy replset config & TTL collection, then restarts the member and ensures that it doesn't
  *  time out the docs in the TTL collection. Then it removes the "config" and
  *  restarts, ensuring that the TTL monitor deletes the docs.
- *  @tags: [SERVER-32997]
  */
 
 var runner;

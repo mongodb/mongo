@@ -22,9 +22,15 @@
     // Wait until the write appears in the currentOp output reporting that it is waiting for a lock.
     assert.soon(
         function() {
+            var lock_type = "";
+            if (jsTest.options().storageEngine === "mobile") {
+                lock_type = "W";
+            } else {
+                lock_type = "w";
+            }
             const ops = db.currentOp({
                 $and: [
-                    {"locks.Global": "w", waitingForLock: true},
+                    {"locks.Global": lock_type, waitingForLock: true},
                     // Depending on whether CurOp::setNS_inlock() has been called, the "ns" field
                     // may either be the full collection name or the command namespace.
                     {

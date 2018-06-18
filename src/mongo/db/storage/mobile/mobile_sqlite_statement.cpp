@@ -40,16 +40,24 @@
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
+#define SQLITE_STMT_TRACE() LOG(MOBILE_TRACE_LEVEL) << "MobileSE: SQLite Stmt ID:" << _id << " "
+
 namespace mongo {
 
+AtomicInt64 SqliteStatement::_nextID(0);
+
 SqliteStatement::SqliteStatement(const MobileSession& session, const std::string& sqlQuery) {
+    // Increment the global instance count and assign this instance an id.
+    _id = _nextID.addAndFetch(1);
+    SQLITE_STMT_TRACE() << "Preparing: " << sqlQuery;
     int status = sqlite3_prepare_v2(
         session.getSession(), sqlQuery.c_str(), sqlQuery.length() + 1, &_stmt, NULL);
     if (status == SQLITE_BUSY) {
-        LOG(2) << "MobileSE: SQLITE_BUSY while preparing query: " << sqlQuery;
+        SQLITE_STMT_TRACE() << "Throwing writeConflictException, "
+                            << "SQLITE_BUSY while preparing: " << sqlQuery;
         throw WriteConflictException();
     } else if (status != SQLITE_OK) {
-        LOG(2) << "MobileSE: Error while preparing query: " << sqlQuery;
+        SQLITE_STMT_TRACE() << "Error while preparing: " << sqlQuery;
         std::string errMsg = "sqlite3_prepare_v2 failed: ";
         errMsg += sqlite3_errstr(status);
         uasserted(ErrorCodes::UnknownError, errMsg);
@@ -85,7 +93,6 @@ void SqliteStatement::clearBindings() {
 }
 
 int SqliteStatement::step(int desiredStatus) {
-    LOG(2) << "MobileSE: SQLite Statement stepping: " << std::string(sqlite3_sql(_stmt));
     int status = sqlite3_step(_stmt);
 
     // A non-negative desiredStatus indicates that checkStatus should assert that the returned
@@ -93,6 +100,10 @@ int SqliteStatement::step(int desiredStatus) {
     if (desiredStatus >= 0) {
         checkStatus(status, desiredStatus, "sqlite3_step");
     }
+
+    char* full_stmt = sqlite3_expanded_sql(_stmt);
+    SQLITE_STMT_TRACE() << sqliteStatusToStr(status) << " - on stepping: " << full_stmt;
+    sqlite3_free(full_stmt);
 
     return status;
 }
@@ -114,11 +125,14 @@ const void* SqliteStatement::getColText(int colIndex) {
 }
 
 void SqliteStatement::execQuery(MobileSession* session, const std::string& query) {
+    LOG(MOBILE_TRACE_LEVEL) << "MobileSE: SQLite sqlite3_exec: " << query;
+
     char* errMsg = NULL;
-    LOG(2) << "MobileSE: SQLite Statement sqlite3_exec: " << query;
     int status = sqlite3_exec(session->getSession(), query.c_str(), NULL, NULL, &errMsg);
 
     if (status == SQLITE_BUSY || status == SQLITE_LOCKED) {
+        LOG(MOBILE_TRACE_LEVEL) << "MobileSE: " << (status == SQLITE_BUSY ? "Busy" : "Locked")
+                                << " - Throwing WriteConflictException on sqlite3_exec: " << query;
         throw WriteConflictException();
     }
 

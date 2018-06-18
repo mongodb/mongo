@@ -418,12 +418,16 @@ Status renameCollectionCommon(OperationContext* opCtx,
         AutoGetCollectionForRead autoSourceColl(opCtx, source);
         AutoGetCollection autoTmpColl(opCtx, tmpName, MODE_IX);
         ctx.reset();
-        if (globalWriteLock) {
-            const ResourceId globalLockResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
-            lockState->downgrade(globalLockResourceId, MODE_IX);
-            invariant(!lockState->isW());
-        } else {
-            invariant(lockState->isW());
+
+        if (opCtx->getServiceContext()->getStorageEngine()->supportsDBLocking()) {
+            if (globalWriteLock) {
+                const ResourceId globalLockResourceId(RESOURCE_GLOBAL,
+                                                      ResourceId::SINGLETON_GLOBAL);
+                lockState->downgrade(globalLockResourceId, MODE_IX);
+                invariant(!lockState->isW());
+            } else {
+                invariant(lockState->isW());
+            }
         }
 
         auto cursor = sourceColl->getCursor(opCtx);
