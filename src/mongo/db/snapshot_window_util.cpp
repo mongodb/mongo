@@ -38,9 +38,13 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+// This failpoint is used for performance testing.
+MONGO_FAIL_POINT_DEFINE(preventDynamicSnapshotHistoryWindowTargetAdjustments);
 
 namespace SnapshotWindowUtil {
 
@@ -82,6 +86,10 @@ void _decreaseTargetSnapshotWindowSize(WithLock lock, OperationContext* opCtx) {
 }  // namespace
 
 void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
+    if (MONGO_FAIL_POINT(preventDynamicSnapshotHistoryWindowTargetAdjustments)) {
+        return;
+    }
+
     stdx::unique_lock<stdx::mutex> lock(snapshotWindowMutex);
 
     // Tracks the last time that the snapshot window was increased so that it does not go up so fast
@@ -135,6 +143,10 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
 }
 
 void decreaseTargetSnapshotWindowSize(OperationContext* opCtx) {
+    if (MONGO_FAIL_POINT(preventDynamicSnapshotHistoryWindowTargetAdjustments)) {
+        return;
+    }
+
     stdx::unique_lock<stdx::mutex> lock(snapshotWindowMutex);
 
     StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
