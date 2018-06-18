@@ -898,8 +898,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         // Pause to wait for replication. This will prevent us from going into critical section
         // until we're ready.
 
-        repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+        log() << "Waiting for replication to catch up before entering critical section";
+
+        auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
             opCtx, lastOpApplied, writeConcern);
+        uassertStatusOKWithContext(awaitReplicationResult.status,
+                                   awaitReplicationResult.status.codeString());
+
+        log() << "Chunk data replicated successfully.";
     }
 
     {
