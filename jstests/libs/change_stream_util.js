@@ -193,6 +193,13 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
                       "Expected change's size must match expected number of changes");
         }
 
+        // Convert 'expectedChanges' to an array, even if it contains just a single element.
+        if (expectedChanges !== undefined && !(expectedChanges instanceof Array)) {
+            let arrayVersion = new Array;
+            arrayVersion.push(expectedChanges);
+            expectedChanges = arrayVersion;
+        }
+
         // Set the expected number of changes based on the size of the expected change list.
         if (expectedNumChanges === undefined) {
             assert.neq(expectedChanges, undefined);

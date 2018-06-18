@@ -131,6 +131,9 @@
     ];
     const dropDbChanges = cst.assertNextChangesEqual(
         {cursor: resumeCursor, expectedChanges: expectedChangesAfterFirstDrop});
+    const resumeTokenDrop = dropDbChanges[0]._id;
+    const resumeTokenDropDb = dropDbChanges[1]._id;
+    const resumeTokenInvalidate = dropDbChanges[2]._id;
 
     // Resume from the first collection drop.
     resumeCursor = cst.startWatchingChanges({
@@ -142,7 +145,7 @@
 
     // Resume from the second collection drop using 'resumeAfter'.
     resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[0]._id}}],
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenDrop}}],
         collection: 1,
     });
     cst.assertNextChangesEqual(
@@ -150,55 +153,53 @@
 
     // Resume from the second collection drop using 'startAfter'.
     resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {startAfter: dropDbChanges[0]._id}}],
+        pipeline: [{$changeStream: {startAfter: resumeTokenDrop}}],
         collection: 1,
     });
     cst.assertNextChangesEqual(
         {cursor: resumeCursor, expectedChanges: expectedChangesAfterFirstDrop.slice(1)});
 
     // Recreate the test collection.
-    coll = assertCreateCollection(testDB, coll.getName());
     assert.writeOK(coll.insert({_id: "after recreate"}));
 
-    let expectedInsert = {
+    let expectedInsert = [{
         operationType: "insert",
-        ns: {db: db.getName(), coll: coll.getName()},
+        ns: {db: testDB.getName(), coll: coll.getName()},
         fullDocument: {_id: "after recreate"},
         documentKey: {_id: "after recreate"}
-    };
-
-    // TODO SERVER-34789: The code below should throw an error. We exercise this behavior here to
-    // be sure that it doesn't crash the server, but the ability to resume a change stream using
-    // 'resumeAfter' with a resume token from an invalidate is a bug, not a feature.
+    }];
 
     // Test resuming from the 'dropDatabase' entry using 'resumeAfter'.
     resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[1]._id}}],
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenDropDb}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
-    cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
+    cst.assertNextChangesEqual(
+        {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
 
     // Test resuming from the 'invalidate' entry using 'resumeAfter'.
-    resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[2]._id}}],
-        collection: 1,
-        aggregateOptions: {cursor: {batchSize: 0}},
-    });
-    cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: 1,
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenInvalidate}}],
+        cursor: {},
+        collation: {locale: "simple"},
+    }),
+                                 ErrorCodes.InvalidResumeToken);
 
     // Test resuming from the 'dropDatabase' entry using 'startAfter'.
     resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {startAfter: dropDbChanges[1]._id}}],
+        pipeline: [{$changeStream: {startAfter: resumeTokenDropDb}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
-    cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
+    cst.assertNextChangesEqual(
+        {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
 
     // Test resuming from the 'invalidate' entry using 'startAfter' and verifies it picks up the
     // insert after recreating the db/collection.
     resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[2]._id}}],
+        pipeline: [{$changeStream: {startAfter: resumeTokenInvalidate}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });

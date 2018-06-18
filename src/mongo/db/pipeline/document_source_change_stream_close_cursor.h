@@ -101,7 +101,6 @@ private:
         : DocumentSource(expCtx) {}
 
     bool _shouldCloseCursor = false;
-    boost::optional<Document> _queuedInvalidate;
 };
 
 }  // namespace mongo

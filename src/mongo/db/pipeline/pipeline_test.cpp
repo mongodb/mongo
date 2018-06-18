@@ -1536,7 +1536,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
     auto spec = BSON("$changeStream" << BSON("fullDocument"
                                              << "updateLookup"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 4UL);
+    ASSERT_EQ(stages.size(), 5UL);
     // Make sure the change lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePostImage*>(stages.back().get()));
 
@@ -1561,7 +1561,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage
     auto spec = BSON("$changeStream" << BSON("fullDocument"
                                              << "updateLookup"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 4UL);
+    ASSERT_EQ(stages.size(), 5UL);
     // Make sure the change lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePostImage*>(stages.back().get()));
 

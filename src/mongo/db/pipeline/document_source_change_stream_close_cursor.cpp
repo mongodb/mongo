@@ -59,11 +59,6 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
         uasserted(ErrorCodes::CloseChangeStream, "Change stream has been invalidated");
     }
 
-    if (_queuedInvalidate) {
-        _shouldCloseCursor = true;
-        return DocumentSource::GetNextResult(std::move(_queuedInvalidate.get()));
-    }
-
     auto nextInput = pSource->getNext();
     if (!nextInput.isAdvanced())
         return nextInput;
@@ -78,15 +73,6 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
         // filtered/transformed by further stages in the pipeline, then throw an exception
         // to close the cursor on the next call to getNext().
         _shouldCloseCursor = true;
-    }
-
-    // Check if this is an invalidating command and the next entry should be an "invalidate".
-    if (isInvalidatingCommand(pExpCtx, operationType)) {
-        _queuedInvalidate = Document{
-            {DocumentSourceChangeStream::kIdField, doc[DocumentSourceChangeStream::kIdField]},
-            {DocumentSourceChangeStream::kClusterTimeField,
-             doc[DocumentSourceChangeStream::kClusterTimeField]},
-            {DocumentSourceChangeStream::kOperationTypeField, "invalidate"_sd}};
     }
 
     return nextInput;

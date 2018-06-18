@@ -86,8 +86,10 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
 
     // If the change stream spec includes a resumeToken with a shard key, populate the document key
     // cache with the field paths.
-    if (auto resumeAfter = spec.getResumeAfter()) {
-        ResumeToken token = resumeAfter.get();
+    auto resumeAfter = spec.getResumeAfter();
+    auto startAfter = spec.getStartAfter();
+    if (resumeAfter || startAfter) {
+        ResumeToken token = resumeAfter ? resumeAfter.get() : startAfter.get();
         ResumeTokenData tokenData = token.getData();
 
         if (!tokenData.documentKey.missing() && tokenData.uuid) {
