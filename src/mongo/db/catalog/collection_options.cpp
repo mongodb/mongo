@@ -145,7 +145,7 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
                 // Ignoring for backwards compatibility.
                 continue;
             }
-            cappedSize = e.numberLong();
+            cappedSize = e.safeNumberLong();
             if (cappedSize < 0)
                 return Status(ErrorCodes::BadValue, "size has to be >= 0");
             const long long kGB = 1024 * 1024 * 1024;
@@ -159,7 +159,7 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
                 // Ignoring for backwards compatibility.
                 continue;
             }
-            cappedMaxDocs = e.numberLong();
+            cappedMaxDocs = e.safeNumberLong();
             if (!validMaxCappedDocs(&cappedMaxDocs))
                 return Status(ErrorCodes::BadValue,
                               "max in a capped collection has to be < 2^31 or not set");
@@ -171,7 +171,7 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
                     initialExtentSizes.push_back(inner.numberInt());
                 }
             } else {
-                initialNumExtents = e.numberLong();
+                initialNumExtents = e.safeNumberLong();
             }
         } else if (fieldName == "autoIndexId") {
             if (e.trueValue())

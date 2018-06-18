@@ -333,4 +333,51 @@ TEST(CollectionOptions, ParseUUID) {
     // Check that a collection options containing a UUID passes validation.
     ASSERT_OK(options.validateForStorage());
 }
+
+TEST(CollectionOptions, SizeNumberLimits) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{size: 'a'}")));
+    ASSERT_EQ(options.cappedSize, 0);
+
+
+    ASSERT_OK(options.parse(fromjson("{size: '-1'}")));
+    ASSERT_EQ(options.cappedSize, 0);
+
+    ASSERT_OK(options.parse(fromjson("{size: '-9999999999999999999999999999999'}")));
+    ASSERT_EQ(options.cappedSize, 0);
+
+    // The test for size is redundant since size returns a status that's not ok if it's larger
+    // than a petabyte, which is smaller than LLONG_MAX anyways. We test that here.
+    ASSERT_NOT_OK(options.parse(fromjson("{size: 9999999999999999}")));
+}
+
+TEST(CollectionOptions, MaxNumberLimits) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{max: 'a'}")));
+    ASSERT_EQ(options.cappedMaxDocs, 0);
+
+    ASSERT_OK(options.parse(fromjson("{max: '-1'}")));
+    ASSERT_EQ(options.cappedMaxDocs, 0);
+
+    ASSERT_OK(options.parse(fromjson("{max: '-9999999999999999999999999999999999'}")));
+    ASSERT_EQ(options.cappedMaxDocs, 0);
+
+    ASSERT_OK(options.parse(fromjson("{max: 99999999999999999999999999999}")));
+    ASSERT_EQ(options.cappedMaxDocs, 0);
+}
+
+TEST(CollectionOptions, NExtentsNumberLimits) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{$nExtents: 'a'}")));
+    ASSERT_EQ(options.initialNumExtents, 0);
+
+    ASSERT_OK(options.parse(fromjson("{$nExtents: '-1'}")));
+    ASSERT_EQ(options.initialNumExtents, 0);
+
+    ASSERT_OK(options.parse(fromjson("{$nExtents: '-9999999999999999999999999999999999'}")));
+    ASSERT_EQ(options.initialNumExtents, 0);
+
+    ASSERT_OK(options.parse(fromjson("{$nExtents: 9999999999999999999999999999999}")));
+    ASSERT_EQ(options.initialNumExtents, LLONG_MAX);
+}
 }  // namespace mongo
