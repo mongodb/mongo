@@ -540,6 +540,19 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "reportingInterval"
                        << 1LL))));
 
+    // max reporting interval
+    ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
+        IDLParserErrorContext("foo"),
+        BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
+                       << "mock123"
+                       << "informationalURL"
+                       << "http://www.example.com/123"
+                       << "message"
+                       << "msg456"
+                       << "reportingInterval"
+                       << 30 * 60 * 60 * 24LL))));
+
+
     // Negative: bad protocol version
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
         IDLParserErrorContext("foo"),
@@ -621,7 +634,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "message"
                        << "msg456"
                        << "reportingInterval"
-                       << (60LL * 60 * 24 + 1LL)))));
+                       << (60LL * 60 * 24 * 30 + 1LL)))));
 }
 
 
@@ -639,6 +652,20 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
                        << "msg456"
                        << "reportingInterval"
                        << 1LL))));
+
+    // max reporting interval
+    ASSERT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
+        IDLParserErrorContext("foo"),
+
+        BSON("version" << 1LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
+                       << "id"
+                       << "mock123"
+                       << "informationalURL"
+                       << "http://www.example.com/123"
+                       << "message"
+                       << "msg456"
+                       << "reportingInterval"
+                       << 60 * 60 * 24 * 30LL))));
 
     // Negative: bad protocol version
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
@@ -732,7 +759,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
                        << "message"
                        << "msg456"
                        << "reportingInterval"
-                       << (60LL * 60 * 24 + 1LL)))));
+                       << (60LL * 60 * 24 * 30 + 1LL)))));
 }
 
 /**
@@ -831,7 +858,7 @@ struct ControllerHolder {
 
     void start(RegistrationType registrationType) {
         std::vector<std::string> tags;
-        controller->start(registrationType, tags);
+        controller->start(registrationType, tags, Seconds(1));
     }
 
 

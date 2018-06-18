@@ -59,7 +59,9 @@ public:
      * Initializes free monitoring.
      * Start free monitoring thread in the background.
      */
-    void start(RegistrationType registrationType, std::vector<std::string>& tags);
+    void start(RegistrationType registrationType,
+               std::vector<std::string>& tags,
+               Seconds gatherMetricsInterval);
 
     /**
      * Stops free monitoring thread.

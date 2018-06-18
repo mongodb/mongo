@@ -283,7 +283,8 @@ public:
     FreeMonProcessor(FreeMonCollectorCollection& registration,
                      FreeMonCollectorCollection& metrics,
                      FreeMonNetworkInterface* network,
-                     bool useCrankForTest);
+                     bool useCrankForTest,
+                     Seconds metricsGatherInterval);
 
     /**
      * Enqueue a message to process
