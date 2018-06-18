@@ -55,6 +55,7 @@ selector:
   - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
   # uses >100MB of data, which can overwhelm test hosts
+  - jstests/concurrency/fsm_workloads/agg_group_external.js
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
   # compact can only be run against a standalone mongod
