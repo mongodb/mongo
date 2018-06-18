@@ -59,6 +59,7 @@
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -101,6 +102,9 @@ using std::ostringstream;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+
+// Failpoint for making filemd5 hang.
+MONGO_FAIL_POINT_DEFINE(waitInFilemd5DuringManualYield);
 
 namespace {
 
@@ -238,6 +242,29 @@ public:
                                                     PlanExecutor::YIELD_MANUAL,
                                                     QueryPlannerParams::NO_TABLE_SCAN));
 
+            // We need to hold a lock to clean up the PlanExecutor, so make sure we have one when we
+            // exit this block. Because we use an AutoGetCollectionForReadCommand and manual
+            // yielding, we may throw when trying to re-acquire the lock. For example, this can
+            // happen if our operation has been interrupted.
+            ON_BLOCK_EXIT([&]() {
+                if (ctx) {
+                    // We still have the lock. No special action required.
+                    return;
+                }
+
+                // We need to be careful to not use AutoGetCollection or AutoGetDb here, since we
+                // only need the lock to protect potential access to the Collection's CursorManager
+                // and those helpers may throw if something has changed since the last time we took
+                // a lock. For example, AutoGetCollection will throw if this namespace has since
+                // turned into a view and AutoGetDb will throw if the database version is stale.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
+                invariant(dbLock.isLocked(),
+                          "Expected lock acquisition to succeed due to UninterruptibleLockGuard");
+                Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
+                exec.reset();
+            });
+
             BSONObj obj;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -276,6 +303,9 @@ public:
                 // This is potentially an expensive operation, so do it out of the lock
                 md5_append(&st, (const md5_byte_t*)(data), len);
                 n++;
+
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &waitInFilemd5DuringManualYield, opCtx, "waitInFilemd5DuringManualYield");
 
                 try {
                     // RELOCKED
