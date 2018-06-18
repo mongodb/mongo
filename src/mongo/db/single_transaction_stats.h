@@ -33,6 +33,67 @@ namespace mongo {
 /**
  * Tracks metrics for a single multi-document transaction.
  */
-class SingleTransactionStats {};
+class SingleTransactionStats {
+public:
+    /**
+     * Returns the start time of the transaction in microseconds.
+     *
+     * This method cannot be called until setStartTime() has been called.
+     */
+    unsigned long long getStartTime() const {
+        invariant(_startTime > 0);
+
+        return _startTime;
+    }
+
+    /**
+     * Sets the transaction's start time, only if it hasn't already been set.
+     *
+     * This method must only be called once.
+     */
+    void setStartTime(unsigned long long time) {
+        invariant(_startTime == 0);
+
+        _startTime = time;
+    }
+
+    /**
+     * If the transaction is currently in progress, this method returns the duration
+     * the transaction has been running for in microseconds.
+     *
+     * For a completed transaction, this method returns the total duration of the
+     * transaction in microseconds.
+     *
+     * This method cannot be called until setStartTime() has been called.
+     */
+    unsigned long long getDuration() const {
+        invariant(_startTime > 0);
+
+        // The transaction hasn't ended yet, so we return how long it has currently
+        // been running for.
+        if (_endTime == 0) {
+            return curTimeMicros64() - _startTime;
+        }
+        return _endTime - _startTime;
+    }
+
+    /**
+     * Sets the transaction's end time, only if the start time has already been set.
+     *
+     * This method cannot be called until setStartTime() has been called.
+     */
+    void setEndTime(unsigned long long time) {
+        invariant(_startTime > 0);
+
+        _endTime = time;
+    }
+
+private:
+    // The start time of the transaction in microseconds.
+    unsigned long long _startTime{0};
+
+    // The end time of the transaction in microseconds.
+    unsigned long long _endTime{0};
+};
 
 }  // namespace mongo

@@ -1235,5 +1235,151 @@ TEST_F(SessionTest, IncrementTotalAbortedUponAbort) {
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAborted(), beforeAbortCount + 1U);
 }
 
+/**
+ * Test fixture for transactions metrics.
+ */
+class TransactionsMetricsTest : public SessionTest {};
+
+TEST_F(TransactionsMetricsTest, SingleTransactionStatsStartTimeShouldBeSetUponTransactionStart) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+
+    // Save the time before the transaction is created.
+    unsigned long long timeBeforeTxn = curTimeMicros64();
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    unsigned long long timeAfterTxn = curTimeMicros64();
+
+    // Start time should be greater than or equal to the time before the transaction was created.
+    ASSERT_GTE(session.getSingleTransactionStats()->getStartTime(), timeBeforeTxn);
+
+    // Start time should be less than or equal to the time after the transaction was started.
+    ASSERT_LTE(session.getSingleTransactionStats()->getStartTime(), timeAfterTxn);
+}
+
+TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCommit) {
+    Session::registerCursorExistsFunction(noopCursorExistsFunction);
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    unsigned long long timeBeforeTxnStart = curTimeMicros64();
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
+    unsigned long long timeAfterTxnStart = curTimeMicros64();
+    session.unstashTransactionResources(opCtx(), "commitTransaction");
+    // The transaction machinery cannot store an empty locker.
+    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+
+    // Sleep here to allow enough time to elapse.
+    sleepmillis(10);
+
+    unsigned long long timeBeforeTxnCommit = curTimeMicros64();
+    session.commitTransaction(opCtx());
+    unsigned long long timeAfterTxnCommit = curTimeMicros64();
+
+    ASSERT_GTE(session.getSingleTransactionStats()->getDuration(),
+               timeBeforeTxnCommit - timeAfterTxnStart);
+
+    ASSERT_LTE(session.getSingleTransactionStats()->getDuration(),
+               timeAfterTxnCommit - timeBeforeTxnStart);
+}
+
+TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponAbort) {
+    Session::registerCursorExistsFunction(noopCursorExistsFunction);
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    unsigned long long timeBeforeTxnStart = curTimeMicros64();
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    unsigned long long timeAfterTxnStart = curTimeMicros64();
+    session.unstashTransactionResources(opCtx(), "insert");
+
+    // Sleep here to allow enough time to elapse.
+    sleepmillis(10);
+
+    unsigned long long timeBeforeTxnAbort = curTimeMicros64();
+    session.abortArbitraryTransaction();
+    unsigned long long timeAfterTxnAbort = curTimeMicros64();
+
+    ASSERT_GTE(session.getSingleTransactionStats()->getDuration(),
+               timeBeforeTxnAbort - timeAfterTxnStart);
+
+    ASSERT_LTE(session.getSingleTransactionStats()->getDuration(),
+               timeAfterTxnAbort - timeBeforeTxnStart);
+}
+
+TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasingUntilCommit) {
+    Session::registerCursorExistsFunction(noopCursorExistsFunction);
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
+    session.unstashTransactionResources(opCtx(), "commitTransaction");
+    // The transaction machinery cannot store an empty locker.
+    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+
+    // Save the transaction's duration at this point.
+    unsigned long long txnDurationAfterStart = session.getSingleTransactionStats()->getDuration();
+    sleepmillis(10);
+
+    // The transaction's duration should have increased.
+    ASSERT_GT(session.getSingleTransactionStats()->getDuration(), txnDurationAfterStart);
+    sleepmillis(10);
+    session.commitTransaction(opCtx());
+    unsigned long long txnDurationAfterCommit = session.getSingleTransactionStats()->getDuration();
+
+    // The transaction has committed, so the duration should have not increased.
+    ASSERT_EQ(session.getSingleTransactionStats()->getDuration(), txnDurationAfterCommit);
+
+    ASSERT_GT(txnDurationAfterCommit, txnDurationAfterStart);
+}
+
+TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasingUntilAbort) {
+    Session::registerCursorExistsFunction(noopCursorExistsFunction);
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+    // The transaction machinery cannot store an empty locker.
+    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+
+    // Save the transaction's duration at this point.
+    unsigned long long txnDurationAfterStart = session.getSingleTransactionStats()->getDuration();
+    sleepmillis(10);
+
+    // The transaction's duration should have increased.
+    ASSERT_GT(session.getSingleTransactionStats()->getDuration(), txnDurationAfterStart);
+    sleepmillis(10);
+    session.abortArbitraryTransaction();
+    unsigned long long txnDurationAfterAbort = session.getSingleTransactionStats()->getDuration();
+
+    // The transaction has aborted, so the duration should have not increased.
+    ASSERT_EQ(session.getSingleTransactionStats()->getDuration(), txnDurationAfterAbort);
+
+    ASSERT_GT(txnDurationAfterAbort, txnDurationAfterStart);
+}
+
 }  // namespace
 }  // namespace mongo

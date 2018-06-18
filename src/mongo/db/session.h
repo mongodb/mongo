@@ -358,6 +358,10 @@ public:
         return _activeTxnNumber;
     }
 
+    boost::optional<SingleTransactionStats> getSingleTransactionStats() const {
+        return _singleTransactionStats;
+    }
+
     /**
      * If this session is holding stashed locks in _txnResourceStash, reports the current state of
      * the session using the provided builder. Locks the session object's mutex while running.
