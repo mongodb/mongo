@@ -235,6 +235,7 @@ struct __wt_ovfl_reuse {
 struct __wt_page_lookaside {
 	uint64_t las_pageid;		/* Page ID in lookaside */
 	uint64_t las_max_txn;		/* Max transaction ID in lookaside */
+	uint64_t las_min_txn;		/* Min transaction ID in lookaside */
 	WT_DECL_TIMESTAMP(min_timestamp)/* Min timestamp in lookaside */
 					/* Max timestamp on page */
 	WT_DECL_TIMESTAMP(onpage_timestamp)
@@ -1070,10 +1071,18 @@ struct __wt_update {
 
 /*
  * WT_MAX_MODIFY_UPDATE --
- *	Limit update chains to a small value to avoid penalizing reads and
- * permit truncation.
+ *	Limit update chains value to avoid penalizing reads and
+ *	permit truncation. Having a smaller value will penalize the cases
+ *	when history has to be maintained, resulting in multiplying cache
+ *	pressure.
  */
 #define	WT_MAX_MODIFY_UPDATE	10
+
+/*
+ * WT_MODIFY_MEM_FACTOR	--
+ *	Limit update chains to a factor of the base document size.
+ */
+#define	WT_MODIFY_MEM_FACTOR	1
 
 /*
  * WT_INSERT --

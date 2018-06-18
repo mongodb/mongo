@@ -40,24 +40,25 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
 }
 
 /*
- * __logmgr_force_ckpt --
- *	Force a checkpoint out, waiting for the checkpoint LSN in the log
- *	is up to the given log number.
+ * __logmgr_force_archive --
+ *	Force a checkpoint out and then force an archive, waiting for the
+ *	first log to be archived up to the given log number.
  */
 static int
-__logmgr_force_ckpt(WT_SESSION_IMPL *session, uint32_t lognum)
+__logmgr_force_archive(WT_SESSION_IMPL *session, uint32_t lognum)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_SESSION_IMPL *tmp_session;
-	int yield;
+	uint64_t sleep_usecs, yield_cnt;
 
 	conn = S2C(session);
 	log = conn->log;
-	yield = 0;
+	sleep_usecs = yield_cnt = 0;
+
 	WT_RET(__wt_open_internal_session(conn,
 	    "compatibility-reconfig", true, 0, &tmp_session));
-	while (log->ckpt_lsn.l.file < lognum) {
+	while (log->first_lsn.l.file < lognum) {
 		/*
 		 * Force a checkpoint to be written in the new log file and
 		 * force the archiving of all previous log files.  We do the
@@ -69,15 +70,16 @@ __logmgr_force_ckpt(WT_SESSION_IMPL *session, uint32_t lognum)
 		 */
 		WT_RET(tmp_session->iface.checkpoint(
 		    &tmp_session->iface, "force=1"));
-		WT_RET(WT_SESSION_CHECK_PANIC(tmp_session));
 		/*
-		 * Only sleep in the rare case that we had to come through
-		 * this loop more than once.
+		 * It's reasonable to start the back off prior to trying at all
+		 * because the backoff is very gradual.
 		 */
-		if (yield++) {
-			WT_STAT_CONN_INCR(session, log_force_ckpt_sleep);
-			__wt_sleep(0, WT_THOUSAND);
-		}
+		__wt_spin_backoff(&yield_cnt, &sleep_usecs);
+		WT_STAT_CONN_INCRV(session,
+		    log_force_archive_sleep, sleep_usecs);
+
+		WT_RET(WT_SESSION_CHECK_PANIC(tmp_session));
+		WT_RET(__wt_log_truncate_files(tmp_session, NULL, true));
 	}
 	WT_RET(tmp_session->iface.close(&tmp_session->iface, NULL));
 	return (0);
@@ -106,18 +108,46 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
 	 * set in the connection.  We must set this before we call log_open
 	 * to open or create a log file.
 	 *
-	 * Since the log version changed at a major release number we only need
-	 * to check the major number, not the minor number in the compatibility
-	 * setting.
+	 * Note: downgrade in this context means the new version is not the
+	 * latest possible version. It does not mean the direction of change
+	 * from the release we may be running currently.
 	 */
-	if (conn->compat_major < WT_LOG_V2) {
+	if (conn->compat_major < WT_LOG_V2_MAJOR) {
 		new_version = 1;
 		first_record = WT_LOG_END_HEADER;
 		downgrade = true;
 	} else {
-		new_version = WT_LOG_VERSION;
+		/*
+		 * Assume current version unless the minor compatibility
+		 * setting is the earlier version.
+		 */
 		first_record = WT_LOG_END_HEADER + log->allocsize;
+		new_version = WT_LOG_VERSION;
 		downgrade = false;
+		if (conn->compat_minor == WT_LOG_V2_MINOR) {
+			new_version = 2;
+			downgrade = true;
+		}
+	}
+
+	/*
+	 * Set up the maximum and minimum log version required if needed.
+	 */
+	if (conn->req_max_major != WT_CONN_COMPAT_NONE) {
+		if (conn->req_max_major < WT_LOG_V2_MAJOR)
+			conn->log_req_max = 1;
+		else if (conn->req_max_minor == WT_LOG_V2_MINOR)
+			conn->log_req_max = 2;
+		else
+			conn->log_req_max = WT_LOG_VERSION;
+	}
+	if (conn->req_min_major != WT_CONN_COMPAT_NONE) {
+		if (conn->req_min_major < WT_LOG_V2_MAJOR)
+			conn->log_req_min = 1;
+		else if (conn->req_min_minor == WT_LOG_V2_MINOR)
+			conn->log_req_min = 2;
+		else
+			conn->log_req_min = WT_LOG_VERSION;
 	}
 
 	/*
@@ -143,7 +173,7 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
 	WT_RET(__wt_log_set_version(session, new_version,
 	    first_record, downgrade, reconfig, &lognum));
 	if (reconfig && FLD_ISSET(conn->log_flags, WT_CONN_LOG_DOWNGRADED))
-		WT_RET(__logmgr_force_ckpt(session, lognum));
+		WT_RET(__logmgr_force_archive(session, lognum));
 	return (0);
 }
 

@@ -197,7 +197,7 @@ testutil_is_flag_set(const char *flag)
 	const char *res;
 	bool enable_long_tests;
 
-	if (__wt_getenv(NULL, flag, &res) == WT_NOTFOUND)
+	if (__wt_getenv(NULL, flag, &res) != 0 || res == NULL)
 		return (false);
 
 	/*

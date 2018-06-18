@@ -29,13 +29,13 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_prepre03.py
+# test_prepare03.py
 #    Prepare: Cursor API usage generates expected error in prepared state.
 
 # Pattern of test script is to invoke cursor operations in prepared transaction
 # state to ensure they fail and to repeat same operations in non-prepared state
 # to ensure normally they pass.
-class test_prepre03(wttest.WiredTigerTestCase):
+class test_prepare03(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
@@ -74,6 +74,9 @@ class test_prepre03(wttest.WiredTigerTestCase):
 
     # Create the table and test cursor operations.
     def test_prepare_cursor(self):
+        if not wiredtiger.timestamp_build():
+            self.skipTest('requires a timestamp build')
+
         tablearg = self.uri + ':' + self.table_name
         create_args = self.format
         preparemsg = "/ not permitted in a prepared transaction/"

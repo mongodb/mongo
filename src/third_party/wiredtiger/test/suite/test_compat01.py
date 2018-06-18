@@ -42,30 +42,32 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
     tablename = 'test_compat01'
     uri = 'table:' + tablename
-    sync_list = [
-        '(method=fsync,enabled)',
-        '(method=none,enabled)',
-    ]
+    # Declare the log versions that do and do not have prevlsn.
+    # Log version 1 does not have the prevlsn record.
+    # Log version 2 introduced that record.
+    # Log version 3 continues to have that record.
+    min_logv = 2
+    latest_logv = 3
 
     # The API uses only the major and minor numbers but accepts with
     # and without the patch number.  Test both.
     start_compat = [
-        ('def', dict(compat1='none', current1=True)),
-        ('current', dict(compat1="3.0", current1=True)),
-        ('current_patch', dict(compat1="3.0.0", current1=True)),
-        ('minor_only', dict(compat1="2.6", current1=False)),
-        ('minor_patch', dict(compat1="2.6.1", current1=False)),
-        ('old', dict(compat1="1.8", current1=False)),
-        ('old_patch', dict(compat1="1.8.1", current1=False)),
+        ('def', dict(compat1='none', logv1=3)),
+        ('31', dict(compat1="3.1", logv1=3)),
+        ('30', dict(compat1="3.0", logv1=2)),
+        ('30_patch', dict(compat1="3.0.0", logv1=2)),
+        ('26', dict(compat1="2.6", logv1=1)),
+        ('old', dict(compat1="1.8", logv1=1)),
+        ('old_patch', dict(compat1="1.8.1", logv1=1)),
     ]
     restart_compat = [
-        ('def2', dict(compat2='none', current2=True)),
-        ('current2', dict(compat2="3.0", current2=True)),
-        ('current_patch2', dict(compat2="3.0.0", current2=True)),
-        ('minor_only2', dict(compat2="2.6", current2=False)),
-        ('minor_patch2', dict(compat2="2.6.1", current2=False)),
-        ('old2', dict(compat2="1.8", current2=False)),
-        ('old_patch2', dict(compat2="1.8.1", current2=False)),
+        ('def2', dict(compat2='none', logv2=3)),
+        ('31_2', dict(compat2="3.1", logv2=3)),
+        ('30_2', dict(compat2="3.0", logv2=2)),
+        ('30_patch2', dict(compat2="3.0.0", logv2=2)),
+        ('26_2', dict(compat2="2.6", logv2=1)),
+        ('old2', dict(compat2="1.8", logv2=1)),
+        ('old_patch2', dict(compat2="1.8.1", logv2=1)),
     ]
     scenarios = make_scenarios(restart_compat, start_compat)
 
@@ -80,18 +82,13 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
         return compat_str
 
     def conn_config(self):
-        # Cycle through the different transaction_sync values in a
-        # deterministic manner.
-        txn_sync = self.sync_list[
-            self.scenario_number % len(self.sync_list)]
         # Set archive false on the home directory.
-        log_str = 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
-            'transaction_sync="%s",' % txn_sync
+        log_str = 'log=(archive=false,enabled,file_max=%s),' % self.logmax
         compat_str = self.make_compat_str(True)
         self.pr("Conn config:" + log_str + compat_str)
         return log_str + compat_str
 
-    def check_prev_lsn(self, conn_close, prev_lsn_count):
+    def check_prev_lsn(self, exists, conn_close):
         #
         # Run printlog and look for the prev_lsn log record.  Verify its
         # existence with the passed in expected result.  We don't use
@@ -100,26 +97,30 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
         # the entire file if needed and set a boolean for comparison.
         #
         self.runWt(['printlog'], outfilename='printlog.out', closeconn=conn_close)
-        contains = 0
+        contains = False
         with open('printlog.out') as logfile:
             for line in logfile:
                 if 'optype' in line and 'prev_lsn' in line:
-                    contains += 1
-        self.assertEqual(prev_lsn_count, contains)
+                    contains = True
+                    break
+        self.assertEqual(exists, contains)
 
     def check_log(self, reconfig):
         orig_logs = fnmatch.filter(os.listdir('.'), "*gerLog*")
         compat_str = self.make_compat_str(False)
-        if self.current1:
-            prev_lsn_logs = len(orig_logs)
-        else:
-            prev_lsn_logs = 0
 
         if not reconfig:
             #
-            # Close and open the connection to force recovery and reset the
-            # compatibility string on startup.
+            # Close and open the connection to force recovery and log archiving
+            # even if archive is turned off (in some circumstances). If we are
+            # downgrading we must archive newer logs. Verify the log files
+            # have or have not been archived.
             #
+            exist = True
+            if self.logv1 < self.min_logv:
+                exist = False
+            self.check_prev_lsn(exist, True)
+
             self.conn.close()
             log_str = 'log=(enabled,file_max=%s,archive=false),' % self.logmax
             restart_config = log_str + compat_str
@@ -130,29 +131,30 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
             conn = self.wiredtiger_open('.', restart_config)
             conn.close()
             check_close = False
-            #
-            # If the version was upgraded we'll see a new log file containing
-            # the new log record no matter what the original setting was.
-            #
-            if self.current2:
-                prev_lsn_logs += 1
         else:
             self.pr("Reconfigure: " + compat_str)
             self.conn.reconfigure(compat_str)
             check_close = True
+
             #
-            # If we're reconfiguring, we'll only see another new log file
-            # when upgrading.  Staying at the same version has no effect.
+            # Archiving is turned off explicitly.
             #
-            if self.current2 and not self.current1:
-                prev_lsn_logs += 1
+            # Check logs. The original logs should have been archived only if
+            # we downgraded.  In all other cases the original logs should be there.
+            # Downgrade means not running the latest possible log version, not
+            # the difference between original and current.
+            cur_logs = fnmatch.filter(os.listdir('.'), "*Log*")
+            log_present = True
+            if self.logv1 != self.logv2 and self.logv2 != self.latest_logv:
+                log_present = False
+            for o in orig_logs:
+                self.assertEqual(log_present, o in cur_logs)
 
         # Run printlog and verify the new record does or does not exist.
-        # Need to check count of log files that should and should not have
-        # the prev_lsn record based on the count of log files that exist
-        # before and after.  Pass that into this function and check the
-        # number of prev_lsn records we see.
-        self.check_prev_lsn(check_close, prev_lsn_logs)
+        exist = True
+        if self.logv2 < self.min_logv:
+            exist = False
+        self.check_prev_lsn(exist, check_close)
 
     def run_test(self, reconfig):
         # If reconfiguring with the empty string there is nothing to do.

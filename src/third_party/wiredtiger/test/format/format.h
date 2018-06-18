@@ -213,6 +213,7 @@ typedef struct {
 	uint32_t c_threads;
 	uint32_t c_timer;
 	uint32_t c_timing_stress_checkpoint;
+	uint32_t c_timing_stress_lookaside_sweep;
 	uint32_t c_timing_stress_split_1;
 	uint32_t c_timing_stress_split_2;
 	uint32_t c_timing_stress_split_3;
@@ -287,7 +288,6 @@ typedef struct {
 
 	uint64_t ops;				/* total operations */
 	uint64_t commit;			/* operation counts */
-	uint64_t deadlock;
 	uint64_t insert;
 	uint64_t prepare;
 	uint64_t remove;

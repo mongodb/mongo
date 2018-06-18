@@ -20,7 +20,7 @@ __wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp)
 	*envp = NULL;
 
 	if ((size = GetEnvironmentVariableA(variable, NULL, 0)) <= 1)
-		return (WT_NOTFOUND);
+		return (0);
 
 	WT_RET(__wt_malloc(session, (size_t)size, envp));
 

@@ -136,7 +136,7 @@ __debug_item_key(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
 		WT_RET(__wt_buf_fmt(
 		    session, ds->t2, "%.*s", (int)size, (char *)data_arg));
 		data_arg = ds->t2->data;
-		size = (size_t)ds->t2->size + 1;
+		size = ds->t2->size + 1;
 	}
 	return (ds->f(ds, "\t%s%s{%s}\n",
 	    tag == NULL ? "" : tag, tag == NULL ? "" : " ",
@@ -165,7 +165,7 @@ __debug_item_value(
 		WT_RET(__wt_buf_fmt(
 		    session, ds->t2, "%.*s", (int)size, (char *)data_arg));
 		data_arg = ds->t2->data;
-		size = (size_t)ds->t2->size + 1;
+		size = ds->t2->size + 1;
 	}
 	return (ds->f(ds, "\t%s%s{%s}\n",
 	    tag == NULL ? "" : tag, tag == NULL ? "" : " ",
@@ -633,9 +633,6 @@ __wt_debug_tree_shape(
 /*
  * __wt_debug_tree_all --
  *	Dump the in-memory information for a tree, including leaf pages.
- *	Takes an explicit btree as an argument, as one may not yet be set on
- *	the session. This is often the case as this function will be called
- *	from within a debugger, which makes setting a btree complicated.
  */
 int
 __wt_debug_tree_all(
@@ -644,6 +641,10 @@ __wt_debug_tree_all(
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
+	/*
+	 * Allow an explicit btree as an argument, as one may not yet be set on
+	 * the session.
+	 */
 	session = (WT_SESSION_IMPL *)session_arg;
 	if (btree == NULL)
 		btree = S2BT(session);
@@ -656,9 +657,6 @@ __wt_debug_tree_all(
 /*
  * __wt_debug_tree --
  *	Dump the in-memory information for a tree, not including leaf pages.
- *	Takes an explicit btree as an argument, as one may not yet be set on
- *	the session. This is often the case as this function will be called
- *	from within a debugger, which makes setting a btree complicated.
  */
 int
 __wt_debug_tree(
@@ -667,6 +665,10 @@ __wt_debug_tree(
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
+	/*
+	 * Allow an explicit btree as an argument, as one may not yet be set on
+	 * the session.
+	 */
 	session = (WT_SESSION_IMPL *)session_arg;
 	if (btree == NULL)
 		btree = S2BT(session);
@@ -688,6 +690,10 @@ __wt_debug_page(
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
+	/*
+	 * Allow an explicit btree as an argument, as one may not yet be set on
+	 * the session.
+	 */
 	session = (WT_SESSION_IMPL *)session_arg;
 	if (btree == NULL)
 		btree = S2BT(session);
@@ -720,11 +726,7 @@ __wt_debug_cursor_page(void *cursor_arg, const char *ofile)
 
 /*
  * __debug_tree --
- *	Dump the in-memory information for a tree. Takes an explicit btree
- *	as an argument, as one may not be set on the session. This is often
- *	the case as this function will be called from within a debugger, which
- *	makes setting a btree complicated. We mark the session to the btree
- *	in this function
+ *	Dump the in-memory information for a tree.
  */
 static int
 __debug_tree(

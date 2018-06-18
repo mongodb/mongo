@@ -286,9 +286,11 @@ err:	WT_TRET(__wt_fclose(session, &fs));
 
 	/*
 	 * A file error or a missing key/value pair in the turtle file means
-	 * something has gone horribly wrong -- we're done.
+	 * something has gone horribly wrong, except for the compatibility
+	 * setting which is optional.
 	 */
-	return (ret == 0 ? 0 : __wt_illegal_value(session, WT_METADATA_TURTLE));
+	return (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0 ? ret :
+	    __wt_illegal_value(session, WT_METADATA_TURTLE));
 }
 
 /*
@@ -298,12 +300,14 @@ err:	WT_TRET(__wt_fclose(session, &fs));
 int
 __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_FSTREAM *fs;
 	int vmajor, vminor, vpatch;
 	const char *version;
 
 	fs = NULL;
+	conn = S2C(session);
 
 	/* Require single-threading. */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TURTLE));
@@ -314,6 +318,16 @@ __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
 	 */
 	WT_RET(__wt_fopen(session, WT_METADATA_TURTLE_SET,
 	    WT_FS_OPEN_CREATE | WT_FS_OPEN_EXCLUSIVE, WT_STREAM_WRITE, &fs));
+
+	/*
+	 * If a compatibility setting has been explicitly set, save it out
+	 * to the turtle file.
+	 */
+	if (F_ISSET(conn, WT_CONN_COMPATIBILITY))
+		WT_ERR(__wt_fprintf(session, fs,
+		    "%s\n" "major=%d,minor=%d\n",
+		    WT_METADATA_COMPAT,
+		    conn->compat_major, conn->compat_minor));
 
 	version = wiredtiger_version(&vmajor, &vminor, &vpatch);
 	WT_ERR(__wt_fprintf(session, fs,

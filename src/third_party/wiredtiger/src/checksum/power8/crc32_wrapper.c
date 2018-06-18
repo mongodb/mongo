@@ -86,6 +86,7 @@ __wt_checksum_hw(const void *chunk, size_t len)
  */
 void
 __wt_checksum_init(void)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 #if defined(HAVE_CRC32_HARDWARE)
 	__wt_process.checksum = __wt_checksum_hw;

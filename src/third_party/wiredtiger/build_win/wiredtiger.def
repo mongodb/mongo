@@ -1,5 +1,6 @@
 LIBRARY WIREDTIGER
 EXPORTS
+    wiredtiger_checksum_crc32c
     wiredtiger_config_parser_open
     wiredtiger_config_validate
     wiredtiger_open

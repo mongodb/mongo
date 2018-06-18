@@ -16,18 +16,41 @@ static bool
 __metadata_turtle(const char *key)
 {
 	switch (key[0]) {
+	case 'C':
+		if (strcmp(key, WT_METADATA_COMPAT) == 0)
+			return (true);
+		break;
 	case 'f':
 		if (strcmp(key, WT_METAFILE_URI) == 0)
 			return (true);
 		break;
 	case 'W':
-		if (strcmp(key, "WiredTiger version") == 0)
+		if (strcmp(key, WT_METADATA_VERSION) == 0)
 			return (true);
-		if (strcmp(key, "WiredTiger version string") == 0)
+		if (strcmp(key, WT_METADATA_VERSION_STR) == 0)
 			return (true);
 		break;
 	}
 	return (false);
+}
+
+/*
+ * __wt_metadata_turtle_rewrite --
+ *	Rewrite the turtle file. We wrap this because the lower functions
+ *	expect a URI key and config value pair for the metadata. This function
+ *	exists to push out the other contents to the turtle file such as a
+ *	change in compatibility information.
+ */
+int
+__wt_metadata_turtle_rewrite(WT_SESSION_IMPL *session)
+{
+	WT_DECL_RET;
+	char *value;
+
+	WT_RET(__wt_metadata_search(session, WT_METAFILE_URI, &value));
+	ret = __wt_metadata_update(session, WT_METAFILE_URI, value);
+	__wt_free(session, value);
+	return (ret);
 }
 
 /*

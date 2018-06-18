@@ -443,14 +443,6 @@ connection_runtime_config = [
             above 0 configures periodic checkpoints''',
             min='0', max='100000'),
         ]),
-    Config('compatibility', '', r'''
-        set compatibility version of database.  Changing the compatibility
-        version requires that there are no active operations for the duration
-        of the call.''',
-        type='category', subconfig=[
-        Config('release', '', r'''
-            compatibility release version string'''),
-        ]),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),
     Config('eviction', '', r'''
@@ -592,8 +584,8 @@ connection_runtime_config = [
         intended for use with internal stress testing of WiredTiger.''',
         type='list', undoc=True,
         choices=[
-        'checkpoint_slow', 'split_race_1', 'split_race_2', 'split_race_3',
-        'split_race_4', 'split_race_5', 'split_race_6', 'split_race_7']),
+        'checkpoint_slow', 'lookaside_sweep_race', 'split_1', 'split_2',
+        'split_3', 'split_4', 'split_5', 'split_6', 'split_7']),
     Config('verbose', '', r'''
         enable messages for various events. Options are given as a
         list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -631,6 +623,38 @@ connection_runtime_config = [
             'verify',
             'version',
             'write']),
+]
+
+# wiredtiger_open and WT_CONNECTION.reconfigure compatibility configurations.
+compatibility_configuration_common = [
+    Config('release', '', r'''
+        compatibility release version string'''),
+]
+
+connection_reconfigure_compatibility_configuration = [
+    Config('compatibility', '', r'''
+        set compatibility version of database.  Changing the compatibility
+        version requires that there are no active operations for the duration
+        of the call.''',
+        type='category', subconfig=
+        compatibility_configuration_common)
+]
+wiredtiger_open_compatibility_configuration = [
+    Config('compatibility', '', r'''
+        set compatibility version of database.  Changing the compatibility
+        version requires that there are no active operations for the duration
+        of the call.''',
+        type='category', subconfig=
+        compatibility_configuration_common + [
+        Config('require_max', '', r'''
+            required maximum compatibility version of existing data files.
+            Must be greater than or equal to any release version set in the
+            \c release setting. Has no effect if creating the database.'''),
+        Config('require_min', '', r'''
+            required minimum compatibility version of existing data files.
+            Must be less than or equal to any release version set in the
+            \c release setting. Has no effect if creating the database.'''),
+    ]),
 ]
 
 # wiredtiger_open and WT_CONNECTION.reconfigure log configurations.
@@ -671,11 +695,11 @@ wiredtiger_open_log_configuration = [
         Config('file_max', '100MB', r'''
             the maximum size of log files''',
             min='100KB', max='2GB'),
-            Config('path', '"."', r'''
-                the name of a directory into which log files are written. The
-                directory must already exist. If the value is not an absolute
-                path, the path is relative to the database home (see @ref
-                absolute_path for more information)'''),
+        Config('path', '"."', r'''
+            the name of a directory into which log files are written. The
+            directory must already exist. If the value is not an absolute path,
+            the path is relative to the database home (see @ref absolute_path
+            for more information)'''),
         Config('recover', 'on', r'''
             run recovery or error if recovery needs to run after an
             unclean shutdown''',
@@ -753,6 +777,7 @@ session_config = [
 
 wiredtiger_open_common =\
     connection_runtime_config +\
+    wiredtiger_open_compatibility_configuration +\
     wiredtiger_open_log_configuration +\
     wiredtiger_open_statistics_log_configuration + [
     Config('buffer_alignment', '-1', r'''
@@ -1353,6 +1378,7 @@ methods = {
         print global txn information''', type='boolean'),
 ]),
 'WT_CONNECTION.reconfigure' : Method(
+    connection_reconfigure_compatibility_configuration +\
     connection_reconfigure_log_configuration +\
     connection_reconfigure_statistics_log_configuration +\
     connection_runtime_config

@@ -422,8 +422,10 @@ struct __wt_connection_stats {
 	int64_t cache_read_deleted;
 	int64_t cache_read_deleted_prepared;
 	int64_t cache_read_lookaside;
+	int64_t cache_read_lookaside_checkpoint;
 	int64_t cache_read_lookaside_skipped;
 	int64_t cache_read_lookaside_delay;
+	int64_t cache_read_lookaside_delay_checkpoint;
 	int64_t cache_pages_requested;
 	int64_t cache_eviction_pages_seen;
 	int64_t cache_eviction_fail;
@@ -506,7 +508,7 @@ struct __wt_connection_stats {
 	int64_t lock_txn_global_read_count;
 	int64_t lock_txn_global_write_count;
 	int64_t log_slot_switch_busy;
-	int64_t log_force_ckpt_sleep;
+	int64_t log_force_archive_sleep;
 	int64_t log_bytes_payload;
 	int64_t log_bytes_written;
 	int64_t log_zero_fills;

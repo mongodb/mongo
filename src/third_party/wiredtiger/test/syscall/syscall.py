@@ -29,14 +29,102 @@
 # syscall.py
 #      Command line syscall test runner
 #
-# For each .run file, run the corresponding program and collect strace
-# output, comparing it to the contents of the .run file.
+# Usage: python syscall.py [ options ]
 #
-# run files are first preprocessed, which means the use of #ifdefs, #defines
-# and #includes are allowed, as well as /**/ and // comments.
-# Expressions are evaluated using the Python parser, so that:
-# hex and octal numbers are accepted, constant values can be or-ed.
+# For each .run file below the current directory, run the corresponding
+# program and collect strace output, comparing it to the contents of
+# the .run file.
 #
+# Options:
+#    --preserve     preserve the outputs in a WT_TEST.* subdirectory
+#                   of the build directory.
+#    --verbose      verbose output to show step by step how run files are
+#                   compared to output files.
+
+# HOW TO DEBUG FAILURES OR CREATE A NEW TEST
+#
+# It will be helpful to look at an existing run file (ending in .run)
+# while reading this. If you are debugging a failure, also have the
+# output file (stderr.txt) available for reference.  These files are
+# generated in a WT_TEST.* subdirectory of the build directory and
+# preserved in case of a failure, or when the --preserve option is used.
+#
+# For each run file under this directory, this script runs the program
+# built for that directory under the 'strace' program and captures the
+# output from that. (On OS/X it runs 'dtruss' instead of 'strace', otherwise
+# it is largely the same). We want to compare the strace output to a known
+# reference. The program typically has some of its own output, this is
+# interleaved into the strace output and provides 'anchor points' during
+# the comparison.
+#
+# The purpose of this output comparison is to determine if there are any
+# system calls that we should be doing that are not happening. We'd also catch
+# if there are any extra syscalls that we are doing. For example, if we
+# are expecting that some operation, like WT_SESSION->create, must do an
+# fdatasync at a particular point to enforce durability guarantees,
+# it would be pretty bad if a future code change inadvertently stopped
+# doing the fdatasync. This wouldn't be picked up by normal testing. It might
+# be detected by asynchronously killing a test run and seeing if a
+# recovered database gives proper results. Or it might not. This script
+# attempts to add certainty to our guarantees.
+#
+# The run file is a template for what the resulting strace output should
+# look like. The challenge is that seemingly minor changes to WiredTiger
+# implementation or even runtime libraries may change what the overall output
+# looks like. The run file can be written to allow runs that are resilient
+# against such changes.
+#
+# This script's first action is to read the run file after it is run through
+# the 'cpp' preprocessor. That means that the run file can use #ifdefs,
+# #defines and #includes, as well as /**/ and // comments. The output
+# of the preprocessor is then parsed. We expect to see a few directives
+# first, each has a string argument as described here:
+#
+#  SYSTEM(".....");      to tell us what system the script can run on, the arg
+#                        currently is either "Linux" and "Darwin".
+#  TRACE(".....");       a comma separated list of system calls that
+#                        we are looking at. Other system calls are ignored.
+#  RUN("");              arguments to the executable.
+#
+# When the RUN directive is seen, it indicates that this header portion is
+# complete, there are no more directives. At this point, the target program
+# is executed via strace. The remaining part of the run file is used to
+# match the output of strace.
+#
+# The string '...' in the run file matches anything, and can be used to skip
+# over system dependent parts of the strace output.  If '...' appears on a line
+# by itself, it matches any number of lines. If it appears immediately after a
+# string, it matches a string that begins with the pattern. (e.g. "foo"...
+# matches any string that starts with "foo"). It can also appear as a function
+# argument where it matches any number of arguments.
+#
+# Lines of strace generally look something like:
+#  open("./WiredTiger.lock", O_RDWR|O_CREAT|O_CLOEXEC, 0666) = 3
+#
+# where the result of the syscall appears at the end.  A matching line in
+# a run file could look like this:
+#  fd = open("./WiredTiger.lock", O_RDWR|O_CREAT|O_CLOEXEC, 0666);
+#
+# or:
+#  fd = open("./WiredTiger"..., O_RDWR|O_CREAT|O_CLOEXEC, 0666);
+#
+# or:
+#  fd = open("./WiredTiger"..., ...);
+#
+# In each of these cases, the 'fd' (which can be any variable name) becomes
+# bound to the value in the strace output, in this case '3'. So if later the
+# run file contains:
+#  write(fd, ""..., 20);
+#
+# then we would expect this to match strace output for a write of 20 bytes
+# using file descriptor 3.
+#
+# Expressions are evaluated using the Python parser, so that
+# hex and octal numbers are accepted, and constant values can be or-ed.
+# Some limited number of defines are known (see 'defines_used' below),
+# so that the run file can contain 'O_RDONLY' and it will match a numeric
+# expression (as it appears in the output of dtruss on OS/X).
+
 from __future__ import print_function
 import argparse, distutils.spawn, fnmatch, os, platform, re, shutil, \
     subprocess, sys
@@ -138,8 +226,11 @@ def printfile(pathname, abbrev):
 class FileLine(str):
     filename = None
     linenum = 0
-    def __new__(cls, value, *args, **kwargs):
-        return super(FileLine, cls).__new__(cls, value)
+    def __new__(cls, filename, linenum, value, *args, **kwargs):
+        result = super(FileLine, cls).__new__(cls, value)
+        result.filename = filename
+        result.linenum = linenum
+        return result
 
     def prefix(self):
         return self.filename + ':' + str(self.linenum) + ': '
@@ -153,6 +244,14 @@ class FileLine(str):
             othernum = '-' + str(otherline.linenum)
         return self.filename + ':' + str(self.linenum) + othernum + ': '
 
+    def normalize(self):
+        changed = re.sub(pwrite_in, pwrite_out, self)
+        if changed == self:
+            normalized = self
+        else:
+            normalized = FileLine(self.filename, self.linenum, str(changed))
+        return normalized
+
 # Manage reading from a file, tracking line numbers.
 class Reader(object):
     # 'raw' means we don't ignore any lines
@@ -165,6 +264,7 @@ class Reader(object):
         self.linenum = 1
         self.raw = raw
         self.is_cpp = is_cpp
+        self.context = []
         if not self.f:
             die(self.filename + ': cannot open')
 
@@ -210,18 +310,30 @@ class Reader(object):
         return line
 
     def readline(self):
-        line = self.strip_line(self.f.readline())
+        rawline = self.f.readline()
+        line = self.strip_line(rawline)
+        self.add_context(rawline)
         while line != None and self.ignore(line):
             self.linenum += 1
-            line = self.strip_line(self.f.readline())
+            rawline = self.f.readline()
+            line = self.strip_line(rawline)
+            self.add_context(rawline)
         if line:
-            line = FileLine(line)
-            line.filename = self.filename
-            line.linenum = self.linenum
+            line = FileLine(self.filename, self.linenum, line)
             self.linenum += 1
         else:
             line = ''     # make this somewhat compatible with file.readline
         return line
+
+    def get_context(self):
+        s = ''
+        for line in self.context:
+            s += '  ' + str(line)
+        return s
+
+    def add_context(self, line):
+        self.context.append(str(self.linenum) + ': ' + line)
+        self.context = self.context[-5:]
 
     def close(self):
         self.f.close()
@@ -335,13 +447,13 @@ class Runner:
             prefix = 'syscall.py: '
         print(prefix + s, file=sys.stderr)
 
-    def failrange(self, line, lineto, s):
+    def failrange(self, errfile, line, lineto, s):
         # make it work if line is None or is a plain string.
         try:
             prefix = simplify_path(self.wttopdir, line.range_prefix(lineto))
         except:
             prefix = 'syscall.py: '
-        print(prefix + s, file=sys.stderr)
+        print(prefix + s + '\n' + errfile.get_context(), file=sys.stderr)
 
     def str_match(self, s1, s2):
         fuzzyRight = False
@@ -475,7 +587,7 @@ class Runner:
         if not em:
             self.fail(errline, 'Unknown strace/dtruss output: ' + errline)
             return False
-        gotcall = re.sub(pwrite_in, pwrite_out, em.groups()[0])
+        gotcall = em.groups()[0]
         # filtering syscalls here if needed.  If it's not a match,
         # mark the errline so it is retried.
         if self.strip_syscalls != None and gotcall not in self.strip_syscalls:
@@ -550,12 +662,12 @@ class Runner:
         with outfile, errfile:
             runlines = self.order_runfile(self.runfile)
             errline = errfile.readline()
-            errline = re.sub(pwrite_in, pwrite_out, errline)
             if re.match(dtruss_init_pat, errline):
                 errline = errfile.readline()
+            errline = errline.normalize()
             skiplines = False
             for runline in runlines:
-                runline = re.sub(pwrite_in, pwrite_out, runline)
+                runline = runline.normalize()
                 if runline == '...':
                     skiplines = True
                     if self.args.verbose:
@@ -566,18 +678,21 @@ class Runner:
                 while errline and not self.match(runline, errline,
                                                  self.args.verbose, skiplines):
                     if skiplines or hasattr(errline, 'skip'):
-                        errline = errfile.readline()
+                        errline = errfile.readline().normalize()
                     else:
                         self.fail(runline, "expecting " + runline)
-                        self.failrange(first_errline, errline, "does not match")
+                        self.failrange(errfile, first_errline, errline,
+                                       "does not match")
                         return False
                 if not errline:
                     self.fail(runline, "failed to match line: " + runline)
-                    self.failrange(first_errline, errline, "does not match")
+                    self.failrange(errfile, first_errline, errline,
+                                   "does not match")
                     return False
                 errline = errfile.readline()
                 if re.match(dtruss_init_pat, errline):
                     errline = errfile.readline()
+                errline = errline.normalize()
                 skiplines = False
             if errline and not skiplines:
                 self.fail(errline, "extra lines seen starting at " + errline)
@@ -853,5 +968,7 @@ cmd = SyscallCommand(wt_disttop, wt_builddir)
 if not cmd.parse_args(sys.argv):
     die('bad usage')
 if not cmd.execute():
+    print('For a HOW TO on debugging, see the top of syscall.py',
+          file=sys.stderr)
     sys.exit(1)
 sys.exit(0)

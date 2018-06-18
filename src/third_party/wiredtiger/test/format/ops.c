@@ -127,7 +127,7 @@ wts_ops(int lastrun)
 	if (!SINGLETHREADED)
 		g.rand_log_stop = true;
 
-	/* Open a session. */
+	/* Logging requires a session. */
 	if (g.logging != 0) {
 		testutil_check(conn->open_session(conn, NULL, NULL, &session));
 		(void)g.wt_api->msg_printf(g.wt_api, session,
@@ -192,7 +192,6 @@ wts_ops(int lastrun)
 		for (i = 0, running = false; i < g.c_threads; ++i) {
 			tinfo = tinfo_list[i];
 			total.commit += tinfo->commit;
-			total.deadlock += tinfo->deadlock;
 			total.insert += tinfo->insert;
 			total.prepare += tinfo->prepare;
 			total.remove += tinfo->remove;
@@ -242,6 +241,10 @@ wts_ops(int lastrun)
 			fprintf(stderr, "%s\n",
 			    "format run exceeded 15 minutes past the maximum "
 			    "time, aborting the process.");
+
+			(void)conn->debug_info(conn, "txn");
+			(void)conn->debug_info(conn, "cache");
+
 			abort();
 		}
 	}
@@ -453,7 +456,7 @@ snap_check(WT_CURSOR *cursor,
 				print_item_data(
 				    "expected", start->vdata, start->vsize);
 			if (ret == WT_NOTFOUND)
-				fprintf(stderr, "found {deleted}\n");
+				fprintf(stderr, "\t   found {deleted}\n");
 			else
 				print_item_data(
 				    "   found", value->data, value->size);
@@ -473,7 +476,7 @@ snap_check(WT_CURSOR *cursor,
 				print_item_data(
 				    "expected", start->vdata, start->vsize);
 			if (ret == WT_NOTFOUND)
-				fprintf(stderr, "found {deleted}\n");
+				fprintf(stderr, "\t   found {deleted}\n");
 			else
 				print_item_data(
 				    "   found", value->data, value->size);
@@ -516,46 +519,44 @@ begin_transaction(TINFO *tinfo, WT_SESSION *session, u_int *iso_configp)
 	default:
 		v = ISOLATION_SNAPSHOT;
 		config = "isolation=snapshot";
-
-		if (g.c_txn_timestamps) {
-			/*
-			 * Avoid starting a new reader when a prepare is in
-			 * progress.
-			 */
-			if (g.c_prepare) {
-				testutil_check(
-				    pthread_rwlock_rdlock(&g.prepare_lock));
-				locked = true;
-			}
-
-			/*
-			 * Set the thread's read timestamp to the current value
-			 * before allocating a new read timestamp. This
-			 * guarantees the oldest timestamp won't move past the
-			 * allocated timestamp before the transaction begins.
-			 */
-			tinfo->read_timestamp = g.timestamp;
-			tinfo->read_timestamp =
-			    __wt_atomic_addv64(&g.timestamp, 1);
-			testutil_check(__wt_snprintf(
-			    config_buf, sizeof(config_buf),
-			    "read_timestamp=%" PRIx64, tinfo->read_timestamp));
-			config = config_buf;
-		}
 		break;
 	}
 	*iso_configp = v;
 
 	testutil_check(session->begin_transaction(session, config));
 
-	if (locked)
-		testutil_check(pthread_rwlock_unlock(&g.prepare_lock));
+	if (v == ISOLATION_SNAPSHOT && g.c_txn_timestamps) {
+		/* Avoid starting a new reader when a prepare is in progress. */
+		if (g.c_prepare) {
+			testutil_check(pthread_rwlock_rdlock(&g.prepare_lock));
+			locked = true;
+		}
 
-	/*
-	 * It's OK for the oldest timestamp to move past a running query, clear
-	 * the thread's read timestamp, it no longer needs to be pinned.
-	 */
-	tinfo->read_timestamp = 0;
+		/*
+		 * Set the thread's read timestamp to the current value before
+		 * allocating a new read timestamp. This guarantees the oldest
+		 * timestamp won't move past the allocated timestamp before the
+		 * transaction uses it.
+		 */
+		tinfo->read_timestamp = g.timestamp;
+		tinfo->read_timestamp = __wt_atomic_addv64(&g.timestamp, 1);
+		testutil_check(__wt_snprintf(
+		    config_buf, sizeof(config_buf),
+		    "read_timestamp=%" PRIx64, tinfo->read_timestamp));
+
+		testutil_check(
+		    session->timestamp_transaction(session, config_buf));
+
+		/*
+		 * It's OK for the oldest timestamp to move past a running
+		 * query, clear the thread's read timestamp, it no longer needs
+		 * to be pinned.
+		 */
+		tinfo->read_timestamp = 0;
+
+		if (locked)
+			testutil_check(pthread_rwlock_unlock(&g.prepare_lock));
+	}
 }
 
 /*
@@ -589,25 +590,25 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 	uint64_t ts;
 	char config_buf[64];
 
+	++tinfo->commit;
+
 	if (g.c_txn_timestamps) {
 		ts = set_commit_timestamp(tinfo);
 		testutil_check(__wt_snprintf(
 		    config_buf, sizeof(config_buf),
 		    "commit_timestamp=%" PRIx64, ts));
 		testutil_check(
-		    session->commit_transaction(session, config_buf));
-	} else
-		testutil_check(session->commit_transaction(session, NULL));
-	++tinfo->commit;
-
-	/*
-	 * Clear the thread's active timestamp: it no longer needs to be pinned.
-	 * Don't let the compiler re-order this statement, if we were to race
-	 * with the timestamp thread, it might see our thread update before the
-	 * transaction commit completes.
-	 */
-	if (g.c_txn_timestamps)
+		    session->timestamp_transaction(session, config_buf));
+		/*
+		 * Clear the thread's active timestamp: it no longer needs to
+		 * be pinned.  Don't let the compiler re-order this statement,
+		 * if we were to race with the timestamp thread, it might see
+		 * our thread update before the commit_timestamp is set for the
+		 * transaction.
+		 */
 		WT_PUBLISH(tinfo->commit_timestamp, 0);
+	}
+	testutil_check(session->commit_transaction(session, NULL));
 }
 
 /*
@@ -617,8 +618,9 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 static void
 rollback_transaction(TINFO *tinfo, WT_SESSION *session)
 {
-	testutil_check(session->rollback_transaction(session, NULL));
 	++tinfo->rollback;
+
+	testutil_check(session->rollback_transaction(session, NULL));
 
 	/*
 	 * Clear the thread's active timestamp: it no longer needs to be pinned.
@@ -644,23 +646,22 @@ prepare_transaction(TINFO *tinfo, WT_SESSION *session)
 	/* Skip if no timestamp has yet been set. */
 	if (g.timestamp == 0)
 		return (0);
-
-	/*
-	 * Prepare timestamps must be less than or equal to the eventual commit
-	 * timestamp. Set the prepare timestamp to whatever the global value is
-	 * now. The subsequent commit will increment it, ensuring correctness.
-	 */
 	++tinfo->prepare;
 
 	/*
 	 * Synchronize prepare call with begin transaction to prevent a new
 	 * reader creeping in.
-	 *
-	 * Prepare will return error if prepare timestamp is less than any
-	 * active read timestamp.
 	 */
 	testutil_check(pthread_rwlock_wrlock(&g.prepare_lock));
 
+	/*
+	 * Prepare timestamps must be less than or equal to the eventual commit
+	 * timestamp. Set the prepare timestamp to whatever the global value is
+	 * now. The subsequent commit will increment it, ensuring correctness.
+	 *
+	 * Prepare will return error if the prepare timestamp is less than any
+	 * active read timestamp.
+	 */
 	ts = set_commit_timestamp(tinfo);
 	testutil_check(__wt_snprintf(
 	    config_buf, sizeof(config_buf), "prepare_timestamp=%" PRIx64, ts));
@@ -677,8 +678,9 @@ prepare_transaction(TINFO *tinfo, WT_SESSION *session)
  */
 #define	OP_FAILED(notfound_ok) do {					\
 	positioned = false;						\
-	if (intxn && (ret == WT_CACHE_FULL || ret == WT_ROLLBACK))	\
-		goto deadlock;						\
+	if (intxn && (ret == WT_CACHE_FULL ||				\
+	    ret == WT_PREPARE_CONFLICT || ret == WT_ROLLBACK))		\
+		goto rollback;						\
 	testutil_assert((notfound_ok && ret == WT_NOTFOUND) ||		\
 	    ret == WT_CACHE_FULL ||					\
 	    ret == WT_PREPARE_CONFLICT || ret == WT_ROLLBACK);		\
@@ -1098,7 +1100,7 @@ update_instead_of_chosen_op:
 			    cursor, snap_list, snap, tinfo->key, tinfo->value);
 			testutil_assert(ret == 0 || ret == WT_ROLLBACK);
 			if (ret == WT_ROLLBACK)
-				goto deadlock;
+				goto rollback;
 		}
 
 		/*
@@ -1109,7 +1111,7 @@ update_instead_of_chosen_op:
 			ret = prepare_transaction(tinfo, session);
 			testutil_assert(ret == 0 || ret == WT_PREPARE_CONFLICT);
 			if (ret == WT_PREPARE_CONFLICT)
-				goto deadlock;
+				goto rollback;
 
 			__wt_yield();		/* Let other threads proceed. */
 		}
@@ -1123,10 +1125,7 @@ update_instead_of_chosen_op:
 			commit_transaction(tinfo, session);
 			break;
 		case 5:						/* 10% */
-			if (0) {
-deadlock:			++tinfo->deadlock;
-			}
-			rollback_transaction(tinfo, session);
+rollback:		rollback_transaction(tinfo, session);
 			break;
 		}
 
