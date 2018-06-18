@@ -47,6 +47,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -512,6 +513,13 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     NamespaceString sourceNss(sourceNsElt.valueStringData());
     NamespaceString targetNss(targetNsElt.valueStringData());
     NamespaceString uiNss(getNamespaceFromUUIDElement(opCtx, ui));
+
+    if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
+         repl::ReplicationCoordinator::modeNone) &&
+        targetNss.isOplog()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot rename collection to the oplog");
+    }
 
     // If the UUID we're targeting already exists, rename from there no matter what.
     if (!uiNss.isEmpty()) {
