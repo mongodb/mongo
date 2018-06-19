@@ -29,7 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/commands.h"
 
 namespace mongo {

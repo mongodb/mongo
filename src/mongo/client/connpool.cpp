@@ -41,6 +41,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/executor/connection_pool_stats.h"

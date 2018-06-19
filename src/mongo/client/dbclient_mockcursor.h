@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/dbclient_cursor.h"
 
 namespace mongo {
 

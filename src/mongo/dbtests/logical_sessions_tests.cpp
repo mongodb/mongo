@@ -30,7 +30,6 @@
 
 #include <memory>
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id.h"

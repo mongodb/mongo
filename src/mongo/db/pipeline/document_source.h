@@ -39,7 +39,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/generic_cursor.h"

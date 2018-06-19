@@ -34,7 +34,6 @@
 #include <utility>
 
 #include "mongo/client/connection_string.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"

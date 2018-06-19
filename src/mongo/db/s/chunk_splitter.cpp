@@ -32,7 +32,7 @@
 
 #include "mongo/db/s/chunk_splitter.h"
 
-#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/query.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"

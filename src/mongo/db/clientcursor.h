@@ -30,7 +30,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"

@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/util/net/hostandport.h"

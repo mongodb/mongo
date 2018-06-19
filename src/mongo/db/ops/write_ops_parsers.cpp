@@ -30,7 +30,6 @@
 
 #include "mongo/db/ops/write_ops_parsers.h"
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/util/assert_util.h"

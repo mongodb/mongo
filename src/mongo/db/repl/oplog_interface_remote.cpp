@@ -30,7 +30,8 @@
 
 #include "mongo/db/repl/oplog_interface_remote.h"
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_base.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
 

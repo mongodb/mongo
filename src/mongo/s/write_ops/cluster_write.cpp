@@ -36,6 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/connpool.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/balancer_configuration.h"

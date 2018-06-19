@@ -31,8 +31,8 @@
 #include <iterator>
 
 #include "mongo/client/connection_pool.h"
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/client/dbclientmockcursor.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_mockcursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_interface_mock.h"

@@ -34,7 +34,6 @@
 
 #include "mongo/db/ops/update.h"
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"

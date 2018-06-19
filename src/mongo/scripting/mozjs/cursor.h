@@ -28,8 +28,7 @@
 
 #pragma once
 
-#include "mongo/client/dbclientcursor.h"
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {

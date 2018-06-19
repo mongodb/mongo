@@ -31,7 +31,7 @@
 #include <map>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"

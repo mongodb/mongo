@@ -30,7 +30,6 @@
 
 #include "mongo/db/repl/rollback_source_impl.h"
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"

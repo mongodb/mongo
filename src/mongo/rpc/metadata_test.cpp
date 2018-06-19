@@ -30,7 +30,8 @@
 
 #include <utility>
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/unittest/unittest.h"

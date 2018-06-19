@@ -32,14 +32,16 @@
 #include <stack>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/rpc/message.h"
 
 namespace mongo {
 
 class AScopedConnection;
+class DBClientBase;
 
 /** Queries return a cursor object */
 class DBClientCursor {

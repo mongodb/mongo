@@ -30,8 +30,8 @@
 #pragma once
 
 
-#include "mongo/client/dbclientcursor.h"
-#include "mongo/client/dbclientmockcursor.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/dbclient_mockcursor.h"
 
 namespace mongo {
 

@@ -33,7 +33,6 @@
 #include "mongo/db/catalog/index_create.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"

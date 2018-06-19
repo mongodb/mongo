@@ -32,6 +32,7 @@
 
 #include "mongo/s/client/version_manager.h"
 
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog_cache.h"

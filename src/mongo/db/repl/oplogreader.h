@@ -31,7 +31,8 @@
 
 #pragma once
 
-#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

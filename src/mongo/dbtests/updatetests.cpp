@@ -34,7 +34,7 @@
 #include <iostream>
 
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db.h"

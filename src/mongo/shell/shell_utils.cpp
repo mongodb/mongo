@@ -32,7 +32,7 @@
 
 #include "mongo/shell/shell_utils.h"
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/hasher.h"
 #include "mongo/platform/random.h"

@@ -37,7 +37,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"

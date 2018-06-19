@@ -32,7 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"

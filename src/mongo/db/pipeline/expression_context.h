@@ -46,6 +46,7 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/tailable_mode.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"

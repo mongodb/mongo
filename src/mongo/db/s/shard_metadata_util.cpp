@@ -32,7 +32,6 @@
 
 #include "mongo/db/s/shard_metadata_util.h"
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/write_concern_options.h"

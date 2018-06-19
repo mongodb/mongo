@@ -30,7 +30,8 @@
 
 #include "mongo/rpc/metadata.h"
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"

@@ -38,7 +38,6 @@
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/collation/collator_interface.h"

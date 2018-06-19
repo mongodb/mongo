@@ -30,7 +30,6 @@
 
 #include "mongo/db/sessions_collection_standalone.h"
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/query.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"

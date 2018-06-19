@@ -30,7 +30,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 
 namespace mongo {
@@ -73,15 +73,15 @@ public:
                                                  int nToSkip = 0,
                                                  const mongo::BSONObj* fieldsToReturn = 0,
                                                  int queryOptions = 0,
-                                                 int batchSize = 0);
+                                                 int batchSize = 0) override;
 
-    uint64_t getSockCreationMicroSec() const;
+    uint64_t getSockCreationMicroSec() const override;
 
-    virtual void insert(const std::string& ns, BSONObj obj, int flags = 0);
+    void insert(const std::string& ns, BSONObj obj, int flags = 0) override;
 
-    virtual void insert(const std::string& ns, const std::vector<BSONObj>& objList, int flags = 0);
+    void insert(const std::string& ns, const std::vector<BSONObj>& objList, int flags = 0) override;
 
-    virtual void remove(const std::string& ns, Query query, int flags = 0);
+    void remove(const std::string& ns, Query query, int flags = 0) override;
 
     //
     // Getters
@@ -89,7 +89,7 @@ public:
 
     mongo::ConnectionString::ConnectionType type() const;
     bool isFailed() const;
-    double getSoTimeout() const;
+    double getSoTimeout() const override;
     std::string getServerAddress() const;
     std::string toString() const;
 
@@ -100,24 +100,24 @@ public:
                              const std::string& ns,
                              mongo::Query query,
                              const mongo::BSONObj* fieldsToReturn = 0,
-                             int queryOptions = 0);
+                             int queryOptions = 0) override;
 
     unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
                              const std::string& ns,
                              mongo::Query query,
                              const mongo::BSONObj* fieldsToReturn = 0,
-                             int queryOptions = 0);
+                             int queryOptions = 0) override;
 
     //
     // Unsupported methods (these are pure virtuals in the base class)
     //
 
-    void killCursor(const NamespaceString& ns, long long cursorID);
+    void killCursor(const NamespaceString& ns, long long cursorID) override;
     bool call(mongo::Message& toSend,
               mongo::Message& response,
               bool assertOk,
-              std::string* actualServer);
-    void say(mongo::Message& toSend, bool isRetry = false, std::string* actualServer = 0);
+              std::string* actualServer) override;
+    void say(mongo::Message& toSend, bool isRetry = false, std::string* actualServer = 0) override;
     bool lazySupported() const;
 
 private:

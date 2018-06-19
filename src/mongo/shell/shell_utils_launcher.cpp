@@ -58,7 +58,7 @@
 #include <unistd.h>
 #endif
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/stdx/memory.h"

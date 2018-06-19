@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_base.h"
 
 namespace mongo {
 

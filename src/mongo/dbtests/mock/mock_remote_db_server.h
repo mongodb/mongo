@@ -30,7 +30,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/unordered_map.h"

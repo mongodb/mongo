@@ -159,6 +159,10 @@ private:
     }
 };
 
+inline std::ostream& operator<<(std::ostream& s, const Query& q) {
+    return s << q.toString();
+}
+
 void assembleQueryRequest(const std::string& ns,
                           BSONObj query,
                           int nToReturn,
@@ -166,5 +170,10 @@ void assembleQueryRequest(const std::string& ns,
                           const BSONObj* fieldsToReturn,
                           int queryOptions,
                           Message& toSend);
+
+/** Typically one uses the QUERY(...) macro to construct a Query object.
+Example: QUERY( "age" << 33 << "school" << "UCLA" )
+*/
+#define QUERY(x) ::mongo::Query(BSON(x))
 
 }  // namespace mongo

@@ -34,7 +34,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"

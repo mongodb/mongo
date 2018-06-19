@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {
