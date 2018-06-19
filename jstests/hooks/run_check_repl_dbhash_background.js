@@ -227,13 +227,21 @@
                     {readConcern: {level: 'snapshot', atClusterTime: clusterTime}});
             }
 
+            let commitErrorSessionId = undefined;
             hasTransientError = false;
 
             try {
                 const result = checkCollectionHashesForDB(dbName);
 
                 for (let session of sessions) {
-                    session.commitTransaction();
+                    // commitTransaction() calls assert.commandWorked(), which may fail with a
+                    // WriteConflict error response, which is ignored.
+                    try {
+                        session.commitTransaction();
+                    } catch (e) {
+                        commitErrorSessionId = session.getSessionId();
+                        throw e;
+                    }
                 }
 
                 for (let mismatchInfo of result) {
@@ -242,7 +250,9 @@
                 }
             } catch (e) {
                 for (let session of sessions) {
-                    session.abortTransaction();
+                    if (session.getSessionId() !== commitErrorSessionId) {
+                        session.abortTransaction();
+                    }
                 }
 
                 if (e.hasOwnProperty('errorLabels') &&
