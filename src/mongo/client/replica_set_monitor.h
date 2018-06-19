@@ -235,6 +235,11 @@ public:
      */
     static void shutdown();
 
+    /**
+     * Returns the refresh period that is given to all new SetStates.
+     */
+    static Seconds getDefaultRefreshPeriod();
+
     //
     // internal types (defined in replica_set_monitor_internal.h)
     //
@@ -268,10 +273,14 @@ public:
 
 private:
     /**
-     * A callback passed to a task executor to refresh the replica set. It reschedules itself until
-     * its canceled in d-tor.
+     * Schedules a refresh via the task executor. (Task is automatically canceled in the d-tor.)
      */
-    void _refresh(const executor::TaskExecutor::CallbackArgs&);
+    void _scheduleRefresh(Date_t when);
+
+    /**
+     * This function refreshes the replica set and calls _scheduleRefresh() again.
+     */
+    void _doScheduledRefresh(const executor::TaskExecutor::CallbackHandle& currentHandle);
 
     // Serializes refresh and protects _refresherHandle
     stdx::mutex _mutex;
