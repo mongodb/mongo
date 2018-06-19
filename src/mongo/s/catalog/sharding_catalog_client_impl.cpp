@@ -59,6 +59,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -237,13 +238,15 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
 
     // The admin database is always hosted on the config server.
     if (dbName == "admin") {
-        DatabaseType dbt(dbName, ShardRegistry::kConfigServerShardId, false);
+        DatabaseType dbt(
+            dbName, ShardRegistry::kConfigServerShardId, false, databaseVersion::makeFixed());
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
 
     // The config database's primary shard is always config, and it is always sharded.
     if (dbName == "config") {
-        DatabaseType dbt(dbName, ShardRegistry::kConfigServerShardId, true);
+        DatabaseType dbt(
+            dbName, ShardRegistry::kConfigServerShardId, true, databaseVersion::makeFixed());
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
 

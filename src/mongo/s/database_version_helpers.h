@@ -33,7 +33,13 @@ namespace databaseVersion {
 
 DatabaseVersion makeNew();
 DatabaseVersion makeIncremented(const DatabaseVersion& v);
+/**
+ * makeFixed is only for databases that do not have entries in the sharding catalog, such as
+ * "config" and "admin".
+ */
+DatabaseVersion makeFixed();
 bool equal(const DatabaseVersion& dbv1, const DatabaseVersion& dbv2);
+bool isFixed(const DatabaseVersion& dbv);
 
 }  // namespace databaseVersion
 }  // namespace mongo

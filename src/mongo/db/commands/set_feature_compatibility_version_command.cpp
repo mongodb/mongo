@@ -178,9 +178,10 @@ public:
                                                   opCtx, repl::ReadConcernLevel::kLocalReadConcern))
                                   .value;
 
-                // The 'config' dataabase contains the sharded 'config.system.sessions' collection,
+                // The 'config' database contains the sharded 'config.system.sessions' collection,
                 // but does not have an entry in config.databases.
-                allDbs.emplace_back("config", ShardId("config"), true);
+                allDbs.emplace_back(
+                    "config", ShardId("config"), true, databaseVersion::makeFixed());
 
                 auto clusterTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
                 for (const auto& db : allDbs) {
@@ -261,7 +262,8 @@ public:
 
                 // The 'config' database contains the sharded 'config.system.sessions' collection,
                 // but does not have an entry in config.databases.
-                allDbs.emplace_back("config", ShardId("config"), true);
+                allDbs.emplace_back(
+                    "config", ShardId("config"), true, databaseVersion::makeFixed());
 
                 for (const auto& db : allDbs) {
                     // Enumerate all collections

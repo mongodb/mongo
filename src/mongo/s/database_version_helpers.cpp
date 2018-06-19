@@ -49,8 +49,19 @@ DatabaseVersion makeIncremented(const DatabaseVersion& v) {
     return dbv;
 }
 
+DatabaseVersion makeFixed() {
+    DatabaseVersion dbv;
+    dbv.setLastMod(0);
+    dbv.setUuid(UUID::gen());
+    return dbv;
+}
+
 bool equal(const DatabaseVersion& dbv1, const DatabaseVersion& dbv2) {
     return dbv1.getUuid() == dbv2.getUuid() && dbv1.getLastMod() == dbv2.getLastMod();
+}
+
+bool isFixed(const DatabaseVersion& dbv) {
+    return dbv.getLastMod() == 0;
 }
 
 }  // namespace databaseVersion

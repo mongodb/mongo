@@ -45,6 +45,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/create_database_gen.h"
 #include "mongo/s/shard_id.h"
@@ -75,17 +76,14 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
 namespace {
 
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo) {
-    // Attach the databaseVersion if we have one cached for the database
-    //
-    // TODO: After 4.0 is released, require the routingInfo to have a databaseVersion for all
-    // databases besides "config" and "admin" (whose primary shard cannot be changed).
-    // (In v4.0, if the cluster is in fcv=3.6, we may not have a databaseVersion cached for any
-    // database).
-    if (!dbInfo.databaseVersion())
+    // Attach the databaseVersion if we have one cached for the database.
+    auto dbVersion = dbInfo.databaseVersion();
+    if (!dbVersion || databaseVersion::isFixed(*dbVersion)) {
         return cmdObj;
+    }
 
     BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));
-    cmdWithVersionBob.append("databaseVersion", dbInfo.databaseVersion()->toBSON());
+    cmdWithVersionBob.append("databaseVersion", dbVersion->toBSON());
     return cmdWithVersionBob.obj();
 }
 
