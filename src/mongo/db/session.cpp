@@ -597,6 +597,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
             stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalStarted();
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentOpen();
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentActive();
     } else {
         // Execute a retryable write.
         invariant(startTransaction == boost::none);
@@ -725,6 +726,8 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
 
     invariant(!_txnResourceStash);
     _txnResourceStash = TxnResources(opCtx);
+    ServerTransactionsMetrics::get(opCtx)->decrementCurrentActive();
+    ServerTransactionsMetrics::get(opCtx)->incrementCurrentInactive();
 }
 
 void Session::unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName) {
@@ -778,6 +781,8 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             if (_txnState == MultiDocumentTransactionState::kInProgress) {
                 _singleTransactionStats->setActive(curTimeMicros64());
             }
+            ServerTransactionsMetrics::get(opCtx)->incrementCurrentActive();
+            ServerTransactionsMetrics::get(opCtx)->decrementCurrentInactive();
             return;
         }
 
@@ -917,6 +922,7 @@ void Session::_abortTransaction(WithLock wl) {
         }
     }
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
@@ -1054,6 +1060,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         _singleTransactionStats->setInactive(curTimeMicros64());
     }
     ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
 }
 
 BSONObj Session::reportStashedState() const {

@@ -46,11 +46,6 @@ public:
     static ServerTransactionsMetrics* get(ServiceContext* service);
     static ServerTransactionsMetrics* get(OperationContext* opCtx);
 
-<<<<<<< HEAD
-    unsigned long long getCurrentOpen() const;
-    void decrementCurrentOpen();
-    void incrementCurrentOpen();
-=======
     unsigned long long getCurrentActive() const;
     void decrementCurrentActive();
     void incrementCurrentActive();
@@ -58,7 +53,10 @@ public:
     unsigned long long getCurrentInactive() const;
     void decrementCurrentInactive();
     void incrementCurrentInactive();
->>>>>>> 40c317ccbb... added to class
+
+    unsigned long long getCurrentOpen() const;
+    void decrementCurrentOpen();
+    void incrementCurrentOpen();
 
     unsigned long long getTotalStarted() const;
     void incrementTotalStarted();
