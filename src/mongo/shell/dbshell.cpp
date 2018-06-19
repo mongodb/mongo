@@ -220,6 +220,9 @@ char* shellReadline(const char* prompt, int handlesigint = 0) {
 }
 
 void setupSignals() {
+#ifndef _WIN32
+    signal(SIGHUP, quitNicely);
+#endif
     signal(SIGINT, quitNicely);
 }
 
