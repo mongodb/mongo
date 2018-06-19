@@ -69,7 +69,7 @@ public:
     static const BSONField<int> enterCriticalSectionCounter;
 
     ShardDatabaseType(const std::string dbName,
-                      boost::optional<DatabaseVersion> version,
+                      DatabaseVersion version,
                       const ShardId primary,
                       bool partitioned);
 
@@ -93,10 +93,10 @@ public:
     }
     void setDbName(const std::string& dbName);
 
-    const boost::optional<DatabaseVersion> getDbVersion() const {
+    const DatabaseVersion getDbVersion() const {
         return _version;
     }
-    void setDbVersion(boost::optional<DatabaseVersion> version);
+    void setDbVersion(DatabaseVersion version);
 
     const ShardId& getPrimary() const {
         return _primary;
@@ -110,7 +110,7 @@ public:
 
 private:
     std::string _name;
-    boost::optional<DatabaseVersion> _version;
+    DatabaseVersion _version;
     ShardId _primary;
     bool _partitioned;
 };

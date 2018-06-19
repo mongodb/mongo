@@ -46,7 +46,7 @@ const BSONField<bool> ShardDatabaseType::partitioned("partitioned");
 const BSONField<int> ShardDatabaseType::enterCriticalSectionCounter("enterCriticalSectionCounter");
 
 ShardDatabaseType::ShardDatabaseType(const std::string dbName,
-                                     boost::optional<DatabaseVersion> version,
+                                     DatabaseVersion version,
                                      const ShardId primary,
                                      bool partitioned)
     : _name(dbName), _version(version), _primary(primary), _partitioned(partitioned) {}
@@ -59,14 +59,16 @@ StatusWith<ShardDatabaseType> ShardDatabaseType::fromBSON(const BSONObj& source)
             return status;
     }
 
-    boost::optional<DatabaseVersion> dbVersion = boost::none;
+    DatabaseVersion dbVersion;
     {
         BSONObj versionField = source.getObjectField("version");
-        // TODO: Parse this unconditionally once featureCompatibilityVersion 3.6 is no longer
-        // supported.
-        if (!versionField.isEmpty()) {
-            dbVersion = DatabaseVersion::parse(IDLParserErrorContext("DatabaseType"), versionField);
+        if (versionField.isEmpty()) {
+            return Status{ErrorCodes::InternalError,
+                          str::stream() << "DatabaseVersion doesn't exist in database entry "
+                                           "despite the shard being in binary version 4.2 or "
+                                           "later."};
         }
+        dbVersion = DatabaseVersion::parse(IDLParserErrorContext("DatabaseType"), versionField);
     }
 
     std::string dbPrimary;
@@ -93,9 +95,7 @@ BSONObj ShardDatabaseType::toBSON() const {
     BSONObjBuilder builder;
 
     builder.append(name.name(), _name);
-    if (_version) {
-        builder.append(version.name(), _version->toBSON());
-    }
+    builder.append(version.name(), _version.toBSON());
     builder.append(primary.name(), _primary.toString());
     builder.append(partitioned.name(), _partitioned);
 
@@ -106,7 +106,7 @@ std::string ShardDatabaseType::toString() const {
     return toBSON().toString();
 }
 
-void ShardDatabaseType::setDbVersion(boost::optional<DatabaseVersion> version) {
+void ShardDatabaseType::setDbVersion(DatabaseVersion version) {
     _version = version;
 }
 
