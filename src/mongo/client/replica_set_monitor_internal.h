@@ -206,6 +206,7 @@ public:
     mutable PseudoRandom rand;  // only used for host selection to balance load
     mutable int roundRobin;     // used when useDeterministicHostSelection is true
     MongoURI setUri;            // URI that may have constructed this
+    Seconds refreshPeriod;
 };
 
 struct ReplicaSetMonitor::ScanState {
