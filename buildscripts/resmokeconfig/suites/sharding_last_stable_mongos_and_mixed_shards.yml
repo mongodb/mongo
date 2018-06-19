@@ -26,7 +26,6 @@ selector:
   - jstests/sharding/moveChunk_recipient_rejects_chunk_if_UUID_mismatch.js
   - jstests/sharding/write_cmd_auto_split.js
   - jstests/sharding/index_and_collection_option_propagation.js
-  - jstests/sharding/remove4.js
   # New feature in v3.6 mongos
   - jstests/sharding/logical_time_metadata.js
   # New feature in v3.6 mongos and mongod.
