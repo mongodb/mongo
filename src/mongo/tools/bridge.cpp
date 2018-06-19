@@ -266,7 +266,7 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
 
         if (!dest.getSession()) {
             source->end();
-            uasserted(50854, str::stream() << "Unable to connect to " << source->remote());
+            uasserted(50861, str::stream() << "Unable to connect to " << source->remote());
         }
     }
 
