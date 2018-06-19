@@ -26,38 +26,34 @@
  *    it in the license file.
  */
 
-#include <mongo/platform/basic.h>
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/stale_exception.h"
 
 #include "mongo/base/init.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace {
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
+}  // namespace
+
+StaleConfigInfo::StaleConfigInfo(const BSONObj& obj)
+    : StaleConfigInfo(NamespaceString(obj["ns"].type() == String ? obj["ns"].String() : ""),
+                      ChunkVersion::fromBSON(obj, "vReceived"),
+                      ChunkVersion::fromBSON(obj, "vWanted")) {}
+
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("ns", _ns);
+    bob->append("ns", _nss.ns());
     _received.addToBSON(*bob, "vReceived");
     _wanted.addToBSON(*bob, "vWanted");
 }
 
-StaleConfigInfo::StaleConfigInfo(const BSONObj& obj)
-    : StaleConfigInfo(obj["ns"].type() == String ? obj["ns"].String() : "",
-                      ChunkVersion::fromBSON(obj, "vReceived"),
-                      ChunkVersion::fromBSON(obj, "vWanted")) {}
-
 std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
     return std::make_shared<StaleConfigInfo>(obj);
-}
-
-void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
-    bob->append("db", _db);
-    bob->append("vReceived", _received.toBSON());
-    if (_wanted) {
-        bob->append("vWanted", _wanted->toBSON());
-    }
 }
 
 StaleDbRoutingVersion::StaleDbRoutingVersion(const BSONObj& obj)
@@ -69,6 +65,14 @@ StaleDbRoutingVersion::StaleDbRoutingVersion(const BSONObj& obj)
               ? DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vWanted"),
                                        obj["vWanted"].Obj())
               : boost::optional<DatabaseVersion>{}) {}
+
+void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
+    bob->append("db", _db);
+    bob->append("vReceived", _received.toBSON());
+    if (_wanted) {
+        bob->append("vWanted", _wanted->toBSON());
+    }
+}
 
 std::shared_ptr<const ErrorExtraInfo> StaleDbRoutingVersion::parse(const BSONObj& obj) {
     return std::make_shared<StaleDbRoutingVersion>(obj);

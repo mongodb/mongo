@@ -29,9 +29,7 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -39,17 +37,17 @@ class CannotImplicitlyCreateCollectionInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CannotImplicitlyCreateCollection;
 
-    CannotImplicitlyCreateCollectionInfo(NamespaceString ns) : _ns(std::move(ns)) {}
+    CannotImplicitlyCreateCollectionInfo(NamespaceString nss) : _nss(std::move(nss)) {}
 
-    NamespaceString getNss() const {
-        return _ns;
+    const auto& getNss() const {
+        return _nss;
     }
 
     void serialize(BSONObjBuilder* bob) const final;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
-    NamespaceString _ns;
+    NamespaceString _nss;
 };
 
 using ImplicitCreateCollectionException =

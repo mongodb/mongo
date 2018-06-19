@@ -43,7 +43,6 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_exception.h"
 
@@ -612,7 +611,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
         } catch (StaleConfigException& e) {
             // Our version isn't compatible with the current version anymore on at least one shard,
             // need to retry immediately
-            NamespaceString staleNS(e->getns());
+            NamespaceString staleNS(e->getNss());
 
             // For legacy reasons, this may not be set in the exception :-(
             if (staleNS.size() == 0)
@@ -767,7 +766,8 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
         } catch (StaleConfigException& e) {
             retry = true;
 
-            string staleNS = e->getns();
+            std::string staleNS = e->getNss().ns();
+
             // For legacy reasons, ns may not always be set in exception :-(
             if (staleNS.size() == 0)
                 staleNS = ns;  // ns is versioned namespace, be careful of this
@@ -1153,7 +1153,9 @@ void ParallelSortClusteredCursor::_oldInit() {
 
         if (throwException && staleConfigExs.size() > 0) {
             // Version is zero b/c this is deprecated codepath
-            uasserted(StaleConfigInfo(_ns, ChunkVersion(0, 0, OID()), ChunkVersion(0, 0, OID())),
+            uasserted(StaleConfigInfo(NamespaceString(_ns),
+                                      ChunkVersion(0, 0, OID()),
+                                      ChunkVersion(0, 0, OID())),
                       errMsg.str());
         } else if (throwException) {
             uasserted(14827, errMsg.str());

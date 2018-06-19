@@ -170,7 +170,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
     err.append("code", exception->code());
     if (scex) {
         err.append("ok", 0.0);
-        err.append("ns", scex->getns());
+        err.append("ns", scex->getNss().ns());
         scex->getVersionReceived().addToBSON(err, "vReceived");
         scex->getVersionWanted().addToBSON(err, "vWanted");
     }
@@ -892,9 +892,7 @@ void execCommandDatabase(OperationContext* opCtx,
             if (!opCtx->getClient()->isInDirectClient()) {
                 // We already have the StaleConfig exception, so just swallow any errors due to
                 // refresh
-                onShardVersionMismatch(
-                    opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
-                    .ignore();
+                onShardVersionMismatch(opCtx, sce->getNss(), sce->getVersionReceived()).ignore();
             }
         } else if (auto sce = e.extraInfo<StaleDbRoutingVersion>()) {
             if (!opCtx->getClient()->isInDirectClient()) {
@@ -1078,9 +1076,7 @@ DbResponse receivedQuery(OperationContext* opCtx,
             if (!opCtx->getClient()->isInDirectClient()) {
                 // We already have the StaleConfig exception, so just swallow any errors due to
                 // refresh
-                onShardVersionMismatch(
-                    opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
-                    .ignore();
+                onShardVersionMismatch(opCtx, sce->getNss(), sce->getVersionReceived()).ignore();
             }
         }
 

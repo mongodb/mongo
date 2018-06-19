@@ -241,10 +241,6 @@ bool handleError(OperationContext* opCtx,
         return false;
     } else if (auto cannotImplicitCreateCollInfo =
                    ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-        // Don't try doing more ops since they will fail with the same error.
-        // Command reply serializer will handle repeating this error if needed.
-        out->results.emplace_back(ex.toStatus());
-
         if (ShardingState::get(opCtx)->enabled()) {
             // Ignore status since we already put the cannot implicitly create error as the
             // result of the write.
@@ -252,6 +248,9 @@ bool handleError(OperationContext* opCtx,
                 .ignore();
         }
 
+        // Don't try doing more ops since they will fail with the same error.
+        // Command reply serializer will handle repeating this error if needed.
+        out->results.emplace_back(ex.toStatus());
         return false;
     }
 

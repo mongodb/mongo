@@ -117,12 +117,10 @@ env.Library(
         'catalog/type_lockpings.cpp',
         'catalog/type_locks.cpp',
         'catalog/type_mongos.cpp',
-        'catalog/type_shard.cpp',
         'catalog/type_shard_collection.cpp',
         'catalog/type_shard_database.cpp',
+        'catalog/type_shard.cpp',
         'catalog/type_tags.cpp',
-        'chunk_version.cpp',
-        'database_version_helpers.cpp',
         'request_types/add_shard_request_type.cpp',
         'request_types/add_shard_to_zone_request_type.cpp',
         'request_types/balance_chunk_request_type.cpp',
@@ -134,8 +132,13 @@ env.Library(
         'request_types/set_shard_version_request.cpp',
         'request_types/split_chunk_request_type.cpp',
         'request_types/update_zone_key_range_request_type.cpp',
+        'cannot_implicitly_create_collection_info.cpp',
+        'chunk_version.cpp',
+        'database_version_helpers.cpp',
         'shard_id.cpp',
+        'stale_exception.cpp',
         env.Idlc('catalog/type_chunk_base.idl')[0],
+        env.Idlc('database_version.idl')[0],
         env.Idlc('request_types/clone_catalog_data.idl')[0],
         env.Idlc('request_types/create_collection.idl')[0],
         env.Idlc('request_types/create_database.idl')[0],
@@ -152,7 +155,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        'stale_config',
     ]
 )
 
@@ -292,19 +294,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         'cluster_last_error_info',
-    ],
-)
-
-env.Library(
-    target='stale_config',
-    source=[
-        'cannot_implicitly_create_collection_info.cpp',
-        'stale_exception.cpp',
-        env.Idlc('database_version.idl')[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 

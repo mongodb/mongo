@@ -28,11 +28,9 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version_gen.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -40,67 +38,57 @@ class StaleConfigInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleConfig;
 
-    StaleConfigInfo(const std::string& ns, ChunkVersion received, ChunkVersion wanted)
-        : _ns(ns), _received(received), _wanted(wanted) {}
+    StaleConfigInfo(NamespaceString nss, ChunkVersion received, ChunkVersion wanted)
+        : _nss(std::move(nss)), _received(received), _wanted(wanted) {}
 
     StaleConfigInfo(const BSONObj& commandError);
 
-    StaleConfigInfo() = default;
-
-    std::string getns() const {
-        return _ns;
+    const auto& getNss() const {
+        return _nss;
     }
 
-    ChunkVersion getVersionReceived() const {
+    const auto& getVersionReceived() const {
         return _received;
     }
 
-    ChunkVersion getVersionWanted() const {
+    const auto& getVersionWanted() const {
         return _wanted;
     }
 
-    /**
-     * Returns true if this exception would require a full reload of config data to resolve.
-     */
-    bool requiresFullReload() const {
-        return !_received.hasEqualEpoch(_wanted) || _received.isSet() != _wanted.isSet();
-    }
-
-    void serialize(BSONObjBuilder* bob) const final;
+    void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
-    std::string _ns;
+    NamespaceString _nss;
     ChunkVersion _received;
     ChunkVersion _wanted;
 };
+using StaleConfigException = ExceptionFor<ErrorCodes::StaleConfig>;
 
 class StaleDbRoutingVersion final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleDbVersion;
 
-    StaleDbRoutingVersion(const std::string& db,
+    StaleDbRoutingVersion(std::string db,
                           DatabaseVersion received,
                           boost::optional<DatabaseVersion> wanted)
-        : _db(db), _received(received), _wanted(wanted) {}
+        : _db(std::move(db)), _received(received), _wanted(wanted) {}
 
     StaleDbRoutingVersion(const BSONObj& commandError);
 
-    StaleDbRoutingVersion() = default;
-
-    const std::string& getDb() const {
+    const auto& getDb() const {
         return _db;
     }
 
-    DatabaseVersion getVersionReceived() const {
+    const auto& getVersionReceived() const {
         return _received;
     }
 
-    boost::optional<DatabaseVersion> getVersionWanted() const {
+    const auto& getVersionWanted() const {
         return _wanted;
     }
 
-    void serialize(BSONObjBuilder* bob) const final;
+    void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
@@ -108,7 +96,5 @@ private:
     DatabaseVersion _received;
     boost::optional<DatabaseVersion> _wanted;
 };
-
-using StaleConfigException = ExceptionFor<ErrorCodes::StaleConfig>;
 
 }  // namespace mongo

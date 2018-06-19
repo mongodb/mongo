@@ -381,10 +381,10 @@ void runCommand(OperationContext* opCtx,
             } catch (const ExceptionForCat<ErrorCategory::NeedRetargettingError>& ex) {
                 const auto staleNs = [&] {
                     if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
-                        return NamespaceString(staleInfo->getns());
+                        return staleInfo->getNss();
                     } else if (auto implicitCreateInfo =
                                    ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-                        return NamespaceString(implicitCreateInfo->getNss());
+                        return implicitCreateInfo->getNss();
                     } else {
                         throw;
                     }
@@ -787,10 +787,10 @@ void Strategy::explainFind(OperationContext* opCtx,
         } catch (const ExceptionForCat<ErrorCategory::NeedRetargettingError>& ex) {
             const auto staleNs = [&] {
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
-                    return NamespaceString(staleInfo->getns());
+                    return staleInfo->getNss();
                 } else if (auto implicitCreateInfo =
                                ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-                    return NamespaceString(implicitCreateInfo->getNss());
+                    return implicitCreateInfo->getNss();
                 } else {
                     throw;
                 }
