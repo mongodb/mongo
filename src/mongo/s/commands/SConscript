@@ -22,6 +22,7 @@ env.Library(
 env.Library(
     target='cluster_commands',
     source=[
+        'cluster_abort_transaction_cmd.cpp',
         'cluster_add_shard_cmd.cpp',
         'cluster_add_shard_to_zone_cmd.cpp',
         'cluster_aggregate.cpp',
@@ -29,6 +30,7 @@ env.Library(
         'cluster_build_info.cpp',
         'cluster_coll_stats_cmd.cpp',
         'cluster_collection_mod_cmd.cpp',
+        'cluster_commit_transaction_cmd.cpp',
         'cluster_compact_cmd.cpp',
         'cluster_control_balancer_cmd.cpp',
         'cluster_count_cmd.cpp',
