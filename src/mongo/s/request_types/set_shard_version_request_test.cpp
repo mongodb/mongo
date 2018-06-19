@@ -267,8 +267,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
     ASSERT_EQ(ssv.getShardName(), "TestShard");
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
-    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSONWithPrefix("version"),
-                      chunkVersion.toBSONWithPrefix("version"));
+    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
@@ -304,8 +303,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
     ASSERT_EQ(ssv.getShardName(), "TestShard");
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
-    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSONWithPrefix("version"),
-                      chunkVersion.toBSONWithPrefix("version"));
+    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
@@ -347,8 +345,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullForceRefresh) {
     ASSERT_EQ(ssv.getShardName(), "TestShard");
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
-    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSONWithPrefix("version"),
-                      chunkVersion.toBSONWithPrefix("version"));
+    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
@@ -384,8 +381,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullNoConnectionVersioning) {
     ASSERT_EQ(ssv.getShardName(), "TestShard");
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
-    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSONWithPrefix("version"),
-                      chunkVersion.toBSONWithPrefix("version"));
+    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
@@ -429,8 +425,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullNoConnectionVersioningForceRefresh)
     ASSERT_EQ(ssv.getShardName(), "TestShard");
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
-    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSONWithPrefix("version"),
-                      chunkVersion.toBSONWithPrefix("version"));
+    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"

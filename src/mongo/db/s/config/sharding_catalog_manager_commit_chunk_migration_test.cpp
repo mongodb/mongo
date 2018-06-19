@@ -104,11 +104,11 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
 
     // Verify the versions returned match expected values.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "migratedChunkVersion");
+    auto mver = ChunkVersion::parseWithField(versions, "migratedChunkVersion");
     ASSERT_OK(mver.getStatus());
     ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, origVersion.epoch()), mver.getValue());
 
-    auto cver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "controlChunkVersion");
+    auto cver = ChunkVersion::parseWithField(versions, "controlChunkVersion");
     ASSERT_OK(cver.getStatus());
     ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 1, origVersion.epoch()), cver.getValue());
 
@@ -174,11 +174,11 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
 
     // Verify the version returned matches expected value.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "migratedChunkVersion");
+    auto mver = ChunkVersion::parseWithField(versions, "migratedChunkVersion");
     ASSERT_OK(mver.getStatus());
     ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, origVersion.epoch()), mver.getValue());
 
-    auto cver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "controlChunkVersion");
+    auto cver = ChunkVersion::parseWithField(versions, "controlChunkVersion");
     ASSERT_NOT_OK(cver.getStatus());
 
     // Verify the chunk ended up in the right shard, and version matches the value returned.
@@ -235,11 +235,11 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
 
     // Verify the version returned matches expected value.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "migratedChunkVersion");
+    auto mver = ChunkVersion::parseWithField(versions, "migratedChunkVersion");
     ASSERT_OK(mver.getStatus());
     ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, origVersion.epoch()), mver.getValue());
 
-    auto cver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "controlChunkVersion");
+    auto cver = ChunkVersion::parseWithField(versions, "controlChunkVersion");
     ASSERT_NOT_OK(cver.getStatus());
 
     // Verify the chunk ended up in the right shard, and version matches the value returned.
@@ -505,7 +505,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 
     // Verify the versions returned match expected values.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "migratedChunkVersion");
+    auto mver = ChunkVersion::parseWithField(versions, "migratedChunkVersion");
     ASSERT_OK(mver.getStatus());
     ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, origVersion.epoch()), mver.getValue());
 

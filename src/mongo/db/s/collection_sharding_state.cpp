@@ -253,14 +253,14 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     ChunkVersion received;
     ChunkVersion wanted;
     if (!_checkShardVersionOk(opCtx, &errmsg, &received, &wanted)) {
-        uasserted(StaleConfigInfo(_nss.ns(), received, wanted),
+        uasserted(StaleConfigInfo(_nss, received, wanted),
                   str::stream() << "shard version not ok: " << errmsg);
     }
 }
 
 bool CollectionShardingState::collectionIsSharded(OperationContext* opCtx) {
     auto metadata = getMetadata(opCtx).getMetadata();
-    if (metadata && (metadata->getCollVersion().isStrictlyEqualTo(ChunkVersion::UNSHARDED()))) {
+    if (metadata && (metadata->getCollVersion() == ChunkVersion::UNSHARDED())) {
         return false;
     }
 

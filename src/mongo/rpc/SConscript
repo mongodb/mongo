@@ -125,10 +125,11 @@ env.Library(
         'legacy_reply_builder.cpp'
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/mongo/util/net/network',
         'command_reply',
         'metadata',
         'object_check',
-        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 

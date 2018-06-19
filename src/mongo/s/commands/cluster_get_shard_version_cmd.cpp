@@ -114,7 +114,7 @@ public:
                 log() << redact(chunk.toString());
             }
 
-            cm->getVersion().addToBSON(result, "version");
+            cm->getVersion().appendLegacyWithField(&result, "version");
         }
 
         return true;

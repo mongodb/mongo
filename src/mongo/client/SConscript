@@ -163,7 +163,7 @@ clientDriverEnv.Library(
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/s/stale_config',
+        '$BUILD_DIR/mongo/s/common_s',
         'authentication',
         'client_query',
         'connection_string',

@@ -28,45 +28,100 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/jsobj.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
-TEST(Parsing, EpochIsOptional) {
-    const OID oid = OID::gen();
-    bool canParse = false;
+using unittest::assertGet;
 
-    ChunkVersion chunkVersionComplete = ChunkVersion::fromBSON(
-        BSON("lastmod" << Timestamp(Seconds(2), 3) << "lastmodEpoch" << oid), "lastmod", &canParse);
-    ASSERT(canParse);
+TEST(ChunkVersionParsing, ToFromBSONRoundtrip) {
+    ChunkVersion version(1, 2, OID::gen());
+    const auto roundTripVersion = assertGet(ChunkVersion::parseWithField(
+        [&] {
+            BSONObjBuilder builder;
+            version.appendWithField(&builder, "testVersionField");
+            return builder.obj();
+        }(),
+        "testVersionField"));
+
+    ASSERT_EQ(version, roundTripVersion);
+}
+
+TEST(ChunkVersionParsing, ToFromBSONLegacyRoundtrip) {
+    ChunkVersion version(1, 2, OID::gen());
+    const auto roundTripVersion = assertGet(ChunkVersion::parseLegacyWithField(
+        [&] {
+            BSONObjBuilder builder;
+            version.appendLegacyWithField(&builder, "testVersionField");
+            return builder.obj();
+        }(),
+        "testVersionField"));
+
+    ASSERT_EQ(version, roundTripVersion);
+}
+
+TEST(ChunkVersionParsing, FromBSON) {
+    const OID oid = OID::gen();
+    ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
+        BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3) << oid)),
+        "testVersionField"));
+
     ASSERT(chunkVersionComplete.epoch().isSet());
-    ASSERT(chunkVersionComplete.epoch() == oid);
+    ASSERT_EQ(oid, chunkVersionComplete.epoch());
     ASSERT_EQ(2, chunkVersionComplete.majorVersion());
     ASSERT_EQ(3, chunkVersionComplete.minorVersion());
+}
 
-    canParse = false;
-    ChunkVersion chunkVersionNoEpoch =
-        ChunkVersion::fromBSON(BSON("lastmod" << Timestamp(Seconds(3), 4)), "lastmod", &canParse);
-    ASSERT(canParse);
+TEST(ChunkVersionParsing, FromBSONMissingEpoch) {
+    ASSERT_THROWS_CODE(
+        uassertStatusOK(ChunkVersion::parseWithField(
+            BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3))), "testVersionField")),
+        AssertionException,
+        ErrorCodes::TypeMismatch);
+}
+
+TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
+    const OID oid = OID::gen();
+    ASSERT_THROWS_CODE(uassertStatusOK(ChunkVersion::parseWithField(BSON("testVersionField" << oid),
+                                                                    "testVersionField")),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST(ChunkVersionParsing, FromBSONLegacy) {
+    const OID oid = OID::gen();
+    ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseLegacyWithField(
+        BSON("lastmod" << Timestamp(Seconds(2), 3) << "lastmodEpoch" << oid), "lastmod"));
+
+    ASSERT(chunkVersionComplete.epoch().isSet());
+    ASSERT_EQ(oid, chunkVersionComplete.epoch());
+    ASSERT_EQ(2, chunkVersionComplete.majorVersion());
+    ASSERT_EQ(3, chunkVersionComplete.minorVersion());
+}
+
+TEST(ChunkVersionParsing, FromBSONLegacyEpochIsOptional) {
+    ChunkVersion chunkVersionNoEpoch = assertGet(
+        ChunkVersion::parseLegacyWithField(BSON("lastmod" << Timestamp(Seconds(3), 4)), "lastmod"));
+
     ASSERT(!chunkVersionNoEpoch.epoch().isSet());
     ASSERT_EQ(3, chunkVersionNoEpoch.majorVersion());
     ASSERT_EQ(4, chunkVersionNoEpoch.minorVersion());
 }
 
-TEST(Comparison, StrictEqual) {
+TEST(ChunkVersionComparison, EqualityOperators) {
     OID epoch = OID::gen();
 
-    ASSERT(ChunkVersion(3, 1, epoch).isStrictlyEqualTo(ChunkVersion(3, 1, epoch)));
-    ASSERT(!ChunkVersion(3, 1, epoch).isStrictlyEqualTo(ChunkVersion(3, 1, OID())));
-    ASSERT(!ChunkVersion(3, 1, OID()).isStrictlyEqualTo(ChunkVersion(3, 1, epoch)));
-    ASSERT(ChunkVersion(3, 1, OID()).isStrictlyEqualTo(ChunkVersion(3, 1, OID())));
-    ASSERT(!ChunkVersion(4, 2, epoch).isStrictlyEqualTo(ChunkVersion(4, 1, epoch)));
+    ASSERT_EQ(ChunkVersion(3, 1, epoch), ChunkVersion(3, 1, epoch));
+    ASSERT_EQ(ChunkVersion(3, 1, OID()), ChunkVersion(3, 1, OID()));
+
+    ASSERT_NE(ChunkVersion(3, 1, epoch), ChunkVersion(3, 1, OID()));
+    ASSERT_NE(ChunkVersion(3, 1, OID()), ChunkVersion(3, 1, epoch));
+    ASSERT_NE(ChunkVersion(4, 2, epoch), ChunkVersion(4, 1, epoch));
 }
 
-TEST(Comparison, OlderThan) {
+TEST(ChunkVersionComparison, OlderThan) {
     OID epoch = OID::gen();
 
     ASSERT(ChunkVersion(3, 1, epoch).isOlderThan(ChunkVersion(4, 1, epoch)));
@@ -83,5 +138,5 @@ TEST(Comparison, OlderThan) {
     ASSERT(!ChunkVersion(3, 1, epoch).isOlderThan(ChunkVersion(3, 1, epoch)));
 }
 
-}  // unnamed namespace
+}  // namespace
 }  // namespace mongo

@@ -99,8 +99,7 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
     }
 
     {
-        auto chunkVersionStatus =
-            ChunkVersion::parseFromBSONWithFieldForCommands(source, kChunkVersion);
+        auto chunkVersionStatus = ChunkVersion::parseWithField(source, kChunkVersion);
         if (!chunkVersionStatus.isOK())
             return chunkVersionStatus.getStatus();
         migrationType._chunkVersion = chunkVersionStatus.getValue();
@@ -130,7 +129,7 @@ BSONObj MigrationType::toBSON() const {
     builder.append(fromShard.name(), _fromShard.toString());
     builder.append(toShard.name(), _toShard.toString());
 
-    _chunkVersion.appendWithFieldForCommands(&builder, kChunkVersion);
+    _chunkVersion.appendWithField(&builder, kChunkVersion);
 
     builder.append(waitForDelete.name(), _waitForDelete);
     return builder.obj();

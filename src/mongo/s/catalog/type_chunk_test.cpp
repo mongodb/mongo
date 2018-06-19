@@ -114,7 +114,7 @@ TEST(ChunkType, MissingShardRequiredFields) {
     BSONObj objModLastmod = BSON(
         ChunkType::minShardID(kMin) << ChunkType::max(kMax) << ChunkType::shard(kShard.toString()));
     chunkRes = ChunkType::fromShardBSON(objModLastmod, epoch);
-    ASSERT_EQUALS(chunkRes.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQUALS(chunkRes.getStatus(), ErrorCodes::NoSuchKey);
 }
 
 TEST(ChunkType, ToFromShardBSON) {

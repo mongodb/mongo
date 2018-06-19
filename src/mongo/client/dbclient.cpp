@@ -663,7 +663,7 @@ void DBClientBase::findN(vector<BSONObj>& out,
     if (c->hasResultFlag(ResultFlag_ShardConfigStale)) {
         BSONObj error;
         c->peekError(&error);
-        uasserted(StaleConfigInfo(error), "findN stale config");
+        uasserted(StaleConfigInfo::parseFromCommandError(error), "findN stale config");
     }
 
     for (int i = 0; i < nToReturn; i++) {

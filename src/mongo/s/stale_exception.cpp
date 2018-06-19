@@ -26,30 +26,42 @@
  *    it in the license file.
  */
 
-#include <mongo/platform/basic.h>
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/stale_exception.h"
 
 #include "mongo/base/init.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace {
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
-void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("ns", _ns);
-    _received.addToBSON(*bob, "vReceived");
-    _wanted.addToBSON(*bob, "vWanted");
+ChunkVersion extractOptionalVersion(const BSONObj& obj, StringData field) {
+    auto swChunkVersion = ChunkVersion::parseLegacyWithField(obj, field);
+    if (swChunkVersion == ErrorCodes::NoSuchKey)
+        return ChunkVersion::UNSHARDED();
+    return uassertStatusOK(std::move(swChunkVersion));
 }
 
-StaleConfigInfo::StaleConfigInfo(const BSONObj& obj)
-    : StaleConfigInfo(obj["ns"].type() == String ? obj["ns"].String() : "",
-                      ChunkVersion::fromBSON(obj, "vReceived"),
-                      ChunkVersion::fromBSON(obj, "vWanted")) {}
+}  // namespace
+
+void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
+    bob->append("ns", _nss.ns());
+    _received.appendLegacyWithField(bob, "vReceived");
+    _wanted.appendLegacyWithField(bob, "vWanted");
+}
 
 std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
-    return std::make_shared<StaleConfigInfo>(obj);
+    return std::make_shared<StaleConfigInfo>(parseFromCommandError(obj));
+}
+
+StaleConfigInfo StaleConfigInfo::parseFromCommandError(const BSONObj& obj) {
+    return StaleConfigInfo(NamespaceString(obj["ns"].str()),
+                           extractOptionalVersion(obj, "vReceived"),
+                           extractOptionalVersion(obj, "vWanted"));
 }
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
@@ -60,18 +72,19 @@ void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
     }
 }
 
-StaleDbRoutingVersion::StaleDbRoutingVersion(const BSONObj& obj)
-    : StaleDbRoutingVersion(
-          obj["db"].String(),
-          DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vReceived"),
-                                 obj["vReceived"].Obj()),
-          !obj["vWanted"].eoo()
-              ? DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vWanted"),
-                                       obj["vWanted"].Obj())
-              : boost::optional<DatabaseVersion>{}) {}
-
 std::shared_ptr<const ErrorExtraInfo> StaleDbRoutingVersion::parse(const BSONObj& obj) {
-    return std::make_shared<StaleDbRoutingVersion>(obj);
+    return std::make_shared<StaleDbRoutingVersion>(parseFromCommandError(obj));
+}
+
+StaleDbRoutingVersion StaleDbRoutingVersion::parseFromCommandError(const BSONObj& obj) {
+    return StaleDbRoutingVersion(
+        obj["db"].String(),
+        DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vReceived"),
+                               obj["vReceived"].Obj()),
+        !obj["vWanted"].eoo()
+            ? DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vWanted"),
+                                     obj["vWanted"].Obj())
+            : boost::optional<DatabaseVersion>{});
 }
 
 }  // namespace mongo

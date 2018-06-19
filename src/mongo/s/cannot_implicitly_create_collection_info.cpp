@@ -26,24 +26,28 @@
  *    it in the license file.
  */
 
-#include <mongo/platform/basic.h>
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 
 #include "mongo/base/init.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace {
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(CannotImplicitlyCreateCollectionInfo);
 
+}  // namespace
+
 void CannotImplicitlyCreateCollectionInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("ns", _ns.ns());
+    bob->append("ns", _nss.ns());
 }
 
 std::shared_ptr<const ErrorExtraInfo> CannotImplicitlyCreateCollectionInfo::parse(
     const BSONObj& obj) {
-    NamespaceString ns(obj["ns"].str());
-    return std::make_shared<CannotImplicitlyCreateCollectionInfo>(std::move(ns));
+    return std::make_shared<CannotImplicitlyCreateCollectionInfo>(NamespaceString(obj["ns"].str()));
 }
 
 }  // namespace mongo

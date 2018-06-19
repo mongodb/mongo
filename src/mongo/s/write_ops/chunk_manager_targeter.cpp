@@ -131,7 +131,7 @@ bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, ChunkM
 CompareResult compareShardVersions(const ChunkVersion& shardVersionA,
                                    const ChunkVersion& shardVersionB) {
     // Collection may have been dropped
-    if (!shardVersionA.hasEqualEpoch(shardVersionB)) {
+    if (shardVersionA.epoch() != shardVersionB.epoch()) {
         return CompareResult_Unknown;
     }
 
@@ -219,10 +219,9 @@ bool isMetadataDifferent(const std::shared_ptr<ChunkManager>& managerA,
         return true;
 
     if (managerA) {
-        return !managerA->getVersion().isStrictlyEqualTo(managerB->getVersion());
+        return managerA->getVersion() != managerB->getVersion();
     }
 
-    dassert(NULL != primaryA.get());
     return primaryA->getId() != primaryB->getId();
 }
 
@@ -629,7 +628,8 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
         remoteShardVersion = getShardVersion(*_routingInfo, endpoint.shardName);
         remoteShardVersion.incMajor();
     } else {
-        remoteShardVersion = ChunkVersion::fromBSON(staleInfo, "vWanted");
+        remoteShardVersion =
+            uassertStatusOK(ChunkVersion::parseLegacyWithField(staleInfo, "vWanted"));
     }
 
     ShardVersionMap::iterator it = _remoteShardVersions.find(endpoint.shardName);
@@ -637,7 +637,7 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
         _remoteShardVersions.insert(std::make_pair(endpoint.shardName, remoteShardVersion));
     } else {
         ChunkVersion& previouslyNotedVersion = it->second;
-        if (previouslyNotedVersion.hasEqualEpoch(remoteShardVersion)) {
+        if (previouslyNotedVersion.epoch() == remoteShardVersion.epoch()) {
             if (previouslyNotedVersion.isOlderThan(remoteShardVersion)) {
                 previouslyNotedVersion = remoteShardVersion;
             }

@@ -223,7 +223,7 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source) {
     }
 
     {
-        auto versionStatus = ChunkVersion::parseFromBSONForChunk(source);
+        auto versionStatus = ChunkVersion::parseLegacyWithField(source, ChunkType::lastmod());
         if (!versionStatus.isOK()) {
             return versionStatus.getStatus();
         }
@@ -262,7 +262,7 @@ BSONObj ChunkType::toConfigBSON() const {
     if (_shard)
         builder.append(shard.name(), getShard().toString());
     if (_version)
-        _version->appendForChunk(&builder);
+        _version->appendLegacyWithField(&builder, ChunkType::lastmod());
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());
     addHistoryToBSON(builder);
@@ -305,11 +305,12 @@ StatusWith<ChunkType> ChunkType::fromShardBSON(const BSONObj& source, const OID&
 
     {
         auto statusWithChunkVersion =
-            ChunkVersion::parseFromBSONWithFieldAndSetEpoch(source, lastmod.name(), epoch);
+            ChunkVersion::parseLegacyWithField(source, ChunkType::lastmod());
         if (!statusWithChunkVersion.isOK()) {
             return statusWithChunkVersion.getStatus();
         }
-        chunk._version = std::move(statusWithChunkVersion.getValue());
+        auto version = std::move(statusWithChunkVersion.getValue());
+        chunk._version = ChunkVersion(version.majorVersion(), version.minorVersion(), epoch);
     }
 
     {
