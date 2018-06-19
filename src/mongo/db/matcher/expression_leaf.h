@@ -281,8 +281,14 @@ public:
 
 class RegexMatchExpression : public LeafMatchExpression {
 public:
+    /**
+     * The maximum length of regex patterns.
+     */
+    static constexpr size_t kMaxPatternSize = 32764;
+
     RegexMatchExpression(StringData path, const BSONElement& e);
     RegexMatchExpression(StringData path, StringData regex, StringData options);
+
     ~RegexMatchExpression();
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
