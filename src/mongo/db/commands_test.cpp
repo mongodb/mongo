@@ -33,6 +33,8 @@
 #include "mongo/db/commands_test_example_gen.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/rpc/factory.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -203,7 +205,7 @@ public:
         /**
          * Reply with an incremented 'request.i'.
          */
-        void run(OperationContext* opCtx, CommandReplyBuilder* reply) override {
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             commands_test_example::ExampleIncrementReply r;
             r.setIPlusOne(request().getI() + 1);
             reply->fillFrom(r);
@@ -345,17 +347,16 @@ protected:
             ASSERT_EQ(invocation->ns(), ns);
 
             const BSONObj reply = [&] {
-                BufBuilder bb;
-                CommandReplyBuilder crb{BSONObjBuilder{bb}};
+                rpc::OpMsgReplyBuilder replyBuilder;
                 try {
-                    invocation->run(opCtx.get(), &crb);
-                    auto bob = crb.getBodyBuilder();
+                    invocation->run(opCtx.get(), &replyBuilder);
+                    auto bob = replyBuilder.getBodyBuilder();
                     CommandHelpers::extractOrAppendOk(bob);
                 } catch (const DBException& e) {
-                    auto bob = crb.getBodyBuilder();
+                    auto bob = replyBuilder.getBodyBuilder();
                     CommandHelpers::appendCommandStatusNoThrow(bob, e.toStatus());
                 }
-                return BSONObj(bb.release());
+                return replyBuilder.releaseBody();
             }();
 
             postAssert(i, reply);

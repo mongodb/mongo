@@ -92,7 +92,7 @@ public:
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}
 
-    void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
+    void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
         uassert(50746,
                 "Explain's child command cannot run on this node. "
                 "Are you explaining a write command on a secondary?",

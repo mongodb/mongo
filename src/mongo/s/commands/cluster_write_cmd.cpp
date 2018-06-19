@@ -302,7 +302,7 @@ private:
         return response.getOk();
     }
 
-    void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
+    void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
         try {
             BSONObjBuilder bob = result->getBodyBuilder();
             bool ok = runImpl(opCtx, *_request, _batchedRequest, bob);

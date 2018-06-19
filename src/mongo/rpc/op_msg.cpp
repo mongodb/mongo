@@ -247,4 +247,15 @@ Message OpMsgBuilder::finish() {
     return Message(_buf.release());
 }
 
+BSONObj OpMsgBuilder::releaseBody() {
+    invariant(_state == kBody);
+    invariant(_bodyStart);
+    invariant(_bodyStart == sizeof(MSGHEADER::Layout) + 4 /*flags*/ + 1 /*body kind byte*/);
+    invariant(!_openBuilder);
+    _state = kDone;
+
+    auto bson = BSONObj(_buf.buf() + _bodyStart);
+    return bson.shareOwnershipWith(_buf.release());
+}
+
 }  // namespace mongo

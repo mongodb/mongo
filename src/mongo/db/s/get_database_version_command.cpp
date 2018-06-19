@@ -72,7 +72,7 @@ public:
                             ActionType::getDatabaseVersion));
         }
 
-        void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << definition()->getName() << " can only be run on shard servers",
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
@@ -83,7 +83,7 @@ public:
                     versionObj = dbVersion->toBSON();
                 }
             }
-            result->append("dbVersion", versionObj);
+            result->getBodyBuilder().append("dbVersion", versionObj);
         }
 
         StringData _targetDb() const {

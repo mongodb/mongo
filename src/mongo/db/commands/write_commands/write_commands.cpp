@@ -225,7 +225,7 @@ private:
     // Customization point for 'run'.
     virtual void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const = 0;
 
-    void run(OperationContext* opCtx, CommandReplyBuilder* result) final {
+    void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) final {
         try {
             try {
                 _transactionChecks(opCtx);

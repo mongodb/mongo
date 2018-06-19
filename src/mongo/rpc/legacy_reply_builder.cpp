@@ -83,14 +83,17 @@ LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(const BSONObj& comman
     return *this;
 }
 
-BSONObjBuilder LegacyReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
-    invariant(_state == State::kCommandReply);
-    // Eagerly allocate reserveBytes bytes.
-    _builder.reserveBytes(reserveBytes);
-    // Claim our reservation immediately so we can actually write data to it.
-    _builder.claimReservedBytes(reserveBytes);
-    _state = State::kMetadata;
-    return BSONObjBuilder(_builder);
+BSONObjBuilder LegacyReplyBuilder::getBodyBuilder() {
+    if (_state == State::kCommandReply) {
+        auto bob = BSONObjBuilder(_builder);
+        _bodyOffset = bob.offset();
+        _state = State::kMetadata;
+        return bob;
+    }
+
+    invariant(_state == State::kMetadata);
+    invariant(_bodyOffset);
+    return BSONObjBuilder(BSONObjBuilder::ResumeBuildingTag{}, _builder, _bodyOffset);
 }
 
 LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(const BSONObj& metadata) {
@@ -105,6 +108,11 @@ Protocol LegacyReplyBuilder::getProtocol() const {
     return rpc::Protocol::kOpQuery;
 }
 
+void LegacyReplyBuilder::reserveBytes(const std::size_t bytes) {
+    _builder.reserveBytes(bytes);
+    _builder.claimReservedBytes(bytes);
+}
+
 void LegacyReplyBuilder::reset() {
     // If we are in State::kMetadata, we are already in the 'start' state, so by
     // immediately returning, we save a heap allocation.
@@ -116,6 +124,7 @@ void LegacyReplyBuilder::reset() {
     _message.reset();
     _state = State::kCommandReply;
     _staleConfigError = false;
+    _bodyOffset = 0;
 }
 
 

@@ -414,52 +414,6 @@ private:
     ServerStatusMetricField<Counter64> _commandsFailedMetric;
 };
 
-class CommandReplyBuilder {
-public:
-    explicit CommandReplyBuilder(BSONObjBuilder bodyObj);
-
-    CommandReplyBuilder(const CommandReplyBuilder&) = delete;
-    CommandReplyBuilder& operator=(const CommandReplyBuilder&) = delete;
-
-    /**
-     * Returns a BSONObjBuilder that can be used to build the reply in-place. The returned
-     * builder (or an object into which it has been moved) must be completed before calling
-     * any more methods on this object. A builder is completed by a call to `done()` or by
-     * its destructor. Can be called repeatedly to append multiple things to the reply, as
-     * long as each returned builder must be completed between calls.
-     */
-    BSONObjBuilder getBodyBuilder() const;
-
-    void reset();
-
-    /**
-     * Appends a key:object field to this reply.
-     */
-    template <typename T>
-    void append(StringData key, const T& object) {
-        getBodyBuilder() << key << object;
-    }
-
-    /**
-     * The specified 'object' must be BSON-serializable.
-     *
-     * BSONSerializable 'x' means 'x.serialize(bob)' appends a representation of 'x'
-     * into 'BSONObjBuilder* bob'.
-     */
-    template <typename T>
-    void fillFrom(const T& object) {
-        static_assert(!isStatusOrStatusWith<std::decay_t<T>>,
-                      "Status and StatusWith<T> aren't supported by TypedCommand and fillFrom(). "
-                      "Use uassertStatusOK() instead.");
-        auto bob = getBodyBuilder();
-        object.serialize(&bob);
-    }
-
-private:
-    BufBuilder* const _bodyBuf;
-    const std::size_t _bodyOffset;
-};
-
 /**
  * Represents a single invocation of a given command.
  */
@@ -476,7 +430,7 @@ public:
      * indicated either by throwing (preferred), or by calling
      * `CommandHelpers::extractOrAppendOk`.
      */
-    virtual void run(OperationContext* opCtx, CommandReplyBuilder* result) = 0;
+    virtual void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) = 0;
 
     virtual void explain(OperationContext* opCtx,
                          ExplainOptions::Verbosity verbosity,
@@ -808,14 +762,14 @@ private:
     decltype(auto) _callTypedRun(OperationContext* opCtx) {
         return static_cast<Invocation*>(this)->typedRun(opCtx);
     }
-    void _runImpl(std::true_type, OperationContext* opCtx, CommandReplyBuilder*) {
+    void _runImpl(std::true_type, OperationContext* opCtx, rpc::ReplyBuilderInterface*) {
         _callTypedRun(opCtx);
     }
-    void _runImpl(std::false_type, OperationContext* opCtx, CommandReplyBuilder* reply) {
+    void _runImpl(std::false_type, OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) {
         reply->fillFrom(_callTypedRun(opCtx));
     }
 
-    void run(OperationContext* opCtx, CommandReplyBuilder* reply) final {
+    void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final {
         using VoidResultTag = std::is_void<decltype(_callTypedRun(opCtx))>;
         _runImpl(VoidResultTag{}, opCtx, reply);
     }

@@ -47,6 +47,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
@@ -425,10 +426,9 @@ Status MapReduceCommandTest::_runCommand(StringData mapCode, StringData reduceCo
     ASSERT(command) << "Unable to look up mapReduce command";
 
     auto request = OpMsgRequest::fromDBAndBody(inputNss.db(), _makeCmdObj(mapCode, reduceCode));
-    BufBuilder bb;
-    CommandReplyBuilder crb(BSONObjBuilder{bb});
-    command->parse(_opCtx.get(), request)->run(_opCtx.get(), &crb);
-    auto status = getStatusFromCommandResult(crb.getBodyBuilder().asTempObj());
+    auto replyBuilder = rpc::makeReplyBuilder(rpc::Protocol::kOpMsg);
+    command->parse(_opCtx.get(), request)->run(_opCtx.get(), replyBuilder.get());
+    auto status = getStatusFromCommandResult(replyBuilder->getBodyBuilder().asTempObj());
     if (!status.isOK()) {
         return status.withContext(str::stream() << "mapReduce command failed: " << request.body);
     }

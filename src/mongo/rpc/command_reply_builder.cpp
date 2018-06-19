@@ -53,14 +53,16 @@ CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(const BSONObj& comm
     return *this;
 }
 
-BSONObjBuilder CommandReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
+BSONObjBuilder CommandReplyBuilder::getBodyBuilder() {
+    if (_state == State::kMetadata) {
+        invariant(_bodyOffset);
+        return BSONObjBuilder(BSONObjBuilder::ResumeBuildingTag{}, _builder, _bodyOffset);
+    }
     invariant(_state == State::kCommandReply);
-    // Eagerly allocate reserveBytes bytes.
-    _builder.reserveBytes(reserveBytes);
-    // Claim our reservation immediately so we can actually write data to it.
-    _builder.claimReservedBytes(reserveBytes);
     _state = State::kMetadata;
-    return BSONObjBuilder(_builder);
+    auto bob = BSONObjBuilder(_builder);
+    _bodyOffset = bob.offset();
+    return bob;
 }
 
 CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
@@ -94,6 +96,7 @@ void CommandReplyBuilder::reset() {
     _builder.skip(mongo::MsgData::MsgDataHeaderSize);
     _message.reset();
     _state = State::kCommandReply;
+    _bodyOffset = 0;
 }
 
 Message CommandReplyBuilder::done() {

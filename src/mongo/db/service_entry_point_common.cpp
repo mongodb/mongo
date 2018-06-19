@@ -460,7 +460,7 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
 
 void invokeInTransaction(OperationContext* opCtx,
                          CommandInvocation* invocation,
-                         CommandReplyBuilder* replyBuilder) {
+                         rpc::ReplyBuilderInterface* replyBuilder) {
     auto session = OperationContextSession::get(opCtx);
     if (!session) {
         // Run the command directly if we're not in a transaction.
@@ -495,7 +495,6 @@ bool runCommandImpl(OperationContext* opCtx,
                     const boost::optional<OperationSessionInfoFromClient>& sessionOptions) {
     const Command* command = invocation->definition();
     auto bytesToReserve = command->reserveBytesForReply();
-
 // SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in conjunction with the
 // additional memory pressure introduced by reply buffer pre-allocation, causes the concurrency
 // suite to run extremely slowly. As a workaround we do not pre-allocate in Windows DEBUG builds.
@@ -503,12 +502,11 @@ bool runCommandImpl(OperationContext* opCtx,
     if (kDebugBuild)
         bytesToReserve = 0;
 #endif
-
-    CommandReplyBuilder crb(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
+    replyBuilder->reserveBytes(bytesToReserve);
 
     if (!invocation->supportsWriteConcern()) {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
-        invokeInTransaction(opCtx, invocation, &crb);
+        invokeInTransaction(opCtx, invocation, replyBuilder);
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
         auto session = OperationContextSession::get(opCtx);
@@ -539,13 +537,13 @@ bool runCommandImpl(OperationContext* opCtx,
         };
 
         try {
-            invokeInTransaction(opCtx, invocation, &crb);
+            invokeInTransaction(opCtx, invocation, replyBuilder);
         } catch (const DBException&) {
             waitForWriteConcern(*extraFieldsBuilder);
             throw;
         }
 
-        waitForWriteConcern(crb.getBodyBuilder());
+        waitForWriteConcern(replyBuilder->getBodyBuilder());
 
         // Nothing in run() should change the writeConcern.
         dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
@@ -555,20 +553,20 @@ bool runCommandImpl(OperationContext* opCtx,
     behaviors.waitForLinearizableReadConcern(opCtx);
 
     const bool ok = [&] {
-        auto body = crb.getBodyBuilder();
+        auto body = replyBuilder->getBodyBuilder();
         return CommandHelpers::extractOrAppendOk(body);
     }();
-    behaviors.attachCurOpErrInfo(opCtx, crb.getBodyBuilder().asTempObj());
+    behaviors.attachCurOpErrInfo(opCtx, replyBuilder->getBodyBuilder().asTempObj());
 
     if (!ok) {
-        auto response = crb.getBodyBuilder().asTempObj();
+        auto response = replyBuilder->getBodyBuilder().asTempObj();
         auto codeField = response["code"];
 
         if (codeField.isNumber()) {
             auto code = ErrorCodes::Error(codeField.numberInt());
             // Append the error labels for transient transaction errors.
             auto errorLabels = getErrorLabels(sessionOptions, command->getName(), code);
-            crb.getBodyBuilder().appendElements(errorLabels);
+            replyBuilder->getBodyBuilder().appendElements(errorLabels);
         }
     }
 
@@ -576,7 +574,7 @@ bool runCommandImpl(OperationContext* opCtx,
     appendReplyMetadata(opCtx, request, &metadataBob);
 
     {
-        auto commandBodyBob = crb.getBodyBuilder();
+        auto commandBodyBob = replyBuilder->getBodyBuilder();
         appendClusterAndOperationTime(opCtx, &commandBodyBob, &metadataBob, startOperationTime);
     }
 

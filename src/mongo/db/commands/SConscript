@@ -109,6 +109,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/logger/parse_log_component_settings',
+        '$BUILD_DIR/mongo/rpc/protocol',
     ],
 )
 

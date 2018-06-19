@@ -220,6 +220,26 @@ public:
      */
     static AtomicBool disableDupeFieldCheck_forTest;
 
+    /**
+     * Similar to finish, any calls on this object after are illegal.
+     */
+    BSONObj releaseBody();
+
+    /**
+     * Returns whether or not this builder is already building a body.
+     */
+    bool isBuildingBody() {
+        return _state == kBody;
+    }
+
+    /**
+     * Reserves and claims the bytes requested in the internal BufBuilder.
+     */
+    void reserveBytes(const std::size_t bytes) {
+        _buf.reserveBytes(bytes);
+        _buf.claimReservedBytes(bytes);
+    }
+
 private:
     friend class DocSequenceBuilder;
 

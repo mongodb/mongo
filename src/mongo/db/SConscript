@@ -594,6 +594,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/rpc/rpc',
         "commands",
         "auth/authmocks",
         "repl/replmocks",

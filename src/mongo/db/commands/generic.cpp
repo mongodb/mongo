@@ -108,8 +108,16 @@ public:
             return NamespaceString(request().request.getDatabase());
         }
 
-        void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
-            result->append("echo", request().request.body);
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
+            auto sequences = request().request.sequences;
+            for (auto& docSeq : sequences) {
+                auto docBuilder = result->getDocSequenceBuilder(docSeq.name);
+                for (auto& bson : docSeq.objs) {
+                    docBuilder.append(bson);
+                }
+            }
+
+            result->getBodyBuilder().append("echo", request().request.body);
         }
     };
 
