@@ -680,7 +680,7 @@ TEST_F(UnwindStageTest, AddsUnwoundPathToDependencies) {
     ASSERT_EQUALS(1U, dependencies.fields.size());
     ASSERT_EQUALS(1U, dependencies.fields.count("x.y.z"));
     ASSERT_EQUALS(false, dependencies.needWholeDocument);
-    ASSERT_EQUALS(false, dependencies.getNeedTextScore());
+    ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
 }
 
 TEST_F(UnwindStageTest, TruncatesOutputSortAtUnwoundPath) {

@@ -97,7 +97,6 @@
         {eval: "function() {return 1;}"},
         {"$eval": "function() {return 1;}"},
         {filemd5: 1, root: "fs"},
-        {geoNear: collName, near: [0, 0]},
         {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: "out"},
         {parallelCollectionScan: collName, numCursors: 1},
     ];

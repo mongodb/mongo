@@ -1306,153 +1306,99 @@
     }
 
     //
-    // Collation tests for geoNear.
+    // Collation tests for the $geoNear aggregation stage.
     //
 
-    // geoNear should return "collection doesn't exist" error when collation specified and
-    // collection does not exist.
+    // $geoNear should fail when collation is specified but the collection does not exist.
     coll.drop();
-    assert.commandFailed(db.runCommand({
-        geoNear: coll.getName(),
-        near: {type: "Point", coordinates: [0, 0]},
-        spherical: true,
-        query: {str: "ABC"},
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [{
+            $geoNear: {
+                near: {type: "Point", coordinates: [0, 0]},
+                distanceField: "dist",
+            }
+        }],
         collation: {locale: "en_US", strength: 2}
-    }));
+    }),
+                                 ErrorCodes.NamespaceNotFound);
 
-    // geoNear should return correct results when collation specified and string predicate not
-    // indexed.
+    // $geoNear rejects the now-deprecated "collation" option.
     coll.drop();
     assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
-    assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
-    assert.eq(0,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"}
-                  }))
-                  .results.length);
-    assert.eq(1,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"},
-                      collation: {locale: "en_US", strength: 2}
-                  }))
-                  .results.length);
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [{
+            $geoNear: {
+                near: {type: "Point", coordinates: [0, 0]},
+                distanceField: "dist",
+                collation: {locale: "en_US"},
+            }
+        }],
+    }),
+                                 40227);
 
-    // geoNear should return correct results when no collation specified and string predicate
+    const geoNearStage = {
+        $geoNear: {
+            near: {type: "Point", coordinates: [0, 0]},
+            distanceField: "dist",
+            spherical: true,
+            query: {str: "ABC"}
+        }
+    };
+
+    // $geoNear should return correct results when collation specified and string predicate not
+    // indexed.
+    assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+    assert.eq(0, coll.aggregate([geoNearStage]).itcount());
+    assert.eq(
+        1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", strength: 2}}).itcount());
+
+    // $geoNear should return correct results when no collation specified and string predicate
     // indexed.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1}));
-    assert.eq(0,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"}
-                  }))
-                  .results.length);
-    assert.eq(1,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"},
-                      collation: {locale: "en_US", strength: 2}
-                  }))
-                  .results.length);
+    assert.eq(0, coll.aggregate([geoNearStage]).itcount());
+    assert.eq(
+        1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", strength: 2}}).itcount());
 
-    // geoNear should return correct results when collation specified and collation on index is
+    // $geoNear should return correct results when collation specified and collation on index is
     // incompatible with string predicate.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(
         coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 3}}));
-    assert.eq(0,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"}
-                  }))
-                  .results.length);
-    assert.eq(1,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"},
-                      collation: {locale: "en_US", strength: 2}
-                  }))
-                  .results.length);
+    assert.eq(0, coll.aggregate([geoNearStage]).itcount());
+    assert.eq(
+        1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", strength: 2}}).itcount());
 
-    // geoNear should return correct results when collation specified and collation on index is
+    // $geoNear should return correct results when collation specified and collation on index is
     // compatible with string predicate.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(
         coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 2}}));
-    assert.eq(0,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"}
-                  }))
-                  .results.length);
-    assert.eq(1,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"},
-                      collation: {locale: "en_US", strength: 2}
-                  }))
-                  .results.length);
+    assert.eq(0, coll.aggregate([geoNearStage]).itcount());
+    assert.eq(
+        1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", strength: 2}}).itcount());
 
-    // geoNear should return correct results when no collation specified and collection has a
+    // $geoNear should return correct results when no collation specified and collection has a
     // default collation.
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
     assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
-    assert.eq(1,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"}
-                  }))
-                  .results.length);
+    assert.eq(1, coll.aggregate([geoNearStage]).itcount());
 
-    // geoNear should return correct results when "simple" collation specified and collection has
+    // $geoNear should return correct results when "simple" collation specified and collection has
     // a default collation.
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
     assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
-    assert.eq(0,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {str: "ABC"},
-                      collation: {locale: "simple"}
-                  }))
-                  .results.length);
+    assert.eq(0, coll.aggregate([geoNearStage], {collation: {locale: "simple"}}).itcount());
 
     //
     // Collation tests for find with $nearSphere.

@@ -44,45 +44,6 @@ namespace {
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceGeoNearTest = AggregationContextFixture;
 
-TEST_F(DocumentSourceGeoNearTest, ShouldAbsorbSubsequentLimitStage) {
-    auto geoNear = DocumentSourceGeoNear::create(getExpCtx());
-
-    Pipeline::SourceContainer container;
-    container.push_back(geoNear);
-
-    ASSERT_EQUALS(geoNear->getLimit(), DocumentSourceGeoNear::kDefaultLimit);
-
-    container.push_back(DocumentSourceLimit::create(getExpCtx(), 200));
-    geoNear->optimizeAt(container.begin(), &container);
-
-    ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_EQUALS(geoNear->getLimit(), DocumentSourceGeoNear::kDefaultLimit);
-
-    container.push_back(DocumentSourceLimit::create(getExpCtx(), 50));
-    geoNear->optimizeAt(container.begin(), &container);
-
-    ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_EQUALS(geoNear->getLimit(), 50);
-
-    container.push_back(DocumentSourceLimit::create(getExpCtx(), 30));
-    geoNear->optimizeAt(container.begin(), &container);
-
-    ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_EQUALS(geoNear->getLimit(), 30);
-}
-
-TEST_F(DocumentSourceGeoNearTest, ShouldReportOutputsAreSortedByDistanceField) {
-    BSONObj queryObj = fromjson(
-        "{geoNear: { near: {type: 'Point', coordinates: [0, 0]}, distanceField: 'dist', "
-        "maxDistance: 2}}");
-    auto geoNear = DocumentSourceGeoNear::createFromBson(queryObj.firstElement(), getExpCtx());
-
-    BSONObjSet outputSort = geoNear->getOutputSorts();
-
-    ASSERT_EQUALS(outputSort.count(BSON("dist" << -1)), 1U);
-    ASSERT_EQUALS(outputSort.size(), 1U);
-}
-
 TEST_F(DocumentSourceGeoNearTest, FailToParseIfKeyFieldNotAString) {
     auto stageObj = fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], key: 1}}");
     ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
@@ -97,6 +58,35 @@ TEST_F(DocumentSourceGeoNearTest, FailToParseIfKeyIsTheEmptyString) {
                        ErrorCodes::BadValue);
 }
 
+TEST_F(DocumentSourceGeoNearTest, FailToParseIfDistanceMultiplierIsNegative) {
+    auto stageObj =
+        fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], distanceMultiplier: -1.0}}");
+    ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceGeoNearTest, FailToParseIfLimitFieldSpecified) {
+    auto stageObj = fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], limit: 1}}");
+    ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       50858);
+}
+
+TEST_F(DocumentSourceGeoNearTest, FailToParseIfNumFieldSpecified) {
+    auto stageObj = fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], num: 1}}");
+    ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       50857);
+}
+
+TEST_F(DocumentSourceGeoNearTest, FailToParseIfStartOptionIsSpecified) {
+    auto stageObj = fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], start: {}}}");
+    ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       50856);
+}
+
 TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeKeyField) {
     auto stageObj = fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], key: 'a.b'}}");
     auto geoNear = DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx());
@@ -108,12 +98,9 @@ TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeKeyField) {
                         Value{Document{{"key", "a.b"_sd},
                                        {"near", std::vector<Value>{Value{0}, Value{0}}},
                                        {"distanceField", "dist"_sd},
-                                       {"limit", 100},
                                        {"query", BSONObj()},
-                                       {"spherical", false},
-                                       {"distanceMultiplier", 1}}}}}};
+                                       {"spherical", false}}}}}};
     ASSERT_VALUE_EQ(expectedSerialization, serialized[0]);
 }
-
 }  // namespace
 }  // namespace mongo

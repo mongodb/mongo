@@ -184,22 +184,25 @@ assert.eq(4, t.find({loc: {$near: offCenter, $maxDistance: step * 1.9}}).count()
 // Command Tests
 // **************
 // Make sure we can get all nearby points to point in range
-assert.eq(overallMax, db.runCommand({geoNear: "borders", near: offCenter}).results[0].obj.loc.y);
+assert.eq(overallMax,
+          t.aggregate({$geoNear: {near: offCenter, distanceField: "d"}}).toArray()[0].loc.y);
 
 // Make sure we can get all nearby points to point on boundary
-assert.eq(overallMin, db.runCommand({geoNear: "borders", near: onBoundsNeg}).results[0].obj.loc.y);
+assert.eq(overallMin,
+          t.aggregate({$geoNear: {near: onBoundsNeg, distanceField: "d"}}).toArray()[0].loc.y);
 
 // Make sure we can't get all nearby points to point over boundary
-// TODO: SERVER-9986 clean up wrapping rules for different CRS queries - not sure this is an error
-/*
-assert.commandFailed( db.runCommand( { geoNear : "borders", near : offBounds } ));
-*/
-
-// Make sure we can't get all nearby points to point on max boundary
-assert.commandWorked(db.runCommand({geoNear: "borders", near: onBounds}));
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: "borders",
+    cursor: {},
+    pipeline: [{$geoNear: {near: offBounds, distanceField: "d"}}]
+}),
+                             16433);
+assert.eq(numItems, t.aggregate({$geoNear: {near: onBounds, distanceField: "d"}}).toArray().length);
 
 // Make sure we can get all nearby points within one step (4 points in top
 // corner)
-assert.eq(
-    4,
-    db.runCommand({geoNear: "borders", near: offCenter, maxDistance: step * 1.5}).results.length);
+assert.eq(4,
+          t.aggregate({$geoNear: {near: offCenter, maxDistance: step * 1.5, distanceField: "d"}})
+              .toArray()
+              .length);

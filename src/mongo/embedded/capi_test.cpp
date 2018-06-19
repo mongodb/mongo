@@ -542,7 +542,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "explain",
                                           "find",
                                           "findAndModify",
-                                          "geoNear",
                                           "getLastError",
                                           "getMore",
                                           "getParameter",

@@ -69,7 +69,6 @@ selector:
   - jstests/core/profile_distinct.js
   - jstests/core/profile_find.js
   - jstests/core/profile_findandmodify.js
-  - jstests/core/profile_geonear.js
   - jstests/core/profile_getmore.js
   - jstests/core/profile_insert.js
   - jstests/core/profile_sampling.js

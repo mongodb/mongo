@@ -35,6 +35,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/mongo_process_common.h"
 #include "mongo/db/query/plan_executor.h"
 
@@ -136,7 +137,7 @@ public:
 
     /**
      * If the first stage in the pipeline does not generate its own output documents, attaches a
-     * DocumentSourceCursor to the front of the pipeline which will output documents from the
+     * cursor document source to the front of the pipeline which will output documents from the
      * collection to feed into the pipeline.
      *
      * This method looks for early pipeline stages that can be folded into the underlying
@@ -152,6 +153,24 @@ public:
                                     const NamespaceString& nss,
                                     const AggregationRequest* aggRequest,
                                     Pipeline* pipeline);
+
+    /**
+     * Prepare a generic DocumentSourceCursor for 'pipeline'.
+     */
+    static void prepareGenericCursorSource(Collection* collection,
+                                           const NamespaceString& nss,
+                                           const AggregationRequest* aggRequest,
+                                           Pipeline* pipeline);
+
+    /**
+     * Prepare a special DocumentSourceGeoNearCursor for 'pipeline'. Unlike
+     * 'prepareGenericCursorSource()', throws if 'collection' does not exist, as the $geoNearCursor
+     * requires a 2d or 2dsphere index.
+     */
+    static void prepareGeoNearCursorSource(Collection* collection,
+                                           const NamespaceString& nss,
+                                           const AggregationRequest* aggRequest,
+                                           Pipeline* pipeline);
 
     /**
      * Injects a MongodInterface into stages which require access to mongod-specific functionality.
@@ -187,17 +206,17 @@ private:
         const DepsTracker& deps,
         const BSONObj& queryObj,
         const AggregationRequest* aggRequest,
+        const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
         BSONObj* sortObj,
         BSONObj* projectionObj);
 
     /**
-     * Creates a DocumentSourceCursor from the given PlanExecutor and adds it to the front of the
-     * Pipeline.
+     * Adds 'cursor' to the front of 'pipeline', using 'deps' to inform the cursor of its
+     * dependencies. If specified, 'queryObj', 'sortObj' and 'projectionObj' are passed to the
+     * cursor for explain reporting.
      */
-    static void addCursorSource(Collection* collection,
-                                Pipeline* pipeline,
-                                const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+    static void addCursorSource(Pipeline* pipeline,
+                                boost::intrusive_ptr<DocumentSourceCursor> cursor,
                                 DepsTracker deps,
                                 const BSONObj& queryObj = BSONObj(),
                                 const BSONObj& sortObj = BSONObj(),

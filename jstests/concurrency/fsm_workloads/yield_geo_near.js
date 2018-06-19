@@ -1,35 +1,40 @@
 'use strict';
 
 /*
- * yield_geo_near.js (extends yield.js)
- *
- * Intersperse geo $near queries with updates and deletes of documents they may match.
+ * Intersperses $geoNear aggregations with updates and deletes of documents they may match.
+ * @tags: [requires_non_retryable_writes]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield.js');       // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-
-    /*
-     * Use geo $near query to find points near the origin. Note this should be done using the
-     * geoNear command, rather than a $near query, as the $near query doesn't work in a sharded
-     * environment. Unfortunately this means we cannot batch the request.
-     */
     $config.states.query = function geoNear(db, collName) {
         // This distance gets about 80 docs around the origin. There is one doc inserted
         // every 1m^2 and the area scanned by a 5m radius is PI*(5m)^2 ~ 79.
-        var maxDistance = 5;
+        const maxDistance = 5;
+        const cursor = db[collName].aggregate([{
+            $geoNear: {
+                near: [0, 0],
+                distanceField: "dist",
+                maxDistance: maxDistance,
+            }
+        }]);
 
-        var res = db.runCommand({geoNear: collName, near: [0, 0], maxDistance: maxDistance});
-        assertWhenOwnColl.commandWorked(res);  // Could fail if more than 1 2d index.
+        // We only run the verification when workloads are run on separate collections, since the
+        // aggregation may fail if we don't have exactly one 2d index to use.
         assertWhenOwnColl(function verifyResults() {
-            var results = res.results;
-            var prevDoc = {dis: 0};  // distance should never be less than 0
-            for (var i = 0; i < results.length; i++) {
-                var doc = results[i];
-                assertAlways.lte(NumberInt(doc.dis), maxDistance);  // satisfies query
-                assertAlways.lte(prevDoc.dis, doc.dis);             // returned in the correct order
-                prevDoc = doc;
+            // We manually verify the results ourselves rather than calling advanceCursor(). In the
+            // event of a failure, the aggregation cursor cannot support explain().
+            let lastDistanceSeen = 0;
+            while (cursor.hasNext()) {
+                const doc = cursor.next();
+                assertAlways.lte(doc.dist,
+                                 maxDistance,
+                                 `dist in ${tojson(doc)} exceeds max allowable $geoNear distance`);
+                assertAlways.lte(lastDistanceSeen,
+                                 doc.dist,
+                                 `dist in ${tojson(doc)} is not less than the previous distance`);
+                lastDistanceSeen = doc.dist;
             }
         });
     };

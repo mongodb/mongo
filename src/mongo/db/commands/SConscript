@@ -212,7 +212,6 @@ env.Library(
         "explain_cmd.cpp",
         "find_and_modify.cpp",
         "find_cmd.cpp",
-        "geo_near_cmd.cpp",
         "get_last_error.cpp",
         "getmore_cmd.cpp",
         "index_filter_commands.cpp",

@@ -120,7 +120,7 @@ TEST(ExclusionProjection, ShouldNotAddAnyDependencies) {
 
     ASSERT_EQ(deps.fields.size(), 0UL);
     ASSERT_FALSE(deps.needWholeDocument);
-    ASSERT_FALSE(deps.getNeedTextScore());
+    ASSERT_FALSE(deps.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
 }
 
 TEST(ExclusionProjection, ShouldReportExcludedFieldsAsModified) {

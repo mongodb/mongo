@@ -100,10 +100,6 @@
                                              isNotFullyQualified,
                                              isNotAdminCommand);
 
-    // Test geoNear fails with an invalid collection name.
-    assertFailsWithInvalidNamespacesForField(
-        "geoNear", {geoNear: "", near: [0.0, 0.0]}, isNotFullyQualified, isNotAdminCommand);
-
     if (!isMongos) {
         // Test geoSearch fails with an invalid collection name.
         assertFailsWithInvalidNamespacesForField(

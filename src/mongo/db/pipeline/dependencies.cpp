@@ -41,6 +41,8 @@ using std::vector;
 
 namespace str = mongoutils::str;
 
+constexpr DepsTracker::MetadataAvailable DepsTracker::kAllGeoNearDataAvailable;
+
 bool DepsTracker::_appendMetaProjections(BSONObjBuilder* projectionBuilder) const {
     if (_needTextScore) {
         projectionBuilder->append(Document::metaFieldTextScore,
@@ -52,7 +54,17 @@ bool DepsTracker::_appendMetaProjections(BSONObjBuilder* projectionBuilder) cons
                                   BSON("$meta"
                                        << "sortKey"));
     }
-    return (_needTextScore || _needSortKey);
+    if (_needGeoNearDistance) {
+        projectionBuilder->append(Document::metaFieldGeoNearDistance,
+                                  BSON("$meta"
+                                       << "geoNearDistance"));
+    }
+    if (_needGeoNearPoint) {
+        projectionBuilder->append(Document::metaFieldGeoNearPoint,
+                                  BSON("$meta"
+                                       << "geoNearPoint"));
+    }
+    return (_needTextScore || _needSortKey || _needGeoNearDistance || _needGeoNearPoint);
 }
 
 BSONObj DepsTracker::toProjection() const {
@@ -132,6 +144,81 @@ boost::optional<ParsedDeps> DepsTracker::toParsedDeps() const {
     }
 
     return ParsedDeps(md.freeze());
+}
+
+bool DepsTracker::getNeedsMetadata(MetadataType type) const {
+    switch (type) {
+        case MetadataType::TEXT_SCORE:
+            return _needTextScore;
+        case MetadataType::SORT_KEY:
+            return _needSortKey;
+        case MetadataType::GEO_NEAR_DISTANCE:
+            return _needGeoNearDistance;
+        case MetadataType::GEO_NEAR_POINT:
+            return _needGeoNearPoint;
+    }
+    MONGO_UNREACHABLE;
+}
+
+bool DepsTracker::isMetadataAvailable(MetadataType type) const {
+    switch (type) {
+        case MetadataType::TEXT_SCORE:
+            return _metadataAvailable & MetadataAvailable::kTextScore;
+        case MetadataType::SORT_KEY:
+            MONGO_UNREACHABLE;
+        case MetadataType::GEO_NEAR_DISTANCE:
+            return _metadataAvailable & MetadataAvailable::kGeoNearDistance;
+        case MetadataType::GEO_NEAR_POINT:
+            return _metadataAvailable & MetadataAvailable::kGeoNearPoint;
+    }
+    MONGO_UNREACHABLE;
+}
+
+void DepsTracker::setNeedsMetadata(MetadataType type, bool required) {
+    switch (type) {
+        case MetadataType::TEXT_SCORE:
+            uassert(40218,
+                    "pipeline requires text score metadata, but there is no text score available",
+                    !required || isMetadataAvailable(type));
+            _needTextScore = required;
+            return;
+        case MetadataType::SORT_KEY:
+            invariant(required || !_needSortKey);
+            _needSortKey = required;
+            return;
+        case MetadataType::GEO_NEAR_DISTANCE:
+            uassert(50860,
+                    "pipeline requires $geoNear distance metadata, but it is not available",
+                    !required || isMetadataAvailable(type));
+            invariant(required || !_needGeoNearDistance);
+            _needGeoNearDistance = required;
+            return;
+        case MetadataType::GEO_NEAR_POINT:
+            uassert(50859,
+                    "pipeline requires $geoNear point metadata, but it is not available",
+                    !required || isMetadataAvailable(type));
+            invariant(required || !_needGeoNearPoint);
+            _needGeoNearPoint = required;
+            return;
+    }
+    MONGO_UNREACHABLE;
+}
+
+std::vector<DepsTracker::MetadataType> DepsTracker::getAllRequiredMetadataTypes() const {
+    std::vector<MetadataType> reqs;
+    if (_needTextScore) {
+        reqs.push_back(MetadataType::TEXT_SCORE);
+    }
+    if (_needSortKey) {
+        reqs.push_back(MetadataType::SORT_KEY);
+    }
+    if (_needGeoNearDistance) {
+        reqs.push_back(MetadataType::GEO_NEAR_DISTANCE);
+    }
+    if (_needGeoNearPoint) {
+        reqs.push_back(MetadataType::GEO_NEAR_POINT);
+    }
+    return reqs;
 }
 
 namespace {

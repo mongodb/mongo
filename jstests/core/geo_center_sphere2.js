@@ -126,36 +126,24 @@ for (var test = 0; test < numTests; test++) {
         distance = minNewDistance;
     }
 
-    // geoNear
-    results = db.runCommand({
-                    geoNear: "sphere",
-                    near: startPoint,
-                    maxDistance: radius,
-                    num: 2 * pointsIn,
-                    spherical: true
-                }).results;
-
-    /*
-    printjson( results );
-
-    for ( var j = 0; j < results[0].obj.loc.length; j++ ) {
-        var newDistance = Geo.sphereDistance( startPoint, results[0].obj.loc[j] )
-        if( newDistance <= radius ) print( results[0].obj.loc[j] + " : " + newDistance )
-    }
-    */
-
-    assert.eq(docsIn, results.length);
+    // Test $geoNear.
+    results = t.aggregate({
+                   $geoNear: {
+                       near: startPoint,
+                       distanceField: "dis",
+                       maxDistance: radius,
+                       spherical: true,
+                   }
+               }).toArray();
+    assert.eq(docsIn, results.length, tojson(results));
 
     var distance = 0;
     for (var i = 0; i < results.length; i++) {
         var retDistance = results[i].dis;
 
-        // print( "Dist from : " + results[i].loc + " to " + startPoint + " is "
-        // + retDistance + " vs " + radius )
-
         var distInObj = false;
-        for (var j = 0; j < results[i].obj.loc.length && distInObj == false; j++) {
-            var newDistance = Geo.sphereDistance(startPoint, results[i].obj.loc[j]);
+        for (var j = 0; j < results[i].loc.length && distInObj == false; j++) {
+            var newDistance = Geo.sphereDistance(startPoint, results[i].loc[j]);
             distInObj =
                 (newDistance >= retDistance - 0.0001 && newDistance <= retDistance + 0.0001);
         }

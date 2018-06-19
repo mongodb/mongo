@@ -178,7 +178,11 @@
                     {createIndexes: coll, indexes: [{key: {loc: "2d"}, name: "loc_2d"}]}));
                 assert.writeOK(mongosConn.getCollection(nss).insert({x: 1, loc: [1, 1]}));
             },
-            command: {geoNear: coll, near: [1, 1]},
+            command: {
+                aggregate: coll,
+                cursor: {},
+                pipeline: [{$geoNear: {near: [1, 1], distanceField: "d"}}]
+            },
             checkResults: function(res) {
                 // The command should fail on the new collection, because the geo index was dropped.
                 assert.commandFailed(res);

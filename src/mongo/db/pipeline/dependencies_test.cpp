@@ -116,7 +116,7 @@ TEST(DependenciesToProjectionTest, ShouldOnlyRequestTextScoreIfEntireDocumentAnd
     DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
     deps.fields = arrayToSet(array);
     deps.needWholeDocument = true;
-    deps.setNeedTextScore(true);
+    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
     ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON(Document::metaFieldTextScore << metaTextScore));
 }
 
@@ -125,7 +125,7 @@ TEST(DependenciesToProjectionTest,
     const char* array[] = {"a"};  // needTextScore without needWholeDocument
     DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
     deps.fields = arrayToSet(array);
-    deps.setNeedTextScore(true);
+    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
     ASSERT_BSONOBJ_EQ(
         deps.toProjection(),
         BSON(Document::metaFieldTextScore << metaTextScore << "a" << 1 << "_id" << 0));
@@ -135,7 +135,7 @@ TEST(DependenciesToProjectionTest, ShouldProduceEmptyObjectIfThereAreNoDependenc
     DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
     deps.fields = {};
     deps.needWholeDocument = false;
-    deps.setNeedTextScore(false);
+    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, false);
     ASSERT_BSONOBJ_EQ(deps.toProjection(), BSONObj());
 }
 
@@ -143,7 +143,7 @@ TEST(DependenciesToProjectionTest, ShouldAttemptToExcludeOtherFieldsIfOnlyTextSc
     DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
     deps.fields = {};
     deps.needWholeDocument = false;
-    deps.setNeedTextScore(true);
+    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
     ASSERT_BSONOBJ_EQ(deps.toProjection(),
                       BSON(Document::metaFieldTextScore << metaTextScore << "_id" << 0
                                                         << "$noFieldsNeeded"
@@ -155,7 +155,7 @@ TEST(DependenciesToProjectionTest,
     DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
     deps.fields = {};
     deps.needWholeDocument = true;
-    deps.setNeedTextScore(true);
+    deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
     ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON(Document::metaFieldTextScore << metaTextScore));
 }
 

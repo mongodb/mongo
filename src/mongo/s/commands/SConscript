@@ -51,7 +51,6 @@ env.Library(
         'cluster_flush_router_config_cmd.cpp',
         'cluster_fsync_cmd.cpp',
         'cluster_ftdc_commands.cpp',
-        'cluster_geo_near_cmd.cpp',
         'cluster_get_last_error_cmd.cpp',
         'cluster_get_prev_error_cmd.cpp',
         'cluster_get_shard_version_cmd.cpp',

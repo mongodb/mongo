@@ -1,35 +1,38 @@
-var t = db.geob;
-t.drop();
+(function() {
+    "use strict";
+    var t = db.geob;
+    t.drop();
 
-var a = {p: [0, 0]};
-var b = {p: [1, 0]};
-var c = {p: [3, 4]};
-var d = {p: [0, 6]};
+    var a = {p: [0, 0]};
+    var b = {p: [1, 0]};
+    var c = {p: [3, 4]};
+    var d = {p: [0, 6]};
 
-t.save(a);
-t.save(b);
-t.save(c);
-t.save(d);
-t.ensureIndex({p: "2d"});
+    t.save(a);
+    t.save(b);
+    t.save(c);
+    t.save(d);
+    t.ensureIndex({p: "2d"});
 
-var res = t.runCommand("geoNear", {near: [0, 0]});
-assert.close(3, res.stats.avgDistance, "A");
+    let res = t.aggregate({$geoNear: {near: [0, 0], distanceField: "dis"}}).toArray();
 
-assert.close(0, res.results[0].dis, "B1");
-assert.eq(a._id, res.results[0].obj._id, "B2");
+    assert.close(0, res[0].dis, "B1");
+    assert.eq(a._id, res[0]._id, "B2");
 
-assert.close(1, res.results[1].dis, "C1");
-assert.eq(b._id, res.results[1].obj._id, "C2");
+    assert.close(1, res[1].dis, "C1");
+    assert.eq(b._id, res[1]._id, "C2");
 
-assert.close(5, res.results[2].dis, "D1");
-assert.eq(c._id, res.results[2].obj._id, "D2");
+    assert.close(5, res[2].dis, "D1");
+    assert.eq(c._id, res[2]._id, "D2");
 
-assert.close(6, res.results[3].dis, "E1");
-assert.eq(d._id, res.results[3].obj._id, "E2");
+    assert.close(6, res[3].dis, "E1");
+    assert.eq(d._id, res[3]._id, "E2");
 
-res = t.runCommand("geoNear", {near: [0, 0], distanceMultiplier: 2});
-assert.close(6, res.stats.avgDistance, "F");
-assert.close(0, res.results[0].dis, "G");
-assert.close(2, res.results[1].dis, "H");
-assert.close(10, res.results[2].dis, "I");
-assert.close(12, res.results[3].dis, "J");
+    res = t.aggregate({
+               $geoNear: {near: [0, 0], distanceField: "dis", distanceMultiplier: 2.0}
+           }).toArray();
+    assert.close(0, res[0].dis, "G");
+    assert.close(2, res[1].dis, "H");
+    assert.close(10, res[2].dis, "I");
+    assert.close(12, res[3].dis, "J");
+}());

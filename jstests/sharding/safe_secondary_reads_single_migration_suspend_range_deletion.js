@@ -202,29 +202,6 @@
         forceerror: {skip: "does not return user data"},
         fsync: {skip: "does not return user data"},
         fsyncUnlock: {skip: "does not return user data"},
-        geoNear: {
-            setUp: function(mongosConn) {
-                assert.commandWorked(mongosConn.getCollection(nss).runCommand(
-                    {createIndexes: coll, indexes: [{key: {loc: "2d"}, name: "loc_2d"}]}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1, loc: [1, 1]}));
-            },
-            command: {geoNear: coll, near: [1, 1]},
-            checkResults: function(res) {
-                // The command should work and return orphaned results, because it doesn't do
-                // filtering and also because the collection is sharded, it will get broadcast to
-                // both shards.
-                assert.commandWorked(res);
-                assert.eq(2, res.results.length, tojson(res));
-            },
-            checkAvailableReadConcernResults: function(res) {
-                // The command should work and return orphaned results, because it doesn't do
-                // filtering. The expected result is 1, because the stale mongos assumes the
-                // collection is still on only 1 shard and will not broadcast it to both.
-                assert.commandWorked(res);
-                assert.eq(1, res.results.length, tojson(res));
-            },
-            behavior: "versioned"
-        },
         geoSearch: {skip: "not supported in mongos"},
         getCmdLineOpts: {skip: "does not return user data"},
         getDiagnosticData: {skip: "does not return user data"},

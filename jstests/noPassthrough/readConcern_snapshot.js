@@ -158,18 +158,5 @@
     assert.commandWorked(session.abortTransaction_forTesting());
     session.endSession();
 
-    // TODO: SERVER-34113 Remove this test when we completely remove snapshot
-    // reads since this command is not supported with transaction api.
-    // readConcern 'snapshot' is supported by geoNear.
-    session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
-    sessionDb = session.getDatabase(dbName);
-    assert.commandWorked(sessionDb.runCommand({
-        geoNear: collName,
-        near: [0, 0],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(0),
-    }));
-
-    session.endSession();
     rst.stopSet();
 }());

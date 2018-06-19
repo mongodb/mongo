@@ -1,5 +1,5 @@
 /**
- * Tests for the 'key' field accepted by the geoNear command and the $geoNear aggregation stage.
+ * Tests for the 'key' field accepted by the $geoNear aggregation stage.
  */
 (function() {
     "use strict";
@@ -29,36 +29,39 @@
     }
 
     /**
-     * Runs the near described by 'nearParams' as both a geoNear command and a $geoNear aggregation.
-     * Verifies that in both cases, the operation fails with 'code'.
+     * Runs the near described by 'nearParams' as a $geoNear aggregation and verifies that the
+     * operation fails with 'code'.
      */
     function assertGeoNearFails(nearParams, code) {
-        assert.commandFailedWithCode(coll.runCommand("geoNear", nearParams), code);
         assert.commandFailedWithCode(runNearAgg(nearParams), code);
     }
 
     /**
-     * Runs the near described by 'nearParams' as both a geoNear command and a $geoNear aggregation.
-     * Verifies that in both cases, the operation succeeds and returns the _id values in
-     * 'expectedIds', in order.
+     * Runs the near described by 'nearParams' as a $geoNear aggregation and verifies that the
+     * operation returns the _id values in 'expectedIds', in order.
      */
     function assertGeoNearSucceedsAndReturnsIds(nearParams, expectedIds) {
-        let cmdResult = assert.commandWorked(coll.runCommand("geoNear", nearParams));
         let aggResult = assert.commandWorked(runNearAgg(nearParams));
+        let res = aggResult.cursor.firstBatch;
+        let errfn = () => `expected ids ${tojson(expectedIds)}, but these documents were ` +
+            `returned: ${tojson(res)}`;
+
+        assert.eq(expectedIds.length, res.length, errfn);
         for (let i = 0; i < expectedIds.length; i++) {
-            assert.eq(expectedIds[i], cmdResult.results[i].obj._id);
-            assert.eq(expectedIds[i], aggResult.cursor.firstBatch[i]._id);
+            assert.eq(expectedIds[i], aggResult.cursor.firstBatch[i]._id, errfn);
         }
     }
 
-    // Verify that the geoNear fails when the key field is not a string.
+    // Verify that $geoNear fails when the key field is not a string.
     assertGeoNearFails({near: [0, 0], key: 1}, ErrorCodes.TypeMismatch);
 
-    // Verify that the geoNear fails when the key field the empty string.
+    // Verify that $geoNear fails when the key field the empty string.
     assertGeoNearFails({near: [0, 0], key: ""}, ErrorCodes.BadValue);
 
-    // Verify that geoNear fails when there are no eligible indexes.
+    // Verify that $geoNear fails when there are no eligible indexes.
     assertGeoNearFails({near: [0, 0]}, ErrorCodes.IndexNotFound);
+
+    // Verify that the query system raises an error when an index is specified that doesn't exist.
     assertGeoNearFails({near: [0, 0], key: "a"}, ErrorCodes.BadValue);
 
     // Create a number of 2d and 2dsphere indexes.
@@ -67,7 +70,7 @@
     assert.commandWorked(coll.createIndex({"b.c": "2d"}));
     assert.commandWorked(coll.createIndex({"b.d": "2dsphere"}));
 
-    // Verify that geoNear fails when the index to use is ambiguous because of the absence of the
+    // Verify that $geoNear fails when the index to use is ambiguous because of the absence of the
     // key field.
     assertGeoNearFails({near: [0, 0]}, ErrorCodes.IndexNotFound);
 
@@ -85,12 +88,12 @@
     assertGeoNearSucceedsAndReturnsIds(
         {near: {type: "Point", coordinates: [0, 0]}, spherical: true, key: "a"}, [0, 1]);
 
-    // Verify that geoNear fails when a GeoJSON point is used with a 'key' path that only has a 2d
+    // Verify that $geoNear fails when a GeoJSON point is used with a 'key' path that only has a 2d
     // index. GeoJSON points can only be used for spherical geometry.
     assertGeoNearFails({near: {type: "Point", coordinates: [0, 0]}, key: "b.c"},
                        ErrorCodes.BadValue);
 
-    // Verify that geoNear fails when:
+    // Verify that $geoNear fails when:
     //  -- The only index available over the 'key' path is 2dsphere.
     //  -- spherical=false.
     //  -- The search point is a legacy coordinate pair.

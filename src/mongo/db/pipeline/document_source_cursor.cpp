@@ -63,6 +63,10 @@ DocumentSource::GetNextResult DocumentSourceCursor::getNext() {
     return std::move(out);
 }
 
+Document DocumentSourceCursor::transformBSONObjToDocument(const BSONObj& obj) const {
+    return _dependencies ? _dependencies->extractFields(obj) : Document::fromBsonWithMetaData(obj);
+}
+
 void DocumentSourceCursor::loadBatch() {
     if (!_exec || _exec->isDisposed()) {
         // No more documents.
@@ -85,10 +89,8 @@ void DocumentSourceCursor::loadBatch() {
             while ((state = _exec->getNext(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
                 if (_shouldProduceEmptyDocs) {
                     _currentBatch.push_back(Document());
-                } else if (_dependencies) {
-                    _currentBatch.push_back(_dependencies->extractFields(resultObj));
                 } else {
-                    _currentBatch.push_back(Document::fromBsonWithMetaData(resultObj));
+                    _currentBatch.push_back(transformBSONObjToDocument(resultObj));
                 }
 
                 if (_limit) {
@@ -302,6 +304,8 @@ DocumentSourceCursor::DocumentSourceCursor(
       _docsAddedToBatches(0),
       _exec(std::move(exec)),
       _outputSorts(_exec->getOutputSorts()) {
+    // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
+    _exec->saveState();
 
     _planSummary = Explain::getPlanSummary(_exec.get());
     recordPlanSummaryStats();

@@ -37,8 +37,9 @@
     assertFailsWithInternalError(() => coll.deleteOne({_id: 1}));
     assertFailsWithInternalError(() => coll.count({_id: 1}));
     assertFailsWithInternalError(() => coll.aggregate([]).itcount());
+    assertFailsWithInternalError(
+        () => coll.aggregate([{$geoNear: {near: [0, 0], distanceField: "d"}}]).itcount());
     assertCmdFailsWithInternalError({distinct: coll.getName(), key: "_id"});
-    assertCmdFailsWithInternalError({geoNear: coll.getName(), near: [0, 0]});
     assertCmdFailsWithInternalError(
         {findAndModify: coll.getName(), query: {_id: 1}, update: {$set: {x: 2}}});
 

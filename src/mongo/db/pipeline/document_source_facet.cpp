@@ -276,11 +276,17 @@ DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* 
         deps->vars.insert(subDepsTracker.vars.begin(), subDepsTracker.vars.end());
 
         deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
-        deps->setNeedTextScore(deps->getNeedTextScore() || subDepsTracker.getNeedTextScore());
+
+        // The text score is the only type of metadata that could be needed by $facet.
+        deps->setNeedsMetadata(
+            DepsTracker::MetadataType::TEXT_SCORE,
+            deps->getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE) ||
+                subDepsTracker.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
 
         // If there are variables defined at this stage's scope, there may be dependencies upon
         // them in subsequent pipelines. Keep enumerating.
-        if (deps->needWholeDocument && deps->getNeedTextScore() && !scopeHasVariables) {
+        if (deps->needWholeDocument &&
+            deps->getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE) && !scopeHasVariables) {
             break;
         }
     }

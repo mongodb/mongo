@@ -26,7 +26,6 @@
         "count",
         "distinct",
         "find",
-        "geoNear",
         "geoSearch",
         "parallelCollectionScan",
     ]);

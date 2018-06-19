@@ -41,9 +41,20 @@
 
         assert.commandWorked(db[coll].ensureIndex({loc: indexType}));
 
-        assert.commandWorked(
-            db.runCommand({geoNear: coll, near: [0, 0], spherical: true, includeLocs: true}),
-            tojson({sharded: sharded, indexType: indexType}));
+        let res = assert.commandWorked(db.runCommand({
+            aggregate: coll,
+            cursor: {},
+            pipeline: [{
+                $geoNear: {
+                    near: [0, 0],
+                    spherical: true,
+                    includeLocs: "match",
+                    distanceField: "dist",
+                }
+            }]
+        }),
+                                       tojson({sharded: sharded, indexType: indexType}));
+        assert.gt(res.cursor.firstBatch.length, 0, tojson(res));
     }
 
     // TODO: SERVER-33954 Remove shardAsReplicaSet: false

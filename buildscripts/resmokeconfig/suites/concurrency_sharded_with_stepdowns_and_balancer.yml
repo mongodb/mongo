@@ -37,10 +37,6 @@ selector:
   - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
   - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
 
-  # Disabled due to SERVER-13364, 'The geoNear command doesn't handle shard versioning, so a
-  # concurrent chunk migration may cause duplicate or missing results'
-  - jstests/concurrency/fsm_workloads/yield_geo_near_dedup.js
-
   # Disabled due to MongoDB restrictions and/or workload restrictions
 
   # These workloads sometimes trigger 'Could not lock auth data update lock'
@@ -158,7 +154,6 @@ selector:
   - jstests/concurrency/fsm_workloads/update_multifield_multiupdate.js
   - jstests/concurrency/fsm_workloads/update_multifield_multiupdate_noindex.js
   - jstests/concurrency/fsm_workloads/update_ordered_bulk_inc.js
-  - jstests/concurrency/fsm_workloads/yield_geo_near.js
   - jstests/concurrency/fsm_workloads/yield_id_hack.js
 
   # Uses non retryable commands.
@@ -181,6 +176,7 @@ selector:
   exclude_with_any_tags:
   - uses_transactions
   - requires_replication
+  - requires_non_retryable_writes
 
 executor:
   archive:

@@ -7,8 +7,11 @@ t.ensureIndex({loc: "2d"});
 // should match no points in the dataset.
 dists = [.49, .51, 1.0];
 for (idx in dists) {
-    b = db.runCommand({geoNear: "geod", near: [1, 0], num: 2, maxDistance: dists[idx]});
-    assert.eq(b.errmsg, undefined, "A" + idx);
-    l = b.results.length;
-    assert.eq(l, idx, "B" + idx);
+    b = db.geod
+            .aggregate([
+                {$geoNear: {near: [1, 0], distanceField: "d", maxDistance: dists[idx]}},
+                {$limit: 2},
+            ])
+            .toArray();
+    assert.eq(b.length, idx, "B" + idx);
 }

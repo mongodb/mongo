@@ -16,8 +16,6 @@ assert.eq(t.count(), n - 1);
 
 t.ensureIndex({loc: "2d"});
 
-fast = db.runCommand({geoNear: t.getName(), near: [50, 50], num: 10});
-
 function a(cur) {
     var total = 0;
     var outof = 0;
@@ -29,9 +27,7 @@ function a(cur) {
     return total / outof;
 }
 
-assert.close(fast.stats.avgDistance, a(t.find({loc: {$near: [50, 50]}}).limit(10)), "B1");
 assert.close(1.33333, a(t.find({loc: {$near: [50, 50]}}).limit(3)), "B2");
-assert.close(fast.stats.avgDistance, a(t.find({loc: {$near: [50, 50]}}).limit(10)), "B3");
 
 printjson(t.find({loc: {$near: [50, 50]}}).explain());
 

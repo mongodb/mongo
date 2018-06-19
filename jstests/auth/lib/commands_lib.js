@@ -1719,6 +1719,35 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_geoNear",
+          command: {
+              aggregate: "coll",
+              cursor: {},
+              pipeline: [{$geoNear: {near: [50, 50], distanceField: "dist"}}]
+          },
+          setup: (db) => {
+              db.coll.drop();
+              assert.commandWorked(db.coll.createIndex({loc: "2d"}));
+              assert.commandWorked(db.coll.insert({loc: [45.32, 51.12]}));
+          },
+          teardown: (db) => {
+              db.coll.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_read,
+                privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ["find"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readAny,
+                privileges:
+                    [{resource: {db: secondDbName, collection: "coll"}, actions: ["find"]}]
+              },
+          ],
+        },
+        {
           testname: "buildInfo",
           command: {buildInfo: 1},
           testcases: [
@@ -3900,30 +3929,6 @@ var authCommandsLib = {
               },
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "geoNear",
-          command: {geoNear: "x", near: [50, 50], num: 1},
-          setup: function(db) {
-              db.x.drop();
-              db.x.save({loc: [50, 50]});
-              db.x.ensureIndex({loc: "2d"});
-          },
-          teardown: function(db) {
-              db.x.drop();
-          },
-          testcases: [
-              {
-                runOnDb: firstDbName,
-                roles: roles_read,
-                privileges: [{resource: {db: firstDbName, collection: "x"}, actions: ["find"]}]
-              },
-              {
-                runOnDb: secondDbName,
-                roles: roles_readAny,
-                privileges: [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
-              }
           ]
         },
         {

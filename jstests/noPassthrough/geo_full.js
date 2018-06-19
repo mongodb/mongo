@@ -500,8 +500,6 @@
                                             "poly.docIn": randYesQuery()
                                         }).count());
 
-        var defaultDocLimit = 100;
-
         // $near
         print("Near query...");
         assert.eq(
@@ -523,60 +521,38 @@
                           results.sphere.locsIn);
         }
 
-        // geoNear
-        // results limited by size of objects
-        if (data.maxLocs < defaultDocLimit) {
-            // GeoNear query
-            print("GeoNear query...");
-            // GeoNear command has a default doc limit 100.
-            assert.eq(
-                Math.min(defaultDocLimit, results.center.docsIn),
-                t.getDB()
-                    .runCommand(
-                        {geoNear: "testAllGeo", near: query.center, maxDistance: query.radius})
-                    .results.length,
-                "GeoNear query: center: " + query.center + "; radius: " + query.radius +
-                    "; docs: " + results.center.docsIn + "; locs: " + results.center.locsIn);
+        // $geoNear aggregation stage.
+        const aggregationLimit = 2 * results.center.docsIn;
+        if (aggregationLimit > 0) {
+            var output = t.aggregate([
+                              {
+                                $geoNear: {
+                                    near: query.center,
+                                    maxDistance: query.radius,
+                                    includeLocs: "pt",
+                                    distanceField: "dis",
+                                }
+                              },
+                              {$limit: aggregationLimit}
+                          ]).toArray();
 
-            var num = Math.min(2 * defaultDocLimit, 2 * results.center.docsIn);
+            const errmsg = {
+                limit: aggregationLimit,
+                center: query.center,
+                radius: query.radius,
+                docs: results.center.docsIn,
+                locs: results.center.locsIn,
+                actualResult: output
+            };
+            assert.eq(results.center.docsIn, output.length, tojson(errmsg));
 
-            var output = db.runCommand({
-                               geoNear: "testAllGeo",
-                               near: query.center,
-                               maxDistance: query.radius,
-                               includeLocs: true,
-                               num: num
-                           }).results;
-
-            assert.eq(Math.min(num, results.center.docsIn),
-                      output.length,
-                      "GeoNear query with limit of " + num + ": center: " + query.center +
-                          "; radius: " + query.radius + "; docs: " + results.center.docsIn +
-                          "; locs: " + results.center.locsIn);
-
-            var distance = 0;
+            let lastDistance = 0;
             for (var i = 0; i < output.length; i++) {
                 var retDistance = output[i].dis;
-                var retLoc = locArray(output[i].loc);
-
-                var arrLocs = locsArray(output[i].obj.locs);
-
-                assert.contains(retLoc, arrLocs);
-
-                var distInObj = false;
-                for (var j = 0; j < arrLocs.length && distInObj == false; j++) {
-                    var newDistance = Geo.distance(locArray(query.center), arrLocs[j]);
-                    distInObj = (newDistance >= retDistance - 0.0001 &&
-                                 newDistance <= retDistance + 0.0001);
-                }
-
-                assert(distInObj);
-                assert.between(retDistance - 0.0001,
-                               Geo.distance(locArray(query.center), retLoc),
-                               retDistance + 0.0001);
+                assert.close(retDistance, Geo.distance(locArray(query.center), output[i].pt));
                 assert.lte(retDistance, query.radius);
-                assert.gte(retDistance, distance);
-                distance = retDistance;
+                assert.gte(retDistance, lastDistance);
+                lastDistance = retDistance;
             }
         }
 

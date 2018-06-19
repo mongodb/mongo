@@ -69,12 +69,21 @@ public:
     enum class SplitState { kUnsplit, kSplitForShards, kSplitForMerge };
 
     /**
-     * List of supported match expression features in a pipeline.
+     * The list of default supported match expression features.
      */
     static constexpr MatchExpressionParser::AllowedFeatureSet kAllowedMatcherFeatures =
         MatchExpressionParser::AllowedFeatures::kText |
         MatchExpressionParser::AllowedFeatures::kExpr |
         MatchExpressionParser::AllowedFeatures::kJSONSchema;
+
+    /**
+     * The match expression features allowed when running a pipeline with $geoNear.
+     */
+    static constexpr MatchExpressionParser::AllowedFeatureSet kGeoNearMatcherFeatures =
+        MatchExpressionParser::AllowedFeatures::kText |
+        MatchExpressionParser::AllowedFeatures::kExpr |
+        MatchExpressionParser::AllowedFeatures::kJSONSchema |
+        MatchExpressionParser::AllowedFeatures::kGeoNear;
 
     /**
      * Parses a Pipeline from a vector of BSONObjs. Returns a non-OK status if it failed to parse.

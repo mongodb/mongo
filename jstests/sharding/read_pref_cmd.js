@@ -164,7 +164,6 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     testDB.user.ensureIndex({loc: '2d'});
     testDB.user.ensureIndex({position: 'geoHaystack', type: 1}, {bucketSize: 10});
     testDB.runCommand({getLastError: 1, w: NODE_COUNT});
-    cmdTest({geoNear: 'user', near: [1, 1]}, true, formatProfileQuery({geoNear: 'user'}));
 
     // Mongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
     if (!isMongos) {

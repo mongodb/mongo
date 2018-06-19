@@ -172,32 +172,38 @@
     }
 
     //
-    // $expr in geoNear.
+    // $expr in the $geoNear stage.
     //
 
     coll.drop();
     assert.writeOK(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}));
     assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
     assert.eq(1,
-              assert
-                  .commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {$expr: {$eq: ["$a", 0]}}
-                  }))
-                  .results.length);
-    assert.commandFailed(db.runCommand({
-        geoNear: coll.getName(),
-        near: {type: "Point", coordinates: [0, 0]},
-        spherical: true,
-        query: {$expr: {$eq: ["$a", "$$unbound"]}}
+              coll.aggregate({
+                      $geoNear: {
+                          near: {type: "Point", coordinates: [0, 0]},
+                          distanceField: "dist",
+                          spherical: true,
+                          query: {$expr: {$eq: ["$a", 0]}}
+                      }
+                  })
+                  .toArray()
+                  .length);
+    assert.throws(() => coll.aggregate({
+        $geoNear: {
+            near: {type: "Point", coordinates: [0, 0]},
+            distanceField: "dist",
+            spherical: true,
+            query: {$expr: {$eq: ["$a", "$$unbound"]}}
+        }
     }));
-    assert.commandFailed(db.runCommand({
-        geoNear: coll.getName(),
-        near: {type: "Point", coordinates: [0, 0]},
-        spherical: true,
-        query: {$expr: {$divide: [1, "$a"]}}
+    assert.throws(() => coll.aggregate({
+        $geoNear: {
+            near: {type: "Point", coordinates: [0, 0]},
+            distanceField: "dist",
+            spherical: true,
+            query: {$expr: {$divide: [1, "$a"]}}
+        }
     }));
 
     //

@@ -143,14 +143,5 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
-    // TODO SERVER-33712: Add snapshot support for geoNear on mongos.
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        geoNear: collName,
-        near: [0, 0],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
-
     st.stop();
 }());

@@ -35,86 +35,120 @@ namespace mongo {
 
 class DocumentSourceGeoNear : public DocumentSource, public NeedsMergerDocumentSource {
 public:
-    static const long long kDefaultLimit;
-
     static constexpr StringData kKeyFieldName = "key"_sd;
+    static constexpr auto kStageName = "$geoNear";
 
-    // virtuals from DocumentSource
-    GetNextResult getNext() final;
-    const char* getSourceName() const final;
     /**
-     * Attempts to combine with a subsequent limit stage, setting the internal limit field
-     * as a result.
+     * Only exposed for testing.
      */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
+    static boost::intrusive_ptr<DocumentSourceGeoNear> create(
+        const boost::intrusive_ptr<ExpressionContext>&);
+
+    const char* getSourceName() const final {
+        return kStageName;
+    }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kFirst,
-                                     HostTypeRequirement::kAnyShard,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed,
-                                     TransactionRequirement::kAllowed);
+        return {StreamType::kStreaming,
+                PositionRequirement::kFirst,
+                HostTypeRequirement::kAnyShard,
+                DiskUseRequirement::kNoDiskUse,
+                FacetRequirement::kNotAllowed,
+                TransactionRequirement::kAllowed};
+    }
 
-        constraints.requiresInputDocSource = false;
-        return constraints;
+    /**
+     * DocumentSourceGeoNear should always be replaced by a DocumentSourceGeoNearCursor before
+     * executing a pipeline, so this method should never be called.
+     */
+    GetNextResult getNext() final {
+        MONGO_UNREACHABLE;
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    BSONObjSet getOutputSorts() final {
-        return SimpleBSONObjComparator::kInstance.makeBSONObjSet(
-            {BSON(distanceField->fullPath() << -1)});
-    }
-
-    // Virtuals for NeedsMergerDocumentSource
-    boost::intrusive_ptr<DocumentSource> getShardSource() final;
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
-    static char geoNearName[];
-
-    long long getLimit() {
-        return limit;
-    }
-
+    /**
+     * A query predicate to apply to the documents in addition to the "near" predicate.
+     */
     BSONObj getQuery() const {
         return query;
     };
 
-    // this should only be used for testing
-    static boost::intrusive_ptr<DocumentSourceGeoNear> create(
-        const boost::intrusive_ptr<ExpressionContext>& pCtx);
+    /**
+     * The field in which the computed distance will be stored.
+     */
+    FieldPath getDistanceField() const {
+        return *distanceField;
+    }
+
+    /**
+     * The field in which the matching point will be stored, if requested.
+     */
+    boost::optional<FieldPath> getLocationField() const {
+        return includeLocs;
+    }
+
+    /**
+     * The field over which to apply the "near" predicate, if specified.
+     */
+    boost::optional<FieldPath> getKeyField() const {
+        return keyFieldPath;
+    }
+
+    /**
+     * A scaling factor to apply to the distance, if specified by the user.
+     */
+    boost::optional<double> getDistanceMultiplier() const {
+        return distanceMultiplier;
+    }
+
+    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+
+    /**
+     * Returns true if the $geoNear specification requires the geoNear point metadata.
+     */
+    bool needsGeoNearPoint() const;
+
+    /**
+     * Converts this $geoNear aggregation stage into an equivalent $near or $nearSphere query on
+     * 'nearFieldName'.
+     */
+    BSONObj asNearQuery(StringData nearFieldName) const;
+
+    /**
+     * This document source is sent as-is to the shards.
+     */
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return this;
+    }
+
+    /**
+     * In a sharded cluster, this becomes a merge sort by distance, from nearest to furthest.
+     */
+    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final;
 
 private:
     explicit DocumentSourceGeoNear(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    /**
+     * Parses the fields in the object 'options', throwing if an error occurs.
+     */
     void parseOptions(BSONObj options);
-    BSONObj buildGeoNearCmd() const;
-    void runCommand();
 
     // These fields describe the command to run.
-    // coords and distanceField are required, rest are optional
+    // 'coords' and 'distanceField' are required; the rest are optional.
     BSONObj coords;  // "near" option, but near is a reserved keyword on windows
     bool coordsIsArray;
     std::unique_ptr<FieldPath> distanceField;  // Using unique_ptr because FieldPath can't be empty
-    long long limit;
-    double maxDistance;
-    double minDistance;
     BSONObj query;
     bool spherical;
-    double distanceMultiplier;
-    std::unique_ptr<FieldPath> includeLocs;
-
-    // The field path over which the command should run, extracted from the 'key' parameter passed
-    // by the user. Or the empty string the user did not provide a 'key'.
-    std::string keyFieldPath;
-
-    // these fields are used while processing the results
-    BSONObj cmdOutput;
-    std::unique_ptr<BSONObjIterator> resultsIterator;  // iterator over cmdOutput["results"]
+    boost::optional<double> maxDistance;
+    boost::optional<double> minDistance;
+    boost::optional<double> distanceMultiplier;
+    boost::optional<FieldPath> includeLocs;
+    boost::optional<FieldPath> keyFieldPath;
 };
-
 }  // namespace mongo

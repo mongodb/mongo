@@ -93,6 +93,8 @@ public:
     static constexpr StringData metaFieldTextScore = "$textScore"_sd;
     static constexpr StringData metaFieldRandVal = "$randVal"_sd;
     static constexpr StringData metaFieldSortKey = "$sortKey"_sd;
+    static constexpr StringData metaFieldGeoNearDistance = "$dis"_sd;
+    static constexpr StringData metaFieldGeoNearPoint = "$pt"_sd;
 
     static const std::vector<StringData> allMetadataFieldNames;
 
@@ -264,6 +266,20 @@ public:
     }
     BSONObj getSortKeyMetaField() const {
         return storage().getSortKeyMetaField();
+    }
+
+    bool hasGeoNearDistance() const {
+        return storage().hasGeoNearDistance();
+    }
+    double getGeoNearDistance() const {
+        return storage().getGeoNearDistance();
+    }
+
+    bool hasGeoNearPoint() const {
+        return storage().hasGeoNearPoint();
+    }
+    Value getGeoNearPoint() const {
+        return storage().getGeoNearPoint();
     }
 
     /// members for Sorter
@@ -516,6 +532,14 @@ public:
 
     void setSortKeyMetaField(BSONObj sortKey) {
         storage().setSortKeyMetaField(sortKey);
+    }
+
+    void setGeoNearDistance(double dist) {
+        storage().setGeoNearDistance(dist);
+    }
+
+    void setGeoNearPoint(Value point) {
+        storage().setGeoNearPoint(std::move(point));
     }
 
     /** Convert to a read-only document and release reference.

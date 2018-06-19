@@ -13,7 +13,7 @@
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
     st.ensurePrimaryShard(testDB.getName(), st.shard1.shardName);
 
-    // Create a collection sharded on {a: 1}. Add 2dsphere index to test geoNear.
+    // Create a collection sharded on {a: 1}. Add 2dsphere index to test $geoNear.
     var coll = testDB.getCollection("simple_collation");
     coll.drop();
     assert.commandWorked(coll.createIndex({a: 1}));
@@ -38,7 +38,7 @@
     // st.shard0.shardName: {a: 1}
     // st.shard1.shardName: {a: 100}, {a: "FOO"}
     // shard0002: {a: "foo"}
-    // Include geo field to test geoNear.
+    // Include geo field to test $geoNear.
     var a_1 = {_id: 0, a: 1, geo: {type: "Point", coordinates: [0, 0]}};
     var a_100 = {_id: 1, a: 100, geo: {type: "Point", coordinates: [0, 0]}};
     var a_FOO = {_id: 2, a: "FOO", geo: {type: "Point", coordinates: [0, 0]}};
@@ -67,6 +67,46 @@
     // single-shard.
     assert.eq(1, coll.aggregate([{$match: {a: 100}}], {collation: caseInsensitive}).itcount());
     explain = coll.explain().aggregate([{$match: {a: 100}}], {collation: caseInsensitive});
+    assert.commandWorked(explain);
+    assert.eq(1, Object.keys(explain.shards).length);
+
+    // Aggregate with $geoNear.
+    const geoJSONPoint = {type: "Point", coordinates: [0, 0]};
+
+    // Test $geoNear with a query on strings with a non-simple collation. This should
+    // scatter-gather.
+    const geoNearStageStringQuery = [{
+        $geoNear: {
+            near: geoJSONPoint,
+            distanceField: "dist",
+            spherical: true,
+            query: {a: "foo"},
+        }
+    }];
+    assert.eq(2, coll.aggregate(geoNearStageStringQuery, {collation: caseInsensitive}).itcount());
+    explain = coll.explain().aggregate(geoNearStageStringQuery, {collation: caseInsensitive});
+    assert.commandWorked(explain);
+    assert.eq(3, Object.keys(explain.shards).length);
+
+    // Test $geoNear with a query on strings with a simple collation. This should be single-shard.
+    assert.eq(1, coll.aggregate(geoNearStageStringQuery).itcount());
+    explain = coll.explain().aggregate(geoNearStageStringQuery);
+    assert.commandWorked(explain);
+    assert.eq(1, Object.keys(explain.shards).length);
+
+    // Test a $geoNear with a query on numbers with a non-simple collation. This should be
+    // single-shard.
+    const geoNearStageNumericalQuery = [{
+        $geoNear: {
+            near: geoJSONPoint,
+            distanceField: "dist",
+            spherical: true,
+            query: {a: 100},
+        }
+    }];
+    assert.eq(1,
+              coll.aggregate(geoNearStageNumericalQuery, {collation: caseInsensitive}).itcount());
+    explain = coll.explain().aggregate(geoNearStageNumericalQuery, {collation: caseInsensitive});
     assert.commandWorked(explain);
     assert.eq(1, Object.keys(explain.shards).length);
 
@@ -167,31 +207,6 @@
         {query: {a: 100}, update: {$set: {b: 1}}, collation: caseInsensitive});
     assert.commandWorked(explain);
     assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
-
-    // GeoNear.
-
-    // Test geoNear on strings with a non-simple collation.
-    assert.eq(2,
-              assert
-                  .commandWorked(testDB.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {a: "foo"},
-                      collation: caseInsensitive
-                  }))
-                  .results.length);
-
-    // Test geoNear on strings with a simple collation.
-    assert.eq(1,
-              assert
-                  .commandWorked(testDB.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {a: "foo"}
-                  }))
-                  .results.length);
 
     // MapReduce.
 

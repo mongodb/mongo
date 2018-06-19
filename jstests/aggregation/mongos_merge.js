@@ -205,7 +205,8 @@
         assertMergeOnMongoS({
             testName: "agg_mongos_merge_geo_near",
             pipeline: [
-                {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true, limit: 300}}
+                {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}},
+                {$limit: 300}
             ],
             allowDiskUse: allowDiskUse,
             expectedCount: 300
@@ -409,7 +410,7 @@
     assertMergeOnMongoS({
         testName: "agg_mongos_merge_all_mongos_runnable_stages",
         pipeline: [
-            {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true, limit: 400}},
+            {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}},
             {$sort: {a: 1}},
             {$skip: 150},
             {$limit: 150},

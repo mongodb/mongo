@@ -80,6 +80,49 @@
     assert.commandWorked(explain);
     assert.eq(1, Object.keys(explain.shards).length);
 
+    // Aggregate with $geoNear.
+    const geoJSONPoint = {type: "Point", coordinates: [0, 0]};
+
+    // Test $geoNear with a query on strings with a non-simple collation inherited from the
+    // collection default. This should scatter-gather.
+    const geoNearStageStringQuery = [{
+        $geoNear: {
+            near: geoJSONPoint,
+            distanceField: "dist",
+            spherical: true,
+            query: {a: "foo"},
+        }
+    }];
+    assert.eq(2, collCaseInsensitive.aggregate(geoNearStageStringQuery).itcount());
+    explain = collCaseInsensitive.explain().aggregate(geoNearStageStringQuery);
+    assert.commandWorked(explain);
+    assert.eq(3, Object.keys(explain.shards).length);
+
+    // Test $geoNear with a query on strings with a simple collation. This should be single-shard.
+    assert.eq(
+        1,
+        collCaseInsensitive.aggregate(geoNearStageStringQuery, {collation: {locale: "simple"}})
+            .itcount());
+    explain = collCaseInsensitive.explain().aggregate(geoNearStageStringQuery,
+                                                      {collation: {locale: "simple"}});
+    assert.commandWorked(explain);
+    assert.eq(1, Object.keys(explain.shards).length);
+
+    // Test a $geoNear with a query on numbers with a non-simple collation inherited from the
+    // collection default. This should be single-shard.
+    const geoNearStageNumericalQuery = [{
+        $geoNear: {
+            near: geoJSONPoint,
+            distanceField: "dist",
+            spherical: true,
+            query: {a: 100},
+        }
+    }];
+    assert.eq(1, collCaseInsensitive.aggregate(geoNearStageNumericalQuery).itcount());
+    explain = collCaseInsensitive.explain().aggregate(geoNearStageNumericalQuery);
+    assert.commandWorked(explain);
+    assert.eq(1, Object.keys(explain.shards).length);
+
     // Count.
 
     // Test a count command on strings with a non-simple collation inherited from the collection
@@ -183,31 +226,6 @@
         collCaseInsensitive.explain().findAndModify({query: {a: 100}, update: {$set: {b: 1}}});
     assert.commandWorked(explain);
     assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
-
-    // GeoNear.
-
-    // Test geoNear on strings with a non-simple collation inherited from collection default.
-    assert.eq(2,
-              assert
-                  .commandWorked(testDB.runCommand({
-                      geoNear: collCaseInsensitive.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {a: "foo"}
-                  }))
-                  .results.length);
-
-    // Test geoNear on strings with a simple collation.
-    assert.eq(1,
-              assert
-                  .commandWorked(testDB.runCommand({
-                      geoNear: collCaseInsensitive.getName(),
-                      near: {type: "Point", coordinates: [0, 0]},
-                      spherical: true,
-                      query: {a: "foo"},
-                      collation: {locale: "simple"}
-                  }))
-                  .results.length);
 
     // MapReduce.
 

@@ -43,14 +43,17 @@ namespace mongo {
 /**
  * Constructs and returns Documents from the BSONObj objects produced by a supplied PlanExecutor.
  */
-class DocumentSourceCursor final : public DocumentSource {
+class DocumentSourceCursor : public DocumentSource {
 public:
     // virtuals from DocumentSource
     GetNextResult getNext() final;
-    const char* getSourceName() const final;
-    BSONObjSet getOutputSorts() final {
+
+    const char* getSourceName() const override;
+
+    BSONObjSet getOutputSorts() override {
         return _outputSorts;
     }
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -150,6 +153,12 @@ public:
     }
 
 protected:
+    DocumentSourceCursor(Collection* collection,
+                         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    ~DocumentSourceCursor();
+
     /**
      * Disposes of '_exec' if it hasn't been disposed already. This involves taking a collection
      * lock.
@@ -162,12 +171,15 @@ protected:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
 
-private:
-    DocumentSourceCursor(Collection* collection,
-                         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-    ~DocumentSourceCursor();
+    /**
+     * If '_shouldProduceEmptyDocs' is false, this function hook is called on each 'obj' returned by
+     * '_exec' when loading a batch and returns a Document to be added to '_currentBatch'.
+     *
+     * The default implementation is a dependency-aware BSONObj-to-Document transformation.
+     */
+    virtual Document transformBSONObjToDocument(const BSONObj& obj) const;
 
+private:
     /**
      * Acquires the appropriate locks, then destroys and de-registers '_exec'. '_exec' must be
      * non-null.
@@ -180,12 +192,14 @@ private:
     void cleanupExecutor(const AutoGetCollectionForRead& readLock);
 
     /**
-     * Reads a batch of data from '_exec'.
+     * Reads a batch of data from '_exec'. Subclasses can specify custom behavior to be performed on
+     * each document by overloading transformBSONObjToDocument().
      */
     void loadBatch();
 
     void recordPlanSummaryStats();
 
+    // Batches results returned from the underlying PlanExecutor.
     std::deque<Document> _currentBatch;
 
     // BSONObj members must outlive _projection and cursor.

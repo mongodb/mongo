@@ -189,7 +189,8 @@ public:
           _hashTabMask(0),
           _metaFields(),
           _textScore(0),
-          _randVal(0) {}
+          _randVal(0),
+          _geoNearDistance(0) {}
 
     ~DocumentStorage();
 
@@ -197,7 +198,10 @@ public:
         TEXT_SCORE,
         RAND_VAL,
         SORT_KEY,
+        GEONEAR_DIST,
+        GEONEAR_POINT,
 
+        // New fields must be added before the NUM_FIELDS sentinel.
         NUM_FIELDS
     };
 
@@ -284,6 +288,12 @@ public:
         if (source.hasSortKeyMetaField()) {
             setSortKeyMetaField(source.getSortKeyMetaField());
         }
+        if (source.hasGeoNearDistance()) {
+            setGeoNearDistance(source.getGeoNearDistance());
+        }
+        if (source.hasGeoNearPoint()) {
+            setGeoNearPoint(source.getGeoNearPoint());
+        }
     }
 
     bool hasTextScore() const {
@@ -317,6 +327,28 @@ public:
     void setSortKeyMetaField(BSONObj sortKey) {
         _metaFields.set(MetaType::SORT_KEY);
         _sortKey = sortKey.getOwned();
+    }
+
+    bool hasGeoNearDistance() const {
+        return _metaFields.test(MetaType::GEONEAR_DIST);
+    }
+    double getGeoNearDistance() const {
+        return _geoNearDistance;
+    }
+    void setGeoNearDistance(double dist) {
+        _metaFields.set(MetaType::GEONEAR_DIST);
+        _geoNearDistance = dist;
+    }
+
+    bool hasGeoNearPoint() const {
+        return _metaFields.test(MetaType::GEONEAR_POINT);
+    }
+    Value getGeoNearPoint() const {
+        return _geoNearPoint;
+    }
+    void setGeoNearPoint(Value point) {
+        _metaFields.set(MetaType::GEONEAR_POINT);
+        _geoNearPoint = std::move(point);
     }
 
 private:
@@ -401,6 +433,8 @@ private:
     double _textScore;
     double _randVal;
     BSONObj _sortKey;
+    double _geoNearDistance;
+    Value _geoNearPoint;
     // When adding a field, make sure to update clone() method
 
     // Defined in document.cpp

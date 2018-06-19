@@ -14,7 +14,6 @@
         "dbStats",
         "distinct",
         "find",
-        "geoNear",
         "geoSearch",
         "mapReduce",
         "mapreduce",

@@ -1,6 +1,5 @@
-// Test $minDistance option for $near and $nearSphere queries, and geoNear command. SERVER-9395.
-//
-// @tags: [requires_fastcount]
+// Test $minDistance option for $near and $nearSphere queries, and the $geoNear aggregation stage.
+// @tags: [requires_fastcount, requires_getmore]
 
 (function() {
     "use strict";
@@ -24,16 +23,20 @@
      * the existing $maxDistance option to test the newer $minDistance option's behavior.
      */
     function n_docs_within(radius_km) {
-        // geoNear's distances are in meters for geoJSON points.
-        var cmdResult = db.runCommand({
-            geoNear: t.getName(),
-            near: {type: 'Point', coordinates: [0, 0]},
-            spherical: true,
-            maxDistance: radius_km * km,
-            num: 1000
-        });
-
-        return cmdResult.results.length;
+        // $geoNear's distances are in meters for geoJSON points.
+        return t
+            .aggregate([
+                {
+                  $geoNear: {
+                      near: {type: 'Point', coordinates: [0, 0]},
+                      distanceField: "dis",
+                      spherical: true,
+                      maxDistance: radius_km * km,
+                  }
+                },
+                {$limit: 1000}
+            ])
+            .itcount();
     }
 
     //
@@ -133,62 +136,68 @@
             n_bw500_and_1000_count);
 
     //
-    // Test geoNear command with GeoJSON point. Distances are in meters.
+    // Test $geoNear aggregation stage with GeoJSON point. Distances are in meters.
     //
 
-    var cmdResult = db.runCommand({
-        geoNear: t.getName(),
-        near: {type: 'Point', coordinates: [0, 0]},
-        minDistance: 1400 * km,
-        spherical: true  // spherical required for 2dsphere index
-    });
+    let geoNearCount = t.aggregate({
+                            $geoNear: {
+                                near: {type: 'Point', coordinates: [0, 0]},
+                                minDistance: 1400 * km,
+                                spherical: true,
+                                distanceField: "d",
+                            }
+                        }).itcount();
     assert.eq(n_docs - n_docs_within(1400),
-              cmdResult.results.length,
+              geoNearCount,
               "Expected " + (n_docs - n_docs_within(1400)) +
-                  " points geoNear (0, 0) with $minDistance 1400 km, got " +
-                  cmdResult.results.length);
+                  " points geoNear (0, 0) with $minDistance 1400 km, got " + geoNearCount);
 
-    cmdResult = db.runCommand({
-        geoNear: t.getName(),
-        near: {type: 'Point', coordinates: [0, 0]},
-        minDistance: 500 * km,
-        maxDistance: 1000 * km,
-        spherical: true
-    });
+    geoNearCount = t.aggregate({
+                        $geoNear: {
+                            near: {type: 'Point', coordinates: [0, 0]},
+                            minDistance: 500 * km,
+                            maxDistance: 1000 * km,
+                            spherical: true,
+                            distanceField: "d",
+                        }
+                    }).itcount();
     assert.eq(n_docs_within(1000) - n_docs_within(500),
-              cmdResult.results.length,
+              geoNearCount,
               "Expected " + (n_docs_within(1000) - n_docs_within(500)) +
                   " points geoNear (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got " +
-                  cmdResult.results.length);
+                  geoNearCount);
 
     //
-    // Test geoNear command with legacy point. Distances are in radians.
+    // Test $geoNear aggregation stage with legacy point. Distances are in radians.
     //
 
-    cmdResult = db.runCommand({
-        geoNear: t.getName(),
-        near: legacyPoint,
-        minDistance: metersToRadians(1400 * km),
-        spherical: true  // spherical required for 2dsphere index
-    });
+    geoNearCount = t.aggregate({
+                        $geoNear: {
+                            near: legacyPoint,
+                            minDistance: metersToRadians(1400 * km),
+                            spherical: true,
+                            distanceField: "d",
+                        }
+                    }).itcount();
     assert.eq(n_docs - n_docs_within(1400),
-              cmdResult.results.length,
+              geoNearCount,
               "Expected " + (n_docs - n_docs_within(1400)) +
-                  " points geoNear (0, 0) with $minDistance 1400 km, got " +
-                  cmdResult.results.length);
+                  " points geoNear (0, 0) with $minDistance 1400 km, got " + geoNearCount);
 
-    cmdResult = db.runCommand({
-        geoNear: t.getName(),
-        near: legacyPoint,
-        minDistance: metersToRadians(500 * km),
-        maxDistance: metersToRadians(1000 * km),
-        spherical: true
-    });
+    geoNearCount = t.aggregate({
+                        $geoNear: {
+                            near: legacyPoint,
+                            minDistance: metersToRadians(500 * km),
+                            maxDistance: metersToRadians(1000 * km),
+                            spherical: true,
+                            distanceField: "d",
+                        }
+                    }).itcount();
     assert.eq(n_docs_within(1000) - n_docs_within(500),
-              cmdResult.results.length,
+              geoNearCount,
               "Expected " + (n_docs_within(1000) - n_docs_within(500)) +
                   " points geoNear (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got " +
-                  cmdResult.results.length);
+                  geoNearCount);
 
     t.drop();
     assert.commandWorked(t.createIndex({loc: "2d"}));
@@ -204,32 +213,42 @@
     assert.eq(3, t.find({loc: {$nearSphere: [0, 0]}}).itcount());
     assert.eq(1, t.find({loc: {$nearSphere: [0, 0], $minDistance: deg2rad(41.5)}}).itcount());
 
-    // Test minDistance for 2d index with geoNear command and spherical=false.
-    cmdResult = db.runCommand({geoNear: t.getName(), near: [0, 0], spherical: false});
-    assert.commandWorked(cmdResult);
-    assert.eq(3, cmdResult.results.length);
-    assert.eq(40, cmdResult.results[0].dis);
-    assert.eq(41, cmdResult.results[1].dis);
-    assert.eq(42, cmdResult.results[2].dis);
+    // Test minDistance for 2d index with $geoNear stage and spherical=false.
+    let cmdResult =
+        t.aggregate({$geoNear: {near: [0, 0], spherical: false, distanceField: "dis"}}).toArray();
+    assert.eq(3, cmdResult.length);
+    assert.eq(40, cmdResult[0].dis);
+    assert.eq(41, cmdResult[1].dis);
+    assert.eq(42, cmdResult[2].dis);
 
-    cmdResult =
-        db.runCommand({geoNear: t.getName(), near: [0, 0], minDistance: 41.5, spherical: false});
-    assert.commandWorked(cmdResult);
-    assert.eq(1, cmdResult.results.length);
-    assert.eq(42, cmdResult.results[0].dis);
+    cmdResult = t.aggregate({
+                     $geoNear: {
+                         near: [0, 0],
+                         minDistance: 41.5,
+                         spherical: false,
+                         distanceField: "dis",
+                     }
+                 }).toArray();
+    assert.eq(1, cmdResult.length);
+    assert.eq(42, cmdResult[0].dis);
 
-    // Test minDistance for 2d index with geoNear command and spherical=true. Distances are in
+    // Test minDistance for 2d index with $geoNear stage and spherical=true. Distances are in
     // radians.
-    cmdResult = db.runCommand({geoNear: t.getName(), near: [0, 0], spherical: true});
-    assert.commandWorked(cmdResult);
-    assert.eq(3, cmdResult.results.length);
-    assertApproxEqual(deg2rad(40), cmdResult.results[0].dis, 1e-3);
-    assertApproxEqual(deg2rad(41), cmdResult.results[1].dis, 1e-3);
-    assertApproxEqual(deg2rad(42), cmdResult.results[2].dis, 1e-3);
+    cmdResult =
+        t.aggregate({$geoNear: {near: [0, 0], spherical: true, distanceField: "dis"}}).toArray();
+    assert.eq(3, cmdResult.length);
+    assertApproxEqual(deg2rad(40), cmdResult[0].dis, 1e-3);
+    assertApproxEqual(deg2rad(41), cmdResult[1].dis, 1e-3);
+    assertApproxEqual(deg2rad(42), cmdResult[2].dis, 1e-3);
 
-    cmdResult = db.runCommand(
-        {geoNear: t.getName(), near: [0, 0], minDistance: deg2rad(41.5), spherical: true});
-    assert.commandWorked(cmdResult);
-    assert.eq(1, cmdResult.results.length);
-    assertApproxEqual(deg2rad(42), cmdResult.results[0].dis, 1e-3);
+    cmdResult = t.aggregate({
+                     $geoNear: {
+                         near: [0, 0],
+                         minDistance: deg2rad(41.5),
+                         spherical: true,
+                         distanceField: "dis",
+                     }
+                 }).toArray();
+    assert.eq(1, cmdResult.length);
+    assertApproxEqual(deg2rad(42), cmdResult[0].dis, 1e-3);
 }());

@@ -126,11 +126,17 @@
     // TODO SERVER-24705: createIndex is not currently counted in Top.
     lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 0);
 
-    // GeoNear
+    // $geoNear aggregation stage
     assert.commandWorked(testDB.runCommand({
-        geoNear: testColl.getName(),
-        near: {type: "Point", coordinates: [0, 0]},
-        spherical: true
+        aggregate: testColl.getName(),
+        pipeline: [{
+            $geoNear: {
+                near: {type: "Point", coordinates: [0, 0]},
+                spherical: true,
+                distanceField: "dist",
+            }
+        }],
+        cursor: {},
     }));
     lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 1, 0, 0);
 

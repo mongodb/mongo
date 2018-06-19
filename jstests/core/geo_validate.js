@@ -77,17 +77,6 @@ assert.throws(function() {
 });
 
 //
-//
-// Make sure we can't do a near search with a negative limit
-assert.commandFailed(
-    db.runCommand({geoNear: coll.getName(), near: [0, 0], spherical: true, num: -1}));
-assert.commandFailed(
-    db.runCommand({geoNear: coll.getName(), near: [0, 0], spherical: true, num: -Infinity}));
-// NaN is interpreted as limit 0
-assert.commandWorked(
-    db.runCommand({geoNear: coll.getName(), near: [0, 0], spherical: true, num: NaN}));
-
-//
 // SERVER-17241 Polygon has no loop
 assert.writeError(coll.insert({geo: {type: 'Polygon', coordinates: []}}));
 

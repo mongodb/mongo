@@ -337,30 +337,39 @@
             }
 
             //
-            // Confirm currentOp content for geoNear.
+            // Confirm currentOp content for the $geoNear aggregation stage.
             //
             dropAndRecreateTestCollection();
             for (let i = 0; i < 10; ++i) {
-                assert.writeOK(coll.insert({a: i, loc: {type: "Point", coordinates: [i, i]}}));
+                assert.commandWorked(
+                    coll.insert({a: i, loc: {type: "Point", coordinates: [i, i]}}));
             }
             assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
-
             confirmCurrentOpContents({
                 test: function(db) {
                     assert.commandWorked(db.runCommand({
-                        geoNear: "currentop_query",
-                        near: {type: "Point", coordinates: [1, 1]},
-                        spherical: true,
-                        query: {$comment: "currentop_query"},
-                        collation: {locale: "fr"}
+                        aggregate: "currentop_query",
+                        cursor: {},
+                        pipeline: [{
+                            $geoNear: {
+                                near: {type: "Point", coordinates: [1, 1]},
+                                distanceField: "dist",
+                                spherical: true,
+                                query: {$comment: "currentop_query"},
+                            }
+                        }],
+                        collation: {locale: "fr"},
+                        comment: "currentop_query",
                     }));
                 },
-                command: "geoNear",
                 planSummary: "GEO_NEAR_2DSPHERE { loc: \"2dsphere\" }",
-                currentOpFilter: {
-                    "command.query.$comment": "currentop_query",
-                    "command.collation": {locale: "fr"}
-                }
+                currentOpFilter: commandOrOriginatingCommand({
+                    "aggregate": {$exists: true},
+                    "pipeline.0.$geoNear.query.$comment": "currentop_query",
+                    "collation": {locale: "fr"},
+                    "comment": "currentop_query",
+                },
+                                                             isRemoteShardCurOp)
             });
 
             //

@@ -89,9 +89,14 @@ for (var b = 0; b < bits.length; b++) {
 
             print(" DOING DIST QUERY ");
 
-            a = db.runCommand({geoNear: "axisaligned", near: center[j], maxDistance: radius[i]})
-                    .results;
-            assert.eq(5, a.length);
+            a = t.aggregate({
+                     $geoNear: {
+                         near: center[j],
+                         distanceField: "dis",
+                         maxDistance: radius[i],
+                     }
+                 }).toArray();
+            assert.eq(5, a.length, tojson(a));
 
             var distance = 0;
             for (var k = 0; k < a.length; k++) {

@@ -16,32 +16,37 @@
         () => db[coll].aggregate(
             [{$match: {x: 1}}, {$geoNear: {near: [1, 1], spherical: true, distanceField: 'dis'}}]));
 
-    function checkOutput(cmdOut, aggOut, expectedNum) {
-        assert.commandWorked(cmdOut, "geoNear command");
+    const kDistanceField = "dis";
+    const kIncludeLocsField = "loc";
 
-        // the output arrays are accessed differently
-        cmdOut = cmdOut.results;
-        aggOut = aggOut.toArray();
+    /**
+     * Tests the output of the $geoNear command. This function expects a document with the following
+     * fields:
+     *   - 'geoNearSpec' is the specification for a $geoNear aggregation stage.
+     *   - 'limit' is an integer limiting the number of pipeline results.
+     *   - 'batchSize', if specified, is the batchSize to use for the aggregation.
+     */
+    function testGeoNearStageOutput({geoNearSpec, limit, batchSize}) {
+        const aggOptions = batchSize ? {batchSize: batchSize} : {};
+        const result =
+            db[coll].aggregate([{$geoNear: geoNearSpec}, {$limit: limit}], aggOptions).toArray();
+        const errmsg = () => tojson(result);
 
-        assert.eq(cmdOut.length, expectedNum);
-        assert.eq(aggOut.length, expectedNum);
+        // Verify that we got the expected number of results.
+        assert.eq(result.length, limit, errmsg);
 
-        var allSame = true;
-        var massaged;  // massage geoNear command output to match output from agg pipeline
-        for (var i = 0; i < cmdOut.length; i++) {
-            massaged = {};
-            Object.extend(massaged, cmdOut[i].obj, /*deep=*/true);
-            massaged.stats = {'dis': cmdOut[i].dis, 'loc': cmdOut[i].loc};
+        // Run though the array, checking for proper sort order and sane computed distances.
+        result.reduce((lastDist, curDoc) => {
+            const curDist = curDoc[kDistanceField];
 
-            if (!friendlyEqual(massaged, aggOut[i])) {
-                allSame = false;  // don't bail yet since we want to print all differences
-                print("Difference detected at index " + i + " of " + expectedNum);
-                print("from geoNear command:" + tojson(massaged));
-                print("from aggregate command:" + tojson(aggOut[i]));
-            }
-        }
+            // Verify that distances are in increasing order.
+            assert.lte(lastDist, curDist, errmsg);
 
-        assert(allSame);
+            // Verify that the computed distance is correct.
+            const computed = Geo.sphereDistance(geoNearSpec["near"], curDoc[kIncludeLocsField]);
+            assert.close(computed, curDist, errmsg);
+            return curDist;
+        }, 0);
     }
 
     // We use this to generate points. Using a single global to avoid reseting RNG in each pass.
@@ -85,67 +90,28 @@
 
         db[coll].ensureIndex({loc: indexType});
 
-        // test with defaults
-        var queryPoint = pointMaker.mkPt(0.25);  // stick to center of map
-        var geoCmd = {geoNear: coll, near: queryPoint, includeLocs: true, spherical: true};
-        var aggCmd = {
-            $geoNear: {
-                near: queryPoint,
-                includeLocs: 'stats.loc',
-                distanceField: 'stats.dis',
-                spherical: true
-            }
-        };
-        checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggCmd), 100);
+        // Test $geoNear with spherical coordinates.
+        testGeoNearStageOutput({
+            geoNearSpec: {
+                near: pointMaker.mkPt(0.25),
+                distanceField: kDistanceField,
+                includeLocs: kIncludeLocsField,
+                spherical: true,
+            },
+            limit: 100
+        });
 
-        // test with num
-        queryPoint = pointMaker.mkPt(0.25);
-        geoCmd.num = 75;
-        geoCmd.near = queryPoint;
-        aggCmd.$geoNear.num = 75;
-        aggCmd.$geoNear.near = queryPoint;
-        checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggCmd), 75);
-
-        // test with limit instead of num (they mean the same thing, but want to test both)
-        queryPoint = pointMaker.mkPt(0.25);
-        geoCmd.near = queryPoint;
-        delete geoCmd.num;
-        geoCmd.limit = 70;
-        aggCmd.$geoNear.near = queryPoint;
-        delete aggCmd.$geoNear.num;
-        aggCmd.$geoNear.limit = 70;
-        checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggCmd), 70);
-
-        // test spherical
-        queryPoint = pointMaker.mkPt(0.25);
-        geoCmd.spherical = true;
-        geoCmd.near = queryPoint;
-        aggCmd.$geoNear.spherical = true;
-        aggCmd.$geoNear.near = queryPoint;
-        checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggCmd), 70);
-
-        // test $geoNear + $limit coalescing
-        queryPoint = pointMaker.mkPt(0.25);
-        geoCmd.num = 40;
-        geoCmd.near = queryPoint;
-        aggCmd.$geoNear.near = queryPoint;
-        var aggArr = [aggCmd, {$limit: 50}, {$limit: 60}, {$limit: 40}];
-        checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggArr), 40);
-
-        // Test $geoNear with an initial batchSize of 0. Regression test for SERVER-20935.
-        queryPoint = pointMaker.mkPt(0.25);
-        geoCmd.spherical = true;
-        geoCmd.near = queryPoint;
-        geoCmd.limit = 70;
-        delete geoCmd.num;
-        aggCmd.$geoNear.spherical = true;
-        aggCmd.$geoNear.near = queryPoint;
-        aggCmd.$geoNear.limit = 70;
-        delete aggCmd.$geoNear.num;
-        var cmdRes = db[coll].runCommand("aggregate", {pipeline: [aggCmd], cursor: {batchSize: 0}});
-        assert.commandWorked(cmdRes);
-        var cmdCursor = new DBCommandCursor(db, cmdRes, 0);
-        checkOutput(db.runCommand(geoCmd), cmdCursor, 70);
+        // Test $geoNear with an initial batchSize of 1.
+        testGeoNearStageOutput({
+            geoNearSpec: {
+                near: pointMaker.mkPt(0.25),
+                distanceField: kDistanceField,
+                includeLocs: kIncludeLocsField,
+                spherical: true,
+            },
+            limit: 70,
+            batchSize: 1
+        });
     }
 
     test(db, false, '2d');

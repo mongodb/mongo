@@ -185,7 +185,8 @@
         stmtId: NumberInt(0),
         autocommit: false
     }));
-    jsTestLog("Check that geoNear accepts a statement ID");
+
+    jsTestLog("Check that geoSearch accepts a statement ID");
     assert.writeOK(testColl.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}),
                    {writeConcern: {w: "majority"}});
     assert.writeOK(testColl.insert({geoh: {lat: 0, long: 0}, b: 0}),
@@ -203,16 +204,6 @@
         testColl.find({}, {readConcern: {level: "snapshot"}});
         return true;
     });
-    assert.commandWorked(sessionDb.runCommand({
-        geoNear: collName,
-        near: {type: "Point", coordinates: [0, 0]},
-        spherical: true,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0)
-    }));
-
-    jsTestLog("Check that geoSearch accepts a statement ID");
     assert.commandWorked(sessionDb.runCommand({
         geoSearch: collName,
         search: {b: 0},

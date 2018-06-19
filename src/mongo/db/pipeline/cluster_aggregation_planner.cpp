@@ -100,10 +100,7 @@ void moveFinalUnwindFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
  * Documents.
  */
 void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe) {
-    auto depsMetadata = DocumentSourceMatch::isTextQuery(shardPipe->getInitialQuery())
-        ? DepsTracker::MetadataAvailable::kTextScore
-        : DepsTracker::MetadataAvailable::kNoMetadata;
-    DepsTracker mergeDeps(mergePipe->getDependencies(depsMetadata));
+    DepsTracker mergeDeps(mergePipe->getDependencies(DepsTracker::kAllMetadataAvailable));
     if (mergeDeps.needWholeDocument)
         return;  // the merge needs all fields, so nothing we can do.
 
@@ -113,7 +110,7 @@ void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
 
     // Remove metadata from dependencies since it automatically flows through projection and we
     // don't want to project it in to the document.
-    mergeDeps.setNeedTextScore(false);
+    mergeDeps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, false);
 
     // HEURISTIC: only apply optimization if none of the shard stages have an exhaustive list of
     // field dependencies. While this may not be 100% ideal in all cases, it is simple and
@@ -125,7 +122,7 @@ void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
     // 2) Optimization IS NOT applied immediately following a $project or $group since it would
     //    add an unnecessary project (and therefore a deep-copy).
     for (auto&& source : shardPipe->getSources()) {
-        DepsTracker dt(depsMetadata);
+        DepsTracker dt(DepsTracker::kAllMetadataAvailable);
         if (source->getDependencies(&dt) & DocumentSource::EXHAUSTIVE_FIELDS)
             return;
     }

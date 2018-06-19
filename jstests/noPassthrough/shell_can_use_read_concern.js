@@ -226,22 +226,6 @@
         });
 
         //
-        // Tests for the "geoNear" command.
-        //
-
-        testCommandCanBeCausallyConsistent(function() {
-            assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
-        }, {expectedSession: withSession, expectedAfterClusterTime: false});
-
-        testCommandCanBeCausallyConsistent(function() {
-            assert.commandWorked(db.runCommand({
-                geoNear: coll.getName(),
-                near: {type: "Point", coordinates: [0, 0]},
-                spherical: true
-            }));
-        });
-
-        //
         // Tests for the "geoSearch" command.
         //
 

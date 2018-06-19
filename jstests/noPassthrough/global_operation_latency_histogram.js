@@ -102,11 +102,17 @@
     assert.commandWorked(testColl.createIndex({pt: "2dsphere"}));
     lastHistogram = checkHistogramDiff(0, 0, 1);
 
-    // GeoNear
+    // $geoNear aggregation stage
     assert.commandWorked(testDB.runCommand({
-        geoNear: testColl.getName(),
-        near: {type: "Point", coordinates: [0, 0]},
-        spherical: true
+        aggregate: testColl.getName(),
+        pipeline: [{
+            $geoNear: {
+                near: {type: "Point", coordinates: [0, 0]},
+                spherical: true,
+                distanceField: "dist",
+            }
+        }],
+        cursor: {},
     }));
     lastHistogram = checkHistogramDiff(1, 0, 0);
 

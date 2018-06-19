@@ -175,20 +175,6 @@
         forceerror: {skip: "does not return user data"},
         fsync: {skip: "does not return user data"},
         fsyncUnlock: {skip: "does not return user data"},
-        geoNear: {
-            setUp: function(mongosConn) {
-                assert.commandWorked(mongosConn.getCollection(nss).runCommand(
-                    {createIndexes: coll, indexes: [{key: {loc: "2d"}, name: "loc_2d"}]}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1, loc: [1, 1]}));
-            },
-            command: {geoNear: coll, near: [1, 1]},
-            checkResults: function(res) {
-                // The command should work and return correct results due to rerouting
-                assert.commandWorked(res);
-                assert.eq(1, res.results.length, tojson(res));
-            },
-            behavior: "versioned"
-        },
         geoSearch: {skip: "not supported in mongos"},
         getCmdLineOpts: {skip: "does not return user data"},
         getDiagnosticData: {skip: "does not return user data"},

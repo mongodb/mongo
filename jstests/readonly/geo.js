@@ -30,14 +30,19 @@ runReadOnlyTest(function() {
             writableCollection.insertMany(locDocs);
         },
         exec: function(readableCollection) {
-            var res = readableCollection.runCommand({
-                geoNear: readableCollection.getName(),
-                near: {type: "Point", coordinates: [40.7211404, -73.9591494]},
-                spherical: true,
-                limit: 1
-            });
-            assert.commandWorked(res);
-            assert.eq(res.results[0].obj.name, "The Counting Room", printjson(res));
+            const res = readableCollection
+                            .aggregate([
+                                {
+                                  $geoNear: {
+                                      near: {type: "Point", coordinates: [40.7211404, -73.9591494]},
+                                      distanceField: "dist",
+                                      spherical: true,
+                                  }
+                                },
+                                {$limit: 1}
+                            ])
+                            .toArray();
+            assert.eq(res[0].name, "The Counting Room", printjson(res));
         }
     };
 }());

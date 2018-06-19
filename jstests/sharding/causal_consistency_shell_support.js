@@ -156,15 +156,24 @@
     runCommandAndCheckLogicalTimes(findCmd, testDB, false);
     commandReturnsExpectedResult(findCmd, testDB, findCallback);
 
-    // GeoNear command.
+    // Aggregate command with $geoNear.
     let geoNearColl = "geoNearColl";
     let geoNearCmd = {
-        geoNear: geoNearColl,
-        near: {type: "Point", coordinates: [-10, 10]},
-        spherical: true
+        aggregate: geoNearColl,
+        cursor: {},
+        pipeline: [
+            {
+              $geoNear: {
+                  near: {type: "Point", coordinates: [-10, 10]},
+                  distanceField: "dist",
+                  spherical: true
+              }
+            },
+        ],
     };
     let geoNearCallback = function(res) {
-        assert.eq(res.results[0].obj, {_id: 1, loc: {type: "Point", coordinates: [-10, 10]}});
+        assert.eq(res.cursor.firstBatch,
+                  [{_id: 1, loc: {type: "Point", coordinates: [-10, 10]}, dist: 0}]);
     };
 
     assert.commandWorked(testDB[geoNearColl].createIndex({loc: "2dsphere"}));

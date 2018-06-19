@@ -320,25 +320,6 @@
                                        keysDeleted: 1
                                      })
             },
-            {
-              test: function(db) {
-                  assert.commandWorked(db.runCommand({
-                      geoNear: coll.getName(),
-                      near: {type: "Point", coordinates: [1, 1]},
-                      spherical: true,
-                      query: {$comment: logFormatTestComment},
-                      collation: {locale: "fr"}
-                  }));
-              },
-              logFields: {
-                  command: "geoNear",
-                  geoNear: coll.getName(),
-                  near: {type: "Point", coordinates: [1, 1]},
-                  planSummary: "GEO_NEAR_2DSPHERE { loc: \"2dsphere\" }",
-                  query: {$comment: logFormatTestComment},
-                  collation: {locale: "fr"}
-              }
-            }
         ];
 
         // Confirm log contains collation for find command.

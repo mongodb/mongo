@@ -45,8 +45,11 @@ using std::vector;
 
 const DocumentStorage DocumentStorage::kEmptyDoc;
 
-const std::vector<StringData> Document::allMetadataFieldNames = {
-    Document::metaFieldTextScore, Document::metaFieldRandVal, Document::metaFieldSortKey};
+const std::vector<StringData> Document::allMetadataFieldNames = {Document::metaFieldTextScore,
+                                                                 Document::metaFieldRandVal,
+                                                                 Document::metaFieldSortKey,
+                                                                 Document::metaFieldGeoNearDistance,
+                                                                 Document::metaFieldGeoNearPoint};
 
 Position DocumentStorage::findField(StringData requested) const {
     int reqSize = requested.size();  // get size calculation out of the way if needed
@@ -205,6 +208,8 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
     out->_textScore = _textScore;
     out->_randVal = _randVal;
     out->_sortKey = _sortKey.getOwned();
+    out->_geoNearDistance = _geoNearDistance;
+    out->_geoNearPoint = _geoNearPoint.getOwned();
 
     // Tell values that they have been memcpyed (updates ref counts)
     for (DocumentStorageIterator it = out->iteratorAll(); !it.atEnd(); it.advance()) {
@@ -272,6 +277,8 @@ BSONObj Document::toBson() const {
 constexpr StringData Document::metaFieldTextScore;
 constexpr StringData Document::metaFieldRandVal;
 constexpr StringData Document::metaFieldSortKey;
+constexpr StringData Document::metaFieldGeoNearDistance;
+constexpr StringData Document::metaFieldGeoNearPoint;
 
 BSONObj Document::toBsonWithMetaData() const {
     BSONObjBuilder bb;
@@ -282,6 +289,10 @@ BSONObj Document::toBsonWithMetaData() const {
         bb.append(metaFieldRandVal, getRandMetaField());
     if (hasSortKeyMetaField())
         bb.append(metaFieldSortKey, getSortKeyMetaField());
+    if (hasGeoNearDistance())
+        bb.append(metaFieldGeoNearDistance, getGeoNearDistance());
+    if (hasGeoNearPoint())
+        getGeoNearPoint().addToBsonObj(&bb, metaFieldGeoNearPoint);
     return bb.obj();
 }
 
@@ -301,6 +312,20 @@ Document Document::fromBsonWithMetaData(const BSONObj& bson) {
                 continue;
             } else if (fieldName == metaFieldSortKey) {
                 md.setSortKeyMetaField(elem.Obj());
+                continue;
+            } else if (fieldName == metaFieldGeoNearDistance) {
+                md.setGeoNearDistance(elem.Double());
+                continue;
+            } else if (fieldName == metaFieldGeoNearPoint) {
+                Value val;
+                if (elem.type() == BSONType::Array) {
+                    val = Value(BSONArray(elem.embeddedObject()));
+                } else {
+                    invariant(elem.type() == BSONType::Object);
+                    val = Value(elem.embeddedObject());
+                }
+
+                md.setGeoNearPoint(val);
                 continue;
             }
         }

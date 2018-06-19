@@ -485,7 +485,7 @@ DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* 
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
         // know what field it will be searching without examining indices.
         deps->needWholeDocument = true;
-        deps->setNeedTextScore(true);
+        deps->setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
         return EXHAUSTIVE_FIELDS;
     }
 

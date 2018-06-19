@@ -27,11 +27,20 @@ assert.throws(function() {
     t.find({loc: {$within: {$centerSphere: [[-180, -91], 0.25]}}}).count();
 });
 
-var res;
-res =
-    db.runCommand({geoNear: "geooobsphere", near: [179, -91], maxDistance: 0.25, spherical: true});
-assert.commandFailed(res);
-printjson(res);
+// In a spherical geometry, this point is out-of-bounds.
+assert.commandFailedWithCode(t.runCommand("find", {filter: {loc: {$nearSphere: [179, -91]}}}),
+                             17444);
+assert.commandFailedWithCode(t.runCommand("aggregate", {
+    cursor: {},
+    pipeline: [{
+        $geoNear: {
+            near: [179, -91],
+            distanceField: "dis",
+            spherical: true,
+        }
+    }]
+}),
+                             17444);
 
 // TODO: SERVER-9986 - it's not clear that throwing is correct behavior here
 // res = db.runCommand({ geoNear : "geooobsphere", near : [30, 89], maxDistance : 0.25, spherical :

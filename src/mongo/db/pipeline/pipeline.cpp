@@ -69,6 +69,9 @@ using DiskUseRequirement = DocumentSource::StageConstraints::DiskUseRequirement;
 using FacetRequirement = DocumentSource::StageConstraints::FacetRequirement;
 using StreamType = DocumentSource::StageConstraints::StreamType;
 
+constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kAllowedMatcherFeatures;
+constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kGeoNearMatcherFeatures;
+
 Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheCtx) {}
 
 Pipeline::Pipeline(SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
@@ -509,12 +512,9 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
         }
 
         if (!knowAllMeta) {
-            if (localDeps.getNeedTextScore())
-                deps.setNeedTextScore(true);
-
-            if (localDeps.getNeedSortKey())
-                deps.setNeedSortKey(true);
-
+            for (auto&& req : localDeps.getAllRequiredMetadataTypes()) {
+                deps.setNeedsMetadata(req, true);
+            }
             knowAllMeta = status & DocumentSource::EXHAUSTIVE_META;
         }
 
@@ -531,11 +531,12 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
     if (metadataAvailable & DepsTracker::MetadataAvailable::kTextScore) {
         // If there is a text score, assume we need to keep it if we can't prove we don't. If we are
         // the first half of a pipeline which has been split, future stages might need it.
-        if (!knowAllMeta)
-            deps.setNeedTextScore(true);
+        if (!knowAllMeta) {
+            deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, true);
+        }
     } else {
         // If there is no text score available, then we don't need to ask for it.
-        deps.setNeedTextScore(false);
+        deps.setNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE, false);
     }
 
     return deps;

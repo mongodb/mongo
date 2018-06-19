@@ -1,9 +1,8 @@
 'use strict';
 
 /*
- * yield_geo_near_dedup.js (extends yield_geo_near.js)
- *
- * Intersperse geo $near queries with updates of non-geo fields to test deduplication.
+ * Intersperses $geoNear aggregations with updates of non-geo fields to test deduplication.
+ * @tags: [requires_non_retryable_writes]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');      // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield_geo_near.js');  // for $config
@@ -43,27 +42,31 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.query = function geoNear(db, collName) {
         // This distance gets about 80 docs around the origin. There is one doc inserted
         // every 1m^2 and the area scanned by a 5m radius is PI*(5m)^2 ~ 79.
-        var maxDistance = 5;
+        const maxDistance = 5;
+        const cursor = db[collName].aggregate([{
+            $geoNear: {
+                near: [0, 0],
+                distanceField: "dist",
+                maxDistance: maxDistance,
+                spherical: true,
+            }
+        }]);
 
-        var res = db.runCommand(
-            {geoNear: collName, near: [0, 0], maxDistance: maxDistance, spherical: true});
-        assertWhenOwnColl.commandWorked(res);
+        // We only run the verification when workloads are run on separate collections, since the
+        // aggregation may fail if we don't have exactly one 2d index to use.
         assertWhenOwnColl(function verifyResults() {
-            var results = res.results;
-            var seenObjs = [];
-            for (var i = 0; i < results.length; i++) {
-                var doc = results[i].obj;
+            const seenObjs = [];
+            while (cursor.hasNext()) {
+                const doc = cursor.next();
 
                 // The pair (_id, timesInserted) is the smallest set of attributes that uniquely
                 // identifies a document.
-                var objToSearchFor = {_id: doc._id, timesInserted: doc.timesInserted};
-                var found = seenObjs.some(function(obj) {
-                    return bsonWoCompare(obj, objToSearchFor) === 0;
-                });
+                const objToSearch = {_id: doc._id, timesInserted: doc.timesInserted};
+                const found = seenObjs.some(obj => bsonWoCompare(obj, objToSearch) === 0);
                 assertWhenOwnColl(!found,
-                                  'geoNear command returned the document ' + tojson(doc) +
-                                      ' multiple times: ' + tojson(seenObjs));
-                seenObjs.push(objToSearchFor);
+                                  `$geoNear returned document ${tojson(doc)} multiple ` +
+                                      `times: ${tojson(seenObjs)}`);
+                seenObjs.push(objToSearch);
             }
         });
     };

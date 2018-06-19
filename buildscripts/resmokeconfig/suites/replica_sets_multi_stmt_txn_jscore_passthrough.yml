@@ -37,6 +37,7 @@ selector:
   - jstests/core/find_getmore_bsonsize.js
   - jstests/core/find_getmore_cmd.js
   - jstests/core/find9.js
+  - jstests/core/geonear_key.js
   - jstests/core/index_big1.js
   - jstests/core/index_bigkeys.js
   - jstests/core/index_decimal.js

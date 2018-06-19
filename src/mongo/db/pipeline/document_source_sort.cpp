@@ -226,7 +226,7 @@ DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(DepsTracker* d
     }
     if (pExpCtx->needsMerge) {
         // Include the sort key if we will merge several sorted streams later.
-        deps->setNeedSortKey(true);
+        deps->setNeedsMetadata(DepsTracker::MetadataType::SORT_KEY, true);
     }
 
     return SEE_NEXT;
