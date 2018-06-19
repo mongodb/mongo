@@ -35,28 +35,37 @@ var {withTxnAndAutoRetry} = (function() {
 
         do {
             session.startTransaction(txnOptions);
+            let commitErrorSessionId = undefined;
             hasTransientError = false;
 
             try {
                 func();
 
                 // commitTransaction() calls assert.commandWorked(), which may fail with a
-                // WriteConflict error response. We therefore suppress its doassert() output.
-                quietly(() => session.commitTransaction());
+                // WriteConflict error response, which is ignored.
+                try {
+                    quietly(() => session.commitTransaction());
+                } catch (e) {
+                    commitErrorSessionId = session.getSessionId();
+                    throw e;
+                }
             } catch (e) {
                 // Use the version of abortTransaction() that ignores errors. We ignore the error
                 // from abortTransaction because the transaction may have implicitly been aborted by
                 // the server already and will therefore return a NoSuchTransaction error response.
                 // We need to call abortTransaction() in order to update the mongo shell's state
                 // such that it agrees no transaction is currently in progress on this session.
-                session.abortTransaction();
-
-                if (!e.hasOwnProperty('errorLabels') ||
-                    !e.errorLabels.includes('TransientTransactionError')) {
-                    throw e;
+                if (session.getSessionId() !== commitErrorSessionId) {
+                    session.abortTransaction();
                 }
 
-                hasTransientError = true;
+                if (e.hasOwnProperty('errorLabels') &&
+                    e.errorLabels.includes('TransientTransactionError')) {
+                    hasTransientError = true;
+                    continue;
+                }
+
+                throw e;
             }
         } while (hasTransientError);
     }
