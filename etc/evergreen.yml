@@ -1086,7 +1086,7 @@ functions:
         WORKDIR=${workdir}
 
         if [ "${build_cdriver|}" = "true" ]; then
-        CDRIVER_VERSION=1.10.1
+        CDRIVER_VERSION=1.10.3
         rm -rf mongo-c-driver-$CDRIVER_VERSION
         rm -rf mongo-c-driver
         curl -LO https://github.com/mongodb/mongo-c-driver/releases/download/$CDRIVER_VERSION/mongo-c-driver-$CDRIVER_VERSION.tar.gz
