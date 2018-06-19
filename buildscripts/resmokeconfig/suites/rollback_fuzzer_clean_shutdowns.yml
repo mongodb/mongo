@@ -13,6 +13,7 @@ executor:
       readMode: commands
       global_vars:
         TestData:
+          syncdelay: 5
           logComponentVerbosity:
             replication:
               heartbeats: 2
