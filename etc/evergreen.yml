@@ -1418,8 +1418,10 @@ functions:
         exit_status=$?
         # If compile fails we do not run any tests
         if [ $exit_status -ne 0 ]; then
-          echo "Dumping build/scons/config.log"
-          cat build/scons/config.log
+          if [ ${dump_scons_config_on_failure} = 'true' ]; then
+            echo "Dumping build/scons/config.log"
+            cat build/scons/config.log
+          fi
           touch ${skip_tests}
         fi
         exit $exit_status
@@ -9217,6 +9219,7 @@ buildvariants:
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
     enable_embedded_tests: native
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9246,6 +9249,7 @@ buildvariants:
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     disable_unit_tests: true
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9278,6 +9282,7 @@ buildvariants:
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: iPhone-7
     ios_sim_runtime: iOS-10-2
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9307,6 +9312,7 @@ buildvariants:
         -DCMAKE_LINKER_FLAGS="-arch arm64 -isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9339,6 +9345,7 @@ buildvariants:
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: Apple-TV-1080p
     ios_sim_runtime: tvOS-10-2
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9372,6 +9379,7 @@ buildvariants:
         -DCMAKE_LINKER_FLAGS="-arch armv7k -isysroot $(xcrun --sdk watchos --show-sdk-path) -mwatchos-version-min=4.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9408,6 +9416,7 @@ buildvariants:
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: Apple-Watch-Series-3-42mm
     ios_sim_runtime: watchOS-4-2
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9433,6 +9442,7 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     disable_unit_tests: true
     enable_embedded_tests: native
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9468,9 +9478,10 @@ buildvariants:
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "armeabi-v7a"
-    android_system_image_version: "25"
+    android_system_image_version: "24"
     android_toolchain_target_arch: "arm"
     android_toolchain_api_version: "21"
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9505,9 +9516,10 @@ buildvariants:
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "arm64-v8a"
-    android_system_image_version: "25"
+    android_system_image_version: "24"
     android_toolchain_target_arch: "arm64"
     android_toolchain_api_version: "21"
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 
@@ -9542,9 +9554,10 @@ buildvariants:
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "x86_64"
-    android_system_image_version: 21
+    android_system_image_version: "24"
     android_toolchain_target_arch: "x86_64"
     android_toolchain_api_version: "21"
+    dump_scons_config_on_failure: true
   tasks:
   - name: compile_mobile
 

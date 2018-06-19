@@ -21,15 +21,15 @@ if [ ! -e  $SDK_ROOT ]; then
         curl -O https://dl.google.com/android/repository/$SDK_PACKAGE
         unzip $SDK_PACKAGE
         echo y | ./tools/bin/sdkmanager  \
-            "platforms;android-27"  \
+            "platforms;android-28"  \
             "ndk-bundle"  \
             "emulator"  \
             "patcher;v4"  \
             "platform-tools"  \
-            "build-tools;23.0.3"  \
-            "system-images;android-25;google_apis;armeabi-v7a"  \
-            "system-images;android-25;google_apis;arm64-v8a"  \
-            "system-images;android-21;google_apis;x86_64"
+            "build-tools;28.0.0" \
+            "system-images;android-24;google_apis;armeabi-v7a"  \
+            "system-images;android-24;google_apis;arm64-v8a"  \
+            "system-images;android-24;google_apis;x86_64"
     )
 fi
 
