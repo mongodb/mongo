@@ -147,6 +147,9 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
                 "logComponentVerbosity": tojsononeline(TestData.logComponentVerbosity)
             };
         }
+        if (TestData.syncdelay) {
+            nodeOptions["syncdelay"] = TestData.syncdelay;
+        }
 
         let replSet = new ReplSetTest({name, nodes: 5, useBridge: true, nodeOptions: nodeOptions});
         replSet.startSet();

@@ -112,6 +112,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
                 "logComponentVerbosity": tojsononeline(TestData.logComponentVerbosity)
             };
         }
+        if (TestData.syncdelay) {
+            nodeOptions["syncdelay"] = TestData.syncdelay;
+        }
 
         let replSet = new ReplSetTest({name, nodes: 3, useBridge: true, nodeOptions: nodeOptions});
         replSet.startSet();
