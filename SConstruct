@@ -2607,8 +2607,13 @@ def doConfigure(myenv):
         # Explicitly enable GNU build id's if the linker supports it.
         AddToLINKFLAGSIfSupported(myenv, '-Wl,--build-id')
 
-        # Explicitly use the new gnu hash section if the linker offers it.
-        AddToLINKFLAGSIfSupported(myenv, '-Wl,--hash-style=gnu')
+        # Explicitly use the new gnu hash section if the linker offers
+        # it, except on android since older runtimes seem to not
+        # support it. For that platform, use 'both'.
+        if env.TargetOSIs('android'):
+            AddToLINKFLAGSIfSupported(myenv, '-Wl,--hash-style=both')
+        else:
+            AddToLINKFLAGSIfSupported(myenv, '-Wl,--hash-style=gnu')
 
         # Try to have the linker tell us about ODR violations. Don't
         # use it when using clang with libstdc++, as libstdc++ was
