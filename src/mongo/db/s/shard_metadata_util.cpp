@@ -366,7 +366,7 @@ Status updateShardChunks(OperationContext* opCtx,
          *
          */
         for (auto& chunk : chunks) {
-            invariant(chunk.getVersion().hasEqualEpoch(currEpoch));
+            invariant(chunk.getVersion().epoch() == currEpoch);
 
             // Delete any overlapping chunk ranges. Overlapping chunks will have a min value
             // ("_id") between (chunk.min, chunk.max].

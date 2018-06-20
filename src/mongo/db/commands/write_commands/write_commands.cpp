@@ -145,7 +145,7 @@ void serializeReply(OperationContext* opCtx,
             error.append("code", int(ErrorCodes::StaleShardVersion));  // Different from exception!
             {
                 BSONObjBuilder errInfo(error.subobjStart("errInfo"));
-                staleInfo->getVersionWanted().addToBSON(errInfo, "vWanted");
+                staleInfo->getVersionWanted().appendLegacyWithField(&errInfo, "vWanted");
             }
         } else {
             error.append("code", int(status.code()));

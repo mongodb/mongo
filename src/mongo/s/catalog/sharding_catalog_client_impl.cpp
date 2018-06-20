@@ -779,7 +779,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
         // Look for the chunk in this shard whose version got bumped. We assume that if that
         // mod made it to the config server, then transaction was successful.
         BSONObjBuilder query;
-        lastChunkVersion.addToBSON(query, ChunkType::lastmod());
+        lastChunkVersion.appendLegacyWithField(&query, ChunkType::lastmod());
         query.append(ChunkType::ns(), nss.ns());
         auto chunkWithStatus = getChunks(opCtx, query.obj(), BSONObj(), 1, nullptr, readConcern);
 

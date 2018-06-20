@@ -1141,7 +1141,7 @@ void ShardServerCatalogCacheLoader::CollAndChunkTaskList::addTask(collAndChunkTa
     }
 
     if (task.dropped) {
-        invariant(_tasks.back().maxQueryVersion.equals(task.minQueryVersion));
+        invariant(_tasks.back().maxQueryVersion == task.minQueryVersion);
 
         // As an optimization, on collection drop, clear any pending tasks in order to prevent any
         // throw-away work from executing. Because we have no way to differentiate whether the
@@ -1155,7 +1155,7 @@ void ShardServerCatalogCacheLoader::CollAndChunkTaskList::addTask(collAndChunkTa
         }
     } else {
         // Tasks must have contiguous versions, unless a complete reload occurs.
-        invariant(_tasks.back().maxQueryVersion.equals(task.minQueryVersion) ||
+        invariant(_tasks.back().maxQueryVersion == task.minQueryVersion ||
                   !task.minQueryVersion.isSet());
 
         _tasks.emplace_back(std::move(task));

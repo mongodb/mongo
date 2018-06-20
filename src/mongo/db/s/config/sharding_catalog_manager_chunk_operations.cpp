@@ -60,12 +60,13 @@ MONGO_FAIL_POINT_DEFINE(migrationCommitVersionError);
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.
  */
-void appendShortVersion(BufBuilder* b, const ChunkType& chunk) {
-    BSONObjBuilder bb(*b);
+void appendShortVersion(BufBuilder* out, const ChunkType& chunk) {
+    BSONObjBuilder bb(*out);
     bb.append(ChunkType::min(), chunk.getMin());
     bb.append(ChunkType::max(), chunk.getMax());
-    if (chunk.isVersionSet())
-        chunk.getVersion().addToBSON(bb, ChunkType::lastmod());
+    if (chunk.isVersionSet()) {
+        chunk.getVersion().appendLegacyWithField(&bb, ChunkType::lastmod());
+    }
     bb.done();
 }
 
@@ -187,7 +188,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
 
         BSONObjBuilder n(op.subobjStart("o"));
         n.append(ChunkType::name(), ChunkType::genID(nss, migratedChunk.getMin()));
-        migratedChunk.getVersion().addToBSON(n, ChunkType::lastmod());
+        migratedChunk.getVersion().appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), migratedChunk.getMin());
         n.append(ChunkType::max(), migratedChunk.getMax());
@@ -211,7 +212,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
 
         BSONObjBuilder n(op.subobjStart("o"));
         n.append(ChunkType::name(), ChunkType::genID(nss, controlChunk->getMin()));
-        controlChunk->getVersion().addToBSON(n, ChunkType::lastmod());
+        controlChunk->getVersion().appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), controlChunk->getMin());
         n.append(ChunkType::max(), controlChunk->getMax());
@@ -300,7 +301,8 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation, errmsg};
     }
 
-    ChunkVersion collVersion = ChunkVersion::fromBSON(chunksVector.front(), ChunkType::lastmod());
+    ChunkVersion collVersion = uassertStatusOK(
+        ChunkVersion::parseLegacyWithField(chunksVector.front(), ChunkType::lastmod()));
 
     // Return an error if collection epoch does not match epoch of request.
     if (collVersion.epoch() != requestEpoch) {
@@ -380,7 +382,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         // add the modified (new) chunk information as the update object
         BSONObjBuilder n(op.subobjStart("o"));
         n.append(ChunkType::name(), ChunkType::genID(nss, startKey));
-        currentMaxVersion.addToBSON(n, ChunkType::lastmod());
+        currentMaxVersion.appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), startKey);
         n.append(ChunkType::max(), endKey);
@@ -445,7 +447,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         BSONObjBuilder b(logDetail.subobjStart("before"));
         b.append(ChunkType::min(), range.getMin());
         b.append(ChunkType::max(), range.getMax());
-        collVersion.addToBSON(b, ChunkType::lastmod());
+        collVersion.appendLegacyWithField(&b, ChunkType::lastmod());
     }
 
     if (newChunks.size() == 2) {
@@ -516,7 +518,8 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "collection does not exist, isn't sharded, or has no chunks"};
 
-    ChunkVersion collVersion = ChunkVersion::fromBSON(chunksVector.front(), ChunkType::lastmod());
+    ChunkVersion collVersion = uassertStatusOK(
+        ChunkVersion::parseLegacyWithField(chunksVector.front(), ChunkType::lastmod()));
 
     // Return an error if epoch of chunk does not match epoch of request
     if (collVersion.epoch() != requestEpoch) {
@@ -580,8 +583,8 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
             b.append(chunkToMerge.toConfigBSON());
         }
     }
-    collVersion.addToBSON(logDetail, "prevShardVersion");
-    mergeVersion.addToBSON(logDetail, "mergedVersion");
+    collVersion.appendLegacyWithField(&logDetail, "prevShardVersion");
+    mergeVersion.appendLegacyWithField(&logDetail, "mergedVersion");
 
     Grid::get(opCtx)
         ->catalogClient()
@@ -751,9 +754,9 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     }
 
     BSONObjBuilder result;
-    newMigratedChunk.getVersion().appendWithFieldForCommands(&result, "migratedChunkVersion");
+    newMigratedChunk.getVersion().appendWithField(&result, "migratedChunkVersion");
     if (controlChunk) {
-        newControlChunk->getVersion().appendWithFieldForCommands(&result, "controlChunkVersion");
+        newControlChunk->getVersion().appendWithField(&result, "controlChunkVersion");
     }
 
     return result.obj();

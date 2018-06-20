@@ -52,6 +52,8 @@ const char kNoConnectionVersioning[] = "noConnectionVersioning";
 
 }  // namespace
 
+constexpr StringData SetShardVersionRequest::kVersion;
+
 SetShardVersionRequest::SetShardVersionRequest(ConnectionString configServer,
                                                ShardId shardName,
                                                ConnectionString shardConnectionString)
@@ -194,7 +196,7 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
     }
 
     {
-        auto versionStatus = ChunkVersion::parseFromBSONForSetShardVersion(cmdObj);
+        auto versionStatus = ChunkVersion::parseLegacyWithField(cmdObj, kVersion);
         if (!versionStatus.isOK())
             return versionStatus.getStatus();
 
@@ -221,7 +223,7 @@ BSONObj SetShardVersionRequest::toBSON() const {
         // SERVER-21458.
         cmdBuilder.append(QueryRequest::cmdOptionMaxTimeMS, 30000);
     } else {
-        _version.get().appendForSetShardVersion(&cmdBuilder);
+        _version->appendLegacyWithField(&cmdBuilder, kVersion);
     }
 
     if (_noConnectionVersioning) {

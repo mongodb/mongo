@@ -153,7 +153,7 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     invariant(nss.isValid());
 
     builder->append(kMoveChunk, nss.ns());
-    chunkVersion.appendForCommands(builder);  // 3.4 shard compatibility
+    chunkVersion.appendToCommand(builder);  // 3.4 shard compatibility
     builder->append(kEpoch, chunkVersion.epoch());
     // config connection string is included for 3.4 shard compatibility
     builder->append(kConfigServerConnectionString, configServerConnectionString.toString());

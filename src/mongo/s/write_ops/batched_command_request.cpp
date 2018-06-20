@@ -42,7 +42,7 @@ template <class T>
 BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request) {
     auto batchRequest = BatchedCommandRequest{T::parse(request)};
 
-    auto chunkVersion = ChunkVersion::parseFromBSONForCommands(request.body);
+    auto chunkVersion = ChunkVersion::parseFromCommand(request.body);
     if (chunkVersion != ErrorCodes::NoSuchKey) {
         batchRequest.setShardVersion(uassertStatusOK(std::move(chunkVersion)));
     }
@@ -136,7 +136,7 @@ void BatchedCommandRequest::setWriteCommandBase(write_ops::WriteCommandBase writ
 void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
     _visit([&](auto&& op) { op.serialize({}, builder); });
     if (_shardVersion) {
-        _shardVersion->appendForCommands(builder);
+        _shardVersion->appendToCommand(builder);
     }
 
     if (_writeConcern) {

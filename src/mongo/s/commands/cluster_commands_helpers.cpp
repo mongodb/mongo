@@ -236,7 +236,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
 
 BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version) {
     BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));
-    version.appendForCommands(&cmdWithVersionBob);
+    version.appendToCommand(&cmdWithVersionBob);
     return cmdWithVersionBob.obj();
 }
 

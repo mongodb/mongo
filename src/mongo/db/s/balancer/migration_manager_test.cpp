@@ -218,7 +218,7 @@ void MigrationManagerTest::setUpMigration(const ChunkType& chunk, const ShardId&
     builder.append(MigrationType::max(), chunk.getMax());
     builder.append(MigrationType::toShard(), toShard.toString());
     builder.append(MigrationType::fromShard(), chunk.getShard().toString());
-    chunk.getVersion().appendWithFieldForCommands(&builder, "chunkVersion");
+    chunk.getVersion().appendWithField(&builder, "chunkVersion");
 
     MigrationType migrationType = assertGet(MigrationType::fromBSON(builder.obj()));
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),

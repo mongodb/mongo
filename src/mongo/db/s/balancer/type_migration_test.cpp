@@ -56,7 +56,7 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     chunkBuilder.append(ChunkType::ns(), kNs);
     chunkBuilder.append(ChunkType::min(), kMin);
     chunkBuilder.append(ChunkType::max(), kMax);
-    version.appendForChunk(&chunkBuilder);
+    version.appendLegacyWithField(&chunkBuilder, ChunkType::lastmod());
     chunkBuilder.append(ChunkType::shard(), kFromShard.toString());
 
     ChunkType chunkType = assertGet(ChunkType::fromConfigBSON(chunkBuilder.obj()));
@@ -72,7 +72,7 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     builder.append(MigrationType::max(), kMax);
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
-    version.appendWithFieldForCommands(&builder, "chunkVersion");
+    version.appendWithField(&builder, "chunkVersion");
     builder.append(MigrationType::waitForDelete(), kWaitForDelete);
 
     BSONObj obj = builder.obj();
@@ -90,7 +90,7 @@ TEST(MigrationTypeTest, FromAndToBSON) {
     builder.append(MigrationType::max(), kMax);
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
-    version.appendWithFieldForCommands(&builder, "chunkVersion");
+    version.appendWithField(&builder, "chunkVersion");
     builder.append(MigrationType::waitForDelete(), kWaitForDelete);
 
     BSONObj obj = builder.obj();
@@ -107,7 +107,7 @@ TEST(MigrationTypeTest, MissingRequiredNamespaceField) {
     builder.append(MigrationType::max(), kMax);
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
-    version.appendWithFieldForCommands(&builder, "chunkVersion");
+    version.appendWithField(&builder, "chunkVersion");
 
     BSONObj obj = builder.obj();
 
@@ -124,7 +124,7 @@ TEST(MigrationTypeTest, MissingRequiredMinField) {
     builder.append(MigrationType::max(), kMax);
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
-    version.appendWithFieldForCommands(&builder, "chunkVersion");
+    version.appendWithField(&builder, "chunkVersion");
 
     BSONObj obj = builder.obj();
 
@@ -141,7 +141,7 @@ TEST(MigrationTypeTest, MissingRequiredMaxField) {
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
-    version.appendWithFieldForCommands(&builder, "chunkVersion");
+    version.appendWithField(&builder, "chunkVersion");
 
     BSONObj obj = builder.obj();
 
@@ -158,7 +158,7 @@ TEST(MigrationTypeTest, MissingRequiredFromShardField) {
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);
     builder.append(MigrationType::toShard(), kToShard.toString());
-    version.appendWithFieldForCommands(&builder, "chunkVersion");
+    version.appendWithField(&builder, "chunkVersion");
 
     BSONObj obj = builder.obj();
 
@@ -175,7 +175,7 @@ TEST(MigrationTypeTest, MissingRequiredToShardField) {
     builder.append(MigrationType::min(), kMin);
     builder.append(MigrationType::max(), kMax);
     builder.append(MigrationType::fromShard(), kFromShard.toString());
-    version.appendWithFieldForCommands(&builder, "chunkVersion");
+    version.appendWithField(&builder, "chunkVersion");
 
     BSONObj obj = builder.obj();
 

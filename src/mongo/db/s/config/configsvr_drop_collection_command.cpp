@@ -202,7 +202,7 @@ private:
             // not sharded. Collections residing on the config server are never sharded so do not
             // send the shard version.
             if (shardId != shardRegistry->getConfigShard()->getId()) {
-                ChunkVersion::UNSHARDED().appendForCommands(&builder);
+                ChunkVersion::UNSHARDED().appendToCommand(&builder);
             }
 
             if (!opCtx->getWriteConcern().usedDefault) {

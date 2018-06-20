@@ -95,8 +95,8 @@ Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) const {
 }
 
 void CollectionMetadata::toBSONBasic(BSONObjBuilder& bb) const {
-    _cm->getVersion().addToBSON(bb, "collVersion");
-    getShardVersion().addToBSON(bb, "shardVersion");
+    _cm->getVersion().appendLegacyWithField(&bb, "collVersion");
+    getShardVersion().appendLegacyWithField(&bb, "shardVersion");
     bb.append("keyPattern", _cm->getShardKeyPattern().toBSON());
 }
 

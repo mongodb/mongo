@@ -75,17 +75,7 @@ void OperationShardingState::initializeClientRoutingVersions(NamespaceString nss
 
     const auto shardVersionElem = cmdObj.getField(ChunkVersion::kShardVersionField);
     if (!shardVersionElem.eoo()) {
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "expected shardVersion element to be an array, got "
-                              << shardVersionElem,
-                shardVersionElem.type() == BSONType::Array);
-        const BSONArray versionArr(shardVersionElem.Obj());
-
-        bool canParse;
-        ChunkVersion shardVersion = ChunkVersion::fromBSON(versionArr, &canParse);
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "could not parse shardVersion from field " << versionArr,
-                canParse);
+        auto shardVersion = uassertStatusOK(ChunkVersion::parseFromCommand(cmdObj));
 
         if (nss.isSystemDotIndexes()) {
             _shardVersions[nss.ns()] = ChunkVersion::IGNORED();

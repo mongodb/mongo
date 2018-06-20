@@ -98,7 +98,7 @@ MigrateInfo makeMigrateInfo() {
     chunkBuilder.append(ChunkType::ns(), kNs);
     chunkBuilder.append(ChunkType::min(), kMin);
     chunkBuilder.append(ChunkType::max(), kMax);
-    kChunkVersion.appendForChunk(&chunkBuilder);
+    kChunkVersion.appendLegacyWithField(&chunkBuilder, ChunkType::lastmod());
     chunkBuilder.append(ChunkType::shard(), kFromShard.toString());
 
     ChunkType chunkType = assertGet(ChunkType::fromConfigBSON(chunkBuilder.obj()));

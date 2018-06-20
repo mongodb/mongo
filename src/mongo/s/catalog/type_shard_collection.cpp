@@ -163,13 +163,13 @@ StatusWith<ShardCollectionType> ShardCollectionType::fromBSON(const BSONObj& sou
     {
         if (!source[lastRefreshedCollectionVersion.name()].eoo()) {
             auto statusWithLastRefreshedCollectionVersion =
-                ChunkVersion::parseFromBSONWithFieldAndSetEpoch(
-                    source, lastRefreshedCollectionVersion.name(), epoch);
+                ChunkVersion::parseLegacyWithField(source, lastRefreshedCollectionVersion());
             if (!statusWithLastRefreshedCollectionVersion.isOK()) {
                 return statusWithLastRefreshedCollectionVersion.getStatus();
             }
+            auto version = std::move(statusWithLastRefreshedCollectionVersion.getValue());
             shardCollectionType.setLastRefreshedCollectionVersion(
-                std::move(statusWithLastRefreshedCollectionVersion.getValue()));
+                ChunkVersion(version.majorVersion(), version.minorVersion(), epoch));
         }
     }
 

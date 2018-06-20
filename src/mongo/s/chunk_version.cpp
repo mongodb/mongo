@@ -30,42 +30,26 @@
 
 #include "mongo/s/chunk_version.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-namespace {
 
-const char kVersion[] = "version";
-const char kLastmod[] = "lastmod";
+constexpr StringData ChunkVersion::kShardVersionField;
 
-}  // namespace
+StatusWith<ChunkVersion> ChunkVersion::parseWithField(const BSONObj& obj, StringData field) {
+    BSONElement versionElem = obj[field];
+    if (versionElem.eoo())
+        return {ErrorCodes::NoSuchKey,
+                str::stream() << "Expected field " << field << " not found."};
 
-const char ChunkVersion::kShardVersionField[] = "shardVersion";
-
-StatusWith<ChunkVersion> ChunkVersion::parseFromBSONForCommands(const BSONObj& obj) {
-    return parseFromBSONWithFieldForCommands(obj, kShardVersionField);
-}
-
-StatusWith<ChunkVersion> ChunkVersion::parseFromBSONWithFieldForCommands(const BSONObj& obj,
-                                                                         StringData field) {
-    BSONElement versionElem;
-    Status status = bsonExtractField(obj, field, &versionElem);
-    if (!status.isOK())
-        return status;
-
-    if (versionElem.type() != Array) {
+    if (versionElem.type() != Array)
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "Invalid type " << versionElem.type()
                               << " for shardVersion element. Expected an array"};
-    }
 
     BSONObjIterator it(versionElem.Obj());
     if (!it.more())
-        return {ErrorCodes::BadValue, "Unexpected empty version"};
+        return {ErrorCodes::BadValue, "Unexpected empty version array"};
 
     ChunkVersion version;
 
@@ -94,49 +78,45 @@ StatusWith<ChunkVersion> ChunkVersion::parseFromBSONWithFieldForCommands(const B
     return version;
 }
 
-StatusWith<ChunkVersion> ChunkVersion::parseFromBSONForSetShardVersion(const BSONObj& obj) {
-    bool canParse;
-    const ChunkVersion chunkVersion = ChunkVersion::fromBSON(obj, kVersion, &canParse);
-    if (!canParse)
-        return {ErrorCodes::BadValue, "Unable to parse shard version"};
+StatusWith<ChunkVersion> ChunkVersion::parseLegacyWithField(const BSONObj& obj, StringData field) {
+    // Expect the timestamp
+    auto versionElem = obj[field];
+    if (versionElem.eoo())
+        return {ErrorCodes::NoSuchKey,
+                str::stream() << "Expected field " << field << " not found."};
 
-    return chunkVersion;
+    ChunkVersion version;
+
+    if (versionElem.type() == bsonTimestamp || versionElem.type() == Date) {
+        version._combined = versionElem._numberLong();
+    } else {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "Invalid type " << versionElem.type()
+                              << " for version timestamp part."};
+    }
+
+    // Expect the optional epoch OID
+    const auto epochField = field + "Epoch";
+    auto epochElem = obj[epochField];
+    if (epochElem.type() == jstOID) {
+        version._epoch = epochElem.OID();
+    } else if (!epochElem.eoo()) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "Invalid type " << epochElem.type() << " for version epoch part."};
+    }
+
+    return version;
 }
 
-StatusWith<ChunkVersion> ChunkVersion::parseFromBSONForChunk(const BSONObj& obj) {
-    bool canParse;
-    const ChunkVersion chunkVersion = ChunkVersion::fromBSON(obj, kLastmod, &canParse);
-    if (!canParse)
-        return {ErrorCodes::BadValue, "Unable to parse shard version"};
-
-    return chunkVersion;
+void ChunkVersion::appendWithField(BSONObjBuilder* out, StringData field) const {
+    BSONArrayBuilder arr(out->subarrayStart(field));
+    arr.appendTimestamp(_combined);
+    arr.append(_epoch);
 }
 
-StatusWith<ChunkVersion> ChunkVersion::parseFromBSONWithFieldAndSetEpoch(const BSONObj& obj,
-                                                                         StringData field,
-                                                                         const OID& epoch) {
-    bool canParse;
-    ChunkVersion chunkVersion = ChunkVersion::fromBSON(obj, field.toString(), &canParse);
-    if (!canParse)
-        return {ErrorCodes::BadValue, "Unable to parse shard version"};
-    chunkVersion._epoch = epoch;
-    return chunkVersion;
-}
-
-void ChunkVersion::appendForSetShardVersion(BSONObjBuilder* builder) const {
-    addToBSON(*builder, kVersion);
-}
-
-void ChunkVersion::appendForCommands(BSONObjBuilder* builder) const {
-    appendWithFieldForCommands(builder, kShardVersionField);
-}
-
-void ChunkVersion::appendWithFieldForCommands(BSONObjBuilder* builder, StringData field) const {
-    builder->appendArray(field, toBSON());
-}
-
-void ChunkVersion::appendForChunk(BSONObjBuilder* builder) const {
-    addToBSON(*builder, kLastmod);
+void ChunkVersion::appendLegacyWithField(BSONObjBuilder* out, StringData field) const {
+    out->appendTimestamp(field, _combined);
+    out->append(field + "Epoch", _epoch);
 }
 
 BSONObj ChunkVersion::toBSON() const {
@@ -144,6 +124,10 @@ BSONObj ChunkVersion::toBSON() const {
     b.appendTimestamp(_combined);
     b.append(_epoch);
     return b.arr();
+}
+
+std::string ChunkVersion::toString() const {
+    return str::stream() << majorVersion() << "|" << minorVersion() << "||" << _epoch;
 }
 
 }  // namespace mongo

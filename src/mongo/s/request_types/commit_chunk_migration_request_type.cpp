@@ -112,7 +112,7 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
 
     {
         auto statusWithChunkVersion =
-            ChunkVersion::parseFromBSONWithFieldForCommands(obj, kFromShardCollectionVersion);
+            ChunkVersion::parseWithField(obj, kFromShardCollectionVersion);
         if (!statusWithChunkVersion.isOK()) {
             return statusWithChunkVersion.getStatus();
         }
@@ -151,7 +151,7 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kFromShard, fromShard.toString());
     builder->append(kToShard, toShard.toString());
     builder->append(kMigratedChunk, migratedChunk.toConfigBSON());
-    fromShardCollectionVersion.appendWithFieldForCommands(builder, kFromShardCollectionVersion);
+    fromShardCollectionVersion.appendWithField(builder, kFromShardCollectionVersion);
 
     builder->append(kValidAfter, validAfter);
 }

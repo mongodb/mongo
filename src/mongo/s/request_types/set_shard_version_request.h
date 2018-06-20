@@ -47,6 +47,8 @@ class StatusWith;
  */
 class SetShardVersionRequest {
 public:
+    static constexpr StringData kVersion = "version"_sd;
+
     /**
      * Constructs a new set shard version request, which is of the "init" type, meaning it has no
      * namespace or version information associated with it and the init flag is set.

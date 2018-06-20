@@ -501,7 +501,7 @@
                 max: {x: 0},
                 keyPattern: {x: 1},
                 splitKeys: [{x: -2}, {x: -1}],
-                shardVersion: [ObjectId(), 2]
+                shardVersion: [Timestamp(1, 2), ObjectId()]
             },
             skipSharded: true,
             expectFailure: true,
