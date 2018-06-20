@@ -7,7 +7,7 @@ var repeatStr = function(str, n) {
 
 t.insert({z: repeatStr('c', 100000)});
 
-var maxOkStrLen = repeatStr('c', 32761);
+var maxOkStrLen = repeatStr('c', 32764);
 var strTooLong = maxOkStrLen + 'c';
 
 assert(t.findOne({z: {$regex: maxOkStrLen}}) != null);
