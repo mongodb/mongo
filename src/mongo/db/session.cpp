@@ -597,7 +597,6 @@ void Session::_beginOrContinueTxn(WithLock wl,
             stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalStarted();
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentOpen();
-        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentActive();
     } else {
         // Execute a retryable write.
         invariant(startTransaction == boost::none);
@@ -726,6 +725,9 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
 
     invariant(!_txnResourceStash);
     _txnResourceStash = TxnResources(opCtx);
+
+    // We accept possible slight inaccuracies in the current active and current inactive counters
+    // from non-atomicity.
     ServerTransactionsMetrics::get(opCtx)->decrementCurrentActive();
     ServerTransactionsMetrics::get(opCtx)->incrementCurrentInactive();
 }
@@ -781,6 +783,7 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             if (_txnState == MultiDocumentTransactionState::kInProgress) {
                 _singleTransactionStats->setActive(curTimeMicros64());
             }
+            // We accept possible slight inaccuracies in these counters from non-atomicity.
             ServerTransactionsMetrics::get(opCtx)->incrementCurrentActive();
             ServerTransactionsMetrics::get(opCtx)->decrementCurrentInactive();
             return;
@@ -795,6 +798,7 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             return;
         }
         opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentActive();
 
         // Set the starting active time for this transaction.
         _singleTransactionStats->setActive(curTimeMicros64());
