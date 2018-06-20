@@ -461,6 +461,10 @@ public:
         return _currentState == kDisposed;
     }
 
+    bool isDetached() const {
+        return _currentState == kDetached;
+    }
+
     /**
      * If the last oplog timestamp is being tracked for this PlanExecutor, return it.
      * Otherwise return a null timestamp.

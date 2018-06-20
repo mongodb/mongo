@@ -231,7 +231,7 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
 }
 
 void DocumentSourceCursor::detachFromOperationContext() {
-    if (_exec) {
+    if (_exec && !_exec->isDetached()) {
         _exec->detachFromOperationContext();
     }
 }

@@ -202,6 +202,7 @@ env.CppUnitTest(
         'document_source_check_resume_token_test.cpp',
         'document_source_count_test.cpp',
         'document_source_current_op_test.cpp',
+        'document_source_exchange_test.cpp',
         'document_source_geo_near_test.cpp',
         'document_source_graph_lookup_test.cpp',
         'document_source_group_test.cpp',
@@ -277,6 +278,7 @@ pipelineeEnv.Library(
         'document_source_coll_stats.cpp',
         'document_source_count.cpp',
         'document_source_current_op.cpp',
+        'document_source_exchange.cpp',
         'document_source_facet.cpp',
         'document_source_geo_near.cpp',
         'document_source_graph_lookup.cpp',
@@ -490,6 +492,7 @@ env.Library(
         env.Idlc('document_source_change_stream.idl')[0],
         env.Idlc('document_source_list_sessions.idl')[0],
         env.Idlc('document_source_out.idl')[0],
+        env.Idlc('document_source_exchange.idl')[0],
         'resume_token.cpp',
     ],
     LIBDEPS=[

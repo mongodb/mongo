@@ -125,7 +125,7 @@ class Document;
         return Status::OK();                                                     \
     }
 
-class DocumentSource : public IntrusiveCounterUnsigned {
+class DocumentSource : public RefCountable {
 public:
     using Parser = stdx::function<std::list<boost::intrusive_ptr<DocumentSource>>(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
