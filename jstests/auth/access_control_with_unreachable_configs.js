@@ -4,8 +4,6 @@
 // there are.
 // @tags: [requires_sharding]
 
-var dopts = {smallfiles: "", nopreallocj: ""};
-
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
 var st = new ShardingTest({
     shards: 1,
@@ -13,12 +11,7 @@ var st = new ShardingTest({
     config: 1,
     keyFile: 'jstests/libs/key1',
     useHostname: false,  // Needed when relying on the localhost exception
-    other: {
-        shardOptions: dopts,
-        configOptions: dopts,
-        mongosOptions: {verbose: 1},
-        shardAsReplicaSet: false
-    }
+    other: {mongosOptions: {verbose: 1}, shardAsReplicaSet: false}
 });
 var mongos = st.s;
 var config = st.config0;

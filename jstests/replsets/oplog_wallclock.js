@@ -10,7 +10,7 @@
     };
 
     var name = 'wt_test_coll';
-    var replSet = new ReplSetTest({nodes: 1, oplogSize: 2, nodeOptions: {smallfiles: ''}});
+    var replSet = new ReplSetTest({nodes: 1, oplogSize: 2});
     replSet.startSet();
     replSet.initiate();
 

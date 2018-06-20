@@ -2191,7 +2191,6 @@ var ReplSetTest = function(opts) {
             keyFile: this.keyFile,
             port: _useBridge ? _unbridgedPorts[n] : this.ports[n],
             noprealloc: "",
-            smallfiles: "",
             replSet: this.useSeedList ? this.getURL() : this.name,
             dbpath: "$set-$node"
         };

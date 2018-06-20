@@ -12,7 +12,7 @@
         var start;
         var insertTime;
 
-        const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
+        const conn = MongoRunner.runMongod({nojournal: ""});
         assert.neq(null, conn, "mongod failed to start.");
         db = conn.getDB("test");
 

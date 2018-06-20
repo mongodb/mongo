@@ -7,7 +7,7 @@
     load("jstests/noPassthrough/libs/index_build.js");
     load("jstests/libs/check_log.js");
 
-    const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
+    const conn = MongoRunner.runMongod({nojournal: ""});
     assert.neq(null, conn, "mongod failed to start.");
 
     let db = conn.getDB("test");

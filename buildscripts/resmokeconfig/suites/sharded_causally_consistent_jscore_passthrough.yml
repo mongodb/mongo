@@ -183,7 +183,6 @@ executor:
             verbosity: 1
             asio: 2
     mongod_options:
-      nopreallocj: ''
       enableMajorityReadConcern: ''
       set_parameters:
         enableTestCommands: 1

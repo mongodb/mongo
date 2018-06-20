@@ -3,7 +3,7 @@ var shardOpts = [
     {}  // just use default params
 ];
 
-var st = new ShardingTest({shards: shardOpts, other: {nopreallocj: 1}});
+var st = new ShardingTest({shards: shardOpts});
 var mongos = st.s;
 
 st.shardColl('bar', {x: 1});

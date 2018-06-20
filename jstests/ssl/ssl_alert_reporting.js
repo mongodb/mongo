@@ -32,7 +32,6 @@ load('jstests/ssl/libs/ssl_helpers.js');
         }
 
         var md = MongoRunner.runMongod({
-            nopreallocj: "",
             sslMode: "requireSSL",
             sslCAFile: "jstests/libs/ca.pem",
             sslPEMKeyFile: "jstests/libs/server.pem",

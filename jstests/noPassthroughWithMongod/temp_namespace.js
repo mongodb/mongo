@@ -5,7 +5,7 @@
 
 testname = 'temp_namespace_sw';
 
-var conn = MongoRunner.runMongod({smallfiles: "", noprealloc: "", nopreallocj: ""});
+var conn = MongoRunner.runMongod({noprealloc: ""});
 d = conn.getDB('test');
 d.runCommand({create: testname + 'temp1', temp: true});
 d[testname + 'temp1'].ensureIndex({x: 1});
@@ -32,9 +32,7 @@ conn = MongoRunner.runMongod({
     restart: true,
     cleanData: false,
     dbpath: conn.dbpath,
-    smallfiles: "",
     noprealloc: "",
-    nopreallocj: ""
 });
 d = conn.getDB('test');
 assert.eq(countCollectionNames(d, /temp\d$/), 0);

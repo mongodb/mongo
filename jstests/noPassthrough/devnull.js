@@ -1,5 +1,5 @@
 (function() {
-    var mongo = MongoRunner.runMongod({smallfiles: "", storageEngine: "devnull"});
+    var mongo = MongoRunner.runMongod({storageEngine: "devnull"});
 
     db = mongo.getDB("test");
 

@@ -1,6 +1,5 @@
 // Check if this build supports the authenticationMechanisms startup parameter.
 var conn = MongoRunner.runMongod({
-    smallfiles: "",
     auth: "",
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",

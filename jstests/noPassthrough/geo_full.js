@@ -23,7 +23,7 @@
 
     load("jstests/libs/geo_math.js");
 
-    const conn = MongoRunner.runMongod({smallfiles: ""});
+    const conn = MongoRunner.runMongod();
     assert.neq(null, conn, "mongod failed to start.");
     const db = conn.getDB("test");
 

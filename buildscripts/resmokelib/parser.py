@@ -124,19 +124,11 @@ def _make_parser():  # pylint: disable=too-many-statements
     parser.add_option("--nojournal", action="store_true", dest="no_journal",
                       help="Disables journaling for all mongod's.")
 
-    parser.add_option("--nopreallocj", action="store_const", const="off", dest="prealloc_journal",
-                      help="Disables preallocation of journal files for all mongod processes.")
-
     parser.add_option("--numClientsPerFixture", type="int", dest="num_clients_per_fixture",
                       help="Number of clients running tests per fixture.")
 
     parser.add_option("--perfReportFile", dest="perf_report_file", metavar="PERF_REPORT",
                       help="Writes a JSON file with performance test results.")
-
-    parser.add_option("--preallocJournal", type="choice", action="store", dest="prealloc_journal",
-                      choices=("on", "off"), metavar="ON|OFF",
-                      help=("Enables or disables preallocation of journal files for all mongod"
-                            " processes. Defaults to %default."))
 
     parser.add_option("--shellConnString", dest="shell_conn_string", metavar="CONN_STRING",
                       help="Overrides the default fixture and connect to an existing MongoDB"
@@ -293,8 +285,7 @@ def _make_parser():  # pylint: disable=too-many-statements
                                  metavar="BENCHMARK_REPETITIONS", help=benchmark_repetitions_help)
 
     parser.set_defaults(logger_file="console", dry_run="off", find_suites=False, list_suites=False,
-                        suite_files="with_server", prealloc_journal="off", shuffle="auto",
-                        stagger_jobs="off")
+                        suite_files="with_server", shuffle="auto", stagger_jobs="off")
     return parser
 
 
@@ -373,7 +364,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
     _config.MONGOS_SET_PARAMETERS = config.pop("mongos_set_parameters")
     _config.NO_JOURNAL = config.pop("no_journal")
-    _config.NO_PREALLOC_JOURNAL = config.pop("prealloc_journal") == "off"
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
     _config.PERF_REPORT_FILE = config.pop("perf_report_file")
     _config.RANDOM_SEED = config.pop("seed")

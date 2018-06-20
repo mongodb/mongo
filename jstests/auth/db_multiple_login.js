@@ -3,7 +3,7 @@
 // authentication.
 //
 // Regression test for SERVER-8144.
-var conn = MongoRunner.runMongod({auth: "", smallfiles: ""});
+var conn = MongoRunner.runMongod({auth: ""});
 var admin = conn.getDB("admin");
 var test = conn.getDB("test");
 

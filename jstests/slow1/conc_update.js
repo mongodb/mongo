@@ -1,7 +1,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
+    const conn = MongoRunner.runMongod({nojournal: ""});
     assert.neq(null, conn, "mongod was unable to start up");
     db = conn.getDB("concurrency");
     db.dropDatabase();

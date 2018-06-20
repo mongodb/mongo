@@ -58,7 +58,6 @@ DEFAULTS = {
     "no_journal": False,
     "num_clients_per_fixture": 1,
     "perf_report_file": None,
-    "prealloc_journal": None,  # Default is set on the commandline.
     "repeat": 1,
     "report_failure_status": "fail",
     "report_file": None,
@@ -280,10 +279,6 @@ MONGOS_SET_PARAMETERS = None
 # If true, then all mongod's started by resmoke.py and by the mongo shell will not have journaling
 # enabled.
 NO_JOURNAL = None
-
-# If true, then all mongod's started by resmoke.py and by the mongo shell will not preallocate
-# journal files.
-NO_PREALLOC_JOURNAL = None
 
 # If set, then each fixture runs tests with the specified number of clients.
 NUM_CLIENTS_PER_FIXTURE = None

@@ -12,7 +12,6 @@
  *     name {string}: name for this test
  *     verbose {number}: the verbosity for the mongos
  *     chunkSize {number}: the chunk size to use as configuration for the cluster
- *     nopreallocj {boolean|number}:
  *
  *     mongos {number|Object|Array.<Object>}: number of mongos or mongos
  *       configuration object(s)(*). @see MongoRunner.runMongos
@@ -54,7 +53,6 @@
  *          options take precedence.
  *
  *     other: {
- *       nopreallocj: same as above
  *       rs: same as above
  *       chunkSize: same as above
  *       keyFile {string}: the location of the keyFile
@@ -1063,7 +1061,7 @@ var ShardingTest = function(params) {
 
     // Allow specifying mixed-type options like this:
     // { mongos : [ { noprealloc : "" } ],
-    //   config : [ { smallfiles : "" } ],
+    //   config : [ { nojournal : "" } ],
     //   shards : { rs : true, d : true } }
     if (Array.isArray(numShards)) {
         for (var i = 0; i < numShards.length; i++) {
@@ -1149,7 +1147,6 @@ var ShardingTest = function(params) {
 
             var rsDefaults = {
                 useHostname: otherParams.useHostname,
-                noJournalPrealloc: otherParams.nopreallocj,
                 oplogSize: 16,
                 shardsvr: '',
                 pathOpts: Object.merge(pathOpts, {shard: i}),
@@ -1238,7 +1235,6 @@ var ShardingTest = function(params) {
         } else {
             var options = {
                 useHostname: otherParams.useHostname,
-                noJournalPrealloc: otherParams.nopreallocj,
                 pathOpts: Object.merge(pathOpts, {shard: i}),
                 dbpath: "$testName$shard",
                 shardsvr: '',
@@ -1347,7 +1343,6 @@ var ShardingTest = function(params) {
         // Ensure that journaling is always enabled for config servers.
         journal: "",
         configsvr: "",
-        noJournalPrealloc: otherParams.nopreallocj,
         storageEngine: "wiredTiger",
     };
 

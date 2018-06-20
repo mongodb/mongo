@@ -79,11 +79,6 @@ Status addTestFrameworkOptions(moe::OptionSection* options) {
 
     options->addOptionChaining("list", "list,l", moe::Switch, "list available test suites");
 
-    options->addOptionChaining("bigfiles",
-                               "bigfiles",
-                               moe::Switch,
-                               "use big datafiles instead of smallfiles which is the default");
-
     options->addOptionChaining(
         "filter", "filter,f", moe::String, "string substring filter on test name");
 
@@ -109,11 +104,6 @@ Status addTestFrameworkOptions(moe::OptionSection* options) {
     options->addOptionChaining("suites", "suites", moe::StringVector, "test suites to run")
         .hidden()
         .positional(1, -1);
-
-    options
-        ->addOptionChaining("nopreallocj", "nopreallocj", moe::Switch, "disable journal prealloc")
-        .hidden();
-
 
     return Status::OK();
 }

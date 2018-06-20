@@ -27,7 +27,7 @@
                   "On " + dbName + "." + collectionName);
     }
 
-    var conn = MongoRunner.runMongod({smallfiles: "", auth: ""});
+    var conn = MongoRunner.runMongod({auth: ""});
 
     var admin = conn.getDB('admin');
     var test = conn.getDB('test');

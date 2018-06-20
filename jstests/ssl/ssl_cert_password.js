@@ -15,7 +15,6 @@ requireSSLProvider('openssl', function() {
 
     // Password is correct
     var md = MongoRunner.runMongod({
-        nopreallocj: "",
         dbpath: dbpath,
         sslMode: "requireSSL",
         sslPEMKeyFile: "jstests/libs/password_protected.pem",

@@ -5,7 +5,7 @@
  */
 
 (function() {
-    let conn = MongoRunner.runMongod({smallfiles: ""});
+    let conn = MongoRunner.runMongod();
     let config = conn.getDB("config");
     let db = conn.getDB("admin");
 

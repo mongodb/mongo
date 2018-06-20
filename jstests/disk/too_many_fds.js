@@ -4,7 +4,7 @@
 function doTest() {
     var baseName = "jstests_disk_too_many_fds";
 
-    var m = MongoRunner.runMongod({smallfiles: "", nssize: 1});
+    var m = MongoRunner.runMongod({nssize: 1});
     // Make 1026 collections, each in a separate database.  On some storage engines, this may cause
     // 1026 files to be created.
     for (var i = 1; i < 1026; ++i) {
@@ -16,8 +16,7 @@ function doTest() {
     MongoRunner.stopMongod(m);
 
     // Ensure we can still start up with that many files.
-    var m2 = MongoRunner.runMongod(
-        {dbpath: m.dbpath, smallfiles: "", nssize: 1, restart: true, cleanData: false});
+    var m2 = MongoRunner.runMongod({dbpath: m.dbpath, nssize: 1, restart: true, cleanData: false});
     assert.eq(1, m2.getDB("db1025").getCollection("coll1025").count());
     MongoRunner.stopMongod(m2);
 

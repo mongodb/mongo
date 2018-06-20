@@ -1,7 +1,7 @@
 (function() {
     "use strict";
     if (0) {  // Test disabled until SERVER-8579 is finished. Reminder ticket: SERVER-8342
-        const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
+        const conn = MongoRunner.runMongod({nojournal: ""});
         assert.neq(null, conn, "mongod failed to start.");
         db = conn.getDB("test");
 

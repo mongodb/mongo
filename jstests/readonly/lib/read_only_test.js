@@ -53,12 +53,8 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
     ShardedFixture.prototype.runLoadPhase = function runLoadPhase(test) {
         // TODO: SERVER-33830 remove shardAsReplicaSet: false
-        this.shardingTest = new ShardingTest({
-            nopreallocj: true,
-            mongos: 1,
-            shards: this.nShards,
-            other: {shardAsReplicaSet: false}
-        });
+        this.shardingTest =
+            new ShardingTest({mongos: 1, shards: this.nShards, other: {shardAsReplicaSet: false}});
 
         this.paths = this.shardingTest.getDBPaths();
 

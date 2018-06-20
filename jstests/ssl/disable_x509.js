@@ -3,7 +3,6 @@
 var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";
 
 var conn = MongoRunner.runMongod({
-    smallfiles: "",
     auth: "",
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",

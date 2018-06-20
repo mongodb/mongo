@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 1, mongos: 2, config: 1, other: {smallfiles: true}});
+    var st = new ShardingTest({shards: 1, mongos: 2, config: 1});
 
     var standalone = MongoRunner.runMongod();
 

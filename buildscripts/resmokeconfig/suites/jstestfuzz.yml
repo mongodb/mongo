@@ -25,5 +25,4 @@ executor:
       set_parameters:
         disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
-      smallfiles: ''
       verbose: ''

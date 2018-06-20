@@ -59,7 +59,6 @@ executor:
         enableTestCommands: 1
     mongod_options:
       bind_ip_all: ''
-      nopreallocj: ''
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1

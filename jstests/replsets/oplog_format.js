@@ -6,7 +6,7 @@
  */
 
 "use strict";
-var replTest = new ReplSetTest({nodes: 1, oplogSize: 2, nodeOptions: {smallfiles: ""}});
+var replTest = new ReplSetTest({nodes: 1, oplogSize: 2});
 var nodes = replTest.startSet();
 replTest.initiate();
 var master = replTest.getPrimary();

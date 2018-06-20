@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    const conn = MongoRunner.runMongod({smallfiles: ""});
+    const conn = MongoRunner.runMongod();
     const admin = conn.getDB('admin');
 
     admin.createUser({user: 'andy', pwd: 'a', roles: jsTest.adminUserRoles});

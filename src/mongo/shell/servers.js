@@ -238,7 +238,6 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         noReplSet: true,
         forgetPort: true,
         arbiter: true,
-        noJournalPrealloc: true,
         noJournal: true,
         binVersion: true,
         waitForConnect: true,
@@ -361,11 +360,6 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
                 if (!o.binVersion)
                     return true;
-
-                // Version 1.x options
-                if (o.binVersion.startsWith("1.")) {
-                    return ["nopreallocj"].indexOf(option) < 0;
-                }
 
                 return true;
             };
@@ -580,7 +574,6 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      *     useLogFiles {boolean}: use with logFile option.
      *     logFile {string}: path to the log file. If not specified and useLogFiles
      *       is true, automatically creates a log file inside dbpath.
-     *     noJournalPrealloc {boolean}
      *     noJournal {boolean}
      *     keyFile
      *     replSet
@@ -608,9 +601,6 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         if (opts.logFile !== undefined) {
             opts.logpath = opts.logFile;
         }
-
-        if (jsTestOptions().noJournalPrealloc || opts.noJournalPrealloc)
-            opts.nopreallocj = "";
 
         if ((jsTestOptions().noJournal || opts.noJournal) && !('journal' in opts) &&
             !('configsvr' in opts)) {

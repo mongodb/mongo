@@ -7,7 +7,7 @@
 //
 //       These transitions are tested for $where and MapReduce.
 
-var conn = MongoRunner.runMongod({smallfiles: ""});
+var conn = MongoRunner.runMongod();
 var test = conn.getDB("test");
 
 // insert a single document and add two test users

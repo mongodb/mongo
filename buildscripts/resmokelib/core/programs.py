@@ -67,7 +67,6 @@ def mongod_program(  # pylint: disable=too-many-branches
 
     shortcut_opts = {
         "nojournal": config.NO_JOURNAL,
-        "nopreallocj": config.NO_PREALLOC_JOURNAL,
         "serviceExecutor": config.SERVICE_EXECUTOR,
         "storageEngine": config.STORAGE_ENGINE,
         "transportLayer": config.TRANSPORT_LAYER,
@@ -82,7 +81,7 @@ def mongod_program(  # pylint: disable=too-many-branches
         shortcut_opts["wiredTigerCacheSizeGB"] = config.STORAGE_ENGINE_CACHE_SIZE
 
     # These options are just flags, so they should not take a value.
-    opts_without_vals = ("nojournal", "nopreallocj")
+    opts_without_vals = ("nojournal", )
 
     # Have the --nojournal command line argument to resmoke.py unset the journal option.
     if shortcut_opts["nojournal"] and "journal" in kwargs:
@@ -162,7 +161,6 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
 
     shortcut_opts = {
         "noJournal": (config.NO_JOURNAL, False),
-        "noJournalPrealloc": (config.NO_PREALLOC_JOURNAL, False),
         "serviceExecutor": (config.SERVICE_EXECUTOR, ""),
         "storageEngine": (config.STORAGE_ENGINE, ""),
         "storageEngineCacheSizeGB": (config.STORAGE_ENGINE_CACHE_SIZE, ""),
