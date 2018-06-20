@@ -26,6 +26,9 @@ selector:
   # TODO: SERVER-35171
   - jstests/multiVersion/new_mongos_old_mongod_wire_version_clash.js
 
+  # TODO: SERVER-35390
+  - jstests/multiVersion/upgrade_cluster.js
+
 # Multiversion tests start their own mongod's.
 executor:
   config:

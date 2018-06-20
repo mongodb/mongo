@@ -57,8 +57,8 @@ TEST(DatabaseType, Basic) {
     ASSERT_EQUALS(db.getName(), "mydb");
     ASSERT_EQUALS(db.getPrimary(), "shard");
     ASSERT_TRUE(db.getSharded());
-    ASSERT_EQUALS(db.getVersion()->getUuid(), uuid);
-    ASSERT_EQUALS(db.getVersion()->getLastMod(), 0);
+    ASSERT_EQUALS(db.getVersion().getUuid(), uuid);
+    ASSERT_EQUALS(db.getVersion().getLastMod(), 0);
 }
 
 TEST(DatabaseType, BadType) {

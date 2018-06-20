@@ -39,6 +39,7 @@
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/config_server_test_fixture.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/scopeguard.h"
@@ -178,7 +179,7 @@ std::shared_ptr<RemoteCommandTargeterMock> MigrationManagerTest::shardTargeterMo
 }
 
 void MigrationManagerTest::setUpDatabase(const std::string& dbName, const ShardId primaryShard) {
-    DatabaseType db(dbName, primaryShard, true);
+    DatabaseType db(dbName, primaryShard, true, databaseVersion::makeNew());
     ASSERT_OK(catalogClient()->insertConfigDocument(
         operationContext(), DatabaseType::ConfigNS, db.toBSON(), kMajorityWriteConcern));
 }

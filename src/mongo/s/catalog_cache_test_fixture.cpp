@@ -44,6 +44,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -104,7 +105,7 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
     ChunkVersion version(1, 0, OID::gen());
 
     const BSONObj databaseBSON = [&]() {
-        DatabaseType db(nss.db().toString(), {"0"}, true);
+        DatabaseType db(nss.db().toString(), {"0"}, true, databaseVersion::makeNew());
         return db.toBSON();
     }();
 
@@ -161,7 +162,7 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
 
 void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        DatabaseType db(nss.db().toString(), {"0"}, true);
+        DatabaseType db(nss.db().toString(), {"0"}, true, databaseVersion::makeNew());
         return std::vector<BSONObj>{db.toBSON()};
     }());
 }

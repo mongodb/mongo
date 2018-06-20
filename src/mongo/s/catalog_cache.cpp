@@ -327,8 +327,8 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
     } else if (itDbEntry->second->needsRefresh) {
         // Refresh has been scheduled for the database already
         return;
-    } else if (!itDbEntry->second->dbt || !itDbEntry->second->dbt->getVersion() ||
-               databaseVersion::equal(*itDbEntry->second->dbt->getVersion(), databaseVersion)) {
+    } else if (!itDbEntry->second->dbt ||
+               databaseVersion::equal(itDbEntry->second->dbt->getVersion(), databaseVersion)) {
         // If the versions match, the cached database info is stale, so mark it as needs refresh.
         log() << "Marking cached database entry for '" << dbName << "' as stale";
         itDbEntry->second->needsRefresh = true;

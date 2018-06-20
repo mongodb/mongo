@@ -51,7 +51,7 @@ const BSONField<BSONObj> DatabaseType::version("version");
 DatabaseType::DatabaseType(const std::string& dbName,
                            const ShardId& primaryShard,
                            bool sharded,
-                           boost::optional<DatabaseVersion> version)
+                           DatabaseVersion version)
     : _name(dbName), _primary(primaryShard), _sharded(sharded), _version(version) {}
 
 StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
@@ -77,15 +77,17 @@ StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
             return status;
     }
 
-    boost::optional<DatabaseVersion> dbtVersion = boost::none;
+    DatabaseVersion dbtVersion;
     {
         BSONObj versionField = source.getObjectField("version");
-        // TODO: Parse this unconditionally once featureCompatibilityVersion 3.6 is no longer
-        // supported.
-        if (!versionField.isEmpty()) {
-            dbtVersion =
-                DatabaseVersion::parse(IDLParserErrorContext("DatabaseType"), versionField);
+        if (versionField.isEmpty()) {
+            return Status{ErrorCodes::InternalError,
+                          str::stream() << "DatabaseVersion doesn't exist in database entry "
+                                        << source
+                                        << " despite the config server being in binary version 4.2 "
+                                           "or later."};
         }
+        dbtVersion = DatabaseVersion::parse(IDLParserErrorContext("DatabaseType"), versionField);
     }
 
     return DatabaseType{
@@ -111,11 +113,7 @@ BSONObj DatabaseType::toBSON() const {
     builder.append(name.name(), _name);
     builder.append(primary.name(), _primary.toString());
     builder.append(sharded.name(), _sharded);
-
-    // Optional fields.
-    if (_version) {
-        builder.append(version.name(), _version->toBSON());
-    }
+    builder.append(version.name(), _version.toBSON());
 
     return builder.obj();
 }

@@ -54,7 +54,7 @@ public:
     DatabaseType(const std::string& dbName,
                  const ShardId& primaryShard,
                  bool sharded,
-                 boost::optional<DatabaseVersion> = boost::none);
+                 DatabaseVersion);
 
 #ifdef _WIN32
     // TODO: Remove this when Microsoft's implementation of std::future doesn't require a default
@@ -108,7 +108,7 @@ public:
     }
     void setSharded(bool sharded);
 
-    boost::optional<DatabaseVersion> getVersion() const {
+    DatabaseVersion getVersion() const {
         return _version;
     }
     void setVersion(const DatabaseVersion& version);
@@ -117,9 +117,7 @@ private:
     std::string _name;
     ShardId _primary;
     bool _sharded;
-
-    // Optional while featureCompatibilityVersion 3.6 is supported.
-    boost::optional<DatabaseVersion> _version;
+    DatabaseVersion _version;
 };
 
 }  // namespace mongo
