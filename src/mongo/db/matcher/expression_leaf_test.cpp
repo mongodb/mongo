@@ -166,18 +166,34 @@ TEST(EqOp, MatchesNestedNull) {
 TEST(EqOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << MinKey);
     EqualityMatchExpression eq("a", operand["a"]);
-    ASSERT(eq.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(!eq.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(!eq.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(eq.matchesBSON(minKeyObj, NULL));
+    ASSERT(!eq.matchesBSON(maxKeyObj, NULL));
+    ASSERT(!eq.matchesBSON(numObj, NULL));
+
+    ASSERT(eq.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(!eq.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(!eq.matchesSingleElement(numObj.firstElement()));
 }
 
 
 TEST(EqOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << MaxKey);
     EqualityMatchExpression eq("a", operand["a"]);
-    ASSERT(eq.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(!eq.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(!eq.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(!eq.matchesBSON(minKeyObj, NULL));
+    ASSERT(eq.matchesBSON(maxKeyObj, NULL));
+    ASSERT(!eq.matchesBSON(numObj, NULL));
+
+    ASSERT(!eq.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(eq.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(!eq.matchesSingleElement(numObj.firstElement()));
 }
 
 TEST(EqOp, MatchesFullArray) {
@@ -314,17 +330,33 @@ TEST(LtOp, MatchesDotNotationNull) {
 TEST(LtOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << MinKey);
     LTMatchExpression lt("a", operand["a"]);
-    ASSERT(!lt.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(!lt.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(!lt.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(!lt.matchesBSON(minKeyObj, NULL));
+    ASSERT(!lt.matchesBSON(maxKeyObj, NULL));
+    ASSERT(!lt.matchesBSON(numObj, NULL));
+
+    ASSERT(!lt.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(!lt.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(!lt.matchesSingleElement(numObj.firstElement()));
 }
 
 TEST(LtOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << MaxKey);
     LTMatchExpression lt("a", operand["a"]);
-    ASSERT(!lt.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(lt.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(lt.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(lt.matchesBSON(minKeyObj, NULL));
+    ASSERT(!lt.matchesBSON(maxKeyObj, NULL));
+    ASSERT(lt.matchesBSON(numObj, NULL));
+
+    ASSERT(lt.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(!lt.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(lt.matchesSingleElement(numObj.firstElement()));
 }
 
 TEST(LtOp, ElemMatchKey) {
@@ -412,17 +444,33 @@ TEST(LteOp, MatchesDotNotationNull) {
 TEST(LteOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << MinKey);
     LTEMatchExpression lte("a", operand["a"]);
-    ASSERT(lte.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(!lte.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(!lte.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(lte.matchesBSON(minKeyObj, NULL));
+    ASSERT(!lte.matchesBSON(maxKeyObj, NULL));
+    ASSERT(!lte.matchesBSON(numObj, NULL));
+
+    ASSERT(lte.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(!lte.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(!lte.matchesSingleElement(numObj.firstElement()));
 }
 
 TEST(LteOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << MaxKey);
     LTEMatchExpression lte("a", operand["a"]);
-    ASSERT(lte.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(lte.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(lte.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(lte.matchesBSON(minKeyObj, NULL));
+    ASSERT(lte.matchesBSON(maxKeyObj, NULL));
+    ASSERT(lte.matchesBSON(numObj, NULL));
+
+    ASSERT(lte.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(lte.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(lte.matchesSingleElement(numObj.firstElement()));
 }
 
 
@@ -499,17 +547,33 @@ TEST(GtOp, MatchesDotNotationNull) {
 TEST(GtOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << MinKey);
     GTMatchExpression gt("a", operand["a"]);
-    ASSERT(!gt.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(gt.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(gt.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(!gt.matchesBSON(minKeyObj, NULL));
+    ASSERT(gt.matchesBSON(maxKeyObj, NULL));
+    ASSERT(gt.matchesBSON(numObj, NULL));
+
+    ASSERT(!gt.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(gt.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(gt.matchesSingleElement(numObj.firstElement()));
 }
 
 TEST(GtOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << MaxKey);
     GTMatchExpression gt("a", operand["a"]);
-    ASSERT(!gt.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(!gt.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(!gt.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(!gt.matchesBSON(minKeyObj, NULL));
+    ASSERT(!gt.matchesBSON(maxKeyObj, NULL));
+    ASSERT(!gt.matchesBSON(numObj, NULL));
+
+    ASSERT(!gt.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(!gt.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(!gt.matchesSingleElement(numObj.firstElement()));
 }
 
 TEST(GtOp, ElemMatchKey) {
@@ -598,17 +662,33 @@ TEST(GteOp, MatchesDotNotationNull) {
 TEST(GteOp, MatchesMinKey) {
     BSONObj operand = BSON("a" << MinKey);
     GTEMatchExpression gte("a", operand["a"]);
-    ASSERT(gte.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(gte.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(gte.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(gte.matchesBSON(minKeyObj, NULL));
+    ASSERT(gte.matchesBSON(maxKeyObj, NULL));
+    ASSERT(gte.matchesBSON(numObj, NULL));
+
+    ASSERT(gte.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(gte.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(gte.matchesSingleElement(numObj.firstElement()));
 }
 
 TEST(GteOp, MatchesMaxKey) {
     BSONObj operand = BSON("a" << MaxKey);
     GTEMatchExpression gte("a", operand["a"]);
-    ASSERT(gte.matchesBSON(BSON("a" << MaxKey), NULL));
-    ASSERT(!gte.matchesBSON(BSON("a" << MinKey), NULL));
-    ASSERT(!gte.matchesBSON(BSON("a" << 4), NULL));
+    BSONObj minKeyObj = BSON("a" << MinKey);
+    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj numObj = BSON("a" << 4);
+
+    ASSERT(!gte.matchesBSON(minKeyObj, NULL));
+    ASSERT(gte.matchesBSON(maxKeyObj, NULL));
+    ASSERT(!gte.matchesBSON(numObj, NULL));
+
+    ASSERT(!gte.matchesSingleElement(minKeyObj.firstElement()));
+    ASSERT(gte.matchesSingleElement(maxKeyObj.firstElement()));
+    ASSERT(!gte.matchesSingleElement(numObj.firstElement()));
 }
 
 TEST(GteOp, ElemMatchKey) {

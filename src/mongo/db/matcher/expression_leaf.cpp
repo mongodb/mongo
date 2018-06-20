@@ -117,14 +117,34 @@ ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
 bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
                                                      MatchDetails* details) const {
     if (e.canonicalType() != _rhs.canonicalType()) {
-        // some special cases
-        //  jstNULL and undefined are treated the same
+        // We can't call 'compareElements' on elements of different canonical types.  Usually
+        // elements with different canonical types should never match any comparison, but there are
+        // a few exceptions, handled here.
+
+        // jstNULL and undefined are treated the same
         if (e.canonicalType() + _rhs.canonicalType() == 5) {
             return matchType() == EQ || matchType() == LTE || matchType() == GTE;
         }
-
         if (_rhs.type() == MaxKey || _rhs.type() == MinKey) {
-            return matchType() != EQ;
+            switch (matchType()) {
+                // LT and LTE need no distinction here because the two elements that we are
+                // comparing do not even have the same canonical type and are thus not equal
+                // (i.e.the case where we compare MinKey against MinKey would not reach this switch
+                // statement at all).  The same reasoning follows for the lack of distinction
+                // between GTE and GT.
+                case LT:
+                case LTE:
+                    return _rhs.type() == MaxKey;
+                case EQ:
+                    return false;
+                case GT:
+                case GTE:
+                    return _rhs.type() == MinKey;
+                default:
+                    // This is a comparison match expression, so it must be either
+                    // a $lt, $lte, $gt, $gte, or equality expression.
+                    MONGO_UNREACHABLE;
+            }
         }
         return false;
     }
@@ -153,7 +173,6 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
 
     int x = BSONElement::compareElements(
         e, _rhs, BSONElement::ComparisonRules::kConsiderFieldName, _collator);
-
     switch (matchType()) {
         case LT:
             return x < 0;
