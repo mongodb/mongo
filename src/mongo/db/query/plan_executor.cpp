@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/plan_executor.h"
@@ -53,6 +55,7 @@
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
 
@@ -74,6 +77,7 @@ struct CappedInsertNotifierData {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
+MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
 
 /**
  * Constructs a PlanYieldPolicy based on 'policy'.
@@ -417,22 +421,27 @@ PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* o
     return getNextImpl(objOut, dlOut);
 }
 
+bool PlanExecutor::shouldListenForInserts() {
+    return _cq && _cq->getQueryRequest().isTailableAndAwaitData() &&
+        awaitDataState(_opCtx).shouldWaitForInserts && _opCtx->checkForInterruptNoAssert().isOK() &&
+        awaitDataState(_opCtx).waitForInsertsDeadline >
+        _opCtx->getServiceContext()->getPreciseClockSource()->now();
+}
 
 bool PlanExecutor::shouldWaitForInserts() {
     // If this is an awaitData-respecting operation and we have time left and we're not interrupted,
     // we should wait for inserts.
-    if (_cq && _cq->getQueryRequest().isTailableAndAwaitData() &&
-        awaitDataState(_opCtx).shouldWaitForInserts && _opCtx->checkForInterruptNoAssert().isOK() &&
-        awaitDataState(_opCtx).waitForInsertsDeadline >
-            _opCtx->getServiceContext()->getPreciseClockSource()->now()) {
+    if (shouldListenForInserts()) {
         // We expect awaitData cursors to be yielding.
         invariant(_yieldPolicy->canReleaseLocksDuringExecution());
 
         // For operations with a last committed opTime, we should not wait if the replication
-        // coordinator's lastCommittedOpTime has changed.
+        // coordinator's lastCommittedOpTime has progressed past the client's lastCommittedOpTime.
+        // In that case, we will return early so that we can inform the client of the new
+        // lastCommittedOpTime immediately.
         if (!clientsLastKnownCommittedOpTime(_opCtx).isNull()) {
             auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-            return clientsLastKnownCommittedOpTime(_opCtx) == replCoord->getLastCommittedOpTime();
+            return clientsLastKnownCommittedOpTime(_opCtx) >= replCoord->getLastCommittedOpTime();
         }
         return true;
     }
@@ -525,7 +534,8 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
     // insert notifier the entire time we are in the loop.  Holding a shared pointer to the capped
     // insert notifier is necessary for the notifierVersion to advance.
     CappedInsertNotifierData cappedInsertNotifierData;
-    if (shouldWaitForInserts()) {
+    if (shouldListenForInserts()) {
+        // We always construct the CappedInsertNotifier for awaitData cursors.
         cappedInsertNotifierData.notifier = getCappedInsertNotifier();
     }
     for (;;) {
@@ -614,6 +624,11 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
         } else if (PlanStage::IS_EOF == code) {
+            if (MONGO_FAIL_POINT(planExecutorHangBeforeShouldWaitForInserts)) {
+                log() << "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
+                         "enabled. Blocking until fail point is disabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(planExecutorHangBeforeShouldWaitForInserts);
+            }
             if (!shouldWaitForInserts()) {
                 return PlanExecutor::IS_EOF;
             }
