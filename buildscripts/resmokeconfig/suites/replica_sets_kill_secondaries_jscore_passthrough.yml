@@ -15,6 +15,9 @@ selector:
 
 executor:
   js_test:
+    archive:
+      hooks:
+        - PeriodicKillSecondaries
     config:
       shell_options:
         eval: "testingReplication = true;"
