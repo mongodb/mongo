@@ -34,7 +34,7 @@
         assert.soon(
             checkFunc, 'Balance at step ' + stepName + ' did not happen', 3 * 60 * 1000, 2000);
 
-        st.awaitBalancerRound();
+        st.waitForBalancer(true, 60000);
         st.printShardingStatus(true);
         assert(checkFunc());
 

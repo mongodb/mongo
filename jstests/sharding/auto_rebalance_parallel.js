@@ -54,8 +54,8 @@
     const testColl2InitialMoves = countMoves('TestDB.TestColl2');
 
     st.startBalancer();
-    st.awaitBalancerRound();
-    st.awaitBalancerRound();
+    st.waitForBalancer(true, 60000);
+    st.waitForBalancer(true, 60000);
     st.stopBalancer();
 
     checkCollectionBalanced('TestDB.TestColl1');

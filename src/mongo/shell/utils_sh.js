@@ -24,6 +24,10 @@ sh._getConfigDB = function() {
     return db.getSiblingDB("config");
 };
 
+sh._getBalancerStatus = function() {
+    return assert.commandWorked(sh._getConfigDB().adminCommand({balancerStatus: 1}));
+};
+
 sh._dataFormat = function(bytes) {
     if (bytes < 1024)
         return Math.floor(bytes) + "B";
@@ -231,6 +235,21 @@ sh.waitForPingChange = function(activePings, timeout, interval) {
     }
 
     return remainingPings;
+};
+
+sh.waitForBalancer = function(wait, timeout, interval) {
+    if (typeof(wait) === 'undefined') {
+        wait = false;
+    }
+    var initialStatus = sh._getBalancerStatus();
+    if (!initialStatus.inBalancerRound && !wait) {
+        return;
+    }
+    var currentStatus;
+    assert.soon(function() {
+        currentStatus = sh._getBalancerStatus();
+        return (currentStatus.numBalancerRounds - initialStatus.numBalancerRounds) != 0;
+    }, 'Latest balancer status: ' + tojson(currentStatus), timeout, interval);
 };
 
 sh.disableBalancing = function(coll) {

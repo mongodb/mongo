@@ -68,7 +68,7 @@
                                             true));
     st.startBalancer();
 
-    st.awaitBalancerRound();
+    st.waitForBalancer(true, 60000);
 
     var shard0ChunksAfter =
         configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
@@ -84,7 +84,7 @@
         },
         true));
 
-    st.awaitBalancerRound();
+    st.waitForBalancer(true, 60000);
 
     shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
     assert.neq(shard0Chunks, shard0ChunksAfter);

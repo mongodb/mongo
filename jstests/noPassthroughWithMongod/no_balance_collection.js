@@ -72,7 +72,7 @@ sh.disableBalancing(collB);
 // Wait for the balancer to fully finish the last migration and write the changelog
 // MUST set db var here, ugly but necessary
 db = st.s0.getDB("config");
-st.awaitBalancerRound();
+st.waitForBalancer(true, 60000);
 
 // Make sure auto-migrates on insert don't move chunks
 var lastMigration = sh._lastMigration(collB);

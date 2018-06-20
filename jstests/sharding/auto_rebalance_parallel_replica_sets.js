@@ -41,7 +41,7 @@
 
     // Do enable the balancer and wait for a single balancer round
     st.startBalancer();
-    st.awaitBalancerRound();
+    st.waitForBalancer(true, 60000);
     st.stopBalancer();
 
     assert.eq(1,
