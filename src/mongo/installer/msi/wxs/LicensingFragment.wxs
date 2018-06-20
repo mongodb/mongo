@@ -17,6 +17,10 @@
         <File Id="f_GnuLicense" Name="GNU-AGPL-3.0" Source="$(var.LicenseSource)\GNU-AGPL-3.0"
               DiskId ="1" KeyPath="yes" />
       </Component>
+      <Component Id="c_CommunityLicense" Guid="D512B995-0FDB-4734-B8F4-6C67D6DE1069">
+        <File Id="f_LicenseCommunity" Name="LICENSE-Community.txt" Source="$(var.LicenseSource)\LICENSE-Community.txt"
+              DiskId ="1" KeyPath="yes" />
+      </Component>
       <Component Id="c_Thirdparty" Guid="D6098364-6DE8-48EA-A955-7D1060752132">
         <File Id="f_Thirdparty" Name="THIRD-PARTY-NOTICES" Source="$(var.LicenseSource)\THIRD-PARTY-NOTICES"
               DiskId ="1" />
@@ -44,6 +48,9 @@
       <ComponentRef Id="c_License"/>
       <ComponentRef Id="c_InstallKey"/>
       <ComponentRef Id="c_MPL2"/>
+      <?if $(var.Edition) != Enterprise ?>
+        <ComponentRef Id="c_CommunityLicense"/>
+      <?endif?>
     </ComponentGroup>
 
     <?if $(var.Edition) = Enterprise ?>
