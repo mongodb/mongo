@@ -98,9 +98,7 @@ public:
             auto cachedDbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.ns()));
             result.append("primaryShard", cachedDbInfo.primaryId().toString());
             result.append("shardingEnabled", cachedDbInfo.shardingEnabled());
-            if (cachedDbInfo.databaseVersion()) {
-                result.append("version", cachedDbInfo.databaseVersion()->toBSON());
-            }
+            result.append("version", cachedDbInfo.databaseVersion().toBSON());
         } else {
             // Return the collection's information.
             auto cachedCollInfo =

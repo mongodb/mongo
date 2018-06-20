@@ -63,7 +63,7 @@ public:
     };
 
     bool shardingEnabled() const;
-    boost::optional<DatabaseVersion> databaseVersion() const;
+    DatabaseVersion databaseVersion() const;
 
 private:
     friend class CatalogCache;

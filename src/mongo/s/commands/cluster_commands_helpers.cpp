@@ -78,12 +78,12 @@ namespace {
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo) {
     // Attach the databaseVersion if we have one cached for the database.
     auto dbVersion = dbInfo.databaseVersion();
-    if (!dbVersion || databaseVersion::isFixed(*dbVersion)) {
+    if (databaseVersion::isFixed(dbVersion)) {
         return cmdObj;
     }
 
     BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));
-    cmdWithVersionBob.append("databaseVersion", dbVersion->toBSON());
+    cmdWithVersionBob.append("databaseVersion", dbVersion.toBSON());
     return cmdWithVersionBob.obj();
 }
 

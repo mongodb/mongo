@@ -632,7 +632,7 @@ bool CachedDatabaseInfo::shardingEnabled() const {
     return _dbt.getSharded();
 }
 
-boost::optional<DatabaseVersion> CachedDatabaseInfo::databaseVersion() const {
+DatabaseVersion CachedDatabaseInfo::databaseVersion() const {
     return _dbt.getVersion();
 }
 

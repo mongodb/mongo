@@ -219,11 +219,10 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         }
 
         const auto cachedDbVersion = DatabaseShardingState::get(db).getDbVersion(opCtx);
-        if (cachedDbVersion && refreshedDbVersion &&
-            cachedDbVersion->getUuid() == refreshedDbVersion->getUuid() &&
-            cachedDbVersion->getLastMod() >= refreshedDbVersion->getLastMod()) {
+        if (cachedDbVersion && cachedDbVersion->getUuid() == refreshedDbVersion.getUuid() &&
+            cachedDbVersion->getLastMod() >= refreshedDbVersion.getLastMod()) {
             LOG(2) << "Skipping setting cached databaseVersion for " << dbName
-                   << " to refreshed version " << refreshedDbVersion->toBSON()
+                   << " to refreshed version " << refreshedDbVersion.toBSON()
                    << " because current cached databaseVersion is already "
                    << cachedDbVersion->toBSON();
             return;
