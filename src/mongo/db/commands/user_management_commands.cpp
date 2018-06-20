@@ -1370,21 +1370,27 @@ public:
                 pipeline.push_back(BSON("$match" << *args.filter));
             }
 
+            DBDirectClient client(opCtx);
+
             BSONObjBuilder responseBuilder;
             AggregationRequest aggRequest(AuthorizationManager::usersCollectionNamespace,
                                           std::move(pipeline));
-            Status status = runAggregate(opCtx,
+            uassertStatusOK(runAggregate(opCtx,
                                          AuthorizationManager::usersCollectionNamespace,
                                          aggRequest,
                                          aggRequest.serializeToCommandObj().toBson(),
-                                         responseBuilder);
-            uassertStatusOK(status);
-
+                                         responseBuilder));
             CommandHelpers::appendSimpleCommandStatus(responseBuilder, true);
-            auto swResponse = CursorResponse::parseFromBSON(responseBuilder.obj());
-            uassertStatusOK(swResponse.getStatus());
-            for (const BSONObj& obj : swResponse.getValue().getBatch()) {
-                usersArrayBuilder.append(obj);
+            auto response = CursorResponse::parseFromBSONThrowing(responseBuilder.obj());
+            DBClientCursor cursor(&client,
+                                  response.getNSS().toString(),
+                                  response.getCursorId(),
+                                  0,
+                                  0,
+                                  response.releaseBatch());
+
+            while (cursor.more()) {
+                usersArrayBuilder.append(cursor.next());
             }
         }
         result.append("users", usersArrayBuilder.arr());

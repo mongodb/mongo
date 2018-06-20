@@ -466,13 +466,15 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      nToSkip,
                      fieldsToReturn,
                      queryOptions,
-                     batchSize) {}
+                     batchSize,
+                     {}) {}
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const std::string& ns,
                                long long cursorId,
                                int nToReturn,
-                               int queryOptions)
+                               int queryOptions,
+                               std::vector<BSONObj> initialBatch)
     : DBClientCursor(client,
                      ns,
                      BSONObj(),  // query
@@ -481,7 +483,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      0,        // nToSkip
                      nullptr,  // fieldsToReturn
                      queryOptions,
-                     0) {}  // batchSize
+                     0,
+                     std::move(initialBatch)) {}  // batchSize
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
                                const std::string& ns,
@@ -491,8 +494,10 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                int nToSkip,
                                const BSONObj* fieldsToReturn,
                                int queryOptions,
-                               int batchSize)
-    : _client(client),
+                               int batchSize,
+                               std::vector<BSONObj> initialBatch)
+    : batch{std::move(initialBatch)},
+      _client(client),
       _originalHost(_client->getServerAddress()),
       ns(ns),
       _isCommand(nsIsFull(ns) ? nsToCollectionSubstring(ns) == "$cmd" : false),
