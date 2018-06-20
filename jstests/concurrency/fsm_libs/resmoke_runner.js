@@ -218,6 +218,9 @@
         throw new Error('Unrecognized topology format: ' + tojson(topology));
     }
 
+    clusterOptions.sameDB = TestData.sameDB;
+    clusterOptions.sameCollection = TestData.sameCollection;
+
     let workloads = TestData.fsmWorkloads;
 
     let sessionOptions = {};

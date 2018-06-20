@@ -51,13 +51,11 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     def _populate_test_data(self, test_data):
         test_data["fsmWorkloads"] = self.fsm_workload_group
-        test_data["fsmWorkloads"] = self.fsm_workload_group
         test_data["resmokeDbPathPrefix"] = self.dbpath_prefix
 
         with FSMWorkloadTestCase._COUNTER_LOCK:
             count = FSMWorkloadTestCase._COUNTER
-            if not self.same_db:
-                FSMWorkloadTestCase._COUNTER += 1
+            FSMWorkloadTestCase._COUNTER += 1
 
         # We use a global incrementing counter as a prefix for the database name to avoid any
         # collection lifecycle related issues in sharded clusters. This more closely matches how
@@ -65,10 +63,8 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
         # for each FSM workload in the entire schedule by runner.js.
         test_prefix = self.db_name_prefix if self.db_name_prefix else "test"
         test_data["dbNamePrefix"] = "{}{:d}_".format(test_prefix, count)
-        if not self.same_db:
-            test_data["sameDB"] = True
-        if not self.same_collection:
-            test_data["sameCollection"] = True
+        test_data["sameDB"] = self.same_db
+        test_data["sameCollection"] = self.same_collection
 
     @staticmethod
     def get_workload_group(selected_tests):
