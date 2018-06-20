@@ -88,7 +88,7 @@ void ServerTransactionsMetrics::incrementTotalCommitted() {
 }
 
 void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
-    // This is a dummy function until we start tracking global transactions metrics.
+    stats->setTotalStarted(_totalStarted.load());
 }
 
 class TransactionsSSS : public ServerStatusSection {
