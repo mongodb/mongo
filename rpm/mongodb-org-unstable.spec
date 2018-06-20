@@ -221,6 +221,7 @@ fi
 %attr(0755,mongod,mongod) %dir /var/log/mongodb
 %attr(0755,mongod,mongod) %dir /var/run/mongodb
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongodb/mongod.log
+%doc LICENSE-Community.txt
 %doc GNU-AGPL-3.0
 %doc README
 %doc THIRD-PARTY-NOTICES

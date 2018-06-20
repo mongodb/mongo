@@ -643,9 +643,11 @@ env.Append(MODULE_BANNERS = [distsrc.File('README'),
                              distsrc.File('THIRD-PARTY-NOTICES'),
                              distsrc.File('MPL-2')])
 
-# If no module has introduced a file named LICENSE.txt, then inject the AGPL.
-if sum(itertools.imap(lambda x: x.name == "LICENSE.txt", env['MODULE_BANNERS'])) == 0:
-    env.Append(MODULE_BANNERS = [distsrc.File('GNU-AGPL-3.0')])
+# If no module has introduced a file named LICENSE-Enterprise.txt then this
+# is a Community build, so inject the AGPL and the Community license
+if sum(itertools.imap(lambda x: x.name == "LICENSE-Enterprise.txt", env['MODULE_BANNERS'])) == 0:
+    env.Append(MODULE_BANNERS = [distsrc.File('GNU-AGPL-3.0'),
+                                 distsrc.File('LICENSE-Community.txt')])
 
 # All module banners get staged to the top level of the tarfile, so we
 # need to fail if we are going to have a name collision.

@@ -5,7 +5,7 @@
     <DirectoryRef Id="INSTALLLOCATION">
       <?if $(var.Edition) = Enterprise ?>
       <Component Id="c_License" Guid="C0EF85E2-95F8-468B-BA95-2F739C63D2D7">
-        <File Id="f_License" Name="LICENSE.txt" Source="$(var.EnterpriseBase)\distsrc\LICENSE.txt"
+        <File Id="f_License" Name="LICENSE-Enterprise.txt" Source="$(var.EnterpriseBase)\distsrc\LICENSE-Enterprise.txt"
               DiskId ="1" KeyPath="yes" />
       </Component>
       <Component Id="c_Thirdparty" Guid="C45662A7-5C18-4A53-8D14-7C92DB38F13E">
@@ -47,9 +47,9 @@
     </ComponentGroup>
 
     <?if $(var.Edition) = Enterprise ?>
-    <WixVariable Id="WixUILicenseRtf" Value="$(var.EnterpriseBase)\distsrc\LICENSE.rtf" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.EnterpriseBase)\distsrc\LICENSE-Enterprise.rtf" />
     <?else ?>
-    <WixVariable Id="WixUILicenseRtf" Value="$(var.ProjectDir)GNU-AGPL-3.0.rtf" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.ProjectDir)LICENSE-Community.rtf" />
     <?endif ?>
 
   </Fragment>
