@@ -227,7 +227,7 @@ fi
 %doc snmp/mongod.conf.master
 %doc snmp/mongod.conf.subagent
 %doc snmp/README-snmp.txt
-%doc LICENSE.txt
+%doc LICENSE-Enterprise.txt
 %doc README
 %doc THIRD-PARTY-NOTICES
 %doc MPL-2

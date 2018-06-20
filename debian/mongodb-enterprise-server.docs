@@ -3,7 +3,7 @@ snmp/mongod.conf.subagent
 snmp/README-snmp.txt
 snmp/MONGOD-MIB.txt
 snmp/MONGODBINC-MIB.txt
-LICENSE.txt
+LICENSE-Enterprise.txt
 README
 THIRD-PARTY-NOTICES
 MPL-2
