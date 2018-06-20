@@ -207,6 +207,8 @@ public:
 private:
     const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
                                                            const stdx::lock_guard<stdx::mutex>&);
+    void _registerUUIDCatalogEntry_inlock(CollectionUUID uuid, Collection* coll);
+    Collection* _removeUUIDCatalogEntry_inlock(CollectionUUID uuid);
 
     mutable mongo::stdx::mutex _catalogLock;
     /**
