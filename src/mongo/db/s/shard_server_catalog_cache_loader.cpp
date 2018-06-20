@@ -185,30 +185,6 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
 /**
  * This function will throw on error!
  *
- * Retrieves the persisted max db version for 'dbName', if there are any persisted dbs. If there
- * are none -- meaning there's no persisted metadata for 'dbName' --, returns boost::optional.
- */
-boost::optional<DatabaseVersion> getPersistedMaxDbVersion(OperationContext* opCtx,
-                                                          StringData dbName) {
-
-    auto statusWithDatabaseEntry = readShardDatabasesEntry(opCtx, dbName);
-    if (statusWithDatabaseEntry == ErrorCodes::NamespaceNotFound) {
-        // There is no persisted metadata.
-        return boost::none;
-    }
-    uassert(ErrorCodes::OperationFailed,
-            str::stream() << "Failed to read persisted database entry for db '" << dbName.toString()
-                          << "' due to '"
-                          << statusWithDatabaseEntry.getStatus().toString()
-                          << "'.",
-            statusWithDatabaseEntry.isOK());
-
-    return statusWithDatabaseEntry.getValue().getDbVersion();
-}
-
-/**
- * This function will throw on error!
- *
  * Tries to find persisted chunk metadata with chunk versions GTE to 'version'.
  *
  * If 'version's epoch matches persisted metadata, returns persisted metadata GTE 'version'.
