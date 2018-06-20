@@ -76,9 +76,15 @@ public:
 
     virtual void setOrderedCommit(bool orderedCommit) {}
 
-    virtual void setPrepareTimestamp(Timestamp) override {}
-
     virtual void prepareUnitOfWork() override {}
+
+    virtual void setPrepareTimestamp(Timestamp ts) override {
+        _prepareTimestamp = ts;
+    }
+
+    virtual Timestamp getPrepareTimestamp() const override {
+        return _prepareTimestamp;
+    }
 
 private:
     typedef std::shared_ptr<Change> ChangePtr;
@@ -86,6 +92,8 @@ private:
 
     Changes _changes;
     stdx::function<void()> _waitUntilDurableCallback;
+
+    Timestamp _prepareTimestamp = Timestamp::min();
 };
 
 }  // namespace mongo

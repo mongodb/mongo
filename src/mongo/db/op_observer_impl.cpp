@@ -970,13 +970,10 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx) {
     invariant(session->inMultiDocumentTransaction());
     auto stmts = session->endTransactionAndRetrieveOperations(opCtx);
 
-    // It is possible that the transaction resulted in no changes.  In that case, we should
-    // not write an empty applyOps entry.
-    if (stmts.empty())
-        return;
-
     // We write the oplog entry in a side transaction so that we do not commit the now-prepared
     // transaction. We then return to the main transaction and set its 'prepareTimestamp'.
+    // We write an empty 'applyOps' entry if there were no writes to choose a prepare timestamp
+    // and allow this transaction to be continued on failover.
     repl::OpTime prepareOpTime;
     {
         Session::SideTransactionBlock sideTxn(opCtx);

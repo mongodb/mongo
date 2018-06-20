@@ -210,6 +210,16 @@ public:
     }
 
     /**
+     * Returns the prepare timestamp for the current transaction.
+     * Must be called after setPrepareTimestamp(), and cannot be called after setTimestamp() or
+     * setCommitTimestamp(). This must be called inside a WUOW.
+     */
+    virtual Timestamp getPrepareTimestamp() const {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support prepared transactions");
+    }
+
+    /**
      * When no read timestamp is provided to the recovery unit, the ReadSource indicates which
      * external timestamp source to read from.
      */

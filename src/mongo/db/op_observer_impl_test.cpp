@@ -42,11 +42,16 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
+
+using repl::OplogEntry;
+using unittest::assertGet;
+
 namespace {
 
 class OpObserverTest : public ServiceContextMongoDTest {
@@ -588,9 +593,10 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
 
     opObserver().onTransactionPrepare(opCtx());
 
-    auto oplogEntry = getSingleOplogEntry(opCtx());
-    checkCommonFields(oplogEntry);
-    auto o = oplogEntry.getObjectField("o");
+    auto oplogEntryObj = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntryObj);
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+    auto o = oplogEntry.getObject();
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
                                                         << "ns"
@@ -629,10 +635,12 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
                                                            << "o"
                                                            << BSON("_id" << 0))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
-    ASSERT(oplogEntry.getBoolField("prepare"));
+    ASSERT(oplogEntry.getPrepare());
+    ASSERT(oplogEntry.getPrepare().get());
+    ASSERT_EQ(oplogEntry.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
 }
 
-TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsNothing) {
+TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
     OperationContextSession opSession(opCtx(),
@@ -645,10 +653,15 @@ TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsNothing) {
     session()->unstashTransactionResources(opCtx(), "prepareTransaction");
     opObserver().onTransactionPrepare(opCtx());
 
-    AutoGetCollection autoColl1(opCtx(), NamespaceString::kRsOplogNamespace, MODE_IX);
-    repl::OplogInterfaceLocal oplogInterface(opCtx(), NamespaceString::kRsOplogNamespace.ns());
-    auto oplogIter = oplogInterface.makeIterator();
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
+    auto oplogEntryObj = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntryObj);
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+    auto o = oplogEntry.getObject();
+    auto oExpected = BSON("applyOps" << BSONArray());
+    ASSERT_BSONOBJ_EQ(oExpected, o);
+    ASSERT(oplogEntry.getPrepare());
+    ASSERT(oplogEntry.getPrepare().get());
+    ASSERT_EQ(oplogEntry.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
@@ -687,9 +700,10 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     opObserver().onInserts(opCtx(), nss1, uuid1, inserts1.begin(), inserts1.end(), false);
     opObserver().onInserts(opCtx(), nss2, uuid2, inserts2.begin(), inserts2.end(), false);
     opObserver().onTransactionCommit(opCtx());
-    auto oplogEntry = getSingleOplogEntry(opCtx());
-    checkCommonFields(oplogEntry);
-    auto o = oplogEntry.getObjectField("o");
+    auto oplogEntryObj = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntryObj);
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+    auto o = oplogEntry.getObject();
     auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                         << "i"
                                                         << "ns"
@@ -727,8 +741,8 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
                                                            << BSON("_id" << 3 << "data"
                                                                          << "w"))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
-    ASSERT_FALSE(oplogEntry.hasField("prepare"));
-    ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
+    ASSERT(!oplogEntry.getPrepare());
+    ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {

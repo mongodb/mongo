@@ -93,6 +93,8 @@ public:
 
     void setPrepareTimestamp(Timestamp timestamp) override;
 
+    Timestamp getPrepareTimestamp() const override;
+
     void setIgnorePrepared(bool ignore) override;
 
     void setTimestampReadSource(ReadSource source,

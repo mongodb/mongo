@@ -459,10 +459,35 @@ void WiredTigerRecoveryUnit::clearCommitTimestamp() {
 
 void WiredTigerRecoveryUnit::setPrepareTimestamp(Timestamp timestamp) {
     invariant(_inUnitOfWork);
-    invariant(_prepareTimestamp.isNull());
-    invariant(_commitTimestamp.isNull());
+    invariant(_prepareTimestamp.isNull(),
+              str::stream() << "Trying to set prepare timestamp to " << timestamp.toString()
+                            << ". It's already set to "
+                            << _prepareTimestamp.toString());
+    invariant(_commitTimestamp.isNull(),
+              str::stream() << "Commit timestamp is " << _commitTimestamp.toString()
+                            << " and trying to set prepare timestamp to "
+                            << timestamp.toString());
+    invariant(!_lastTimestampSet,
+              str::stream() << "Last timestamp set is " << _lastTimestampSet->toString()
+                            << " and trying to set prepare timestamp to "
+                            << timestamp.toString());
 
     _prepareTimestamp = timestamp;
+}
+
+Timestamp WiredTigerRecoveryUnit::getPrepareTimestamp() const {
+    invariant(_inUnitOfWork);
+    invariant(!_prepareTimestamp.isNull());
+    invariant(_commitTimestamp.isNull(),
+              str::stream() << "Commit timestamp is " << _commitTimestamp.toString()
+                            << " and trying to get prepare timestamp of "
+                            << _prepareTimestamp.toString());
+    invariant(!_lastTimestampSet,
+              str::stream() << "Last timestamp set is " << _lastTimestampSet->toString()
+                            << " and trying to get prepare timestamp of "
+                            << _prepareTimestamp.toString());
+
+    return _prepareTimestamp;
 }
 
 void WiredTigerRecoveryUnit::setIgnorePrepared(bool value) {
