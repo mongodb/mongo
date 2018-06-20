@@ -152,7 +152,8 @@ public:
                    const std::string& ns,
                    long long cursorId,
                    int nToReturn,
-                   int options);
+                   int options,
+                   std::vector<BSONObj> initialBatch = {});
 
     virtual ~DBClientCursor();
 
@@ -224,11 +225,16 @@ private:
                    int nToSkip,
                    const BSONObj* fieldsToReturn,
                    int queryOptions,
-                   int bs);
+                   int bs,
+                   std::vector<BSONObj> initialBatch);
 
     int nextBatchSize();
 
     struct Batch {
+        // TODO remove constructors after c++17 toolchain upgrade
+        Batch() = default;
+        Batch(std::vector<BSONObj> initial, size_t initialPos = 0)
+            : objs(std::move(initial)), pos(initialPos) {}
         std::vector<BSONObj> objs;
         size_t pos = 0;
     };
