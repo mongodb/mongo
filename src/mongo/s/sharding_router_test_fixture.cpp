@@ -405,7 +405,8 @@ void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& config
                       actualChangeLog.getClientAddr());
         ASSERT_BSONOBJ_EQ(detail, actualChangeLog.getDetails());
         ASSERT_EQUALS(ns, actualChangeLog.getNS());
-        ASSERT_EQUALS(network()->getHostName(), actualChangeLog.getServer());
+        const std::string expectedServer = str::stream() << network()->getHostName() << ":27017";
+        ASSERT_EQUALS(expectedServer, actualChangeLog.getServer());
         ASSERT_EQUALS(timestamp, actualChangeLog.getTime());
         ASSERT_EQUALS(what, actualChangeLog.getWhat());
 
@@ -418,7 +419,9 @@ void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& config
         const std::string timePiece = changeId.substr(firstDash + 1, lastDash - firstDash - 1);
         const std::string oidPiece = changeId.substr(lastDash + 1);
 
-        ASSERT_EQUALS(Grid::get(operationContext())->getNetwork()->getHostName(), serverPiece);
+        const std::string expectedServerPiece = str::stream()
+            << Grid::get(operationContext())->getNetwork()->getHostName() << ":27017";
+        ASSERT_EQUALS(expectedServerPiece, serverPiece);
         ASSERT_EQUALS(timestamp.toString(), timePiece);
 
         OID generatedOID;

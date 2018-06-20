@@ -204,12 +204,14 @@ Status ShardingCatalogClientImpl::_log(OperationContext* opCtx,
                                        const BSONObj& detail,
                                        const WriteConcernOptions& writeConcern) {
     Date_t now = Grid::get(opCtx)->getNetwork()->now();
-    const std::string hostName = Grid::get(opCtx)->getNetwork()->getHostName();
-    const string changeId = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
+    const std::string serverName = str::stream() << Grid::get(opCtx)->getNetwork()->getHostName()
+                                                 << ":" << serverGlobalParams.port;
+    const std::string changeId = str::stream() << serverName << "-" << now.toString() << "-"
+                                               << OID::gen();
 
     ChangeLogType changeLog;
     changeLog.setChangeId(changeId);
-    changeLog.setServer(hostName);
+    changeLog.setServer(serverName);
     changeLog.setClientAddr(opCtx->getClient()->clientAddress(true));
     changeLog.setTime(now);
     changeLog.setNS(operationNS);
