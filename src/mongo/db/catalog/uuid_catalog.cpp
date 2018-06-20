@@ -128,8 +128,10 @@ UUIDCatalog& UUIDCatalog::get(OperationContext* opCtx) {
 void UUIDCatalog::onCreateCollection(OperationContext* opCtx,
                                      Collection* coll,
                                      CollectionUUID uuid) {
-    removeUUIDCatalogEntry(uuid);
-    registerUUIDCatalogEntry(uuid, coll);
+
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    _removeUUIDCatalogEntry_inlock(uuid);  // Remove UUID if it exists
+    _registerUUIDCatalogEntry_inlock(uuid, coll);
     opCtx->recoveryUnit()->onRollback([this, uuid] { removeUUIDCatalogEntry(uuid); });
 }
 
@@ -198,51 +200,19 @@ NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
 Collection* UUIDCatalog::replaceUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     invariant(coll);
-
-    auto foundIt = _catalog.find(uuid);
-    invariant(foundIt != _catalog.end());
-    // Invalidate the source database's ordering, since we're deleting a UUID.
-    _orderedCollections.erase(foundIt->second->ns().db());
-
-    Collection* oldColl = foundIt->second;
-    LOG(2) << "unregistering collection " << oldColl->ns() << " with UUID " << uuid.toString();
-    _catalog.erase(foundIt);
-
-    // Invalidate the destination database's ordering, since we're adding a new UUID.
-    _orderedCollections.erase(coll->ns().db());
-
-    std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
-    LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid.toString();
-    invariant(_catalog.insert(entry).second == true);
+    Collection* oldColl = _removeUUIDCatalogEntry_inlock(uuid);
+    invariant(oldColl != nullptr);  // Need to replace an existing coll
+    _registerUUIDCatalogEntry_inlock(uuid, coll);
     return oldColl;
 }
 void UUIDCatalog::registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-
-    if (coll && !_catalog.count(uuid)) {
-        // Invalidate this database's ordering, since we're adding a new UUID.
-        _orderedCollections.erase(coll->ns().db());
-
-        std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
-        LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid.toString();
-        invariant(_catalog.insert(entry).second == true);
-    }
+    _registerUUIDCatalogEntry_inlock(uuid, coll);
 }
 
 Collection* UUIDCatalog::removeUUIDCatalogEntry(CollectionUUID uuid) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-
-    auto foundIt = _catalog.find(uuid);
-    if (foundIt == _catalog.end())
-        return nullptr;
-
-    // Invalidate this database's ordering, since we're deleting a UUID.
-    _orderedCollections.erase(foundIt->second->ns().db());
-
-    auto foundCol = foundIt->second;
-    LOG(2) << "unregistering collection " << foundCol->ns() << " with UUID " << uuid.toString();
-    _catalog.erase(foundIt);
-    return foundCol;
+    return _removeUUIDCatalogEntry_inlock(uuid);
 }
 
 boost::optional<CollectionUUID> UUIDCatalog::prev(const StringData& db, CollectionUUID uuid) {
@@ -291,5 +261,28 @@ const std::vector<CollectionUUID>& UUIDCatalog::_getOrdering_inlock(
     std::sort(newOrdering.begin(), newOrdering.end());
 
     return newOrdering;
+}
+void UUIDCatalog::_registerUUIDCatalogEntry_inlock(CollectionUUID uuid, Collection* coll) {
+    if (coll && !_catalog.count(uuid)) {
+        // Invalidate this database's ordering, since we're adding a new UUID.
+        _orderedCollections.erase(coll->ns().db());
+
+        std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
+        LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid.toString();
+        invariant(_catalog.insert(entry).second == true);
+    }
+}
+Collection* UUIDCatalog::_removeUUIDCatalogEntry_inlock(CollectionUUID uuid) {
+    auto foundIt = _catalog.find(uuid);
+    if (foundIt == _catalog.end())
+        return nullptr;
+
+    // Invalidate this database's ordering, since we're deleting a UUID.
+    _orderedCollections.erase(foundIt->second->ns().db());
+
+    auto foundCol = foundIt->second;
+    LOG(2) << "unregistering collection " << foundCol->ns() << " with UUID " << uuid.toString();
+    _catalog.erase(foundIt);
+    return foundCol;
 }
 }  // namespace mongo
