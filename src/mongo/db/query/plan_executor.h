@@ -469,6 +469,12 @@ public:
 
 private:
     /**
+     * Returns true if the PlanExecutor should listen for inserts, which is when a getMore is called
+     * on a tailable and awaitData cursor that still has time left and hasn't been interrupted.
+     */
+    bool shouldListenForInserts();
+
+    /**
      * Returns true if the PlanExecutor should wait for data to be inserted, which is when a getMore
      * is called on a tailable and awaitData cursor on a capped collection.  Returns false if an EOF
      * should be returned immediately.
