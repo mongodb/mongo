@@ -97,21 +97,6 @@
             "read from another user's listIndexes cursor");
         testDB.logout();
 
-        // Test that "Mallory" cannot use a parallelCollectionScan cursor created by "Alice".
-        if (!isMongos) {
-            assert.eq(1, testDB.auth("Alice", "pwd"));
-            res = assert.commandWorked(
-                testDB.runCommand({parallelCollectionScan: "foo", numCursors: 1}));
-            assert.eq(res.cursors.length, 1, tojson(res));
-            cursorId = res.cursors[0].cursor.id;
-            testDB.logout();
-            assert.eq(1, testDB.auth("Mallory", "pwd"));
-            assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "foo"}),
-                                         ErrorCodes.Unauthorized,
-                                         "read from another user's parallelCollectionScan cursor");
-            testDB.logout();
-        }
-
         //
         // Test that a user can call getMore on an indexStats cursor they created, even if the
         // indexStats privilege has been revoked in the meantime.

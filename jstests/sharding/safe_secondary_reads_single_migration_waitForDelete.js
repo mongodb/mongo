@@ -241,7 +241,6 @@
         movePrimary: {skip: "primary only"},
         multicast: {skip: "does not return user data"},
         netstat: {skip: "does not return user data"},
-        parallelCollectionScan: {skip: "is an internal command"},
         ping: {skip: "does not return user data"},
         planCacheClear: {skip: "does not return user data"},
         planCacheClearFilters: {skip: "does not return user data"},

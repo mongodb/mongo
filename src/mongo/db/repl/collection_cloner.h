@@ -109,8 +109,7 @@ public:
                      const CollectionOptions& options,
                      const CallbackFn& onCompletion,
                      StorageInterface* storageInterface,
-                     const int batchSize,
-                     const int maxNumClonerCursors);
+                     const int batchSize);
 
     virtual ~CollectionCloner();
 
@@ -191,31 +190,16 @@ private:
     void _beginCollectionCallback(const executor::TaskExecutor::CallbackArgs& callbackData);
 
     /**
-     * The possible command types that can be used to establish the initial cursors on the
-     * remote collection.
+     * Parses the cursor responses from the 'find' command and passes them into the
+     * 'AsyncResultsMerger'.
      */
-    enum EstablishCursorsCommand { Find, ParallelCollScan };
+    void _establishCollectionCursorsCallback(const RemoteCommandCallbackArgs& rcbd);
 
     /**
-     * Parses the cursor responses from the 'find' or 'parallelCollectionScan' command
-     * and passes them into the 'AsyncResultsMerger'.
-     */
-    void _establishCollectionCursorsCallback(const RemoteCommandCallbackArgs& rcbd,
-                                             EstablishCursorsCommand cursorCommand);
-
-    /**
-     * Parses the response from a 'parallelCollectionScan' command into a vector of cursor
-     * elements.
-     */
-    StatusWith<std::vector<BSONElement>> _parseParallelCollectionScanResponse(BSONObj resp);
-
-    /**
-     * Takes a cursors buffer and parses the 'parallelCollectionScan' response into cursor
+     * Takes a cursors buffer and parses the 'find' response into cursor
      * responses that are pushed onto the buffer.
      */
-    Status _parseCursorResponse(BSONObj response,
-                                std::vector<CursorResponse>* cursors,
-                                EstablishCursorsCommand cursorCommand);
+    Status _parseCursorResponse(BSONObj response, std::vector<CursorResponse>* cursors);
 
     /**
      * Calls to get the next event from the 'AsyncResultsMerger'. This schedules
@@ -297,8 +281,6 @@ private:
     const int _collectionCloningBatchSize;  // (R) The size of the batches of documents returned in
                                             // collection cloning.
 
-    // (R) The maximum number of cursors to use in the collection cloning process.
-    const int _maxNumClonerCursors;
     // (M) Component responsible for fetching the documents from the collection cloner cursor(s).
     std::unique_ptr<AsyncResultsMerger> _arm;
 

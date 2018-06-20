@@ -239,15 +239,6 @@
         });
 
         //
-        // Tests for the "parallelCollectionScan" command.
-        //
-
-        testCommandCanBeCausallyConsistent(function() {
-            assert.commandWorked(
-                db.runCommand({parallelCollectionScan: coll.getName(), numCursors: 1}));
-        });
-
-        //
         // Tests for the "explain" command.
         //
 

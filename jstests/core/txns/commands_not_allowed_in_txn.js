@@ -96,7 +96,6 @@
         {explain: {find: collName}},
         {filemd5: 1, root: "fs"},
         {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: "out"},
-        {parallelCollectionScan: collName, numCursors: 1},
     ];
 
     sessionCommands.forEach(testCommand);

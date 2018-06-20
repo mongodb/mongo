@@ -6,7 +6,6 @@
  *  - aggregation
  *  - distinct
  *  - count
- *  - parallelCollectionScan
  *  - geoSearch
  *
  * Each operation is tested on a single node, and (if supported) through mongos on both sharded and
@@ -60,13 +59,6 @@
                 cursor: {batchSize: 0},
                 pipeline: [{$geoNear: {near: [0, 0], distanceField: "d", spherical: true}}]
             })));
-        },
-        parallelCollectionScan: function(coll) {
-            var res = coll.runCommand('parallelCollectionScan',
-                                      {readConcern: {level: 'majority'}, numCursors: 1});
-            assert.commandWorked(res);
-            assert.eq(res.cursors.length, 1, tojson(res));
-            return makeCursor(coll.getDB(), res.cursors[0]);
         },
     };
 
@@ -224,7 +216,7 @@
 
     // Remove tests of commands that aren't supported at all through mongos, even on unsharded
     // collections.
-    ['parallelCollectionScan', 'geoSearch'].forEach(function(cmd) {
+    ['geoSearch'].forEach(function(cmd) {
         // Make sure it really isn't supported.
         assert.eq(shardingTest.getDB('test').coll.runCommand(cmd).code, ErrorCodes.CommandNotFound);
         delete cursorTestCases[cmd];

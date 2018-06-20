@@ -134,7 +134,6 @@ var {
             "group",
             "mapReduce",
             "mapreduce",
-            "parallelCollectionScan",
         ]);
 
         function canUseReadConcern(driverSession, cmdObj) {

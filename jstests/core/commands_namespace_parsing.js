@@ -142,12 +142,6 @@
                                              isNotAdminCommand);
 
     if (!isMongos) {
-        // Test parallelCollectionScan fails with an invalid collection name.
-        assertFailsWithInvalidNamespacesForField("parallelCollectionScan",
-                                                 {parallelCollectionScan: "", numCursors: 10},
-                                                 isNotFullyQualified,
-                                                 isNotAdminCommand);
-
         // Test godinsert fails with an invalid collection name.
         assertFailsWithInvalidNamespacesForField(
             "godinsert", {godinsert: "", obj: {_id: 1}}, isNotFullyQualified, isNotAdminCommand);

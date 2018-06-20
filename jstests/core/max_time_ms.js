@@ -418,21 +418,6 @@ assert.commandWorked(
     t.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}], maxTimeMS: 60 * 1000}));
 
 //
-// Test maxTimeMS for parallelCollectionScan
-//
-res = t.runCommand({parallelCollectionScan: t.getName(), numCursors: 1, maxTimeMS: 60 * 1000});
-assert.commandWorked(res);
-var cursor = new DBCommandCursor(t.getDB(), res.cursors[0], 5);
-assert.commandWorked(
-    t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
-error = assert.throws(function() {
-    cursor.itcount();
-}, [], "expected query to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code, "Failed with error: " + tojson(error));
-assert.commandWorked(
-    t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
-
-//
 // test count shell helper SERVER-13334
 //
 t.drop();

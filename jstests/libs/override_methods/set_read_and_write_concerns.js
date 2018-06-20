@@ -27,7 +27,6 @@
         "distinct",
         "find",
         "geoSearch",
-        "parallelCollectionScan",
     ]);
 
     const kCommandsOnlySupportingReadConcernSnapshot = new Set([

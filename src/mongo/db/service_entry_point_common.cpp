@@ -129,7 +129,6 @@ const StringMap<int> sessionCheckoutWhitelist = {{"abortTransaction", 1},
                                                  {"insert", 1},
                                                  {"killCursors", 1},
                                                  {"mapReduce", 1},
-                                                 {"parallelCollectionScan", 1},
                                                  {"prepareTransaction", 1},
                                                  {"refreshLogicalSessionCacheNow", 1},
                                                  {"update", 1}};

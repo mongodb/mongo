@@ -104,8 +104,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                                    const CollectionOptions& options,
                                    const CallbackFn& onCompletion,
                                    StorageInterface* storageInterface,
-                                   const int batchSize,
-                                   const int maxNumClonerCursors)
+                                   const int batchSize)
     : _executor(executor),
       _dbWorkThreadPool(dbWorkThreadPool),
       _source(source),
@@ -167,8 +166,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                      kProgressMeterCheckInterval,
                      "documents copied",
                      str::stream() << _sourceNss.toString() << " collection clone progress"),
-      _collectionCloningBatchSize(batchSize),
-      _maxNumClonerCursors(maxNumClonerCursors) {
+      _collectionCloningBatchSize(batchSize) {
     // Fetcher throws an exception on null executor.
     invariant(executor);
     uassert(ErrorCodes::BadValue,
@@ -478,24 +476,11 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
     _collLoader = std::move(collectionBulkLoader.getValue());
 
     BSONObjBuilder cmdObj;
-    EstablishCursorsCommand cursorCommand;
-    // The 'find' command is used when the number of cloning cursors is 1 to ensure
-    // the correctness of the collection cloning process until 'parallelCollectionScan'
-    // can be tested more extensively in context of initial sync.
-    if (_maxNumClonerCursors == 1) {
-        cmdObj.appendElements(
-            makeCommandWithUUIDorCollectionName("find", _options.uuid, _sourceNss));
-        cmdObj.append("noCursorTimeout", true);
-        // Set batchSize to be 0 to establish the cursor without fetching any documents,
-        // similar to the response format of 'parallelCollectionScan'.
-        cmdObj.append("batchSize", 0);
-        cursorCommand = Find;
-    } else {
-        cmdObj.appendElements(makeCommandWithUUIDorCollectionName(
-            "parallelCollectionScan", _options.uuid, _sourceNss));
-        cmdObj.append("numCursors", _maxNumClonerCursors);
-        cursorCommand = ParallelCollScan;
-    }
+
+    cmdObj.appendElements(makeCommandWithUUIDorCollectionName("find", _options.uuid, _sourceNss));
+    cmdObj.append("noCursorTimeout", true);
+    // Set batchSize to be 0 to establish the cursor without fetching any documents,
+    cmdObj.append("batchSize", 0);
 
     Client::initThreadIfNotAlready();
     auto opCtx = cc().getOperationContext();
@@ -519,15 +504,12 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
                              ReadPreferenceSetting::secondaryPreferredMetadata(),
                              opCtx,
                              RemoteCommandRequest::kNoTimeout),
-        [=](const RemoteCommandCallbackArgs& rcbd) {
-            _establishCollectionCursorsCallback(rcbd, cursorCommand);
-        },
+        [=](const RemoteCommandCallbackArgs& rcbd) { _establishCollectionCursorsCallback(rcbd); },
         RemoteCommandRetryScheduler::makeRetryPolicy(
             numInitialSyncCollectionFindAttempts.load(),
             executor::RemoteCommandRequest::kNoTimeout,
             RemoteCommandRetryScheduler::kAllRetriableErrors));
     auto scheduleStatus = _establishCollectionCursorsScheduler->startup();
-    LOG(1) << "Attempting to establish cursors with maxNumClonerCursors: " << _maxNumClonerCursors;
 
     if (!scheduleStatus.isOK()) {
         _establishCollectionCursorsScheduler.reset();
@@ -537,58 +519,19 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
 }
 
 Status CollectionCloner::_parseCursorResponse(BSONObj response,
-                                              std::vector<CursorResponse>* cursors,
-                                              EstablishCursorsCommand cursorCommand) {
-    switch (cursorCommand) {
-        case Find: {
-            StatusWith<CursorResponse> findResponse = CursorResponse::parseFromBSON(response);
-            if (!findResponse.isOK()) {
-                return findResponse.getStatus().withContext(
-                    str::stream() << "Error parsing the 'find' query against collection '"
-                                  << _sourceNss.ns()
-                                  << "'");
-            }
-            cursors->push_back(std::move(findResponse.getValue()));
-            break;
-        }
-        case ParallelCollScan: {
-            auto cursorElements = _parseParallelCollectionScanResponse(response);
-            if (!cursorElements.isOK()) {
-                return cursorElements.getStatus();
-            }
-            std::vector<BSONElement> cursorsArray;
-            cursorsArray = cursorElements.getValue();
-            // Parse each BSONElement into a 'CursorResponse' object.
-            for (BSONElement cursor : cursorsArray) {
-                if (!cursor.isABSONObj()) {
-                    Status errorStatus(
-                        ErrorCodes::FailedToParse,
-                        "The 'cursor' field in the list of cursor responses is not a "
-                        "valid BSON Object");
-                    return errorStatus;
-                }
-                const BSONObj cursorObj = cursor.Obj().getOwned();
-                StatusWith<CursorResponse> parallelCollScanResponse =
-                    CursorResponse::parseFromBSON(cursorObj);
-                if (!parallelCollScanResponse.isOK()) {
-                    return parallelCollScanResponse.getStatus();
-                }
-                cursors->push_back(std::move(parallelCollScanResponse.getValue()));
-            }
-            break;
-        }
-        default: {
-            Status errorStatus(
-                ErrorCodes::FailedToParse,
-                "The command used to establish the collection cloner cursors is not valid.");
-            return errorStatus;
-        }
+                                              std::vector<CursorResponse>* cursors) {
+    StatusWith<CursorResponse> findResponse = CursorResponse::parseFromBSON(response);
+    if (!findResponse.isOK()) {
+        return findResponse.getStatus().withContext(
+            str::stream() << "Error parsing the 'find' query against collection '"
+                          << _sourceNss.ns()
+                          << "'");
     }
+    cursors->push_back(std::move(findResponse.getValue()));
     return Status::OK();
 }
 
-void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCallbackArgs& rcbd,
-                                                           EstablishCursorsCommand cursorCommand) {
+void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCallbackArgs& rcbd) {
     if (_state == State::kShuttingDown) {
         Status shuttingDownStatus{ErrorCodes::CallbackCanceled, "Cloner shutting down."};
         _finishCallback(shuttingDownStatus);
@@ -611,8 +554,7 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
     }
 
     std::vector<CursorResponse> cursorResponses;
-    Status parseResponseStatus =
-        _parseCursorResponse(response.data, &cursorResponses, cursorCommand);
+    Status parseResponseStatus = _parseCursorResponse(response.data, &cursorResponses);
     if (!parseResponseStatus.isOK()) {
         _finishCallback(parseResponseStatus);
         return;
@@ -656,22 +598,6 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
     if (!scheduleStatus.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, scheduleStatus);
         return;
-    }
-}
-
-StatusWith<std::vector<BSONElement>> CollectionCloner::_parseParallelCollectionScanResponse(
-    BSONObj resp) {
-    if (!resp.hasField("cursors")) {
-        return Status(ErrorCodes::CursorNotFound,
-                      "The 'parallelCollectionScan' response does not contain a 'cursors' field.");
-    }
-    BSONElement response = resp["cursors"];
-    if (response.type() == BSONType::Array) {
-        return response.Array();
-    } else {
-        return Status(
-            ErrorCodes::FailedToParse,
-            "The 'parallelCollectionScan' response is unable to be transformed into an array.");
     }
 }
 

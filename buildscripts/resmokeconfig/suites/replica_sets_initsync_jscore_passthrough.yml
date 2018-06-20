@@ -50,7 +50,6 @@ selector:
   # may insert unexpected operations into the profile collection.
   - jstests/core/profile_list_collections.js
   - jstests/core/profile_list_indexes.js
-  - jstests/core/profile_parallel_collection_scan.js
   - jstests/core/profile_repair_cursor.js
   - jstests/core/recursion.js
   - jstests/core/system_profile.js

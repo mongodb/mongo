@@ -81,7 +81,7 @@ enum StageType {
     STAGE_IXSCAN,
     STAGE_LIMIT,
 
-    // Implements parallelCollectionScan.
+    // Implements iterating over one or more RecordStore::Cursor.
     STAGE_MULTI_ITERATOR,
 
     STAGE_MULTI_PLAN,

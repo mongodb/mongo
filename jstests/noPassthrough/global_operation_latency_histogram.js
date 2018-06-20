@@ -90,10 +90,6 @@
     }
     lastHistogram = checkHistogramDiff(numRecords, 0, 0);
 
-    // ParallelCollectionScan
-    testDB.runCommand({parallelCollectionScan: testColl.getName(), numCursors: 5});
-    lastHistogram = checkHistogramDiff(0, 0, 1);
-
     // FindAndModify
     testColl.findAndModify({query: {}, update: {pt: {type: "Point", coordinates: [0, 0]}}});
     lastHistogram = checkHistogramDiff(0, 1, 0);

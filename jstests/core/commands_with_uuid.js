@@ -5,7 +5,6 @@
 * @tags: [
 *    requires_fastcount,
 *
-*    # parallelCollectionScan is not available on embedded
 *    incompatible_with_embedded,
 * ]
 */
@@ -62,10 +61,7 @@
 
     // Ensure passing a missing UUID to commands taking UUIDs uasserts that the UUID is not found.
     const missingUUID = UUID();
-    for (cmd of[{count: missingUUID},
-                {find: missingUUID},
-                {listIndexes: missingUUID},
-                {parallelCollectionScan: missingUUID, numCursors: 1}]) {
+    for (cmd of[{count: missingUUID}, {find: missingUUID}, {listIndexes: missingUUID}]) {
         assert.commandFailedWithCode(
             db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
     }
@@ -85,12 +81,6 @@
     assert.commandWorked(res, 'could not run ' + tojson(cmd));
     assert.eq(res.n, 1, "expected to count a single document with command: " + tojson(cmd));
 
-    // Ensure passing a UUID to parallelCollectionScan retrieves results from the correct
-    // collection.
-    cmd = {parallelCollectionScan: uuid, numCursors: 1};
-    res = assert.commandWorked(db.runCommand(cmd), 'could not run ' + tojson(cmd));
-    assert.eq(res.cursors[0].cursor.ns, 'test.' + mainCollName);
-
     // Test that UUID resolution fails when the UUID belongs to a different database. First, we
     // create a collection in another database.
     const dbWithUUID = db.getSiblingDB(kOtherDbName);
@@ -104,10 +94,7 @@
     // Run read commands supporting UUIDs against the original database, passing the UUID from a
     // different database, and verify that the UUID resolution fails with the correct error code. We
     // also test that the same command succeeds when there is no database mismatch.
-    for (cmd of[{count: uuid}, {distinct: uuid, key: "a"}, {find: uuid}, {listIndexes: uuid}, {
-             parallelCollectionScan: uuid,
-             numCursors: 1
-         }]) {
+    for (cmd of[{count: uuid}, {distinct: uuid, key: "a"}, {find: uuid}, {listIndexes: uuid}]) {
         assert.commandWorked(dbWithUUID.runCommand(cmd));
         assert.commandFailedWithCode(
             db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));

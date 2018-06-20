@@ -171,8 +171,6 @@
 
     // MapReduce doesn't currently support read concern majority.
 
-    // ParallelCollectionScan is not available on mongos.
-
     // Verify that the server rejects commands when operation time is invalid by running a command
     // with an afterClusterTime value one day ahead.
     const invalidTime = new Timestamp(session.getOperationTime().getTime() + (60 * 60 * 24), 0);

@@ -41,9 +41,8 @@ namespace mongo {
 /**
  * Iterates over a collection using multiple underlying RecordCursors.
  *
- * This is a special stage which is not used automatically by queries. It is intended for
- * special commands that work with RecordCursors. For example, it is used by the
- * parallelCollectionScan and repairCursor commands
+ * This is a special stage which is not used automatically by queries. It is intended for special
+ * commands that work with RecordCursors. For example, it is used by the repairCursor command.
  */
 class MultiIteratorStage final : public PlanStage {
 public:
