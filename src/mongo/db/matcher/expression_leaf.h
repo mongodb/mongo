@@ -457,6 +457,12 @@ private:
 
     // Original container of equality elements, including duplicates. Needed for re-computing
     // '_equalitySet' in case '_collator' changes after elements have been added.
+    //
+    // We keep the equalities in sorted order according to the current BSON element comparator. This
+    // list of equalities will be used to construct a boost::flat_set, which maintains the set of
+    // elements in sorted order within a contiguous region of memory. Sorting and then constructing
+    // a flat_set is O(n log n), whereas the boost::flat_set constructor is O(n ^ 2) due to
+    // https://svn.boost.org/trac10/ticket/13140.
     std::vector<BSONElement> _originalEqualityVector;
 
     // Set of equality elements associated with this expression. '_eltCmp' is used as a comparator
