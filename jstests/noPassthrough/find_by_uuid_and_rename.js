@@ -39,6 +39,12 @@
     while (conn.getDB("test").await_data.findOne({_id: "rename has ended"}) == null) {
         for (let i = 0; i < repeatFind; i++) {
             let res = findRenameDB.runCommand(findCmd);
+
+            // This is an acceptable transient error until SERVER-31695 has been completed.
+            if (res.code === ErrorCodes.QueryPlanKilled) {
+                print("Ignoring transient QueryPlanKilled error: " + res.errmsg);
+                continue;
+            }
             assert.commandWorked(res, "could not run " + tojson(findCmd));
             let cursor = new DBCommandCursor(findRenameDB, res);
             let errMsg = "expected more data from command " + tojson(findCmd) + ", with result " +
