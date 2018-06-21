@@ -1,8 +1,15 @@
-// Ensures that if the config servers are blackholed from the point of view of MongoS, metadata
-// operations do not get stuck forever.
+/**
+ * Ensures that if the config servers are blackholed from the point of view of MongoS, metadata
+ * operations do not get stuck forever.
+ *
+ * Checking UUID consistency involves talking to config servers through mongos, but mongos is
+ * blackholed from the config servers in this test.
+ *
+ * This test triggers a compiler bug that causes a crash when compiling with optimizations on, see
+ * SERVER-35632.
+ * @tags: [blacklist_from_rhel_67_s390x]
+ */
 
-// Checking UUID consistency involves talking to config servers through mongos, but mongos is
-// blackholed from the config servers in this test.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 (function() {
