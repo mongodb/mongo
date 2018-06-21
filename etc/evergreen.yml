@@ -10931,7 +10931,7 @@ buildvariants:
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1,blacklist_from_rhel_67_s390x
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -11028,7 +11028,7 @@ buildvariants:
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1,blacklist_from_rhel_67_s390x
     has_packages: true
     packager_script: packager.py
     packager_arch: s390x

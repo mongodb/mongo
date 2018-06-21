@@ -1,6 +1,10 @@
 /**
  * Test that mongos times out when the config server replica set only contains nodes that
  * are behind the majority opTime.
+ *
+ * This test triggers a compiler bug that causes a crash when compiling with optimizations on, see
+ * SERVER-35632.
+ * @tags: [blacklist_from_rhel_67_s390x]
  */
 
 // Checking UUID consistency involves mongos being able to do a read from the config server, but
