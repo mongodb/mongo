@@ -64,7 +64,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/update/update_common',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
-        'chunk_writes_tracker',
         'common_s',
     ],
 )
@@ -360,45 +359,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/db/serveronly',
         'catalog_cache_test_fixture',
-    ]
-)
-
-env.Library(
-    target='chunk_writes_tracker',
-    source=[
-        'chunk_writes_tracker.cpp',
-    ],
-    LIBDEPS=[
-    ],
-)
-
-env.CppUnitTest(
-    target='chunk_writes_tracker_test',
-    source=[
-        'chunk_writes_tracker_test.cpp',
-    ],
-    LIBDEPS=[
-        'chunk_writes_tracker',
-    ]
-)
-
-env.Library(
-    target='chunk_split_state_driver',
-    source=[
-        'chunk_split_state_driver.cpp',
-    ],
-    LIBDEPS=[
-        'chunk_writes_tracker'
-    ],
-)
-
-env.CppUnitTest(
-    target='chunk_split_state_driver_test',
-    source=[
-        'chunk_split_state_driver_test.cpp',
-    ],
-    LIBDEPS=[
-        'chunk_split_state_driver',
     ]
 )
 

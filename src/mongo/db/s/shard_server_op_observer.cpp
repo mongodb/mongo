@@ -145,7 +145,11 @@ bool shouldSplitChunk(OperationContext* opCtx,
     const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
     invariant(balancerConfig);
 
-    return chunk.shouldSplit(balancerConfig->getMaxChunkSizeBytes());
+    const auto& keyPattern = shardKeyPattern.getKeyPattern();
+    const bool minIsInf = (0 == keyPattern.globalMin().woCompare(chunk.getMin()));
+    const bool maxIsInf = (0 == keyPattern.globalMax().woCompare(chunk.getMax()));
+
+    return chunk.shouldSplit(balancerConfig->getMaxChunkSizeBytes(), minIsInf, maxIsInf);
 }
 
 /**
