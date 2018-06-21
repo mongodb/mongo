@@ -361,25 +361,6 @@ public:
      */
     static void clearForTests(ServiceContext* serviceContext);
 
-    //
-    // Upgrade/downgrade
-    //
-
-    /**
-     * Upgrade the chunk metadata to include the history field.
-     */
-    Status upgradeChunksHistory(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const OID& collectionEpoch,
-                                const Timestamp validAfter);
-
-    /**
-     * Remove the history field from the chunk metadata.
-     */
-    Status downgradeChunksHistory(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const OID& collectionEpoch);
-
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version

@@ -232,12 +232,9 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
         auto shardId = (i == 0) ? primaryShardId : shardIds[i % shardIds.size()];
         chunk.setShard(shardId);
 
-        if (serverGlobalParams.featureCompatibility.getVersion() >=
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
-            std::vector<ChunkHistory> initialHistory;
-            initialHistory.emplace_back(ChunkHistory(validAfter, shardId));
-            chunk.setHistory(std::move(initialHistory));
-        }
+        std::vector<ChunkHistory> initialHistory;
+        initialHistory.emplace_back(ChunkHistory(validAfter, shardId));
+        chunk.setHistory(std::move(initialHistory));
 
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,

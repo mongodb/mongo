@@ -88,13 +88,8 @@ BSONArray buildMergeChunksTransactionUpdates(const std::vector<ChunkType>& chunk
         // fill in additional details for sending through transaction
         mergedChunk.setVersion(mergeVersion);
 
-        // FCV 3.6 does not have the history field in the persisted metadata
-        if (serverGlobalParams.featureCompatibility.getVersion() >=
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
-
-            invariant(validAfter);
-            mergedChunk.setHistory({ChunkHistory(validAfter.get(), mergedChunk.getShard())});
-        }
+        invariant(validAfter);
+        mergedChunk.setHistory({ChunkHistory(validAfter.get(), mergedChunk.getShard())});
 
         // add the new chunk information as the update object
         op.append("o", mergedChunk.toConfigBSON());
@@ -391,11 +386,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         n.append(ChunkType::max(), endKey);
         n.append(ChunkType::shard(), shardName);
 
-        // FCV 3.6 does not have the history field in the persisted metadata
-        if (serverGlobalParams.featureCompatibility.getVersion() >=
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
-            origChunk.getValue().addHistoryToBSON(n);
-        }
+        origChunk.getValue().addHistoryToBSON(n);
 
         n.done();
 
@@ -503,9 +494,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     // move chunks on different collections to proceed in parallel
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-    if (serverGlobalParams.featureCompatibility.getVersion() >=
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40 &&
-        !validAfter) {
+    if (!validAfter) {
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
     }
     // Get the chunk with the highest version for this namespace
@@ -625,9 +614,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     // (Note: This is not needed while we have a global lock, taken here only for consistency.)
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-    if (serverGlobalParams.featureCompatibility.getVersion() >=
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40 &&
-        !validAfter) {
+    if (!validAfter) {
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
     }
 
@@ -707,33 +694,27 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     auto newHistory = origChunk.getValue().getHistory();
     const int kHistorySecs = 10;
 
+    invariant(validAfter);
+
     // Update the history of the migrated chunk.
-    if (serverGlobalParams.featureCompatibility.getVersion() >=
-        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
-        invariant(validAfter);
-
-        // Drop the history that is too old (10 seconds of history for now).
-        // TODO SERVER-33831 to update the old history removal policy.
-        while (!newHistory.empty() &&
-               newHistory.back().getValidAfter().getSecs() + kHistorySecs <
-                   validAfter.get().getSecs()) {
-            newHistory.pop_back();
-        }
-
-        if (!newHistory.empty() && newHistory.front().getValidAfter() >= validAfter.get()) {
-            return {ErrorCodes::IncompatibleShardingMetadata,
-                    str::stream() << "The chunk history for '"
-                                  << ChunkType::genID(nss, migratedChunk.getMin())
-                                  << " is corrupted. The last validAfter "
-                                  << newHistory.back().getValidAfter().toString()
-                                  << " is greater or equal to the new validAfter "
-                                  << validAfter.get().toString()};
-        }
-        newHistory.emplace(newHistory.begin(), ChunkHistory(validAfter.get(), toShard));
-    } else {
-        // FCV 3.6 does not have the history field in the persisted metadata
-        newHistory.clear();
+    // Drop the history that is too old (10 seconds of history for now).
+    // TODO SERVER-33831 to update the old history removal policy.
+    while (!newHistory.empty() &&
+           newHistory.back().getValidAfter().getSecs() + kHistorySecs <
+               validAfter.get().getSecs()) {
+        newHistory.pop_back();
     }
+
+    if (!newHistory.empty() && newHistory.front().getValidAfter() >= validAfter.get()) {
+        return {ErrorCodes::IncompatibleShardingMetadata,
+                str::stream() << "The chunk history for '"
+                              << ChunkType::genID(nss, migratedChunk.getMin())
+                              << " is corrupted. The last validAfter "
+                              << newHistory.back().getValidAfter().toString()
+                              << " is greater or equal to the new validAfter "
+                              << validAfter.get().toString()};
+    }
+    newHistory.emplace(newHistory.begin(), ChunkHistory(validAfter.get(), toShard));
     newMigratedChunk.setHistory(std::move(newHistory));
 
     // Control chunk's minor version will be 1 (if control chunk is present).
@@ -748,13 +729,6 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         newControlChunk = origControlChunk.getValue();
         newControlChunk->setVersion(ChunkVersion(
             currentCollectionVersion.majorVersion() + 1, 1, currentCollectionVersion.epoch()));
-
-        // Copy the history of the control chunk.
-        if (serverGlobalParams.featureCompatibility.getVersion() <
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
-            // FCV 3.6 does not have the history field in the persisted metadata
-            newControlChunk->setHistory({});
-        }
     }
 
     auto command = makeCommitChunkTransactionCommand(
@@ -811,151 +785,6 @@ StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContex
     }
 
     return ChunkType::fromConfigBSON(origChunks.front());
-}
-
-Status ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
-                                                    const NamespaceString& nss,
-                                                    const OID& collectionEpoch,
-                                                    const Timestamp validAfter) {
-    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto const catalogClient = Grid::get(opCtx)->catalogClient();
-
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
-    // migrations.
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
-
-    auto findResponse =
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
-                                            ChunkType::ConfigNS,
-                                            BSON("ns" << nss.ns()),
-                                            BSONObj(),
-                                            boost::none);
-    if (!findResponse.isOK()) {
-        return findResponse.getStatus();
-    }
-
-    const auto chunksVector = std::move(findResponse.getValue().docs);
-    if (chunksVector.empty()) {
-        return {ErrorCodes::IncompatibleShardingMetadata,
-                str::stream() << "Tried to find chunks for collection '" << nss.ns()
-                              << ", but found no chunks"};
-    }
-
-    const auto currentCollectionVersion = _findCollectionVersion(opCtx, nss, collectionEpoch);
-    if (!currentCollectionVersion.isOK()) {
-        return currentCollectionVersion.getStatus();
-    }
-
-    // Bump the version.
-    auto newCollectionVersion = ChunkVersion(currentCollectionVersion.getValue().majorVersion() + 1,
-                                             0,
-                                             currentCollectionVersion.getValue().epoch());
-
-    for (const auto& chunk : chunksVector) {
-        auto swChunk = ChunkType::fromConfigBSON(chunk);
-        if (!swChunk.isOK()) {
-            return swChunk.getStatus();
-        }
-        auto& upgradeChunk = swChunk.getValue();
-
-        if (upgradeChunk.getHistory().empty()) {
-
-            // Bump the version.
-            upgradeChunk.setVersion(newCollectionVersion);
-            newCollectionVersion.incMajor();
-
-            // Construct the fresh history.
-            upgradeChunk.setHistory({ChunkHistory{validAfter, upgradeChunk.getShard()}});
-
-            // Run the update.
-            auto status =
-                catalogClient->updateConfigDocument(opCtx,
-                                                    ChunkType::ConfigNS,
-                                                    BSON(ChunkType::name(upgradeChunk.getName())),
-                                                    upgradeChunk.toConfigBSON(),
-                                                    false,
-                                                    ShardingCatalogClient::kLocalWriteConcern);
-
-            if (!status.isOK()) {
-                return status.getStatus();
-            }
-        }
-    }
-
-    return Status::OK();
-}
-
-Status ShardingCatalogManager::downgradeChunksHistory(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
-                                                      const OID& collectionEpoch) {
-    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto const catalogClient = Grid::get(opCtx)->catalogClient();
-
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
-    // migrations.
-    //
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
-
-    auto findResponse =
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
-                                            ChunkType::ConfigNS,
-                                            BSON("ns" << nss.ns()),
-                                            BSONObj(),
-                                            boost::none);
-    if (!findResponse.isOK()) {
-        return findResponse.getStatus();
-    }
-
-    const auto chunksVector = std::move(findResponse.getValue().docs);
-    if (chunksVector.empty()) {
-        return {ErrorCodes::IncompatibleShardingMetadata,
-                str::stream() << "Tried to find chunks for collection '" << nss.ns()
-                              << ", but found no chunks"};
-    }
-
-    const auto currentCollectionVersion = _findCollectionVersion(opCtx, nss, collectionEpoch);
-    if (!currentCollectionVersion.isOK()) {
-        return currentCollectionVersion.getStatus();
-    }
-
-    // Bump the version.
-    auto newCollectionVersion = ChunkVersion(currentCollectionVersion.getValue().majorVersion() + 1,
-                                             0,
-                                             currentCollectionVersion.getValue().epoch());
-
-    for (const auto& chunk : chunksVector) {
-        auto swChunk = ChunkType::fromConfigBSON(chunk);
-        if (!swChunk.isOK()) {
-            return swChunk.getStatus();
-        }
-        auto& downgradeChunk = swChunk.getValue();
-
-        // Bump the version.
-        downgradeChunk.setVersion(newCollectionVersion);
-        newCollectionVersion.incMajor();
-
-        // Clear the history.
-        downgradeChunk.setHistory({});
-
-        // Run the update.
-        auto status =
-            catalogClient->updateConfigDocument(opCtx,
-                                                ChunkType::ConfigNS,
-                                                BSON(ChunkType::name(downgradeChunk.getName())),
-                                                downgradeChunk.toConfigBSON(),
-                                                false,
-                                                ShardingCatalogClient::kLocalWriteConcern);
-
-        if (!status.isOK()) {
-            return status.getStatus();
-        }
-    }
-
-    return Status::OK();
 }
 
 StatusWith<ChunkVersion> ShardingCatalogManager::_findCollectionVersion(
