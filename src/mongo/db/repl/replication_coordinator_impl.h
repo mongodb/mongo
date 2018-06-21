@@ -391,7 +391,7 @@ public:
     void waitForElectionDryRunFinish_forTest();
 
     /**
-     * Waits until a stepdown command has begun. Callers should ensure that the stepdown attempt
+     * Waits until a stepdown attempt has begun. Callers should ensure that the stepdown attempt
      * won't fully complete before this method is called, or this method may never return.
      */
     void waitForStepDownAttempt_forTest();
@@ -625,13 +625,6 @@ private:
                                            const WriteConcernOptions& writeConcern);
 
     Status _checkIfWriteConcernCanBeSatisfied_inlock(const WriteConcernOptions& writeConcern) const;
-
-    /**
-     * Wakes up threads in the process of handling a stepdown request based on whether the
-     * TopologyCoordinator now believes enough secondaries are caught up for the stepdown request to
-     * complete.
-     */
-    void _signalStepDownWaiterIfReady_inlock();
 
     bool _canAcceptWritesFor_inlock(const NamespaceString& ns);
 
@@ -1202,9 +1195,6 @@ private:
 
     // This member's index position in the current config.
     int _selfIndex;  // (M)
-
-    // Condition to signal when new heartbeat data comes in.
-    stdx::condition_variable _stepDownWaiters;  // (M)
 
     // State for conducting an election of this node.
     // the presence of a non-null _freshnessChecker pointer indicates that an election is
