@@ -109,7 +109,7 @@ public:
      */
     static void cloneDocumentsFromDonor(
         OperationContext* opCtx,
-        stdx::function<void(OperationContext*, BSONObjIterator)> insertBatchFn,
+        stdx::function<void(OperationContext*, BSONObj)> insertBatchFn,
         stdx::function<BSONObj(OperationContext*)> fetchBatchFn);
 
     /**
