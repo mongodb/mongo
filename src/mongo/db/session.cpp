@@ -726,8 +726,7 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     invariant(!_txnResourceStash);
     _txnResourceStash = TxnResources(opCtx);
 
-    // We accept possible slight inaccuracies in the current active and current inactive counters
-    // from non-atomicity.
+    // We accept possible slight inaccuracies in these counters from non-atomicity.
     ServerTransactionsMetrics::get(opCtx)->decrementCurrentActive();
     ServerTransactionsMetrics::get(opCtx)->incrementCurrentInactive();
 }
@@ -926,7 +925,13 @@ void Session::_abortTransaction(WithLock wl) {
         }
     }
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
-    ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
+
+    // If the transaction is stashed, then we have aborted an inactive transaction.
+    if (_txnResourceStash) {
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
+    } else {
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
+    }
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
