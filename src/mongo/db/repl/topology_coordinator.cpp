@@ -2802,7 +2802,7 @@ bool TopologyCoordinator::_isCaughtUpAndElectable(int memberIndex, OpTime lastAp
         return false;
     }
 
-    return (_memberData.at(memberIndex).getHeartbeatAppliedOpTime() >= lastApplied);
+    return (_memberData.at(memberIndex).getLastAppliedOpTime() >= lastApplied);
 }
 
 bool TopologyCoordinator::isSafeToStepDown() {

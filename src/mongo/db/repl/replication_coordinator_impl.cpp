@@ -1769,21 +1769,12 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     try {
 
-        bool firstTime = true;
         while (!_topCoord->attemptStepDown(
             termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
 
-            // The stepdown attempt failed.
-
-            if (firstTime) {
-                // We send out a fresh round of heartbeats because stepping down successfully
-                // without {force: true} is dependent on timely heartbeat data.
-                _restartHeartbeats_inlock();
-                firstTime = false;
-            }
-
-            // Now release the global lock to allow secondaries to read the oplog, then wait until
-            // enough secondaries are caught up for us to finish stepdown.
+            // The stepdown attempt failed. Now release the global lock to allow secondaries
+            // to read the oplog, then wait until enough secondaries are caught up for us to
+            // finish stepdown.
             globalLock.reset();
             invariant(!opCtx->lockState()->isLocked());
 
@@ -1838,7 +1829,7 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 }
 
 void ReplicationCoordinatorImpl::_signalStepDownWaiterIfReady_inlock() {
-    if (_topCoord->isSafeToStepDown()) {
+    if (_topCoord->isSteppingDown() && _topCoord->isSafeToStepDown()) {
         _stepDownWaiters.notify_all();
     }
 }
@@ -3284,6 +3275,7 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     // as lastCommittedOpTime may be based on durable optimes whereas some waiters may be
     // waiting on applied (but not necessarily durable) optimes.
     _wakeReadyWaiters_inlock();
+    _signalStepDownWaiterIfReady_inlock();
 }
 
 boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime_inlock(
