@@ -60,7 +60,7 @@ class UpdateRequest;
  * refresh' (in which case refreshFromStorageIfNeeded needs to be called in order to make it
  * up-to-date).
  */
-class Session {
+class Session : public Decorable<Session> {
     MONGO_DISALLOW_COPYING(Session);
 
 public:
