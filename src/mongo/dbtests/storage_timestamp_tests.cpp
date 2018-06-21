@@ -2264,8 +2264,9 @@ class AllStorageTimestampTests : public unittest::Suite {
 public:
     AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
     void setupTests() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (storageGlobalParams.engine != "wiredTiger") {
+        // Only run on storage engines that support snapshot reads.
+        auto storageEngine = cc().getServiceContext()->getStorageEngine();
+        if (!storageEngine->supportsReadConcernSnapshot()) {
             unittest::log() << "Skipping this test suite because storage engine "
                             << storageGlobalParams.engine << " does not support timestamp writes.";
             return;
