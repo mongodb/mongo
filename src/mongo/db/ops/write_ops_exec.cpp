@@ -321,7 +321,8 @@ WriteResult performCreateIndexes(OperationContext* opCtx, const write_ops::Inser
 void insertDocuments(OperationContext* opCtx,
                      Collection* collection,
                      std::vector<InsertStatement>::iterator begin,
-                     std::vector<InsertStatement>::iterator end) {
+                     std::vector<InsertStatement>::iterator end,
+                     bool fromMigrate) {
     // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to
     // oversized batches.
     WriteUnitOfWork wuow(opCtx);
@@ -349,7 +350,8 @@ void insertDocuments(OperationContext* opCtx,
         }
     }
 
-    uassertStatusOK(collection->insertDocuments(opCtx, begin, end, &CurOp::get(opCtx)->debug()));
+    uassertStatusOK(
+        collection->insertDocuments(opCtx, begin, end, &CurOp::get(opCtx)->debug(), fromMigrate));
     wuow.commit();
 }
 
@@ -360,7 +362,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 const write_ops::Insert& wholeOp,
                                 std::vector<InsertStatement>& batch,
                                 LastOpFixer* lastOpFixer,
-                                WriteResult* out) {
+                                WriteResult* out,
+                                bool fromMigrate) {
     if (batch.empty())
         return true;
 
@@ -397,7 +400,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             // First try doing it all together. If all goes well, this is all we need to do.
             // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
             lastOpFixer->startingOp();
-            insertDocuments(opCtx, collection->getCollection(), batch.begin(), batch.end());
+            insertDocuments(
+                opCtx, collection->getCollection(), batch.begin(), batch.end(), fromMigrate);
             lastOpFixer->finishedOpSuccessfully();
             globalOpCounters.gotInserts(batch.size());
             SingleWriteResult result;
@@ -430,7 +434,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     if (!collection)
                         acquireCollection();
                     lastOpFixer->startingOp();
-                    insertDocuments(opCtx, collection->getCollection(), it, it + 1);
+                    insertDocuments(opCtx, collection->getCollection(), it, it + 1, fromMigrate);
                     lastOpFixer->finishedOpSuccessfully();
                     SingleWriteResult result;
                     result.setN(1);
@@ -472,7 +476,9 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 
 }  // namespace
 
-WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& wholeOp) {
+WriteResult performInserts(OperationContext* opCtx,
+                           const write_ops::Insert& wholeOp,
+                           bool fromMigrate) {
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
     auto session = OperationContextSession::get(opCtx);
@@ -552,7 +558,8 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
                 continue;  // Add more to batch before inserting.
         }
 
-        bool canContinue = insertBatchAndHandleErrors(opCtx, wholeOp, batch, &lastOpFixer, &out);
+        bool canContinue =
+            insertBatchAndHandleErrors(opCtx, wholeOp, batch, &lastOpFixer, &out, fromMigrate);
         batch.clear();  // We won't need the current batch any more.
         bytesInBatch = 0;
 

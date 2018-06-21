@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -375,7 +376,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
 
 void MigrationDestinationManager::cloneDocumentsFromDonor(
     OperationContext* opCtx,
-    stdx::function<void(OperationContext*, BSONObjIterator)> insertBatchFn,
+    stdx::function<void(OperationContext*, BSONObj)> insertBatchFn,
     stdx::function<BSONObj(OperationContext*)> fetchBatchFn) {
 
     ProducerConsumerQueue<BSONObj> batches(1);
@@ -390,7 +391,7 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
                 if (arr.isEmpty()) {
                     return;
                 }
-                insertBatchFn(inserterOpCtx.get(), BSONObjIterator(arr));
+                insertBatchFn(inserterOpCtx.get(), arr);
             }
         } catch (...) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -757,61 +758,55 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
 
         _chunkMarkedPending = true;  // no lock needed, only the migrate thread looks.
 
-        auto insertBatchFn = [&](OperationContext* opCtx, BSONObjIterator docs) {
-            while (docs.more()) {
-                opCtx->checkForInterrupt();
+        auto assertNotAborted = [&](OperationContext* opCtx) {
+            opCtx->checkForInterrupt();
+            uassert(50748, "Migration aborted while copying documents", getState() != ABORT);
+        };
 
-                if (getState() == ABORT) {
-                    auto message = "Migration aborted while copying documents";
-                    log() << message;
-                    uasserted(50748, message);
+        auto insertBatchFn = [&](OperationContext* opCtx, BSONObj arr) {
+            int batchNumCloned = 0;
+            int batchClonedBytes = 0;
+
+            assertNotAborted(opCtx);
+
+            write_ops::Insert insertOp(_nss);
+            insertOp.getWriteCommandBase().setOrdered(true);
+            insertOp.setDocuments([&] {
+                std::vector<BSONObj> toInsert;
+                for (const auto& doc : arr) {
+                    BSONObj docToClone = doc.Obj();
+                    toInsert.push_back(docToClone);
+                    batchNumCloned++;
+                    batchClonedBytes += docToClone.objsize();
                 }
+                return toInsert;
+            }());
 
-                BSONObj docToClone = docs.next().Obj();
-                {
-                    AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-                    uassert(ErrorCodes::ConflictingOperationInProgress,
-                            str::stream() << "Collection " << _nss.ns()
-                                          << " was dropped in the middle of the migration",
-                            autoColl.getCollection());
+            const WriteResult reply = performInserts(opCtx, insertOp, true);
 
-                    BSONObj localDoc;
-                    if (willOverrideLocalId(opCtx,
-                                            _nss,
-                                            _min,
-                                            _max,
-                                            _shardKeyPattern,
-                                            autoColl.getDb(),
-                                            docToClone,
-                                            &localDoc)) {
-                        const std::string errMsg = str::stream()
-                            << "cannot migrate chunk, local document " << redact(localDoc)
-                            << " has same _id as cloned "
-                            << "remote document " << redact(docToClone);
-                        warning() << errMsg;
+            for (unsigned long i = 0; i < reply.results.size(); ++i) {
+                uassertStatusOKWithContext(reply.results[i],
+                                           str::stream() << "Insert of "
+                                                         << redact(insertOp.getDocuments()[i])
+                                                         << " failed.");
+            }
 
-                        // Exception will abort migration cleanly
-                        uasserted(16976, errMsg);
-                    }
-                    Helpers::upsert(opCtx, _nss.ns(), docToClone, true);
-                }
-                {
-                    stdx::lock_guard<stdx::mutex> statsLock(_mutex);
-                    _numCloned++;
-                    _clonedBytes += docToClone.objsize();
-                }
-                if (_writeConcern.shouldWaitForOtherNodes()) {
-                    repl::ReplicationCoordinator::StatusAndDuration replStatus =
-                        repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
-                            opCtx,
-                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                            _writeConcern);
-                    if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
-                        warning() << "secondaryThrottle on, but doc insert timed out; "
-                                     "continuing";
-                    } else {
-                        massertStatusOK(replStatus.status);
-                    }
+            {
+                stdx::lock_guard<stdx::mutex> statsLock(_mutex);
+                _numCloned += batchNumCloned;
+                _clonedBytes += batchClonedBytes;
+            }
+            if (_writeConcern.shouldWaitForOtherNodes()) {
+                repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                    repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+                        opCtx,
+                        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                        _writeConcern);
+                if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
+                    warning() << "secondaryThrottle on, but doc insert timed out; "
+                                 "continuing";
+                } else {
+                    uassertStatusOK(replStatus.status);
                 }
             }
         };
