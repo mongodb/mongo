@@ -98,23 +98,6 @@ bool ChunkInfo::containsKey(const BSONObj& shardKey) const {
     return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
 }
 
-uint64_t ChunkInfo::getBytesWritten() const {
-    return _writesTracker->getBytesWritten();
-}
-
-void ChunkInfo::addBytesWritten(uint64_t bytesWrittenIncrement) {
-    _writesTracker->addBytesWritten(bytesWrittenIncrement);
-}
-
-void ChunkInfo::clearBytesWritten() {
-    _writesTracker->clearBytesWritten();
-}
-
-bool ChunkInfo::shouldSplit(uint64_t maxChunkSize) const {
-    // Check if there are enough estimated bytes written to warrant a split
-    return _writesTracker->shouldSplit(maxChunkSize);
-}
-
 std::string ChunkInfo::toString() const {
     return str::stream() << ChunkType::shard() << ": " << _shardId << ", " << ChunkType::lastmod()
                          << ": " << _lastmod.toString() << ", " << _range.toString();

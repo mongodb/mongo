@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/chunk_split_state_driver.h"
+#include "mongo/db/s/chunk_split_state_driver.h"
 
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

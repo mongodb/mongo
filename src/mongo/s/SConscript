@@ -384,26 +384,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='chunk_split_state_driver',
-    source=[
-        'chunk_split_state_driver.cpp',
-    ],
-    LIBDEPS=[
-        'chunk_writes_tracker'
-    ],
-)
-
-env.CppUnitTest(
-    target='chunk_split_state_driver_test',
-    source=[
-        'chunk_split_state_driver_test.cpp',
-    ],
-    LIBDEPS=[
-        'chunk_split_state_driver',
-    ]
-)
-
-env.Library(
     target='catalog_cache_test_fixture',
     source=[
         'catalog_cache_test_fixture.cpp',

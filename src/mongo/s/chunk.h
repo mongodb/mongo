@@ -67,6 +67,13 @@ public:
     }
 
     /**
+     * Get writes tracker for this chunk.
+     */
+    std::shared_ptr<ChunkWritesTracker> getWritesTracker() const {
+        return _writesTracker;
+    }
+
+    /**
      * Returns a string represenation of the chunk for logging.
      */
     std::string toString() const;
@@ -76,15 +83,6 @@ public:
     // Note: this function takes an extracted *key*, not an original document (the point may be
     // computed by, say, hashing a given field or projecting to a subset of fields).
     bool containsKey(const BSONObj& shardKey) const;
-
-    /**
-     * Get/increment/set the estimation of how much data was written for this chunk.
-     */
-    uint64_t getBytesWritten() const;
-    void addBytesWritten(uint64_t bytesWrittenIncrement);
-    void clearBytesWritten();
-
-    bool shouldSplit(uint64_t desiredChunkSize) const;
 
     /**
      * Marks this chunk as jumbo. Only moves from false to true once and is used by the balancer.
@@ -140,6 +138,13 @@ public:
     }
 
     /**
+     * Get writes tracker for this chunk.
+     */
+    std::shared_ptr<ChunkWritesTracker> getWritesTracker() const {
+        return _chunkInfo.getWritesTracker();
+    }
+
+    /**
      * Returns a string represenation of the chunk for logging.
      */
     std::string toString() const {
@@ -152,23 +157,6 @@ public:
     // computed by, say, hashing a given field or projecting to a subset of fields).
     bool containsKey(const BSONObj& shardKey) const {
         return _chunkInfo.containsKey(shardKey);
-    }
-
-    /**
-     * Get/increment/set the estimation of how much data was written for this chunk.
-     */
-    uint64_t getBytesWritten() const {
-        return _chunkInfo.getBytesWritten();
-    }
-    void addBytesWritten(uint64_t bytesWrittenIncrement) {
-        _chunkInfo.addBytesWritten(bytesWrittenIncrement);
-    }
-    void clearBytesWritten() {
-        _chunkInfo.clearBytesWritten();
-    }
-
-    bool shouldSplit(uint64_t desiredChunkSize) const {
-        return _chunkInfo.shouldSplit(desiredChunkSize);
     }
 
     /**

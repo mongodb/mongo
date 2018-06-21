@@ -37,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/chunk_split_state_driver.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/split_chunk.h"
 #include "mongo/db/s/split_vector.h"
@@ -259,19 +260,22 @@ void ChunkSplitter::onStepDown() {
     // TODO: Re-enable this log when auto split is actively running on shards.
 }
 
-void ChunkSplitter::trySplitting(const NamespaceString& nss,
+void ChunkSplitter::trySplitting(ChunkSplitStateDriver chunkSplitStateDriver,
+                                 const NamespaceString& nss,
                                  const BSONObj& min,
                                  const BSONObj& max,
                                  long dataWritten) {
     if (!_isPrimary) {
         return;
     }
-    uassertStatusOK(_threadPool.schedule([ this, nss, min, max, dataWritten ]() noexcept {
-        _runAutosplit(nss, min, max, dataWritten);
-    }));
+    uassertStatusOK(_threadPool.schedule(
+        [ this, &chunkSplitStateDriver, nss, min, max, dataWritten ]() noexcept {
+            _runAutosplit(std::move(chunkSplitStateDriver), nss, min, max, dataWritten);
+        }));
 }
 
-void ChunkSplitter::_runAutosplit(const NamespaceString& nss,
+void ChunkSplitter::_runAutosplit(ChunkSplitStateDriver chunkSplitStateDriver,
+                                  const NamespaceString& nss,
                                   const BSONObj& min,
                                   const BSONObj& max,
                                   long dataWritten) {
@@ -306,6 +310,7 @@ void ChunkSplitter::_runAutosplit(const NamespaceString& nss,
                << " dataWritten since last check: " << dataWritten
                << " maxChunkSizeBytes: " << maxChunkSizeBytes;
 
+        chunkSplitStateDriver.prepareSplit();
         auto splitPoints = uassertStatusOK(splitVector(opCtx.get(),
                                                        nss,
                                                        shardKeyPattern.toBSON(),
@@ -359,6 +364,7 @@ void ChunkSplitter::_runAutosplit(const NamespaceString& nss,
                                                    cm->getVersion(),
                                                    ChunkRange(min, max),
                                                    splitPoints));
+        chunkSplitStateDriver.commitSplit();
 
         const bool shouldBalance = isAutoBalanceEnabled(opCtx.get(), nss, balancerConfig);
 

@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/chunk_split_state_driver.h"
+#include "mongo/db/s/chunk_split_state_driver.h"
 
 #include "mongo/util/assert_util.h"
 

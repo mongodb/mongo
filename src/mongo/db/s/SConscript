@@ -61,10 +61,32 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+        'chunk_splitter',
         'sharding',
         'sharding_api_d',
         'sharding_catalog_manager',
     ],
+)
+
+env.Library(
+    target='chunk_splitter',
+    source=[
+        'chunk_split_state_driver.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/s/chunk_writes_tracker'
+    ],
+)
+
+env.CppUnitTest(
+    target='chunk_split_state_driver_test',
+    source=[
+        'chunk_split_state_driver_test.cpp',
+    ],
+    LIBDEPS=[
+        'chunk_splitter',
+    ]
 )
 
 env.CppUnitTest(

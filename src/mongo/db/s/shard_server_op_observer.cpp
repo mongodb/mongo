@@ -34,6 +34,8 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/s/chunk_split_state_driver.h"
+#include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
@@ -137,23 +139,12 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
 }
 
 /**
- * Returns true if the total number of bytes on the specified chunk nears the max size of a shard.
- */
-bool shouldSplitChunk(OperationContext* opCtx,
-                      const ShardKeyPattern& shardKeyPattern,
-                      const Chunk& chunk) {
-    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-    invariant(balancerConfig);
-
-    return chunk.shouldSplit(balancerConfig->getMaxChunkSizeBytes());
-}
-
-/**
  * If the collection is sharded, finds the chunk that contains the specified document and increments
  * the size tracked for that chunk by the specified amount of data written, in bytes. Returns the
  * number of total bytes on that chunk after the data is written.
  */
 void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
+                                    const NamespaceString& nss,
                                     const ChunkManager& chunkManager,
                                     const BSONObj& document,
                                     long dataWritten) {
@@ -175,13 +166,21 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
     // Note that we can assume the simple collation, because shard keys do not support non-simple
     // collations.
     auto chunk = chunkManager.findIntersectingChunkWithSimpleCollation(shardKey);
-    chunk.addBytesWritten(dataWritten);
+    auto chunkWritesTracker = chunk.getWritesTracker();
+    chunkWritesTracker->addBytesWritten(dataWritten);
 
-    // If the chunk becomes too large, then we call the ChunkSplitter to schedule a split. Then, we
-    // reset the tracking for that chunk to 0.
-    if (shouldSplitChunk(opCtx, shardKeyPattern, chunk)) {
-        // TODO: call ChunkSplitter here
-        chunk.clearBytesWritten();
+    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+
+    if (chunkWritesTracker->shouldSplit(balancerConfig->getMaxChunkSizeBytes())) {
+        auto chunkSplitStateDriver = ChunkSplitStateDriver::tryInitiateSplit(chunkWritesTracker);
+        if (chunkSplitStateDriver) {
+            // TODO (SERVER-9287): Enable the following to trigger chunk splitting
+            // ChunkSplitter::get(opCtx).trySplitting(std::move(chunkSplitStateDriver.get()),
+            //                                       nss,
+            //                                       chunk.getMin(),
+            //                                       chunk.getMax(),
+            //                                       dataWritten);
+        }
     }
 }
 
@@ -217,7 +216,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 
         if (metadata) {
             incrementChunkOnInsertOrUpdate(
-                opCtx, *metadata->getChunkManager(), insertedDoc, insertedDoc.objsize());
+                opCtx, nss, *metadata->getChunkManager(), insertedDoc, insertedDoc.objsize());
         }
     }
 }
@@ -313,8 +312,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
     }
 
     if (metadata) {
-        incrementChunkOnInsertOrUpdate(
-            opCtx, *metadata->getChunkManager(), args.updatedDoc, args.updatedDoc.objsize());
+        incrementChunkOnInsertOrUpdate(opCtx,
+                                       args.nss,
+                                       *metadata->getChunkManager(),
+                                       args.updatedDoc,
+                                       args.updatedDoc.objsize());
     }
 }
 

@@ -41,6 +41,7 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_writes_tracker.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
@@ -249,11 +250,12 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
     const bool maxIsInf =
         (0 == manager->getShardKeyPattern().getKeyPattern().globalMax().woCompare(chunk.getMax()));
 
-    chunk.addBytesWritten(chunkBytesWritten);
+    auto writesTracker = chunk.getWritesTracker();
+    writesTracker->addBytesWritten(chunkBytesWritten);
 
     const uint64_t desiredChunkSize = balancerConfig->getMaxChunkSizeBytes();
 
-    if (!chunk.shouldSplit(desiredChunkSize)) {
+    if (!writesTracker->shouldSplit(desiredChunkSize)) {
         return;
     }
 
@@ -307,7 +309,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
             // No split points means there isn't enough data to split on; 1 split point means we
             // have
             // between half the chunk size to full chunk size so there is no need to split yet
-            chunk.clearBytesWritten();
+            writesTracker->clearBytesWritten();
             return;
         }
 
@@ -315,7 +317,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
             // We don't want to reset _dataWritten since we want to check the other side right away
         } else {
             // We're splitting, so should wait a bit
-            chunk.clearBytesWritten();
+            writesTracker->clearBytesWritten();
         }
 
         // We assume that if the chunk being split is the first (or last) one on the collection,
@@ -401,7 +403,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
         // Ensure the collection gets reloaded because of the move
         Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
     } catch (const DBException& ex) {
-        chunk.clearBytesWritten();
+        chunk.getWritesTracker()->clearBytesWritten();
 
         if (ErrorCodes::isStaleShardVersionError(ex.code())) {
             log() << "Unable to auto-split chunk " << redact(chunkRange.toString()) << causedBy(ex)
