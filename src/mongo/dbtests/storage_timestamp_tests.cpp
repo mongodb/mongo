@@ -137,10 +137,6 @@ public:
     repl::ReplicationConsistencyMarkers* _consistencyMarkers;
 
     StorageTimestampTest() {
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         repl::ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
         replSettings.setReplSetString("rs0");
@@ -185,10 +181,6 @@ public:
     }
 
     ~StorageTimestampTest() {
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         try {
             reset(NamespaceString("local.oplog.rs"));
         } catch (...) {
@@ -559,11 +551,6 @@ public:
 class SecondaryInsertTimes : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // In order for applyOps to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -621,11 +608,6 @@ public:
 class SecondaryArrayInsertTimes : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // In order for applyOps to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -702,11 +684,6 @@ public:
 class SecondaryDeleteTimes : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // In order for applyOps to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -763,11 +740,6 @@ public:
 class SecondaryUpdateTimes : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // In order for applyOps to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -840,11 +812,6 @@ public:
 class SecondaryInsertToUpsert : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // In order for applyOps to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -907,11 +874,6 @@ public:
 class SecondaryAtomicApplyOps : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // Create a new collection.
         NamespaceString nss("unittests.insertToUpsert");
         reset(nss);
@@ -972,11 +934,6 @@ public:
 class SecondaryAtomicApplyOpsWCEToNonAtomic : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // Create a new collectiont.
         NamespaceString nss("unitteTsts.insertToUpsert");
         reset(nss);
@@ -1029,11 +986,6 @@ public:
 class SecondaryCreateCollection : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // In order for applyOps to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -1068,11 +1020,6 @@ public:
 class SecondaryCreateTwoCollections : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // In order for applyOps to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -1130,11 +1077,6 @@ public:
 class SecondaryCreateCollectionBetweenInserts : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // In order for applyOps to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -1226,11 +1168,6 @@ public:
 class PrimaryCreateCollectionInApplyOps : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         NamespaceString nss("unittests.primaryCreateCollectionInApplyOps");
         ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
 
@@ -1274,11 +1211,6 @@ class SecondarySetIndexMultikeyOnInsert : public StorageTimestampTest {
 
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // Pretend to be a secondary.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -1367,11 +1299,6 @@ class InitialSyncSetIndexMultikeyOnInsert : public StorageTimestampTest {
 
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // Pretend to be a secondary.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -1484,11 +1411,6 @@ class PrimarySetIndexMultikeyOnInsert : public StorageTimestampTest {
 
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         NamespaceString nss("unittests.PrimarySetIndexMultikeyOnInsert");
         reset(nss);
 
@@ -1518,11 +1440,6 @@ class PrimarySetIndexMultikeyOnInsertUnreplicated : public StorageTimestampTest 
 
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // Use an unreplicated collection.
         NamespaceString nss("unittests.system.profile");
         reset(nss);
@@ -1552,11 +1469,6 @@ public:
 class InitializeMinValid : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
@@ -1580,11 +1492,6 @@ public:
 class SetMinValidInitialSyncFlag : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
@@ -1623,11 +1530,6 @@ public:
 class SetMinValidToAtLeast : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
@@ -1677,11 +1579,6 @@ public:
 class SetMinValidAppliedThrough : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
         reset(nss);
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
@@ -1726,11 +1623,6 @@ template <bool SimulatePrimary>
 class KVDropDatabase : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         repl::DropPendingCollectionReaper::set(
             _opCtx->getServiceContext(),
@@ -1836,11 +1728,6 @@ template <bool SimulatePrimary>
 class TimestampIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         const bool SimulateSecondary = !SimulatePrimary;
         if (SimulateSecondary) {
             // The MemberState is inspected during index builds to use a "ghost" write to timestamp
@@ -1958,11 +1845,6 @@ public:
 class TimestampMultiIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         auto kvStorageEngine =
             dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
         KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
@@ -2044,10 +1926,6 @@ public:
 class TimestampIndexDrops : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
         auto kvStorageEngine =
             dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
         KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
@@ -2125,10 +2003,6 @@ public:
 class SecondaryReadsDuringBatchApplicationAreAllowed : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
         ASSERT(_opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot());
 
         NamespaceString ns("unittest.secondaryReadsDuringBatchApplicationAreAllowed");
@@ -2233,11 +2107,6 @@ template <bool Foreground>
 class TimestampIndexBuilderOnPrimary : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         // In order for applyOps to assign timestamps, we must be in non-replicated mode.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
@@ -2338,11 +2207,6 @@ public:
 class ViewCreationSeparateTransaction : public StorageTimestampTest {
 public:
     void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
         auto kvStorageEngine =
             dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
         KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
@@ -2400,6 +2264,13 @@ class AllStorageTimestampTests : public unittest::Suite {
 public:
     AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
     void setupTests() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (storageGlobalParams.engine != "wiredTiger") {
+            unittest::log() << "Skipping this test suite because storage engine "
+                            << storageGlobalParams.engine << " does not support timestamp writes.";
+            return;
+        }
+
         add<SecondaryInsertTimes>();
         add<SecondaryArrayInsertTimes>();
         add<SecondaryDeleteTimes>();
