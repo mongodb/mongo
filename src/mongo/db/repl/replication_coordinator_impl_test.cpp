@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/is_master_response.h"
@@ -1613,6 +1614,172 @@ TEST_F(ReplCoordTest, DrainCompletionMidStepDown) {
     // ASSERT_EQUALS(2, getReplCoord()->getTerm()); // SERVER-28290
 }
 
+TEST_F(StepDownTest, StepDownCanCompleteBasedOnReplSetUpdatePositionAlone) {
+    const auto repl = getReplCoord();
+
+    OpTimeWithTermOne opTime1(100, 1);
+    OpTimeWithTermOne opTime2(200, 1);
+
+    repl->setMyLastAppliedOpTime(opTime2);
+    repl->setMyLastDurableOpTime(opTime2);
+
+    // Secondaries not caught up yet.
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 1, opTime1));
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, opTime1));
+
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(repl->getMemberState().primary());
+
+    // Step down where the secondary actually has to catch up before the stepDown can succeed.
+    auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
+
+    // The node has not been able to step down yet.
+    ASSERT_TRUE(repl->getMemberState().primary());
+
+    // Catch up one of the secondaries using only replSetUpdatePosition.
+    long long configVersion = repl->getConfig().getConfigVersion();
+    UpdatePositionArgs updatePositionArgs;
+
+    ASSERT_OK(updatePositionArgs.initialize(
+        BSON(UpdatePositionArgs::kCommandFieldName
+             << 1
+             << UpdatePositionArgs::kUpdateArrayFieldName
+             << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
+                                << configVersion
+                                << UpdatePositionArgs::kMemberIdFieldName
+                                << 1
+                                << UpdatePositionArgs::kAppliedOpTimeFieldName
+                                << opTime2.asOpTime().toBSON()
+                                << UpdatePositionArgs::kDurableOpTimeFieldName
+                                << opTime2.asOpTime().toBSON())
+                           << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                                   << configVersion
+                                   << UpdatePositionArgs::kMemberIdFieldName
+                                   << 2
+                                   << UpdatePositionArgs::kAppliedOpTimeFieldName
+                                   << opTime1.asOpTime().toBSON()
+                                   << UpdatePositionArgs::kDurableOpTimeFieldName
+                                   << opTime1.asOpTime().toBSON())))));
+
+    ASSERT_OK(repl->processReplSetUpdatePosition(updatePositionArgs, &configVersion));
+
+    // Verify that stepDown completes successfully.
+    ASSERT_OK(*result.second.get());
+    ASSERT_TRUE(repl->getMemberState().secondary());
+}
+
+class StepDownTestWithUnelectableNode : public StepDownTest {
+private:
+    void setUp() override {
+        ReplCoordTest::setUp();
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(BSON("_id"
+                                << "mySet"
+                                << "version"
+                                << 1
+                                << "protocolVersion"
+                                << 1
+                                << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                         << "test1:1234")
+                                              << BSON("_id" << 1 << "host"
+                                                            << "test2:1234"
+                                                            << "priority"
+                                                            << 0)
+                                              << BSON("_id" << 2 << "host"
+                                                            << "test3:1234"))),
+                           HostAndPort("test1", 1234));
+        ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    }
+};
+
+TEST_F(StepDownTestWithUnelectableNode,
+       UpdatePositionDuringStepDownWakesUpStepDownWaiterMoreThanOnce) {
+    const auto repl = getReplCoord();
+
+    OpTimeWithTermOne opTime1(100, 1);
+    OpTimeWithTermOne opTime2(200, 1);
+
+    repl->setMyLastAppliedOpTime(opTime2);
+    repl->setMyLastDurableOpTime(opTime2);
+
+    // No secondaries are caught up yet.
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 1, opTime1));
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, opTime1));
+
+    simulateSuccessfulV1Election();
+    ASSERT_TRUE(repl->getMemberState().primary());
+
+    // Step down where the secondary actually has to catch up before the stepDown can succeed.
+    auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
+
+    // The node has not been able to step down yet.
+    ASSERT_TRUE(repl->getMemberState().primary());
+
+    // Use replSetUpdatePosition to catch up the first secondary, which is not electable.
+    // This will yield a majority at the primary's opTime, so the waiter will be woken up,
+    // but stepDown will not be able to complete.
+    long long configVersion = repl->getConfig().getConfigVersion();
+    UpdatePositionArgs catchupFirstSecondary;
+
+    ASSERT_OK(catchupFirstSecondary.initialize(
+        BSON(UpdatePositionArgs::kCommandFieldName
+             << 1
+             << UpdatePositionArgs::kUpdateArrayFieldName
+             << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
+                                << configVersion
+                                << UpdatePositionArgs::kMemberIdFieldName
+                                << 1
+                                << UpdatePositionArgs::kAppliedOpTimeFieldName
+                                << opTime2.asOpTime().toBSON()
+                                << UpdatePositionArgs::kDurableOpTimeFieldName
+                                << opTime2.asOpTime().toBSON())
+                           << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                                   << configVersion
+                                   << UpdatePositionArgs::kMemberIdFieldName
+                                   << 2
+                                   << UpdatePositionArgs::kAppliedOpTimeFieldName
+                                   << opTime1.asOpTime().toBSON()
+                                   << UpdatePositionArgs::kDurableOpTimeFieldName
+                                   << opTime1.asOpTime().toBSON())))));
+
+    ASSERT_OK(repl->processReplSetUpdatePosition(catchupFirstSecondary, &configVersion));
+
+    // The primary has still not been able to finish stepping down.
+    ASSERT_TRUE(repl->getMemberState().primary());
+
+    // Now catch up the other secondary. This will wake up the waiter again, but this time
+    // there is an electable node, so stepDown will complete.
+    UpdatePositionArgs catchupOtherSecondary;
+
+    ASSERT_OK(catchupOtherSecondary.initialize(
+        BSON(UpdatePositionArgs::kCommandFieldName
+             << 1
+             << UpdatePositionArgs::kUpdateArrayFieldName
+             << BSON_ARRAY(BSON(UpdatePositionArgs::kConfigVersionFieldName
+                                << configVersion
+                                << UpdatePositionArgs::kMemberIdFieldName
+                                << 1
+                                << UpdatePositionArgs::kAppliedOpTimeFieldName
+                                << opTime2.asOpTime().toBSON()
+                                << UpdatePositionArgs::kDurableOpTimeFieldName
+                                << opTime2.asOpTime().toBSON())
+                           << BSON(UpdatePositionArgs::kConfigVersionFieldName
+                                   << configVersion
+                                   << UpdatePositionArgs::kMemberIdFieldName
+                                   << 2
+                                   << UpdatePositionArgs::kAppliedOpTimeFieldName
+                                   << opTime2.asOpTime().toBSON()
+                                   << UpdatePositionArgs::kDurableOpTimeFieldName
+                                   << opTime2.asOpTime().toBSON())))));
+
+    ASSERT_OK(repl->processReplSetUpdatePosition(catchupOtherSecondary, &configVersion));
+
+    // Verify that stepDown completes successfully.
+    ASSERT_OK(*result.second.get());
+    ASSERT_TRUE(repl->getMemberState().secondary());
+}
+
 TEST_F(StepDownTest, NodeReturnsNotMasterWhenAskedToStepDownAsANonPrimaryNode) {
     const auto opCtx = makeOperationContext();
 
@@ -1631,23 +1798,32 @@ TEST_F(StepDownTest, NodeReturnsNotMasterWhenAskedToStepDownAsANonPrimaryNode) {
 TEST_F(StepDownTest,
        NodeReturnsExceededTimeLimitWhenStepDownFailsToObtainTheGlobalLockWithinTheAllottedTime) {
     OpTimeWithTermOne optime1(100, 1);
-    // All nodes are caught up
+
+    // Set up this test so that all nodes are caught up. This is necessary to exclude the false
+    // positive case where stepDown returns "ExceededTimeLimit", but not because it could not
+    // acquire the lock, but because it could not satisfy all stepdown conditions on time.
     getReplCoord()->setMyLastAppliedOpTime(optime1);
     getReplCoord()->setMyLastDurableOpTime(optime1);
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 1, optime1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 2, optime1));
 
     simulateSuccessfulV1Election();
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     const auto opCtx = makeOperationContext();
 
-    // Make sure stepDown cannot grab the global shared lock
+    // Make sure stepDown cannot grab the global exclusive lock. We need to use a different
+    // locker to test this, or otherwise stepDown will be granted the lock automatically.
     Lock::GlobalWrite lk(opCtx.get());
+    ASSERT_TRUE(opCtx->lockState()->isW());
+    auto locker = opCtx.get()->swapLockState(stdx::make_unique<DefaultLockerImpl>());
 
     Status status =
         getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000));
     ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    opCtx.get()->swapLockState(std::move(locker));
 }
 
 /* Step Down Test for a 5-node replica set */
@@ -1988,10 +2164,6 @@ TEST_F(StepDownTest,
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // Step down where the secondary actually has to catch up before the stepDown can succeed.
-    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
-    // T + 2 seconds and send out a new round of heartbeats immediately.
-    // This makes it unnecessary to advance the clock after entering the network to process
-    // the heartbeat requests.
     auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
 
     catchUpSecondaries(optime2);
@@ -2015,15 +2187,12 @@ TEST_F(StepDownTest,
     simulateSuccessfulV1Election();
 
     // Step down where the secondary actually has to catch up before the stepDown can succeed.
-    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
-    // T + 2 seconds and send out a new round of heartbeats immediately.
-    // This makes it unnecessary to advance the clock after entering the network to process
-    // the heartbeat requests.
     auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
 
-    // Secondary has not caught up on first round of heartbeats.
+    // Advance the clock by two seconds to allow for a round of heartbeats to be sent. The
+    // secondary will not appear to be caught up.
     enterNetwork();
-    getNet()->runUntil(getNet()->now() + Milliseconds(1000));
+    getNet()->runUntil(getNet()->now() + Milliseconds(2000));
     NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
     RemoteCommandRequest request = noi->getRequest();
     log() << "HB1: " << request.target.toString() << " processing " << request.cmdObj;
@@ -2087,10 +2256,6 @@ TEST_F(StepDownTest, OnlyOneStepDownCmdIsAllowedAtATime) {
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // Step down where the secondary actually has to catch up before the stepDown can succeed.
-    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
-    // T + 2 seconds and send out a new round of heartbeats immediately.
-    // This makes it unnecessary to advance the clock after entering the network to process
-    // the heartbeat requests.
     auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
 
     // We should still be primary at this point
@@ -2126,12 +2291,6 @@ TEST_F(StepDownTest, UnconditionalStepDownFailsStepDownCommand) {
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-    // Step down where the secondary actually has to catch up before the stepDown can succeed.
-    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
-    // T + 2 seconds and send out a new round of heartbeats immediately.
-    // This makes it unnecessary to advance the clock after entering the network to process
-    // the heartbeat requests.
-
     // Start a stepdown command that needs to wait for secondaries to catch up.
     auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
 
@@ -2165,12 +2324,6 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     simulateSuccessfulV1Election();
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-
-    // Step down where the secondary actually has to catch up before the stepDown can succeed.
-    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
-    // T + 2 seconds and send out a new round of heartbeats immediately.
-    // This makes it unnecessary to advance the clock after entering the network to process
-    // the heartbeat requests.
 
     // Start a stepdown command that needs to wait for secondaries to catch up.
     auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));
@@ -2212,12 +2365,6 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
     simulateSuccessfulV1Election();
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-
-    // Step down where the secondary actually has to catch up before the stepDown can succeed.
-    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
-    // T + 2 seconds and send out a new round of heartbeats immediately.
-    // This makes it unnecessary to advance the clock after entering the network to process
-    // the heartbeat requests.
 
     // Start a stepdown command that needs to wait for secondaries to catch up.
     auto result = stepDown_nonBlocking(false, Seconds(10), Seconds(60));

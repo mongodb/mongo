@@ -212,9 +212,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         _updateLastCommittedOpTime_inlock();
     }
 
-    // Wake the stepdown waiter when our updated OpTime allows it to finish stepping down.
-    _signalStepDownWaiterIfReady_inlock();
-
     // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.
     if (_catchupState) {
         _catchupState->signalHeartbeatUpdate_inlock();

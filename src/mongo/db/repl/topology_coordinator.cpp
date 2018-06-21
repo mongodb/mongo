@@ -2334,7 +2334,9 @@ bool TopologyCoordinator::isSafeToStepDown() {
             continue;
         }
         UnelectableReasonMask reason = _getUnelectableReason(memberIndex);
-        if (!reason && _memberData.at(memberIndex).getHeartbeatAppliedOpTime() >= lastOpApplied) {
+        auto memberData = _memberData.at(memberIndex);
+        bool caughtUp = (memberData.getLastAppliedOpTime() >= lastOpApplied);
+        if (!reason && caughtUp) {
             // Found a caught up and electable node, succeed with step down.
             return true;
         }
