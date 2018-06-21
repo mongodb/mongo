@@ -211,9 +211,6 @@ public:
 
     virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj) override;
 
-    virtual Status processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                    ReplSetHeartbeatResponse* response) override;
-
     virtual Status processReplSetReconfig(OperationContext* opCtx,
                                           const ReplSetReconfigArgs& args,
                                           BSONObjBuilder* resultObj) override;

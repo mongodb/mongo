@@ -51,7 +51,6 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -637,12 +636,6 @@ bool replHasDatabases(OperationContext* opCtx) {
     return false;
 }
 
-const std::string kHeartbeatConfigVersion = "configVersion";
-
-bool isHeartbeatRequestV1(const BSONObj& cmdObj) {
-    return cmdObj.hasField(kHeartbeatConfigVersion);
-}
-
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(rsDelayHeartbeatResponse);
@@ -671,40 +664,13 @@ public:
             uassertStatusOK(status);
         }
 
-        // Process heartbeat based on the version of request. The missing fields in mismatched
-        // version will be empty.
-        if (isHeartbeatRequestV1(cmdObj)) {
-            ReplSetHeartbeatArgsV1 args;
-            status = args.initialize(cmdObj);
-            if (status.isOK()) {
-                ReplSetHeartbeatResponse response;
-                status = ReplicationCoordinator::get(opCtx)->processHeartbeatV1(args, &response);
-                if (status.isOK())
-                    response.addToBSON(&result, true);
-
-                LOG_FOR_HEARTBEATS(2) << "Processed heartbeat from "
-                                      << cmdObj.getStringField("from")
-                                      << " and generated response, " << response;
-                uassertStatusOK(status);
-                return true;
-            }
-            // else: fall through to old heartbeat protocol as it is likely that
-            // a new node just joined the set
-        }
-
-        ReplSetHeartbeatArgs args;
-        status = args.initialize(cmdObj);
-        uassertStatusOK(status);
-
-        // ugh.
-        if (args.getCheckEmpty()) {
-            result.append("hasData", replHasDatabases(opCtx));
-        }
+        ReplSetHeartbeatArgsV1 args;
+        uassertStatusOK(args.initialize(cmdObj));
 
         ReplSetHeartbeatResponse response;
-        status = ReplicationCoordinator::get(opCtx)->processHeartbeat(args, &response);
+        status = ReplicationCoordinator::get(opCtx)->processHeartbeatV1(args, &response);
         if (status.isOK())
-            response.addToBSON(&result, false);
+            response.addToBSON(&result, true);
 
         LOG_FOR_HEARTBEATS(2) << "Processed heartbeat from " << cmdObj.getStringField("from")
                               << " and generated response, " << response;

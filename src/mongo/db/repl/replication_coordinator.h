@@ -70,7 +70,6 @@ class OplogReader;
 class OpTime;
 class ReadConcernArgs;
 class ReplSetConfig;
-class ReplSetHeartbeatArgs;
 class ReplSetHeartbeatArgsV1;
 class ReplSetHeartbeatResponse;
 class ReplSetHtmlSummary;
@@ -586,8 +585,6 @@ public:
      * Handles an incoming heartbeat command with arguments 'args'. Populates 'response';
      * returns a Status with either OK or an error message.
      */
-    virtual Status processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                    ReplSetHeartbeatResponse* response) = 0;
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response) = 0;
 

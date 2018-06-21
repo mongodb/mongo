@@ -42,7 +42,6 @@
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
-#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
@@ -98,17 +97,11 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
     const Date_t now = _replExecutor->now();
     BSONObj heartbeatObj;
     Milliseconds timeout(0);
-    if (isV1ElectionProtocol()) {
-        const std::pair<ReplSetHeartbeatArgsV1, Milliseconds> hbRequest =
-            _topCoord->prepareHeartbeatRequestV1(now, _settings.ourSetName(), target);
-        heartbeatObj = hbRequest.first.toBSON();
-        timeout = hbRequest.second;
-    } else {
-        const std::pair<ReplSetHeartbeatArgs, Milliseconds> hbRequest =
-            _topCoord->prepareHeartbeatRequest(now, _settings.ourSetName(), target);
-        heartbeatObj = hbRequest.first.toBSON();
-        timeout = hbRequest.second;
-    }
+    invariant(isV1ElectionProtocol());
+    const std::pair<ReplSetHeartbeatArgsV1, Milliseconds> hbRequest =
+        _topCoord->prepareHeartbeatRequestV1(now, _settings.ourSetName(), target);
+    heartbeatObj = hbRequest.first.toBSON();
+    timeout = hbRequest.second;
 
     const RemoteCommandRequest request(
         target, "admin", heartbeatObj, BSON(rpc::kReplSetMetadataFieldName << 1), nullptr, timeout);

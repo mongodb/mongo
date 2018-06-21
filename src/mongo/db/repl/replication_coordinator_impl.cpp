@@ -55,7 +55,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
-#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_html_summary.h"
@@ -2140,44 +2139,6 @@ Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder
     }
 
     return Status::OK();
-}
-
-Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                                    ReplSetHeartbeatResponse* response) {
-    {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
-            return Status(ErrorCodes::NotYetInitialized,
-                          "Received heartbeat while still initializing replication system");
-        }
-    }
-
-    auto senderHost(args.getSenderHost());
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    const Date_t now = _replExecutor->now();
-    Status result =
-        _topCoord->prepareHeartbeatResponse(now, args, _settings.ourSetName(), response);
-    if ((result.isOK() || result == ErrorCodes::InvalidReplicaSetConfig) && _selfIndex < 0) {
-        // If this node does not belong to the configuration it knows about, send heartbeats
-        // back to any node that sends us a heartbeat, in case one of those remote nodes has
-        // a configuration that contains us.  Chances are excellent that it will, since that
-        // is the only reason for a remote node to send this node a heartbeat request.
-        if (!senderHost.empty() && _seedList.insert(senderHost).second) {
-            _scheduleHeartbeatToTarget_inlock(senderHost, -1, now);
-        }
-    } else if (result.isOK() && response->getConfigVersion() < args.getConfigVersion()) {
-        // Schedule a heartbeat to the sender to fetch the new config.
-        // We cannot cancel the enqueued heartbeat, but either this one or the enqueued heartbeat
-        // will trigger reconfig, which cancels and reschedules all heartbeats.
-
-        if (args.hasSenderHost()) {
-            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
-            _scheduleHeartbeatToTarget_inlock(senderHost, senderIndex, now);
-        }
-    }
-    return result;
 }
 
 Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCtx,

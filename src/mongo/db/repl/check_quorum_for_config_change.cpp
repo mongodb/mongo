@@ -35,7 +35,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
@@ -85,30 +84,18 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
     }
 
     BSONObj hbRequest;
-    if (_term == OpTime::kUninitializedTerm) {
-        ReplSetHeartbeatArgs hbArgs;
-        hbArgs.setSetName(_rsConfig->getReplSetName());
-        hbArgs.setProtocolVersion(1);
-        hbArgs.setConfigVersion(_rsConfig->getConfigVersion());
-        hbArgs.setHeartbeatVersion(1);
-        hbArgs.setCheckEmpty(isInitialConfig);
-        hbArgs.setSenderHost(myConfig.getHostAndPort());
-        hbArgs.setSenderId(myConfig.getId());
-        hbRequest = hbArgs.toBSON();
-
-    } else {
-        ReplSetHeartbeatArgsV1 hbArgs;
-        hbArgs.setSetName(_rsConfig->getReplSetName());
-        hbArgs.setConfigVersion(_rsConfig->getConfigVersion());
-        hbArgs.setHeartbeatVersion(1);
-        if (isInitialConfig) {
-            hbArgs.setCheckEmpty();
-        }
-        hbArgs.setSenderHost(myConfig.getHostAndPort());
-        hbArgs.setSenderId(myConfig.getId());
-        hbArgs.setTerm(_term);
-        hbRequest = hbArgs.toBSON();
+    invariant(_term != OpTime::kUninitializedTerm);
+    ReplSetHeartbeatArgsV1 hbArgs;
+    hbArgs.setSetName(_rsConfig->getReplSetName());
+    hbArgs.setConfigVersion(_rsConfig->getConfigVersion());
+    hbArgs.setHeartbeatVersion(1);
+    if (isInitialConfig) {
+        hbArgs.setCheckEmpty();
     }
+    hbArgs.setSenderHost(myConfig.getHostAndPort());
+    hbArgs.setSenderId(myConfig.getId());
+    hbArgs.setTerm(_term);
+    hbRequest = hbArgs.toBSON();
 
     // Send a bunch of heartbeat requests.
     // Schedule an operation when a "sufficient" number of them have completed, and use that

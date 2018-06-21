@@ -32,7 +32,6 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
-#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"

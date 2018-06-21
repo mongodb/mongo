@@ -289,11 +289,6 @@ Status ReplicationCoordinatorEmbedded::processReplSetFreeze(int, BSONObjBuilder*
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::processHeartbeat(const ReplSetHeartbeatArgs&,
-                                                        ReplSetHeartbeatResponse*) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 Status ReplicationCoordinatorEmbedded::processReplSetReconfig(OperationContext*,
                                                               const ReplSetReconfigArgs&,
                                                               BSONObjBuilder*) {

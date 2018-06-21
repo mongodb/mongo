@@ -48,7 +48,6 @@ namespace repl {
 class HeartbeatResponseAction;
 class MemberData;
 class OpTime;
-class ReplSetHeartbeatArgs;
 class ReplSetConfig;
 class TagSubgroup;
 struct MemberState;
@@ -338,12 +337,6 @@ public:
                               BSONObjBuilder* response,
                               Status* result);
 
-    // produce a reply to a heartbeat
-    Status prepareHeartbeatResponse(Date_t now,
-                                    const ReplSetHeartbeatArgs& args,
-                                    const std::string& ourSetName,
-                                    ReplSetHeartbeatResponse* response);
-
     // produce a reply to a V1 heartbeat
     Status prepareHeartbeatResponseV1(Date_t now,
                                       const ReplSetHeartbeatArgsV1& args,
@@ -418,8 +411,6 @@ public:
      * This call should be paired (with intervening network communication) with a call to
      * processHeartbeatResponse for the same "target".
      */
-    std::pair<ReplSetHeartbeatArgs, Milliseconds> prepareHeartbeatRequest(
-        Date_t now, const std::string& ourSetName, const HostAndPort& target);
     std::pair<ReplSetHeartbeatArgsV1, Milliseconds> prepareHeartbeatRequestV1(
         Date_t now, const std::string& ourSetName, const HostAndPort& target);
 
@@ -448,7 +439,7 @@ public:
      * processWinElection) before calling updateConfig.
      *
      * This call should be paired (with intervening network communication) with a call to
-     * prepareHeartbeatRequest for the same "target".
+     * prepareHeartbeatRequestV1 for the same "target".
      */
     HeartbeatResponseAction processHeartbeatResponse(
         Date_t now,

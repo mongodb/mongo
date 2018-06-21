@@ -320,11 +320,6 @@ Status ReplicationCoordinatorMock::processReplSetFreeze(int secs, BSONObjBuilder
     return Status::OK();
 }
 
-Status ReplicationCoordinatorMock::processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                                    ReplSetHeartbeatResponse* response) {
-    return Status::OK();
-}
-
 Status ReplicationCoordinatorMock::processReplSetReconfig(OperationContext* opCtx,
                                                           const ReplSetReconfigArgs& args,
                                                           BSONObjBuilder* resultObj) {

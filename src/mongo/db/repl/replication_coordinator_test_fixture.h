@@ -238,7 +238,6 @@ protected:
     /**
      * Receive the heartbeat request from replication coordinator and reply with a response.
      */
-    void replyToReceivedHeartbeat();
     void replyToReceivedHeartbeatV1();
     /**
      * Consumes the network operation and responds if it's a heartbeat request.

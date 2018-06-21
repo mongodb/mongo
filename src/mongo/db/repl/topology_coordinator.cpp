@@ -44,7 +44,6 @@
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/member_data.h"
-#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_html_summary.h"
@@ -759,103 +758,6 @@ void TopologyCoordinator::prepareElectResponse(const ReplicationCoordinator::Rep
 }
 
 // produce a reply to a heartbeat
-Status TopologyCoordinator::prepareHeartbeatResponse(Date_t now,
-                                                     const ReplSetHeartbeatArgs& args,
-                                                     const std::string& ourSetName,
-                                                     ReplSetHeartbeatResponse* response) {
-    if (args.getProtocolVersion() != 1) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "replset: incompatible replset protocol version: "
-                                    << args.getProtocolVersion());
-    }
-
-    // Verify that replica set names match
-    const std::string rshb = args.getSetName();
-    if (ourSetName != rshb) {
-        log() << "replSet set names do not match, ours: " << ourSetName
-              << "; remote node's: " << rshb;
-        response->noteMismatched();
-        return Status(ErrorCodes::InconsistentReplicaSetNames,
-                      str::stream() << "Our set name of " << ourSetName << " does not match name "
-                                    << rshb
-                                    << " reported by remote node");
-    }
-
-    const MemberState myState = getMemberState();
-    if (_selfIndex == -1) {
-        if (myState.removed()) {
-            return Status(ErrorCodes::InvalidReplicaSetConfig,
-                          "Our replica set configuration is invalid or does not include us");
-        }
-    } else {
-        invariant(_rsConfig.getReplSetName() == args.getSetName());
-        if (args.getSenderId() == _selfConfig().getId()) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Received heartbeat from member with the same "
-                                           "member ID as ourself: "
-                                        << args.getSenderId());
-        }
-    }
-
-    // This is a replica set
-    response->noteReplSet();
-
-    response->setSetName(ourSetName);
-    response->setState(myState.s);
-    if (myState.primary()) {
-        response->setElectionTime(_electionTime);
-    }
-
-    const OpTime lastOpApplied = getMyLastAppliedOpTime();
-    const OpTime lastOpDurable = getMyLastDurableOpTime();
-
-    // Are we electable
-    response->setElectable(!_getMyUnelectableReason(now, StartElectionReason::kElectionTimeout));
-
-    // Heartbeat status message
-    response->setHbMsg(_getHbmsg(now));
-    response->setTime(duration_cast<Seconds>(now - Date_t{}));
-    response->setAppliedOpTime(lastOpApplied);
-    response->setDurableOpTime(lastOpDurable);
-
-    if (!_syncSource.empty()) {
-        response->setSyncingTo(_syncSource);
-    }
-
-    if (!_rsConfig.isInitialized()) {
-        response->setConfigVersion(-2);
-        return Status::OK();
-    }
-
-    const long long v = _rsConfig.getConfigVersion();
-    response->setConfigVersion(v);
-    // Deliver new config if caller's version is older than ours
-    if (v > args.getConfigVersion()) {
-        response->setConfig(_rsConfig);
-    }
-
-    // Resolve the caller's id in our Member list
-    int from = -1;
-    if (v == args.getConfigVersion() && args.getSenderId() != -1) {
-        from = _getMemberIndex(args.getSenderId());
-    }
-    if (from == -1) {
-        // Can't find the member, so we leave out the stateDisagreement field
-        return Status::OK();
-    }
-    invariant(from != _selfIndex);
-
-    auto& fromNodeData = _memberData.at(from);
-    // if we thought that this node is down, let it know
-    if (!fromNodeData.up()) {
-        response->noteStateDisagreement();
-    }
-
-    // note that we got a heartbeat from this node
-    fromNodeData.setLastHeartbeatRecv(now);
-    return Status::OK();
-}
-
 Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
                                                        const ReplSetHeartbeatArgsV1& args,
                                                        const std::string& ourSetName,
@@ -948,41 +850,6 @@ int TopologyCoordinator::_getMemberIndex(int id) const {
         }
     }
     return -1;
-}
-
-std::pair<ReplSetHeartbeatArgs, Milliseconds> TopologyCoordinator::prepareHeartbeatRequest(
-    Date_t now, const std::string& ourSetName, const HostAndPort& target) {
-    PingStats& hbStats = _pings[target];
-    Milliseconds alreadyElapsed = now - hbStats.getLastHeartbeatStartDate();
-    if (!_rsConfig.isInitialized() || !hbStats.trying() ||
-        (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis())) {
-        // This is either the first request ever for "target", or the heartbeat timeout has
-        // passed, so we're starting a "new" heartbeat.
-        hbStats.start(now);
-        alreadyElapsed = Milliseconds(0);
-    }
-    ReplSetHeartbeatArgs hbArgs;
-    hbArgs.setProtocolVersion(1);
-    hbArgs.setCheckEmpty(false);
-    if (_rsConfig.isInitialized()) {
-        hbArgs.setSetName(_rsConfig.getReplSetName());
-        hbArgs.setConfigVersion(_rsConfig.getConfigVersion());
-        if (_selfIndex >= 0) {
-            const MemberConfig& me = _selfConfig();
-            hbArgs.setSenderHost(me.getHostAndPort());
-            hbArgs.setSenderId(me.getId());
-        }
-    } else {
-        hbArgs.setSetName(ourSetName);
-        hbArgs.setConfigVersion(-2);
-    }
-    hbArgs.setHeartbeatVersion(1);
-
-    const Milliseconds timeoutPeriod(
-        _rsConfig.isInitialized() ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
-                                  : Milliseconds{ReplSetConfig::kDefaultHeartbeatTimeoutPeriod});
-    const Milliseconds timeout = timeoutPeriod - alreadyElapsed;
-    return std::make_pair(hbArgs, timeout);
 }
 
 std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHeartbeatRequestV1(

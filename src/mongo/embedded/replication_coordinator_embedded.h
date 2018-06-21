@@ -160,9 +160,6 @@ public:
 
     Status processReplSetFreeze(int, BSONObjBuilder*) override;
 
-    Status processHeartbeat(const repl::ReplSetHeartbeatArgs&,
-                            repl::ReplSetHeartbeatResponse*) override;
-
     Status processReplSetReconfig(OperationContext*,
                                   const ReplSetReconfigArgs&,
                                   BSONObjBuilder*) override;

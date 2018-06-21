@@ -35,7 +35,6 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
@@ -234,7 +233,6 @@ void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {
         const RemoteCommandRequest& request = noi->getRequest();
         log() << request.target.toString() << " processing " << request.cmdObj;
         ReplSetHeartbeatArgsV1 hbArgs;
-        ReplSetHeartbeatArgs hbArgsPV0;
         if (hbArgs.initialize(request.cmdObj).isOK()) {
             ReplSetHeartbeatResponse hbResp;
             hbResp.setSetName(rsConfig.getReplSetName());
@@ -412,26 +410,6 @@ void ReplCoordTest::shutdown(OperationContext* opCtx) {
     _net->exitNetwork();
     _repl->shutdown(opCtx);
     _callShutdown = false;
-}
-
-void ReplCoordTest::replyToReceivedHeartbeat() {
-    NetworkInterfaceMock* net = getNet();
-    net->enterNetwork();
-    const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    const RemoteCommandRequest& request = noi->getRequest();
-    const ReplSetConfig rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
-    repl::ReplSetHeartbeatArgs hbArgs;
-    ASSERT_OK(hbArgs.initialize(request.cmdObj));
-    repl::ReplSetHeartbeatResponse hbResp;
-    hbResp.setSetName(rsConfig.getReplSetName());
-    hbResp.setState(MemberState::RS_SECONDARY);
-    hbResp.setConfigVersion(rsConfig.getConfigVersion());
-    BSONObjBuilder respObj;
-    respObj << "ok" << 1;
-    hbResp.addToBSON(&respObj, false);
-    net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
-    net->runReadyNetworkOperations();
-    getNet()->exitNetwork();
 }
 
 void ReplCoordTest::replyToReceivedHeartbeatV1() {
