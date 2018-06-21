@@ -666,7 +666,7 @@ boost::optional<UUID> getUUIDFromPrimaryShard(const NamespaceString& nss,
             str::stream() << "expected primary shard to return 'info' field as part of "
                              "listCollections for "
                           << nss.ns()
-                          << " because the cluster is in featureCompatibilityVersion=3.6, but got "
+                          << ", but got "
                           << res,
             !collectionInfo.isEmpty());
 

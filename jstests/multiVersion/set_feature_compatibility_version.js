@@ -41,7 +41,7 @@ TestData.skipCheckDBHashes = true;
     // featureCompatibilityVersion cannot be set to invalid value.
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: 5}));
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "4.2"}));
+    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "4.4"}));
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
 
     // setFeatureCompatibilityVersion rejects unknown fields.
@@ -217,6 +217,9 @@ TestData.skipCheckDBHashes = true;
     // upgraded to 'latestFCV'.
     // Note: the 'lastStable' secondary must stop replicating during the upgrade to ensure it has no
     // chance of seeing the 'upgrading to latest' message in the oplog, whereupon it would crash.
+
+    // TODO: Revisit the value of this section of code in SERVER-35884.
+    /*
     stopServerReplication(secondary);
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
     restartServerReplication(secondary);
@@ -224,6 +227,7 @@ TestData.skipCheckDBHashes = true;
     assert.writeOK(primaryAdminDB.getSiblingDB("test").coll.insert({shouldReplicate: false}));
     assert.eq(secondaryAdminDB.getSiblingDB("test").coll.find({shouldReplicate: false}).itcount(),
               0);
+    */
     rst.stopSet();
 
     // Test idempotency for setFeatureCompatibilityVersion.
@@ -274,7 +278,7 @@ TestData.skipCheckDBHashes = true;
     // featureCompatibilityVersion cannot be set to invalid value on mongos.
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: 5}));
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "4.2"}));
+    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "4.4"}));
 
     // setFeatureCompatibilityVersion rejects unknown fields on mongos.
     assert.commandFailed(
@@ -361,44 +365,4 @@ TestData.skipCheckDBHashes = true;
     // ShardingTest.stop can talk to lastStableShard.
     st.stop();
     lastStableShard.stopSet();
-
-    // Create a cluster running with 'latestFCV'
-    st = new ShardingTest({shards: 1, mongos: 1});
-    mongosAdminDB = st.s.getDB("admin");
-    configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
-    shardPrimaryAdminDB = st.shard0.getDB("admin");
-    checkFCV(configPrimaryAdminDB, latestFCV);
-    checkFCV(shardPrimaryAdminDB, latestFCV);
-
-    // Ensure that a 'lastStable' binary mongos can be added to a 'lastStableFCV' cluster.
-
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-    checkFCV(configPrimaryAdminDB, lastStableFCV);
-    checkFCV(shardPrimaryAdminDB, lastStableFCV);
-
-    let lastStableMongos =
-        MongoRunner.runMongos({configdb: st.configRS.getURL(), binVersion: lastStable});
-    assert.neq(null,
-               lastStableMongos,
-               "mongos was unable to start up with binary version=" + latest +
-                   " and connect to FCV=" + lastStableFCV + " cluster");
-
-    // Ensure that the 'lastStable' binary mongos can perform reads and writes to the shards in the
-    // cluster.
-    assert.writeOK(lastStableMongos.getDB("test").foo.insert({x: 1}));
-    let foundDoc = lastStableMongos.getDB("test").foo.findOne({x: 1});
-    assert.neq(null, foundDoc);
-    assert.eq(1, foundDoc.x, tojson(foundDoc));
-
-    // The 'lastStable' binary mongos can no longer perform reads and writes after the cluster is
-    // upgraded to 'latestFCV'.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
-    assert.writeError(lastStableMongos.getDB("test").foo.insert({x: 1}));
-
-    // The 'latest' binary mongos can still perform reads and writes after the FCV is upgraded to
-    // 'latestFCV'.
-    assert.writeOK(st.s.getDB("test").foo.insert({x: 1}));
-
-    st.stop();
-    MongoRunner.stopMongos(lastStableMongos);
 })();

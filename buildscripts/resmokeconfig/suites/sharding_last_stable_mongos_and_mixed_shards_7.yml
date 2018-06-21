@@ -21,7 +21,6 @@ selector:
   - jstests/sharding/change_streams_establishment_finds_new_shards.js
   - jstests/sharding/migration_ignore_interrupts_4.js
   - jstests/sharding/in_memory_sort_limit.js
-  - jstests/sharding/collation_targeting_inherited.js
   - jstests/sharding/zero_shard_version.js
   - jstests/sharding/remove1.js
   - jstests/sharding/multi_write_target.js
@@ -38,7 +37,6 @@ selector:
   - jstests/sharding/sharding_balance2.js
   - jstests/sharding/addshard_idempotent.js
   - jstests/sharding/tag_auto_split_partial_key.js
-  - jstests/sharding/collation_targeting.js
   - jstests/sharding/shard3.js
   - jstests/sharding/after_cluster_time.js
   - jstests/sharding/multi_coll_drop.js

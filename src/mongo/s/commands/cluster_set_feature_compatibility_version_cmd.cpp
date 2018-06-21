@@ -71,11 +71,11 @@ public:
     std::string help() const override {
         return str::stream()
             << "Set the API version for the cluster. If set to \""
-            << FeatureCompatibilityVersionParser::kVersion36
-            << "\", then 4.0 features are disabled. If \""
             << FeatureCompatibilityVersionParser::kVersion40
-            << "\", then 4.0 features are enabled, and all nodes in the cluster must be version "
-            << "4.0. See " << feature_compatibility_version_documentation::kCompatibilityLink
+            << "\", then 4.2 features are disabled. If \""
+            << FeatureCompatibilityVersionParser::kVersion42
+            << "\", then 4.2 features are enabled, and all nodes in the cluster must be version "
+            << "4.2. See " << feature_compatibility_version_documentation::kCompatibilityLink
             << ".";
     }
 

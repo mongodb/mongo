@@ -320,7 +320,6 @@ selector:
   - jstests/sharding/replication_with_undefined_shard_key.js
   - jstests/sharding/hash_single_shard.js
   - jstests/sharding/version2.js
-  - jstests/sharding/crash_mongos_against_upgraded_cluster.js
   - jstests/sharding/advance_logical_time_with_valid_signature.js
   - jstests/sharding/cleanup_orphaned_auth.js
   - jstests/sharding/mrShardedOutputAuth.js

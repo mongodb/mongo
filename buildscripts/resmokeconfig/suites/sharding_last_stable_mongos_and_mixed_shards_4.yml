@@ -25,7 +25,6 @@ selector:
   - jstests/sharding/move_chunk_update_with_write_retryability.js
   - jstests/sharding/drop_sharded_db.js
   - jstests/sharding/key_rotation.js
-  - jstests/sharding/stale_mongos_updates_and_removes.js
   - jstests/sharding/sharding_balance1.js
   - jstests/sharding/shard_identity_rollback.js
   - jstests/sharding/commands_that_write_accept_wc_shards.js

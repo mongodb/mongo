@@ -30,7 +30,6 @@ selector:
   - jstests/sharding/create_idx_empty_primary.js
   - jstests/sharding/clone_catalog_data.js
   - jstests/sharding/coll_epoch_test0.js
-  - jstests/sharding/shard7.js
   - jstests/sharding/hash_skey_split.js
   - jstests/sharding/conn_pool_stats.js
   - jstests/sharding/tag_range.js

@@ -165,7 +165,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
 
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     repl::ReplSettings replSettings;
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     ServiceContext* service = getGlobalServiceContext();

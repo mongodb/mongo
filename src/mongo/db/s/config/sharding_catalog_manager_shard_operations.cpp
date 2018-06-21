@@ -343,14 +343,14 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                                 << " as a shard");
     }
     if (serverGlobalParams.featureCompatibility.getVersion() >
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
-        // If the cluster's FCV is 4.0, or upgrading to / downgrading from, the node being added
-        // must be a v4.0 binary.
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40) {
+        // If the cluster's FCV is 4.2, or upgrading to / downgrading from, the node being added
+        // must be a v4.2 binary.
         invariant(maxWireVersion == WireVersion::LATEST_WIRE_VERSION);
     } else {
-        // If the cluster's FCV is 3.6, the node being added must be a v3.6 or v4.0 binary.
+        // If the cluster's FCV is 4.0, the node being added must be a v4.0 or v4.2 binary.
         invariant(serverGlobalParams.featureCompatibility.getVersion() ==
-                  ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36);
+                  ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40);
         invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION - 1);
     }
 
@@ -702,16 +702,16 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         BSONObj setFCVCmd;
         switch (serverGlobalParams.featureCompatibility.getVersion()) {
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
-            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42:
+            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42:
                 setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                                 << FeatureCompatibilityVersionParser::kVersion40
+                                 << FeatureCompatibilityVersionParser::kVersion42
                                  << WriteConcernOptions::kWriteConcernField
                                  << opCtx->getWriteConcern().toBSON());
                 break;
             default:
                 setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                                 << FeatureCompatibilityVersionParser::kVersion36
+                                 << FeatureCompatibilityVersionParser::kVersion40
                                  << WriteConcernOptions::kWriteConcernField
                                  << opCtx->getWriteConcern().toBSON());
                 break;

@@ -7,8 +7,8 @@
  * scenarios that are intended to be maintained between releases.
  */
 
-const latestFCV = "4.0";
-const lastStableFCV = "3.6";
+const latestFCV = "4.2";
+const lastStableFCV = "4.0";
 
 /**
  * Checks the featureCompatibilityVersion document and server parameter. The

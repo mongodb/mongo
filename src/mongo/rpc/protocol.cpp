@@ -181,7 +181,7 @@ ProtocolSet computeProtocolSet(const WireVersionInfo version) {
             result |= supports::kOpMsgOnly;
         }
         if (version.maxWireVersion >= WireVersion::FIND_COMMAND &&
-            version.maxWireVersion <= WireVersion::REPLICA_SET_TRANSACTIONS) {
+            version.maxWireVersion <= WireVersion::SHARDED_TRANSACTIONS) {
             // Future versions may remove support for OP_COMMAND.
             result |= supports::kOpCommandOnly;
         }

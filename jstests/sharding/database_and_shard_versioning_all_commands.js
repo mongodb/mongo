@@ -12,6 +12,13 @@
 
     const SHARD_VERSION_UNSHARDED = [Timestamp(0, 0), ObjectId("000000000000000000000000")];
 
+    // These commands exist in the 4.0 mongo shell, so we must define a test case in mixed version
+    // suites. However, a check exists in this test that asserts that every command tested exists
+    // on mongos. In an all-4.2 environment, these commands won't exist. To increase test coverage,
+    // and allow us to run on same- and mixed-version suites, we will allow these commands to have
+    // a test defined without always existing on the mongos being used.
+    const fcv40OnlyCommands = ['geoNear', 'group'];
+
     function validateTestCase(testCase) {
         assert(testCase.skip || testCase.command,
                "must specify exactly one of 'skip' or 'command' for test case " + tojson(testCase));
@@ -218,6 +225,7 @@
         },
         flushRouterConfig: {skip: "executes locally on mongos (not sent to any remote node)"},
         fsync: {skip: "broadcast to all shards"},
+        geoNear: {skip: "must define test coverage for 4.0 backwards compatibility"},
         getCmdLineOpts: {skip: "executes locally on mongos (not sent to any remote node)"},
         getDiagnosticData: {skip: "executes locally on mongos (not sent to any remote node)"},
         getLastError: {skip: "does not forward command to primary shard"},
@@ -231,6 +239,7 @@
         grantPrivilegesToRole: {skip: "always targets the config server"},
         grantRolesToRole: {skip: "always targets the config server"},
         grantRolesToUser: {skip: "always targets the config server"},
+        group: {skip: "must define test coverage for 4.0 backwards compatibility"},
         hostInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
         insert: {
             sendsDbVersion: false,
@@ -536,6 +545,9 @@
             // After iterating through all the existing commands, ensure there were no additional
             // test cases that did not correspond to any mongos command.
             for (let key of Object.keys(testCases)) {
+                if (fcv40OnlyCommands.includes(key)) {
+                    continue;
+                }
                 assert(testCases[key].validated || testCases[key].conditional,
                        "you defined a test case for a command '" + key +
                            "' that does not exist on mongos: " + tojson(testCases[key]));

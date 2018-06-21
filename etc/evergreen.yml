@@ -292,6 +292,23 @@ variables:
   - sharding_ese_20
   - sharding_ese_misc
 
+- &sharding_last_stable_mongos_and_mixed_shards
+  name: sharding_last_stable_mongos_and_mixed_shards
+  execution_tasks:
+  - sharding_last_stable_mongos_and_mixed_shards_0
+  - sharding_last_stable_mongos_and_mixed_shards_1
+  - sharding_last_stable_mongos_and_mixed_shards_2
+  - sharding_last_stable_mongos_and_mixed_shards_3
+  - sharding_last_stable_mongos_and_mixed_shards_4
+  - sharding_last_stable_mongos_and_mixed_shards_5
+  - sharding_last_stable_mongos_and_mixed_shards_6
+  - sharding_last_stable_mongos_and_mixed_shards_7
+  - sharding_last_stable_mongos_and_mixed_shards_8
+  - sharding_last_stable_mongos_and_mixed_shards_9
+  - sharding_last_stable_mongos_and_mixed_shards_10
+  - sharding_last_stable_mongos_and_mixed_shards_11
+  - sharding_last_stable_mongos_and_mixed_shards_misc
+
 - &sharding_op_query
   name: sharding_op_query
   execution_tasks:
@@ -5992,6 +6009,160 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_0
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_0
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_1
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_2
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_2
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_3
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_3
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_4
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_4
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_5
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_5
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_6
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_6
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_7
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_7
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_8
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_8
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_9
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_9
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_10
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_10
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_11
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_11
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_last_stable_mongos_and_mixed_shards_misc
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards_misc
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: snmp
   commands:
   - func: "do setup"
@@ -7028,6 +7199,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: tool
   - name: write_concern_majority_passthrough
   - name: push
@@ -7399,6 +7571,7 @@ buildvariants:
   - name: powercycle_write_concern_majority
   - name: sharding
   - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: slow1
   - name: serial_run
   - name: sharded_core_txns
@@ -7756,6 +7929,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sharding
   - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: slow1
   - name: serial_run
   - name: sharded_core_txns
@@ -8234,6 +8408,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sharding
   - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
@@ -8411,6 +8586,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sharding
   - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
@@ -9101,6 +9277,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
+  - name: sharding_last_stable_mongos_and_mixed_shards
     distros:
     - windows-64-vs2015-large
   - name: slow1
@@ -9774,6 +9951,7 @@ buildvariants:
   - *sharding_auth
   - *sharding_auth_audit
   - *sharding_ese
+  - *sharding_last_stable_mongos_and_mixed_shards
   - *sharding_op_query
   tasks:
   - name: compile_all_run_unittests_TG
@@ -10221,6 +10399,45 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
+  - name: sharding_last_stable_mongos_and_mixed_shards_0
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_1
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_2
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_3
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_4
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_5
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_6
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_7
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_8
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_9
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_10
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_11
+    distros:
+    - rhel62-large
+  - name: sharding_last_stable_mongos_and_mixed_shards_misc
+    distros:
+    - rhel62-large
   - name: sharding_csrs_continuous_config_stepdown
     distros:
     - rhel62-large
@@ -10404,6 +10621,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: sharding_op_query
   - name: sharding_csrs_continuous_config_stepdown
   - name: slow1
@@ -10602,6 +10820,7 @@ buildvariants:
   - name: serial_run
   - name: sharded_core_txns
   - name: sharding_jscore_passthrough
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -10704,6 +10923,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharding_jscore_passthrough
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -11488,6 +11708,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sharding
   - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: slow1
   - name: serial_run
   - name: sharded_core_txns
@@ -11635,6 +11856,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sharding
   - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
@@ -11786,6 +12008,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sharding
   - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
@@ -12559,6 +12782,7 @@ buildvariants:
   - name: sharding_auth_audit
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
@@ -12738,6 +12962,7 @@ buildvariants:
   - name: sharding_auth_audit
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
@@ -12875,6 +13100,7 @@ buildvariants:
   - name: sharding_auth_audit
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops

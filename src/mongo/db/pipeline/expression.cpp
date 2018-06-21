@@ -1343,34 +1343,6 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(
         }
     }
 
-    // The 'format', 'onNull' and 'onError' options were introduced in 4.0, and should not be
-    // allowed in contexts where the maximum feature version is <= 4.0.
-    if (expCtx->maxFeatureCompatibilityVersion &&
-        *expCtx->maxFeatureCompatibilityVersion <
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-        uassert(
-            ErrorCodes::QueryFeatureNotAllowed,
-            str::stream() << "\"format\" option to $dateFromString is not allowed with the current "
-                             "feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            !formatElem);
-        uassert(
-            ErrorCodes::QueryFeatureNotAllowed,
-            str::stream() << "\"onNull\" option to $dateFromString is not allowed with the current "
-                             "feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            !onNullElem);
-        uassert(ErrorCodes::QueryFeatureNotAllowed,
-                str::stream()
-                    << "\"onError\" option to $dateFromString is not allowed with the current "
-                       "feature compatibility version. See "
-                    << feature_compatibility_version_documentation::kCompatibilityLink
-                    << " for more information.",
-                !onErrorElem);
-    }
-
     uassert(40542, "Missing 'dateString' parameter to $dateFromString", dateStringElem);
 
     return new ExpressionDateFromString(
@@ -1689,28 +1661,6 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(
                       str::stream() << "Unrecognized argument to $dateToString: "
                                     << arg.fieldName());
         }
-    }
-
-    // The 'onNull' option was introduced in 4.0, and should not be allowed in contexts where the
-    // maximum feature version is <= 4.0. Similarly, the 'format' option was made optional in 4.0,
-    // so should be required in such scenarios.
-    if (expCtx->maxFeatureCompatibilityVersion &&
-        *expCtx->maxFeatureCompatibilityVersion <
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-        uassert(
-            ErrorCodes::QueryFeatureNotAllowed,
-            str::stream() << "\"onNull\" option to $dateToString is not allowed with the current "
-                             "feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            !onNullElem);
-
-        uassert(ErrorCodes::QueryFeatureNotAllowed,
-                str::stream() << "\"format\" option to $dateToString is required with the current "
-                                 "feature compatibility version. See "
-                              << feature_compatibility_version_documentation::kCompatibilityLink
-                              << " for more information.",
-                formatElem);
     }
 
     uassert(18628, "Missing 'date' parameter to $dateToString", !dateElem.eoo());

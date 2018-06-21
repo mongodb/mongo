@@ -39,10 +39,10 @@ namespace mongo {
  */
 class FeatureCompatibilityVersionParser {
 public:
-    static constexpr StringData kVersion36 = "3.6"_sd;
     static constexpr StringData kVersion40 = "4.0"_sd;
-    static constexpr StringData kVersionDowngradingTo36 = "downgrading to 3.6"_sd;
-    static constexpr StringData kVersionUpgradingTo40 = "upgrading to 4.0"_sd;
+    static constexpr StringData kVersion42 = "4.2"_sd;
+    static constexpr StringData kVersionDowngradingTo40 = "downgrading to 4.0"_sd;
+    static constexpr StringData kVersionUpgradingTo42 = "upgrading to 4.2"_sd;
     static constexpr StringData kVersionUnset = "Unset"_sd;
 
     static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
@@ -62,16 +62,16 @@ public:
      */
     static StringData toString(ServerGlobalParams::FeatureCompatibility::Version version) {
         switch (version) {
-            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior:
+            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault40Behavior:
                 return kVersionUnset;
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36:
-                return kVersion36;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
-                return kVersionUpgradingTo40;
-            case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo36:
-                return kVersionDowngradingTo36;
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40:
                 return kVersion40;
+            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42:
+                return kVersionUpgradingTo42;
+            case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40:
+                return kVersionDowngradingTo40;
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42:
+                return kVersion42;
             default:
                 MONGO_UNREACHABLE;
         }

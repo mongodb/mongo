@@ -68,8 +68,8 @@ using std::endl;
 namespace {
 
 const std::string mustDowngradeErrorMsg = str::stream()
-    << "UPGRADE PROBLEM: The data files need to be fully upgraded to version 3.6 before attempting "
-       "an upgrade to 4.0; see "
+    << "UPGRADE PROBLEM: The data files need to be fully upgraded to version 4.0 before attempting "
+       "an upgrade to 4.2; see "
     << feature_compatibility_version_documentation::kUpgradeLink << " for more details.";
 
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
@@ -104,11 +104,11 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
                           BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
                           featureCompatibilityVersion)) {
         log() << "Re-creating featureCompatibilityVersion document that was deleted with version "
-              << FeatureCompatibilityVersionParser::kVersion36 << ".";
+              << FeatureCompatibilityVersionParser::kVersion40 << ".";
 
         BSONObj fcvObj = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName
                                     << FeatureCompatibilityVersionParser::kVersionField
-                                    << FeatureCompatibilityVersionParser::kVersion36);
+                                    << FeatureCompatibilityVersionParser::kVersion40);
 
         writeConflictRetry(opCtx, "insertFCVDocument", fcvNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
@@ -426,14 +426,14 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                     if (!swVersion.isOK()) {
                         severe() << swVersion.getStatus();
                         // Note this error path captures all cases of an FCV document existing,
-                        // but with any value other than "3.6" or "4.0". This includes unexpected
+                        // but with any value other than "4.0" or "4.2". This includes unexpected
                         // cases with no path forward such as the FCV value not being a string.
                         return {ErrorCodes::MustDowngrade,
                                 str::stream()
                                     << "UPGRADE PROBLEM: Unable to parse the "
                                        "featureCompatibilityVersion document. The data files need "
-                                       "to be fully upgraded to version 3.6 before attempting an "
-                                       "upgrade to 4.0. If you are upgrading to 4.0, see "
+                                       "to be fully upgraded to version 4.0 before attempting an "
+                                       "upgrade to 4.2. If you are upgrading to 4.2, see "
                                     << feature_compatibility_version_documentation::kUpgradeLink
                                     << "."};
                     }
@@ -445,23 +445,23 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                     // On startup, if the version is in an upgrading or downrading state, print a
                     // warning.
                     if (version ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42) {
                         log() << "** WARNING: A featureCompatibilityVersion upgrade did not "
                               << "complete. " << startupWarningsLog;
                         log() << "**          The current featureCompatibilityVersion is "
                               << FeatureCompatibilityVersionParser::toString(version) << "."
                               << startupWarningsLog;
                         log() << "**          To fix this, use the setFeatureCompatibilityVersion "
-                              << "command to resume upgrade to 4.0." << startupWarningsLog;
+                              << "command to resume upgrade to 4.2." << startupWarningsLog;
                     } else if (version == ServerGlobalParams::FeatureCompatibility::Version::
-                                              kDowngradingTo36) {
+                                              kDowngradingTo40) {
                         log() << "** WARNING: A featureCompatibilityVersion downgrade did not "
                               << "complete. " << startupWarningsLog;
                         log() << "**          The current featureCompatibilityVersion is "
                               << FeatureCompatibilityVersionParser::toString(version) << "."
                               << startupWarningsLog;
                         log() << "**          To fix this, use the setFeatureCompatibilityVersion "
-                              << "command to resume downgrade to 3.6." << startupWarningsLog;
+                              << "command to resume downgrade to 4.0." << startupWarningsLog;
                     }
                 }
             }

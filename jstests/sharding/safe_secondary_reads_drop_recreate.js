@@ -171,23 +171,7 @@
         forceerror: {skip: "does not return user data"},
         fsync: {skip: "does not return user data"},
         fsyncUnlock: {skip: "does not return user data"},
-        geoNear: {
-            setUp: function(mongosConn) {
-                assert.commandWorked(mongosConn.getCollection(nss).runCommand(
-                    {createIndexes: coll, indexes: [{key: {loc: "2d"}, name: "loc_2d"}]}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1, loc: [1, 1]}));
-            },
-            command: {
-                aggregate: coll,
-                cursor: {},
-                pipeline: [{$geoNear: {near: [1, 1], distanceField: "d"}}]
-            },
-            checkResults: function(res) {
-                // The command should fail on the new collection, because the geo index was dropped.
-                assert.commandFailed(res);
-            },
-            behavior: "versioned"
-        },
+        geoNear: {skip: "must define test coverage for 4.0 backwards compatibility"},
         geoSearch: {skip: "not supported in mongos"},
         getCmdLineOpts: {skip: "does not return user data"},
         getDiagnosticData: {skip: "does not return user data"},
@@ -203,6 +187,7 @@
         grantPrivilegesToRole: {skip: "primary only"},
         grantRolesToRole: {skip: "primary only"},
         grantRolesToUser: {skip: "primary only"},
+        group: {skip: "must define test coverage for 4.0 backwards compatibility"},
         handshake: {skip: "does not return user data"},
         hostInfo: {skip: "does not return user data"},
         insert: {skip: "primary only"},

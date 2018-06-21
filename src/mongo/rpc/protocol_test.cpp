@@ -283,20 +283,19 @@ TEST(Protocol, validateWireVersion) {
 
 // A mongos is unable to communicate with a fully upgraded cluster with a higher wire version.
 TEST(Protocol, validateWireVersionFailsForUpgradedServerNode) {
-    // Server is fully upgraded higher than the latest wire version.
-    auto msg =
-        BSON("minWireVersion" << static_cast<int>(WireVersion::FUTURE_WIRE_VERSION_FOR_TESTING)
-                              << "maxWireVersion"
-                              << static_cast<int>(WireVersion::FUTURE_WIRE_VERSION_FOR_TESTING));
+    // Server is fully upgraded to the latest wire version.
+    auto msg = BSON("minWireVersion" << static_cast<int>(WireVersion::LATEST_WIRE_VERSION)
+                                     << "maxWireVersion"
+                                     << static_cast<int>(WireVersion::LATEST_WIRE_VERSION));
     auto swReply = parseProtocolSetFromIsMasterReply(msg);
     ASSERT_OK(swReply.getStatus());
 
-    // The client (this mongos server) only has latest wire version.
-    ASSERT_EQUALS(
-        mongo::ErrorCodes::IncompatibleWithUpgradedServer,
-        validateWireVersion({WireVersion::LATEST_WIRE_VERSION, WireVersion::LATEST_WIRE_VERSION},
-                            swReply.getValue().version)
-            .code());
+    // The client (this mongos server) only has the previous wire version.
+    ASSERT_EQUALS(mongo::ErrorCodes::IncompatibleWithUpgradedServer,
+                  validateWireVersion(
+                      {WireVersion::LATEST_WIRE_VERSION - 1, WireVersion::LATEST_WIRE_VERSION - 1},
+                      swReply.getValue().version)
+                      .code());
 }
 
 }  // namespace

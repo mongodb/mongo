@@ -37,10 +37,10 @@
 
 namespace mongo {
 
-constexpr StringData FeatureCompatibilityVersionParser::kVersion36;
 constexpr StringData FeatureCompatibilityVersionParser::kVersion40;
-constexpr StringData FeatureCompatibilityVersionParser::kVersionDowngradingTo36;
-constexpr StringData FeatureCompatibilityVersionParser::kVersionUpgradingTo40;
+constexpr StringData FeatureCompatibilityVersionParser::kVersion42;
+constexpr StringData FeatureCompatibilityVersionParser::kVersionDowngradingTo40;
+constexpr StringData FeatureCompatibilityVersionParser::kVersionUpgradingTo42;
 constexpr StringData FeatureCompatibilityVersionParser::kVersionUnset;
 
 constexpr StringData FeatureCompatibilityVersionParser::kParameterName;
@@ -50,7 +50,7 @@ constexpr StringData FeatureCompatibilityVersionParser::kTargetVersionField;
 StatusWith<ServerGlobalParams::FeatureCompatibility::Version>
 FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVersionDoc) {
     ServerGlobalParams::FeatureCompatibility::Version version =
-        ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior;
+        ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault40Behavior;
     std::string versionString;
     std::string targetVersionString;
 
@@ -75,15 +75,15 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
                                   << ".");
             }
 
-            if (elem.String() != kVersion40 && elem.String() != kVersion36) {
+            if (elem.String() != kVersion42 && elem.String() != kVersion40) {
                 return Status(
                     ErrorCodes::BadValue,
                     str::stream() << "Invalid value for " << fieldName << ", found "
                                   << elem.String()
                                   << ", expected '"
-                                  << kVersion40
+                                  << kVersion42
                                   << "' or '"
-                                  << kVersion36
+                                  << kVersion40
                                   << "'. Contents of "
                                   << kParameterName
                                   << " document in "
@@ -115,16 +115,16 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
         }
     }
 
-    if (versionString == kVersion36) {
-        if (targetVersionString == kVersion40) {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40;
-        } else if (targetVersionString == kVersion36) {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo36;
+    if (versionString == kVersion40) {
+        if (targetVersionString == kVersion42) {
+            version = ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42;
+        } else if (targetVersionString == kVersion40) {
+            version = ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40;
         } else {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36;
+            version = ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40;
         }
-    } else if (versionString == kVersion40) {
-        if (targetVersionString == kVersion40 || targetVersionString == kVersion36) {
+    } else if (versionString == kVersion42) {
+        if (targetVersionString == kVersion42 || targetVersionString == kVersion40) {
             return Status(
                 ErrorCodes::BadValue,
                 str::stream() << "Invalid state for " << kParameterName << " document in "
@@ -135,7 +135,7 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
                               << feature_compatibility_version_documentation::kCompatibilityLink
                               << ".");
         } else {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40;
+            version = ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
         }
     } else {
         return Status(

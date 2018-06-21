@@ -7,6 +7,7 @@
 (function() {
     'use strict';
 
+    load("jstests/libs/feature_compatibility_version.js");
     load('jstests/libs/check_log.js');
 
     const rst = new ReplSetTest({nodes: 2});
@@ -22,8 +23,6 @@
     const primary = rst.getPrimary();
     const dbName = 'foo';
     const collName = 'bar';
-    const lastStableFCV = '3.6';
-    const latestFCV = '4.0';
 
     assert.writeOK(primary.getDB(dbName).getCollection(collName).insert({a: 1}));
 

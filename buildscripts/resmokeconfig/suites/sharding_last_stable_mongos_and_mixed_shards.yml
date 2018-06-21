@@ -9,67 +9,31 @@ selector:
   # running in fully downgraded version, the config server won't forward the
   # command to the shards - it'll just return success immediately. 
   - jstests/sharding/max_time_ms_sharded_new_commands.js
-  #### Enable when 4.0 becomes last-stable.
-  - jstests/sharding/change_stream_no_shards.js
-  - jstests/sharding/create_database.js
-  - jstests/sharding/database_and_shard_versioning_all_commands.js
-  - jstests/sharding/database_versioning_safe_secondary_reads.js
-  - jstests/sharding/dump_coll_metadata.js
-  - jstests/sharding/geo_near_random1.js
-  - jstests/sharding/geo_near_random2.js
-  - jstests/sharding/geo_near_sort.js
-  - jstests/sharding/basic_drop_coll.js
-  - jstests/sharding/commands_that_write_accept_wc_configRS.js
-  - jstests/sharding/kill_pinned_cursor.js
-  - jstests/sharding/movechunk_commit_changelog_stats.js
-  - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
-  - jstests/sharding/mongos_local_explain.js
-  - jstests/sharding/safe_secondary_reads_drop_recreate.js
-  - jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
-  - jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
-  - jstests/sharding/mongos_validate_writes.js
-  - jstests/sharding/resume_change_stream_on_subset_of_shards.js
-  # Can be un-blacklisted once the version of 4.0 used for 'last-stable' includes SERVER-34338's
-  # backport.
-  - jstests/sharding/explainFind_stale_mongos.js
   # Requires fix to SERVER-31689
   - jstests/sharding/aggregation_currentop.js
-  #### End "Enable when 4.0 becomes last stable"
   # SERVER-33683: We added a restriction on using an aggregation within a transaction against
   # mongos. This should be removed and the test can be adjusted and re-added to this passthrough.
   - jstests/sharding/aggregations_in_session.js
-  # New failpoint in v4.0 mongos.
-  - jstests/sharding/crash_mongos_against_upgraded_cluster.js
   # New waitForClusterTime
   - jstests/sharding/auth_slaveok_routing.js
   # This test should not be run with a mixed cluster environment.
   - jstests/sharding/nonreplicated_uuids_on_shardservers.js
-  # Requires the ability to interrupt a pinned cursor, introduced in v4.0.
-  - jstests/sharding/kill_pinned_cursor.js
-  # New feature in v4.0 mongos and mongod.
-  - jstests/sharding/shards_and_config_return_last_committed_optime.js
-  # Requires maxTimeMS tracking on mongos, added in v4.0
-  - jstests/sharding/max_time_ms_sharded.js
-  # Requires killOp to work for local operations on mongos, introduced in v4.0.
-  - jstests/sharding/killop.js
-  # New 4.0 feature
-  - jstests/sharding/change_stream_lookup_single_shard_cluster.js
-  - jstests/sharding/change_stream_metadata_notifications.js
-  - jstests/sharding/change_streams.js
-  - jstests/sharding/change_streams_primary_shard_unaware.js
-  - jstests/sharding/change_streams_unsharded_becomes_sharded.js
-  - jstests/sharding/change_streams_whole_db.js
-  - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js
-  - jstests/sharding/resume_change_stream.js
-  - jstests/sharding/change_stream_resume_from_different_mongos.js
-  - jstests/sharding/change_stream_shard_failover.js
-  # Requires count command to be accurate on sharded clusters, introduced in v4.0.
-  - jstests/sharding/accurate_count_with_predicate.js
   # Enable when SERVER-33538 is backported.
   - jstests/sharding/mapReduce_outSharded_checkUUID.js
+  # Will always fail because we can't downgrade FCV before the last-stable binary mongos connects,
+  # meaning that either the test will stall, or mongos will crash due to connecting to an upgraded
+  # FCV cluster.
+  - jstests/sharding/mongos_wait_csrs_initiate.js
   # Enable if SERVER-34971 is backported or 4.2 becomes last-stable
   - jstests/sharding/update_replace_id.js
-
+  - jstests/sharding/stale_mongos_updates_and_removes.js
+  - jstests/sharding/geo_near_sharded.js
+  # Enable when 4.2 becomes last-stable.
+  - jstests/sharding/collation_targeting.js
+  - jstests/sharding/collation_targeting_inherited.js
+  - jstests/sharding/geo_near_random1.js
+  - jstests/sharding/geo_near_random2.js
+  - jstests/sharding/shard7.js
 executor:
   config:
     shell_options:

@@ -184,7 +184,7 @@ void Test::run() {
 // with a meaningful value will trigger failures as of SERVER-32630.
 void Test::setUp() {
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
 }
 void Test::tearDown() {
     serverGlobalParams.featureCompatibility.reset();

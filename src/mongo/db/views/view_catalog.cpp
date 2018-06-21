@@ -254,11 +254,11 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
     // Save this to a variable to avoid reading the atomic variable multiple times.
     auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
 
-    // If the feature compatibility version is not 4.0, and we are validating features as master,
-    // ban the use of new agg features introduced in 4.0 to prevent them from being persisted in the
+    // If the feature compatibility version is not 4.2, and we are validating features as master,
+    // ban the use of new agg features introduced in 4.2 to prevent them from being persisted in the
     // catalog.
     if (serverGlobalParams.validateFeaturesAsMaster.load() &&
-        currentFCV != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+        currentFCV != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         expCtx->maxFeatureCompatibilityVersion = currentFCV;
     }
     auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));

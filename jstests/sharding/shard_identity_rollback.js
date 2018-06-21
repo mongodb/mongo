@@ -19,8 +19,8 @@
     var secondaries = replTest.getSecondaries();
     var configConnStr = st.configRS.getURL();
 
-    // Shards start in FCV 3.6 until a config server reaches out to them. This causes storage to
-    // shutdown with 3.6 compatible files, requiring rollback via refetch.
+    // Shards start in FCV 4.0 until a config server reaches out to them. This causes storage to
+    // shutdown with 4.0 compatible files, requiring rollback via refetch.
     priConn.adminCommand({setFeatureCompatibilityVersion: "4.0"});
 
     // Wait for the secondaries to have the latest oplog entries before stopping the fetcher to

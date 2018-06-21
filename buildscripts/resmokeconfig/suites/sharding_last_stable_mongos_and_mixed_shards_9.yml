@@ -14,7 +14,6 @@ selector:
   roots:
   - jstests/sharding/views.js
   - jstests/sharding/migration_failure.js
-  - jstests/sharding/geo_near_sharded.js
   - jstests/sharding/shard_targeting.js
   - jstests/sharding/listshards.js
   - jstests/sharding/multi_mongos2a.js
@@ -30,7 +29,6 @@ selector:
   - jstests/sharding/shard_aware_on_add_shard.js
   - jstests/sharding/migration_server_status.js
   - jstests/sharding/agg_project_limit_pipe_split.js
-  - jstests/sharding/update_sharded.js
   - jstests/sharding/movechunk_with_moveParanoia.js
   - jstests/sharding/movechunk_with_default_paranoia.js
   - jstests/sharding/shard_key_immutable.js
