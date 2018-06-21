@@ -76,7 +76,9 @@ public:
 
     virtual void setOrderedCommit(bool orderedCommit) {}
 
-    virtual void setPrepareTimestamp(Timestamp) {}
+    virtual void setPrepareTimestamp(Timestamp) override {}
+
+    virtual void prepareUnitOfWork() override {}
 
 private:
     typedef std::shared_ptr<Change> ChangePtr;

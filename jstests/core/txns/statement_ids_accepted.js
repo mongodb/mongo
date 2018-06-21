@@ -250,8 +250,14 @@
     // prepareTransaction can only be run on the admin database.
     assert.commandWorked(sessionDb.adminCommand({
         prepareTransaction: 1,
-        txnNumber: NumberLong(txnNumber++),
+        txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(1),
+        autocommit: false
+    }));
+    assert.commandWorked(sessionDb.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        stmtId: NumberInt(2),
         autocommit: false
     }));
 
