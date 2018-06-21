@@ -1084,7 +1084,6 @@ functions:
         VERSION=${version}
         WORKDIR=${workdir}
 
-        if [ "${build_cdriver|}" = "true" ]; then
         CDRIVER_VERSION=1.10.3
         rm -rf mongo-c-driver-$CDRIVER_VERSION
         rm -rf mongo-c-driver
@@ -1098,7 +1097,6 @@ functions:
         ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_ZLIB=OFF -DENABLE_SSL=OFF -DENABLE_SASL=OFF -DENABLE_TESTS=OFF -DENABLE_SRV=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${cdriver_cmake_flags}
         make install VERBOSE=1
         mv $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp $WORKDIR/src/build/mongo-embedded-sdk-$VERSION
-        fi
 
   "build new tools" :
     command: shell.exec
@@ -3382,24 +3380,18 @@ tasks:
         resmoke_args: --suites=unittests
         run_multiple_jobs: true
 
-## compile_mobile - build the mobile-dev and mobile-test targets only ##
-- name: compile_mobile
+## embedded_sdk_build_and_test_* - build the mobile-dev and mobile-test targets only ##
+
+- name: embedded_sdk_build_cdriver
   commands:
-    - command: manifest.load
-    - func: "git get project"
-    - func: "get buildnumber"
-    - func: "set up credentials"
-    - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
-    - func: "generate compile expansions"
-    # Then we load the generated version data into the agent so we can use it in task definitions.
-    - func: "apply compile expansions"
+    - func: "build cdriver"
 
-    - func: "build cdriver" # noop if ${build_cdriver} is not "true"
-
+- name: embedded_sdk_install_dev
+  commands:
     - func: "scons compile"
       vars:
-        targets: install-mobile-dev install-mobile-test
-        task_compile_flags: >-
+        targets: install-mobile-dev
+        task_compile_flags: &embedded_sdk_compile_flags >-
           --disable-warnings-as-errors
           --install-mode=hygienic
           --js-engine=none
@@ -3412,6 +3404,8 @@ tasks:
           --wiredtiger=off
           CPPPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libbson-1.0 $BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libmongoc-1.0'
 
+- name: embedded_sdk_s3_put
+  commands:
     # Need to sign artifacts on iOS-ish.
     - command: shell.exec
       params:
@@ -3440,12 +3434,32 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk.tgz"
-        remote_file: ${project}/embedded-sdk/${build_variant}/${revision}/${build_id}.tgz
+        remote_file: ${project}/embedded-sdk/${build_variant}/${revision}/${version}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
         display_name: "Embedded SDK Tar Archive"
 
+- name: embedded_sdk_install_tests
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: install-mobile-test
+        task_compile_flags: *embedded_sdk_compile_flags
+    - command: shell.exec
+      params:
+        working_dir: "src/build/mongo-embedded-sdk-${version}"
+        script: |
+          set -o errexit
+          set -o verbose
+          if command -v xcrun; then
+            # Do ad-hoc signing for now, until we have a better answer
+            find ./lib -type f -name "*.dylib" -print0 | \
+              xargs -0 -L 1 -I "{}" bash -c "xcrun codesign -v {} || xcrun codesign -s - {}"
+          fi
+
+- name: embedded_sdk_run_tests
+  commands:
     - func: "run embedded tests"
 
     # If this is a patch build, blow away the file so our subsequent and optional s3.put
@@ -3458,6 +3472,8 @@ tasks:
             rm -f src/build/embedded-sdk.tgz
           fi
 
+- name: embedded_sdk_s3_put_latest
+  commands:
     # A second put, this time to -latest, to give devs a reasonable
     # way to get the most recent build.
     - command: s3.put
@@ -3472,8 +3488,6 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
 
-    - func: "scons cache pruning"
-    - func: "umount shared scons directory"
 
 - name: compile_benchmarks
   depends_on: []
@@ -6813,6 +6827,29 @@ task_groups:
   - compile_unittests
   - unittests
   - compile_all
+- name: embedded_sdk_build_and_test
+  setup_group:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
+    - func: "generate compile expansions"
+  teardown_group:
+    - func: "scons cache pruning"
+    - func: "umount shared scons directory"
+  setup_task:
+    - func: "set up virtualenv"
+    - func: "set task expansion macros"
+    - func: "apply compile expansions"
+  teardown_task:
+  tasks:
+  - "embedded_sdk_build_cdriver"
+  - "embedded_sdk_install_dev"
+  - "embedded_sdk_s3_put"
+  - "embedded_sdk_install_tests"
+  - "embedded_sdk_run_tests"
+  - "embedded_sdk_s3_put_latest"
 
 #######################################
 #               Modules               #
@@ -9321,7 +9358,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
-    build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     compile_flags: >-
@@ -9344,7 +9380,7 @@ buildvariants:
     enable_embedded_tests: native
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-iphoneos-10.2
   display_name: "Embedded SDK - iOS 10.2"
@@ -9353,8 +9389,8 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
-    build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
+    compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --variables-files=etc/scons/xcode_ios.vars
@@ -9370,11 +9406,10 @@ buildvariants:
         -DCMAKE_C_FLAGS="-arch arm64 -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2"
         -DCMAKE_LINKER_FLAGS="-arch arm64 -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
-    compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-iphonesimulator-10.2
   display_name: "Embedded SDK - iOS Simulator 10.2"
@@ -9383,7 +9418,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
-    build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     compile_flags: >-
@@ -9407,7 +9441,7 @@ buildvariants:
     ios_sim_runtime: iOS-10-2
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-appletvos-10.2
   display_name: "Embedded SDK - tvOS 10.2"
@@ -9415,7 +9449,6 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
@@ -9437,7 +9470,7 @@ buildvariants:
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-appletvsimulator-10.2
   display_name: "Embedded SDK - tvOS Simulator 10.2"
@@ -9445,7 +9478,6 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
@@ -9470,7 +9502,7 @@ buildvariants:
     ios_sim_runtime: tvOS-10-2
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-watchos-4.2
   display_name: "Embedded SDK - watchOS 4.2"
@@ -9478,7 +9510,6 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
@@ -9504,7 +9535,7 @@ buildvariants:
     disable_unit_tests: true
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-watchsimulator-4.2
   display_name: "Embedded SDK - watchOS Simulator 4.2"
@@ -9512,7 +9543,6 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    build_cdriver: true
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
@@ -9541,7 +9571,7 @@ buildvariants:
     ios_sim_runtime: watchOS-4-2
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-ubuntu-1604-x86_64
   display_name: "Embedded SDK - Ubuntu 16.04 x86_64"
@@ -9550,7 +9580,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
-    build_cdriver: true
     # We need --allocator=system here to work around SERVER-XXXXX
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -9561,12 +9590,11 @@ buildvariants:
         -DCMAKE_C_COMPILER=/opt/mongodbtoolchain/v2/bin/gcc
         -DCMAKE_CXX_COMPILER=/opt/mongodbtoolchain/v2/bin/g++
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     disable_unit_tests: true
     enable_embedded_tests: native
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-android-arm32
   display_name: "Embedded SDK - Android arm32"
@@ -9575,7 +9603,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
-    build_cdriver: true
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -9594,7 +9621,6 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     disable_unit_tests: true
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
@@ -9604,7 +9630,7 @@ buildvariants:
     android_toolchain_api_version: "21"
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-android-arm64
   display_name: "Embedded SDK - Android arm64"
@@ -9613,7 +9639,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
-    build_cdriver: true
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -9631,7 +9656,6 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     disable_unit_tests: true
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
@@ -9641,7 +9665,7 @@ buildvariants:
     android_toolchain_api_version: "21"
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 - name: embedded-sdk-android-x86_64
   display_name: "Embedded SDK - Android x86_64"
@@ -9650,7 +9674,6 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
-    build_cdriver: true
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -9668,7 +9691,6 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
-    compile_env: JAVA_HOME=/opt/java/jdk8/
     disable_unit_tests: true
     # The Android x86_64 emulator requires KVM.
     enable_embedded_tests: android_emulator
@@ -9679,7 +9701,7 @@ buildvariants:
     android_toolchain_api_version: "21"
     dump_scons_config_on_failure: true
   tasks:
-  - name: compile_mobile
+  - name: embedded_sdk_build_and_test
 
 ###########################################
 #          Redhat buildvariants           #
