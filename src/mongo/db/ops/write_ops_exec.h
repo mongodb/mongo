@@ -60,8 +60,12 @@ struct WriteResult {
  * LastError is updated for failures of individual writes, but not for batch errors reported by an
  * exception being thrown from these functions. Callers are responsible for managing LastError in
  * that case. This should generally be combined with LastError handling from parse failures.
+ *
+ * 'fromMigrate' indicates whether the operation was induced by a chunk migration
  */
-WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& op);
+WriteResult performInserts(OperationContext* opCtx,
+                           const write_ops::Insert& op,
+                           bool fromMigrate = false);
 WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& op);
 WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& op);
 

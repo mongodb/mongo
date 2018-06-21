@@ -84,9 +84,9 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsFromDonorWorksCorrectly) {
 
     std::vector<BSONObj> resultDocs;
 
-    auto insertBatchFn = [&](OperationContext* opCtx, BSONObjIterator docs) {
-        while (docs.more()) {
-            resultDocs.push_back(docs.next().Obj().getOwned());
+    auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) {
+        for (auto&& docToClone : docs) {
+            resultDocs.push_back(docToClone.Obj().getOwned());
         }
     };
 
@@ -122,7 +122,7 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsThrowsFetchErrors) {
         return fetchBatchResultBuilder.obj();
     };
 
-    auto insertBatchFn = [&](OperationContext* opCtx, BSONObjIterator docs) {};
+    auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) {};
 
     ASSERT_THROWS_CODE_AND_WHAT(MigrationDestinationManager::cloneDocumentsFromDonor(
                                     operationContext(), insertBatchFn, fetchBatchFn),
@@ -140,7 +140,7 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsCatchesInsertErrors) {
         return fetchBatchResultBuilder.obj();
     };
 
-    auto insertBatchFn = [&](OperationContext* opCtx, BSONObjIterator docs) {
+    auto insertBatchFn = [&](OperationContext* opCtx, BSONObj docs) {
         uasserted(ErrorCodes::FailedToParse, "insertion error");
     };
 
