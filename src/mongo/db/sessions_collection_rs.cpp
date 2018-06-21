@@ -120,7 +120,15 @@ auto sendToPrimary(OperationContext* opCtx, Callback callback)
         return res;
     }
 
-    return callback(conn->get());
+    auto val = callback(conn->get());
+
+    if (val.isOK()) {
+        conn->done();
+    } else {
+        conn->kill();
+    }
+
+    return std::move(val);
 }
 
 template <typename LocalCallback, typename RemoteCallback>
