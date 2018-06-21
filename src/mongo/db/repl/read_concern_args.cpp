@@ -35,6 +35,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -60,8 +61,17 @@ const string ReadConcernArgs::kAtClusterTimeFieldName("atClusterTime");
 
 const string ReadConcernArgs::kLevelFieldName("level");
 
-const OperationContext::Decoration<ReadConcernArgs> ReadConcernArgs::get =
+const OperationContext::Decoration<ReadConcernArgs> handle =
     OperationContext::declareDecoration<ReadConcernArgs>();
+
+ReadConcernArgs& ReadConcernArgs::get(OperationContext* opCtx) {
+    return handle(opCtx);
+}
+
+const ReadConcernArgs& ReadConcernArgs::get(const OperationContext* opCtx) {
+    return handle(opCtx);
+}
+
 
 ReadConcernArgs::ReadConcernArgs() = default;
 

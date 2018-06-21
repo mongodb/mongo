@@ -34,7 +34,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/json.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/util/time_support.h"
@@ -42,6 +41,7 @@
 namespace mongo {
 
 class BSONObj;
+class OperationContext;
 
 namespace repl {
 
@@ -53,7 +53,8 @@ public:
     static const std::string kAtClusterTimeFieldName;
     static const std::string kLevelFieldName;
 
-    static const OperationContext::Decoration<ReadConcernArgs> get;
+    static ReadConcernArgs& get(OperationContext* opCtx);
+    static const ReadConcernArgs& get(const OperationContext* opCtx);
 
     ReadConcernArgs();
 
