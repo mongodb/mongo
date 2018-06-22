@@ -642,6 +642,12 @@ ExitCode _initAndListen(int listenPort) {
         return EXIT_NET_ERROR;
     }
 
+    start = serviceContext->getServiceEntryPoint()->start();
+    if (!start.isOK()) {
+        error() << "Failed to start the service entry point: " << start;
+        return EXIT_NET_ERROR;
+    }
+
     start = serviceContext->getTransportLayer()->start();
     if (!start.isOK()) {
         error() << "Failed to start the listener: " << start.toString();

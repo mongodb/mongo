@@ -75,11 +75,15 @@ void ServiceEntryPointEmbedded::startSession(transport::SessionHandle session) {
 
 void ServiceEntryPointEmbedded::endAllSessions(transport::Session::TagMask tags) {}
 
+Status ServiceEntryPointEmbedded::start() {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 bool ServiceEntryPointEmbedded::shutdown(Milliseconds timeout) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-ServiceEntryPoint::Stats ServiceEntryPointEmbedded::sessionStats() const {
+void ServiceEntryPointEmbedded::appendStats(BSONObjBuilder*) const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
