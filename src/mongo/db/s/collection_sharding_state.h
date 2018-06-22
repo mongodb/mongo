@@ -154,13 +154,9 @@ public:
     }
 
     /**
-     * Checks whether the shard version in the context is compatible with the shard version of the
-     * collection locally and if not throws StaleConfigException populated with the expected and
-     * actual versions.
-     *
-     * Because StaleConfigException has special semantics in terms of how a sharded command's
-     * response is constructed, this function should be the only means of checking for shard version
-     * match.
+     * Checks whether the shard version in the operation context is compatible with the shard
+     * version of the collection and if not throws StaleConfigException populated with the received
+     * and wanted versions.
      */
     void checkShardVersionOrThrow(OperationContext* opCtx);
 
@@ -189,24 +185,6 @@ public:
     boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& startingFrom);
 
 private:
-    /**
-     * Checks whether the shard version of the operation matches that of the collection.
-     *
-     * opCtx - Operation context from which to retrieve the operation's expected version.
-     * errmsg (out) - On false return contains an explanatory error message.
-     * expectedShardVersion (out) - On false return contains the expected collection version on this
-     *  shard. Obtained from the operation sharding state.
-     * actualShardVersion (out) - On false return contains the actual collection version on this
-     *  shard. Obtained from the collection sharding state.
-     *
-     * Returns true if the expected collection version on the shard matches its actual version on
-     * the shard and false otherwise. Upon false return, the output parameters will be set.
-     */
-    bool _checkShardVersionOk(OperationContext* opCtx,
-                              std::string* errmsg,
-                              ChunkVersion* expectedShardVersion,
-                              ChunkVersion* actualShardVersion);
-
     // Namespace this state belongs to.
     const NamespaceString _nss;
 

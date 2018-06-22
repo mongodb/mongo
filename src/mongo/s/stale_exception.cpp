@@ -39,7 +39,7 @@ namespace {
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
-ChunkVersion extractOptionalVersion(const BSONObj& obj, StringData field) {
+boost::optional<ChunkVersion> extractOptionalVersion(const BSONObj& obj, StringData field) {
     auto swChunkVersion = ChunkVersion::parseLegacyWithField(obj, field);
     if (swChunkVersion == ErrorCodes::NoSuchKey)
         return ChunkVersion::UNSHARDED();
@@ -51,7 +51,9 @@ ChunkVersion extractOptionalVersion(const BSONObj& obj, StringData field) {
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("ns", _nss.ns());
     _received.appendLegacyWithField(bob, "vReceived");
-    _wanted.appendLegacyWithField(bob, "vWanted");
+    if (_wanted) {
+        _wanted->appendLegacyWithField(bob, "vWanted");
+    }
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
@@ -59,8 +61,8 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
 }
 
 StaleConfigInfo StaleConfigInfo::parseFromCommandError(const BSONObj& obj) {
-    return StaleConfigInfo(NamespaceString(obj["ns"].str()),
-                           extractOptionalVersion(obj, "vReceived"),
+    return StaleConfigInfo(NamespaceString(obj["ns"].String()),
+                           uassertStatusOK(ChunkVersion::parseLegacyWithField(obj, "vReceived")),
                            extractOptionalVersion(obj, "vWanted"));
 }
 

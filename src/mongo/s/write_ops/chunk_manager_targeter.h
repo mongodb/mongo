@@ -86,7 +86,8 @@ public:
 
     void noteCouldNotTarget() override;
 
-    void noteStaleResponse(const ShardEndpoint& endpoint, const BSONObj& staleInfo) override;
+    void noteStaleResponse(const ShardEndpoint& endpoint,
+                           const StaleConfigInfo& staleInfo) override;
 
     /**
      * Replaces the targeting information with the latest information from the cache.  If this

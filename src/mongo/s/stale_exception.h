@@ -38,7 +38,9 @@ class StaleConfigInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleConfig;
 
-    StaleConfigInfo(NamespaceString nss, ChunkVersion received, ChunkVersion wanted)
+    StaleConfigInfo(NamespaceString nss,
+                    ChunkVersion received,
+                    boost::optional<ChunkVersion> wanted)
         : _nss(std::move(nss)), _received(received), _wanted(wanted) {}
 
     const auto& getNss() const {
@@ -60,7 +62,7 @@ public:
 private:
     NamespaceString _nss;
     ChunkVersion _received;
-    ChunkVersion _wanted;
+    boost::optional<ChunkVersion> _wanted;
 };
 using StaleConfigException = ExceptionFor<ErrorCodes::StaleConfig>;
 

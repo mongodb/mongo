@@ -118,7 +118,8 @@ public:
         // No-op
     }
 
-    void noteStaleResponse(const ShardEndpoint& endpoint, const BSONObj& staleInfo) override {
+    void noteStaleResponse(const ShardEndpoint& endpoint,
+                           const StaleConfigInfo& staleInfo) override {
         // No-op
     }
 

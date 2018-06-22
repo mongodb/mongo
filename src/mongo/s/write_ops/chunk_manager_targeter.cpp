@@ -688,18 +688,16 @@ void ChunkManagerTargeter::noteCouldNotTarget() {
 }
 
 void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
-                                             const BSONObj& staleInfo) {
+                                             const StaleConfigInfo& staleInfo) {
     dassert(!_needsTargetingRefresh);
 
     ChunkVersion remoteShardVersion;
-    if (staleInfo["vWanted"].eoo()) {
-        // If we don't have a vWanted sent, assume the version is higher than our current
-        // version.
+    if (!staleInfo.getVersionWanted()) {
+        // If we don't have a vWanted sent, assume the version is higher than our current version.
         remoteShardVersion = getShardVersion(*_routingInfo, endpoint.shardName);
         remoteShardVersion.incMajor();
     } else {
-        remoteShardVersion =
-            uassertStatusOK(ChunkVersion::parseLegacyWithField(staleInfo, "vWanted"));
+        remoteShardVersion = *staleInfo.getVersionWanted();
     }
 
     ShardVersionMap::iterator it = _remoteShardVersions.find(endpoint.shardName);
