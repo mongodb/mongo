@@ -719,6 +719,10 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
         return;
     }
 
+    if (_singleTransactionStats->isActive()) {
+        _singleTransactionStats->setInactive(curTimeMicros64());
+    }
+
     invariant(!_txnResourceStash);
     _txnResourceStash = TxnResources(opCtx);
 }
@@ -768,9 +772,12 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             uassert(ErrorCodes::InvalidOptions,
                     "Only the first command in a transaction may specify a readConcern",
                     readConcernArgs.isEmpty());
-
             _txnResourceStash->release(opCtx);
             _txnResourceStash = boost::none;
+            // Set the starting active time for this transaction.
+            if (_txnState == MultiDocumentTransactionState::kInProgress) {
+                _singleTransactionStats->setActive(curTimeMicros64());
+            }
             return;
         }
 
@@ -783,6 +790,9 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             return;
         }
         opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
+
+        // Set the starting active time for this transaction.
+        _singleTransactionStats->setActive(curTimeMicros64());
 
         // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
         // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
@@ -892,6 +902,7 @@ void Session::_abortTransaction(WithLock wl) {
         return;
     }
     const bool isMultiDocumentTransaction = _inMultiDocumentTransaction(wl);
+
     _txnResourceStash = boost::none;
     _transactionOperationBytes = 0;
     _transactionOperations.clear();
@@ -900,6 +911,10 @@ void Session::_abortTransaction(WithLock wl) {
     ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
     if (isMultiDocumentTransaction) {
         _singleTransactionStats->setEndTime(curTimeMicros64());
+        // The transaction has aborted, so we mark it as inactive.
+        if (_singleTransactionStats->isActive()) {
+            _singleTransactionStats->setInactive(curTimeMicros64());
+        }
     }
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
 }
@@ -924,6 +939,7 @@ void Session::_setActiveTxn(WithLock wl, TxnNumber txnNumber) {
     _activeTxnCommittedStatements.clear();
     _hasIncompleteHistory = false;
     _txnState = MultiDocumentTransactionState::kNone;
+    _singleTransactionStats = boost::none;
     _speculativeTransactionReadOpTime = repl::OpTime();
     _multikeyPathInfo.clear();
 }
@@ -1029,8 +1045,11 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     }
     _txnState = MultiDocumentTransactionState::kCommitted;
     ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
-    // After the transaction has been committed, we must update the end time.
+    // After the transaction has been committed, we must update the end time and mark it as inactive.
     _singleTransactionStats->setEndTime(curTimeMicros64());
+    if (_singleTransactionStats->isActive()) {
+        _singleTransactionStats->setInactive(curTimeMicros64());
+    }
     ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
 }
 

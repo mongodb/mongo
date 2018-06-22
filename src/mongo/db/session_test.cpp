@@ -1606,5 +1606,194 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
     ASSERT_GT(txnDurationAfterAbort, txnDurationAfterStart);
 }
 
+TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndStash) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    // Time active should be zero.
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+
+    session.unstashTransactionResources(opCtx(), "insert");
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    session.stashTransactionResources(opCtx());
+
+    // Time active should have increased.
+    ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+
+    // Save time active at this point.
+    auto timeActiveSoFar = session.getSingleTransactionStats()->getTimeActiveMicros();
+
+    session.unstashTransactionResources(opCtx(), "insert");
+    // Sleep here to allow enough time to elapse.
+    sleepmillis(10);
+    session.stashTransactionResources(opCtx());
+
+    // Time active should have increased again.
+    ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(), timeActiveSoFar);
+
+    // Start a new transaction.
+    const TxnNumber higherTxnNum = 2;
+    session.beginOrContinueTxn(opCtx(), higherTxnNum, false, true, "testDB", "insert");
+
+    // Time active should be zero for a new transaction.
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+}
+
+TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    // Time active should be zero.
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+
+    session.unstashTransactionResources(opCtx(), "insert");
+    // Sleep here to allow enough time to elapse.
+    sleepmillis(10);
+    session.abortArbitraryTransaction();
+
+    // Time active should have increased.
+    ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+
+    // Save time active at this point.
+    auto timeActiveSoFar = session.getSingleTransactionStats()->getTimeActiveMicros();
+
+    // The transaction is no longer active, so time active should not have increased.
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), timeActiveSoFar);
+}
+
+TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetUponAbortOnly) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    // Time active should be zero.
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+
+    session.abortArbitraryTransaction();
+
+    // Time active should not have increased.
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+}
+
+TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilStash) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    // Time active should be zero.
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+    session.unstashTransactionResources(opCtx(), "insert");
+    sleepmillis(1);
+
+    // Time active should have increased.
+    ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+
+    // Save time active at this point.
+    auto timeActiveSoFar = session.getSingleTransactionStats()->getTimeActiveMicros();
+    sleepmillis(1);
+
+    // Time active should have increased again.
+    ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(), timeActiveSoFar);
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    session.stashTransactionResources(opCtx());
+
+    // The transaction is no longer active, so time active should not have increased.
+    timeActiveSoFar = session.getSingleTransactionStats()->getTimeActiveMicros();
+    sleepmillis(1);
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), timeActiveSoFar);
+}
+
+TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilCommit) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
+
+    // Time active should be zero.
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+    session.unstashTransactionResources(opCtx(), "commitTransaction");
+    sleepmillis(1);
+
+    // Time active should have increased.
+    ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+
+    // Save time active at this point.
+    auto timeActiveSoFar = session.getSingleTransactionStats()->getTimeActiveMicros();
+    sleepmillis(1);
+
+    // Time active should have increased again.
+    ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(), timeActiveSoFar);
+    session.commitTransaction(opCtx());
+
+    // The transaction is no longer active, so time active should not have increased.
+    timeActiveSoFar = session.getSingleTransactionStats()->getTimeActiveMicros();
+    sleepmillis(1);
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), timeActiveSoFar);
+}
+
+TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetIfUnstashHasBadReadConcernArgs) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "find");
+
+    // Initialize bad read concern args (!readConcernArgs.isEmpty()).
+    repl::ReadConcernArgs readConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+    // Transaction resources do not exist yet.
+    session.unstashTransactionResources(opCtx(), "find");
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    session.stashTransactionResources(opCtx());
+
+    // Time active should have increased.
+    ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(), Microseconds{0});
+
+    // Save time active at this point.
+    auto timeActiveSoFar = session.getSingleTransactionStats()->getTimeActiveMicros();
+
+    // Transaction resources already exist here and should throw an exception due to bad read
+    // concern arguments.
+    ASSERT_THROWS_CODE(session.unstashTransactionResources(opCtx(), "find"),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+
+    // Time active should not have increased.
+    ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(), timeActiveSoFar);
+}
+
 }  // namespace
 }  // namespace mongo

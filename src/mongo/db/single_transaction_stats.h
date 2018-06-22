@@ -88,12 +88,67 @@ public:
         _endTime = time;
     }
 
+    /**
+     * Returns the total active time of the transaction. A transaction is active when there is a
+     * running operation that is part of the transaction.
+     */
+    Microseconds getTimeActiveMicros() const {
+        invariant(_startTime > 0);
+
+        // The transaction is currently active, so we return the recorded active time so far plus
+        // the time since _timeActiveStart.
+        if (isActive()) {
+            return _timeActiveMicros +
+                Microseconds{static_cast<long long>(curTimeMicros64() - _lastTimeActiveStart)};
+        }
+        return _timeActiveMicros;
+    }
+
+    /**
+     * Marks the transaction as active and sets the start of the transaction's active time.
+     *
+     * This method cannot be called if the transaction is currently active. A call to setActive()
+     * must be followed by a call to setInactive() before calling setActive() again.
+     */
+    void setActive(unsigned long long time) {
+        invariant(!isActive());
+
+        _lastTimeActiveStart = time;
+    }
+
+    /**
+     * Marks the transaction as inactive and sets the total active time of the transaction. The
+     * total active time will only be set if the transaction was active prior to this call.
+     *
+     * This method cannot be called if the transaction is currently not active.
+     */
+    void setInactive(unsigned long long time) {
+        invariant(isActive());
+
+        _timeActiveMicros += Microseconds{static_cast<long long>(time - _lastTimeActiveStart)};
+        _lastTimeActiveStart = 0;
+    }
+
+    /**
+     * Returns whether or not the transaction is currently active.
+     */
+    bool isActive() const {
+        return _lastTimeActiveStart != 0;
+    }
+
 private:
     // The start time of the transaction in microseconds.
     unsigned long long _startTime{0};
 
     // The end time of the transaction in microseconds.
     unsigned long long _endTime{0};
+
+    // The total amount of active time spent by the transaction.
+    Microseconds _timeActiveMicros = Microseconds{0};
+
+    // The time at which the transaction was last marked as active in microseconds. The transaction
+    // is considered active if this value is not equal to 0.
+    unsigned long long _lastTimeActiveStart{0};
 };
 
 }  // namespace mongo
