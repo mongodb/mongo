@@ -1021,6 +1021,8 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
                 _txnState = MultiDocumentTransactionState::kAborted;
                 // After the transaction has been aborted, we must update the end time.
                 _singleTransactionStats->setEndTime(curTimeMicros64());
+                ServerTransactionsMetrics::get(opCtx)->incrementTotalAborted();
+                ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
             }
         }
         // We must clear the recovery unit and locker so any post-transaction writes can run without
