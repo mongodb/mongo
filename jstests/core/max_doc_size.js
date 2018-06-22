@@ -1,55 +1,68 @@
-var maxBsonObjectSize = db.isMaster().maxBsonObjectSize;
-var docOverhead = Object.bsonsize({_id: new ObjectId(), x: ''});
-var maxStrSize = maxBsonObjectSize - docOverhead;
-var maxStr = 'a'.repeat(maxStrSize);
-var coll = db.max_doc_size;
+/**
+ * Confirms that:
+ *  - Documents at the maximum BSON size limit can be written and read back.
+ *  - Documents over the maximum BSON size limit cannot be written.
+ */
+(function() {
+    'use strict';
 
-coll.drop();
-var res = db.runCommand({insert: coll.getName(), documents: [{_id: new ObjectId(), x: maxStr}]});
-assert(res.ok);
-assert.eq(null, res.writeErrors);
+    const maxBsonObjectSize = db.isMaster().maxBsonObjectSize;
+    const docOverhead = Object.bsonsize({_id: new ObjectId(), x: ''});
+    const maxStrSize = maxBsonObjectSize - docOverhead;
+    const maxStr = 'a'.repeat(maxStrSize);
+    const coll = db.max_doc_size;
 
-coll.drop();
-res = db.runCommand({
-    update: coll.getName(),
-    ordered: true,
-    updates: [{q: {a: 1}, u: {_id: new ObjectId(), x: maxStr}, upsert: true}]
-});
-assert(res.ok);
-assert.eq(null, res.writeErrors);
+    //
+    // Test that documents at the size limit can be written and read back.
+    //
+    coll.drop();
+    assert.commandWorked(
+        db.runCommand({insert: coll.getName(), documents: [{_id: new ObjectId(), x: maxStr}]}));
+    assert.eq(coll.find({}).itcount(), 1);
 
-coll.drop();
-var id = new ObjectId();
-coll.insert({_id: id});
-res = db.runCommand(
-    {update: coll.getName(), ordered: true, updates: [{q: {_id: id}, u: {$set: {x: maxStr}}}]});
-assert(res.ok);
-assert.eq(null, res.writeErrors);
+    coll.drop();
+    assert.commandWorked(db.runCommand({
+        update: coll.getName(),
+        ordered: true,
+        updates: [{q: {a: 1}, u: {_id: new ObjectId(), x: maxStr}, upsert: true}]
+    }));
+    assert.eq(coll.find({}).itcount(), 1);
 
-//
-// Test documents over the size limit.
-//
+    coll.drop();
+    const objectId = new ObjectId();
+    assert.commandWorked(coll.insert({_id: objectId}));
+    assert.commandWorked(db.runCommand({
+        update: coll.getName(),
+        ordered: true,
+        updates: [{q: {_id: objectId}, u: {$set: {x: maxStr}}}]
+    }));
+    assert.eq(coll.find({}).itcount(), 1);
 
-var overBigStr = maxStr + 'a';
+    //
+    // Test that documents over the size limit cannot be written.
+    //
+    const largerThanMaxString = maxStr + 'a';
 
-coll.drop();
-res = db.runCommand({insert: coll.getName(), documents: [{_id: new ObjectId(), x: overBigStr}]});
-assert(res.ok);
-assert.neq(null, res.writeErrors);
+    coll.drop();
+    assert.commandFailedWithCode(
+        db.runCommand(
+            {insert: coll.getName(), documents: [{_id: new ObjectId(), x: largerThanMaxString}]}),
+        2);
 
-coll.drop();
-res = db.runCommand({
-    update: coll.getName(),
-    ordered: true,
-    updates: [{q: {a: 1}, u: {_id: new ObjectId(), x: overBigStr}, upsert: true}]
-});
-assert(res.ok);
-assert.neq(null, res.writeErrors);
+    coll.drop();
+    assert.commandFailedWithCode(db.runCommand({
+        update: coll.getName(),
+        ordered: true,
+        updates: [{q: {a: 1}, u: {_id: new ObjectId(), x: largerThanMaxString}, upsert: true}]
+    }),
+                                 17420);
 
-coll.drop();
-id = new ObjectId();
-coll.insert({_id: id});
-res = db.runCommand(
-    {update: coll.getName(), ordered: true, updates: [{q: {_id: id}, u: {$set: {x: overBigStr}}}]});
-assert(res.ok);
-assert.neq(null, res.writeErrors);
+    coll.drop();
+    assert.commandWorked(coll.insert({_id: objectId}));
+    assert.commandFailedWithCode(db.runCommand({
+        update: coll.getName(),
+        ordered: true,
+        updates: [{q: {_id: objectId}, u: {$set: {x: largerThanMaxString}}}]
+    }),
+                                 17419);
+})();

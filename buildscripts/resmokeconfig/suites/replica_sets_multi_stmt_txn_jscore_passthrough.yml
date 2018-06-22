@@ -140,7 +140,6 @@ selector:
   - jstests/core/max_doc_size.js
 
   # Calls res.getWriteError() or res.hasWriteError().
-  - jstests/core/big_object1.js
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
   - jstests/core/bulk_legacy_enforce_gle.js
