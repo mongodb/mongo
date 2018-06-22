@@ -219,6 +219,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              const boost::optional<LogicalSessionIdToClient>& lsid,
                              boost::optional<TxnNumber> txnNumber,
                              std::unique_ptr<QueryRequest> qr,
+                             Milliseconds delayBeforeGetMore,
                              BSONObj* objOut) {
     const auto dbName = qr->nss().db().toString();
 
@@ -249,6 +250,8 @@ int runQueryWithReadCommands(DBClientBase* conn,
     }
 
     while (cursorResponse.getCursorId() != 0) {
+        sleepFor(delayBeforeGetMore);
+
         GetMoreRequest getMoreRequest(
             qr->nss(),
             cursorResponse.getCursorId(),
@@ -279,6 +282,45 @@ int runQueryWithReadCommands(DBClientBase* conn,
 }
 
 void doNothing(const BSONObj&) {}
+
+/**
+ * Queries the oplog for the latest cluster time / timestamp and returns it.
+ */
+Timestamp getLatestClusterTime(DBClientBase* conn) {
+    // Sort by descending 'ts' in the query to the oplog collection. The first entry will have the
+    // latest cluster time.
+    auto qr = stdx::make_unique<QueryRequest>(NamespaceString("local.oplog.rs"));
+    qr->setSort(BSON("$natural" << -1));
+    qr->setLimit(1LL);
+    qr->setWantMore(false);
+    invariant(qr->validate());
+    const auto dbName = qr->nss().db().toString();
+
+    BSONObj oplogResult;
+    int count = runQueryWithReadCommands(
+        conn, boost::none, boost::none, std::move(qr), Milliseconds(0), &oplogResult);
+    uassert(ErrorCodes::OperationFailed,
+            str::stream() << "Find cmd on the oplog collection failed; reply was: " << oplogResult,
+            count == 1);
+
+    const BSONElement tsElem = oplogResult["ts"];
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Expects oplog entry to have a valid 'ts' field: " << oplogResult,
+            !tsElem.eoo() || tsElem.type() == bsonTimestamp);
+    return tsElem.timestamp();
+}
+
+/**
+ * Gets the latest timestamp/clusterTime T from the oplog collection, then returns a cluster time
+ * 'numSecondsInThePast' earlier than that time T.
+ *
+ * 'numSecondsInThePast' must be greater than or equal to 0.
+ */
+Timestamp getAClusterTimeSecondsInThePast(DBClientBase* conn, int numSecondsInThePast) {
+    invariant(numSecondsInThePast >= 0);
+    Timestamp latestTimestamp = getLatestClusterTime(conn);
+    return Timestamp(latestTimestamp.getSecs() - numSecondsInThePast, latestTimestamp.getInc());
+}
 
 }  // namespace
 
@@ -550,6 +592,42 @@ BenchRunOp opFromBson(const BSONObj& op) {
             BSONObjBuilder valBuilder;
             valBuilder.append(arg);
             myOp.value = valBuilder.obj();
+        } else if (name == "useAClusterTimeWithinPastSeconds") {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field 'useAClusterTimeWithinPastSeconds' should be a number, "
+                                     "instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "field 'useAClusterTimeWithinPastSeconds' cannot be a "
+                                     "negative value. Value is: "
+                                  << arg.numberInt(),
+                    arg.numberInt() >= 0);
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Field 'useAClusterTimeWithinPastSeconds' is only valid for "
+                                     "find op types. Type is "
+                                  << opType,
+                    (opType == "find") || (opType == "query"));
+            myOp.useAClusterTimeWithinPastSeconds = arg.numberInt();
+        } else if (name == "maxRandomMillisecondDelayBeforeGetMore") {
+            uassert(ErrorCodes::BadValue,
+                    str::stream()
+                        << "Field 'maxRandomMillisecondDelayBeforeGetMore' should be a number, "
+                           "instead it's type: "
+                        << typeName(arg.type()),
+                    arg.isNumber());
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "field 'maxRandomMillisecondDelayBeforeGetMore' cannot be a "
+                                     "negative value. Value is: "
+                                  << arg.numberInt(),
+                    arg.numberInt() >= 0);
+            uassert(
+                ErrorCodes::InvalidOptions,
+                str::stream() << "Field 'maxRandomMillisecondDelayBeforeGetMore' is only valid for "
+                                 "find op types. Type is "
+                              << opType,
+                (opType == "find") || (opType == "query"));
+            myOp.maxRandomMillisecondDelayBeforeGetMore = arg.numberInt();
         } else {
             uassert(34394, str::stream() << "Benchrun op has unsupported field: " << name, false);
         }
@@ -625,6 +703,12 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
                                   << typeName(arg.type()),
                     arg.isBoolean());
             useSnapshotReads = arg.boolean();
+        } else if (name == "delayMillisOnFailedOperation") {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field '" << name << "' should be a number. Type is "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            delayMillisOnFailedOperation = Milliseconds(arg.numberInt());
         } else if (name == "hideResults") {
             hideResults = arg.trueValue();
         } else if (name == "handleErrors") {
@@ -759,7 +843,7 @@ BenchRunWorker::BenchRunWorker(size_t id,
                                const BenchRunConfig* config,
                                BenchRunState& brState,
                                int64_t randomSeed)
-    : _id(id), _config(config), _brState(brState), _randomSeed(randomSeed) {}
+    : _id(id), _config(config), _brState(brState), _rng(randomSeed) {}
 
 BenchRunWorker::~BenchRunWorker() = default;
 
@@ -780,7 +864,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
     long long count = 0;
     Timer timer;
 
-    BsonTemplateEvaluator bsonTemplateEvaluator(_randomSeed);
+    BsonTemplateEvaluator bsonTemplateEvaluator(_rng.nextInt32());
     invariant(bsonTemplateEvaluator.setId(_id) == BsonTemplateEvaluator::StatusSuccess);
 
     if (_config->username != "") {
@@ -876,8 +960,12 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 txnNumberForOp = txnNumber;
                                 inProgressMultiStatementTxn = true;
                             }
-                            runQueryWithReadCommands(
-                                conn, lsid, txnNumberForOp, std::move(qr), &result);
+                            runQueryWithReadCommands(conn,
+                                                     lsid,
+                                                     txnNumberForOp,
+                                                     std::move(qr),
+                                                     Milliseconds(0),
+                                                     &result);
                         } else {
                             BenchRunEventTrace _bret(&stats.findOneCounter);
                             result = conn->findOne(op.ns,
@@ -990,9 +1078,20 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (op.batchSize) {
                                 qr->setBatchSize(op.batchSize);
                             }
+                            BSONObjBuilder readConcernBuilder;
                             if (_config->useSnapshotReads) {
-                                qr->setReadConcern(readConcernSnapshot);
+                                readConcernBuilder.append("level", "snapshot");
                             }
+                            if (op.useAClusterTimeWithinPastSeconds > 0) {
+                                invariant(_config->useSnapshotReads);
+                                // Get a random cluster time between the latest time and
+                                // 'useAClusterTimeWithinPastSeconds' in the past.
+                                Timestamp atClusterTime = getAClusterTimeSecondsInThePast(
+                                    conn, _rng.nextInt32(op.useAClusterTimeWithinPastSeconds));
+                                readConcernBuilder.append("atClusterTime", atClusterTime);
+                            }
+                            qr->setReadConcern(readConcernBuilder.obj());
+
                             invariant(qr->validate());
 
                             BenchRunEventTrace _bret(&stats.queryCounter);
@@ -1002,8 +1101,17 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 txnNumberForOp = txnNumber;
                                 inProgressMultiStatementTxn = true;
                             }
-                            count = runQueryWithReadCommands(
-                                conn, lsid, txnNumberForOp, std::move(qr), nullptr);
+
+                            int delayBeforeGetMore = op.maxRandomMillisecondDelayBeforeGetMore
+                                ? _rng.nextInt32(op.maxRandomMillisecondDelayBeforeGetMore)
+                                : 0;
+
+                            count = runQueryWithReadCommands(conn,
+                                                             lsid,
+                                                             txnNumberForOp,
+                                                             std::move(qr),
+                                                             Milliseconds(delayBeforeGetMore),
+                                                             nullptr);
                         } else {
                             // Use special query function for exhaust query option.
                             if (op.options & QueryOption_Exhaust) {
@@ -1304,6 +1412,8 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                 if (!_config->handleErrors && !op.handleError)
                     return;
 
+                sleepFor(_config->delayMillisOnFailedOperation);
+
                 stats.errCount++;
             } catch (...) {
                 if (!_config->hideErrors || op.showError)
@@ -1478,12 +1588,20 @@ BSONObj BenchRunner::finish(BenchRunner* runner) {
     };
 
     appendPerSec("totalOps/s", stats.opCount);
+    // TODO: SERVER-35721 these are all per second results and should be renamed to reflect that.
     appendPerSec("findOne", stats.findOneCounter.getNumEvents());
     appendPerSec("insert", stats.insertCounter.getNumEvents());
     appendPerSec("delete", stats.deleteCounter.getNumEvents());
     appendPerSec("update", stats.updateCounter.getNumEvents());
     appendPerSec("query", stats.queryCounter.getNumEvents());
     appendPerSec("command", stats.commandCounter.getNumEvents());
+
+    buf.append("findOnes", stats.findOneCounter.getNumEvents());
+    buf.append("inserts", stats.insertCounter.getNumEvents());
+    buf.append("deletes", stats.deleteCounter.getNumEvents());
+    buf.append("updates", stats.updateCounter.getNumEvents());
+    buf.append("queries", stats.queryCounter.getNumEvents());
+    buf.append("commands", stats.commandCounter.getNumEvents());
 
     BSONObj zoo = buf.obj();
 
