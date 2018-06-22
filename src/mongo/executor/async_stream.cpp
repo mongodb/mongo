@@ -70,6 +70,11 @@ void AsyncStream::connect(tcp::resolver::iterator iter, ConnectHandler&& connect
                 return connectHandler(ec);
             }
 
+            ec = setStreamKeepAlive(&_stream);
+            if (ec) {
+                return connectHandler(ec);
+            }
+
             _connected = true;
             return connectHandler(ec);
         }));
