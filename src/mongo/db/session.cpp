@@ -911,6 +911,12 @@ void Session::_abortTransaction(WithLock wl) {
     }
     const bool isMultiDocumentTransaction = _inMultiDocumentTransaction(wl);
 
+    // If the transaction is stashed, then we have aborted an inactive transaction.
+    if (_txnResourceStash) {
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
+    } else {
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
+    }
     _txnResourceStash = boost::none;
     _transactionOperationBytes = 0;
     _transactionOperations.clear();
@@ -925,13 +931,6 @@ void Session::_abortTransaction(WithLock wl) {
         }
     }
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
-
-    // If the transaction is stashed, then we have aborted an inactive transaction.
-    if (_txnResourceStash) {
-        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
-    } else {
-        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
-    }
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
@@ -1033,6 +1032,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
             opCtx->setWriteUnitOfWork(nullptr);
             // Make sure the transaction didn't change because of chunk migration.
             if (opCtx->getTxnNumber() == _activeTxnNumber) {
+                ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
                 _txnState = MultiDocumentTransactionState::kAborted;
                 // After the transaction has been aborted, we must update the end time.
                 _singleTransactionStats->setEndTime(curTimeMicros64());

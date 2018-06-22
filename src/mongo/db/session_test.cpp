@@ -1563,9 +1563,9 @@ TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithStashedAbort) {
 
     // Tests that aborting a stashed transaction decrements the inactive counter only.
     session.abortArbitraryTransaction();
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), thirdActiveCounter - 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), thirdActiveCounter);
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
-              thirdInactiveCounter);
+              thirdInactiveCounter - 1U);
 }
 
 TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithUnstashedAbort) {
