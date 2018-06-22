@@ -1032,8 +1032,8 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
             opCtx->setWriteUnitOfWork(nullptr);
             // Make sure the transaction didn't change because of chunk migration.
             if (opCtx->getTxnNumber() == _activeTxnNumber) {
-                ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
                 _txnState = MultiDocumentTransactionState::kAborted;
+                ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
                 // After the transaction has been aborted, we must update the end time.
                 _singleTransactionStats->setEndTime(curTimeMicros64());
                 ServerTransactionsMetrics::get(opCtx)->incrementTotalAborted();
