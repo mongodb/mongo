@@ -710,6 +710,13 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
         }
     }
 
+    if (qr.getSkip()) {
+        SkipNode* skip = new SkipNode();
+        skip->skip = *qr.getSkip();
+        skip->children.push_back(solnRoot);
+        solnRoot = skip;
+    }
+
     // Project the results.
     if (NULL != query.getProj()) {
         LOG(5) << "PROJECTION: fetched status: " << solnRoot->fetched();
@@ -824,13 +831,6 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
             fetch->children.push_back(solnRoot);
             solnRoot = fetch;
         }
-    }
-
-    if (qr.getSkip()) {
-        SkipNode* skip = new SkipNode();
-        skip->skip = *qr.getSkip();
-        skip->children.push_back(solnRoot);
-        solnRoot = skip;
     }
 
     // When there is both a blocking sort and a limit, the limit will
