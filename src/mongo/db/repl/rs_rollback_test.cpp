@@ -69,23 +69,8 @@ using namespace mongo::repl::rollback_internal;
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
-class RSRollbackTest : public RollbackTest {
-private:
-    void setUp() override;
-    void tearDown() override;
-};
+class RSRollbackTest : public RollbackTest {};
 
-void RSRollbackTest::setUp() {
-    RollbackTest::setUp();
-    auto observerRegistry = stdx::make_unique<OpObserverRegistry>();
-    observerRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
-    _serviceContextMongoDTest.getServiceContext()->setOpObserver(
-        std::unique_ptr<OpObserver>(observerRegistry.release()));
-}
-
-void RSRollbackTest::tearDown() {
-    RollbackTest::tearDown();
-}
 
 OplogInterfaceMock::Operation makeNoopOplogEntryAndRecordId(Seconds seconds) {
     OpTime ts(Timestamp(seconds, 0), 0);

@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/db_raii.h"
@@ -48,21 +49,13 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-class KVStorageEngineTest : public unittest::Test {
+class KVStorageEngineTest : public ServiceContextMongoDTest {
 public:
     KVStorageEngineTest()
-        : _storageEngine(stdx::make_unique<KVStorageEngine>(new EphemeralForTestEngine(),
-                                                            KVStorageEngineOptions())) {}
-
-    void setUp() final {
-        _serviceContext.setUp();
-    }
-
-    void tearDown() final {
-        _storageEngine->cleanShutdown();
-        _serviceContext.tearDown();
-    }
+        : ServiceContextMongoDTest("ephemeralForTest"),
+          _storageEngine(checked_cast<KVStorageEngine*>(getServiceContext()->getStorageEngine())) {}
 
     /**
      * Create a collection in the catalog and in the KVEngine. Return the storage engine's `ident`.
@@ -134,8 +127,7 @@ public:
         return Status::OK();
     }
 
-    ServiceContextMongoDTest _serviceContext;
-    std::unique_ptr<KVStorageEngine> _storageEngine;
+    KVStorageEngine* _storageEngine;
 };
 
 TEST_F(KVStorageEngineTest, ReconcileIdentsTest) {
@@ -229,4 +221,6 @@ TEST_F(KVStorageEngineTest, RecreateIndexes) {
                       return str.find("index-") == 0;
                   }));
 }
+
+}  // namespace
 }  // namespace mongo

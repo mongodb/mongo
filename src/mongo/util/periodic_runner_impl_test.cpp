@@ -32,7 +32,7 @@
 
 #include "mongo/util/periodic_runner_impl.h"
 
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source_mock.h"
@@ -43,12 +43,11 @@ class Client;
 
 namespace {
 
-class PeriodicRunnerImplTestNoSetup : public unittest::Test {
+class PeriodicRunnerImplTestNoSetup : public ServiceContextTest {
 public:
     void setUp() override {
         _clockSource = std::make_unique<ClockSourceMock>();
-        _svc = stdx::make_unique<ServiceContextNoop>();
-        _runner = stdx::make_unique<PeriodicRunnerImpl>(_svc.get(), _clockSource.get());
+        _runner = stdx::make_unique<PeriodicRunnerImpl>(getServiceContext(), _clockSource.get());
     }
 
     void tearDown() override {
@@ -64,7 +63,6 @@ public:
     }
 
 private:
-    std::unique_ptr<ServiceContext> _svc;
     std::unique_ptr<ClockSourceMock> _clockSource;
     std::unique_ptr<PeriodicRunner> _runner;
 };

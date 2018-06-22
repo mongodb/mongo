@@ -91,23 +91,16 @@ AuthorizationManager* getGlobalAuthorizationManager() {
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(startupAuthSchemaValidation, bool, true);
 
-GlobalInitializerRegisterer authorizationManagerInitializer(
+ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
     "CreateAuthorizationManager",
-    {MONGO_SHIM_DEPENDENCY(AuthorizationManager::create),
-     "OIDGeneration",
+    {"OIDGeneration",
      "EndStartupOptionStorage",
-     "ServiceContext"},
-    [](InitializerContext* context) {
+     MONGO_SHIM_DEPENDENCY(AuthorizationManager::create)},
+    [](ServiceContext* service) {
         auto authzManager = AuthorizationManager::create();
         authzManager->setAuthEnabled(serverGlobalParams.authState ==
                                      ServerGlobalParams::AuthState::kEnabled);
         authzManager->setShouldValidateAuthSchemaOnStartup(startupAuthSchemaValidation);
-        AuthorizationManager::set(getGlobalServiceContext(), std::move(authzManager));
-        return Status::OK();
-    },
-    [](DeinitializerContext* context) {
-        AuthorizationManager::set(getGlobalServiceContext(), nullptr);
-        return Status::OK();
+        AuthorizationManager::set(service, std::move(authzManager));
     });
-
 }  // namespace mongo

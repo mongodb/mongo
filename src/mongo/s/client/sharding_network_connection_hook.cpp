@@ -53,7 +53,8 @@ Status ShardingNetworkConnectionHook::validateHost(
 
 Status ShardingNetworkConnectionHook::validateHostImpl(
     const HostAndPort& remoteHost, const executor::RemoteCommandResponse& isMasterReply) {
-    auto shard = grid.shardRegistry()->getShardForHostNoReload(remoteHost);
+    auto shard =
+        Grid::get(getGlobalServiceContext())->shardRegistry()->getShardForHostNoReload(remoteHost);
     if (!shard) {
         return {ErrorCodes::ShardNotFound,
                 str::stream() << "No shard found for host: " << remoteHost.toString()};

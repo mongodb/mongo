@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018 MongoDB Inc.
+ *    Copyright (C) 2016-2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,45 +26,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/service_context_registrar.h"
-
-#include "mongo/base/init.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace {
-std::function<std::unique_ptr<ServiceContext>()>& getServiceContextFactory() {
-    static std::function<std::unique_ptr<ServiceContext>()> factory;
-    return factory;
-}
 
-// clang-format off
-GlobalInitializerRegisterer registerCreateServiceContext{
-    "ServiceContext",
-    {"default"},
-    [](InitializerContext* context) {
-        // Set the global service context if a service context factory was previously registered.
-        if (getServiceContextFactory()) {
-            setGlobalServiceContext(getServiceContextFactory()());
-        }
-        return Status::OK();
-    },
-    [](DeinitializerContext* context) {
-        // For now, deregistration is done manually after all deinitializers run, in case any
-        // erroneously access the globalServiceContext without expressing a dependency.
-        return Status::OK();
+/**
+ * Test fixture for tests that require a properly initialized global service context.
+ */
+class ServiceContextTest : public unittest::Test {
+public:
+    /**
+     * Returns a service context, which is only valid for this instance of the test.
+     * Must not be called before setUp or after tearDown.
+     */
+    ServiceContext* getServiceContext();
+
+    /**
+     * Returns the default Client for this test.
+     */
+    Client* getClient();
+
+    ServiceContext::UniqueOperationContext makeOperationContext() {
+        return getClient()->makeOperationContext();
     }
+
+protected:
+    ServiceContextTest();
+    virtual ~ServiceContextTest();
 };
-// clang-format on
-
-}  // namespace
-
-ServiceContextRegistrar::ServiceContextRegistrar(
-    std::function<std::unique_ptr<ServiceContext>()> fn) {
-    invariant(!getServiceContextFactory());
-    getServiceContextFactory() = std::move(fn);
-}
 
 }  // namespace mongo

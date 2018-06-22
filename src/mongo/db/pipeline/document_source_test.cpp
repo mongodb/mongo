@@ -32,13 +32,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
 namespace {
 
-TEST(TruncateSort, SortTruncatesNormalField) {
+class DocumentSourceTruncateSort : public ServiceContextTest {};
+
+TEST_F(DocumentSourceTruncateSort, SortTruncatesNormalField) {
     SimpleBSONObjComparator bsonComparator{};
     BSONObj sortKey = BSON("a" << 1 << "b" << 1 << "c" << 1);
     auto truncated =
@@ -47,7 +50,7 @@ TEST(TruncateSort, SortTruncatesNormalField) {
     ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
 }
 
-TEST(DocumentSourceTruncateSort, SortTruncatesOnSubfield) {
+TEST_F(DocumentSourceTruncateSort, SortTruncatesOnSubfield) {
     SimpleBSONObjComparator bsonComparator{};
     BSONObj sortKey = BSON("a" << 1 << "b.c" << 1 << "d" << 1);
     auto truncated =
@@ -56,7 +59,7 @@ TEST(DocumentSourceTruncateSort, SortTruncatesOnSubfield) {
     ASSERT_EQUALS(truncated.count(BSON("a" << 1)), 1U);
 }
 
-TEST(DocumentSourceTruncateSort, SortDoesNotTruncateOnParent) {
+TEST_F(DocumentSourceTruncateSort, SortDoesNotTruncateOnParent) {
     SimpleBSONObjComparator bsonComparator{};
     BSONObj sortKey = BSON("a" << 1 << "b" << 1 << "d" << 1);
     auto truncated =
@@ -65,7 +68,7 @@ TEST(DocumentSourceTruncateSort, SortDoesNotTruncateOnParent) {
     ASSERT_EQUALS(truncated.count(BSON("a" << 1 << "b" << 1 << "d" << 1)), 1U);
 }
 
-TEST(DocumentSourceTruncateSort, TruncateSortDedupsSortCorrectly) {
+TEST_F(DocumentSourceTruncateSort, TruncateSortDedupsSortCorrectly) {
     SimpleBSONObjComparator bsonComparator{};
     BSONObj sortKeyOne = BSON("a" << 1 << "b" << 1);
     BSONObj sortKeyTwo = BSON("a" << 1);

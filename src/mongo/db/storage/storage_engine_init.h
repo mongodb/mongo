@@ -56,12 +56,6 @@ void initializeStorageEngine(ServiceContext* service, StorageEngineInitFlags ini
 void shutdownGlobalStorageEngineCleanly(ServiceContext* service);
 
 /**
- * Creates the lock file used to prevent concurrent processes from accessing the data files,
- * as appropriate.
- */
-void createLockFile(ServiceContext* service);
-
-/**
  * Registers a storage engine onto the given "service".
  */
 void registerStorageEngine(ServiceContext* service,

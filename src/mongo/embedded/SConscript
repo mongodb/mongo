@@ -21,7 +21,6 @@ env.Library(
         'embedded_options_parser_init.cpp',
         'index_create_impl_embedded.cpp',
         'replication_coordinator_embedded.cpp',
-        'service_context_embedded.cpp',
         'service_entry_point_embedded.cpp',
     ],
     LIBDEPS=[

@@ -53,7 +53,7 @@ protected:
 
         setupNShards(2);
 
-        _manager = std::make_shared<MetadataManager>(serviceContext(), kNss, executor());
+        _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor());
     }
 
     void expectGetDatabase() {

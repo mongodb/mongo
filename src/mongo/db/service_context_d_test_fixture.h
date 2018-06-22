@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2016-2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -37,40 +37,21 @@ namespace mongo {
 /**
  * Test fixture class for tests that use the "ephemeralForTest" storage engine.
  */
-class ServiceContextMongoDTest : public unittest::Test {
-public:
-    /**
-     * Initializes global storage engine.
-     */
-    void setUp() override;
+class ServiceContextMongoDTest : public ServiceContextTest {
+protected:
+    ServiceContextMongoDTest();
 
     /**
-     * Clear all databases.
+     * Build a ServiceContextMongoDTest, using the named storage engine.
      */
-    void tearDown() override;
-
-    /**
-     * Returns a service context, which is only valid for this instance of the test.
-     * Must not be called before setUp or after tearDown.
-     */
-    ServiceContext* getServiceContext();
+    explicit ServiceContextMongoDTest(std::string engine);
+    virtual ~ServiceContextMongoDTest();
 
 private:
-    /**
-     * Unused implementation of test function. This allows us to instantiate
-     * ServiceContextMongoDTest on its own without the need to inherit from it in a test.
-     * This supports using ServiceContextMongoDTest inside another test fixture and works around the
-     * limitation that tests cannot inherit from multiple test fixtures.
-     *
-     * It is an error to call this implementation of _doTest() directly.
-     */
-    void _doTest() override;
-
-    /**
-     * Drops all databases. Call this before global ReplicationCoordinator is destroyed -- it is
-     * used to drop the databases.
-     */
-    void _dropAllDBs(OperationContext* opCtx);
+    struct {
+        std::string engine;
+        bool engineSetByUser;
+    } _stashedStorageParams;
 };
 
 }  // namespace mongo

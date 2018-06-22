@@ -37,15 +37,24 @@ namespace mongo {
 namespace {
 stdx::function<std::unique_ptr<HarnessHelper>()> basicHarnessFactory;
 }  // namespace
-}  // namespace mongo
 
 
-mongo::HarnessHelper::~HarnessHelper() = default;
+HarnessHelper::HarnessHelper() {
+    setGlobalServiceContext(ServiceContext::make());
+    Client::initThread(getThreadName());
+}
 
-void mongo::registerHarnessHelperFactory(stdx::function<std::unique_ptr<HarnessHelper>()> factory) {
+HarnessHelper::~HarnessHelper() {
+    Client::destroy();
+    setGlobalServiceContext({});
+}
+
+void registerHarnessHelperFactory(stdx::function<std::unique_ptr<HarnessHelper>()> factory) {
     basicHarnessFactory = std::move(factory);
 }
 
-auto mongo::newHarnessHelper() -> std::unique_ptr<HarnessHelper> {
+auto newHarnessHelper() -> std::unique_ptr<HarnessHelper> {
     return basicHarnessFactory();
 }
+
+}  // namespace mongo

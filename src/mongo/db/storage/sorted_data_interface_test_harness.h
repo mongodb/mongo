@@ -35,7 +35,6 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/test_harness_helper.h"
 #include "mongo/stdx/memory.h"

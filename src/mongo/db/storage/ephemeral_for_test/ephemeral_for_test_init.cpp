@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
@@ -69,12 +68,10 @@ public:
     }
 };
 
+ServiceContext::ConstructorActionRegisterer registerEphemeralForTest(
+    "RegisterEphemeralForTestEngine", [](ServiceContext* service) {
+        registerStorageEngine(service, std::make_unique<EphemeralForTestFactory>());
+    });
+
 }  // namespace
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(EphemeralForTestEngineInit, ("ServiceContext"))
-(InitializerContext* context) {
-    registerStorageEngine(getGlobalServiceContext(), std::make_unique<EphemeralForTestFactory>());
-    return Status::OK();
-}
-
 }  // namespace mongo

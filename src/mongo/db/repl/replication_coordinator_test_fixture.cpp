@@ -45,6 +45,8 @@
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -79,12 +81,11 @@ BSONObj ReplCoordTest::addProtocolVersion(const BSONObj& configDoc, int protocol
     return builder.obj();
 }
 
-
-void ReplCoordTest::setUp() {
+ReplCoordTest::ReplCoordTest() {
     _settings.setReplSetString("mySet/node1:12345,node2:54321");
 }
 
-void ReplCoordTest::tearDown() {
+ReplCoordTest::~ReplCoordTest() {
     getGlobalFailPointRegistry()
         ->getFailPoint("blockHeartbeatReconfigFinish")
         ->setMode(FailPoint::off);

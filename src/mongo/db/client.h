@@ -47,6 +47,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/invariant.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -241,6 +242,37 @@ private:
 
     PseudoRandom _prng;
 };
+
+/**
+ * Utility class to temporarily swap which client is bound to the running thread.
+ *
+ * Use this class to bind a client to the current thread for the duration of the
+ * AlternativeClientRegion's lifetime, restoring the prior client, if any, at the
+ * end of the block.
+ */
+class AlternativeClientRegion {
+public:
+    explicit AlternativeClientRegion(ServiceContext::UniqueClient& clientToUse)
+        : _alternateClient(&clientToUse) {
+        invariant(clientToUse);
+        if (Client::getCurrent()) {
+            _originalClient = Client::releaseCurrent();
+        }
+        Client::setCurrent(std::move(*_alternateClient));
+    }
+
+    ~AlternativeClientRegion() {
+        *_alternateClient = Client::releaseCurrent();
+        if (_originalClient) {
+            Client::setCurrent(std::move(_originalClient));
+        }
+    }
+
+private:
+    ServiceContext::UniqueClient _originalClient;
+    ServiceContext::UniqueClient* const _alternateClient;
+};
+
 
 /** get the Client object for this thread. */
 Client& cc();

@@ -73,7 +73,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         'document_value',
         'document_value_test_util',
         ],
@@ -242,7 +241,7 @@ env.CppUnitTest(
     source='document_source_facet_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/s/is_mongos',
         'pipeline',
         'document_source_mock',
@@ -353,7 +352,6 @@ env.CppUnitTest(
     source='tee_buffer_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/is_mongos',
         'document_source_mock',
         'document_value_test_util',
@@ -369,6 +367,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         'accumulator',
         'document_value_test_util',
         'expression',
@@ -396,8 +395,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/s/is_mongos',
         'document_value_test_util',
         'document_source_mock',
@@ -413,7 +411,6 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         'document_value',
     ]
 )
@@ -503,7 +500,6 @@ env.CppUnitTest(
     target='resume_token_test',
     source='resume_token_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         'document_sources_idl',
     ],

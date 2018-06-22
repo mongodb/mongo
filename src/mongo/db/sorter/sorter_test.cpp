@@ -36,9 +36,6 @@
 #include "mongo/base/init.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/db/service_context_registrar.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
@@ -54,14 +51,6 @@ namespace mongo {
 using namespace mongo::sorter;
 using std::make_shared;
 using std::pair;
-
-namespace {
-
-// Stub to avoid including the server environment library.
-ServiceContextRegistrar serviceContextCreator([]() {
-    return std::make_unique<ServiceContextNoop>();
-});
-}  // namespace
 
 //
 // Sorter framework testing utilities

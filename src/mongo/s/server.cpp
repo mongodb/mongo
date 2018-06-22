@@ -60,8 +60,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/db/service_context_registrar.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/wire_version.h"
@@ -112,8 +110,6 @@
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stringutils.h"
-#include "mongo/util/system_clock_source.h"
-#include "mongo/util/system_tick_source.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
@@ -546,14 +542,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion40, ("EndStar
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
     return Status::OK();
 }
-
-ServiceContextRegistrar serviceContextCreator([]() {
-    auto service = std::make_unique<ServiceContextNoop>();
-    service->setTickSource(std::make_unique<SystemTickSource>());
-    service->setFastClockSource(std::make_unique<SystemClockSource>());
-    service->setPreciseClockSource(std::make_unique<SystemClockSource>());
-    return service;
-});
 
 #ifdef MONGO_CONFIG_SSL
 MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))

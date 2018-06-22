@@ -33,6 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/unittest/unittest.h"
@@ -55,7 +56,7 @@ using executor::NetworkInterfaceMock;
 /**
  * Fixture for testing ReplicationCoordinatorImpl behaviors.
  */
-class ReplCoordTest : public mongo::unittest::Test {
+class ReplCoordTest : public ServiceContextMongoDTest {
 public:
     /**
      * Makes a command response with the given "doc" response and optional elapsed time "millis".
@@ -81,8 +82,8 @@ public:
     static BSONObj addProtocolVersion(const BSONObj& configDoc, int protocolVersion);
 
 protected:
-    virtual void setUp();
-    virtual void tearDown();
+    ReplCoordTest();
+    virtual ~ReplCoordTest();
 
     /**
      * Asserts that calling start(configDoc, selfHost) successfully initiates the
@@ -128,27 +129,6 @@ protected:
      */
     ReplicationCoordinatorExternalStateMock* getExternalState() {
         return _externalState;
-    }
-
-    /**
-     * Makes a new OperationContext on the default Client for this test.
-     */
-    ServiceContext::UniqueOperationContext makeOperationContext() {
-        return _client->makeOperationContext();
-    }
-
-    /**
-     * Returns the ServiceContext for this test.
-     */
-    ServiceContext* getServiceContext() {
-        return getGlobalServiceContext();
-    }
-
-    /**
-     * Returns the default Client for this test.
-     */
-    Client* getClient() {
-        return _client.get();
     }
 
     /**
@@ -298,7 +278,6 @@ private:
 
     ReplSettings _settings;
     bool _callShutdown = false;
-    ServiceContext::UniqueClient _client = getGlobalServiceContext()->makeClient("testClient");
 };
 
 }  // namespace repl

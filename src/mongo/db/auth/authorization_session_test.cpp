@@ -47,7 +47,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -89,7 +89,7 @@ public:
     FailureCapableAuthzManagerExternalStateMock* managerState;
     transport::TransportLayerMock transportLayer;
     transport::SessionHandle session;
-    ServiceContextNoop serviceContext;
+    ServiceContext::UniqueServiceContext serviceContext = ServiceContext::make();
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext _opCtx;
     AuthzSessionExternalStateMock* sessionState;
@@ -99,7 +99,7 @@ public:
 
     void setUp() {
         session = transportLayer.createSession();
-        client = serviceContext.makeClient("testClient", session);
+        client = serviceContext->makeClient("testClient", session);
         RestrictionEnvironment::set(
             session, stdx::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
         _opCtx = client->makeOperationContext();
@@ -110,7 +110,7 @@ public:
             std::move(localManagerState),
             AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{});
         authzManager = uniqueAuthzManager.get();
-        AuthorizationManager::set(&serviceContext, std::move(uniqueAuthzManager));
+        AuthorizationManager::set(serviceContext.get(), std::move(uniqueAuthzManager));
         auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
         sessionState = localSessionState.get();
         authzSession = std::make_unique<AuthorizationSessionForTest>(

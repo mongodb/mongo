@@ -43,7 +43,7 @@
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_scram_server_conversation.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
@@ -174,9 +174,9 @@ protected:
     const SCRAMStepsResult goalState =
         SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 4), Status::OK());
 
-    std::unique_ptr<ServiceContextNoop> serviceContext;
-    ServiceContextNoop::UniqueClient client;
-    ServiceContextNoop::UniqueOperationContext opCtx;
+    ServiceContext::UniqueServiceContext serviceContext;
+    ServiceContext::UniqueClient client;
+    ServiceContext::UniqueOperationContext opCtx;
 
     AuthzManagerExternalStateMock* authzManagerExternalState;
     AuthorizationManager* authzManager;
@@ -186,7 +186,7 @@ protected:
     std::unique_ptr<NativeSaslClientSession> saslClientSession;
 
     void setUp() final {
-        serviceContext = stdx::make_unique<ServiceContextNoop>();
+        serviceContext = ServiceContext::make();
         client = serviceContext->makeClient("test");
         opCtx = serviceContext->makeOperationContext(client.get());
 

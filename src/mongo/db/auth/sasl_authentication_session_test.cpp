@@ -22,8 +22,8 @@
 #include "mongo/db/auth/sasl_plain_server_conversation.h"
 #include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/password_digest.h"
@@ -32,7 +32,7 @@ namespace mongo {
 
 namespace {
 
-class SaslConversation : public unittest::Test {
+class SaslConversation : public ServiceContextTest {
 public:
     explicit SaslConversation(std::string mech);
 
@@ -42,8 +42,6 @@ public:
     void testWrongClientMechanism();
     void testWrongServerMechanism();
 
-    ServiceContextNoop serviceContext;
-    ServiceContext::UniqueClient opClient;
     ServiceContext::UniqueOperationContext opCtx;
     AuthzManagerExternalStateMock* authManagerExternalState;
     AuthorizationManager* authManager;
@@ -66,8 +64,7 @@ const std::string mockServiceName = "mocksvc";
 const std::string mockHostName = "host.mockery.com";
 
 SaslConversation::SaslConversation(std::string mech)
-    : opClient(serviceContext.makeClient("saslTest")),
-      opCtx(serviceContext.makeOperationContext(opClient.get())),
+    : opCtx(makeOperationContext()),
       authManagerExternalState(new AuthzManagerExternalStateMock),
       authManager(new AuthorizationManagerImpl(
           std::unique_ptr<AuthzManagerExternalState>(authManagerExternalState),
@@ -75,7 +72,8 @@ SaslConversation::SaslConversation(std::string mech)
       authSession(authManager->makeAuthorizationSession()),
       mechanism(mech) {
 
-    AuthorizationManager::set(&serviceContext, std::unique_ptr<AuthorizationManager>(authManager));
+    AuthorizationManager::set(getServiceContext(),
+                              std::unique_ptr<AuthorizationManager>(authManager));
 
     client.reset(SaslClientSession::create(mechanism));
 

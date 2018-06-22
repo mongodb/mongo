@@ -392,7 +392,7 @@ Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
 
 std::shared_ptr<Shard> AsyncRequestsSender::RemoteData::getShard() {
     // TODO: Pass down an OperationContext* to use here.
-    return grid.shardRegistry()->getShardNoReload(shardId);
+    return Grid::get(getGlobalServiceContext())->shardRegistry()->getShardNoReload(shardId);
 }
 
 AsyncRequestsSender::BatonDetacher::BatonDetacher(OperationContext* opCtx)

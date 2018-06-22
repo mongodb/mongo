@@ -39,7 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/query/query_request.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -1322,20 +1322,19 @@ TEST(QueryRequestTest, ParseFromLegacyQueryTooNegativeNToReturn) {
             .getStatus());
 }
 
-TEST(QueryRequestTest, ParseFromUUID) {
-    ServiceContextNoop service;
-    auto client = service.makeClient("test");
-    auto opCtxNoop = client->makeOperationContext();
-    auto opCtx = opCtxNoop.get();
+class QueryRequestTest : public ServiceContextTest {};
+
+TEST_F(QueryRequestTest, ParseFromUUID) {
+    auto opCtx = makeOperationContext();
     // Register a UUID/Collection pair in the UUIDCatalog.
     const CollectionUUID uuid = UUID::gen();
     const NamespaceString nss("test.testns");
     Collection coll(stdx::make_unique<CollectionMock>(nss));
-    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-    catalog.onCreateCollection(opCtx, &coll, uuid);
+    UUIDCatalog& catalog = UUIDCatalog::get(opCtx.get());
+    catalog.onCreateCollection(opCtx.get(), &coll, uuid);
     QueryRequest qr(uuid);
     // Ensure a call to refreshNSS succeeds.
-    qr.refreshNSS(opCtx);
+    qr.refreshNSS(opCtx.get());
     ASSERT_EQ(nss, qr.nss());
 }
 

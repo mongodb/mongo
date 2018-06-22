@@ -28,30 +28,16 @@
 
 #pragma once
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 
 namespace mongo {
-
-class ServiceContext;
 
 /**
  * Test fixture class for mongod tests that use the "devnull" storage engine.
  */
-class ServiceContextDevnullTestFixture : public unittest::Test {
-public:
-    /**
-     * Initializes the devnull engine as the global storage engine.
-     * Also sets up a Client on the thread, which can be accessed via 'cc()'.
-     */
-    void setUp() override;
-
-    void tearDown() override;
-
-    /**
-     * Returns a service context, which is only valid for this instance of the test.
-     * Must not be called before setUp() or after tearDown().
-     */
-    ServiceContext* getServiceContext();
+class ServiceContextDevnullTestFixture : public ServiceContextMongoDTest {
+protected:
+    ServiceContextDevnullTestFixture();
 };
 
 }  // namespace mongo

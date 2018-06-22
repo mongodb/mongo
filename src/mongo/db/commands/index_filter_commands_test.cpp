@@ -149,13 +149,12 @@ void addQueryShapeToPlanCache(OperationContext* opCtx,
 /**
  * Checks if plan cache contains query shape.
  */
-bool planCacheContains(const PlanCache& planCache,
+bool planCacheContains(OperationContext* opCtx,
+                       const PlanCache& planCache,
                        const char* queryStr,
                        const char* sortStr,
                        const char* projectionStr,
                        const char* collationStr) {
-    QueryTestServiceContext serviceContext;
-    auto opCtx = serviceContext.makeOperationContext();
 
     // Create canonical query.
     auto qr = stdx::make_unique<QueryRequest>(nss);
@@ -163,7 +162,7 @@ bool planCacheContains(const PlanCache& planCache,
     qr->setSort(fromjson(sortStr));
     qr->setProj(fromjson(projectionStr));
     qr->setCollation(fromjson(collationStr));
-    auto statusWithInputQuery = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+    auto statusWithInputQuery = CanonicalQuery::canonicalize(opCtx, std::move(qr));
     ASSERT_OK(statusWithInputQuery.getStatus());
     unique_ptr<CanonicalQuery> inputQuery = std::move(statusWithInputQuery.getValue());
 
@@ -183,7 +182,7 @@ bool planCacheContains(const PlanCache& planCache,
         qr->setSort(entry->sort);
         qr->setProj(entry->projection);
         qr->setCollation(entry->collation);
-        auto statusWithCurrentQuery = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+        auto statusWithCurrentQuery = CanonicalQuery::canonicalize(opCtx, std::move(qr));
         ASSERT_OK(statusWithCurrentQuery.getStatus());
         unique_ptr<CanonicalQuery> currentQuery = std::move(statusWithCurrentQuery.getValue());
 
@@ -333,8 +332,12 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
                              "{a: -1}",
                              "{_id: 0, a: 1}",
                              "{locale: 'mock_reverse_string'}");
-    ASSERT_TRUE(planCacheContains(
-        planCache, "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}", "{locale: 'mock_reverse_string'}"));
+    ASSERT_TRUE(planCacheContains(opCtx.get(),
+                                  planCache,
+                                  "{a: 1, b: 1}",
+                                  "{a: -1}",
+                                  "{_id: 0, a: 1}",
+                                  "{locale: 'mock_reverse_string'}"));
 
     ASSERT_OK(SetFilter::set(opCtx.get(),
                              &querySettings,
@@ -347,8 +350,12 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_EQUALS(filters.size(), 1U);
 
     // Query shape should not exist in plan cache after hint is updated.
-    ASSERT_FALSE(planCacheContains(
-        planCache, "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}", "{locale: 'mock_reverse_string'}"));
+    ASSERT_FALSE(planCacheContains(opCtx.get(),
+                                   planCache,
+                                   "{a: 1, b: 1}",
+                                   "{a: -1}",
+                                   "{_id: 0, a: 1}",
+                                   "{locale: 'mock_reverse_string'}"));
 
     // Fields in filter should match criteria in most recent query settings update.
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("query"), fromjson("{a: 1, b: 1}"));
@@ -403,8 +410,8 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_EQUALS(filters.size(), 2U);
 
     // Query shape should not exist in plan cache after cleaing 1 hint.
-    ASSERT_FALSE(planCacheContains(planCache, "{a: 1}", "{}", "{}", "{}"));
-    ASSERT_TRUE(planCacheContains(planCache, "{b: 1}", "{}", "{}", "{}"));
+    ASSERT_FALSE(planCacheContains(opCtx.get(), planCache, "{a: 1}", "{}", "{}", "{}"));
+    ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{b: 1}", "{}", "{}", "{}"));
 
     // Clear all filters
     ASSERT_OK(
@@ -413,7 +420,7 @@ TEST(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_TRUE(filters.empty());
 
     // {b: 1} should be gone from plan cache after flushing query settings.
-    ASSERT_FALSE(planCacheContains(planCache, "{b: 1}", "{}", "{}", "{}"));
+    ASSERT_FALSE(planCacheContains(opCtx.get(), planCache, "{b: 1}", "{}", "{}", "{}"));
 }
 
 TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
@@ -430,9 +437,9 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     addQueryShapeToPlanCache(
         opCtx.get(), &planCache, "{a: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}");
     addQueryShapeToPlanCache(opCtx.get(), &planCache, "{a: 'foo'}", "{}", "{}", "{}");
-    ASSERT_TRUE(
-        planCacheContains(planCache, "{a: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}"));
-    ASSERT_TRUE(planCacheContains(planCache, "{a: 'foo'}", "{}", "{}", "{}"));
+    ASSERT_TRUE(planCacheContains(
+        opCtx.get(), planCache, "{a: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}"));
+    ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 'foo'}", "{}", "{}", "{}"));
 
     ASSERT_OK(SetFilter::set(opCtx.get(),
                              &querySettings,
@@ -450,9 +457,9 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
                   "mock_reverse_string");
 
     // Plan cache should only contain entry for query without collation.
-    ASSERT_FALSE(
-        planCacheContains(planCache, "{a: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}"));
-    ASSERT_TRUE(planCacheContains(planCache, "{a: 'foo'}", "{}", "{}", "{}"));
+    ASSERT_FALSE(planCacheContains(
+        opCtx.get(), planCache, "{a: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}"));
+    ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 'foo'}", "{}", "{}", "{}"));
 
     // Add filter for query shape without collation.
     ASSERT_OK(SetFilter::set(opCtx.get(),
@@ -483,9 +490,9 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("collation"), fromjson("{}"));
 
     // Plan cache should only contain entry for query without collation.
-    ASSERT_FALSE(
-        planCacheContains(planCache, "{a: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}"));
-    ASSERT_TRUE(planCacheContains(planCache, "{a: 'foo'}", "{}", "{}", "{}"));
+    ASSERT_FALSE(planCacheContains(
+        opCtx.get(), planCache, "{a: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}"));
+    ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 'foo'}", "{}", "{}", "{}"));
 }
 
 
@@ -504,7 +511,7 @@ TEST(IndexFilterCommandsTest, SetFilterAcceptsIndexNames) {
          collatedIndex});
 
     addQueryShapeToPlanCache(opCtx.get(), &planCache, "{a: 2}", "{}", "{}", "{}");
-    ASSERT_TRUE(planCacheContains(planCache, "{a: 2}", "{}", "{}", "{}"));
+    ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 2}", "{}", "{}", "{}"));
 
     ASSERT_OK(SetFilter::set(opCtx.get(),
                              &querySettings,

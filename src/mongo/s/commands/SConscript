@@ -129,7 +129,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'shared_cluster_commands',
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/db/logical_time',
         '$BUILD_DIR/mongo/unittest/unittest',
     ]
@@ -144,7 +143,6 @@ env.CppUnitTest(
         'shared_cluster_commands',
         '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/unittest/unittest',
     ]
@@ -159,7 +157,6 @@ env.CppUnitTest(
         'cluster_commands',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/saslauth',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
     ],
 )

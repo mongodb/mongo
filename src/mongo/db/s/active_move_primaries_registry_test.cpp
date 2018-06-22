@@ -29,7 +29,7 @@
 #include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/client.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/unittest/unittest.h"
 
@@ -38,26 +38,8 @@ namespace {
 
 using unittest::assertGet;
 
-class MovePrimaryRegistration : public unittest::Test {
+class MovePrimaryRegistration : public ServiceContextMongoDTest {
 protected:
-    void setUp() override {
-        _client = _serviceContext.makeClient("MovePrimaryRegistrationTest");
-        _opCtx = _serviceContext.makeOperationContext(_client.get());
-    }
-
-    void tearDown() override {
-        _opCtx.reset();
-        _client.reset();
-    }
-
-    OperationContext* getTxn() const {
-        return _opCtx.get();
-    }
-
-    ServiceContextNoop _serviceContext;
-    ServiceContext::UniqueClient _client;
-    ServiceContext::UniqueOperationContext _opCtx;
-
     ActiveMovePrimariesRegistry _registry;
 };
 
@@ -120,8 +102,9 @@ TEST_F(MovePrimaryRegistration, SecondMovePrimaryWithSameArgumentsJoinsFirst) {
     ASSERT(!secondScopedMovePrimary.mustExecute());
 
     originalScopedMovePrimary.signalComplete({ErrorCodes::InternalError, "Test error"});
+    auto opCtx = makeOperationContext();
     ASSERT_EQ(Status(ErrorCodes::InternalError, "Test error"),
-              secondScopedMovePrimary.waitForCompletion(getTxn()));
+              secondScopedMovePrimary.waitForCompletion(opCtx.get()));
 }
 
 }  // namespace

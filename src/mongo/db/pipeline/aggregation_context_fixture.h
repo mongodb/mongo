@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -40,18 +41,25 @@ namespace mongo {
 /**
  * Test fixture which provides an ExpressionContext for use in testing.
  */
-class AggregationContextFixture : public unittest::Test {
+class AggregationContextFixture : public ServiceContextTest {
 public:
     AggregationContextFixture()
         : AggregationContextFixture(NamespaceString("unittests.pipeline_test")) {}
 
-    AggregationContextFixture(NamespaceString nss) : _expCtx(new ExpressionContextForTest(nss)) {}
+    AggregationContextFixture(NamespaceString nss) {
+        TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
+        // Must instantiate ExpressionContext _after_ setting the TZ database on the service
+        // context.
+        _expCtx = new ExpressionContext(_opCtx.get(), nullptr);
+        _expCtx->ns = std::move(nss);
+    }
 
-    boost::intrusive_ptr<ExpressionContextForTest> getExpCtx() {
+    boost::intrusive_ptr<ExpressionContext> getExpCtx() {
         return _expCtx.get();
     }
 
 private:
-    boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
+    ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 }  // namespace mongo

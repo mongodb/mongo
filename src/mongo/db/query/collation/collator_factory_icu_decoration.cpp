@@ -37,13 +37,12 @@ namespace mongo {
 
 namespace {
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateCollatorFactory, ("ServiceContext", "LoadICUData"))
-(InitializerContext* context) {
-    CollatorFactoryInterface::set(getGlobalServiceContext(),
-                                  stdx::make_unique<CollatorFactoryICU>());
-    return Status::OK();
-}
-
+ServiceContext::ConstructorActionRegisterer registerIcuCollator{
+    "CreateCollatorFactory",
+    {"LoadICUData"},
+    [](ServiceContext* service) {
+        CollatorFactoryInterface::set(service, stdx::make_unique<CollatorFactoryICU>());
+    }};
 }  // namespace
 
 }  // namespace mongo

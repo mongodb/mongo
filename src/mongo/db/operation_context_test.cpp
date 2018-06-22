@@ -36,7 +36,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -77,7 +76,7 @@ std::ostream& operator<<(std::ostream& os, stdx::future_status futureStatus) {
 }
 
 TEST(OperationContextTest, NoSessionIdNoTransactionNumber) {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("OperationContextTest");
     auto opCtx = client->makeOperationContext();
 
@@ -86,7 +85,7 @@ TEST(OperationContextTest, NoSessionIdNoTransactionNumber) {
 }
 
 TEST(OperationContextTest, SessionIdNoTransactionNumber) {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("OperationContextTest");
     auto opCtx = client->makeOperationContext();
 
@@ -100,7 +99,7 @@ TEST(OperationContextTest, SessionIdNoTransactionNumber) {
 }
 
 TEST(OperationContextTest, SessionIdAndTransactionNumber) {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("OperationContextTest");
     auto opCtx = client->makeOperationContext();
 
@@ -113,7 +112,7 @@ TEST(OperationContextTest, SessionIdAndTransactionNumber) {
 }
 
 DEATH_TEST(OperationContextTest, SettingSessionIdMoreThanOnceShouldCrash, "invariant") {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("OperationContextTest");
     auto opCtx = client->makeOperationContext();
 
@@ -122,7 +121,7 @@ DEATH_TEST(OperationContextTest, SettingSessionIdMoreThanOnceShouldCrash, "invar
 }
 
 DEATH_TEST(OperationContextTest, SettingTransactionNumberMoreThanOnceShouldCrash, "invariant") {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("OperationContextTest");
     auto opCtx = client->makeOperationContext();
 
@@ -133,7 +132,7 @@ DEATH_TEST(OperationContextTest, SettingTransactionNumberMoreThanOnceShouldCrash
 }
 
 DEATH_TEST(OperationContextTest, SettingTransactionNumberWithoutSessionIdShouldCrash, "invariant") {
-    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("OperationContextTest");
     auto opCtx = client->makeOperationContext();
 
@@ -144,12 +143,12 @@ TEST(OperationContextTest, OpCtxGroup) {
     OperationContextGroup group1;
     ASSERT_TRUE(group1.isEmpty());
     {
-        auto serviceCtx1 = stdx::make_unique<ServiceContextNoop>();
+        auto serviceCtx1 = ServiceContext::make();
         auto client1 = serviceCtx1->makeClient("OperationContextTest1");
         auto opCtx1 = group1.makeOperationContext(*client1);
         ASSERT_FALSE(group1.isEmpty());
 
-        auto serviceCtx2 = stdx::make_unique<ServiceContextNoop>();
+        auto serviceCtx2 = ServiceContext::make();
         auto client2 = serviceCtx2->makeClient("OperationContextTest2");
         {
             auto opCtx2 = group1.makeOperationContext(*client2);
@@ -170,7 +169,7 @@ TEST(OperationContextTest, OpCtxGroup) {
 
     OperationContextGroup group2;
     {
-        auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+        auto serviceCtx = ServiceContext::make();
         auto client = serviceCtx->makeClient("OperationContextTest1");
         auto opCtx2 = group2.adopt(client->makeOperationContext());
         ASSERT_FALSE(group2.isEmpty());
@@ -185,7 +184,7 @@ TEST(OperationContextTest, OpCtxGroup) {
     OperationContextGroup group3;
     OperationContextGroup group4;
     {
-        auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+        auto serviceCtx = ServiceContext::make();
         auto client3 = serviceCtx->makeClient("OperationContextTest3");
         auto opCtx3 = group3.makeOperationContext(*client3);
         auto p3 = opCtx3.opCtx();
@@ -204,7 +203,7 @@ TEST(OperationContextTest, OpCtxGroup) {
 class OperationDeadlineTests : public unittest::Test {
 public:
     void setUp() {
-        service = stdx::make_unique<ServiceContextNoop>();
+        service = ServiceContext::make();
         service->setFastClockSource(stdx::make_unique<SharedClockSourceAdapter>(mockClock));
         service->setPreciseClockSource(stdx::make_unique<SharedClockSourceAdapter>(mockClock));
         service->setTickSource(stdx::make_unique<TickSourceMock>());
@@ -212,7 +211,7 @@ public:
     }
 
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
-    std::unique_ptr<ServiceContext> service;
+    ServiceContext::UniqueServiceContext service;
     ServiceContext::UniqueClient client;
 };
 

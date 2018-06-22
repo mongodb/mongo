@@ -39,7 +39,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
@@ -179,11 +178,10 @@ public:
         return true;
     }
 };
-}  // namespace
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(WiredTigerEngineInit, ("ServiceContext"))
-(InitializerContext* context) {
-    registerStorageEngine(getGlobalServiceContext(), std::make_unique<WiredTigerFactory>());
-    return Status::OK();
-}
-}
+ServiceContext::ConstructorActionRegisterer registerWiredTiger(
+    "WiredTigerEngineInit", [](ServiceContext* service) {
+        registerStorageEngine(service, std::make_unique<WiredTigerFactory>());
+    });
+}  // namespace
+}  // namespace

@@ -38,8 +38,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/db/service_context_registrar.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/command_request.h"
@@ -84,10 +82,6 @@ boost::optional<HostAndPort> extractHostInfo(const OpMsgRequest& request) {
     }
     return boost::none;
 }
-
-ServiceContextRegistrar serviceContextCreator([]() {
-    return std::make_unique<ServiceContextNoop>();
-});
 
 }  // namespace
 
@@ -142,7 +136,7 @@ private:
     HostSettingsMap _settings;
 };
 
-const ServiceContextNoop::Decoration<BridgeContext> BridgeContext::_get =
+const ServiceContext::Decoration<BridgeContext> BridgeContext::_get =
     ServiceContext::declareDecoration<BridgeContext>();
 
 BridgeContext* BridgeContext::get() {

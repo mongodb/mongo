@@ -30,41 +30,9 @@
 
 #include "mongo/db/service_context_devnull_test_fixture.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
-#include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/util/assert_util.h"
-
 namespace mongo {
 
-void ServiceContextDevnullTestFixture::setUp() {
-    Test::setUp();
-    Client::initThread(getThreadName());
-
-    auto const serviceContext = getServiceContext();
-    if (!serviceContext->getStorageEngine()) {
-        // When using the 'devnull' storage engine, it is fine for the temporary directory to
-        // go away after the global storage engine is initialized.
-        unittest::TempDir tempDir("service_context_devnull_test");
-        mongo::storageGlobalParams.dbpath = tempDir.path();
-        mongo::storageGlobalParams.engine = "devnull";
-        mongo::storageGlobalParams.engineSetByUser = true;
-        createLockFile(serviceContext);
-        initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
-    }
-}
-
-void ServiceContextDevnullTestFixture::tearDown() {
-    Client::destroy();
-    Test::tearDown();
-}
-
-ServiceContext* ServiceContextDevnullTestFixture::getServiceContext() {
-    return getGlobalServiceContext();
-}
+ServiceContextDevnullTestFixture::ServiceContextDevnullTestFixture()
+    : ServiceContextMongoDTest("devnull") {}
 
 }  // namespace mongo

@@ -74,7 +74,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'transport_layer',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
     ]
 )
 
@@ -86,7 +85,6 @@ tlEnv.CppUnitTest(
     LIBDEPS=[
         'transport_layer',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/util/net/socket',
     ],

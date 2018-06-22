@@ -40,30 +40,21 @@
 
 namespace mongo {
 
-/* Make a EncryptionHooks pointer a decoration on the global ServiceContext */
-GlobalInitializerRegisterer encryptionHooksInitializer(
-    "SetEncryptionHooks",
-    {"ServiceContext"},
-    [](InitializerContext* context) {
-        EncryptionHooks::set(getGlobalServiceContext(), stdx::make_unique<EncryptionHooks>());
-        return Status::OK();
-    },
-    [](DeinitializerContext* context) {
-        EncryptionHooks::set(getGlobalServiceContext(), nullptr);
-        return Status::OK();
-    });
-
 namespace {
-const auto getEncryptionHooks =
-    ServiceContext::declareDecoration<std::unique_ptr<EncryptionHooks>>();
+
+struct EncryptionHooksHolder {
+    std::unique_ptr<EncryptionHooks> ptr = std::make_unique<EncryptionHooks>();
+};
+
+const auto getEncryptionHooks = ServiceContext::declareDecoration<EncryptionHooksHolder>();
 }  // namespace
 
 void EncryptionHooks::set(ServiceContext* service, std::unique_ptr<EncryptionHooks> custHooks) {
-    getEncryptionHooks(service) = std::move(custHooks);
+    getEncryptionHooks(service).ptr = std::move(custHooks);
 }
 
 EncryptionHooks* EncryptionHooks::get(ServiceContext* service) {
-    return getEncryptionHooks(service).get();
+    return getEncryptionHooks(service).ptr.get();
 }
 
 EncryptionHooks::~EncryptionHooks() {}

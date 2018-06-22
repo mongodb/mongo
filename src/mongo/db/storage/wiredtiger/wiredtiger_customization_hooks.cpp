@@ -37,17 +37,14 @@
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
-
-/* Make a WiredTigerCustomizationHooks pointer a decoration on the global ServiceContext */
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetWiredTigerCustomizationHooks, ("ServiceContext"))
-(InitializerContext* context) {
-    auto customizationHooks = stdx::make_unique<WiredTigerCustomizationHooks>();
-    WiredTigerCustomizationHooks::set(getGlobalServiceContext(), std::move(customizationHooks));
-
-    return Status::OK();
-}
-
 namespace {
+
+ServiceContext::ConstructorActionRegisterer setWiredTigerCustomizationHooks{
+    "SetWiredTigerCustomizationHooks", [](ServiceContext* service) {
+        auto customizationHooks = stdx::make_unique<WiredTigerCustomizationHooks>();
+        WiredTigerCustomizationHooks::set(service, std::move(customizationHooks));
+    }};
+
 const auto getCustomizationHooks =
     ServiceContext::declareDecoration<std::unique_ptr<WiredTigerCustomizationHooks>>();
 }  // namespace

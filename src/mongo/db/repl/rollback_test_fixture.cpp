@@ -68,9 +68,8 @@ ReplSettings createReplSettings() {
 }  // namespace
 
 void RollbackTest::setUp() {
-    _serviceContextMongoDTest.setUp();
     _storageInterface = new StorageInterfaceRollback();
-    auto serviceContext = _serviceContextMongoDTest.getServiceContext();
+    auto serviceContext = getServiceContext();
     auto consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
     auto recovery =
         stdx::make_unique<ReplicationRecoveryImpl>(_storageInterface, consistencyMarkers.get());
@@ -85,7 +84,7 @@ void RollbackTest::setUp() {
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
     setOplogCollectionName(serviceContext);
 
-    _opCtx = cc().makeOperationContext();
+    _opCtx = makeOperationContext();
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(_opCtx.get(), {});
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
     _replicationProcess->initializeRollbackID(_opCtx.get()).transitional_ignore();
@@ -93,24 +92,6 @@ void RollbackTest::setUp() {
     // Increase rollback log component verbosity for unit tests.
     mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
         logger::LogComponent::kReplicationRollback, logger::LogSeverity::Debug(2));
-}
-
-void RollbackTest::tearDown() {
-    _coordinator = nullptr;
-    _opCtx.reset();
-
-    SessionCatalog::get(_serviceContextMongoDTest.getServiceContext())->reset_forTest();
-
-    // We cannot unset the global replication coordinator because ServiceContextMongoD::tearDown()
-    // calls Databse::dropAllDatabasesExceptLocal() which requires the replication coordinator to
-    // clear all snapshots.
-    _serviceContextMongoDTest.tearDown();
-
-    // ServiceContextMongoD::tearDown() does not destroy service context so it is okay
-    // to access the service context after tearDown().
-    auto serviceContext = _serviceContextMongoDTest.getServiceContext();
-    _replicationProcess.reset();
-    ReplicationCoordinator::set(serviceContext, {});
 }
 
 RollbackTest::ReplicationCoordinatorRollbackMock::ReplicationCoordinatorRollbackMock(

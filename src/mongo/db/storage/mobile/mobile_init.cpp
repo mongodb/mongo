@@ -69,15 +69,10 @@ public:
         return BSONObj();
     }
 };
+
+ServiceContext::ConstructorActionRegisterer mobileKVEngineInitializer{
+    "MobileKVEngineInit", [](ServiceContext* service) {
+        registerStorageEngine(service, std::make_unique<MobileFactory>());
+    }};
 }  // namespace
-
-GlobalInitializerRegisterer mobileKVEngineInitializer(
-    "MobileKVEngineInit",
-    {"ServiceContext"},
-    [](InitializerContext* context) {
-        registerStorageEngine(getGlobalServiceContext(), std::make_unique<MobileFactory>());
-        return Status::OK();
-    },
-    [](DeinitializerContext* const) { return Status::OK(); });
-
 }  // namespace mongo

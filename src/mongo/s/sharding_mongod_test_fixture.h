@@ -189,7 +189,6 @@ private:
     const std::vector<HostAndPort> _servers{
         _host, HostAndPort("node2:12345"), HostAndPort("node3:12345")};
 
-    ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
 
     // Since the RemoteCommandTargeterFactory is currently a private member of ShardFactory, we

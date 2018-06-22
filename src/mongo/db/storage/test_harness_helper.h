@@ -36,7 +36,6 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -54,9 +53,9 @@ namespace mongo {
  */
 class HarnessHelper {
 public:
-    virtual ~HarnessHelper() = 0;
+    virtual ~HarnessHelper();
 
-    explicit HarnessHelper() = default;
+    explicit HarnessHelper();
 
     virtual ServiceContext::UniqueOperationContext newOperationContext(Client* const client) {
         auto opCtx = client->makeOperationContext();
@@ -66,26 +65,22 @@ public:
     }
 
     virtual ServiceContext::UniqueOperationContext newOperationContext() {
-        return newOperationContext(_client.get());
+        return newOperationContext(client());
     }
 
     Client* client() const {
-        return _client.get();
+        return Client::getCurrent();
     }
 
     ServiceContext* serviceContext() {
-        return &_serviceContext;
+        return getGlobalServiceContext();
     }
 
     const ServiceContext* serviceContext() const {
-        return &_serviceContext;
+        return getGlobalServiceContext();
     }
 
     virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
-
-private:
-    ServiceContextNoop _serviceContext;
-    ServiceContext::UniqueClient _client = _serviceContext.makeClient("hh");
 };
 
 namespace harness_helper_detail {

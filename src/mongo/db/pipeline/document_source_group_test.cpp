@@ -196,11 +196,10 @@ BSONObj toBson(const intrusive_ptr<DocumentSource>& source) {
     return arr[0].getDocument().toBson();
 }
 
-class Base {
+class Base : public ServiceContextTest {
 public:
     Base()
-        : _queryServiceContext(stdx::make_unique<QueryTestServiceContext>()),
-          _opCtx(_queryServiceContext->makeOperationContext()),
+        : _opCtx(makeOperationContext()),
           _ctx(new ExpressionContextForTest(_opCtx.get(),
                                             AggregationRequest(NamespaceString(ns), {}))),
           _tempDir("DocumentSourceGroupTest") {}
@@ -257,7 +256,7 @@ private:
 class ParseErrorBase : public Base {
 public:
     virtual ~ParseErrorBase() {}
-    void run() {
+    void _doTest() final {
         ASSERT_THROWS(createGroup(spec()), AssertionException);
     }
 
@@ -268,7 +267,7 @@ protected:
 class ExpressionBase : public Base {
 public:
     virtual ~ExpressionBase() {}
-    void run() {
+    void _doTest() final {
         createGroup(spec());
         auto source = DocumentSourceMock::create(Document(doc()));
         group()->setSource(source.get());
@@ -298,7 +297,7 @@ class IdConstantBase : public ExpressionBase {
 /** $group spec is not an object. */
 class NonObject : public Base {
 public:
-    void run() {
+    void _doTest() final {
         BSONObj spec = BSON("$group"
                             << "foo");
         BSONElement specElement = spec.firstElement();
@@ -500,7 +499,7 @@ typedef map<Value, Document, ValueCmp> IdMap;
 class CheckResultsBase : public Base {
 public:
     virtual ~CheckResultsBase() {}
-    void run() {
+    void _doTest() {
         runSharded(false);
         runSharded(true);
     }
@@ -726,7 +725,7 @@ class UndefinedAccumulatorValue : public CheckResultsBase {
 /** Simulate merging sharded results in the router. */
 class RouterMerger : public CheckResultsBase {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create({"{_id:0,list:[1,2]}",
                                                   "{_id:1,list:[3,4]}",
                                                   "{_id:0,list:[10,20]}",
@@ -755,7 +754,7 @@ private:
 /** Dependant field paths. */
 class Dependencies : public Base {
 public:
-    void run() {
+    void _doTest() final {
         createGroup(fromjson("{_id:'$x',a:{$sum:'$y.z'},b:{$avg:{$add:['$u','$v']}}}"));
         DepsTracker dependencies;
         ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, group()->getDependencies(&dependencies));
@@ -773,7 +772,7 @@ public:
 
 class StreamingOptimization : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create({"{a: 0}", "{a: 0}", "{a: 1}", "{a: 1}"});
         source->sorts = {BSON("a" << 1)};
 
@@ -808,7 +807,7 @@ public:
 
 class StreamingWithMultipleIdFields : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create(
             {"{a: 1, b: 2}", "{a: 1, b: 2}", "{a: 1, b: 1}", "{a: 2, b: 1}", "{a: 2, b: 1}"});
         source->sorts = {BSON("a" << 1 << "b" << -1)};
@@ -848,7 +847,7 @@ public:
 
 class StreamingWithMultipleLevels : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create(
             {"{a: {b: {c: 3}}, d: 1}", "{a: {b: {c: 1}}, d: 2}", "{a: {b: {c: 1}}, d: 0}"});
         source->sorts = {BSON("a.b.c" << -1 << "a.b.d" << 1 << "d" << 1)};
@@ -884,7 +883,7 @@ public:
 
 class StreamingWithFieldRepeated : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create(
             {"{a: 1, b: 1}", "{a: 1, b: 1}", "{a: 2, b: 1}", "{a: 2, b: 3}"});
         source->sorts = {BSON("a" << 1 << "b" << 1)};
@@ -919,7 +918,7 @@ public:
 
 class StreamingWithConstantAndFieldPath : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create(
             {"{a: 5, b: 1}", "{a: 5, b: 2}", "{a: 3, b: 1}", "{a: 1, b: 1}", "{a: 1, b: 1}"});
         source->sorts = {BSON("a" << -1 << "b" << 1)};
@@ -953,7 +952,7 @@ public:
 
 class StreamingWithRootSubfield : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}", "{a: 3}"});
         source->sorts = {BSON("a" << 1)};
 
@@ -973,7 +972,7 @@ public:
 
 class StreamingWithConstant : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}", "{a: 3}"});
         source->sorts = {BSON("$a" << 1)};
 
@@ -990,7 +989,7 @@ public:
 
 class StreamingWithEmptyId : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}", "{a: 3}"});
         source->sorts = {BSON("$a" << 1)};
 
@@ -1007,7 +1006,7 @@ public:
 
 class NoOptimizationIfMissingDoubleSort : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}", "{a: 3}"});
         source->sorts = {BSON("a" << 1)};
 
@@ -1034,7 +1033,7 @@ public:
 
 class NoOptimizationWithRawRoot : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}", "{a: 3}"});
         source->sorts = {BSON("a" << 1)};
 
@@ -1061,7 +1060,7 @@ public:
 
 class NoOptimizationIfUsingExpressions : public Base {
 public:
-    void run() {
+    void _doTest() final {
         auto source = DocumentSourceMock::create({"{a: 1, b: 1}", "{a: 2, b: 2}", "{a: 3, b: 1}"});
         source->sorts = {BSON("a" << 1 << "b" << 1)};
 
@@ -1100,11 +1099,11 @@ class StringConstantIdAndAccumulatorExpressions : public CheckResultsBase {
 /** An array constant passed to an accumulator. */
 class ArrayConstantAccumulatorExpression : public CheckResultsBase {
 public:
-    void run() {
+    void _doTest() final {
         // A parse exception is thrown when a raw array is provided to an accumulator.
         ASSERT_THROWS(createGroup(fromjson("{_id:1,a:{$push:[4,5,6]}}")), AssertionException);
         // Run standard base tests.
-        CheckResultsBase::run();
+        CheckResultsBase::_doTest();
     }
     deque<DocumentSource::GetNextResult> inputData() {
         return {Document()};

@@ -1,5 +1,5 @@
-/*
- *    Copyright (C) 2015 MongoDB Inc.
+/**
+ *    Copyright (C) 2016-2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,19 +28,35 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/db/service_context_registrar.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/db/service_context_test_fixture.h"
 
+#include <memory>
+
+#include "mongo/db/client.h"
+#include "mongo/db/op_observer_registry.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace {
 
-ServiceContextRegistrar serviceContextEmbeddedFactory([]() {
-    return std::make_unique<ServiceContextNoop>();
-});
+ServiceContextTest::ServiceContextTest() {
+    setGlobalServiceContext(ServiceContext::make());
+    auto const serviceContext = getGlobalServiceContext();
+    Client::initThread(getThreadName());
+    auto observerRegistry = std::make_unique<OpObserverRegistry>();
+    serviceContext->setOpObserver(std::move(observerRegistry));
+}
 
-}  // namespace
+ServiceContextTest::~ServiceContextTest() {
+    Client::destroy();
+    setGlobalServiceContext({});
+}
+
+ServiceContext* ServiceContextTest::getServiceContext() {
+    return getGlobalServiceContext();
+}
+
+Client* ServiceContextTest::getClient() {
+    return Client::getCurrent();
+}
+
 }  // namespace mongo

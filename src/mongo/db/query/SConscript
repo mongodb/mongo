@@ -108,7 +108,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         "query_test_service_context",
         "query_common",
     ],
@@ -203,6 +202,8 @@ env.Library(
         "$BUILD_DIR/mongo/db/logical_session_id",
         "$BUILD_DIR/mongo/db/service_context",
     ],
+    LIBDEPS_PRIVATE=[
+    ],
 )
 
 env.Library(
@@ -263,6 +264,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "query_request",
     ],
 )

@@ -524,7 +524,6 @@ if not has_option('noshell') and usemozjs:
             "$BUILD_DIR/third_party/shim_pcrecpp",
             "shell_core",
             "db/server_options_core",
-            "db/service_context_noop_init",
             "client/clientdriver_network",
             "$BUILD_DIR/mongo/util/password",
         ],

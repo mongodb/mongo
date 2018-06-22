@@ -49,7 +49,7 @@ namespace repl {
  *   storage layer. The storage engine is initialized as part of the ServiceContextForMongoD test
  *   fixture.
  */
-class RollbackTest : public unittest::Test {
+class RollbackTest : public ServiceContextMongoDTest {
 public:
     RollbackTest() = default;
 
@@ -57,15 +57,6 @@ public:
      * Initializes the service context and task executor.
      */
     void setUp() override;
-
-    /**
-     * Destroys the service context and task executor.
-     *
-     * Note on overriding tearDown() in tests:
-     * This cancels outstanding tasks and remote command requests scheduled using the task
-     * executor.
-     */
-    void tearDown() override;
 
     /**
      * Creates a collection with the given namespace and options.
@@ -101,9 +92,6 @@ public:
         Timestamp ts, OptionalCollectionUUID uuid, StringData nss, BSONObj cmdObj, int recordId);
 
 protected:
-    // Test fixture used to manage the service context and global storage engine.
-    ServiceContextMongoDTest _serviceContextMongoDTest;
-
     // OperationContext provided to test cases for storage layer operations.
     ServiceContext::UniqueOperationContext _opCtx;
 

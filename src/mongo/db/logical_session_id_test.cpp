@@ -40,7 +40,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/sasl_options.h"
@@ -50,8 +49,9 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/service_liaison_mock.h"
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/transport/session.h"
@@ -61,42 +61,29 @@
 namespace mongo {
 namespace {
 
-class LogicalSessionIdTest : public ::mongo::unittest::Test {
+class LogicalSessionIdTest : public ServiceContextTest {
 public:
     AuthzManagerExternalStateMock* managerState;
     transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session;
-    ServiceContextNoop serviceContext;
-    ServiceContext::UniqueClient client;
+    transport::SessionHandle session = transportLayer.createSession();
     ServiceContext::UniqueOperationContext _opCtx;
-    AuthzSessionExternalStateMock* sessionState;
-    AuthorizationManager* authzManager;
-    AuthorizationSessionForTest* authzSession;
+    AuthorizationSession* authzSession;
 
-    void setUp() {
-        session = transportLayer.createSession();
-        client = serviceContext.makeClient("testClient", session);
+    LogicalSessionIdTest() {
         RestrictionEnvironment::set(
             session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
-        _opCtx = client->makeOperationContext();
         auto localManagerState = std::make_unique<AuthzManagerExternalStateMock>();
         managerState = localManagerState.get();
         managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-        auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
+        auto authzManager = std::make_unique<AuthorizationManagerImpl>(
             std::move(localManagerState),
             AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{});
-        authzManager = uniqueAuthzManager.get();
-        AuthorizationManager::set(&serviceContext, std::move(uniqueAuthzManager));
-        auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
-        sessionState = localSessionState.get();
-
-        auto localauthzSession = std::make_unique<AuthorizationSessionForTest>(
-            std::move(localSessionState),
-            AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
-        authzSession = localauthzSession.get();
-
-        AuthorizationSession::set(client.get(), std::move(localauthzSession));
         authzManager->setAuthEnabled(true);
+        AuthorizationManager::set(getServiceContext(), std::move(authzManager));
+        Client::releaseCurrent();
+        Client::initThread(getThreadName(), session);
+        authzSession = AuthorizationSession::get(getClient());
+        _opCtx = makeOperationContext();
 
         auto localServiceLiaison =
             std::make_unique<MockServiceLiaison>(std::make_shared<MockServiceLiaisonImpl>());
@@ -106,7 +93,7 @@ public:
         auto localLogicalSessionCache = std::make_unique<LogicalSessionCacheImpl>(
             std::move(localServiceLiaison), std::move(localSessionsCollection), nullptr);
 
-        LogicalSessionCache::set(&serviceContext, std::move(localLogicalSessionCache));
+        LogicalSessionCache::set(getServiceContext(), std::move(localLogicalSessionCache));
     }
 
     User* addSimpleUser(UserName un) {

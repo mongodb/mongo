@@ -120,7 +120,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         'update',
     ],
 )

@@ -35,9 +35,8 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -49,30 +48,20 @@ namespace {
 using std::unique_ptr;
 using stdx::make_unique;
 
-class QueuedDataStageTest : public unittest::Test {
+class QueuedDataStageTest : public ServiceContextMongoDTest {
 public:
     QueuedDataStageTest() {
-        _service = stdx::make_unique<ServiceContextNoop>();
-        _service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-        _client = _service->makeClient("test");
-        _opCtxNoop = _client->makeOperationContext();
-        _opCtx = _opCtxNoop.get();
+        getServiceContext()->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+        _opCtx = makeOperationContext();
     }
 
 protected:
     OperationContext* getOpCtx() {
-        return _opCtx;
+        return _opCtx.get();
     }
 
 private:
-    OperationContext* _opCtx;
-
-    // Members of a class are destroyed in reverse order of declaration.
-    // The UniqueClient must be destroyed before the ServiceContextNoop is destroyed.
-    // The OperationContextNoop must be destroyed before the UniqueClient is destroyed.
-    std::unique_ptr<ServiceContextNoop> _service;
-    ServiceContext::UniqueClient _client;
-    ServiceContext::UniqueOperationContext _opCtxNoop;
+    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 //

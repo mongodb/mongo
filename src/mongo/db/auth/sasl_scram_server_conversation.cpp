@@ -342,13 +342,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
 template class SaslSCRAMServerMechanism<SCRAMSHA1Policy>;
 template class SaslSCRAMServerMechanism<SCRAMSHA256Policy>;
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SASLSCRAMServerMechanism,
-                                     ("CreateSASLServerMechanismRegistry"))
-(::mongo::InitializerContext* context) {
-    auto& registry = SASLServerMechanismRegistry::get(getGlobalServiceContext());
-    registry.registerFactory<SCRAMSHA1ServerFactory>();
-    registry.registerFactory<SCRAMSHA256ServerFactory>();
-    return Status::OK();
-}
-
+namespace {
+GlobalSASLMechanismRegisterer<SCRAMSHA1ServerFactory> scramsha1Registerer;
+GlobalSASLMechanismRegisterer<SCRAMSHA256ServerFactory> scramsha256Registerer;
+}  // namespace
 }  // namespace mongo

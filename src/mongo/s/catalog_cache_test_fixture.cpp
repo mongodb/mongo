@@ -57,15 +57,15 @@ void CatalogCacheTestFixture::setUp() {
     setRemote(HostAndPort("FakeRemoteClient:34567"));
     configTargeter()->setFindHostReturnValue(kConfigHostAndPort);
 
-    CollatorFactoryInterface::set(serviceContext(), stdx::make_unique<CollatorFactoryMock>());
+    CollatorFactoryInterface::set(getServiceContext(), stdx::make_unique<CollatorFactoryMock>());
 }
 
 executor::NetworkTestEnv::FutureHandle<boost::optional<CachedCollectionRoutingInfo>>
 CatalogCacheTestFixture::scheduleRoutingInfoRefresh(const NamespaceString& nss) {
     return launchAsync([this, nss] {
-        auto client = serviceContext()->makeClient("Test");
+        auto client = getServiceContext()->makeClient("Test");
         auto opCtx = client->makeOperationContext();
-        auto const catalogCache = Grid::get(serviceContext())->catalogCache();
+        auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
         catalogCache->invalidateShardedCollection(nss);
 
         return boost::make_optional(

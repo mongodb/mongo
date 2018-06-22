@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
@@ -55,7 +56,6 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/shard_server_op_observer.h"
-#include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -135,14 +135,10 @@ void ShardingMongodTestFixture::setUp() {
 
     repl::StorageInterface::set(service, std::move(storagePtr));
 
-    auto makeOpObserver = [&] {
-        auto opObserver = stdx::make_unique<OpObserverRegistry>();
-        opObserver->addObserver(stdx::make_unique<OpObserverImpl>());
-        opObserver->addObserver(stdx::make_unique<ConfigServerOpObserver>());
-        opObserver->addObserver(stdx::make_unique<ShardServerOpObserver>());
-        return opObserver;
-    };
-    service->setOpObserver(makeOpObserver());
+    auto opObserver = checked_cast<OpObserverRegistry*>(service->getOpObserver());
+    opObserver->addObserver(stdx::make_unique<OpObserverImpl>());
+    opObserver->addObserver(stdx::make_unique<ConfigServerOpObserver>());
+    opObserver->addObserver(stdx::make_unique<ShardServerOpObserver>());
 
     repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
@@ -308,8 +304,6 @@ void ShardingMongodTestFixture::tearDown() {
     Grid::get(operationContext())->clearForUnitTests();
 
     _opCtx.reset();
-    _client.reset();
-
     ServiceContextMongoDTest::tearDown();
 }
 

@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/s/active_migrations_registry.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/unittest/unittest.h"
 
@@ -41,26 +41,8 @@ namespace {
 
 using unittest::assertGet;
 
-class MoveChunkRegistration : public unittest::Test {
+class MoveChunkRegistration : public ServiceContextMongoDTest {
 protected:
-    void setUp() override {
-        _client = _serviceContext.makeClient("MoveChunkRegistrationTest");
-        _opCtx = _serviceContext.makeOperationContext(_client.get());
-    }
-
-    void tearDown() override {
-        _opCtx.reset();
-        _client.reset();
-    }
-
-    OperationContext* getTxn() const {
-        return _opCtx.get();
-    }
-
-    ServiceContextNoop _serviceContext;
-    ServiceContext::UniqueClient _client;
-    ServiceContext::UniqueOperationContext _opCtx;
-
     ActiveMigrationsRegistry _registry;
 };
 
@@ -133,8 +115,9 @@ TEST_F(MoveChunkRegistration, SecondMigrationWithSameArgumentsJoinsFirst) {
     ASSERT(!secondScopedDonateChunk.mustExecute());
 
     originalScopedDonateChunk.signalComplete({ErrorCodes::InternalError, "Test error"});
+    auto opCtx = makeOperationContext();
     ASSERT_EQ(Status(ErrorCodes::InternalError, "Test error"),
-              secondScopedDonateChunk.waitForCompletion(getTxn()));
+              secondScopedDonateChunk.waitForCompletion(opCtx.get()));
 }
 
 }  // namespace
