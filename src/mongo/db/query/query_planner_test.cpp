@@ -425,8 +425,55 @@ TEST_F(QueryPlannerTest, BasicSkipWithIndex) {
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists("{skip: {n: 8, node: {cscan: {dir: 1, filter: {a: 5}}}}}");
     assertSolutionExists(
-        "{skip: {n: 8, node: {fetch: {filter: null, node: "
+        "{fetch: {filter: null, node: {skip: {n: 8, node: "
         "{ixscan: {filter: null, pattern: {a: 1, b: 1}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CoveredSkipWithIndex) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    runQuerySortProjSkipNToReturn(
+        fromjson("{a: 5}"), BSONObj(), fromjson("{_id: 0, a: 1, b: 1}"), 8, 0);
+
+    ASSERT_EQUALS(getNumSolutions(), 2U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1}, node: "
+        "{skip: {n: 8, node: {cscan: {dir: 1, filter: {a: 5}}}}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1}, "
+        "node: {skip: {n: 8, node: {ixscan: {filter: null, pattern: {a: 1, b: 1}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, SkipEvaluatesAfterFetchWithPredicate) {
+    addIndex(fromjson("{a: 1}"));
+
+    runQuerySkipNToReturn(fromjson("{a: 5, b: 7}"), 8, 0);
+
+    ASSERT_EQUALS(getNumSolutions(), 2U);
+    assertSolutionExists("{skip: {n: 8, node: {cscan: {dir: 1, filter: {a: 5, b: 7}}}}}");
+
+    // When a plan includes a fetch with no predicate, the skip should execute first, so we avoid
+    // fetching a document that we will always discard. When the fetch does have a predicate (as in
+    // this case), however, that optimization would be invalid; we need to fetch the document and
+    // evaluate the filter to determine if the document should count towards the number of skipped
+    // documents.
+    assertSolutionExists(
+        "{skip: {n: 8, node: {fetch: {filter: {b: 7}, node: "
+        "{ixscan: {filter: null, pattern: {a: 1}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, SkipEvaluatesBeforeFetchForIndexedOr) {
+    addIndex(fromjson("{a: 1}"));
+
+    runQuerySkipNToReturn(fromjson("{$or: [{a: 5}, {a: 7}]}"), 8, 0);
+
+    ASSERT_EQUALS(getNumSolutions(), 2U);
+    assertSolutionExists(
+        "{skip: {n: 8, node: "
+        "{cscan: {dir: 1, filter: {$or: [{a: 5}, {a: 7}]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {skip: {n: 8, node: "
+        "{ixscan: {filter: null, pattern: {a: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, BasicLimitNoIndex) {
@@ -481,9 +528,8 @@ TEST_F(QueryPlannerTest, SkipAndLimit) {
         "{limit: {n: 2, node: {skip: {n: 7, node: "
         "{cscan: {dir: 1, filter: {x: {$lte: 4}}}}}}}}");
     assertSolutionExists(
-        "{limit: {n: 2, node: {skip: {n: 7, node: {fetch: "
-        "{filter: null, node: {ixscan: "
-        "{filter: null, pattern: {x: 1}}}}}}}}}");
+        "{limit: {n: 2, node: {fetch: {filter: null, node: "
+        "{skip: {n: 7, node: {ixscan: {filter: null, pattern: {x: 1}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, SkipAndSoftLimit) {
@@ -496,9 +542,8 @@ TEST_F(QueryPlannerTest, SkipAndSoftLimit) {
         "{skip: {n: 7, node: "
         "{cscan: {dir: 1, filter: {x: {$lte: 4}}}}}}");
     assertSolutionExists(
-        "{skip: {n: 7, node: {fetch: "
-        "{filter: null, node: {ixscan: "
-        "{filter: null, pattern: {x: 1}}}}}}}");
+        "{fetch: {filter: null, node: {skip: {n: 7, node: "
+        "{ixscan: {filter: null, pattern: {x: 1}}}}}}}");
 }
 
 //

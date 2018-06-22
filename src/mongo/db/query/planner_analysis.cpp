@@ -721,6 +721,13 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
         }
     }
 
+    if (qr.getSkip()) {
+        auto skip = std::make_unique<SkipNode>();
+        skip->skip = *qr.getSkip();
+        skip->children.push_back(solnRoot.release());
+        solnRoot = std::move(skip);
+    }
+
     // Project the results.
     if (NULL != query.getProj()) {
         LOG(5) << "PROJECTION: Current plan is:\n" << redact(solnRoot->toString());
@@ -825,13 +832,6 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             fetch->children.push_back(solnRoot.release());
             solnRoot.reset(fetch);
         }
-    }
-
-    if (qr.getSkip()) {
-        SkipNode* skip = new SkipNode();
-        skip->skip = *qr.getSkip();
-        skip->children.push_back(solnRoot.release());
-        solnRoot.reset(skip);
     }
 
     // When there is both a blocking sort and a limit, the limit will
