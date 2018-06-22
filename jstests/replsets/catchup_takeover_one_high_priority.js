@@ -92,5 +92,8 @@
     replSet.waitForState(2, ReplSetTest.State.PRIMARY, 30 * 1000);
     jsTestLog('node 2 performed priority takeover and is now primary');
 
+    // Wait until the old primary steps down so the connections won't be closed during stopSet().
+    replSet.waitForState(0, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);
+
     replSet.stopSet();
 })();
