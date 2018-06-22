@@ -1034,8 +1034,13 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
             if (opCtx->getTxnNumber() == _activeTxnNumber) {
                 _txnState = MultiDocumentTransactionState::kAborted;
                 ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
-                // After the transaction has been aborted, we must update the end time.
-                _singleTransactionStats->setEndTime(curTimeMicros64());
+                // After the transaction has been aborted, we must update the end time and mark it
+                // as inactive.
+                auto curTime = curTimeMicros64();
+                _singleTransactionStats->setEndTime(curTime);
+                if (_singleTransactionStats->isActive()) {
+                    _singleTransactionStats->setInactive(curTime);
+                }
                 ServerTransactionsMetrics::get(opCtx)->incrementTotalAborted();
                 ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
             }
