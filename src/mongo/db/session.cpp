@@ -712,6 +712,10 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
         return;
     }
 
+    if (_singleTransactionStats->isActive()) {
+        _singleTransactionStats->setInactive(curTimeMicros64());
+    }
+
     invariant(!_txnResourceStash);
     _txnResourceStash = TxnResources(opCtx);
 }
@@ -761,9 +765,12 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             uassert(ErrorCodes::InvalidOptions,
                     "Only the first command in a transaction may specify a readConcern",
                     readConcernArgs.isEmpty());
-
             _txnResourceStash->release(opCtx);
             _txnResourceStash = boost::none;
+            // Set the starting active time for this transaction.
+            if (_txnState == MultiDocumentTransactionState::kInProgress) {
+                _singleTransactionStats->setActive(curTimeMicros64());
+            }
             return;
         }
 
@@ -773,6 +780,9 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             return;
         }
         opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
+
+        // Set the starting active time for this transaction.
+        _singleTransactionStats->setActive(curTimeMicros64());
 
         // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
         // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
@@ -857,7 +867,11 @@ void Session::_abortTransaction(WithLock wl) {
     _txnState = MultiDocumentTransactionState::kAborted;
     _speculativeTransactionReadOpTime = repl::OpTime();
     if (isMultiDocumentTransaction) {
-        _singleTransactionStats->setEndTime(curTimeMicros64());
+        auto curTime = curTimeMicros64();
+        _singleTransactionStats->setEndTime(curTime);
+        if (_singleTransactionStats->isActive()) {
+            _singleTransactionStats->setInactive(curTime);
+        }
     }
 }
 
@@ -881,6 +895,7 @@ void Session::_setActiveTxn(WithLock wl, TxnNumber txnNumber) {
     _activeTxnCommittedStatements.clear();
     _hasIncompleteHistory = false;
     _txnState = MultiDocumentTransactionState::kNone;
+    _singleTransactionStats = boost::none;
     _speculativeTransactionReadOpTime = repl::OpTime();
     _multikeyPathInfo.clear();
 }
@@ -964,8 +979,13 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
             // Make sure the transaction didn't change because of chunk migration.
             if (opCtx->getTxnNumber() == _activeTxnNumber) {
                 _txnState = MultiDocumentTransactionState::kAborted;
-                // After the transaction has been aborted, we must update the end time.
-                _singleTransactionStats->setEndTime(curTimeMicros64());
+                // After the transaction has been aborted, we must update the end time and mark it
+                // as inactive.
+                auto curTime = curTimeMicros64();
+                _singleTransactionStats->setEndTime(curTime);
+                if (_singleTransactionStats->isActive()) {
+                    _singleTransactionStats->setInactive(curTime);
+                }
             }
         }
         // We must clear the recovery unit and locker so any post-transaction writes can run without
@@ -990,9 +1010,12 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
     _txnState = MultiDocumentTransactionState::kCommitted;
-    // After the transaction has been committed, we must update the end time.
-    if (isMultiDocumentTransaction) {
-        _singleTransactionStats->setEndTime(curTimeMicros64());
+    // After the transaction has been committed, we must update the end time and mark it as
+    // inactive.
+    auto curTime = curTimeMicros64();
+    _singleTransactionStats->setEndTime(curTime);
+    if (_singleTransactionStats->isActive()) {
+        _singleTransactionStats->setInactive(curTime);
     }
 }
 
