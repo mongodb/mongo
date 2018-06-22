@@ -558,7 +558,7 @@ string finishCode(string code) {
 }
 
 bool execPrompt(mongo::Scope& scope, const char* promptFunction, string& prompt) {
-    string execStatement = string("__prompt__ = ") + promptFunction + "();";
+    string execStatement = string("__promptWrapper__(") + promptFunction + ");";
     scope.exec("delete __prompt__;", "", false, false, false, 0);
     scope.exec(execStatement, "", false, false, false, 0);
     if (scope.type("__prompt__") == String) {

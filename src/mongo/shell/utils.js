@@ -1056,6 +1056,29 @@ shellHelper.show = function(what) {
 
 };
 
+__promptWrapper__ = function(promptFunction) {
+    // Call promptFunction directly if the global "db" is not defined, e.g. --nodb.
+    if (typeof db === 'undefined' || !(db instanceof DB)) {
+        __prompt__ = promptFunction();
+        return;
+    }
+
+    // Stash the global "db" for the prompt function to make sure the session
+    // of the global "db" isn't accessed by the prompt function.
+    let originalDB = db;
+    try {
+        db = originalDB.getMongo().getDB(originalDB.getName());
+        // Setting db._session to be a _DummyDriverSession instance makes it so that
+        // a logical session id isn't included in the isMaster and replSetGetStatus
+        // commands and therefore won't interfere with the session associated with the
+        // global "db" object.
+        db._session = new _DummyDriverSession(db.getMongo());
+        __prompt__ = promptFunction();
+    } finally {
+        db = originalDB;
+    }
+};
+
 Math.sigFig = function(x, N) {
     if (!N) {
         N = 3;
