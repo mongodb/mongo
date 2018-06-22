@@ -1045,7 +1045,8 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     }
     _txnState = MultiDocumentTransactionState::kCommitted;
     ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
-    // After the transaction has been committed, we must update the end time and mark it as inactive.
+    // After the transaction has been committed, we must update the end time and mark it as
+    // inactive.
     _singleTransactionStats->setEndTime(curTimeMicros64());
     if (_singleTransactionStats->isActive()) {
         _singleTransactionStats->setInactive(curTimeMicros64());
