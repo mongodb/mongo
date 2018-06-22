@@ -31,6 +31,7 @@
 #include <utility>
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 namespace executor {
@@ -93,6 +94,7 @@ void cancelStream(ASIOStream* stream) {
 
 void logFailureInSetStreamNonBlocking(std::error_code ec);
 void logFailureInSetStreamNoDelay(std::error_code ec);
+void logFailureInSetStreamKeepAlive(std::error_code ec);
 
 template <typename ASIOStream>
 std::error_code setStreamNonBlocking(ASIOStream* stream) {
@@ -111,6 +113,17 @@ std::error_code setStreamNoDelay(ASIOStream* stream) {
     if (ec) {
         logFailureInSetStreamNoDelay(ec);
     }
+    return ec;
+}
+
+template <typename ASIOStream>
+std::error_code setStreamKeepAlive(ASIOStream* stream) {
+    std::error_code ec;
+    stream->set_option(asio::socket_base::keep_alive(true), ec);
+    if (ec) {
+        logFailureInSetStreamKeepAlive(ec);
+    }
+    setSocketKeepAliveParams(stream->native_handle());
     return ec;
 }
 
