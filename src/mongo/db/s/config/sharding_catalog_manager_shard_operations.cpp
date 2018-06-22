@@ -646,12 +646,15 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Helper function that runs a command on the to-be shard and returns the status
     auto runCmdOnNewShard = [this, &opCtx, &targeter](const BSONObj& cmd) -> Status {
-        auto response =
+        auto swCommandResponse =
             _runCommandForAddShard(opCtx, targeter.get(), NamespaceString::kAdminDb, cmd);
+        if (!swCommandResponse.isOK()) {
+            return swCommandResponse.getStatus();
+        }
         // Grabs the underlying status from a StatusWith object by taking the first
         // non-OK status, if there is one. This is needed due to the semantics of
         // _runCommandForAddShard.
-        auto commandResponse = std::move(response.getValue());
+        auto commandResponse = std::move(swCommandResponse.getValue());
         BatchedCommandResponse batchResponse;
         return Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
     };
