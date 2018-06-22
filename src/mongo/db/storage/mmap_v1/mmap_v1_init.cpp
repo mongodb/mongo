@@ -77,10 +77,9 @@ public:
 
 }  // namespace
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(MMAPV1EngineInit, ("ServiceContext"))
-(InitializerContext* context) {
-    registerStorageEngine(getGlobalServiceContext(), std::make_unique<MMAPV1Factory>());
-    return Status::OK();
-}
+ServiceContext::ConstructorActionRegisterer registerMMAPV1EngineInit{
+    "MMAPV1EngineInit", [](ServiceContext* service) {
+        registerStorageEngine(service, std::make_unique<MMAPV1Factory>());
+    }};
 
 }  // namespace mongo

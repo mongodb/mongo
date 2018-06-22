@@ -186,6 +186,14 @@ public:
         return tailableMode == TailableModeEnum::kTailableAndAwaitData;
     }
 
+    /**
+     * Sets the resolved definition for an involved namespace.
+     */
+    void setResolvedNamespace_forTest(const NamespaceString& nss,
+                                      ResolvedNamespace resolvedNamespace) {
+        _resolvedNamespaces[nss.coll()] = std::move(resolvedNamespace);
+    }
+
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 

@@ -30,7 +30,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 
@@ -42,20 +42,18 @@ namespace mongo {
 class QueryTestServiceContext {
 public:
     QueryTestServiceContext();
+    ~QueryTestServiceContext();
 
     ServiceContext::UniqueOperationContext makeOperationContext();
 
     ServiceContext::UniqueOperationContext makeOperationContext(LogicalSessionId lsid);
 
     Client* getClient() const;
-
-    ServiceContext* getServiceContext() {
-        return &_serviceContext;
-    }
+    ServiceContext* getServiceContext();
 
 private:
-    ServiceContextNoop _serviceContext;
-    ServiceContext::UniqueClient _uniqueClient;
+    ServiceContext::UniqueServiceContext _service;
+    ServiceContext::UniqueClient _client;
 };
 
 }  // namespace mongo

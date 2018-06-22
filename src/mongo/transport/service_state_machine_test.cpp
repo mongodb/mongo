@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/mock_session.h"
@@ -272,7 +272,7 @@ class ServiceStateMachineFixture : public unittest::Test {
 protected:
     void setUp() override {
 
-        auto scOwned = stdx::make_unique<ServiceContextNoop>();
+        auto scOwned = ServiceContext::make();
         auto sc = scOwned.get();
         setGlobalServiceContext(std::move(scOwned));
 

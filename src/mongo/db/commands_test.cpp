@@ -32,7 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands_test_example_gen.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -96,14 +96,9 @@ TEST(Commands, appendCommandStatusErrorExtraInfo) {
     ASSERT_BSONOBJ_EQ(actualResult.obj(), expectedResult.obj());
 }
 
-class ParseNsOrUUID : public unittest::Test {
+class ParseNsOrUUID : public ServiceContextTest {
 public:
-    ParseNsOrUUID()
-        : client(service.makeClient("test")),
-          opCtxPtr(client->makeOperationContext()),
-          opCtx(opCtxPtr.get()) {}
-    ServiceContextNoop service;
-    ServiceContext::UniqueClient client;
+    ParseNsOrUUID() : opCtxPtr(makeOperationContext()), opCtx(opCtxPtr.get()) {}
     ServiceContext::UniqueOperationContext opCtxPtr;
     OperationContext* opCtx;
 };
@@ -333,18 +328,18 @@ ExampleMinimalCommand exampleMinimalCommand;
 ExampleVoidCommand exampleVoidCommand;
 CmdT<decltype(throwFn)> throwStatusCommand("throwsStatus", throwFn);
 
-struct IncrementTestCommon {
+class TypedCommand : public ServiceContextTest {
+protected:
     template <typename T>
-    void run(T& command, std::function<void(int, const BSONObj&)> postAssert) {
+    void runIncr(T& command, std::function<void(int, const BSONObj&)> postAssert) {
         const NamespaceString ns("testdb.coll");
-        auto client = getGlobalServiceContext()->makeClient("commands_test");
         for (std::int32_t i : {123, 12345, 0, -456}) {
             const OpMsgRequest request = [&] {
                 typename T::Request incr(ns);
                 incr.setI(i);
                 return incr.serialize(BSON("$db" << ns.db()));
             }();
-            auto opCtx = client->makeOperationContext();
+            auto opCtx = makeOperationContext();
             auto invocation = command.parse(opCtx.get(), request);
 
             ASSERT_EQ(invocation->ns(), ns);
@@ -368,29 +363,29 @@ struct IncrementTestCommon {
     }
 };
 
-TEST(TypedCommand, runTyped) {
-    IncrementTestCommon{}.run(exampleIncrementCommand, [](int i, const BSONObj& reply) {
+TEST_F(TypedCommand, runTyped) {
+    runIncr(exampleIncrementCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(reply["iPlusOne"].Int(), i + 1);
     });
 }
 
-TEST(TypedCommand, runMinimal) {
-    IncrementTestCommon{}.run(exampleMinimalCommand, [](int i, const BSONObj& reply) {
+TEST_F(TypedCommand, runMinimal) {
+    runIncr(exampleMinimalCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(reply["iPlusOne"].Int(), i + 1);
     });
 }
 
-TEST(TypedCommand, runVoid) {
-    IncrementTestCommon{}.run(exampleVoidCommand, [](int i, const BSONObj& reply) {
+TEST_F(TypedCommand, runVoid) {
+    runIncr(exampleVoidCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(exampleVoidCommand.iCapture, i + 1);
     });
 }
 
-TEST(TypedCommand, runThrowStatus) {
-    IncrementTestCommon{}.run(throwStatusCommand, [](int i, const BSONObj& reply) {
+TEST_F(TypedCommand, runThrowStatus) {
+    runIncr(throwStatusCommand, [](int i, const BSONObj& reply) {
         Status status = Status::OK();
         try {
             (void)throwFn();

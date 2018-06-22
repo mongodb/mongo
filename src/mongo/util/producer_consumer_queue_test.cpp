@@ -32,7 +32,7 @@
 
 #include "mongo/util/producer_consumer_queue.h"
 
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -112,8 +112,6 @@ private:
 
 class ProducerConsumerQueueTest : public unittest::Test {
 public:
-    ProducerConsumerQueueTest() : _serviceCtx(stdx::make_unique<ServiceContextNoop>()) {}
-
     template <typename Callback>
     stdx::thread runThread(StringData name, Callback&& cb) {
         return stdx::thread([this, name, cb] {
@@ -153,7 +151,7 @@ public:
     }
 
 private:
-    std::unique_ptr<ServiceContext> _serviceCtx;
+    ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();
 };
 
 class MoveOnly {

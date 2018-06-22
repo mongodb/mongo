@@ -51,7 +51,6 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repair_database_and_check_version.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/service_context_registrar.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/storage/encryption_hooks.h"
@@ -59,7 +58,6 @@
 #include "mongo/db/ttl.h"
 #include "mongo/embedded/periodic_runner_embedded.h"
 #include "mongo/embedded/replication_coordinator_embedded.h"
-#include "mongo/embedded/service_context_embedded.h"
 #include "mongo/embedded/service_entry_point_embedded.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
@@ -100,11 +98,10 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 
 // Create a minimalistic replication coordinator to provide a limited interface for users. Not
 // functional to provide any replication logic.
-GlobalInitializerRegisterer replicationManagerInitializer(
+ServiceContext::ConstructorActionRegisterer replicationManagerInitializer(
     "CreateReplicationManager",
-    {"SSLManager", "ServiceContext", "default"},
-    [](InitializerContext* context) {
-        auto serviceContext = getGlobalServiceContext();
+    {"SSLManager", "default"},
+    [](ServiceContext* serviceContext) {
         repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
 
         auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
@@ -113,16 +110,6 @@ GlobalInitializerRegisterer replicationManagerInitializer(
         auto replCoord = std::make_unique<ReplicationCoordinatorEmbedded>(serviceContext);
         repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
         repl::setOplogCollectionName(serviceContext);
-        return Status::OK();
-    },
-    [](DeinitializerContext* context) {
-        auto serviceContext = getGlobalServiceContext();
-
-        repl::ReplicationCoordinator::set(serviceContext, nullptr);
-        LogicalClock::set(serviceContext, nullptr);
-        repl::StorageInterface::set(serviceContext, nullptr);
-
-        return Status::OK();
     });
 
 MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
@@ -197,12 +184,14 @@ ServiceContext* initialize(const char* yaml_config) {
 
     Status status = mongo::runGlobalInitializers(yaml_config ? 1 : 0, argv, nullptr);
     uassertStatusOKWithContext(status, "Global initilization failed");
+    setGlobalServiceContext(ServiceContext::make());
 
     Client::initThread("initandlisten");
 
     initWireSpec();
 
     auto serviceContext = getGlobalServiceContext();
+    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointEmbedded>());
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
     opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());

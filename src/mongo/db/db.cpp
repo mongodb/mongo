@@ -119,8 +119,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
-#include "mongo/db/service_context_registrar.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_killer.h"
@@ -322,8 +320,6 @@ ExitCode _initAndListen(int listenPort) {
 
     logProcessDetails();
 
-    createLockFile(serviceContext);
-
     serviceContext->setServiceEntryPoint(
         stdx::make_unique<ServiceEntryPointMongod>(serviceContext));
 
@@ -367,7 +363,7 @@ ExitCode _initAndListen(int listenPort) {
     }
 
     // Disallow running a storage engine that doesn't support capped collections with --profile
-    if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections() &&
+    if (!serviceContext->getStorageEngine()->supportsCappedCollections() &&
         serverGlobalParams.defaultProfile != 0) {
         log() << "Running " << storageGlobalParams.engine << " with profiling is not supported. "
               << "Make sure you are not using --profile.";
@@ -809,10 +805,7 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
         executor::makeNetworkInterface("Replication", nullptr, std::move(hookList)));
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
-                                     ("SSLManager", "ServiceContext", "default"))
-(InitializerContext* context) {
-    auto serviceContext = getGlobalServiceContext();
+void setUpReplication(ServiceContext* serviceContext) {
     repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());
     auto storageInterface = repl::StorageInterface::get(serviceContext);
 
@@ -849,7 +842,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         static_cast<int64_t>(curTimeMillis64()));
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::setOplogCollectionName(serviceContext);
-    return Status::OK();
 }
 
 #ifdef MONGO_CONFIG_SSL
@@ -996,6 +988,18 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
         severe(LogComponent::kControl) << "Failed global initialization: " << status;
         quickExit(EXIT_FAILURE);
     }
+
+    try {
+        setGlobalServiceContext(ServiceContext::make());
+    } catch (...) {
+        auto cause = exceptionToStatus();
+        severe(LogComponent::kControl) << "Failed to create service context: " << redact(cause);
+        quickExit(EXIT_FAILURE);
+    }
+
+    auto service = getGlobalServiceContext();
+    setUpReplication(service);
+    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
 
     ErrorExtraInfo::invariantHaveAllParsers();
 

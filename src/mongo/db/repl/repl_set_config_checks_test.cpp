@@ -36,13 +36,14 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace repl {
 namespace {
 
-TEST(ValidateConfigForInitiate, VersionMustBe1) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_VersionMustBe1) {
     ReplicationCoordinatorExternalStateMock rses;
     rses.addSelf(HostAndPort("h1"));
 
@@ -60,7 +61,7 @@ TEST(ValidateConfigForInitiate, VersionMustBe1) {
                   validateConfigForInitiate(&rses, config, getGlobalServiceContext()).getStatus());
 }
 
-TEST(ValidateConfigForInitiate, MustFindSelf) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_MustFindSelf) {
     ReplSetConfig config;
     ASSERT_OK(config.initializeForInitiate(BSON("_id"
                                                 << "rs0"
@@ -95,7 +96,7 @@ TEST(ValidateConfigForInitiate, MustFindSelf) {
                       &presentOnceExternalState, config, getGlobalServiceContext())));
 }
 
-TEST(ValidateConfigForInitiate, SelfMustBeElectable) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_SelfMustBeElectable) {
     ReplSetConfig config;
     ASSERT_OK(config.initializeForInitiate(BSON("_id"
                                                 << "rs0"
@@ -121,7 +122,7 @@ TEST(ValidateConfigForInitiate, SelfMustBeElectable) {
             .getStatus());
 }
 
-TEST(ValidateConfigForInitiate, WriteConcernMustBeSatisfiable) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_WriteConcernMustBeSatisfiable) {
     ReplSetConfig config;
     ASSERT_OK(
         config.initializeForInitiate(BSON("_id"
@@ -144,7 +145,7 @@ TEST(ValidateConfigForInitiate, WriteConcernMustBeSatisfiable) {
             .getStatus());
 }
 
-TEST(ValidateConfigForInitiate, ArbiterPriorityMustBeZeroOrOne) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_ArbiterPriorityMustBeZeroOrOne) {
     ReplSetConfig zeroConfig;
     ReplSetConfig oneConfig;
     ReplSetConfig twoConfig;
@@ -216,7 +217,7 @@ TEST(ValidateConfigForInitiate, ArbiterPriorityMustBeZeroOrOne) {
             .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, NewConfigVersionNumberMustBeHigherThanOld) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigVersionNumberMustBeHigherThanOld) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
@@ -284,7 +285,7 @@ TEST(ValidateConfigForReconfig, NewConfigVersionNumberMustBeHigherThanOld) {
                       .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetName) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
@@ -333,7 +334,7 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
                       .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetId) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotChangeSetId) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
@@ -388,7 +389,7 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetId) {
                       .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipBuildIndexesFlag) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
@@ -470,7 +471,7 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
                       .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigMustNotFlipArbiterFlag) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
@@ -545,7 +546,7 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
                       .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_HostAndIdRemappingRestricted) {
     // When reconfiguring a replica set, it is allowed to introduce (host, id) pairs
     // absent from the old config only when the hosts and ids were both individually
     // absent in the old config.
@@ -654,7 +655,7 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
             .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, MustFindSelf) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_MustFindSelf) {
     // Old and new config are same except for version change; this is just testing that we can
     // find ourself in the new config.
     ReplSetConfig oldConfig;
@@ -725,7 +726,7 @@ TEST(ValidateConfigForReconfig, MustFindSelf) {
             &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)));
 }
 
-TEST(ValidateConfigForReconfig, ArbiterPriorityValueMustBeZeroOrOne) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_ArbiterPriorityValueMustBeZeroOrOne) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
@@ -823,7 +824,7 @@ TEST(ValidateConfigForReconfig, ArbiterPriorityValueMustBeZeroOrOne) {
                       .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, SelfMustEndElectable) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_SelfMustEndElectable) {
     // Old and new config are same except for version change and the electability of one node;
     // this is just testing that we must be electable in the new config.
     ReplSetConfig oldConfig;
@@ -871,7 +872,7 @@ TEST(ValidateConfigForReconfig, SelfMustEndElectable) {
                   .getStatus());
 }
 
-TEST(ValidateConfigForInitiate, NewConfigInvalid) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForInitiate will return a status indicating what is
     // wrong with the new config.
@@ -896,7 +897,7 @@ TEST(ValidateConfigForInitiate, NewConfigInvalid) {
             .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, NewConfigInvalid) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForReconfig will return a status indicating what is
     // wrong with the new config.
@@ -939,7 +940,7 @@ TEST(ValidateConfigForReconfig, NewConfigInvalid) {
             .getStatus());
 }
 
-TEST(ValidateConfigForReconfig, NewConfigWriteConcernNotSatisifiable) {
+TEST_F(ServiceContextTest, ValidateConfigForReconfig_NewConfigWriteConcernNotSatisifiable) {
     // The new config is not valid due to an unsatisfiable write concern. This tests that if the
     // new config is invalid, validateConfigForReconfig will return a status indicating what is
     // wrong with the new config.
@@ -982,7 +983,7 @@ TEST(ValidateConfigForReconfig, NewConfigWriteConcernNotSatisifiable) {
             .getStatus());
 }
 
-TEST(ValidateConfigForStartUp, NewConfigInvalid) {
+TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForStartUp will return a status indicating what is wrong
     // with the new config.
@@ -1007,7 +1008,7 @@ TEST(ValidateConfigForStartUp, NewConfigInvalid) {
             .getStatus());
 }
 
-TEST(ValidateConfigForStartUp, NewConfigValid) {
+TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigValid) {
     // The new config is valid. This tests that validateConfigForStartUp will return a
     // Status::OK() indicating the validity of this configuration.
     ReplSetConfig newConfig;
@@ -1032,7 +1033,7 @@ TEST(ValidateConfigForStartUp, NewConfigValid) {
             .getStatus());
 }
 
-TEST(ValidateConfigForStartUp, NewConfigWriteConcernNotSatisfiable) {
+TEST_F(ServiceContextTest, ValidateConfigForStartUp_NewConfigWriteConcernNotSatisfiable) {
     // The new config contains an unsatisfiable write concern.  We don't allow these configs to be
     // created anymore, but we allow any which exist to pass and the database to start up to
     // maintain backwards compatibility.
@@ -1056,7 +1057,7 @@ TEST(ValidateConfigForStartUp, NewConfigWriteConcernNotSatisfiable) {
             .getStatus());
 }
 
-TEST(ValidateConfigForHeartbeatReconfig, NewConfigInvalid) {
+TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForHeartbeatReconfig will return a status indicating
     // what is wrong with the new config.
@@ -1081,7 +1082,7 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigInvalid) {
                       .getStatus());
 }
 
-TEST(ValidateConfigForHeartbeatReconfig, NewConfigValid) {
+TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigValid) {
     // The new config is valid. This tests that validateConfigForHeartbeatReconfig will return
     // a Status::OK() indicating the validity of this config change.
     ReplSetConfig newConfig;
@@ -1104,7 +1105,7 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigValid) {
                   .getStatus());
 }
 
-TEST(ValidateConfigForHeartbeatReconfig, NewConfigWriteConcernNotSatisfiable) {
+TEST_F(ServiceContextTest, ValidateConfigForHeartbeatReconfig_NewConfigWriteConcernNotSatisfiable) {
     // The new config contains an unsatisfiable write concern.  We don't allow these configs to be
     // created anymore, but we allow any which exist to be received in a heartbeat.
     ReplSetConfig newConfig;
@@ -1129,7 +1130,7 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigWriteConcernNotSatisfiable) {
                   .getStatus());
 }
 
-TEST(ValidateForReconfig, ForceStillNeedsValidConfig) {
+TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsValidConfig) {
     // The new config is invalid due to two nodes with the same _id value. This tests that
     // ValidateForReconfig fails with an invalid config, even if force is true.
     ReplSetConfig oldConfig;
@@ -1168,7 +1169,7 @@ TEST(ValidateForReconfig, ForceStillNeedsValidConfig) {
             .getStatus());
 }
 
-TEST(ValidateForReconfig, ForceStillNeedsSelfPresent) {
+TEST_F(ServiceContextTest, ValidateForReconfig_ForceStillNeedsSelfPresent) {
     // The new config does not contain self. This tests that ValidateForReconfig fails
     // if the member receiving it is absent from the config, even if force is true.
     ReplSetConfig oldConfig;

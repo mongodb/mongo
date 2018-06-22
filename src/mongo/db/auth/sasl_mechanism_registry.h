@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <unordered_map>
 
@@ -333,4 +334,18 @@ private:
     stdx::unordered_map<std::string, std::unique_ptr<ServerFactoryBase>> _externalMap;
 };
 
+template <typename Factory>
+class GlobalSASLMechanismRegisterer {
+private:
+    boost::optional<ServiceContext::ConstructorActionRegisterer> registerer;
+
+public:
+    GlobalSASLMechanismRegisterer() {
+        registerer.emplace(std::string(typeid(Factory).name()),
+                           std::vector<std::string>{"CreateSASLServerMechanismRegistry"},
+                           [](ServiceContext* service) {
+                               SASLServerMechanismRegistry::get(service).registerFactory<Factory>();
+                           });
+    }
+};
 }  // namespace mongo

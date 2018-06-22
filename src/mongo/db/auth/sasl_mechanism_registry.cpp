@@ -124,23 +124,13 @@ bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechNam
     return sequenceContains(saslGlobalParams.authenticationMechanisms, mechName);
 }
 
-GlobalInitializerRegisterer SASLServerMechanismRegistryInitializer(
+namespace {
+ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializer{
     "CreateSASLServerMechanismRegistry",
-    {"ServiceContext"},
-    [](InitializerContext* context) {
-        if (saslGlobalParams.hostName.empty())
-            saslGlobalParams.hostName = getHostNameCached();
-        if (saslGlobalParams.serviceName.empty())
-            saslGlobalParams.serviceName = "mongodb";
-
-        auto registry = stdx::make_unique<SASLServerMechanismRegistry>();
-        SASLServerMechanismRegistry::set(getGlobalServiceContext(), std::move(registry));
-        return Status::OK();
-    },
-    [](DeinitializerContext* context) {
-        SASLServerMechanismRegistry::set(getGlobalServiceContext(), nullptr);
-
-        return Status::OK();
-    });
+    {"EndStartupOptionStorage"},
+    [](ServiceContext* service) {
+        SASLServerMechanismRegistry::set(service, std::make_unique<SASLServerMechanismRegistry>());
+    }};
+}  // namespace
 
 }  // namespace mongo

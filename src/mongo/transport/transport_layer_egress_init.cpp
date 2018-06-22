@@ -34,25 +34,23 @@
 #include "mongo/db/service_context.h"
 #include "mongo/transport/transport_layer_asio.h"
 
+#include <iostream>
+
 namespace mongo {
 namespace {
-// Linking with this file will configure an egress-only TransportLayer on a ServiceContextNoop.
+// Linking with this file will configure an egress-only TransportLayer on all new ServiceContexts.
 // Use this for unit/integration tests that require only egress networking.
-MONGO_INITIALIZER_WITH_PREREQUISITES(ConfigureEgressTransportLayer, ("ServiceContext"))
-(InitializerContext* context) {
-    auto sc = getGlobalServiceContext();
-    invariant(!sc->getTransportLayer());
 
-    transport::TransportLayerASIO::Options opts;
-    opts.mode = transport::TransportLayerASIO::Options::kEgress;
-    sc->setTransportLayer(std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
-    auto status = sc->getTransportLayer()->setup();
-    if (!status.isOK()) {
-        return status;
-    }
+ServiceContext::ConstructorActionRegisterer registerEgressTransportLayer{
+    "ConfigureEgressTransportLayer", [](ServiceContext* sc) {
 
-    return sc->getTransportLayer()->start();
-}
+        invariant(!sc->getTransportLayer());
+        transport::TransportLayerASIO::Options opts;
+        opts.mode = transport::TransportLayerASIO::Options::kEgress;
+        sc->setTransportLayer(std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
+        uassertStatusOK(sc->getTransportLayer()->setup());
+        uassertStatusOK(sc->getTransportLayer()->start());
+    }};
 
 }  // namespace
-}  // namespace
+}  // namespace mongo

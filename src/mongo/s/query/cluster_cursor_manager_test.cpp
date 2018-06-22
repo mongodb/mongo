@@ -34,8 +34,8 @@
 
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_cache_noop.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/query/cluster_client_cursor_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -48,13 +48,17 @@ namespace {
 using unittest::assertGet;
 const NamespaceString nss("test.collection");
 
-class ClusterCursorManagerTest : public unittest::Test {
+class ClusterCursorManagerTest : public ServiceContextTest {
 protected:
-    ClusterCursorManagerTest() : _manager(&_clockSourceMock) {}
+    ClusterCursorManagerTest() : _opCtx(makeOperationContext()), _manager(&_clockSourceMock) {
+        LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
+    }
 
-    ServiceContextNoop serviceContext;
+    ~ClusterCursorManagerTest() {
+        _manager.shutdown(_opCtx.get());
+    }
+
     ServiceContext::UniqueOperationContext _opCtx;
-    Client* _client;
 
     static Status successAuthChecker(UserNameIterator userNames) {
         return Status::OK();
@@ -106,49 +110,16 @@ protected:
     }
 
     void killCursorFromDifferentOpCtx(const NamespaceString& nss, CursorId cursorId) {
+
         // Set up another client to kill the cursor.
-        auto killCursorClientOwned = serviceContext.makeClient("killCursorClient");
-        // Keep around a raw pointer for when we transfer ownership of killingClientOwned to the
-        // global current client.
-        Client* killCursorClient = killCursorClientOwned.get();
-
-        // Need to swap the current client in order to make an operation context.
-        auto pinningClient = Client::releaseCurrent();
-        Client::setCurrent(std::move(killCursorClientOwned));
-
+        auto killCursorClient = getServiceContext()->makeClient("killCursorClient");
         auto killCursorOpCtx = killCursorClient->makeOperationContext();
-        invariant(killCursorOpCtx);
+        AlternativeClientRegion acr(killCursorClient);
         ASSERT_OK(getManager()->killCursor(killCursorOpCtx.get(), nss, cursorId));
-
-        // Restore the old client. We don't need 'killCursorClient' anymore.
-        killCursorOpCtx.reset();
-        Client::releaseCurrent();
-
-        Client::setCurrent(std::move(pinningClient));
     }
 
 
 private:
-    void setUp() final {
-        auto client = serviceContext.makeClient("testClient");
-        _opCtx = client->makeOperationContext();
-        _client = client.get();
-        Client::setCurrent(std::move(client));
-
-        LogicalSessionCache::set(&serviceContext, stdx::make_unique<LogicalSessionCacheNoop>());
-    }
-
-    void tearDown() final {
-        _manager.shutdown(_opCtx.get());
-
-        if (_opCtx) {
-            _opCtx.reset();
-        }
-
-        Client::releaseCurrent();
-        LogicalSessionCache::set(&serviceContext, nullptr);
-    }
-
     // List of flags representing whether our allocated cursors have been killed yet.  The value of
     // the flag is true iff the cursor has been killed.
     //

@@ -69,10 +69,10 @@ protected:
         CatalogCacheTestFixture::setupNShards(numShards);
 
         // Set up a logical clock with an initial time.
-        auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext());
+        auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         LogicalTime initialTime(Timestamp(10, 1));
         logicalClock->setClusterTimeFromTrustedSource(initialTime);
-        LogicalClock::set(serviceContext(), std::move(logicalClock));
+        LogicalClock::set(getServiceContext(), std::move(logicalClock));
 
         auto keysCollectionClient = stdx::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
@@ -81,7 +81,7 @@ protected:
             "dummy", std::move(keysCollectionClient), Seconds(KeysRotationIntervalSec));
 
         auto validator = stdx::make_unique<LogicalTimeValidator>(keyManager);
-        LogicalTimeValidator::set(serviceContext(), std::move(validator));
+        LogicalTimeValidator::set(getServiceContext(), std::move(validator));
 
         // ReadConcern 'snapshot' is only supported with test commands enabled.
         setTestCommandsEnabled(true);
@@ -123,7 +123,7 @@ protected:
     DbResponse runAggregateCommand(BSONObj aggCmd) {
         // Create a new client/operation context per command, and setup a test session ID and
         // transaction number.
-        auto client = serviceContext()->makeClient("ClusterAggClient");
+        auto client = getServiceContext()->makeClient("ClusterAggClient");
         auto opCtx = client->makeOperationContext();
         opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
         opCtx->setTxnNumber(1);

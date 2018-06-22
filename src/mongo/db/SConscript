@@ -244,7 +244,6 @@ env.CppUnitTest(
         'logical_session_id_helpers',
         'service_context',
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/unittest/concurrency',
         '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
@@ -508,8 +507,6 @@ env.Library(
         'operation_context.cpp',
         'operation_context_group.cpp',
         'service_context.cpp',
-        'service_context_noop.cpp',
-        'service_context_registrar.cpp',
         'server_recovery.cpp',
         'unclean_shutdown.cpp',
     ],
@@ -522,16 +519,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/periodic_runner',
-    ],
-)
-
-env.Library(
-    target='service_context_noop_init',
-    source=[
-        'service_context_noop_init.cpp'
-    ],
-    LIBDEPS=[
-        'service_context',
     ],
 )
 
@@ -607,9 +594,9 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/idl_parser',
         "commands",
-        "service_context_noop_init",
         "auth/authmocks",
         "repl/replmocks",
+        "service_context_test_fixture",
     ],
 )
 
@@ -677,7 +664,7 @@ env.CppUnitTest(
         'auth/authmocks',
         'catalog/database_holder_mock',
         'catalog_raii',
-        'service_context_noop_init',
+        'service_context_test_fixture',
         'stats/fill_locker_info',
     ],
 )
@@ -726,7 +713,6 @@ env.Library(
 env.Library(
     target="service_context_d",
     source=[
-        "service_context_d.cpp",
         "service_entry_point_mongod.cpp",
     ],
     LIBDEPS=[
@@ -1196,13 +1182,12 @@ envWithAsio.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/authorization_session_for_test',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         'logical_session_cache',
         'logical_session_cache_impl',
         'logical_session_id',
         'logical_session_id_helpers',
+        'service_context_test_fixture',
         'service_liaison_mock',
         'sessions_collection_mock',
     ],
@@ -1398,7 +1383,6 @@ envWithAsio.CppUnitTest(
         'logical_session_cache_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/executor/async_timer_mock',
         'auth/authmocks',
         'keys_collection_manager',
@@ -1409,6 +1393,7 @@ envWithAsio.CppUnitTest(
         'logical_session_cache',
         'logical_session_cache_impl',
         'service_liaison_mock',
+        'service_context_test_fixture',
         'sessions_collection_mock',
     ],
 )
@@ -1708,6 +1693,20 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='service_context_test_fixture',
+    source=[
+        'service_context_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'service_context',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+    LIBDEPS_PRIVATE=[
+        'op_observer',
+    ],
+)
+
+env.Library(
     target= 'service_context_d_test_fixture',
     source= [
         'service_context_d_test_fixture.cpp',
@@ -1718,6 +1717,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
         'service_context_d',
+        'service_context_test_fixture',
     ],
 )
 
@@ -1787,6 +1787,7 @@ asioEnv.CppIntegrationTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/network_interface_fixture',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
     ],
 )
 

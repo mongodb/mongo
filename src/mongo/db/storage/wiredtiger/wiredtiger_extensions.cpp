@@ -31,35 +31,18 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 
-#include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetWiredTigerExtensions, ("ServiceContext"))
-(InitializerContext* context) {
-    auto configHooks = stdx::make_unique<WiredTigerExtensions>();
-    WiredTigerExtensions::set(getGlobalServiceContext(), std::move(configHooks));
-
-    return Status::OK();
-}
-
 namespace {
-const auto getConfigHooks =
-    ServiceContext::declareDecoration<std::unique_ptr<WiredTigerExtensions>>();
+const auto getConfigHooks = ServiceContext::declareDecoration<WiredTigerExtensions>();
 }  // namespace
 
-void WiredTigerExtensions::set(ServiceContext* service,
-                               std::unique_ptr<WiredTigerExtensions> configHooks) {
-    auto& hooks = getConfigHooks(service);
-    invariant(configHooks);
-    hooks = std::move(configHooks);
-}
-
 WiredTigerExtensions* WiredTigerExtensions::get(ServiceContext* service) {
-    return getConfigHooks(service).get();
+    return &getConfigHooks(service);
 }
 
 std::string WiredTigerExtensions::getOpenExtensionsConfig() const {

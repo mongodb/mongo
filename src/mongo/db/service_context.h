@@ -28,14 +28,17 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/global_initializer_registerer.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/list.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
@@ -89,19 +92,10 @@ protected:
  * A ServiceContext is the root of a hierarchy of contexts.  A ServiceContext owns
  * zero or more Clients, which in turn each own OperationContexts.
  */
-class ServiceContext : public Decorable<ServiceContext> {
+class ServiceContext final : public Decorable<ServiceContext> {
     MONGO_DISALLOW_COPYING(ServiceContext);
 
 public:
-    /**
-     * Special deleter used for cleaning up Client objects owned by a ServiceContext.
-     * See UniqueClient, below.
-     */
-    class ClientDeleter {
-    public:
-        void operator()(Client* client) const;
-    };
-
     /**
      * Observer interface implemented to hook client and operation context creation and
      * destruction.
@@ -172,6 +166,31 @@ public:
     };
 
     /**
+     * Special deleter used for cleaning up ServiceContext objects.
+     * See UniqueServiceContext, below.
+     */
+    class ServiceContextDeleter {
+    public:
+        void operator()(ServiceContext* service) const;
+    };
+
+    using UniqueServiceContext = std::unique_ptr<ServiceContext, ServiceContextDeleter>;
+
+    /**
+     * Special deleter used for cleaning up Client objects owned by a ServiceContext.
+     * See UniqueClient, below.
+     */
+    class ClientDeleter {
+    public:
+        void operator()(Client* client) const;
+    };
+
+    /**
+     * This is the unique handle type for Clients created by a ServiceContext.
+     */
+    using UniqueClient = std::unique_ptr<Client, ClientDeleter>;
+
+    /**
      * Special deleter used for cleaning up OperationContext objects owned by a ServiceContext.
      * See UniqueOperationContext, below.
      */
@@ -181,16 +200,87 @@ public:
     };
 
     /**
-     * This is the unique handle type for Clients created by a ServiceContext.
-     */
-    using UniqueClient = std::unique_ptr<Client, ClientDeleter>;
-
-    /**
      * This is the unique handle type for OperationContexts created by a ServiceContext.
      */
     using UniqueOperationContext = std::unique_ptr<OperationContext, OperationContextDeleter>;
 
-    virtual ~ServiceContext();
+    /**
+     * Register a function of this type using  an instance of ConstructorActionRegisterer,
+     * below, to cause the function to be executed on new ServiceContext instances.
+     */
+    using ConstructorAction = stdx::function<void(ServiceContext*)>;
+
+    /**
+     * Register a function of this type using an instance of ConstructorActionRegisterer,
+     * below, to cause the function to be executed on ServiceContext instances before they
+     * are destroyed.
+     */
+    using DestructorAction = stdx::function<void(ServiceContext*) noexcept>;
+
+    /**
+     * Representation of a paired ConstructorAction and DestructorAction.
+     */
+    class ConstructorDestructorActions {
+    public:
+        ConstructorDestructorActions(ConstructorAction constructor, DestructorAction destructor)
+            : _constructor(std::move(constructor)), _destructor(std::move(destructor)) {}
+
+        void onCreate(ServiceContext* service) const {
+            _constructor(service);
+        }
+        void onDestroy(ServiceContext* service) const {
+            _destructor(service);
+        }
+
+    private:
+        ConstructorAction _constructor;
+        DestructorAction _destructor;
+    };
+
+    /**
+     * Registers a function to execute on new service contexts when they are created, and optionally
+     * also register a function to execute before those contexts are destroyed.
+     *
+     * Construct instances of this type during static initialization only, as they register
+     * MONGO_INITIALIZERS.
+     */
+    class ConstructorActionRegisterer {
+    public:
+        /**
+         * This constructor registers a constructor and optional destructor with the given
+         * "name" and no prerequisite constructors or mongo initializers.
+         */
+        ConstructorActionRegisterer(std::string name,
+                                    ConstructorAction constructor,
+                                    DestructorAction destructor = {});
+
+        /**
+         * This constructor registers a constructor and optional destructor with the given
+         * "name", and a list of names of prerequisites, "prereqs".
+         *
+         * The named constructor will run after all of its prereqs successfully complete,
+         * and the corresponding destructor, if provided, will run before any of its
+         * prerequisites execute.
+         */
+        ConstructorActionRegisterer(std::string name,
+                                    std::vector<std::string> prereqs,
+                                    ConstructorAction constructor,
+                                    DestructorAction destructor = {});
+
+    private:
+        using ConstructorActionListIterator = stdx::list<ConstructorDestructorActions>::iterator;
+        ConstructorActionListIterator _iter;
+        boost::optional<GlobalInitializerRegisterer> _registerer;
+    };
+
+    /**
+     * Factory function for making instances of ServiceContext. It is the only means by which they
+     * should be created.
+     */
+    static UniqueServiceContext make();
+
+    ServiceContext();
+    ~ServiceContext();
 
     /**
      * Registers an observer of lifecycle events on Clients created by this ServiceContext.
@@ -411,20 +501,29 @@ public:
      */
     void setServiceExecutor(std::unique_ptr<transport::ServiceExecutor> exec);
 
-protected:
-    ServiceContext();
-
-    /**
-     * Mutex used to synchronize access to mutable state of this ServiceContext instance,
-     * including possibly by its subclasses.
-     */
-    stdx::mutex _mutex;
-
 private:
-    /**
-     * Returns a new OperationContext. Private, for use by makeOperationContext.
-     */
-    virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) = 0;
+    class ClientObserverHolder {
+    public:
+        explicit ClientObserverHolder(std::unique_ptr<ClientObserver> observer)
+            : _observer(std::move(observer)) {}
+        void onCreate(Client* client) const {
+            _observer->onCreateClient(client);
+        }
+        void onDestroy(Client* client) const {
+            _observer->onDestroyClient(client);
+        }
+        void onCreate(OperationContext* opCtx) const {
+            _observer->onCreateOperationContext(opCtx);
+        }
+        void onDestroy(OperationContext* opCtx) const {
+            _observer->onDestroyOperationContext(opCtx);
+        }
+
+    private:
+        std::unique_ptr<ClientObserver> _observer;
+    };
+
+    stdx::mutex _mutex;
 
     /**
      * The storage engine, if any.
@@ -454,7 +553,7 @@ private:
     /**
      * Vector of registered observers.
      */
-    std::vector<std::unique_ptr<ClientObserver>> _clientObservers;
+    std::vector<ClientObserverHolder> _clientObservers;
     ClientSet _clients;
 
     /**
@@ -503,23 +602,12 @@ bool hasGlobalServiceContext();
 ServiceContext* getGlobalServiceContext();
 
 /**
- * Warning - This function is temporary. Do not introduce new uses of this API.
- *
- * Returns the singleton ServiceContext for this server process.
- *
- * Waits until there is a valid global ServiceContext.
- *
- * Caller does not own pointer.
- */
-ServiceContext* waitAndGetGlobalServiceContext();
-
-/**
  * Sets the global ServiceContext.  If 'serviceContext' is NULL, un-sets and deletes
  * the current global ServiceContext.
  *
  * Takes ownership of 'serviceContext'.
  */
-void setGlobalServiceContext(std::unique_ptr<ServiceContext>&& serviceContext);
+void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceContext);
 
 /**
  * Shortcut for querying the storage engine about whether it supports document-level locking.

@@ -34,28 +34,38 @@
 
 #include <map>
 
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/unclean_shutdown.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
+namespace {
+/**
+ * Creates the lock file used to prevent concurrent processes from accessing the data files,
+ * as appropriate.
+ */
+void createLockFile(ServiceContext* service);
+}  // namespace
+
 extern bool _supportsDocLocking;
 
-void initializeStorageEngine(ServiceContext* service, StorageEngineInitFlags initFlags) {
+void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFlags initFlags) {
     // This should be set once.
     invariant(!service->getStorageEngine());
 
-    // We should have a lock file or be in read-only mode. Confusingly, we can still have a lockFile
-    // if we are in read-only mode. This can happen if the server is started in read-only mode on a
-    // writable dbpath.
-    invariant((initFlags & StorageEngineInitFlags::kAllowNoLockFile) ||
-              StorageEngineLockFile::get(service) || storageGlobalParams.readOnly);
+    if (0 == (initFlags & StorageEngineInitFlags::kAllowNoLockFile)) {
+        createLockFile(service);
+    }
 
     const std::string dbpath = storageGlobalParams.dbpath;
     if (auto existingStorageEngine = StorageEngineMetadata::getStorageEngineForPath(dbpath)) {
@@ -192,6 +202,8 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
     }
 }
 
+namespace {
+
 void createLockFile(ServiceContext* service) {
     auto& lockFile = StorageEngineLockFile::get(service);
     try {
@@ -222,8 +234,6 @@ void createLockFile(ServiceContext* service) {
         startingAfterUncleanShutdown(service) = true;
     }
 }
-
-namespace {
 
 using FactoryMap = std::map<std::string, std::unique_ptr<StorageEngine::Factory>>;
 
@@ -306,4 +316,40 @@ void appendStorageEngineList(ServiceContext* service, BSONObjBuilder* result) {
     result->append("storageEngines", storageEngineList(service));
 }
 
+namespace {
+
+class StorageClientObserver final : public ServiceContext::ClientObserver {
+public:
+    void onCreateClient(Client* client) override{};
+    void onDestroyClient(Client* client) override{};
+    void onCreateOperationContext(OperationContext* opCtx) {
+        auto service = opCtx->getServiceContext();
+        auto storageEngine = service->getStorageEngine();
+        // NOTE(schwerin): The following uassert would be more desirable than the early return when
+        // no storage engine is set, but to achieve that we would have to ensure that this file was
+        // never linked into a test binary that didn't actually need/use the storage engine.
+        //
+        // uassert(<some code>,
+        //         "Must instantiate storage engine before creating OperationContext",
+        //         storageEngine);
+        if (!storageEngine) {
+            return;
+        }
+        if (storageEngine->isMmapV1()) {
+            opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+        } else {
+            opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());
+        }
+        opCtx->setRecoveryUnit(storageEngine->newRecoveryUnit(),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    }
+    void onDestroyOperationContext(OperationContext* opCtx) {}
+};
+
+ServiceContext::ConstructorActionRegisterer registerStorageClientObserverConstructor{
+    "RegisterStorageClientObserverConstructor", [](ServiceContext* service) {
+        service->registerClientObserver(std::make_unique<StorageClientObserver>());
+    }};
+
+}  // namespace
 }  // namespace mongo

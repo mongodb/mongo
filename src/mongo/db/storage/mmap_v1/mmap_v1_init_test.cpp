@@ -31,6 +31,7 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
@@ -41,13 +42,13 @@ namespace {
 
 using namespace mongo;
 
-class MMAPV1FactoryTest : public mongo::unittest::Test {
+class MMAPV1FactoryTest : public ServiceContextTest {
 private:
     virtual void setUp() {
-        ServiceContext* globalEnv = getGlobalServiceContext();
-        ASSERT_TRUE(globalEnv);
-        ASSERT_TRUE(isRegisteredStorageEngine(globalEnv, "mmapv1"));
-        factory = getFactoryForStorageEngine(globalEnv, "mmapv1");
+        ServiceContext* sc = getServiceContext();
+        ASSERT_TRUE(sc);
+        ASSERT_TRUE(isRegisteredStorageEngine(sc, "mmapv1"));
+        factory = getFactoryForStorageEngine(sc, "mmapv1");
         ASSERT_TRUE(factory);
     }
 

@@ -28,7 +28,9 @@
     // Test that a non-existent timezone directory causes mongoS startup to fail.
     conn = MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzNoInfo});
     assert.eq(conn, null, "expected launching mongos with bad timezone rules to fail");
-    assert.neq(-1, rawMongoProgramOutput().indexOf("Failed global initialization"));
+    // Look for either old or new error message
+    assert(rawMongoProgramOutput().indexOf("Failed to create service context") != -1 ||
+           rawMongoProgramOutput().indexOf("Failed global initialization") != -1);
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
     assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));

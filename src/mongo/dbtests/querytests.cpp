@@ -46,7 +46,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -702,7 +701,7 @@ public:
         // Check number of results and filterSet flag in explain.
         // filterSet is not available in oplog replay mode.
         BSONObj explainObj = c->next();
-        ASSERT(explainObj.hasField("executionStats"));
+        ASSERT(explainObj.hasField("executionStats")) << explainObj;
         BSONObj execStats = explainObj["executionStats"].Obj();
         ASSERT_EQUALS(1, execStats.getIntField("nReturned"));
 

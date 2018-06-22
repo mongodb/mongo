@@ -200,8 +200,4 @@ private:
     bool _allowLocalShard{true};
 };
 
-// Reference to the global Grid instance. Do not use in new code. Use one of the Grid::get methods
-// instead.
-extern Grid grid;
-
 }  // namespace mongo

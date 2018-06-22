@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_request.h"
@@ -74,7 +74,11 @@ const CursorId kExhaustedCursorID = 0;
 
 class DocumentSourceMergeCursorsTest : public ShardingTestFixture {
 public:
-    DocumentSourceMergeCursorsTest() : _expCtx(new ExpressionContextForTest(kTestNss)) {}
+    DocumentSourceMergeCursorsTest() {
+        TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
+        _expCtx = new ExpressionContext(operationContext(), nullptr);
+        _expCtx->ns = kTestNss;
+    }
 
     void setUp() override {
         ShardingTestFixture::setUp();
@@ -102,12 +106,12 @@ public:
         setupShards(shards);
     }
 
-    boost::intrusive_ptr<ExpressionContextForTest> getExpCtx() {
+    boost::intrusive_ptr<ExpressionContext> getExpCtx() {
         return _expCtx.get();
     }
 
 private:
-    boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectNonArray) {

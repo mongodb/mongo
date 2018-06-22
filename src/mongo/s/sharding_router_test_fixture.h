@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 
 namespace mongo {
@@ -50,7 +51,7 @@ class TransportLayerMock;
  * Sets up the mocked out objects for testing the replica-set backed catalog manager and catalog
  * client.
  */
-class ShardingTestFixture : public unittest::Test, public ShardingTestFixtureCommon {
+class ShardingTestFixture : public ServiceContextTest, public ShardingTestFixtureCommon {
 public:
     ShardingTestFixture();
     ~ShardingTestFixture();
@@ -64,7 +65,6 @@ public:
     DistLockManagerMock* distLock() const;
     RemoteCommandTargeterMock* configTargeter() const;
 
-    ServiceContext* serviceContext() const;
     OperationContext* operationContext() const;
 
     /**
@@ -169,10 +169,6 @@ public:
                                const ShardType& expectedShard,
                                const NamespaceString& expectedNs,
                                const ChunkVersion& expectedChunkVersion);
-
-    void setUp() override;
-
-    void tearDown() override;
 
     void shutdownExecutor();
 

@@ -32,7 +32,7 @@
 
 #include "boost/optional.hpp"
 
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context.h"
 #include "mongo/transport/service_executor_adaptive.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -107,8 +107,7 @@ struct RecursionOptions : public ServiceExecutorAdaptive::Options {
 class ServiceExecutorAdaptiveFixture : public unittest::Test {
 protected:
     void setUp() override {
-        auto scOwned = stdx::make_unique<ServiceContextNoop>();
-        setGlobalServiceContext(std::move(scOwned));
+        setGlobalServiceContext(ServiceContext::make());
         asioIoCtx = std::make_shared<asio::io_context>();
     }
 

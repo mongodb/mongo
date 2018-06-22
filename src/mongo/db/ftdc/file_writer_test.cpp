@@ -47,8 +47,10 @@ namespace mongo {
 const char* kTestFile = "metrics.test";
 const char* kTestFileCopy = "metrics.test.copy";
 
+class FTDCFileTest : public ServiceContextTest {};
+
 // File Sanity check
-TEST(FTDCFileTest, TestFileBasicMetadata) {
+TEST_F(FTDCFileTest, TestFileBasicMetadata) {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path p(tempdir.path());
     p /= kTestFile;
@@ -99,7 +101,7 @@ TEST(FTDCFileTest, TestFileBasicMetadata) {
 }
 
 // File Sanity check
-TEST(FTDCFileTest, TestFileBasicCompress) {
+TEST_F(FTDCFileTest, TestFileBasicCompress) {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path p(tempdir.path());
     p /= kTestFile;
@@ -208,7 +210,7 @@ private:
 };
 
 // Test various schema changes
-TEST(FTDCFileTest, TestSchemaChanges) {
+TEST_F(FTDCFileTest, TestSchemaChanges) {
     FileTestTie c;
 
     c.addSample(BSON("name"
@@ -279,7 +281,7 @@ TEST(FTDCFileTest, TestSchemaChanges) {
 }
 
 // Test a full buffer
-TEST(FTDCFileTest, TestFull) {
+TEST_F(FTDCFileTest, TestFull) {
     // Test a large numbers of zeros, and incremental numbers in a full buffer
     for (int j = 0; j < 2; j++) {
         FileTestTie c;
@@ -318,7 +320,7 @@ TEST(FTDCFileTest, TestFull) {
 }
 
 // Test a large documents so that we cause multiple 4kb buffers to flush on Windows.
-TEST(FTDCFileTest, TestLargeDocuments) {
+TEST_F(FTDCFileTest, TestLargeDocuments) {
     FileTestTie c;
 
     for (int j = 0; j < 5; j++) {
@@ -337,7 +339,7 @@ TEST(FTDCFileTest, TestLargeDocuments) {
 }
 
 // Test a bad file
-TEST(FTDCFileTest, TestBadFile) {
+TEST_F(FTDCFileTest, TestBadFile) {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path p(tempdir.path());
     p /= kTestFile;

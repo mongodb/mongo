@@ -39,7 +39,6 @@
 #include "mongo/db/ftdc/file_reader.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
@@ -111,17 +110,11 @@ void createDirectoryClean(const boost::filesystem::path& dir) {
     boost::filesystem::create_directory(dir);
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(FTDCTestInit, ("ThreadNameInitializer"))
-(InitializerContext* context) {
-    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-
-    getGlobalServiceContext()->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-    getGlobalServiceContext()->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-    getGlobalServiceContext()->setTickSource(stdx::make_unique<TickSourceMock>());
-
-    Client::initThreadIfNotAlready("UnitTest");
-
-    return Status::OK();
+FTDCTest::FTDCTest() {
+    auto service = getServiceContext();
+    service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+    service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
+    service->setTickSource(stdx::make_unique<TickSourceMock>());
 }
 
 }  // namespace mongo

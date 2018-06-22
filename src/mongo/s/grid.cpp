@@ -44,15 +44,17 @@
 
 namespace mongo {
 
+namespace {
 // Global grid instance
-Grid grid;
+const auto grid = ServiceContext::declareDecoration<Grid>();
+}
 
 Grid::Grid() = default;
 
 Grid::~Grid() = default;
 
 Grid* Grid::get(ServiceContext* serviceContext) {
-    return &grid;
+    return &grid(serviceContext);
 }
 
 Grid* Grid::get(OperationContext* operationContext) {

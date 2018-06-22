@@ -30,8 +30,14 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context_test_fixture.h"
 
 namespace mongo {
+
+class FTDCTest : public ServiceContextTest {
+public:
+    FTDCTest();
+};
 
 /**
  * Validate the documents in a file match the specified vector.

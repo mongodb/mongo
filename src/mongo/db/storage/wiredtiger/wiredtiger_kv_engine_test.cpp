@@ -53,6 +53,8 @@ class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(bool forRepair = false)
         : _dbpath("wt-kv-harness"), _forRepair(forRepair) {
+        if (!hasGlobalServiceContext())
+            setGlobalServiceContext(ServiceContext::make());
         _engine.reset(makeEngine());
         repl::ReplicationCoordinator::set(
             getGlobalServiceContext(),
@@ -101,7 +103,7 @@ private:
 class WiredTigerKVEngineTest : public unittest::Test {
 public:
     void setUp() override {
-
+        setGlobalServiceContext(ServiceContext::make());
         Client::initThread(getThreadName());
 
         _helper = makeHelper();
@@ -111,6 +113,7 @@ public:
     void tearDown() override {
         _helper.reset(nullptr);
         Client::destroy();
+        setGlobalServiceContext({});
     }
 
     std::unique_ptr<OperationContext> makeOperationContext() {

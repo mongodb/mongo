@@ -50,23 +50,14 @@
 
 namespace mongo {
 namespace {
-std::unique_ptr<DatabaseHolder> dbHolderStorage;
 
-GlobalInitializerRegisterer dbHolderImplInitializer("InitializeDbHolderimpl",
-                                                    [](InitializerContext* const) {
-                                                        dbHolderStorage =
-                                                            std::make_unique<DatabaseHolder>();
-                                                        return Status::OK();
-                                                    },
-                                                    [](DeinitializerContext* const) {
-                                                        dbHolderStorage = nullptr;
-                                                        return Status::OK();
-                                                    });
+const auto dbHolderStorage = ServiceContext::declareDecoration<DatabaseHolder>();
+
 }  // namespace
 
 MONGO_REGISTER_SHIM(DatabaseHolder::getDatabaseHolder)
 ()->DatabaseHolder& {
-    return *dbHolderStorage;
+    return dbHolderStorage(getGlobalServiceContext());
 }
 
 MONGO_REGISTER_SHIM(DatabaseHolder::makeImpl)

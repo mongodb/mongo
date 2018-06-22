@@ -36,11 +36,10 @@
 
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -49,19 +48,17 @@ using namespace mongo;
 
 namespace {
 
-class SortStageTest : public unittest::Test {
+class SortStageTest : public ServiceContextMongoDTest {
 public:
     SortStageTest() {
-        _service = stdx::make_unique<ServiceContextNoop>();
-        _service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-        _client = _service->makeClient("test");
-        _opCtxNoop = _client->makeOperationContext();
-        _opCtx = _opCtxNoop.get();
-        CollatorFactoryInterface::set(_service.get(), stdx::make_unique<CollatorFactoryMock>());
+        getServiceContext()->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+        _opCtx = makeOperationContext();
+        CollatorFactoryInterface::set(getServiceContext(),
+                                      stdx::make_unique<CollatorFactoryMock>());
     }
 
     OperationContext* getOpCtx() {
-        return _opCtx;
+        return _opCtx.get();
     }
 
     /**
@@ -155,15 +152,7 @@ public:
     }
 
 private:
-    OperationContext* _opCtx;
-
-    std::unique_ptr<ServiceContextNoop> _service;
-
-    // Members of a class are destroyed in reverse order of declaration.
-    // The UniqueClient must be destroyed before the ServiceContextNoop is destroyed.
-    // The OperationContextNoop must be destroyed before the UniqueClient is destroyed.
-    ServiceContext::UniqueClient _client;
-    ServiceContext::UniqueOperationContext _opCtxNoop;
+    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 TEST_F(SortStageTest, SortEmptyWorkingSet) {

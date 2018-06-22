@@ -60,8 +60,10 @@ namespace mongo {
                 FTDCCompressor::CompressorState::kCompressorFull); \
     ASSERT_TRUE(st.getValue().is_initialized());
 
+class FTDCCompressorTest : public FTDCTest {};
+
 // Sanity check
-TEST(FTDCCompressor, TestBasic) {
+TEST_F(FTDCCompressorTest, TestBasic) {
     FTDCConfig config;
     FTDCCompressor c(&config);
 
@@ -91,7 +93,7 @@ TEST(FTDCCompressor, TestBasic) {
 }
 
 // Test strings only
-TEST(FTDCCompressor, TestStrings) {
+TEST_F(FTDCCompressorTest, TestStrings) {
     FTDCConfig config;
     FTDCCompressor c(&config);
 
@@ -180,7 +182,7 @@ private:
 };
 
 // Test various schema changes
-TEST(FTDCCompressor, TestSchemaChanges) {
+TEST_F(FTDCCompressorTest, TestSchemaChanges) {
     TestTie c;
 
     auto st = c.addSample(BSON("name"
@@ -341,7 +343,7 @@ TEST(FTDCCompressor, TestSchemaChanges) {
 }
 
 // Ensure changing between the various number formats is considered compatible
-TEST(FTDCCompressor, TestNumbersCompat) {
+TEST_F(FTDCCompressorTest, TestNumbersCompat) {
     TestTie c;
 
     auto st = c.addSample(BSON("name"
@@ -368,7 +370,7 @@ TEST(FTDCCompressor, TestNumbersCompat) {
 }
 
 // Test various date time types
-TEST(FTDCCompressor, TestDateTimeTypes) {
+TEST_F(FTDCCompressorTest, TestDateTimeTypes) {
     TestTie c;
     for (int i = 0; i < 10; i++) {
         BSONObjBuilder builder1;
@@ -382,7 +384,7 @@ TEST(FTDCCompressor, TestDateTimeTypes) {
 }
 
 // Test all types
-TEST(FTDCCompressor, Types) {
+TEST_F(FTDCCompressorTest, Types) {
     TestTie c;
 
     auto st = c.addSample(BSON("name"
@@ -455,7 +457,7 @@ TEST(FTDCCompressor, Types) {
 }
 
 // Test a full buffer
-TEST(FTDCCompressor, TestFull) {
+TEST_F(FTDCCompressorTest, TestFull) {
     // Test a large numbers of zeros, and incremental numbers in a full buffer
     for (int j = 0; j < 2; j++) {
         TestTie c;
@@ -509,7 +511,7 @@ BSONObj generateSample(std::random_device& rd, T generator, size_t count) {
 }
 
 // Test many metrics
-TEST(ZFTDCCompressor, TestManyMetrics) {
+TEST_F(FTDCCompressorTest, TestManyMetrics) {
     std::random_device rd;
     std::mt19937 gen(rd());
 

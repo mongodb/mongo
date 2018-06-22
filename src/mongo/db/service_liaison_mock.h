@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
 #include "mongo/db/service_liaison.h"
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/platform/atomic_word.h"
@@ -132,7 +131,7 @@ protected:
 
 private:
     std::shared_ptr<MockServiceLiaisonImpl> _impl;
-    std::unique_ptr<ServiceContextNoop> _serviceContext;
+    ServiceContext::UniqueServiceContext _serviceContext;
 };
 
 }  // namespace mongo

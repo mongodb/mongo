@@ -43,7 +43,6 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
@@ -90,7 +89,6 @@ int runDbTests(int argc, char** argv) {
 
     srand((unsigned)frameworkGlobalParams.seed);
 
-    createLockFile(globalServiceContext);
     initializeStorageEngine(globalServiceContext, StorageEngineInitFlags::kNone);
     auto registry = stdx::make_unique<OpObserverRegistry>();
     registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());

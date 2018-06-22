@@ -35,18 +35,18 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/filesystem/operations.hpp>
 
+namespace mongo {
 namespace {
-using mongo::MongoURI;
-
 struct URITestCase {
     std::string URI;
     std::string uname;
     std::string password;
-    mongo::ConnectionString::ConnectionType type;
+    ConnectionString::ConnectionType type;
     std::string setname;
     size_t numservers;
     size_t numOptions;
@@ -57,8 +57,8 @@ struct InvalidURITestCase {
     std::string URI;
 };
 
-const mongo::ConnectionString::ConnectionType kMaster = mongo::ConnectionString::MASTER;
-const mongo::ConnectionString::ConnectionType kSet = mongo::ConnectionString::SET;
+const ConnectionString::ConnectionType kMaster = ConnectionString::MASTER;
+const ConnectionString::ConnectionType kSet = ConnectionString::SET;
 
 const URITestCase validCases[] = {
 
@@ -407,34 +407,34 @@ const InvalidURITestCase invalidCases[] = {
 };
 
 // Helper Method to take a filename for a json file and return the array of tests inside of it
-mongo::BSONObj getBsonFromJsonFile(std::string fileName) {
+BSONObj getBsonFromJsonFile(std::string fileName) {
     boost::filesystem::path directoryPath = boost::filesystem::current_path();
     boost::filesystem::path filePath(directoryPath / "src" / "mongo" / "client" /
                                      "mongo_uri_tests" / fileName);
     std::string filename(filePath.string());
     std::ifstream infile(filename.c_str());
     std::string data((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
-    mongo::BSONObj obj = mongo::fromjson(data);
-    ASSERT_TRUE(obj.valid(mongo::BSONVersion::kLatest));
+    BSONObj obj = fromjson(data);
+    ASSERT_TRUE(obj.valid(BSONVersion::kLatest));
     ASSERT_TRUE(obj.hasField("tests"));
-    mongo::BSONObj arr = obj.getField("tests").embeddedObject().getOwned();
+    BSONObj arr = obj.getField("tests").embeddedObject().getOwned();
     ASSERT_TRUE(arr.couldBeArray());
     return arr;
 }
 
 // Helper method to take a BSONElement and either extract its string or return an empty string
-std::string returnStringFromElementOrNull(mongo::BSONElement element) {
+std::string returnStringFromElementOrNull(BSONElement element) {
     ASSERT_TRUE(!element.eoo());
-    if (element.type() == mongo::jstNULL) {
+    if (element.type() == jstNULL) {
         return std::string();
     }
-    ASSERT_EQ(element.type(), mongo::String);
+    ASSERT_EQ(element.type(), String);
     return element.String();
 }
 
 // Helper method to take a valid test case, parse() it, and assure the output is correct
 void testValidURIFormat(URITestCase testCase) {
-    mongo::unittest::log() << "Testing URI: " << testCase.URI << '\n';
+    unittest::log() << "Testing URI: " << testCase.URI << '\n';
     std::string errMsg;
     const auto cs_status = MongoURI::parse(testCase.URI);
     ASSERT_OK(cs_status);
@@ -462,13 +462,13 @@ TEST(MongoURI, InvalidURIs) {
 
     for (size_t i = 0; i != numCases; ++i) {
         const InvalidURITestCase testCase = invalidCases[i];
-        mongo::unittest::log() << "Testing URI: " << testCase.URI << '\n';
+        unittest::log() << "Testing URI: " << testCase.URI << '\n';
         auto cs_status = MongoURI::parse(testCase.URI);
         ASSERT_NOT_OK(cs_status);
     }
 }
 
-TEST(MongoURI, ValidButBadURIsFailToConnect) {
+TEST_F(ServiceContextTest, ValidButBadURIsFailToConnect) {
     // "invalid" is a TLD that cannot exit on the public internet (see rfc2606). It should always
     // parse as a valid URI, but connecting should always fail.
     auto sw_uri = MongoURI::parse("mongodb://user:pass@hostname.invalid:12345");
@@ -477,7 +477,7 @@ TEST(MongoURI, ValidButBadURIsFailToConnect) {
     ASSERT_TRUE(uri.isValid());
 
     std::string errmsg;
-    auto dbclient = uri.connect(mongo::StringData(), errmsg);
+    auto dbclient = uri.connect(StringData(), errmsg);
     ASSERT_EQ(dbclient, static_cast<decltype(dbclient)>(nullptr));
 }
 
@@ -494,7 +494,7 @@ TEST(MongoURI, CloneURIForServer) {
     auto& uriOptions = uri.getOptions();
     ASSERT_EQ(uriOptions.at("ssl"), "true");
 
-    auto clonedURI = uri.cloneURIForServer(mongo::HostAndPort{"localhost:27020"});
+    auto clonedURI = uri.cloneURIForServer(HostAndPort{"localhost:27020"});
 
     ASSERT_EQ(clonedURI.type(), kMaster);
     ASSERT_TRUE(clonedURI.getSetName().empty());
@@ -524,7 +524,7 @@ TEST(MongoURI, specTests) {
         const auto testBson = getBsonFromJsonFile(file);
 
         for (const auto& testElement : testBson) {
-            ASSERT_EQ(testElement.type(), mongo::Object);
+            ASSERT_EQ(testElement.type(), Object);
             const auto test = testElement.Obj();
 
             // First extract the valid field and the uri field
@@ -535,13 +535,13 @@ TEST(MongoURI, specTests) {
 
             const auto uriDoc = test.getField("uri");
             ASSERT_FALSE(uriDoc.eoo());
-            ASSERT_EQ(uriDoc.type(), mongo::String);
+            ASSERT_EQ(uriDoc.type(), String);
             const auto uri = uriDoc.String();
 
             if (!valid) {
                 // This uri string is invalid --> parse the uri and ensure it fails
                 const InvalidURITestCase testCase = {uri};
-                mongo::unittest::log() << "Testing URI: " << testCase.URI << '\n';
+                unittest::log() << "Testing URI: " << testCase.URI << '\n';
                 auto cs_status = MongoURI::parse(testCase.URI);
                 ASSERT_NOT_OK(cs_status);
             } else {
@@ -552,8 +552,8 @@ TEST(MongoURI, specTests) {
 
                 const auto auth = test.getField("auth");
                 ASSERT_FALSE(auth.eoo());
-                if (auth.type() != mongo::jstNULL) {
-                    ASSERT_EQ(auth.type(), mongo::Object);
+                if (auth.type() != jstNULL) {
+                    ASSERT_EQ(auth.type(), Object);
                     const auto authObj = auth.embeddedObject();
                     database = returnStringFromElementOrNull(authObj.getField("db"));
                     username = returnStringFromElementOrNull(authObj.getField("username"));
@@ -563,22 +563,22 @@ TEST(MongoURI, specTests) {
                 // parse the hosts
                 const auto hosts = test.getField("hosts");
                 ASSERT_FALSE(hosts.eoo());
-                ASSERT_EQ(hosts.type(), mongo::Array);
+                ASSERT_EQ(hosts.type(), Array);
                 const auto numHosts = static_cast<size_t>(hosts.Obj().nFields());
 
                 // parse the options
-                mongo::ConnectionString::ConnectionType connectionType = kMaster;
+                ConnectionString::ConnectionType connectionType = kMaster;
                 size_t numOptions = 0;
                 std::string setName;
                 const auto optionsElement = test.getField("options");
                 ASSERT_FALSE(optionsElement.eoo());
-                if (optionsElement.type() != mongo::jstNULL) {
-                    ASSERT_EQ(optionsElement.type(), mongo::Object);
+                if (optionsElement.type() != jstNULL) {
+                    ASSERT_EQ(optionsElement.type(), Object);
                     const auto optionsObj = optionsElement.Obj();
                     numOptions = optionsObj.nFields();
                     const auto replsetElement = optionsObj.getField("replicaSet");
                     if (!replsetElement.eoo()) {
-                        ASSERT_EQ(replsetElement.type(), mongo::String);
+                        ASSERT_EQ(replsetElement.type(), String);
                         setName = replsetElement.String();
                         connectionType = kSet;
                     }
@@ -600,7 +600,6 @@ TEST(MongoURI, specTests) {
 }
 
 TEST(MongoURI, srvRecordTest) {
-    using namespace mongo;
     enum Expectation : bool { success = true, failure = false };
     const struct {
         int lineNumber;
@@ -843,11 +842,10 @@ TEST(MongoURI, srvRecordTest) {
 
         for (std::size_t i = 0; i < std::min(options.size(), expectedOptions.size()); ++i) {
             if (options[i] != expectedOptions[i]) {
-                mongo::unittest::log() << "Option: \"" << options[i].first << "="
-                                       << options[i].second << "\" doesn't equal: \""
-                                       << expectedOptions[i].first << "="
-                                       << expectedOptions[i].second << "\""
-                                       << " data on line: " << test.lineNumber << std::endl;
+                unittest::log() << "Option: \"" << options[i].first << "=" << options[i].second
+                                << "\" doesn't equal: \"" << expectedOptions[i].first << "="
+                                << expectedOptions[i].second << "\""
+                                << " data on line: " << test.lineNumber << std::endl;
                 std::cerr << "Failing URI: \"" << test.uri << "\""
                           << " data on line: " << test.lineNumber << std::endl;
                 ASSERT(false);
@@ -874,3 +872,4 @@ TEST(MongoURI, srvRecordTest) {
 }
 
 }  // namespace
+}  // namespace mongo

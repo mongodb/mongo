@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
@@ -42,7 +43,7 @@
 namespace mongo {
 namespace {
 
-TEST(KVDatabaseCatalogEntryTest, CreateCollectionValidNamespace) {
+TEST_F(ServiceContextTest, CreateCollectionValidNamespace) {
     KVStorageEngine storageEngine(
         new DevNullKVEngine(), KVStorageEngineOptions{}, kvDatabaseCatalogEntryMockFactory);
     storageEngine.finishInit();
@@ -54,7 +55,7 @@ TEST(KVDatabaseCatalogEntryTest, CreateCollectionValidNamespace) {
     ASSERT_FALSE(collectionNamespaces.empty());
 }
 
-TEST(KVDatabaseCatalogEntryTest, CreateCollectionEmptyNamespace) {
+TEST_F(ServiceContextTest, CreateCollectionEmptyNamespace) {
     KVStorageEngine storageEngine(
         new DevNullKVEngine(), KVStorageEngineOptions{}, kvDatabaseCatalogEntryMockFactory);
     storageEngine.finishInit();
@@ -84,7 +85,7 @@ public:
 };
 
 // After createCollection fails, collection namespaces should remain empty.
-TEST(KVDatabaseCatalogEntryTest, CreateCollectionInvalidRecordStore) {
+TEST_F(ServiceContextTest, CreateCollectionInvalidRecordStore) {
     KVStorageEngine storageEngine(new InvalidRecordStoreKVEngine(),
                                   KVStorageEngineOptions{},
                                   kvDatabaseCatalogEntryMockFactory);

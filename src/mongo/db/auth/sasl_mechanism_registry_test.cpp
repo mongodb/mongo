@@ -31,8 +31,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -128,16 +128,15 @@ public:
 };
 
 
-class MechanismRegistryTest : public mongo::unittest::Test {
+class MechanismRegistryTest : public ServiceContextTest {
 public:
     MechanismRegistryTest()
-        : opClient(serviceContext.makeClient("mechanismRegistryTest")),
-          opCtx(serviceContext.makeOperationContext(opClient.get())),
+        : opCtx(makeOperationContext()),
           authManagerExternalState(new AuthzManagerExternalStateMock()),
           authManager(new AuthorizationManagerImpl(
               std::unique_ptr<AuthzManagerExternalStateMock>(authManagerExternalState),
               AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{})) {
-        AuthorizationManager::set(&serviceContext,
+        AuthorizationManager::set(getServiceContext(),
                                   std::unique_ptr<AuthorizationManager>(authManager));
 
         ASSERT_OK(authManagerExternalState->updateOne(
@@ -181,8 +180,6 @@ public:
                                                    BSONObj()));
     }
 
-    ServiceContextNoop serviceContext;
-    ServiceContext::UniqueClient opClient;
     ServiceContext::UniqueOperationContext opCtx;
     AuthzManagerExternalStateMock* authManagerExternalState;
     AuthorizationManager* authManager;

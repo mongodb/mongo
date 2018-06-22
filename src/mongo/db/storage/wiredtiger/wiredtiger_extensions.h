@@ -39,8 +39,6 @@ class ServiceContext;
 
 class WiredTigerExtensions {
 public:
-    static void set(ServiceContext* service, std::unique_ptr<WiredTigerExtensions> custHooks);
-
     static WiredTigerExtensions* get(ServiceContext* service);
 
     /**

@@ -390,6 +390,7 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     operationContext()->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
 
     auto future = launchAsync([this, expectedShardName] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName =
             assertGet(ShardingCatalogManager::get(operationContext())
@@ -472,6 +473,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     DatabaseType discoveredDB2("TestDB2", ShardId(expectedShardName), false);
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(
             ShardingCatalogManager::get(operationContext())
@@ -563,6 +565,7 @@ TEST_F(AddShardTest, UnreachableHost) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto status =
             ShardingCatalogManager::get(operationContext())
@@ -590,6 +593,7 @@ TEST_F(AddShardTest, AddMongosAsShard) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto status =
             ShardingCatalogManager::get(operationContext())
@@ -617,6 +621,7 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
     std::string expectedShardName = "Standalone";
 
     auto future = launchAsync([this, expectedShardName, shardTarget] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto status =
             ShardingCatalogManager::get(operationContext())
@@ -649,6 +654,7 @@ TEST_F(AddShardTest, AddStandaloneHostShardAsReplicaSet) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
@@ -677,6 +683,7 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
@@ -707,6 +714,7 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
@@ -740,6 +748,7 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
     std::string expectedShardName = "StandaloneShard";
 
     auto future = launchAsync([this, expectedShardName, connString] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
@@ -775,6 +784,7 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
     std::string expectedShardName = "config";
 
     auto future = launchAsync([this, expectedShardName, connString] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
@@ -820,6 +830,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
 
 
     auto future = launchAsync([this, expectedShardName, connString] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto status = ShardingCatalogManager::get(operationContext())
                           ->addShard(operationContext(), &expectedShardName, connString, 100);
@@ -867,6 +878,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     DatabaseType discoveredDB("shardDB", ShardId(expectedShardName), false);
 
     auto future = launchAsync([this, &expectedShardName, &connString] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(), nullptr, connString, 100));
@@ -932,6 +944,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     DatabaseType discoveredDB("shardDB", ShardId(expectedShardName), false);
 
     auto future = launchAsync([this, &expectedShardName, &seedString] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(), nullptr, seedString, 100));
@@ -1007,6 +1020,7 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     ON_BLOCK_EXIT([&] { failPoint->setMode(FailPoint::off); });
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(
             ShardingCatalogManager::get(operationContext())
@@ -1098,6 +1112,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
     // Adding the same standalone host with a different shard name should fail.
     std::string differentName = "anotherShardName";
     auto future1 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
@@ -1113,6 +1128,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
 
     // Adding the same standalone host with a different maxSize should fail.
     auto future2 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
@@ -1128,6 +1144,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
     // can't change the sharded cluster's notion of the shard from standalone to replica set just
     // by calling addShard.
     auto future3 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
@@ -1143,6 +1160,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
 
     // Adding the same standalone host with the same options should succeed.
     auto future4 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(),
@@ -1159,6 +1177,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
     // Adding the same standalone host with the same options (without explicitly specifying the
     // shard name) should succeed.
     auto future5 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(),
@@ -1202,6 +1221,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     // Adding the same connection string with a different shard name should fail.
     std::string differentName = "anotherShardName";
     auto future1 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(
             ErrorCodes::IllegalOperation,
@@ -1216,6 +1236,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
 
     // Adding the same connection string with a different maxSize should fail.
     auto future2 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(
             ErrorCodes::IllegalOperation,
@@ -1234,6 +1255,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     // the sharded cluster's notion of the shard from replica set to standalone just by calling
     // addShard.
     auto future3 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
@@ -1252,6 +1274,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     // change the replica set name the sharded cluster knows for it just by calling addShard again.
     std::string differentSetName = "differentSet";
     auto future4 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                       ShardingCatalogManager::get(operationContext())
@@ -1268,6 +1291,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
 
     // Adding the same host with the same options should succeed.
     auto future5 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(),
@@ -1281,6 +1305,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     // Adding the same host with the same options (without explicitly specifying the shard name)
     // should succeed.
     auto future6 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(
             ShardingCatalogManager::get(operationContext())
@@ -1305,6 +1330,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
         targeterFactory()->addTargeterToReturn(otherHostConnString, std::move(otherHostTargeter));
     }
     auto future7 = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(ShardingCatalogManager::get(operationContext())
                                        ->addShard(operationContext(),

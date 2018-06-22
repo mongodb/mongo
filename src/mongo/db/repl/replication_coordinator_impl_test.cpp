@@ -57,7 +57,7 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
@@ -829,10 +829,6 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedUntilASufficientNumberOfNodes
 
 TEST_F(ReplCoordTest,
        NodeReturnsUnknownReplWriteConcernWhenAwaitReplicationReceivesAnInvalidWriteConcernMode) {
-    auto service = stdx::make_unique<ServiceContextNoop>();
-    auto client = service->makeClient("test");
-    auto opCtx = client->makeOperationContext();
-
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version"
@@ -862,6 +858,7 @@ TEST_F(ReplCoordTest,
     invalidWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
     invalidWriteConcern.wMode = "fakemode";
 
+    auto opCtx = makeOperationContext();
     ReplicationCoordinator::StatusAndDuration statusAndDur =
         getReplCoord()->awaitReplication(opCtx.get(), time1, invalidWriteConcern);
     ASSERT_EQUALS(ErrorCodes::UnknownReplWriteConcern, statusAndDur.status);
@@ -870,10 +867,6 @@ TEST_F(ReplCoordTest,
 TEST_F(
     ReplCoordTest,
     NodeReturnsWriteConcernFailedUntilASufficientSetOfNodesHaveTheWriteAndTheWriteIsInACommittedSnapshot) {
-    auto service = stdx::make_unique<ServiceContextNoop>();
-    auto client = service->makeClient("test");
-    auto opCtx = client->makeOperationContext();
-
     assertStartSuccess(
         BSON("_id"
              << "mySet"
@@ -941,7 +934,7 @@ TEST_F(
     multiRackWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
     multiRackWriteConcern.wMode = "multiDCAndRack";
 
-
+    auto opCtx = makeOperationContext();
     // Nothing satisfied
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);

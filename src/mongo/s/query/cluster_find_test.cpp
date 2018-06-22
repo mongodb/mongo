@@ -65,9 +65,9 @@ protected:
         CatalogCacheTestFixture::setupNShards(numShards);
 
         // Set up a logical clock with an initial time.
-        auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext());
+        auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
-        LogicalClock::set(serviceContext(), std::move(logicalClock));
+        LogicalClock::set(getServiceContext(), std::move(logicalClock));
     }
 
     // The index of the shard expected to receive the response is used to prevent different shards

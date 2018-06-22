@@ -34,6 +34,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 
@@ -171,6 +172,11 @@ Status storeSASLOptions(const moe::Environment& params) {
                 std::max<int>(scramSHA1IterationCount, defaultScramSHA256IterationCount));
         }
     }
+
+    if (saslGlobalParams.hostName.empty())
+        saslGlobalParams.hostName = getHostNameCached();
+    if (saslGlobalParams.serviceName.empty())
+        saslGlobalParams.serviceName = "mongodb";
 
     return Status::OK();
 }

@@ -79,7 +79,8 @@ const auto getShardingState = ServiceContext::declareDecoration<ShardingState>()
  */
 void updateShardIdentityConfigStringCB(const std::string& setName,
                                        const std::string& newConnectionString) {
-    auto configsvrConnStr = grid.shardRegistry()->getConfigServerConnectionString();
+    auto configsvrConnStr =
+        Grid::get(getGlobalServiceContext())->shardRegistry()->getConfigServerConnectionString();
     if (configsvrConnStr.getSetName() != setName) {
         // Ignore all change notification for other sets that are not the config server.
         return;

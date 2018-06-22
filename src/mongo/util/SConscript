@@ -274,7 +274,7 @@ env.CppUnitTest(
         "periodic_runner_impl_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "clock_source_mock",
         "periodic_runner_impl",
     ],

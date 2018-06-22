@@ -157,12 +157,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
     return std::make_tuple(true, std::string());
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SASLPLAINServerMechanism,
-                                     ("CreateSASLServerMechanismRegistry"))
-(::mongo::InitializerContext* context) {
-    auto& registry = SASLServerMechanismRegistry::get(getGlobalServiceContext());
-    registry.registerFactory<PLAINServerFactory>();
-    return Status::OK();
-}
-
+namespace {
+GlobalSASLMechanismRegisterer<PLAINServerFactory> plainRegisterer;
+}  // namespace
 }  // namespace mongo

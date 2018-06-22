@@ -35,7 +35,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot_manager.h"
@@ -46,7 +46,7 @@
 namespace mongo {
 namespace {
 
-class SnapshotManagerTests : public unittest::Test {
+class SnapshotManagerTests : public ServiceContextTest {
 public:
     /**
      * Usable as an OperationContext* but owns both the Client and the OperationContext.
@@ -89,7 +89,8 @@ public:
     };
 
     Operation makeOperation() {
-        return Operation(service.makeClient(""), helper->getEngine()->newRecoveryUnit());
+        return Operation(getServiceContext()->makeClient(""),
+                         helper->getEngine()->newRecoveryUnit());
     }
 
     // Returns the timestamp before incrementing.
@@ -200,7 +201,6 @@ public:
         ASSERT(rs);
     }
 
-    ServiceContextNoop service;
     std::unique_ptr<KVHarnessHelper> helper;
     KVEngine* engine;
     SnapshotManager* snapshotManager;

@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "mongo/db/client.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/s/client/shard_connection.h"
@@ -47,7 +48,7 @@ namespace {
 
 const std::string TARGET_HOST = "$dummy:27017";
 
-class ShardConnFixture : public unittest::Test {
+class ShardConnFixture : public ServiceContextTest {
 public:
     void setUp() {
         Client::initThreadIfNotAlready("ShardConnFixture");

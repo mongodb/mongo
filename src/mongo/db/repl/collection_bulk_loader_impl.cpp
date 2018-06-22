@@ -51,40 +51,6 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-
-/**
- * Utility class to temporarily swap which client is bound to the running thread.
- *
- * Use this class to bind a client to the current thread for the duration of the
- * AlternativeClientRegion's lifetime, restoring the prior client, if any, at the
- * end of the block.
- */
-class AlternativeClientRegion {
-public:
-    explicit AlternativeClientRegion(ServiceContext::UniqueClient& clientToUse)
-        : _alternateClient(&clientToUse) {
-        invariant(clientToUse);
-        if (Client::getCurrent()) {
-            _originalClient = Client::releaseCurrent();
-        }
-        Client::setCurrent(std::move(*_alternateClient));
-    }
-
-    ~AlternativeClientRegion() {
-        *_alternateClient = Client::releaseCurrent();
-        if (_originalClient) {
-            Client::setCurrent(std::move(_originalClient));
-        }
-    }
-
-private:
-    ServiceContext::UniqueClient _originalClient;
-    ServiceContext::UniqueClient* const _alternateClient;
-};
-
-}  // namespace
-
 CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient&& client,
                                                    ServiceContext::UniqueOperationContext&& opCtx,
                                                    std::unique_ptr<AutoGetCollection>&& autoColl,

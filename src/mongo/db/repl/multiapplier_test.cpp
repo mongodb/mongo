@@ -31,6 +31,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -40,7 +41,8 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
-class MultiApplierTest : public executor::ThreadPoolExecutorTest {
+class MultiApplierTest : public executor::ThreadPoolExecutorTest,
+                         ScopedGlobalServiceContextForTest {
 public:
 private:
     executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override;

@@ -50,8 +50,10 @@
 
 namespace mongo {
 
+class FTDCFileManagerTest : public ServiceContextTest {};
+
 // Test a full buffer
-TEST(FTDCFileManagerTest, TestFull) {
+TEST_F(FTDCFileManagerTest, TestFull) {
     Client* client = &cc();
     FTDCConfig c;
     c.maxFileSizeBytes = 300;
@@ -149,7 +151,7 @@ void ValidateInterimFileHasData(const boost::filesystem::path& dir, bool hasData
 }
 
 // Test a normal restart
-TEST(FTDCFileManagerTest, TestNormalRestart) {
+TEST_F(FTDCFileManagerTest, TestNormalRestart) {
     Client* client = &cc();
     FTDCConfig c;
     c.maxFileSizeBytes = 1000;
@@ -219,7 +221,7 @@ TEST(FTDCFileManagerTest, TestNormalRestart) {
 }
 
 // Test a restart after a crash with a corrupt archive file
-TEST(FTDCFileManagerTest, TestCorruptCrashRestart) {
+TEST_F(FTDCFileManagerTest, TestCorruptCrashRestart) {
     Client* client = &cc();
     FTDCConfig c;
     c.maxFileSizeBytes = 1000;
@@ -296,7 +298,7 @@ TEST(FTDCFileManagerTest, TestCorruptCrashRestart) {
 }
 
 // Test a restart with a good interim file, and validate we have all the data
-TEST(FTDCFileManagerTest, TestNormalCrashInterim) {
+TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     Client* client = &cc();
     FTDCConfig c;
     c.maxSamplesPerInterimMetricChunk = 3;

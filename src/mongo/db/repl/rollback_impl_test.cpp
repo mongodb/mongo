@@ -419,7 +419,7 @@ void _assertDocsInOplog(OperationContext* opCtx, std::vector<int> timestamps) {
 }
 
 TEST_F(RollbackImplTest, TestFixtureSetUpInitializesStorageEngine) {
-    auto serviceContext = _serviceContextMongoDTest.getServiceContext();
+    auto serviceContext = getServiceContext();
     ASSERT_TRUE(serviceContext);
     ASSERT_TRUE(serviceContext->getStorageEngine());
 }

@@ -95,6 +95,7 @@ asioEnv.CppIntegrationTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/network_interface_fixture',
-        '$BUILD_DIR/mongo/rpc/protocol'
+        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
     ],
 )

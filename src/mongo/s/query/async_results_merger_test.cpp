@@ -74,7 +74,6 @@ public:
     AsyncResultsMergerTest() {}
 
     void setUp() override {
-        ShardingTestFixture::setUp();
         setRemote(HostAndPort("ClientHost", 12345));
 
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
@@ -98,10 +97,6 @@ public:
         }
 
         setupShards(shards);
-    }
-
-    void tearDown() override {
-        ShardingTestFixture::tearDown();
     }
 
 protected:
@@ -2072,7 +2067,8 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     params.setOperationSessionInfo(sessionInfo);
 
     // This should trigger an invariant.
-    stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+    ASSERT_FALSE(
+        stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params)));
 }
 
 DEATH_TEST_F(AsyncResultsMergerTest,

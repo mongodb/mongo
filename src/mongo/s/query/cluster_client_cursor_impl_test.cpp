@@ -32,7 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/query/router_stage_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -41,27 +41,11 @@ namespace mongo {
 
 namespace {
 
-class ClusterClientCursorImplTest : public unittest::Test {
+class ClusterClientCursorImplTest : public ServiceContextTest {
 protected:
-    ServiceContextNoop _serviceContext;
+    ClusterClientCursorImplTest() : _opCtx(makeOperationContext()) {}
+
     ServiceContext::UniqueOperationContext _opCtx;
-    Client* _client;
-
-private:
-    void setUp() final {
-        auto client = _serviceContext.makeClient("testClient");
-        _opCtx = client->makeOperationContext();
-        _client = client.get();
-        Client::setCurrent(std::move(client));
-    }
-
-    void tearDown() final {
-        if (_opCtx) {
-            _opCtx.reset();
-        }
-
-        Client::releaseCurrent();
-    }
 };
 
 TEST_F(ClusterClientCursorImplTest, NumReturnedSoFar) {
@@ -196,7 +180,7 @@ TEST_F(ClusterClientCursorImplTest, ChecksForInterrupt) {
 
     // Now interrupt the opCtx which the cursor is running under.
     {
-        stdx::lock_guard<Client> lk(*_client);
+        stdx::lock_guard<Client> lk(*_opCtx->getClient());
         _opCtx->markKilled(ErrorCodes::CursorKilled);
     }
 

@@ -71,9 +71,9 @@ protected:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
         // Set up a logical clock with an initial time.
-        auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext());
+        auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
-        LogicalClock::set(serviceContext(), std::move(logicalClock));
+        LogicalClock::set(getServiceContext(), std::move(logicalClock));
     }
 };
 
@@ -131,9 +131,9 @@ protected:
         CatalogCacheTestFixture::setupNShards(2);
 
         // Set up a logical clock with an initial time.
-        auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext());
+        auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
-        LogicalClock::set(serviceContext(), std::move(logicalClock));
+        LogicalClock::set(getServiceContext(), std::move(logicalClock));
     }
 };
 
