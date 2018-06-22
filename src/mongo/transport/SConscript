@@ -113,6 +113,7 @@ tlEnv.Library(
     target='service_executor',
     source=[
         'service_executor_adaptive.cpp',
+        'service_executor_reserved.cpp',
         'service_executor_synchronous.cpp',
         'thread_idle_callback.cpp',
     ],
@@ -169,10 +170,23 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/util/processinfo',
+        'service_executor',
         'transport_layer_common',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/transport/message_compressor',
+    ],
+)
+
+env.CppUnitTest(
+    target='max_conns_override_test',
+    source=[
+        'max_conns_override_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_entry_point',
+        'transport_layer_mock',
+        '$BUILD_DIR/mongo/unittest/unittest'
     ],
 )
 

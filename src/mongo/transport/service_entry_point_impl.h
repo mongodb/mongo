@@ -34,8 +34,11 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_state_machine.h"
+#include "mongo/util/net/cidr.h"
 
 namespace mongo {
 class ServiceContext;
@@ -61,9 +64,10 @@ public:
 
     void endAllSessions(transport::Session::TagMask tags) final;
 
+    Status start() final;
     bool shutdown(Milliseconds timeout) final;
 
-    Stats sessionStats() const final;
+    void appendStats(BSONObjBuilder* bob) const final;
 
     size_t numOpenSessions() const final {
         return _currentConnections.load();
@@ -83,6 +87,14 @@ private:
     size_t _maxNumConnections{DEFAULT_MAX_CONN};
     AtomicWord<size_t> _currentConnections{0};
     AtomicWord<size_t> _createdConnections{0};
+
+    std::unique_ptr<transport::ServiceExecutorReserved> _adminInternalPool;
 };
+
+/*
+ * Returns true if a session with remote/local addresses should be exempted from maxConns
+ */
+bool shouldOverrideMaxConns(const transport::SessionHandle& session,
+                            const std::vector<stdx::variant<CIDR, std::string>>& exemptions);
 
 }  // namespace mongo

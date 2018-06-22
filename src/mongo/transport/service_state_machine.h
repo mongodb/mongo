@@ -126,6 +126,12 @@ public:
     void start(Ownership ownershipModel);
 
     /*
+     * Set the executor to be used for the next call to runNext(). This allows switching between
+     * thread models after the SSM has started.
+     */
+    void setServiceExecutor(transport::ServiceExecutor* executor);
+
+    /*
      * Gets the current state of connection for testing/diagnostic purposes.
      */
     State state();
@@ -219,6 +225,7 @@ private:
     transport::Mode _transportMode;
 
     ServiceContext* const _serviceContext;
+    transport::ServiceExecutor* _serviceExecutor;
 
     transport::SessionHandle _sessionHandle;
     const std::string _threadName;

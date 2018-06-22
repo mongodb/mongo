@@ -45,8 +45,9 @@ public:
 
     void startSession(transport::SessionHandle session) override;
     void endAllSessions(transport::Session::TagMask tags) override;
+    Status start() override;
     bool shutdown(Milliseconds timeout) override;
-    Stats sessionStats() const override;
+    void appendStats(BSONObjBuilder* bob) const override;
     size_t numOpenSessions() const override;
 
 private:
