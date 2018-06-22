@@ -10,10 +10,11 @@
 (function() {
     'use strict';
 
-    function runTest(m) {
+    load("jstests/libs/fixture_helpers.js");  // For isMongos.
+
+    function runTest(m, failPointName) {
         var db = m.getDB("foo");
         var admin = m.getDB("admin");
-        const kFailPointName = "waitInFindBeforeMakingBatch";
 
         admin.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
         admin.auth('admin', 'password');
@@ -29,6 +30,11 @@
 
         var t = db.jstests_killop;
         t.save({x: 1});
+
+        if (!FixtureHelpers.isMongos(db)) {
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+        }
 
         admin.logout();
 
@@ -48,8 +54,7 @@
             var ids = [];
             for (let o of ops) {
                 if ((o.active || o.waitingForLock) && o.command &&
-                    o.command.find === "jstests_killop" && o.command.comment === "kill_own_ops" &&
-                    o.msg === kFailPointName) {
+                    o.command.find === "jstests_killop" && o.command.comment === "kill_own_ops") {
                     ids.push(o.opid);
                 }
             }
@@ -62,7 +67,7 @@
         jsTestLog("Starting long-running operation");
         db.auth('reader', 'reader');
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn"}));
+            db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
         var s1 = startParallelShell(queryAsReader, m.port);
         jsTestLog("Finding ops in $currentOp output");
         var o = [];
@@ -88,7 +93,7 @@
         var start = new Date();
         db.auth('reader', 'reader');
         assert.commandWorked(db.killOp(o[0]));
-        assert.commandWorked(db.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
 
         jsTestLog("Waiting for ops to terminate");
         var exitCode = s1({checkExitSuccess: false});
@@ -103,7 +108,7 @@
 
         jsTestLog("Starting a second long-running operation");
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn"}));
+            db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
         var s2 = startParallelShell(queryAsReader, m.port);
         jsTestLog("Finding ops in $currentOp output");
         var o2 = [];
@@ -130,7 +135,7 @@
         jsTestLog("Checking that an administrative user can kill others' operations");
         var start = new Date();
         assert.commandWorked(db.killOp(o2[0]));
-        assert.commandWorked(db.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
         jsTestLog("Waiting for ops to terminate");
         var exitCode = s2({checkExitSuccess: false});
         assert.neq(
@@ -142,12 +147,14 @@
     }
 
     var conn = MongoRunner.runMongod({auth: ""});
-    runTest(conn);
+    runTest(conn, "setYieldAllLocksHang");
     MongoRunner.stopMongod(conn);
 
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     var st = new ShardingTest(
         {shards: 1, keyFile: 'jstests/libs/key1', other: {shardAsReplicaSet: false}});
-    runTest(st.s);
+    // Use a different failpoint in the sharded version, since the mongos does not have a
+    // setYieldAlllocksHang failpoint.
+    runTest(st.s, "waitInFindBeforeMakingBatch");
     st.stop();
 })();
