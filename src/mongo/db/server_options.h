@@ -31,6 +31,8 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/net/cidr.h"
 
 namespace mongo {
 
@@ -80,6 +82,8 @@ struct ServerGlobalParams {
     std::string serviceExecutor;
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
+    std::vector<stdx::variant<CIDR, std::string>> maxConnsOverride;
+    int reservedAdminThreads = 0;
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket
 

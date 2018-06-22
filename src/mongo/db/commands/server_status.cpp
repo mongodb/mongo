@@ -239,10 +239,7 @@ public:
         auto serviceEntryPoint = opCtx->getServiceContext()->getServiceEntryPoint();
         invariant(serviceEntryPoint);
 
-        auto stats = serviceEntryPoint->sessionStats();
-        bb.append("current", static_cast<int>(stats.numOpenSessions));
-        bb.append("available", static_cast<int>(stats.numAvailableSessions));
-        bb.append("totalCreated", static_cast<int>(stats.numCreatedSessions));
+        serviceEntryPoint->appendStats(&bb);
         return bb.obj();
     }
 
@@ -300,8 +297,10 @@ public:
         networkCounter.append(b);
         appendMessageCompressionStats(&b);
         auto executor = opCtx->getServiceContext()->getServiceExecutor();
-        if (executor)
+        if (executor) {
+            BSONObjBuilder section(b.subobjStart("serviceExecutorTaskStats"));
             executor->appendStats(&b);
+        }
 
         return b.obj();
     }

@@ -459,8 +459,15 @@ static ExitCode runMongosServer() {
         return EXIT_NET_ERROR;
     }
 
+    start = getGlobalServiceContext()->getServiceEntryPoint()->start();
+    if (!start.isOK()) {
+        error() << "Failed to start the service entry point: " << redact(start);
+        return EXIT_NET_ERROR;
+    }
+
     start = getGlobalServiceContext()->getTransportLayer()->start();
     if (!start.isOK()) {
+        error() << "Failed to start the transport layer: " << redact(start);
         return EXIT_NET_ERROR;
     }
 
