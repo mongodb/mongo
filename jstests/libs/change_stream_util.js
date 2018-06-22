@@ -3,6 +3,8 @@
  * opened cursors and kills them on cleanup.
  */
 
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+
 /**
  * Enumeration of the possible types of change streams.
  */
@@ -303,6 +305,45 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
             // Use a batch size of 0 to prevent any notifications from being returned in the first
             // batch. These would be ignored by ChangeStreamTest.getOneChange().
             aggregateOptions: {cursor: {batchSize: 0}},
+        });
+    };
+
+    /**
+     * Asserts that the change stream cursor given by 'cursor' returns at least one 'dropType'
+     * notification before returning the next notification given by 'expectedNext'. If running in a
+     * sharded passthrough suite, the expectation is to receive a 'dropType' notification from each
+     * shard that has at least one chunk. If the change stream is watching the single collection,
+     * then the first drop will invalidate the stream.
+     *
+     * Returns an array of documents which includes all drop events consumed and the expected change
+     * itself.
+     */
+    self.consumeDropUpTo = function({cursor, dropType, expectedNext, expectInvalidate}) {
+        expectInvalidate = expectInvalidate || false;
+
+        let results = [];
+        let change = self.getOneChange(cursor, expectInvalidate);
+        while (change.operationType == dropType) {
+            results.push(change);
+            change = self.getOneChange(cursor, expectInvalidate);
+        }
+        results.push(change);
+        assertChangeIsExpected([expectedNext], 0, [change], expectInvalidate);
+
+        return results;
+    };
+
+    /**
+     * Asserts that the notifications from the change stream cursor include 0 or more 'drop'
+     * notifications followed by a 'dropDatabase' notification.
+     *
+     * Returns the list of notifications.
+     */
+    self.assertDatabaseDrop = function({cursor, db}) {
+        return self.consumeDropUpTo({
+            cursor: cursor,
+            dropType: "drop",
+            expectedNext: {operationType: "dropDatabase", ns: {db: db.getName()}}
         });
     };
 }

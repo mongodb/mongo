@@ -122,12 +122,7 @@
     // Dropping a database should generate drop entries for each collection followed by a database
     // drop.
     assert.commandWorked(otherDB.dropDatabase());
-    expected = [
-        {operationType: "drop", ns: {db: otherDB.getName(), coll: "t2"}},
-        {operationType: "dropDatabase", ns: {db: otherDB.getName()}},
-    ];
-
-    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
+    cst.assertDatabaseDrop({cursor: cursor, db: otherDB});
 
     // Drop the remaining databases and clean up the test.
     assert.commandWorked(db.dropDatabase());

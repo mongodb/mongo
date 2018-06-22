@@ -126,14 +126,8 @@
     // 'dropDatabase' notification.
     resumeCursor = cst.startWatchingAllChangesForCluster();
     assert.commandWorked(testDBs[0].dropDatabase());
-    const dropDbChanges = cst.assertNextChangesEqual({
-        cursor: resumeCursor,
-        expectedChanges: [
-            {operationType: "drop", ns: {db: testDBs[0].getName(), coll: db1Coll.getName()}},
-            {operationType: "dropDatabase", ns: {db: testDBs[0].getName()}}
-        ]
-    });
-    const resumeTokenDbDrop = dropDbChanges[1]._id;
+    const dropDbChanges = cst.assertDatabaseDrop({cursor: resumeCursor, db: testDBs[0]});
+    const resumeTokenDbDrop = dropDbChanges[dropDbChanges.length - 1]._id;
 
     // Recreate the collection and insert a document.
     assert.writeOK(db1Coll.insert({_id: "after recreate"}));
@@ -149,17 +143,27 @@
     // the insert.
     resumeCursor = cst.startWatchingChanges({
         collection: 1,
-        pipeline: [{$changeStream: {resumeAfter: resumeTokenDbDrop, allChangesForCluster: true}}]
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenDbDrop, allChangesForCluster: true}}],
+        aggregateOptions: {cursor: {batchSize: 0}}
     });
-    cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
+    cst.consumeDropUpTo({
+        cursor: resumeCursor,
+        dropType: "dropDatabase",
+        expectedNext: expectedInsert,
+    });
 
     // Resume from the database drop using 'startAfter', and verify the change stream picks up the
     // insert.
     resumeCursor = cst.startWatchingChanges({
         collection: 1,
-        pipeline: [{$changeStream: {startAfter: resumeTokenDbDrop, allChangesForCluster: true}}]
+        pipeline: [{$changeStream: {startAfter: resumeTokenDbDrop, allChangesForCluster: true}}],
+        aggregateOptions: {cursor: {batchSize: 0}}
     });
-    cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
+    cst.consumeDropUpTo({
+        cursor: resumeCursor,
+        dropType: "dropDatabase",
+        expectedNext: expectedInsert,
+    });
 
     cst.cleanUp();
 })();

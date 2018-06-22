@@ -250,13 +250,9 @@
     // Dropping the database should generate a 'dropDatabase' notification followed by an
     // 'invalidate'.
     assert.commandWorked(testDB.dropDatabase());
-    cst.assertNextChangesEqual({
-        cursor: aggCursor,
-        expectedChanges: [
-            {operationType: "dropDatabase", ns: {db: testDB.getName()}},
-            {operationType: "invalidate"}
-        ]
-    });
+    cst.assertDatabaseDrop({cursor: aggCursor, db: testDB});
+    cst.assertNextChangesEqual(
+        {cursor: aggCursor, expectedChanges: [{operationType: "invalidate"}]});
 
     cst.cleanUp();
 }());

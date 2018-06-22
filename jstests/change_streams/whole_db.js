@@ -51,10 +51,9 @@
     // includes "system" but is not considered an internal collection.
     const validSystemColls = ["system", "systems.views", "ssystem.views", "test.system"];
     validSystemColls.forEach(collName => {
-        assert.writeOK(db.getCollection(collName).insert({_id: 0, a: 1}));
-        // Drop the collection so that it doesn't show up in the notifications after dropping the
-        // database.
-        assertDropCollection(db, collName);
+        cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
+        const coll = db.getCollection(collName);
+        assert.writeOK(coll.insert({_id: 0, a: 1}));
         expected = [
             {
               documentKey: {_id: 0},
@@ -62,9 +61,25 @@
               ns: {db: db.getName(), coll: collName},
               operationType: "insert",
             },
-            {operationType: "drop", ns: {db: db.getName(), coll: collName}}
         ];
         cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
+
+        // Drop the collection and verify that the change stream picks up the "drop" notification.
+        assertDropCollection(db, collName);
+        // Insert to the test collection to queue up another change after the drop. This is needed
+        // since the number of 'drop' notifications is not deterministic in the sharded passthrough
+        // suites.
+        assert.writeOK(coll.insert({_id: 0}));
+        cst.consumeDropUpTo({
+            cursor: cursor,
+            dropType: "drop",
+            expectedNext: {
+                documentKey: {_id: 0},
+                fullDocument: {_id: 0},
+                ns: {db: db.getName(), coll: collName},
+                operationType: "insert",
+            },
+        });
     });
 
     cst.cleanUp();

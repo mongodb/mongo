@@ -8,13 +8,6 @@ selector:
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
   # Only relevant for single-collection change streams.
   - jstests/change_streams/metadata_notifications.js
-  # TODO SERVER-35280: Update change stream tests to handle drops of sharded collections and databases.
-  - jstests/change_streams/whole_cluster.js
-  - jstests/change_streams/whole_cluster_metadata_notifications.js
-  - jstests/change_streams/whole_cluster_resumability.js
-  - jstests/change_streams/whole_db.js
-  - jstests/change_streams/whole_db_metadata_notifications.js
-  - jstests/change_streams/whole_db_resumability.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the

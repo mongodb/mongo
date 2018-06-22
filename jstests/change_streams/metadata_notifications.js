@@ -8,6 +8,7 @@
     load("jstests/libs/change_stream_util.js");
     load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load("jstests/libs/fixture_helpers.js");           // For isSharded.
 
     db = db.getSiblingDB(jsTestName());
     let cst = new ChangeStreamTest(db);
@@ -90,10 +91,18 @@
     assert.writeOK(coll.insert({_id: "after recreate"}));
 
     // Test resuming the change stream from the collection drop using 'resumeAfter'.
-    assertResumeExpected({
-        coll: coll.getName(),
-        spec: {resumeAfter: resumeTokenDrop},
-        expected: [{operationType: "invalidate"}]
+    // If running in a sharded passthrough suite, resuming from the drop will first return the drop
+    // from the other shard before returning an invalidate.
+    cursor = cst.startWatchingChanges({
+        collection: coll,
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenDrop}}],
+        aggregateOptions: {collation: {locale: "simple"}, cursor: {batchSize: 0}}
+    });
+    cst.consumeDropUpTo({
+        cursor: cursor,
+        dropType: "drop",
+        expectedNext: {operationType: "invalidate"},
+        expectInvalidate: true
     });
 
     // Test resuming the change stream from the invalidate after the drop using 'resumeAfter'.
@@ -113,16 +122,20 @@
     });
 
     // Test resuming the change stream from the 'invalidate' notification using 'startAfter'.
-    expectedChanges = [{
-        operationType: "insert",
-        ns: {db: db.getName(), coll: coll.getName()},
-        fullDocument: {_id: "after recreate"},
-        documentKey: {_id: "after recreate"}
-    }];
-    assertResumeExpected({
-        coll: coll.getName(),
-        spec: {startAfter: resumeTokenInvalidate},
-        expected: expectedChanges
+    cursor = cst.startWatchingChanges({
+        collection: coll,
+        pipeline: [{$changeStream: {startAfter: resumeTokenInvalidate}}],
+        aggregateOptions: {collation: {locale: "simple"}, cursor: {batchSize: 0}}
+    });
+    cst.consumeDropUpTo({
+        cursor: cursor,
+        dropType: "drop",
+        expectedNext: {
+            operationType: "insert",
+            ns: {db: db.getName(), coll: coll.getName()},
+            fullDocument: {_id: "after recreate"},
+            documentKey: {_id: "after recreate"}
+        },
     });
 
     // Test that renaming a collection being watched generates a "rename" entry followed by an
