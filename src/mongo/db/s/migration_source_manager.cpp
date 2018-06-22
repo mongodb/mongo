@@ -317,17 +317,7 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
         return status;
     }
 
-    {
-        // The critical section must be entered with collection X lock in order to ensure there are
-        // no writes which could have entered and passed the version check just before we entered
-        // the crticial section, but managed to complete after we left it.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
-
-        // IMPORTANT: After this line, the critical section is in place and needs to be signaled
-        CollectionShardingState::get(opCtx, _args.getNss())
-            ->enterCriticalSectionCatchUpPhase(opCtx);
-    }
+    _critSec.emplace(opCtx, _args.getNss());
 
     _state = kCriticalSection;
 
@@ -419,11 +409,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
     // Read operations must begin to wait on the critical section just before we send the commit
     // operation to the config server
-    {
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
-        CollectionShardingState::get(opCtx, _args.getNss())->enterCriticalSectionCommitPhase(opCtx);
-    }
+    _critSec->enterCommitPhase();
 
     Timer t;
 
@@ -687,7 +673,7 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
         auto css = CollectionShardingState::get(opCtx, getNss());
 
         invariant(this == std::exchange(msmForCss(css), nullptr));
-        css->exitCriticalSection(opCtx);
+        _critSec.reset();
         return std::move(_cloneDriver);
     }();
 

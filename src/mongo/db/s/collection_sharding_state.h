@@ -202,4 +202,26 @@ private:
         -> boost::optional<Date_t>;
 };
 
+/**
+ * RAII-style class, which obtains a reference to the critical section for the
+ * specified collection.
+ */
+class CollectionCriticalSection {
+    MONGO_DISALLOW_COPYING(CollectionCriticalSection);
+
+public:
+    CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns);
+    ~CollectionCriticalSection();
+
+    /**
+     * Enters the commit phase of the critical section and blocks reads.
+     */
+    void enterCommitPhase();
+
+private:
+    NamespaceString _nss;
+
+    OperationContext* _opCtx;
+};
+
 }  // namespace mongo

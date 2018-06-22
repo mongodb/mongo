@@ -387,4 +387,21 @@ boost::optional<ChunkRange> CollectionShardingState::getNextOrphanRange(BSONObj 
     return _metadataManager->getNextOrphanRange(from);
 }
 
+CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns)
+    : _nss(std::move(ns)), _opCtx(opCtx) {
+    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
+    CollectionShardingState::get(opCtx, _nss)->enterCriticalSectionCatchUpPhase(_opCtx);
+}
+
+CollectionCriticalSection::~CollectionCriticalSection() {
+    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
+    CollectionShardingState::get(_opCtx, _nss)->exitCriticalSection(_opCtx);
+}
+
+void CollectionCriticalSection::enterCommitPhase() {
+    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
+    CollectionShardingState::get(_opCtx, _nss)->enterCriticalSectionCommitPhase(_opCtx);
+}
+
 }  // namespace mongo
