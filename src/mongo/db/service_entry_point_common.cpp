@@ -148,13 +148,13 @@ bool shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName)
     return false;
 }
 
-void generateLegacyQueryErrorResponse(const AssertionException* exception,
+void generateLegacyQueryErrorResponse(const AssertionException& exception,
                                       const QueryMessage& queryMessage,
                                       CurOp* curop,
                                       Message* response) {
-    curop->debug().errInfo = exception->toStatus();
+    curop->debug().errInfo = exception.toStatus();
 
-    log(LogComponent::kQuery) << "assertion " << exception->toString() << " ns:" << queryMessage.ns
+    log(LogComponent::kQuery) << "assertion " << exception.toString() << " ns:" << queryMessage.ns
                               << " query:" << (queryMessage.query.valid(BSONVersion::kLatest)
                                                    ? redact(queryMessage.query)
                                                    : "query object is corrupt");
@@ -163,18 +163,18 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                   << " ntoreturn:" << queryMessage.ntoreturn;
     }
 
-    auto scex = exception->extraInfo<StaleConfigInfo>();
-
     BSONObjBuilder err;
-    err.append("$err", exception->reason());
-    err.append("code", exception->code());
-    if (scex) {
-        err.append("ok", 0.0);
-        scex->serialize(&err);
+    err.append("$err", exception.reason());
+    err.append("code", exception.code());
+    err.append("ok", 0.0);
+    auto const extraInfo = exception.extraInfo();
+    if (extraInfo) {
+        extraInfo->serialize(&err);
     }
     BSONObj errObj = err.done();
 
-    if (scex) {
+    const bool isStaleConfig = exception.code() == ErrorCodes::StaleConfig;
+    if (isStaleConfig) {
         log(LogComponent::kQuery) << "stale version detected during query over " << queryMessage.ns
                                   << " : " << errObj;
     }
@@ -187,8 +187,9 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
     QueryResult::View msgdata = bb.buf();
     QueryResult::View qr = msgdata;
     qr.setResultFlags(ResultFlag_ErrSet);
-    if (scex)
+    if (isStaleConfig) {
         qr.setResultFlags(qr.getResultFlags() | ResultFlag_ShardConfigStale);
+    }
     qr.msgdata().setLen(bb.len());
     qr.msgdata().setOperation(opReply);
     qr.setCursorId(0);
@@ -890,7 +891,7 @@ void execCommandDatabase(OperationContext* opCtx,
                                 sessionOptions)) {
                 command->incrementCommandsFailed();
             }
-        } catch (DBException&) {
+        } catch (const DBException&) {
             command->incrementCommandsFailed();
             throw;
         }
@@ -969,9 +970,9 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
     curop->setNS_inlock(nss.ns());
 }
 
-DbResponse runCommands(OperationContext* opCtx,
-                       const Message& message,
-                       const ServiceEntryPointCommon::Hooks& behaviors) {
+DbResponse receivedCommands(OperationContext* opCtx,
+                            const Message& message,
+                            const ServiceEntryPointCommon::Hooks& behaviors) {
     auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
     [&] {
         OpMsgRequest request;
@@ -1089,7 +1090,7 @@ DbResponse receivedQuery(OperationContext* opCtx,
         }
 
         dbResponse.response.reset();
-        generateLegacyQueryErrorResponse(&e, q, &op, &dbResponse.response);
+        generateLegacyQueryErrorResponse(e, q, &op, &dbResponse.response);
     }
 
     op.debug().responseLength = dbResponse.response.header().dataLen();
@@ -1314,7 +1315,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
 
     DbResponse dbresponse;
     if (op == dbMsg || op == dbCommand || (op == dbQuery && isCommand)) {
-        dbresponse = runCommands(opCtx, m, behaviors);
+        dbresponse = receivedCommands(opCtx, m, behaviors);
     } else if (op == dbQuery) {
         invariant(!isCommand);
         dbresponse = receivedQuery(opCtx, nsString, c, m);

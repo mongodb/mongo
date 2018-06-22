@@ -57,7 +57,6 @@ LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
     invariant(_state == State::kCommandReply);
     if (nonOKStatus == ErrorCodes::StaleConfig) {
         _staleConfigError = true;
-        auto scex = nonOKStatus.extraInfo<StaleConfigInfo>();
 
         // Need to use the special $err format for StaleConfig errors to be backwards
         // compatible.
@@ -66,9 +65,8 @@ LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
         // $err must be the first field in object.
         err.append("$err", nonOKStatus.reason());
         err.append("code", nonOKStatus.code());
-        if (scex) {
-            scex->serialize(&err);
-        }
+        auto const scex = nonOKStatus.extraInfo<StaleConfigInfo>();
+        scex->serialize(&err);
         err.appendElements(extraErrorInfo);
         setRawCommandReply(err.done());
     } else {

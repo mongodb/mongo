@@ -37,15 +37,14 @@
 
 namespace mongo {
 namespace rpc {
-
 namespace {
+
 const char kOKField[] = "ok";
 const char kCodeField[] = "code";
 const char kCodeNameField[] = "codeName";
 const char kErrorField[] = "errmsg";
 
-// similar to appendCommandStatusNoThrow (duplicating logic here to avoid cyclic library
-// dependency)
+// Similar to appendCommandStatusNoThrow (duplicating logic here to avoid cyclic library dependency)
 BSONObj augmentReplyWithStatus(const Status& status, BSONObj reply) {
     auto okField = reply.getField(kOKField);
     if (!okField.eoo() && okField.trueValue()) {
@@ -75,7 +74,8 @@ BSONObj augmentReplyWithStatus(const Status& status, BSONObj reply) {
 
     return bob.obj();
 }
-}
+
+}  // namespace
 
 ReplyBuilderInterface& ReplyBuilderInterface::setCommandReply(StatusWith<BSONObj> commandReply) {
     auto reply = commandReply.isOK() ? std::move(commandReply.getValue()) : BSONObj();

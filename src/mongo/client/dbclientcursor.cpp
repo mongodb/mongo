@@ -252,7 +252,7 @@ BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
     auto commandReply = _client->parseCommandReplyMessage(_client->getServerAddress(), reply);
     auto commandStatus = getStatusFromCommandResult(commandReply->getCommandReply());
 
-    if (ErrorCodes::StaleConfig == commandStatus) {
+    if (commandStatus == ErrorCodes::StaleConfig) {
         uassertStatusOK(
             commandStatus.withContext("stale config in DBClientCursor::dataReceived()"));
     } else if (!commandStatus.isOK()) {
