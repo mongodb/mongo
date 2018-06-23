@@ -43,16 +43,24 @@ const string IndexNames::HASHED = "hashed";
 const string IndexNames::BTREE = "";
 const string IndexNames::ALLPATHS = "allPaths";
 
+const StringMap<IndexType> kIndexNameToType = {
+    {IndexNames::GEO_2D, INDEX_2D},
+    {IndexNames::GEO_HAYSTACK, INDEX_HAYSTACK},
+    {IndexNames::GEO_2DSPHERE, INDEX_2DSPHERE},
+    {IndexNames::TEXT, INDEX_TEXT},
+    {IndexNames::HASHED, INDEX_HASHED},
+    {IndexNames::ALLPATHS, INDEX_ALLPATHS},
+};
+
 // static
 string IndexNames::findPluginName(const BSONObj& keyPattern) {
     BSONObjIterator i(keyPattern);
     while (i.more()) {
         BSONElement e = i.next();
-        string fieldName(e.fieldName());
+        StringData fieldName(e.fieldNameStringData());
         if (String == e.type()) {
             return e.String();
-        } else if ((fieldName == "$**") ||
-                   (fieldName.size() > 4 && fieldName.substr(e.fieldNameSize() - 5) == ".$**")) {
+        } else if ((fieldName == "$**") || fieldName.endsWith(".$**")) {
             return IndexNames::ALLPATHS;
         } else
             continue;
@@ -76,20 +84,12 @@ bool IndexNames::isKnownName(const string& name) {
 }
 
 // static
-IndexType IndexNames::nameToType(const string& accessMethod) {
-    if (IndexNames::GEO_2D == accessMethod) {
-        return INDEX_2D;
-    } else if (IndexNames::GEO_HAYSTACK == accessMethod) {
-        return INDEX_HAYSTACK;
-    } else if (IndexNames::GEO_2DSPHERE == accessMethod) {
-        return INDEX_2DSPHERE;
-    } else if (IndexNames::TEXT == accessMethod) {
-        return INDEX_TEXT;
-    } else if (IndexNames::HASHED == accessMethod) {
-        return INDEX_HASHED;
-    } else {
+IndexType IndexNames::nameToType(StringData accessMethod) {
+    auto typeIt = kIndexNameToType.find(accessMethod);
+    if (typeIt == kIndexNameToType.end()) {
         return INDEX_BTREE;
     }
+    return typeIt->second;
 }
 
 }  // namespace mongo
