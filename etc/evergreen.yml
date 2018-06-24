@@ -2014,8 +2014,8 @@ functions:
           ${activate_virtualenv}
           # Specify '--mode start' to ensure the remote instance is running.
           monitor_ec2_yml=monitor_ec2.yml
-          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start --yamlFile $monitor_ec2_yml)
-          echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
+          $python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start --yamlFile $monitor_ec2_yml
+          echo "AMI EC2 instance ${instance_id} status: $(cat $monitor_ec2_yml)"
           private_ip_address=$($python buildscripts/yaml_key_value.py --yamlFile $monitor_ec2_yml --yamlKey private_ip_address)
           if [ -z "$private_ip_address" ]; then
             echo "Cannot determine the IP address for the remote monitor."
@@ -2365,8 +2365,14 @@ functions:
         # has been stopped and started.
         ${activate_virtualenv}
         # Specify '--mode start' to ensure the remote instance is running.
+        now=$(date +'%Y%m%d%H%M%S')
         aws_ec2_status_yml=aws_ec2_status.yml
-        aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start --yamlFile $aws_ec2_status_yml)
+        $python buildscripts/aws_ec2.py            \
+          --imageId ${instance_id}                 \
+          --mode start                             \
+          --yamlFile $aws_ec2_status_yml           \
+          --consoleOutputFile ec2_console_$now.log \
+          --consoleScreenshotFile ec2_console_screen_shot_$now.jpg
         private_ip_address=$($python buildscripts/yaml_key_value.py --yamlFile $aws_ec2_status_yml --yamlKey private_ip_address)
         echo "private_ip_address: $private_ip_address" > private_ip_address.yml
 
@@ -2506,6 +2512,29 @@ functions:
       display_name: Remote EC2 Monitor - Execution ${execution}
       optional: true
 
+  "gather EC2 console artifacts": &gather_ec2_console_artifacts
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        ec2_console_files=$(ls ec2_console* 2> /dev/null)
+        if [ -n "$ec2_console_files" ]; then
+          ${tar|tar} czf ec2_console_files.tgz $ec2_console_files
+        fi
+
+  "archive EC2 console artifacts": &archive_ec2_console_artifacts
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/ec2_console_files.tgz
+      remote_file: ${project}/${build_variant}/${revision}/ec2/ec2_console-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: EC2 Console files - Execution ${execution}
+      optional: true
+
   "save ec2 task artifacts":
     - *get_ec2_address
     - *update_ec2_address
@@ -2513,6 +2542,8 @@ functions:
     - *copy_ec2_artifacts
     - *gather_remote_mongo_coredumps
     - *copy_remote_mongo_coredumps
+    - *gather_ec2_console_artifacts
+    - *archive_ec2_console_artifacts
     - *cleanup_ec2_instance
     - *archive_remote_ec2_artifacts
     - *archive_remote_ec2_monitor_files
