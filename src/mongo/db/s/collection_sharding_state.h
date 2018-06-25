@@ -75,11 +75,12 @@ public:
     static void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
-     * Returns the chunk metadata for the collection. The metadata it represents lives as long as
-     * the object itself, and the collection, exist. After dropping the collection lock, the
-     * collection may no longer exist, but it is still safe to destroy the object.
-     * The metadata is tied to a specific point in time (atClusterTime) and the time is retrieved
-     * from the operation context (opCtx).
+     * Returns the chunk filtering metadata for the collection. The returned object is safe to
+     * access outside of collection lock.
+     *
+     * If the operation context contains an 'atClusterTime' property, the returned filtering
+     * metadata will be tied to a specific point in time. Otherwise it will reference the latest
+     * time available.
      */
     ScopedCollectionMetadata getMetadata(OperationContext* opCtx);
 

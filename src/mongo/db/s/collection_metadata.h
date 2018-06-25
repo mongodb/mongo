@@ -56,6 +56,13 @@ public:
     CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId);
 
     /**
+     * Obtains the shard id with which this collection metadata is configured.
+     */
+    const ShardId& shardId() const {
+        return _thisShardId;
+    }
+
+    /**
      * Returns true if 'key' contains exactly the same fields as the shard key pattern.
      */
     bool isValidKey(const BSONObj& key) const {

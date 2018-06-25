@@ -39,8 +39,6 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
@@ -183,34 +181,25 @@ void MetadataManager::_clearAllCleanups(WithLock, Status status) {
     _rangesToClean.clear(status);
 }
 
-ScopedCollectionMetadata MetadataManager::getActiveMetadata(std::shared_ptr<MetadataManager> self) {
+ScopedCollectionMetadata MetadataManager::getActiveMetadata(
+    std::shared_ptr<MetadataManager> self, const boost::optional<LogicalTime>& atClusterTime) {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
-    if (!_metadata.empty()) {
+    if (_metadata.empty()) {
+        return ScopedCollectionMetadata();
+    }
+
+    auto metadataTracker = _metadata.back();
+    if (!atClusterTime) {
         return ScopedCollectionMetadata(lg, std::move(self), _metadata.back());
     }
 
-    return ScopedCollectionMetadata();
-}
+    auto chunkManager = metadataTracker->metadata.getChunkManager();
+    auto chunkManagerAtClusterTime = std::make_shared<ChunkManager>(
+        chunkManager->getRoutingHistory(), atClusterTime->asTimestamp());
 
-ScopedCollectionMetadata MetadataManager::createMetadataAt(OperationContext* opCtx,
-                                                           LogicalTime atClusterTime) {
-    auto cache = Grid::get(opCtx)->catalogCache();
-    if (!cache) {
-        return ScopedCollectionMetadata();
-    }
-
-    auto routingTable = cache->getCollectionRoutingTableHistoryNoRefresh(_nss);
-    if (!routingTable) {
-        return ScopedCollectionMetadata();
-    }
-    auto cm = std::make_shared<ChunkManager>(routingTable, atClusterTime.asTimestamp());
-
-    CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->getShardName());
-
-    auto metadataTracker =
-        std::make_shared<MetadataManager::CollectionMetadataTracker>(std::move(metadata));
-
-    return ScopedCollectionMetadata(std::move(metadataTracker));
+    return ScopedCollectionMetadata(
+        std::make_shared<MetadataManager::CollectionMetadataTracker>(CollectionMetadata(
+            std::move(chunkManagerAtClusterTime), metadataTracker->metadata.shardId())));
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {

@@ -66,13 +66,8 @@ public:
      * contains the currently active metadata.  When the usageCounter goes to zero, the RAII
      * object going out of scope will call _removeMetadata.
      */
-    ScopedCollectionMetadata getActiveMetadata(std::shared_ptr<MetadataManager> self);
-
-    /**
-     * Creates the metadata on demand for a specific point in time. The object is not tracked by
-     * the metadata manager.
-     */
-    ScopedCollectionMetadata createMetadataAt(OperationContext* opCtx, LogicalTime atCusterTime);
+    ScopedCollectionMetadata getActiveMetadata(std::shared_ptr<MetadataManager> self,
+                                               const boost::optional<LogicalTime>& atClusterTime);
 
     /**
      * Returns the number of CollectionMetadata objects being maintained on behalf of running
@@ -295,10 +290,7 @@ public:
 
 private:
     friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(
-        std::shared_ptr<MetadataManager>);
-
-    friend ScopedCollectionMetadata MetadataManager::createMetadataAt(OperationContext*,
-                                                                      LogicalTime);
+        std::shared_ptr<MetadataManager>, const boost::optional<LogicalTime>&);
 
     friend std::vector<ScopedCollectionMetadata> MetadataManager::overlappingMetadata(
         std::shared_ptr<MetadataManager> const&, ChunkRange const&);

@@ -300,22 +300,6 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutin
     return routingInfoStatus;
 }
 
-std::shared_ptr<RoutingTableHistory> CatalogCache::getCollectionRoutingTableHistoryNoRefresh(
-    const NamespaceString& nss) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-    const auto itDb = _collectionsByDb.find(nss.db());
-    if (itDb == _collectionsByDb.end()) {
-        return nullptr;
-    }
-    const auto itColl = itDb->second.find(nss.ns());
-    if (itColl == itDb->second.end()) {
-        return nullptr;
-    }
-    return itColl->second->routingInfo;
-}
-
-
 void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
                                           const DatabaseVersion& databaseVersion) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);

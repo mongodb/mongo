@@ -273,6 +273,7 @@ public:
 
     ChunkManager(std::shared_ptr<RoutingTableHistory> rt, boost::optional<Timestamp> clusterTime)
         : _rt(std::move(rt)), _clusterTime(std::move(clusterTime)) {}
+
     /**
      * Returns an increasing number of the reload sequence number of this chunk manager.
      */
@@ -415,8 +416,8 @@ public:
         return _rt->_autoSplitThrottle;
     }
 
-    RoutingTableHistory& getRoutingHistory() const {
-        return *_rt;
+    auto getRoutingHistory() const {
+        return _rt;
     }
 
     boost::optional<UUID> getUUID() const {

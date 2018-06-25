@@ -95,7 +95,7 @@ NOINLINE_DECL auto makeChunkManagerWithOptimalBalancedDistribution(int nShards, 
 
 NOINLINE_DECL auto runIncrementalUpdate(const CollectionMetadata& cm,
                                         const std::vector<ChunkType>& newChunks) {
-    auto rt = cm.getChunkManager()->getRoutingHistory().makeUpdated(newChunks);
+    auto rt = cm.getChunkManager()->getRoutingHistory()->makeUpdated(newChunks);
     return std::make_unique<CollectionMetadata>(std::make_shared<ChunkManager>(rt, boost::none),
                                                 ShardId("shard0"));
 }

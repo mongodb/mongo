@@ -196,10 +196,8 @@ void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* bu
 }
 
 ScopedCollectionMetadata CollectionShardingState::getMetadata(OperationContext* opCtx) {
-    // TODO: SERVER-34276 - find an alternative to get the atClusterTime.
     auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    return atClusterTime ? _metadataManager->createMetadataAt(opCtx, atClusterTime.get())
-                         : _metadataManager->getActiveMetadata(_metadataManager);
+    return _metadataManager->getActiveMetadata(_metadataManager, atClusterTime);
 }
 
 void CollectionShardingState::refreshMetadata(OperationContext* opCtx,
@@ -276,7 +274,8 @@ Status CollectionShardingState::waitForClean(OperationContext* opCtx,
             {
                 // First, see if collection was dropped, but do it in a separate scope in order to
                 // not hold reference on it, which would make it appear in use
-                auto metadata = css->_metadataManager->getActiveMetadata(css->_metadataManager);
+                auto metadata =
+                    css->_metadataManager->getActiveMetadata(css->_metadataManager, boost::none);
                 if (!metadata || metadata->getCollVersion().epoch() != epoch) {
                     return {ErrorCodes::StaleShardVersion, "Collection being migrated was dropped"};
                 }

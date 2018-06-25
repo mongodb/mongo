@@ -130,10 +130,15 @@ protected:
         }());
 
         auto routingInfo = future.timed_get(kFutureTimeout);
-        ASSERT(routingInfo->cm());
         auto cm = routingInfo->cm();
-
+        ASSERT(cm);
         ASSERT_EQ(4, cm->numChunks());
+
+        auto const css = CollectionShardingState::get(operationContext(), kNss);
+        css->refreshMetadata(operationContext(),
+                             std::make_unique<CollectionMetadata>(cm, ShardId("0")));
+
+        _manager->refreshActiveMetadata(std::make_unique<CollectionMetadata>(cm, ShardId("0")));
     }
 
     std::shared_ptr<MetadataManager> _manager;
@@ -145,7 +150,7 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPresent) {
 
     ShardingState::get(operationContext())->setEnabledForTest(ShardId("0").toString());
 
-    auto metadata = _manager->createMetadataAt(operationContext(), LogicalTime(Timestamp(100, 0)));
+    auto metadata = _manager->getActiveMetadata(_manager, LogicalTime(Timestamp(100, 0)));
 
     ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << -500)));
     ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << 50)));
@@ -159,7 +164,7 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPast) {
 
     ShardingState::get(operationContext())->setEnabledForTest(ShardId("0").toString());
 
-    auto metadata = _manager->createMetadataAt(operationContext(), LogicalTime(Timestamp(50, 0)));
+    auto metadata = _manager->getActiveMetadata(_manager, LogicalTime(Timestamp(50, 0)));
 
     ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << -500)));
     ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << 50)));
@@ -173,7 +178,7 @@ TEST_F(MetadataFilteringTest, FilterDocumentsStale) {
 
     ShardingState::get(operationContext())->setEnabledForTest(ShardId("0").toString());
 
-    auto metadata = _manager->createMetadataAt(operationContext(), LogicalTime(Timestamp(10, 0)));
+    auto metadata = _manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10, 0)));
 
     ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << -500)),
                        AssertionException,
@@ -203,8 +208,7 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPresentShardingState) {
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
-    auto css = CollectionShardingState::get(operationContext(), kNss);
-
+    auto const css = CollectionShardingState::get(operationContext(), kNss);
     auto metadata = css->getMetadata(operationContext());
 
     ASSERT_TRUE(metadata->keyBelongsToMe(BSON("_id" << -500)));
@@ -227,8 +231,7 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPastShardingState) {
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
-    auto css = CollectionShardingState::get(operationContext(), kNss);
-
+    auto const css = CollectionShardingState::get(operationContext(), kNss);
     auto metadata = css->getMetadata(operationContext());
 
     ASSERT_FALSE(metadata->keyBelongsToMe(BSON("_id" << -500)));
@@ -251,8 +254,7 @@ TEST_F(MetadataFilteringTest, FilterDocumentsStaleShardingState) {
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
-    auto css = CollectionShardingState::get(operationContext(), kNss);
-
+    auto const css = CollectionShardingState::get(operationContext(), kNss);
     auto metadata = css->getMetadata(operationContext());
 
     ASSERT_THROWS_CODE(metadata->keyBelongsToMe(BSON("_id" << -500)),
