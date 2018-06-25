@@ -177,7 +177,8 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
                           << maxNumInitialChunksForShards
                           << ", 8192 * number of shards; or "
                           << maxNumInitialChunksTotal,
-            numChunks <= maxNumInitialChunksForShards && numChunks <= maxNumInitialChunksTotal);
+            numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
+                numChunks <= maxNumInitialChunksTotal);
 
     // Retrieve the collection metadata in order to verify that it is legal to shard this
     // collection.
