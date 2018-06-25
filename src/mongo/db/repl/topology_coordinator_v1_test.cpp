@@ -4695,6 +4695,223 @@ TEST_F(TopoCoordTest, StatusResponseAlwaysIncludesStringStatusFieldsForNonMember
     ASSERT_EQUALS("", rsStatus["infoMessage"].String());
 }
 
+TEST_F(TopoCoordTest, NoElectionHandoffCandidateInSingleNodeReplicaSet) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 2
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017"))),
+                 0);
+
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(100, 0), getTopoCoord().getTerm()));
+
+    // There are no other nodes in the set.
+    ASSERT_EQUALS(-1, getTopoCoord().chooseElectionHandoffCandidate());
+}
+
+TEST_F(TopoCoordTest, NoElectionHandoffCandidateWithOneLaggedNode) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 2
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017"))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(200, 0), term));
+
+    // Node1 is electable, but not caught up.
+    heartbeatFromMember(
+        HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(100, 0), term));
+
+    ASSERT_EQUALS(-1, getTopoCoord().chooseElectionHandoffCandidate());
+}
+
+TEST_F(TopoCoordTest, NoElectionHandoffCandidateWithOneUnelectableNode) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 2
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017"
+                                                  << "priority"
+                                                  << 0))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(100, 0), term));
+
+    // Node1 is caught up, but not electable.
+    heartbeatFromMember(
+        HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(100, 0), term));
+
+    ASSERT_EQUALS(-1, getTopoCoord().chooseElectionHandoffCandidate());
+}
+
+TEST_F(TopoCoordTest, NoElectionHandoffCandidateWithOneLaggedAndOneUnelectableNode) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 2
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017"
+                                                  << "priority"
+                                                  << 0))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(200, 0), term));
+
+    // Node1 is electable, but not caught up.
+    heartbeatFromMember(
+        HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(100, 0), term));
+    // Node2 is caught up, but not electable.
+    heartbeatFromMember(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(200, 0), term));
+
+    ASSERT_EQUALS(-1, getTopoCoord().chooseElectionHandoffCandidate());
+}
+
+TEST_F(TopoCoordTest, ExactlyOneNodeEligibleForElectionHandoffOutOfOneSecondary) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 2
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017"))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(100, 0), term));
+
+    // Node1 is caught up and electable.
+    heartbeatFromMember(
+        HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(100, 0), term));
+
+    ASSERT_EQUALS(1, getTopoCoord().chooseElectionHandoffCandidate());
+}
+
+TEST_F(TopoCoordTest, ExactlyOneNodeEligibleForElectionHandoffOutOfThreeSecondaries) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 2
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017"
+                                                  << "priority"
+                                                  << 0)
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017")
+                                    << BSON("_id" << 3 << "host"
+                                                  << "host3:27017"))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(200, 0), term));
+
+    // Node1 is caught up, but not electable.
+    heartbeatFromMember(
+        HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(200, 0), term));
+
+    // Node2 is electable, but not caught up.
+    heartbeatFromMember(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(100, 0), term));
+
+    // Node3 is caught up and electable.
+    heartbeatFromMember(
+        HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(200, 0), term));
+
+    ASSERT_EQUALS(3, getTopoCoord().chooseElectionHandoffCandidate());
+}
+
+TEST_F(TopoCoordTest, TwoNodesEligibleForElectionHandoffResolveByPriority) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 2
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017"
+                                                  << "priority"
+                                                  << 5))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(100, 0), term));
+
+    // Node1 is caught up and has default priority (1).
+    heartbeatFromMember(
+        HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(100, 0), term));
+
+    // Node2 is caught up and has priority 5.
+    heartbeatFromMember(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(100, 0), term));
+
+    // Candidates tied in opTime. Choose node with highest priority.
+    ASSERT_EQUALS(2, getTopoCoord().chooseElectionHandoffCandidate());
+}
+
+TEST_F(TopoCoordTest, TwoNodesEligibleForElectionHandoffEqualPriorityResolveByMemberId) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 2
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017"))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+    setMyOpTime(OpTime(Timestamp(100, 0), term));
+
+    // Node1 is caught up and has default priority (1).
+    heartbeatFromMember(
+        HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(100, 0), term));
+
+    // Node2 is caught up and has default priority (1).
+    heartbeatFromMember(
+        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(100, 0), term));
+
+    // Candidates tied in opTime and priority. Choose node with lowest member index.
+    ASSERT_EQUALS(1, getTopoCoord().chooseElectionHandoffCandidate());
+}
+
 TEST_F(HeartbeatResponseTestV1,
        ScheduleACatchupTakeoverWhenElectableAndReceiveHeartbeatFromPrimaryInCatchup) {
     updateConfig(BSON("_id"

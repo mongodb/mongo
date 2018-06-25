@@ -617,6 +617,13 @@ public:
     void finishUnconditionalStepDown();
 
     /**
+     * Returns the index of the most suitable candidate for an election handoff. The node must be
+     * caught up and electable. Ties are resolved first by highest priority, then by lowest member
+     * id.
+     */
+    int chooseElectionHandoffCandidate();
+
+    /**
      * Considers whether or not this node should stand for election, and returns true
      * if the node has transitioned to candidate role as a result of the call.
      */
@@ -838,6 +845,11 @@ private:
      * attemptStepDown() for more details on the rules of when stepdown attempts succeed or fail.
      */
     bool _canCompleteStepDownAttempt(Date_t now, Date_t waitUntil, bool force);
+
+    /**
+     * Returns true if a node is both caught up to our last applied opTime and electable.
+     */
+    bool _isCaughtUpAndElectable(int memberIndex, OpTime lastApplied);
 
     void _stepDownSelfAndReplaceWith(int newPrimary);
 
