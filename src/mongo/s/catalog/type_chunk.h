@@ -36,6 +36,7 @@
 #include "mongo/s/catalog/type_chunk_base_gen.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
@@ -64,6 +65,8 @@ public:
     const BSONObj& getMax() const {
         return _maxKey;
     }
+
+    const Status extractKeyPattern(KeyPattern* shardKeyPatternOut) const;
 
     /**
      * Checks whether the specified key is within the bounds of this chunk range.
