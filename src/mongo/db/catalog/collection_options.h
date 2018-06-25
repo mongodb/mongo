@@ -98,9 +98,7 @@ struct CollectionOptions {
 
     // ----
 
-    // Collection UUID. Present for all CollectionOptions parsed for storage, except for those
-    // corresponding to the system.namespaces and system.indexes collections on MMAP (see
-    // SERVER-29926, SERVER-30095).
+    // Collection UUID. Present for all CollectionOptions parsed for storage.
     OptionalCollectionUUID uuid;
 
     bool capped = false;

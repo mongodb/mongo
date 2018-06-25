@@ -183,8 +183,7 @@ Status _applyOps(OperationContext* opCtx,
 
             // Append completed op, including UUID if available, to 'opsBuilder'.
             if (opsBuilder) {
-                if (opObj.hasField("ui") || nss.isSystemDotIndexes() ||
-                    !(collection && collection->uuid())) {
+                if (opObj.hasField("ui") || !(collection && collection->uuid())) {
                     // No changes needed to operation document.
                     opsBuilder->append(opObj);
                 } else {

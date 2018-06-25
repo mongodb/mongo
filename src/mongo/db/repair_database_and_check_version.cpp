@@ -135,7 +135,6 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
  */
 Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
                                      const std::vector<std::string>& dbNames) {
-    bool isMmapV1 = opCtx->getServiceContext()->getStorageEngine()->isMmapV1();
     for (const auto& dbName : dbNames) {
         Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
         invariant(db);
@@ -146,11 +145,6 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
             // drop these collections on wiredTiger because users are not permitted to
             // store data in them.
             if (coll->ns().coll() == "system.indexes" || coll->ns().coll() == "system.namespaces") {
-                if (isMmapV1) {
-                    // system.indexes and system.namespaces don't currently have UUIDs in MMAP.
-                    // SERVER-29926 and SERVER-30095 will address this problem.
-                    continue;
-                }
                 const auto nssToDrop = coll->ns();
                 LOG(1) << "Attempting to drop invalid system collection " << nssToDrop;
                 if (coll->numRecords(opCtx)) {

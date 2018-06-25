@@ -13,10 +13,6 @@ function checkCollectionUUIDs(adminDB) {
         let currentDatabase = adminDB.getSiblingDB(database.name);
         let collectionInfos = currentDatabase.getCollectionInfos();
         for (let i = 0; i < collectionInfos.length; i++) {
-            // Always skip system.indexes due to SERVER-30500.
-            if (collectionInfos[i].name == "system.indexes") {
-                continue;
-            }
             assert(collectionInfos[i].info.uuid,
                    "Expect uuid for collection: " + tojson(collectionInfos[i]));
         }
