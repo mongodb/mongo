@@ -55,15 +55,18 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     bool verbose = param["verbose"].trueValue();
 
     AutoGetCollectionForReadCommand ctx(opCtx, nss);
-    if (!ctx.getDb()) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Database [" << nss.db().toString() << "] not found."};
-    }
-
-    Collection* collection = ctx.getCollection();
-    if (!collection) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Collection [" << nss.toString() << "] not found."};
+    Collection* collection = ctx.getCollection();  // Will be set if present
+    if (!ctx.getDb() || !collection) {
+        result->appendNumber("size", 0);
+        result->appendNumber("count", 0);
+        result->appendNumber("storageSize", 0);
+        result->append("nindexes", 0);
+        result->appendNumber("totalIndexSize", 0);
+        result->append("indexDetails", BSONObj());
+        result->append("indexSizes", BSONObj());
+        std::string errmsg = !(ctx.getDb()) ? "Database [" + nss.db().toString() + "] not found."
+                                            : "Collection [" + nss.toString() + "] not found.";
+        return {ErrorCodes::NamespaceNotFound, errmsg};
     }
 
     long long size = collection->dataSize(opCtx) / scale;

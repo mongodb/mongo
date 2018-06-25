@@ -608,7 +608,7 @@ public:
 
         result.append("ns", nss.ns());
         Status status = appendCollectionStorageStats(opCtx, nss, jsobj, &result);
-        if (!status.isOK()) {
+        if (!status.isOK() && status.code() != ErrorCodes::NamespaceNotFound) {
             errmsg = status.reason();
             return false;
         }

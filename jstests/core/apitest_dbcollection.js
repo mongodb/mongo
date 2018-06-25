@@ -1,3 +1,4 @@
+// stats will return ok:1 for non-existant colls
 /**
  * Tests for the db collection
  *
@@ -152,7 +153,14 @@ assert.eq(0, db.getCollection("test_db").getIndexes().length, "24");
 
     // Non-existent collection.
     t.drop();
-    assert.commandFailed(t.stats(), 'db.collection.stats() should fail on non-existent collection');
+    var noCollStats = assert.commandWorked(
+        t.stats(), 'db.collection.stats() should work on non-existent collection');
+    assert.eq(0, noCollStats.size, "All properties should be 0 on nonexistant collections");
+    assert.eq(0, noCollStats.count, "All properties should be 0 on nonexistant collections");
+    assert.eq(0, noCollStats.storageSize, "All properties should be 0 on nonexistant collections");
+    assert.eq(0, noCollStats.nindexes, "All properties should be 0 on nonexistant collections");
+    assert.eq(
+        0, noCollStats.totalIndexSize, "All properties should be 0 on nonexistant collections");
 
     // scale - passed to stats() as sole numerical argument or part of an options object.
     t.drop();
@@ -248,18 +256,16 @@ assert.eq(0, db.getCollection("test_db").getIndexes().length, "24");
     var t = db.apitest_dbcollection;
 
     t.drop();
-    var failedStats = assert.commandFailed(t.stats());
-    assert.eq(failedStats.storageSize, t.storageSize());
-    assert.eq(undefined,
-              t.storageSize(),
-              'db.collection.storageSize() on empty collection should return undefined');
-    assert.eq(failedStats.totalIndexSize, t.totalIndexSize());
-    assert.eq(undefined,
+    var emptyStats = assert.commandWorked(t.stats());
+    assert.eq(emptyStats.storageSize, 0);
+    assert.eq(emptyStats.totalIndexSize, 0);
+
+    assert.eq(
+        0, t.storageSize(), 'db.collection.storageSize() on empty collection should return 0');
+    assert.eq(0,
               t.totalIndexSize(),
-              'db.collection.totalIndexSize() on empty collection should return undefined');
-    assert.eq(undefined,
-              t.totalSize(),
-              'db.collection.totalSize() on empty collection should return undefined');
+              'db.collection.totalIndexSize() on empty collection should return 0');
+    assert.eq(0, t.totalSize(), 'db.collection.totalSize() on empty collection should return 0');
 
     t.save({a: 1});
     var stats = assert.commandWorked(t.stats());

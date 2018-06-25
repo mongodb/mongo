@@ -77,5 +77,5 @@ assert.commandWorked(testDB.createCollection("system.profile"));
 assert.commandWorked(testDBCopy.dropDatabase());
 assert.commandWorked(
     testDB.adminCommand({copydb: 1, fromdb: testDB.getName(), todb: testDBCopy.getName()}));
-assert.commandWorked(testDBCopy.foo.stats());
-assert.commandFailed(testDBCopy.system.profile.stats());
+assert(testDBCopy.foo.exists());
+assert.isnull(testDBCopy.system.profile.exists());

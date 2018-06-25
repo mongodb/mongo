@@ -14,4 +14,4 @@ assert.isnull(t.findOne(), "A");
 assert.writeError(t.insert({z: 1, $inc: {x: 1}}, 0, true));
 assert.isnull(t.findOne(), "B");
 // Collection should not exist
-assert.commandFailed(t.stats());
+assert.isnull(t.exists());

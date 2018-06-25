@@ -8,4 +8,4 @@ t.drop();
 t.insert({_id: undefined});
 assert.eq(t.count(), 0);
 // Make sure the collection was not created
-assert.commandFailed(t.stats());
+assert.isnull(t.exists());

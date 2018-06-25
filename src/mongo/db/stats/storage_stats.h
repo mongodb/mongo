@@ -38,6 +38,14 @@ namespace mongo {
 
 /**
  * Appends to 'builder' storage related statistics for the collection represented by 'nss'.
+ *
+ * Params:
+ * opCtx
+ * nss Fully qualified namespace.
+ * param Uses "scale" (default = 1) and "verbose".
+ * builder out; object the stats will be appended to.
+ *
+ * returns Status, (note "NamespaceNotFound" will fill result with 0-ed stats)
  */
 Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,

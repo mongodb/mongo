@@ -15,8 +15,8 @@
     }
 
     db.foo.drop();
-    assert.commandFailed(db.foo.stats(),
-                         'db.collection.stats() should fail on non-existent collection');
+    assert.commandWorked(db.foo.stats(),
+                         'db.collection.stats() should return 0s on non-existent collection');
 
     // ---------- load some data -----
 
