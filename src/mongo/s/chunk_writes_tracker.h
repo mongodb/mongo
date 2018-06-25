@@ -57,9 +57,10 @@ public:
     }
 
     /**
-     * Sets the number of bytes in the tracker to zero.
+     * Sets the number of bytes in the tracker to zero and returns the number
+     * of bytes in the tracker prior to clearing it.
      */
-    void clearBytesWritten();
+    uint64_t clearBytesWritten();
 
     /**
      * Returns whether or not this chunk is ready to be split based on the

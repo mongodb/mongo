@@ -37,8 +37,8 @@
 
 namespace mongo {
 
-void ChunkWritesTracker::clearBytesWritten() {
-    _bytesWritten.store(0);
+uint64_t ChunkWritesTracker::clearBytesWritten() {
+    return _bytesWritten.swap(0);
 }
 
 bool ChunkWritesTracker::shouldSplit(uint64_t maxChunkSize) {

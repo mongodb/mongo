@@ -55,6 +55,14 @@ TEST(ChunkWritesTrackerTest, ClearBytesWrittenSetsBytesToZero) {
     ASSERT_EQ(wt.getBytesWritten(), 0ull);
 }
 
+TEST(ChunkWritesTrackerTest, ClearBytesWrittenReturnsBytesWrittenBeforeClearing) {
+    ChunkWritesTracker wt;
+    uint64_t bytesToAdd{4};
+    wt.addBytesWritten(bytesToAdd);
+    auto previousBytesWritten = wt.clearBytesWritten();
+    ASSERT_EQ(previousBytesWritten, bytesToAdd);
+}
+
 TEST(ChunkWritesTrackerTest, ShouldSplitReturnsTrueWithBytesWrittenAndMaxChunkSizeZero) {
     ChunkWritesTracker wt;
     wt.addBytesWritten(4ull);
