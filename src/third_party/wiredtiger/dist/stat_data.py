@@ -238,9 +238,9 @@ connection_stats = [
     CacheStat('cache_eviction_state', 'eviction state', 'no_clear,no_scale'),
     CacheStat('cache_eviction_target_page_ge128', 'eviction walk target pages histogram - 128 and higher'),
     CacheStat('cache_eviction_target_page_lt10', 'eviction walk target pages histogram - 0-9'),
+    CacheStat('cache_eviction_target_page_lt128', 'eviction walk target pages histogram - 64-128'),
     CacheStat('cache_eviction_target_page_lt32', 'eviction walk target pages histogram - 10-31'),
     CacheStat('cache_eviction_target_page_lt64', 'eviction walk target pages histogram - 32-63'),
-    CacheStat('cache_eviction_target_page_lt128', 'eviction walk target pages histogram - 64-128'),
     CacheStat('cache_eviction_walk', 'pages walked for eviction'),
     CacheStat('cache_eviction_walk_from_root', 'eviction walks started from root of tree'),
     CacheStat('cache_eviction_walk_passes', 'eviction passes of a file'),
@@ -294,11 +294,11 @@ connection_stats = [
     CursorStat('cursor_modify', 'cursor modify calls'),
     CursorStat('cursor_next', 'cursor next calls'),
     CursorStat('cursor_prev', 'cursor prev calls'),
-    CursorStat('cursor_reopen', 'cursors reused from cache'),
     CursorStat('cursor_remove', 'cursor remove calls'),
+    CursorStat('cursor_reopen', 'cursors reused from cache'),
     CursorStat('cursor_reserve', 'cursor reserve calls'),
     CursorStat('cursor_reset', 'cursor reset calls'),
-    CursorStat('cursor_restart', 'cursor restarted searches'),
+    CursorStat('cursor_restart', 'cursor operation restarted'),
     CursorStat('cursor_search', 'cursor search calls'),
     CursorStat('cursor_search_near', 'cursor search near calls'),
     CursorStat('cursor_truncate', 'truncate calls'),
@@ -309,8 +309,8 @@ connection_stats = [
     ##########################################
     CursorStat('cursor_sweep', 'cursor sweeps'),
     CursorStat('cursor_sweep_buckets', 'cursor sweep buckets'),
-    CursorStat('cursor_sweep_examined', 'cursor sweep cursors examined'),
     CursorStat('cursor_sweep_closed', 'cursor sweep cursors closed'),
+    CursorStat('cursor_sweep_examined', 'cursor sweep cursors examined'),
 
     ##########################################
     # Dhandle statistics
@@ -507,9 +507,9 @@ connection_stats = [
     TxnStat('txn_checkpoint_time_total', 'transaction checkpoint total time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_commit', 'transactions committed'),
     TxnStat('txn_commit_queue_empty', 'commit timestamp queue insert to empty'),
-    TxnStat('txn_commit_queue_tail', 'commit timestamp queue inserts to tail'),
     TxnStat('txn_commit_queue_inserts', 'commit timestamp queue inserts total'),
     TxnStat('txn_commit_queue_len', 'commit timestamp queue length'),
+    TxnStat('txn_commit_queue_tail', 'commit timestamp queue inserts to tail'),
     TxnStat('txn_fail_cache', 'transaction failures due to cache overflow'),
     TxnStat('txn_pinned_checkpoint_range', 'transaction range of IDs currently pinned by a checkpoint', 'no_clear,no_scale'),
     TxnStat('txn_pinned_range', 'transaction range of IDs currently pinned', 'no_clear,no_scale'),
@@ -622,9 +622,9 @@ dsrc_stats = [
     CacheStat('cache_eviction_split_leaf', 'leaf pages split during eviction'),
     CacheStat('cache_eviction_target_page_ge128', 'eviction walk target pages histogram - 128 and higher'),
     CacheStat('cache_eviction_target_page_lt10', 'eviction walk target pages histogram - 0-9'),
+    CacheStat('cache_eviction_target_page_lt128', 'eviction walk target pages histogram - 64-128'),
     CacheStat('cache_eviction_target_page_lt32', 'eviction walk target pages histogram - 10-31'),
     CacheStat('cache_eviction_target_page_lt64', 'eviction walk target pages histogram - 32-63'),
-    CacheStat('cache_eviction_target_page_lt128', 'eviction walk target pages histogram - 64-128'),
     CacheStat('cache_eviction_walk_from_root', 'eviction walks started from root of tree'),
     CacheStat('cache_eviction_walk_passes', 'eviction walk passes of a file'),
     CacheStat('cache_eviction_walk_saved_pos', 'eviction walks started from saved location in tree'),
@@ -697,7 +697,7 @@ dsrc_stats = [
     CursorStat('cursor_reopen', 'cursors reused from cache'),
     CursorStat('cursor_reserve', 'reserve calls'),
     CursorStat('cursor_reset', 'reset calls'),
-    CursorStat('cursor_restart', 'restarted searches'),
+    CursorStat('cursor_restart', 'cursor operation restarted'),
     CursorStat('cursor_search', 'search calls'),
     CursorStat('cursor_search_near', 'search near calls'),
     CursorStat('cursor_truncate', 'truncate calls'),
@@ -741,8 +741,8 @@ dsrc_stats = [
     ##########################################
     # Session operations
     ##########################################
-    SessionStat('session_cursor_cached', 'cached cursor count', 'no_clear,no_scale'),
     SessionStat('session_compact', 'object compaction'),
+    SessionStat('session_cursor_cached', 'cached cursor count', 'no_clear,no_scale'),
     SessionStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
 
     ##########################################

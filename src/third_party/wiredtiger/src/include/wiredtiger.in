@@ -5213,16 +5213,16 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CURSOR_MODIFY			1140
 /*! cursor: cursor next calls */
 #define	WT_STAT_CONN_CURSOR_NEXT			1141
+/*! cursor: cursor operation restarted */
+#define	WT_STAT_CONN_CURSOR_RESTART			1142
 /*! cursor: cursor prev calls */
-#define	WT_STAT_CONN_CURSOR_PREV			1142
+#define	WT_STAT_CONN_CURSOR_PREV			1143
 /*! cursor: cursor remove calls */
-#define	WT_STAT_CONN_CURSOR_REMOVE			1143
+#define	WT_STAT_CONN_CURSOR_REMOVE			1144
 /*! cursor: cursor reserve calls */
-#define	WT_STAT_CONN_CURSOR_RESERVE			1144
+#define	WT_STAT_CONN_CURSOR_RESERVE			1145
 /*! cursor: cursor reset calls */
-#define	WT_STAT_CONN_CURSOR_RESET			1145
-/*! cursor: cursor restarted searches */
-#define	WT_STAT_CONN_CURSOR_RESTART			1146
+#define	WT_STAT_CONN_CURSOR_RESET			1146
 /*! cursor: cursor search calls */
 #define	WT_STAT_CONN_CURSOR_SEARCH			1147
 /*! cursor: cursor search near calls */
@@ -6019,32 +6019,32 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2106
 /*! cursor: create calls */
 #define	WT_STAT_DSRC_CURSOR_CREATE			2107
+/*! cursor: cursor operation restarted */
+#define	WT_STAT_DSRC_CURSOR_RESTART			2108
 /*! cursor: cursor-insert key and value bytes inserted */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2108
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2109
 /*! cursor: cursor-remove key bytes removed */
-#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2109
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2110
 /*! cursor: cursor-update value bytes updated */
-#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2110
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2111
 /*! cursor: cursors cached on close */
-#define	WT_STAT_DSRC_CURSOR_CACHE			2111
+#define	WT_STAT_DSRC_CURSOR_CACHE			2112
 /*! cursor: cursors reused from cache */
-#define	WT_STAT_DSRC_CURSOR_REOPEN			2112
+#define	WT_STAT_DSRC_CURSOR_REOPEN			2113
 /*! cursor: insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT			2113
+#define	WT_STAT_DSRC_CURSOR_INSERT			2114
 /*! cursor: modify calls */
-#define	WT_STAT_DSRC_CURSOR_MODIFY			2114
+#define	WT_STAT_DSRC_CURSOR_MODIFY			2115
 /*! cursor: next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT			2115
+#define	WT_STAT_DSRC_CURSOR_NEXT			2116
 /*! cursor: prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV			2116
+#define	WT_STAT_DSRC_CURSOR_PREV			2117
 /*! cursor: remove calls */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			2117
+#define	WT_STAT_DSRC_CURSOR_REMOVE			2118
 /*! cursor: reserve calls */
-#define	WT_STAT_DSRC_CURSOR_RESERVE			2118
+#define	WT_STAT_DSRC_CURSOR_RESERVE			2119
 /*! cursor: reset calls */
-#define	WT_STAT_DSRC_CURSOR_RESET			2119
-/*! cursor: restarted searches */
-#define	WT_STAT_DSRC_CURSOR_RESTART			2120
+#define	WT_STAT_DSRC_CURSOR_RESET			2120
 /*! cursor: search calls */
 #define	WT_STAT_DSRC_CURSOR_SEARCH			2121
 /*! cursor: search near calls */

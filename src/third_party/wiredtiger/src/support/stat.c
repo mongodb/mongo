@@ -111,6 +111,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"compression: raw compression call succeeded",
 	"cursor: bulk-loaded cursor-insert calls",
 	"cursor: create calls",
+	"cursor: cursor operation restarted",
 	"cursor: cursor-insert key and value bytes inserted",
 	"cursor: cursor-remove key bytes removed",
 	"cursor: cursor-update value bytes updated",
@@ -123,7 +124,6 @@ static const char * const __stats_dsrc_desc[] = {
 	"cursor: remove calls",
 	"cursor: reserve calls",
 	"cursor: reset calls",
-	"cursor: restarted searches",
 	"cursor: search calls",
 	"cursor: search near calls",
 	"cursor: truncate calls",
@@ -296,6 +296,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->compress_raw_ok = 0;
 	stats->cursor_insert_bulk = 0;
 	stats->cursor_create = 0;
+	stats->cursor_restart = 0;
 	stats->cursor_insert_bytes = 0;
 	stats->cursor_remove_bytes = 0;
 	stats->cursor_update_bytes = 0;
@@ -308,7 +309,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cursor_remove = 0;
 	stats->cursor_reserve = 0;
 	stats->cursor_reset = 0;
-	stats->cursor_restart = 0;
 	stats->cursor_search = 0;
 	stats->cursor_search_near = 0;
 	stats->cursor_truncate = 0;
@@ -482,6 +482,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->compress_raw_ok += from->compress_raw_ok;
 	to->cursor_insert_bulk += from->cursor_insert_bulk;
 	to->cursor_create += from->cursor_create;
+	to->cursor_restart += from->cursor_restart;
 	to->cursor_insert_bytes += from->cursor_insert_bytes;
 	to->cursor_remove_bytes += from->cursor_remove_bytes;
 	to->cursor_update_bytes += from->cursor_update_bytes;
@@ -494,7 +495,6 @@ __wt_stat_dsrc_aggregate_single(
 	to->cursor_remove += from->cursor_remove;
 	to->cursor_reserve += from->cursor_reserve;
 	to->cursor_reset += from->cursor_reset;
-	to->cursor_restart += from->cursor_restart;
 	to->cursor_search += from->cursor_search;
 	to->cursor_search_near += from->cursor_search_near;
 	to->cursor_truncate += from->cursor_truncate;
@@ -701,6 +701,7 @@ __wt_stat_dsrc_aggregate(
 	to->compress_raw_ok += WT_STAT_READ(from, compress_raw_ok);
 	to->cursor_insert_bulk += WT_STAT_READ(from, cursor_insert_bulk);
 	to->cursor_create += WT_STAT_READ(from, cursor_create);
+	to->cursor_restart += WT_STAT_READ(from, cursor_restart);
 	to->cursor_insert_bytes += WT_STAT_READ(from, cursor_insert_bytes);
 	to->cursor_remove_bytes += WT_STAT_READ(from, cursor_remove_bytes);
 	to->cursor_update_bytes += WT_STAT_READ(from, cursor_update_bytes);
@@ -713,7 +714,6 @@ __wt_stat_dsrc_aggregate(
 	to->cursor_remove += WT_STAT_READ(from, cursor_remove);
 	to->cursor_reserve += WT_STAT_READ(from, cursor_reserve);
 	to->cursor_reset += WT_STAT_READ(from, cursor_reset);
-	to->cursor_restart += WT_STAT_READ(from, cursor_restart);
 	to->cursor_search += WT_STAT_READ(from, cursor_search);
 	to->cursor_search_near += WT_STAT_READ(from, cursor_search_near);
 	to->cursor_truncate += WT_STAT_READ(from, cursor_truncate);
@@ -889,11 +889,11 @@ static const char * const __stats_connection_desc[] = {
 	"cursor: cursor insert calls",
 	"cursor: cursor modify calls",
 	"cursor: cursor next calls",
+	"cursor: cursor operation restarted",
 	"cursor: cursor prev calls",
 	"cursor: cursor remove calls",
 	"cursor: cursor reserve calls",
 	"cursor: cursor reset calls",
-	"cursor: cursor restarted searches",
 	"cursor: cursor search calls",
 	"cursor: cursor search near calls",
 	"cursor: cursor sweep buckets",
@@ -1286,11 +1286,11 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cursor_insert = 0;
 	stats->cursor_modify = 0;
 	stats->cursor_next = 0;
+	stats->cursor_restart = 0;
 	stats->cursor_prev = 0;
 	stats->cursor_remove = 0;
 	stats->cursor_reserve = 0;
 	stats->cursor_reset = 0;
-	stats->cursor_restart = 0;
 	stats->cursor_search = 0;
 	stats->cursor_search_near = 0;
 	stats->cursor_sweep_buckets = 0;
@@ -1726,11 +1726,11 @@ __wt_stat_connection_aggregate(
 	to->cursor_insert += WT_STAT_READ(from, cursor_insert);
 	to->cursor_modify += WT_STAT_READ(from, cursor_modify);
 	to->cursor_next += WT_STAT_READ(from, cursor_next);
+	to->cursor_restart += WT_STAT_READ(from, cursor_restart);
 	to->cursor_prev += WT_STAT_READ(from, cursor_prev);
 	to->cursor_remove += WT_STAT_READ(from, cursor_remove);
 	to->cursor_reserve += WT_STAT_READ(from, cursor_reserve);
 	to->cursor_reset += WT_STAT_READ(from, cursor_reset);
-	to->cursor_restart += WT_STAT_READ(from, cursor_restart);
 	to->cursor_search += WT_STAT_READ(from, cursor_search);
 	to->cursor_search_near += WT_STAT_READ(from, cursor_search_near);
 	to->cursor_sweep_buckets += WT_STAT_READ(from, cursor_sweep_buckets);

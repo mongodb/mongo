@@ -802,14 +802,10 @@ __txn_checkpoint_can_skip(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "target", &cval));
 	__wt_config_subinit(session, &targetconf, &cval);
-	full = __wt_config_next(&targetconf, &k, &v) != 0;
-	if (fullp != NULL)
-		*fullp = full;
+	*fullp = full = __wt_config_next(&targetconf, &k, &v) != 0;
 
 	WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
-	use_timestamp = cval.val != 0;
-	if (use_timestampp != NULL)
-		*use_timestampp = use_timestamp;
+	*use_timestampp = use_timestamp = cval.val != 0;
 
 	/* Never skip non-full checkpoints */
 	if (!full)

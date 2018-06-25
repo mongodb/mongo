@@ -31,24 +31,6 @@ typedef enum {
 } WT_SPLIT_ERROR_PHASE;
 
 /*
- * __page_split_timing_stress --
- *	Optionally add delay to simulate the race conditions in page split for
- * debug purposes. The purpose is to uncover the race conditions in page split.
- */
-static void
-__page_split_timing_stress(
-    WT_SESSION_IMPL *session, uint64_t flag, uint64_t micro_seconds)
-{
-	WT_CONNECTION_IMPL *conn;
-
-	conn = S2C(session);
-
-	/* We only want to sleep when page split race flag is set. */
-	if (FLD_ISSET(conn->timing_stress_flags, flag))
-		__wt_sleep(0, micro_seconds);
-}
-
-/*
  * __split_safe_free --
  *	Free a buffer if we can be sure no thread is accessing it, or schedule
  *	it to be freed otherwise.
@@ -566,8 +548,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_ERR(__split_ref_prepare(session, alloc_index, &locked, false));
 
 	/* Encourage a race */
-	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_1, TIMING_STRESS_TEST_SLEEP);
+	__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_1);
 
 	/*
 	 * Confirm the root page's index hasn't moved, then update it, which
@@ -578,8 +559,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	alloc_index = NULL;
 
 	/* Encourage a race */
-	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_2, TIMING_STRESS_TEST_SLEEP);
+	__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_2);
 
 	/*
 	 * Get a generation for this split, mark the root page.  This must be
@@ -772,8 +752,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_NOT_READ(complete, WT_ERR_PANIC);
 
 	/* Encourage a race */
-	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_3, TIMING_STRESS_TEST_SLEEP);
+	__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_3);
 
 	/*
 	 * Confirm the parent page's index hasn't moved then update it, which
@@ -784,8 +763,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	alloc_index = NULL;
 
 	/* Encourage a race */
-	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_4, TIMING_STRESS_TEST_SLEEP);
+	__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_4);
 
 	/*
 	 * Get a generation for this split, mark the page.  This must be after
@@ -1125,8 +1103,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_ERR(__split_ref_prepare(session, alloc_index, &locked, true));
 
 	/* Encourage a race */
-	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_5, TIMING_STRESS_TEST_SLEEP);
+	__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_5);
 
 	/* Split into the parent. */
 	WT_ERR(__split_parent(session, page_ref, alloc_index->index,
@@ -1140,8 +1117,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_INTL_INDEX_SET(page, replace_index);
 
 	/* Encourage a race */
-	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_6, TIMING_STRESS_TEST_SLEEP);
+	__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_6);
 
 	/*
 	 * Get a generation for this split, mark the parent page.  This must be
@@ -1259,8 +1235,7 @@ __split_internal_lock(
 		parent = ref->home;
 
 		/* Encourage races. */
-		__page_split_timing_stress(
-		    session, WT_TIMING_STRESS_SPLIT_7, WT_THOUSAND);
+		__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_7);
 
 		/* Page locks live in the modify structure. */
 		WT_RET(__wt_page_modify_init(session, parent));
