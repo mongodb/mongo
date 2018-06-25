@@ -32,6 +32,7 @@
 
 #include "mongo/db/server_parameters.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/options_parser/startup_option_init.h"
 
 namespace mongo {
 
@@ -163,5 +164,18 @@ MONGO_COMPILER_VARIABLE_UNUSED auto _exportedCheckCachePressurePeriodSeconds =
 
             return Status::OK();
         });
+
+/**
+ * After startup parameters have been initialized, set targetSnapshotHistoryWindowInSeconds to the
+ * value of maxTargetSnapshotHistoryWindowInSeconds, in case the max has been altered. The cache
+ * pressure is zero to begin with, so the user should not have to wait for the target to slowly
+ * adjust to max.
+ */
+MONGO_STARTUP_OPTIONS_POST(SetTargetSnapshotWindowSize)
+(InitializerContext* context) {
+    snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.store(
+        snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load());
+    return Status::OK();
+}
 
 }  // namespace mongo

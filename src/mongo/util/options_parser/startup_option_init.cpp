@@ -85,6 +85,14 @@ MONGO_INITIALIZER_GROUP(BeginStartupOptionStorage,
                         ("EndStartupOptionStorage"))
 MONGO_INITIALIZER_GROUP(EndStartupOptionStorage,
                         ("BeginStartupOptionStorage"),
+                        ("BeginPostStartupOptionStorage"))
+
+/* Groups for post option storage */
+MONGO_INITIALIZER_GROUP(BeginPostStartupOptionStorage,
+                        ("EndStartupOptionStorage"),
+                        ("EndPostStartupOptionStorage"))
+MONGO_INITIALIZER_GROUP(EndPostStartupOptionStorage,
+                        ("BeginPostStartupOptionStorage"),
                         ("EndStartupOptionHandling"))
 
 MONGO_INITIALIZER_GROUP(EndStartupOptionHandling, ("BeginStartupOptionHandling"), ("default"))

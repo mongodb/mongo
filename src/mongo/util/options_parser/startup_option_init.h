@@ -125,3 +125,17 @@
 #define MONGO_STARTUP_OPTIONS_STORE(fname) \
     MONGO_INITIALIZER_GENERAL(             \
         fname##_Store, ("BeginStartupOptionStorage"), ("EndStartupOptionStorage"))
+
+/**
+ * Macro to define an initializer function named "<fname>_Post" to set internal values after storing
+ * the command line and config file options.  This includes setting the values of global variables
+ * and configuring global state.
+ *
+ * Usage:
+ *     MONGO_STARTUP_OPTIONS_POST(MongodOptions)(InitializerContext* context) {
+ *         return Status::OK();
+ *     }
+ */
+#define MONGO_STARTUP_OPTIONS_POST(fname) \
+    MONGO_INITIALIZER_GENERAL(            \
+        fname##_Store, ("BeginPostStartupOptionStorage"), ("EndPostStartupOptionStorage"))
