@@ -64,7 +64,10 @@ boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx
 
     auto opTime = opTimeToFetch.value();
     DBDirectClient client(opCtx);
-    auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery());
+    auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                                    opTime.asQuery(),
+                                    nullptr,
+                                    QueryOption_OplogReplay);
 
     return uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
 }
@@ -267,8 +270,10 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
     }
 
     DBDirectClient client(opCtx);
-    auto newWriteOplog =
-        client.findOne(NamespaceString::kRsOplogNamespace.ns(), nextOpTimeToFetch.asQuery());
+    auto newWriteOplog = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                                        nextOpTimeToFetch.asQuery(),
+                                        nullptr,
+                                        QueryOption_OplogReplay);
 
     uassert(40620,
             str::stream() << "Unable to fetch oplog entry with opTime: "
