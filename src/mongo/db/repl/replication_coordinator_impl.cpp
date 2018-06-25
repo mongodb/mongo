@@ -105,6 +105,8 @@ const OperationContext::Decoration<bool> alwaysAllowNonLocalWrites =
 
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncAttempts, int, 10);
 
+MONGO_EXPORT_SERVER_PARAMETER(handOffElectionOnStepdown, bool, false);
+
 // Number of seconds between noop writer writes.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(periodicNoopIntervalSecs, int, 10);
 
@@ -1759,11 +1761,50 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // Stepdown success!
     onExitGuard.Dismiss();
     updateMemberState();
+
     // Schedule work to (potentially) step back up once the stepdown period has ended.
     _scheduleWorkAt(stepDownUntil, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
         _handleTimePassing(cbData);
     });
+
+    // If election handoff is enabled, schedule a step-up immediately instead of waiting for the
+    // election timeout to expire.
+    if (!force && handOffElectionOnStepdown.load()) {
+        _performElectionHandoff();
+    }
     return Status::OK();
+}
+
+void ReplicationCoordinatorImpl::_performElectionHandoff() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    auto candidateIndex = _topCoord->chooseElectionHandoffCandidate();
+
+    if (candidateIndex < 0) {
+        log() << "Could not find node to hand off election to.";
+        return;
+    }
+
+    auto target = _rsConfig.getMemberAt(candidateIndex).getHostAndPort();
+    executor::RemoteCommandRequest request(target, "admin", BSON("replSetStepUp" << 1), nullptr);
+    log() << "Handing off election to " << target;
+
+    auto callbackHandleSW = _replExecutor->scheduleRemoteCommand(
+        request, [target](const executor::TaskExecutor::RemoteCommandCallbackArgs& callbackData) {
+            auto status = callbackData.response.status;
+
+            if (status.isOK()) {
+                LOG(1) << "replSetStepUp request to " << target << " succeeded with response -- "
+                       << callbackData.response.data;
+            } else {
+                log() << "replSetStepUp request to " << target << " failed due to " << status;
+            }
+        });
+
+    auto callbackHandleStatus = callbackHandleSW.getStatus();
+    if (!callbackHandleStatus.isOK()) {
+        error() << "Failed to schedule ReplSetStepUp request to " << target
+                << " for election handoff: " << callbackHandleStatus;
+    }
 }
 
 void ReplicationCoordinatorImpl::_handleTimePassing(

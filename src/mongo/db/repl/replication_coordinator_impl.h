@@ -596,6 +596,11 @@ private:
     void _handleTimePassing(const executor::TaskExecutor::CallbackArgs& cbData);
 
     /**
+     * Chooses a candidate for election handoff and sends a ReplSetStepUp command to it.
+     */
+    void _performElectionHandoff();
+
+    /**
      * Helper method for _awaitReplication that takes an already locked unique_lock, but leaves
      * operation timing to the caller.
      */
