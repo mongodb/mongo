@@ -331,11 +331,21 @@ Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     KeyPattern shardKeyPattern{BSONObj()};
     auto fullShardKeyStatus =
         includeFullShardKey(opCtx, configServer.get(), nss, givenRange, &shardKeyPattern);
-    if (!fullShardKeyStatus.isOK()) {
+    const bool namespaceNotSharded =
+        (fullShardKeyStatus.getStatus() == ErrorCodes::NamespaceNotSharded);
+
+    if (!fullShardKeyStatus.isOK() && !namespaceNotSharded) {
         return fullShardKeyStatus.getStatus();
     }
 
-    const auto& fullShardKeyRange = fullShardKeyStatus.getValue();
+    const auto& fullShardKeyRange =
+        namespaceNotSharded ? givenRange : fullShardKeyStatus.getValue();
+    if (namespaceNotSharded) {
+        Status shardKeyStatus = fullShardKeyRange.extractKeyPattern(&shardKeyPattern);
+        if (!shardKeyStatus.isOK()) {
+            return shardKeyStatus;
+        }
+    }
 
     auto zoneExistStatus =
         configServer->exhaustiveFindOnConfig(opCtx,
@@ -393,7 +403,9 @@ Status ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
     KeyPattern shardKeyPattern{BSONObj()};
     auto fullShardKeyStatus =
         includeFullShardKey(opCtx, configServer.get(), nss, range, &shardKeyPattern);
-    if (!fullShardKeyStatus.isOK()) {
+    const bool namespaceNotSharded =
+        (fullShardKeyStatus.getStatus() == ErrorCodes::NamespaceNotSharded);
+    if (!fullShardKeyStatus.isOK() && !namespaceNotSharded) {
         return fullShardKeyStatus.getStatus();
     }
 
