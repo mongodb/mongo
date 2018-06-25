@@ -66,10 +66,15 @@ private:
     std::unique_ptr<boost::optional<ChunkSplitStateDriver>> _splitDriver;
 };
 
-TEST_F(ChunkSplitStateDriverTest, InitiateSplitLeavesBytesWrittenUnchanged) {
-    auto bytesInTracker = writesTracker().getBytesWritten();
-    ASSERT_TRUE(splitDriver());
-    ASSERT_EQ(writesTracker().getBytesWritten(), bytesInTracker);
+TEST(ChunkSplitStateDriverTest, InitiateSplitLeavesBytesWrittenUnchanged) {
+    auto writesTracker = std::make_shared<ChunkWritesTracker>();
+    uint64_t bytesInTrackerBeforeSplit{4};
+    writesTracker->addBytesWritten(bytesInTrackerBeforeSplit);
+
+    auto splitDriver = std::make_unique<boost::optional<ChunkSplitStateDriver>>(
+        ChunkSplitStateDriver::tryInitiateSplit(writesTracker));
+
+    ASSERT_EQ(writesTracker->getBytesWritten(), bytesInTrackerBeforeSplit);
 }
 
 TEST_F(ChunkSplitStateDriverTest, PrepareSplitClearsBytesWritten) {
