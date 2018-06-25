@@ -353,6 +353,7 @@ env.CppUnitTest(
         'catalog_cache_refresh_test.cpp',
         'chunk_manager_index_bounds_test.cpp',
         'chunk_manager_query_test.cpp',
+        'routing_table_history_test.cpp',
         'shard_key_pattern_test.cpp',
     ],
     LIBDEPS=[

@@ -37,24 +37,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-namespace {
-
-// Test whether we should split once data * kSplitCheckInterval > chunkSize (approximately)
-PseudoRandom prng(static_cast<int64_t>(time(0)));
-
-// Assume user has 64MB chunkSize setting. It is ok if this assumption is wrong since it is only
-// a heuristic.
-const int64_t kMaxDataWritten = 64 / ChunkWritesTracker::kSplitTestFactor;
-
-/**
- * Generates a random value for _dataWritten so that a mongos restart wouldn't cause delay in
- * splitting.
- */
-int64_t mkDataWritten() {
-    return prng.nextInt64(kMaxDataWritten);
-}
-
-}  // namespace
 
 ChunkInfo::ChunkInfo(const ChunkType& from)
     : _range(from.getMin(), from.getMax()),
@@ -67,7 +49,6 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
     if (!_history.empty()) {
         invariant(_shardId == _history.front().getShard());
     }
-    _writesTracker->addBytesWritten(mkDataWritten());
 }
 
 const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {

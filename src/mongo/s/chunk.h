@@ -103,8 +103,8 @@ private:
     mutable bool _jumbo;
 
     // Used for tracking writes to this chunk, to estimate its size for the autosplitter. Since
-    // ChunkInfo obejcts are always treated as const, and this contains metadata about the chunk
-    // that needs to change, it's okay (and necessary) to mark it mutable
+    // ChunkInfo objects are always treated as const, and this contains metadata about the chunk
+    // that needs to change, it's okay (and necessary) to mark it mutable.
     mutable std::shared_ptr<ChunkWritesTracker> _writesTracker;
 };
 

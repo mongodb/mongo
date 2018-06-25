@@ -40,6 +40,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/s/chunk_writes_tracker.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -534,11 +535,33 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
         // not overlap max
         const auto high = chunkMap.upper_bound(chunkMaxKeyString);
 
+        // If we are in the middle of splitting a chunk, for the first few
+        // chunks inserted, low == high, because both lookups will point to the
+        // same chunk (the one being split). If we're inserting the last chunk
+        // for the current chunk being split, low will point to the chunk that
+        // we're splitting, and high will point to the next chunk past the one
+        // we're splitting (which could be chunkMap.end()). In this case,
+        // std::distance(low, high) == 1. Lastly, this does not apply during
+        // the creation of the original routing table, in which case the map is
+        // empty and the first chunk that is inserted will find that low ==
+        // high, but low == chunkMap.end(), and we aren't doing a split in that
+        // case.
+        auto foundSingleChunk =
+            ((low == high || std::distance(low, high) == 1) && low != chunkMap.end());
+
+        auto newChunk = std::make_shared<ChunkInfo>(chunk);
+        if (foundSingleChunk) {
+            auto chunkBeingReplacedBySplit = low->second;
+            auto bytesInReplacedChunk =
+                chunkBeingReplacedBySplit->getWritesTracker()->getBytesWritten();
+            newChunk->getWritesTracker()->addBytesWritten(bytesInReplacedChunk);
+        }
+
         // Erase all chunks from the map, which overlap the chunk we got from the persistent store
         chunkMap.erase(low, high);
 
         // Insert only the chunk itself
-        chunkMap.insert(std::make_pair(chunkMaxKeyString, std::make_shared<ChunkInfo>(chunk)));
+        chunkMap.insert(std::make_pair(chunkMaxKeyString, newChunk));
     }
 
     // If at least one diff was applied, the metadata is correct, but it might not have changed so
