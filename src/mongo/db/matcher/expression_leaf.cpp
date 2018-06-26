@@ -551,7 +551,10 @@ Status ArrayFilterEntries::setEqualities(std::vector<BSONElement> equalities) {
         }
     }
 
-    _equalities = BSONElementFlatSet(equalities.begin(), equalities.end());
+    // Sort the list of equalities to work around https://svn.boost.org/trac10/ticket/13140.
+    std::sort(equalities.begin(), equalities.end(), BSONElementCmpWithoutField());
+    _equalities =
+        BSONElementFlatSet(equalities.begin(), equalities.end(), BSONElementCmpWithoutField());
     return Status::OK();
 }
 
