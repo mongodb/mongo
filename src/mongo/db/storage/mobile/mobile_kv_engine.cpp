@@ -97,7 +97,7 @@ MobileKVEngine::MobileKVEngine(const std::string& path) {
 
         // Pragma returns current "synchronous" setting, ensure it is FULL.
         int sync_val = sqlite3_column_int(stmt, 0);
-        fassert(50867, sync_val == PRAGMA_SYNC_FULL);
+        fassert(50869, sync_val == PRAGMA_SYNC_FULL);
         status = sqlite3_finalize(stmt);
         checkStatus(status, SQLITE_OK, "sqlite3_finalize");
 
