@@ -31,7 +31,11 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
+
 #include "mongo/base/init.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
@@ -39,6 +43,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
@@ -46,11 +51,11 @@ namespace {
 
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
-    WiredTigerKVHarnessHelper() : _dbpath("wt-kv-harness") {
+    WiredTigerKVHarnessHelper(bool forRepair = false)
+        : _dbpath("wt-kv-harness"), _forRepair(forRepair) {
         if (!hasGlobalServiceContext())
             setGlobalServiceContext(ServiceContext::make());
-        _engine.reset(new WiredTigerKVEngine(
-            kWiredTigerEngineName, _dbpath.path(), _cs.get(), "", 1, false, false, false, false));
+        _engine.reset(makeEngine());
         repl::ReplicationCoordinator::set(
             getGlobalServiceContext(),
             std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
@@ -58,26 +63,186 @@ public:
     }
 
     virtual ~WiredTigerKVHarnessHelper() {
-        _engine.reset(NULL);
+        _engine.reset(nullptr);
         // Cannot cleanup the global service context here, the test still have clients remaining.
     }
 
-    virtual KVEngine* restartEngine() {
-        _engine.reset(NULL);
-        _engine.reset(new WiredTigerKVEngine(
-            kWiredTigerEngineName, _dbpath.path(), _cs.get(), "", 1, false, false, false, false));
+    virtual KVEngine* restartEngine() override {
+        _engine.reset(nullptr);
+        _engine.reset(makeEngine());
         return _engine.get();
     }
 
-    virtual KVEngine* getEngine() {
+    virtual KVEngine* getEngine() override {
+        return _engine.get();
+    }
+
+    virtual WiredTigerKVEngine* getWiredTigerKVEngine() {
         return _engine.get();
     }
 
 private:
+    WiredTigerKVEngine* makeEngine() {
+        return new WiredTigerKVEngine(kWiredTigerEngineName,
+                                      _dbpath.path(),
+                                      _cs.get(),
+                                      "",
+                                      1,
+                                      false,
+                                      false,
+                                      _forRepair,
+                                      false);
+    }
+
     const std::unique_ptr<ClockSource> _cs = stdx::make_unique<ClockSourceMock>();
     unittest::TempDir _dbpath;
     std::unique_ptr<WiredTigerKVEngine> _engine;
+    bool _forRepair;
 };
+
+class WiredTigerKVEngineTest : public unittest::Test {
+public:
+    void setUp() override {
+        setGlobalServiceContext(ServiceContext::make());
+        Client::initThread(getThreadName());
+
+        _helper = makeHelper();
+        _engine = _helper->getWiredTigerKVEngine();
+    }
+
+    void tearDown() override {
+        _helper.reset(nullptr);
+        Client::destroy();
+        setGlobalServiceContext({});
+    }
+
+    std::unique_ptr<OperationContext> makeOperationContext() {
+        return std::make_unique<OperationContextNoop>(_engine->newRecoveryUnit());
+    }
+
+protected:
+    virtual std::unique_ptr<WiredTigerKVHarnessHelper> makeHelper() {
+        return std::make_unique<WiredTigerKVHarnessHelper>();
+    }
+
+    std::unique_ptr<WiredTigerKVHarnessHelper> _helper;
+    WiredTigerKVEngine* _engine;
+};
+
+class WiredTigerKVEngineRepairTest : public WiredTigerKVEngineTest {
+    virtual std::unique_ptr<WiredTigerKVHarnessHelper> makeHelper() override {
+        return std::make_unique<WiredTigerKVHarnessHelper>(true /* repair */);
+    }
+};
+
+TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
+    auto opCtxPtr = makeOperationContext();
+
+    std::string ns = "a.b";
+    std::string ident = "collection-1234";
+    std::string record = "abcd";
+    CollectionOptions options;
+
+    std::unique_ptr<RecordStore> rs;
+    ASSERT_OK(_engine->createRecordStore(opCtxPtr.get(), ns, ident, options));
+    rs = _engine->getRecordStore(opCtxPtr.get(), ns, ident, options);
+    ASSERT(rs);
+
+    RecordId loc;
+    {
+        WriteUnitOfWork uow(opCtxPtr.get());
+        StatusWith<RecordId> res =
+            rs->insertRecord(opCtxPtr.get(), record.c_str(), record.length() + 1, Timestamp());
+        ASSERT_OK(res.getStatus());
+        loc = res.getValue();
+        uow.commit();
+    }
+
+    const boost::optional<boost::filesystem::path> dataFilePath =
+        _engine->getDataFilePathForIdent(ident);
+    ASSERT(dataFilePath);
+
+    ASSERT(boost::filesystem::exists(*dataFilePath));
+
+    const boost::filesystem::path tmpFile{dataFilePath->string() + ".tmp"};
+    ASSERT(!boost::filesystem::exists(tmpFile));
+
+#ifdef _WIN32
+    ASSERT_NOT_OK(_engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options));
+#else
+    // Move the data file out of the way so the ident can be dropped. This not permitted on Windows
+    // because the file cannot be moved while it is open. The implementation for orphan recovery is
+    // also not implemented on Windows for this reason.
+    boost::system::error_code err;
+    boost::filesystem::rename(*dataFilePath, tmpFile, err);
+    ASSERT(!err) << err.message();
+
+    ASSERT_OK(_engine->dropIdent(opCtxPtr.get(), ident));
+
+    // The data file is moved back in place so that it becomes an "orphan" of the storage
+    // engine and the restoration process can be tested.
+    boost::filesystem::rename(tmpFile, *dataFilePath, err);
+    ASSERT(!err) << err.message();
+
+    ASSERT_OK(_engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options));
+#endif
+
+    // The existing RecordStore is still usable with a different OperationContext and
+    // RecoveryUnit because a new session with new cursors will be opened.
+    ASSERT_EQUALS(record, rs->dataFor(opCtxPtr.get(), loc).data());
+}
+
+TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesFailGracefully) {
+    auto opCtxPtr = makeOperationContext();
+
+    std::string ns = "a.b";
+    std::string ident = "collection-1234";
+    std::string record = "abcd";
+    CollectionOptions options;
+
+    std::unique_ptr<RecordStore> rs;
+    ASSERT_OK(_engine->createRecordStore(opCtxPtr.get(), ns, ident, options));
+    rs = _engine->getRecordStore(opCtxPtr.get(), ns, ident, options);
+    ASSERT(rs);
+
+    RecordId loc;
+    {
+        WriteUnitOfWork uow(opCtxPtr.get());
+        StatusWith<RecordId> res =
+            rs->insertRecord(opCtxPtr.get(), record.c_str(), record.length() + 1, Timestamp());
+        ASSERT_OK(res.getStatus());
+        loc = res.getValue();
+        uow.commit();
+    }
+
+    const boost::optional<boost::filesystem::path> dataFilePath =
+        _engine->getDataFilePathForIdent(ident);
+    ASSERT(dataFilePath);
+
+    ASSERT(boost::filesystem::exists(*dataFilePath));
+
+    ASSERT_OK(_engine->dropIdent(opCtxPtr.get(), ident));
+
+#ifdef _WIN32
+    ASSERT_NOT_OK(_engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options));
+#else
+    // The ident may not get immediately dropped, so ensure it is completely gone.
+    boost::system::error_code err;
+    boost::filesystem::remove(*dataFilePath, err);
+    ASSERT(!err) << err.message();
+
+    // Create an empty data file. The subsequent call to recreate the collection will fail because
+    // it is unsalvageable.
+    boost::filesystem::ofstream fileStream(*dataFilePath);
+    fileStream << "";
+    fileStream.close();
+
+    ASSERT(boost::filesystem::exists(*dataFilePath));
+
+    // This should fail gracefully and not cause any crashing.
+    ASSERT_NOT_OK(_engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options));
+#endif
+}
 
 std::unique_ptr<KVHarnessHelper> makeHelper() {
     return stdx::make_unique<WiredTigerKVHarnessHelper>();
