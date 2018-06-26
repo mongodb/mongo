@@ -35,7 +35,7 @@ var {withTxnAndAutoRetry} = (function() {
 
         do {
             session.startTransaction(txnOptions);
-            let commitErrorSessionId = undefined;
+            let hasCommitTxnError = false;
             hasTransientError = false;
 
             try {
@@ -46,16 +46,18 @@ var {withTxnAndAutoRetry} = (function() {
                 try {
                     quietly(() => session.commitTransaction());
                 } catch (e) {
-                    commitErrorSessionId = session.getSessionId();
+                    hasCommitTxnError = true;
                     throw e;
                 }
             } catch (e) {
-                // Use the version of abortTransaction() that ignores errors. We ignore the error
-                // from abortTransaction because the transaction may have implicitly been aborted by
-                // the server already and will therefore return a NoSuchTransaction error response.
-                // We need to call abortTransaction() in order to update the mongo shell's state
-                // such that it agrees no transaction is currently in progress on this session.
-                if (session.getSessionId() !== commitErrorSessionId) {
+                if (!hasCommitTxnError) {
+                    // Use the version of abortTransaction() that ignores errors. We ignore the
+                    // error from abortTransaction because the transaction may have implicitly
+                    // been aborted by the server already and will therefore return a
+                    // NoSuchTransaction error response.
+                    // We need to call abortTransaction() in order to update the mongo shell's
+                    // state such that it agrees no transaction is currently in progress on this
+                    // session.
                     session.abortTransaction();
                 }
 
