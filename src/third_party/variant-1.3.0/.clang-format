@@ -1,0 +1,359 @@
+---
+BasedOnStyle: Google
+
+# Good:
+#
+#   class TFoo {
+#     public:
+#
+#     TFoo() = default;
+#
+#   }  // TFoo
+#
+# Bad:
+#
+#   class TFoo {
+#    public:
+#
+#     TFoo() = default;
+#
+#   }  // TFoo
+#
+AccessModifierOffset: 0
+
+### AlignEscapedNewlinesLeft: true
+
+# Good:
+#
+#   int x = 100;  // comment1
+#   std::string y = "one hundred";  // comment2
+#
+# Bad:
+#
+#   int x = 100;                    // comment1
+#   std::string y = "one hundred";  // comment2
+#
+AlignTrailingComments: false
+
+### AllowAllParametersOfDeclarationOnNextLine: true
+
+AllowShortIfStatementsOnASingleLine: true
+
+# Good:
+#
+#   while (flag)
+#     x = 42;
+#
+# Bad:
+#
+#   while (flag) x = 42;
+#
+AllowShortLoopsOnASingleLine: false
+
+# Good:
+#
+#   const char *text =
+#       "hello"
+#       "world";
+#
+# Bad:
+#
+#   const char *text = "hello"
+#                      "world";
+#
+AlwaysBreakBeforeMultilineStrings: true
+
+# Good:
+#
+#   template <typename TVal>
+#   void F() {}
+#
+# Bad:
+#
+#   template <typename TVal> void F() {}
+#
+AlwaysBreakTemplateDeclarations: true
+
+# Good:
+#
+#   F(first,
+#     second,
+#     third,
+#     fourth,
+#     fifth,
+#     sixth,
+#     seventh,
+#     eighth);
+#
+# Bad:
+#
+#   F(first, second, third, fourth, fifth, sixth,
+#     seventh, eighth);
+#
+BinPackArguments: false
+
+# Good:
+#
+#   void F(int first,
+#          int second,
+#          int third,
+#          int fourth,
+#          int fifth,
+#          int sixth,
+#          int seventh,
+#          int eighth) {}
+#
+# Bad:
+#
+#   void F(int first, int second, int third, int fourth, int fifth, int sixth,
+#          int seventh, int eighth) {}
+#
+BinPackParameters: false
+
+# Good:
+#
+#   int x = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa +
+#           bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb;
+#
+# Bad:
+#
+#  int x = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+#          + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb;
+#
+BreakBeforeBinaryOperators: false
+
+# Good:
+#
+#   void F() {}
+#
+# Bad:
+#
+#   void F()
+#   {
+#   }
+#
+BreakBeforeBraces: Attach
+
+# Good:
+#
+#   class TFoo {
+#     public:
+#
+#     TFoo()
+#         : Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(1),
+#           Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb(2) {}
+#
+#   };  // TFoo
+#
+# Bad:
+#
+#   class TFoo {
+#     public:
+#
+#     TFoo()
+#         : Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(1)
+#         , Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb(2) {}
+#
+#   };  // TFoo
+#
+BreakConstructorInitializersBeforeComma: false
+
+ColumnLimit: 80
+
+# Good:
+#
+#   class TFoo {
+#     public:
+#
+#     TFoo()
+#         : First(1),
+#           Second(2),
+#           Third(3),
+#           Fourth(4),
+#           Fifth(5),
+#           Sixth(6),
+#           Seventh(7),
+#           Eighth(8) {}
+#
+#   };  // TFoo
+#
+# Bad:
+#
+#   class TFoo {
+#     public:
+#
+#     TFoo()
+#         : First(1), Second(2), Third(3), Fourth(4), Fifth(5), Sixth(6),
+#           Seventh(7), Eighth(8) {}
+#
+#   };  // TFoo
+#
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+
+ConstructorInitializerIndentWidth: 4
+
+Cpp11BracedListStyle: true
+
+DerivePointerBinding: false
+
+# Good:
+#
+#   int x;
+#   switch (x) {
+#     case 0: {
+#       x = 0;
+#       break;
+#     }  // case
+#     case 1: {
+#       x = 1;
+#       break;
+#     }  // case
+#   }  // switch
+#
+# Bad:
+#
+#   int x;
+#   switch (x) {
+#   case 0: {
+#     x = 0;
+#     break;
+#   }  // case
+#   case 1: {
+#     x = 1;
+#     break;
+#   }  // case
+#   }  // switch
+#
+IndentCaseLabels: true
+
+# Good:
+#
+#   std::tuple<int, int, double, double>
+#   Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa();
+#
+# Bad:
+#
+#   std::tuple<int, int, double, double>
+#       Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa();
+#
+IndentFunctionDeclarationAfterType: false
+
+IndentWidth: 2
+
+MaxEmptyLinesToKeep: 1
+
+# Good:
+#
+#   namespace Foo {
+#
+#     class TFoo {};
+#
+#   }  // Foo
+#
+# Bad:
+#
+#   namespace Foo {
+#
+#   class TFoo {};
+#
+#   }  // Foo
+#
+NamespaceIndentation: All
+
+### ObjCSpaceBeforeProtocolList: false
+
+### PenaltyBreakComment: 60
+
+### PenaltyBreakFirstLessLess: 120
+
+### PenaltyBreakString: 1000
+
+### PenaltyExcessCharacter: 1000000
+
+### PenaltyReturnTypeOnItsOwnLine: 200
+
+# Good:
+#
+#   int *ptr = nullptr;
+#
+# Bad:
+#
+#   int* ptr = nullptr;
+#
+PointerBindsToType: false
+
+# Good:
+#
+#   if (flag) {
+#     flag = true;
+#   }  // if
+#
+# Bad:
+#
+#   if(flag) {
+#     flag = true;
+#   }  // if
+#
+SpaceAfterControlStatementKeyword: true
+
+# Good:
+#
+#   x = 42;
+#
+# Bad:
+#
+#   x= 42;
+#
+SpaceBeforeAssignmentOperators: true
+
+# Good:
+#
+#   F();
+#
+# Bad:
+#
+#   F( );
+#
+SpaceInEmptyParentheses: false
+
+# Good:
+#
+#   x = 42;  // Comment
+#
+# Bad:
+#
+#   x = 42; // Comment
+#
+SpacesBeforeTrailingComments: 2
+
+# Good:
+#
+#   bool y = (bool)x;
+#
+# Bad:
+#
+#   bool y = ( bool )x;
+#
+SpacesInCStyleCastParentheses: false
+
+# Good:
+#
+#   if (flag) {
+#     flag = true;
+#   }  // if
+#
+# Bad:
+#
+#   if ( flag ) {
+#     flag = true;
+#   }  // if
+#
+SpacesInParentheses: false
+
+Standard: Cpp11
+
+TabWidth: 2
+
+UseTab: false
+...
+
