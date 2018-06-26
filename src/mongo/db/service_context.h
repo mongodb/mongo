@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -37,7 +38,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -208,14 +208,14 @@ public:
      * Register a function of this type using  an instance of ConstructorActionRegisterer,
      * below, to cause the function to be executed on new ServiceContext instances.
      */
-    using ConstructorAction = stdx::function<void(ServiceContext*)>;
+    using ConstructorAction = std::function<void(ServiceContext*)>;
 
     /**
      * Register a function of this type using an instance of ConstructorActionRegisterer,
      * below, to cause the function to be executed on ServiceContext instances before they
      * are destroyed.
      */
-    using DestructorAction = stdx::function<void(ServiceContext*) noexcept>;
+    using DestructorAction = std::function<void(ServiceContext*)>;
 
     /**
      * Representation of a paired ConstructorAction and DestructorAction.
