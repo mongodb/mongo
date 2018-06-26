@@ -17,22 +17,22 @@ import yaml
 _MODES = ("status", "create", "start", "stop", "force-stop", "reboot", "terminate")
 
 
-def write_binary_file(path, buffer):
-    """Write buffer to path in binary format."""
+def write_binary_file(path, string_buffer):
+    """Write string_buffer to path in binary format."""
     with open(path, "wb") as fh:
-        fh.write(buffer)
+        fh.write(string_buffer)
 
 
-def write_utf8_file(path, buffer):
-    """Write buffer to path in utf-8 format."""
+def write_utf8_file(path, string_buffer):
+    """Write string_buffer to path in utf-8 format."""
     with open(path, "w") as fh:
-        fh.write(buffer.encode("utf-8"))
+        fh.write(string_buffer.encode("utf-8"))
 
 
-def write_yaml_file(path, dict):
-    """Write dict to path in YML format."""
+def write_yaml_file(path, dictionary):
+    """Write dictionary to path in YML format."""
     with open(path, "w") as ystream:
-        yaml.safe_dump(dict, ystream)
+        yaml.safe_dump(dictionary, ystream)
 
 
 class AwsEc2(object):
@@ -93,8 +93,9 @@ class AwsEc2(object):
             sys.stdout.flush()
         return 0 if reached_state else 1
 
-    def control_instance(self, mode, image_id, wait_time_secs=0, show_progress=False,
-                         console_output_file=None, console_screenshot_file=None):
+    def control_instance(  #pylint: disable=too-many-arguments,too-many-branches
+            self, mode, image_id, wait_time_secs=0, show_progress=False, console_output_file=None,
+            console_screenshot_file=None):
         """Control an AMI instance. Returns 0 & status information, if successful."""
         if mode not in _MODES:
             raise ValueError("Invalid mode '{}' specified, choose from {}.".format(mode, _MODES))
