@@ -492,7 +492,15 @@ env.CppUnitTest(
     LIBDEPS=[
         'dns_query',
         "$BUILD_DIR/mongo/base",
-    ]
+    ],
+)
+
+env.CppUnitTest(
+    target='dns_name_test',
+    source=['dns_name_test.cpp'],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
 )
 
 env.Library(
