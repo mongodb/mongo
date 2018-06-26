@@ -4453,6 +4453,15 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: sharded_core_txns
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharded_core_txns --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: causally_consistent_jscore_txns_passthrough
   commands:
   - func: "do setup"
@@ -6934,6 +6943,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
@@ -7087,6 +7097,7 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: sharded_causally_consistent_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_0
   - name: sharding_1
   - name: sharding_2
@@ -7309,6 +7320,7 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: serial_run
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: ssl
   - name: sslSpecial
@@ -7396,6 +7408,7 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: serial_run
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: ssl
   - name: sslSpecial
@@ -7664,6 +7677,7 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: serial_run
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: ssl
   - name: sslSpecial
@@ -7747,6 +7761,7 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: serial_run
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: ssl
   - name: sslSpecial
@@ -7865,6 +7880,7 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: serial_run
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: ssl
   - name: sslSpecial
@@ -7959,6 +7975,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -8045,6 +8062,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
@@ -8138,6 +8156,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
@@ -8217,6 +8236,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
@@ -8314,6 +8334,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
@@ -8561,6 +8582,7 @@ buildvariants:
   - name: replica_sets_ese_6
   - name: replica_sets_ese_misc
   - name: sasl
+  - name: sharded_core_txns
   - name: sharding_auth_0
     distros:
     - windows-64-vs2015-large
@@ -8882,6 +8904,7 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
   - name: sasl
+  - name: sharded_core_txns
   - name: sharding_auth
     distros:
     - windows-64-vs2015-large
@@ -8989,6 +9012,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
     distros:
     - windows-64-vs2015-large
@@ -9143,6 +9167,7 @@ buildvariants:
   - name: serial_run
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
@@ -9898,6 +9923,7 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_0
     distros:
     - rhel62-large
@@ -10313,6 +10339,7 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -10517,6 +10544,7 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: serial_run
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: ssl
   - name: sslSpecial
@@ -10614,6 +10642,7 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_auth
   - name: slow1
@@ -10716,6 +10745,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -10825,6 +10855,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -10926,6 +10957,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -11298,6 +11330,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -11401,6 +11434,7 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: serial_run
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: ssl
   - name: sslSpecial
@@ -11699,6 +11733,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
@@ -11827,6 +11862,7 @@ buildvariants:
   - name: rollback_fuzzer
   - name: sasl
   - name: session_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharded_collections_jscore_passthrough
   - name: sharding
   - name: sharding_auth
@@ -12126,6 +12162,7 @@ buildvariants:
   - name: slow1
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
   - name: sharding_jscore_passthrough_wire_ops
@@ -12198,6 +12235,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_auth
   - name: sharding_auth_audit
@@ -12294,6 +12332,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_auth
   - name: sharding_auth_audit
@@ -12457,6 +12496,7 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -12635,6 +12675,7 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth
@@ -12771,6 +12812,7 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
+  - name: sharded_core_txns
   - name: sharding
   - name: sharding_ese
   - name: sharding_auth

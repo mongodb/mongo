@@ -102,7 +102,6 @@ env.Library(
         "$BUILD_DIR/mongo/s/client/sharding_client",
         "$BUILD_DIR/mongo/s/coreshard",
         '$BUILD_DIR/mongo/s/client/shard_interface',
-        'transaction/router_session',
     ],
 )
 
@@ -295,6 +294,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         'cluster_last_error_info',
+        'transaction/router_session',
     ],
 )
 
