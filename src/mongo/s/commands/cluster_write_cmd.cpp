@@ -345,10 +345,6 @@ private:
         return true;
     }
 
-    bool supportsReadConcern(repl::ReadConcernLevel level) const final {
-        return true;
-    }
-
     void doCheckAuthorization(OperationContext* opCtx) const final {
         try {
             doCheckAuthorizationHook(AuthorizationSession::get(opCtx->getClient()));

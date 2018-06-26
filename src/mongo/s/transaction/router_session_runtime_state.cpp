@@ -101,19 +101,12 @@ RouterSessionCatalog* RouterSessionCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-bool isTransactionCommand(const BSONObj& cmd) {
-    auto cmdName = cmd.firstElement().fieldNameStringData();
-    return cmdName == "abortTransaction" || cmdName == "commitTransaction" ||
-        cmdName == "prepareTransaction";
-}
-
 }  // unnamed namespace
 
 BSONObj TransactionParticipant::attachTxnFieldsIfNeeded(BSONObj cmd) {
-    auto isTxnCmd = isTransactionCommand(cmd);  // check first before moving cmd.
     BSONObjBuilder newCmd(std::move(cmd));
 
-    if (_state == State::kMustStart && !isTxnCmd) {
+    if (_state == State::kMustStart) {
         newCmd.append(kStartTransactionField, true);
     }
 
