@@ -86,13 +86,6 @@ public:
      */
     void commitSplit();
 
-    /**
-     * Marks the split state of an in-progress split back to kNotSplitting.
-     * If a split has already been prepared, resets the byte counter to what it
-     * was prior to prepare plus any new bytes that have been written.
-     */
-    void cancelSplit();
-
 private:
     /**
      * Should only be used by tryInitiateSplit
@@ -119,13 +112,6 @@ private:
         kSplitPrepared,
         kSplitCommitted,
     } _splitState{SplitState::kNotSplitting};
-
-
-    /**
-     * Returns the ChunkWritesTracker whose state this driver is controlling,
-     * checking to make sure it has not yet been destroyed.
-     */
-    std::shared_ptr<ChunkWritesTracker> _getWritesTracker();
 };
 
 }  // namespace mongo

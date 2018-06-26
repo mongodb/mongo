@@ -47,14 +47,21 @@ boost::optional<ChunkSplitStateDriver> ChunkSplitStateDriver::tryInitiateSplit(
 ChunkSplitStateDriver::ChunkSplitStateDriver(ChunkSplitStateDriver&& source) {
     _writesTracker = source._writesTracker;
     source._writesTracker.reset();
+
+    _stashedBytesWritten = source._stashedBytesWritten;
+    source._stashedBytesWritten = 0;
+
     _splitState = source._splitState;
-    // Ensure that the source driver does not cancel the ongoing split
     source._splitState = SplitState::kNotSplitting;
 }
 
 ChunkSplitStateDriver::~ChunkSplitStateDriver() {
-    if (_splitState == SplitState::kSplitInProgress || _splitState == SplitState::kSplitPrepared) {
-        cancelSplit();
+    if (_splitState != SplitState::kSplitCommitted) {
+        auto wt = _writesTracker.lock();
+        if (wt) {
+            wt->releaseSplitLock();
+            wt->addBytesWritten(_stashedBytesWritten);
+        }
     }
 }
 
@@ -62,28 +69,15 @@ void ChunkSplitStateDriver::prepareSplit() {
     invariant(_splitState == SplitState::kSplitInProgress);
     _splitState = SplitState::kSplitPrepared;
 
+    auto wt = _writesTracker.lock();
+    uassert(50873, "Split interrupted due to chunk metadata change.", wt);
     // Clear bytes written and get the previous bytes written.
-    _stashedBytesWritten = _getWritesTracker()->clearBytesWritten();
+    _stashedBytesWritten = wt->clearBytesWritten();
 }
 
 void ChunkSplitStateDriver::commitSplit() {
     invariant(_splitState == SplitState::kSplitPrepared);
     _splitState = SplitState::kSplitCommitted;
-}
-
-void ChunkSplitStateDriver::cancelSplit() {
-    invariant(_splitState == SplitState::kSplitInProgress ||
-              _splitState == SplitState::kSplitPrepared);
-    _splitState = SplitState::kNotSplitting;
-
-    _getWritesTracker()->releaseSplitLock();
-    _getWritesTracker()->addBytesWritten(_stashedBytesWritten);
-}
-
-std::shared_ptr<ChunkWritesTracker> ChunkSplitStateDriver::_getWritesTracker() {
-    auto wt = _writesTracker.lock();
-    invariant(wt, "ChunkWritesTracker was destructed before ChunkSplitStateDriver");
-    return wt;
 }
 
 }  // namespace mongo

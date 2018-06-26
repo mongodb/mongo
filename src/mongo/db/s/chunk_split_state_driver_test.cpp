@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class ChunkSplitStateDriverTest : public unittest::Test {
+class ChunkSplitStateDriverTestNoTeardown : public unittest::Test {
 public:
     // Add bytes to write tracker and create the ChunkSplitStateDriver object
     // to test, which starts the split on the writes tracker
@@ -48,22 +48,27 @@ public:
             ChunkSplitStateDriver::tryInitiateSplit(_writesTracker));
     }
 
+    void tearDown() override {}
+
+    virtual ChunkWritesTracker& writesTracker() {
+        return *_writesTracker;
+    }
+
+    virtual boost::optional<ChunkSplitStateDriver>& splitDriver() {
+        return *_splitDriver;
+    }
+
+protected:
+    std::shared_ptr<ChunkWritesTracker> _writesTracker;
+    std::unique_ptr<boost::optional<ChunkSplitStateDriver>> _splitDriver;
+};
+
+class ChunkSplitStateDriverTest : public ChunkSplitStateDriverTestNoTeardown {
+public:
     void tearDown() override {
         _splitDriver.reset();
         _writesTracker.reset();
     }
-
-    ChunkWritesTracker& writesTracker() {
-        return *_writesTracker;
-    }
-
-    boost::optional<ChunkSplitStateDriver>& splitDriver() {
-        return *_splitDriver;
-    }
-
-private:
-    std::shared_ptr<ChunkWritesTracker> _writesTracker;
-    std::unique_ptr<boost::optional<ChunkSplitStateDriver>> _splitDriver;
 };
 
 TEST(ChunkSplitStateDriverTest, InitiateSplitLeavesBytesWrittenUnchanged) {
@@ -82,20 +87,21 @@ TEST_F(ChunkSplitStateDriverTest, PrepareSplitClearsBytesWritten) {
     ASSERT_EQ(writesTracker().getBytesWritten(), 0ull);
 }
 
-TEST_F(ChunkSplitStateDriverTest, PrepareSplitFollowedByCancelSplitRestoresBytesWritten) {
+TEST_F(ChunkSplitStateDriverTestNoTeardown,
+       PrepareSplitFollowedByDestructorWithoutCommitRestoresBytesWritten) {
     auto bytesInTracker = writesTracker().getBytesWritten();
     splitDriver()->prepareSplit();
-    splitDriver()->cancelSplit();
+    splitDriver().reset();
     ASSERT_EQ(writesTracker().getBytesWritten(), bytesInTracker);
 }
 
-TEST_F(ChunkSplitStateDriverTest,
-       PrepareSplitThenAddBytesThenCancelSplitRestoresOldBytesWrittenPlusNewBytesWritten) {
+TEST_F(ChunkSplitStateDriverTestNoTeardown,
+       PrepareSplitFollowedByDestructorWithoutCommitRestoresOldBytesWrittenPlusNewBytesWritten) {
     auto bytesInTracker = writesTracker().getBytesWritten();
     splitDriver()->prepareSplit();
     uint64_t extraBytesToAdd{4};
     writesTracker().addBytesWritten(extraBytesToAdd);
-    splitDriver()->cancelSplit();
+    splitDriver().reset();
 
     ASSERT_EQ(writesTracker().getBytesWritten(), bytesInTracker + extraBytesToAdd);
 }
@@ -125,9 +131,10 @@ TEST_F(ChunkSplitStateDriverTest, ShouldSplitReturnsFalseEvenAfterCommit) {
     ASSERT_FALSE(writesTracker().shouldSplit(maxChunkSize));
 }
 
-TEST_F(ChunkSplitStateDriverTest, ShouldSplitReturnsTrueAgainAfterCancel) {
+TEST_F(ChunkSplitStateDriverTestNoTeardown,
+       ShouldSplitReturnsTrueAfterPrepareSplitThenDestruction) {
     splitDriver()->prepareSplit();
-    splitDriver()->cancelSplit();
+    splitDriver().reset();
 
     uint64_t maxChunkSize{0};
     ASSERT_TRUE(writesTracker().shouldSplit(maxChunkSize));
@@ -139,9 +146,16 @@ DEATH_TEST_F(ChunkSplitStateDriverTest,
     splitDriver()->commitSplit();
 }
 
-DEATH_TEST_F(ChunkSplitStateDriverTest, CancelSplitAfterCommitErrors, "Invariant failure") {
-    splitDriver()->commitSplit();
-    splitDriver()->cancelSplit();
+TEST(ChunkSplitStateDriverTest, PrepareErrorsWhenChunkWritesTrackerNoLongerExists) {
+    std::unique_ptr<boost::optional<ChunkSplitStateDriver>> splitDriver;
+    {
+        auto writesTracker = std::make_shared<ChunkWritesTracker>();
+        uint64_t bytesToAdd{4};
+        writesTracker->addBytesWritten(bytesToAdd);
+        splitDriver = std::make_unique<boost::optional<ChunkSplitStateDriver>>(
+            ChunkSplitStateDriver::tryInitiateSplit(writesTracker));
+    }
+    ASSERT_THROWS(splitDriver->get().prepareSplit(), AssertionException);
 }
 
 }  // namespace mongo
