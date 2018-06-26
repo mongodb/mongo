@@ -1,0 +1,175 @@
+# MPark.Variant
+#
+# Copyright Michael Park, 2015-2017
+#
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE.md or copy at http://boost.org/LICENSE_1_0.txt)
+
+language: cpp
+sudo: false
+
+branches:
+  only:
+    - master
+
+git:
+  depth: 1
+
+matrix:
+  include:
+    # ubuntu 14.04, gcc-4.8
+    - env: VER=4.8 STDS="11;1y" TESTS="mpark"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-4.8"], sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 14.04, gcc-4.9
+    - env: VER=4.9 STDS="11;14" TESTS="mpark"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-4.9"], sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 14.04, gcc-5
+    - env: VER=5 STDS="11;14;1z" TESTS="mpark"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-5"], sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 14.04, gcc-6
+    - env: VER=6 STDS="11;14;1z" TESTS="mpark"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-6"], sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 14.04, gcc-7
+    - env: VER=7 STDS="11;14;17" TESTS="mpark;libc++"
+      compiler: gcc
+      os: linux
+      addons: { apt: { packages: ["g++-7"], sources: ["ubuntu-toolchain-r-test"] } }
+
+    # ubuntu 14.04, clang-3.5
+    - env: VER=3.5 STDS="11;14" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-3.5", "libstdc++-5-dev"], sources: ["ubuntu-toolchain-r-test", "llvm-toolchain-precise-3.5"] } }
+
+    # ubuntu 14.04, clang-3.6
+    - env: VER=3.6 STDS="11;14" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-3.6", "libstdc++-5-dev"], sources: ["ubuntu-toolchain-r-test", "llvm-toolchain-precise-3.6"] } }
+
+    # ubuntu 14.04, clang-3.7
+    - env: VER=3.7 STDS="11;14" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-3.7", "libstdc++-5-dev"], sources: ["ubuntu-toolchain-r-test", "llvm-toolchain-precise-3.7"] } }
+
+    # ubuntu 14.04, clang-3.8
+    - env: VER=3.8 STDS="11;14" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-3.8", "libstdc++-5-dev"], sources: ["ubuntu-toolchain-r-test", "llvm-toolchain-precise-3.8"] } }
+
+    # ubuntu 14.04, clang-3.9
+    - env: VER=3.9 STDS="11;14;1z" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-3.9", "libstdc++-6-dev"], sources: ["ubuntu-toolchain-r-test", "llvm-toolchain-trusty-3.9"] } }
+
+    # ubuntu 14.04, clang-4.0
+    - env: VER=4.0 STDS="11;14;1z" TESTS="mpark"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-4.0", "libstdc++-6-dev"], sources: ["ubuntu-toolchain-r-test", "llvm-toolchain-trusty-4.0"] } }
+
+    # ubuntu 14.04, clang-5.0
+    - env: VER=5.0 STDS="11;14;17" TESTS="mpark;libc++"
+      compiler: clang
+      os: linux
+      addons: { apt: { packages: ["clang-5.0", "libstdc++-7-dev"], sources: ["ubuntu-toolchain-r-test", "llvm-toolchain-trusty-5.0"] } }
+
+    # OS X Yosemite 10.10, Apple Clang 6
+    - env: STDS="11;14" TESTS="mpark"
+      compiler: clang
+      os: osx
+      osx_image: xcode6.4
+
+    # OS X El Capitan 10.11, Apple Clang 7
+    - env: STDS="11;14;1z" TESTS="mpark"
+      compiler: clang
+      os: osx
+      osx_image: xcode7.3
+
+    # OS X Sierra 10.12, Apple Clang 8
+    - env: STDS="11;14;1z" TESTS="mpark"
+      compiler: clang
+      os: osx
+      osx_image: xcode8.3
+
+before_install:
+  # Set the correct `CC` and `CXX` environment variables.
+  - |
+    if [ -n "${VER}" ]; then
+      export CC="${CC}-${VER}"
+      export CXX="${CXX}-${VER}"
+    fi
+  - ${CXX} --version
+  # Directory for dependency installation.
+  - DEPS="${TRAVIS_BUILD_DIR}/deps"
+  - mkdir -p ${DEPS}
+  # Install newer cmake.
+  - |
+    if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
+      brew update
+      brew upgrade cmake
+    elif [ "${TRAVIS_OS_NAME}" = "linux" ]; then
+      travis_retry wget --no-check-certificate https://cmake.org/files/v3.8/cmake-3.8.2-Linux-x86_64.sh
+      bash cmake-3.8.2-Linux-x86_64.sh --skip-license --prefix="${DEPS}"
+      export PATH="${DEPS}/bin:${PATH}"
+    fi
+  - export CXXFLAGS="-Wall -Wextra -Werror -pedantic-errors"
+  - STDS=(${STDS//;/ })
+  - BUILDS=(Debug Release)
+  - EXS=(ON OFF)
+
+install:
+  - |
+    for STD in "${STDS[@]}"; do
+      for BUILD in "${BUILDS[@]}"; do
+        for EX in "${EXS[@]}"; do
+          BUILD_DIR="build-${STD}-${BUILD}-${EX}"
+          mkdir "${BUILD_DIR}"
+          pushd "${BUILD_DIR}"
+          (
+            set -ex
+            export CXXFLAGS="${CXXFLAGS} -std=c++${STD}"
+            cmake -DCMAKE_BUILD_TYPE="${BUILD}"          \
+                  -DMPARK_VARIANT_EXCEPTIONS="${EX}"     \
+                  -DMPARK_VARIANT_INCLUDE_TESTS="${TESTS}" ..
+          )
+          popd
+        done
+      done
+    done
+
+script:
+  - |
+    for STD in "${STDS[@]}"; do
+      for BUILD in "${BUILDS[@]}"; do
+        for EX in "${EXS[@]}"; do
+          BUILD_DIR="build-${STD}-${BUILD}-${EX}"
+          mkdir "${BUILD_DIR}"
+          pushd "${BUILD_DIR}"
+          (
+            set -ex
+            cmake --build . -- -k -j 2
+            ctest --output-on-failure
+          )
+          popd
+        done
+      done
+    done
+
+notifications:
+  email: false
