@@ -13,23 +13,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# ChunkTypeBase type
+# Sharding IDL file
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/shard_id.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
-    - "mongo/s/sharding_types.idl"
 
-structs:
-    ChunkHistoryBase:
-        description: "An element of a chunk history array. The array holds the history ordered from
-                      the most recent (the index 0) to the oldest supported."
-        fields:
-            validAfter:
-                type: timestamp
-                description: The time after which this chunk is at this shard.
-            shard:
-                type: shard_id
-                description: Shard this chunk lives in, starting at the "validAfter" time.
+types:
+    shard_id:
+        bson_serialization_type: string
+        description: "String identifier for a shard's name"
+        cpp_type: "ShardId"
+        deserializer: "mongo::BSONElement::str"
+        serializer: "mongo::ShardId::toString"

@@ -13,8 +13,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# ChunkTypeBase type
-
 global:
     cpp_namespace: "mongo"
 
@@ -22,14 +20,12 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 
-structs:
-    ChunkHistoryBase:
-        description: "An element of a chunk history array. The array holds the history ordered from
-                      the most recent (the index 0) to the oldest supported."
+commands:
+    prepareTransaction:
+        description: "Parser for the 'prepareTransaction' command."
+        strict: true
+        namespace: ignored
         fields:
-            validAfter:
-                type: timestamp
-                description: The time after which this chunk is at this shard.
-            shard:
+            coordinator:
+                description: "The coordinator shard for this transaction."
                 type: shard_id
-                description: Shard this chunk lives in, starting at the "validAfter" time.
