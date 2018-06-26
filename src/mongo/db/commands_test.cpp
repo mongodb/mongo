@@ -328,7 +328,7 @@ ExampleMinimalCommand exampleMinimalCommand;
 ExampleVoidCommand exampleVoidCommand;
 CmdT<decltype(throwFn)> throwStatusCommand("throwsStatus", throwFn);
 
-class TypedCommand : public ServiceContextTest {
+class TypedCommandTest : public ServiceContextTest {
 protected:
     template <typename T>
     void runIncr(T& command, std::function<void(int, const BSONObj&)> postAssert) {
@@ -363,28 +363,28 @@ protected:
     }
 };
 
-TEST_F(TypedCommand, runTyped) {
+TEST_F(TypedCommandTest, runTyped) {
     runIncr(exampleIncrementCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(reply["iPlusOne"].Int(), i + 1);
     });
 }
 
-TEST_F(TypedCommand, runMinimal) {
+TEST_F(TypedCommandTest, runMinimal) {
     runIncr(exampleMinimalCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(reply["iPlusOne"].Int(), i + 1);
     });
 }
 
-TEST_F(TypedCommand, runVoid) {
+TEST_F(TypedCommandTest, runVoid) {
     runIncr(exampleVoidCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(exampleVoidCommand.iCapture, i + 1);
     });
 }
 
-TEST_F(TypedCommand, runThrowStatus) {
+TEST_F(TypedCommandTest, runThrowStatus) {
     runIncr(throwStatusCommand, [](int i, const BSONObj& reply) {
         Status status = Status::OK();
         try {
