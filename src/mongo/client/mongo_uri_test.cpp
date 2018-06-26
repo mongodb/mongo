@@ -603,6 +603,7 @@ TEST(MongoURI, srvRecordTest) {
     using namespace mongo;
     enum Expectation : bool { success = true, failure = false };
     const struct {
+        int lineNumber;
         std::string uri;
         std::string user;
         std::string password;
@@ -612,7 +613,8 @@ TEST(MongoURI, srvRecordTest) {
         Expectation expectation;
     } tests[] = {
         // Test some non-SRV URIs to make sure that they do not perform expansions
-        {"mongodb://test1.test.build.10gen.cc:12345/",
+        {__LINE__,
+         "mongodb://test1.test.build.10gen.cc:12345/",
          "",
          "",
          "",
@@ -620,7 +622,8 @@ TEST(MongoURI, srvRecordTest) {
          {},
          success},
 
-        {"mongodb://test6.test.build.10gen.cc:12345/",
+        {__LINE__,
+         "mongodb://test6.test.build.10gen.cc:12345/",
          "",
          "",
          "",
@@ -629,7 +632,8 @@ TEST(MongoURI, srvRecordTest) {
          success},
 
         // Test a sample URI against each provided testing DNS entry
-        {"mongodb+srv://test1.test.build.10gen.cc/",
+        {__LINE__,
+         "mongodb+srv://test1.test.build.10gen.cc/",
          "",
          "",
          "",
@@ -638,7 +642,8 @@ TEST(MongoURI, srvRecordTest) {
          success},
 
         // Test a sample URI against each provided testing DNS entry
-        {"mongodb+srv://test1.test.build.10gen.cc/?ssl=false",
+        {__LINE__,
+         "mongodb+srv://test1.test.build.10gen.cc/?ssl=false",
          "",
          "",
          "",
@@ -646,7 +651,36 @@ TEST(MongoURI, srvRecordTest) {
          {{"ssl", "false"}},
          success},
 
-        {"mongodb+srv://user:password@test2.test.build.10gen.cc/"
+        // Test a sample URI against the need for deep DNS relation
+        {__LINE__,
+         "mongodb+srv://test18.test.build.10gen.cc/?replicaSet=repl0",
+         "",
+         "",
+         "",
+         {
+             {"localhost.sub.test.build.10gen.cc.", 27017},
+         },
+         {
+             {"ssl", "true"}, {"replicaSet", "repl0"},
+         },
+         success},
+
+        // Test a sample URI with FQDN against the need for deep DNS relation
+        {__LINE__,
+         "mongodb+srv://test18.test.build.10gen.cc./?replicaSet=repl0",
+         "",
+         "",
+         "",
+         {
+             {"localhost.sub.test.build.10gen.cc.", 27017},
+         },
+         {
+             {"ssl", "true"}, {"replicaSet", "repl0"},
+         },
+         success},
+
+        {__LINE__,
+         "mongodb+srv://user:password@test2.test.build.10gen.cc/"
          "database?someOption=someValue&someOtherOption=someOtherValue",
          "user",
          "password",
@@ -656,7 +690,8 @@ TEST(MongoURI, srvRecordTest) {
          success},
 
 
-        {"mongodb+srv://user:password@test3.test.build.10gen.cc/"
+        {__LINE__,
+         "mongodb+srv://user:password@test3.test.build.10gen.cc/"
          "database?someOption=someValue&someOtherOption=someOtherValue",
          "user",
          "password",
@@ -666,7 +701,8 @@ TEST(MongoURI, srvRecordTest) {
          success},
 
 
-        {"mongodb+srv://user:password@test5.test.build.10gen.cc/"
+        {__LINE__,
+         "mongodb+srv://user:password@test5.test.build.10gen.cc/"
          "database?someOption=someValue&someOtherOption=someOtherValue",
          "user",
          "password",
@@ -679,7 +715,8 @@ TEST(MongoURI, srvRecordTest) {
           {"ssl", "true"}},
          success},
 
-        {"mongodb+srv://user:password@test5.test.build.10gen.cc/"
+        {__LINE__,
+         "mongodb+srv://user:password@test5.test.build.10gen.cc/"
          "database?someOption=someValue&authSource=anotherDB&someOtherOption=someOtherValue",
          "user",
          "password",
@@ -693,11 +730,19 @@ TEST(MongoURI, srvRecordTest) {
           {"ssl", "true"}},
          success},
 
-        {"mongodb+srv://test6.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test6.test.build.10gen.cc/", "", "", "", {}, {}, failure},
 
-        {"mongodb+srv://test6.test.build.10gen.cc/database", "", "", "database", {}, {}, failure},
+        {__LINE__,
+         "mongodb+srv://test6.test.build.10gen.cc/database",
+         "",
+         "",
+         "database",
+         {},
+         {},
+         failure},
 
-        {"mongodb+srv://test6.test.build.10gen.cc/?authSource=anotherDB",
+        {__LINE__,
+         "mongodb+srv://test6.test.build.10gen.cc/?authSource=anotherDB",
          "",
          "",
          "",
@@ -705,7 +750,8 @@ TEST(MongoURI, srvRecordTest) {
          {},
          failure},
 
-        {"mongodb+srv://test6.test.build.10gen.cc/?irrelevantOption=irrelevantValue",
+        {__LINE__,
+         "mongodb+srv://test6.test.build.10gen.cc/?irrelevantOption=irrelevantValue",
          "",
          "",
          "",
@@ -714,7 +760,8 @@ TEST(MongoURI, srvRecordTest) {
          failure},
 
 
-        {"mongodb+srv://test6.test.build.10gen.cc/"
+        {__LINE__,
+         "mongodb+srv://test6.test.build.10gen.cc/"
          "?irrelevantOption=irrelevantValue&authSource=anotherDB",
          "",
          "",
@@ -723,7 +770,8 @@ TEST(MongoURI, srvRecordTest) {
          {},
          failure},
 
-        {"mongodb+srv://test7.test.build.10gen.cc./?irrelevantOption=irrelevantValue",
+        {__LINE__,
+         "mongodb+srv://test7.test.build.10gen.cc./?irrelevantOption=irrelevantValue",
          "",
          "",
          "",
@@ -731,11 +779,12 @@ TEST(MongoURI, srvRecordTest) {
          {},
          failure},
 
-        {"mongodb+srv://test7.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test7.test.build.10gen.cc./", "", "", "", {}, {}, failure},
 
-        {"mongodb+srv://test8.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test8.test.build.10gen.cc./", "", "", "", {}, {}, failure},
 
-        {"mongodb+srv://test10.test.build.10gen.cc./?irrelevantOption=irrelevantValue",
+        {__LINE__,
+         "mongodb+srv://test10.test.build.10gen.cc./?irrelevantOption=irrelevantValue",
          "",
          "",
          "",
@@ -743,7 +792,8 @@ TEST(MongoURI, srvRecordTest) {
          {},
          failure},
 
-        {"mongodb+srv://test11.test.build.10gen.cc./?irrelevantOption=irrelevantValue",
+        {__LINE__,
+         "mongodb+srv://test11.test.build.10gen.cc./?irrelevantOption=irrelevantValue",
          "",
          "",
          "",
@@ -751,36 +801,39 @@ TEST(MongoURI, srvRecordTest) {
          {},
          failure},
 
-        {"mongodb+srv://test12.test.build.10gen.cc./", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test13.test.build.10gen.cc./", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test14.test.build.10gen.cc./", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test15.test.build.10gen.cc./", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test16.test.build.10gen.cc./", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test17.test.build.10gen.cc./", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test18.test.build.10gen.cc./", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test19.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test12.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test13.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test14.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test15.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test16.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test17.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test19.test.build.10gen.cc./", "", "", "", {}, {}, failure},
 
-        {"mongodb+srv://test12.test.build.10gen.cc/", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test13.test.build.10gen.cc/", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test14.test.build.10gen.cc/", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test15.test.build.10gen.cc/", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test16.test.build.10gen.cc/", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test17.test.build.10gen.cc/", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test18.test.build.10gen.cc/", "", "", "", {}, {}, failure},
-        {"mongodb+srv://test19.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test12.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test13.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test14.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test15.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test16.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test17.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {__LINE__, "mongodb+srv://test19.test.build.10gen.cc/", "", "", "", {}, {}, failure},
     };
 
     for (const auto& test : tests) {
         auto rs = MongoURI::parse(test.uri);
         if (test.expectation == failure) {
-            ASSERT_FALSE(rs.getStatus().isOK()) << "Failing URI: " << test.uri;
+            ASSERT_FALSE(rs.getStatus().isOK()) << "Failing URI: " << test.uri
+                                                << " data on line: " << test.lineNumber;
             continue;
         }
-        ASSERT_OK(rs.getStatus());
+        ASSERT_OK(rs.getStatus()) << "Failed on URI: " << test.uri
+                                  << " data on line: " << test.lineNumber;
         auto rv = rs.getValue();
-        ASSERT_EQ(rv.getUser(), test.user);
-        ASSERT_EQ(rv.getPassword(), test.password);
-        ASSERT_EQ(rv.getDatabase(), test.database);
+        ASSERT_EQ(rv.getUser(), test.user) << "Failed on URI: " << test.uri
+                                           << " data on line: " << test.lineNumber;
+        ASSERT_EQ(rv.getPassword(), test.password) << "Failed on URI: " << test.uri
+                                                   << " data on line : " << test.lineNumber;
+        ASSERT_EQ(rv.getDatabase(), test.database) << "Failed on URI: " << test.uri
+                                                   << " data on line : " << test.lineNumber;
         std::vector<std::pair<std::string, std::string>> options(begin(rv.getOptions()),
                                                                  end(rv.getOptions()));
         std::sort(begin(options), end(options));
@@ -793,12 +846,16 @@ TEST(MongoURI, srvRecordTest) {
                 mongo::unittest::log() << "Option: \"" << options[i].first << "="
                                        << options[i].second << "\" doesn't equal: \""
                                        << expectedOptions[i].first << "="
-                                       << expectedOptions[i].second << "\"" << std::endl;
-                std::cerr << "Failing URI: \"" << test.uri << "\"" << std::endl;
+                                       << expectedOptions[i].second << "\""
+                                       << " data on line: " << test.lineNumber << std::endl;
+                std::cerr << "Failing URI: \"" << test.uri << "\""
+                          << " data on line: " << test.lineNumber << std::endl;
                 ASSERT(false);
             }
         }
-        ASSERT_EQ(options.size(), expectedOptions.size()) << "Failing URI: " << test.uri;
+        ASSERT_EQ(options.size(), expectedOptions.size()) << "Failing URI: "
+                                                          << " data on line: " << test.lineNumber
+                                                          << test.uri;
 
         std::vector<HostAndPort> hosts(begin(rv.getServers()), end(rv.getServers()));
         std::sort(begin(hosts), end(hosts));
@@ -806,9 +863,13 @@ TEST(MongoURI, srvRecordTest) {
         std::sort(begin(expectedHosts), end(expectedHosts));
 
         for (std::size_t i = 0; i < std::min(hosts.size(), expectedHosts.size()); ++i) {
-            ASSERT_EQ(hosts[i], expectedHosts[i]);
+            ASSERT_EQ(hosts[i], expectedHosts[i]) << "Failed on URI: " << test.uri
+                                                  << " at host number" << i
+                                                  << " data on line: " << test.lineNumber;
         }
-        ASSERT_TRUE(hosts.size() == expectedHosts.size());
+        ASSERT_TRUE(hosts.size() == expectedHosts.size())
+            << "Failed on URI: " << test.uri << " Found " << hosts.size() << " hosts, expected "
+            << expectedHosts.size() << " data on line: " << test.lineNumber;
     }
 }
 
