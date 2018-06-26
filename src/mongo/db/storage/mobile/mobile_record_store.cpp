@@ -59,7 +59,7 @@ public:
            const std::string& path,
            const std::string& ident,
            bool forward)
-        : _opCtx(opCtx), _isCapped(rs.isCapped()), _forward(forward) {
+        : _opCtx(opCtx), _forward(forward) {
 
         str::stream cursorQuery;
         cursorQuery << "SELECT rec_id, data from \"" << ident << "\" "
@@ -129,34 +129,9 @@ public:
             return true;
         }
 
-        bool isValid = true;
-
-        if (_isCapped) {
-            // Check that the cursor's saved position still exists. If not, it has been invalidated
-            // by capped deletion.
-            RecordId oldPosition = _savedId;
-            int decr = _forward ? -1 : 1;
-            if (_savedId == RecordId::min() || _savedId == RecordId::max()) {
-                decr = 0;
-            }
-
-            _resetStatement();
-            _stmt->bindInt(0, static_cast<int64_t>(_savedId.repr()) + decr);
-            boost::optional<Record> newPosition = next();
-
-            if (!newPosition || newPosition->id != oldPosition) {
-                // The cursor's current position was invalidated.
-                isValid = false;
-            }
-
-            _savedId = oldPosition;
-            _eof = false;
-        }
-
         _resetStatement();
         _stmt->bindInt(0, _savedId.repr());
-
-        return isValid;
+        return true;
     }
 
     void detachFromOperationContext() final {
@@ -186,7 +161,6 @@ private:
     // Default start ID number that is specific to cursor direction.
     int64_t _startIdNum;
 
-    const bool _isCapped;
     const bool _forward;
 };
 
@@ -195,18 +169,17 @@ MobileRecordStore::MobileRecordStore(OperationContext* opCtx,
                                      const std::string& path,
                                      const std::string& ident,
                                      const CollectionOptions& options)
-    : RecordStore(ns),
-      _path(path),
-      _ident(ident),
-      _isOplog(NamespaceString::oplog(ns)),
-      _isCapped(options.capped),
-      _cappedMaxSize(options.cappedSize > 4096 ? options.cappedSize : 4096),
-      _cappedMaxDocs(options.cappedMaxDocs) {
+    : RecordStore(ns), _path(path), _ident(ident) {
 
     // Mobile SE doesn't support creating an oplog, assert now
     massert(ErrorCodes::IllegalOperation,
             "Replication is not supported by the mobile storage engine",
-            !_isOplog);
+            !NamespaceString::oplog(ns));
+
+    // Mobile SE doesn't support creating a capped collection, assert now
+    massert(ErrorCodes::IllegalOperation,
+            "Capped Collections are not supported by the mobile storage engine",
+            !options.capped);
 
     // Determines the nextId to be used for a new record.
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
@@ -301,8 +274,6 @@ bool MobileRecordStore::findRecord(OperationContext* opCtx,
 }
 
 void MobileRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& recId) {
-    invariant(!_isCapped);
-
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
     std::string dataSizeQuery =
         "SELECT IFNULL(LENGTH(data), 0) FROM \"" + _ident + "\" WHERE rec_id = ?;";
@@ -320,94 +291,10 @@ void MobileRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& re
     deleteStmt.step(SQLITE_DONE);
 }
 
-bool MobileRecordStore::_isCappedAndNeedsDelete(int64_t numRecs, int64_t numBytes) {
-    if (!_isCapped) {
-        return false;
-    }
-
-    return numBytes > _cappedMaxSize || (_cappedMaxDocs > 0 && numRecs > _cappedMaxDocs);
-}
-
-void MobileRecordStore::_notifyCappedCallbackIfNeeded_inlock(OperationContext* opCtx,
-                                                             RecordId recId,
-                                                             const RecordData& recData) {
-    if (!_cappedCallback) {
-        return;
-    }
-
-    uassertStatusOK(_cappedCallback->aboutToDeleteCapped(opCtx, recId, recData));
-}
-
-void MobileRecordStore::_doCappedDelete(OperationContext* opCtx,
-                                        SqliteStatement& stmt,
-                                        const std::string& direction,
-                                        int64_t startRecId) {
-    bool isStartRecIdKnown = startRecId;
-    int64_t numRecs = numRecords(opCtx), numBytes = dataSize(opCtx);
-    int64_t numRecsRemoved = 0, numBytesRemoved = 0;
-
-    WriteUnitOfWork wuow(opCtx);
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
-
-    {
-        stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
-
-        // Update how many records and how many bytes of data are about to be removed. Notify the
-        // capped callback of each record that will be deleted.
-        while ((isStartRecIdKnown && stmt.step() == SQLITE_ROW) ||
-               (!isStartRecIdKnown &&
-                _isCappedAndNeedsDelete(numRecs - numRecsRemoved, numBytes - numBytesRemoved) &&
-                stmt.step() == SQLITE_ROW)) {
-            int64_t id = stmt.getColInt(0);
-            if (!isStartRecIdKnown) {
-                startRecId = id;
-            }
-
-            const void* data = stmt.getColBlob(1);
-            int64_t size = stmt.getColBytes(1);
-
-            numRecsRemoved++;
-            numBytesRemoved += size;
-
-            _notifyCappedCallbackIfNeeded_inlock(
-                opCtx, RecordId(id), RecordData(static_cast<const char*>(data), size));
-        }
-    }
-
-    _changeNumRecs(opCtx, -numRecsRemoved);
-    _changeDataSize(opCtx, -numBytesRemoved);
-
-    str::stream cappedDeleteQuery;
-    cappedDeleteQuery << "DELETE FROM \"" << _ident << "\" WHERE rec_id " << direction << " ?;";
-    SqliteStatement cappedDeleteStmt(*session, cappedDeleteQuery);
-    cappedDeleteStmt.bindInt(0, startRecId);
-    cappedDeleteStmt.step(SQLITE_DONE);
-
-    wuow.commit();
-}
-
-void MobileRecordStore::_cappedDeleteIfNeeded(OperationContext* opCtx) {
-    if (!_isCappedAndNeedsDelete(numRecords(opCtx), dataSize(opCtx))) {
-        return;
-    }
-
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
-
-    std::string recordRemovalQuery =
-        "SELECT rec_id, data FROM \"" + _ident + "\" ORDER BY rec_id ASC;";
-    SqliteStatement recordRemovalStmt(*session, recordRemovalQuery);
-
-    _doCappedDelete(opCtx, recordRemovalStmt, "<=");
-}
-
 StatusWith<RecordId> MobileRecordStore::insertRecord(
     OperationContext* opCtx, const char* data, int len, Timestamp, bool enforceQuota) {
     // Inserts record into SQLite table (or replaces if duplicate record id).
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
-
-    if (_isCapped && len > _cappedMaxSize) {
-        return Status(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
-    }
 
     _changeNumRecs(opCtx, 1);
     _changeDataSize(opCtx, len);
@@ -419,8 +306,6 @@ StatusWith<RecordId> MobileRecordStore::insertRecord(
     insertStmt.bindInt(0, recId.repr());
     insertStmt.bindBlob(1, data, len);
     insertStmt.step(SQLITE_DONE);
-
-    _cappedDeleteIfNeeded(opCtx);
 
     return StatusWith<RecordId>(recId);
 }
@@ -463,9 +348,6 @@ Status MobileRecordStore::updateRecord(OperationContext* opCtx,
     dataSizeStmt.step(SQLITE_ROW);
 
     int64_t dataSizeBefore = dataSizeStmt.getColInt(0);
-    if (_isCapped && dataSizeBefore != len) {
-        return Status(ErrorCodes::IllegalOperation, "cannot change the size of a document");
-    }
     _changeDataSize(opCtx, -dataSizeBefore + len);
 
     if (notifier) {
@@ -516,34 +398,6 @@ Status MobileRecordStore::truncate(OperationContext* opCtx) {
     SqliteStatement::execQuery(session, deleteForTruncateQuery);
 
     return Status::OK();
-}
-
-/**
- * The method throws an assertion if the capped truncate results in an emptied table.
- */
-void MobileRecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-
-    // Check that the table will not be empty after performing deletes.
-    str::stream recordsRemainingQuery;
-    recordsRemainingQuery << "SELECT * FROM \"" << _ident << "\" "
-                          << "WHERE rec_id " << (inclusive ? "< " : "<= ") << end.repr()
-                          << " LIMIT 1;";
-
-    SqliteStatement recordsRemainingStmt(*session, recordsRemainingQuery);
-    int status = recordsRemainingStmt.step();
-    if (status == SQLITE_DONE) {
-        massert(
-            37003, str::stream() << "Cannot perform cappedTruncateAfter with end " << end, false);
-    }
-    checkStatus(status, SQLITE_ROW, "sqlite3_step");
-
-    str::stream recordsRemovedQuery;
-    recordsRemovedQuery << "SELECT rec_id, data FROM \"" << _ident << "\" "
-                        << "WHERE rec_id " << (inclusive ? ">= " : "> ") << end.repr();
-    SqliteStatement recordsRemovedStmt(*session, recordsRemovedQuery);
-
-    _doCappedDelete(opCtx, recordsRemovedStmt, (inclusive ? ">=" : ">"), end.repr());
 }
 
 Status MobileRecordStore::compact(OperationContext* opCtx,
@@ -647,16 +501,6 @@ Status MobileRecordStore::validate(OperationContext* opCtx,
     return Status::OK();
 }
 
-void MobileRecordStore::appendCustomStats(OperationContext* opCtx,
-                                          BSONObjBuilder* result,
-                                          double scale) const {
-    result->appendBool("capped", _isCapped);
-    if (_isCapped) {
-        result->appendIntOrLL("max", _cappedMaxDocs);
-        result->appendIntOrLL("maxSize", static_cast<long long>(_cappedMaxSize / scale));
-    }
-}
-
 Status MobileRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
     return Status(ErrorCodes::CommandNotSupported, "this storage engine does not support touch");
 }
@@ -750,11 +594,6 @@ bool MobileRecordStore::_resetDataSizeIfNeeded(OperationContext* opCtx, int64_t 
         _dataSize = newDataSize;
     }
     return wasReset;
-}
-
-Status MobileRecordStore::updateCappedSize(OperationContext* opCtx, long long cappedSize) {
-    _cappedMaxSize = cappedSize;
-    return Status::OK();
 }
 
 boost::optional<RecordId> MobileRecordStore::oplogStartHack(

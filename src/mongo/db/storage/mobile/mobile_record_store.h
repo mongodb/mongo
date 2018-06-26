@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
@@ -93,7 +92,9 @@ public:
 
     Status truncate(OperationContext* opCtx) override;
 
-    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) override;
+    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) override {
+        // Capped Collections are not supported, do nothing
+    }
 
     bool compactSupported() const override {
         return true;
@@ -116,7 +117,9 @@ public:
 
     void appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* result,
-                           double scale) const override;
+                           double scale) const override {
+        // No custom stats to add
+    }
 
     Status touch(OperationContext* opCtx, BSONObjBuilder* output) const override;
 
@@ -138,14 +141,13 @@ public:
                                 long long dataSize) override {}
 
     bool isCapped() const override {
-        return _isCapped;
+        // Capped Collections are not supported
+        return false;
     }
 
     void setCappedCallback(CappedCallback* cb) override {
-        _cappedCallback = cb;
+        // Capped Collections are not supported, do nothing
     }
-
-    Status updateCappedSize(OperationContext* opCtx, long long cappedSize) override;
 
     // Not in record store API.
 
@@ -169,43 +171,6 @@ private:
 
     const std::string _path;
     const std::string _ident;
-
-    // True if the namespace of this record store starts with "local.oplog.", and false otherwise.
-    const bool _isOplog;
-
-    /**
-     * Returns true if the collection is capped and exceeds the size or document cap.
-     */
-    bool _isCappedAndNeedsDelete(int64_t numRecs, int64_t numBytes);
-
-    /**
-     * Notifies the capped callback that a capped collection is about to delete a record.
-     * _cappedCallbackMutex should be locked before this is called.
-     */
-    void _notifyCappedCallbackIfNeeded_inlock(OperationContext* opCtx,
-                                              RecordId recId,
-                                              const RecordData& recData);
-
-    /**
-     * Performs the capped deletion. Deletes all records in the specified direction beginning at
-     * startRecId.
-     */
-    void _doCappedDelete(OperationContext* opCtx,
-                         SqliteStatement& stmt,
-                         const std::string& direction,
-                         int64_t startRecId = 0);
-
-    /**
-     * Deletes records from a capped database if the cap is exceeded.
-     */
-    void _cappedDeleteIfNeeded(OperationContext* opCtx);
-
-    const bool _isCapped;
-    int64_t _cappedMaxSize;
-    const int64_t _cappedMaxDocs;
-    // Mutex that protects _cappedCallback
-    stdx::mutex _cappedCallbackMutex;
-    CappedCallback* _cappedCallback = nullptr;
 
     AtomicInt64 _nextIdNum;
 
