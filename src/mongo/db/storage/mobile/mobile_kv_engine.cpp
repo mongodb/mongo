@@ -65,19 +65,74 @@ MobileKVEngine::MobileKVEngine(const std::string& path) {
     // Guarantees that sqlite3_close() will be called when the function returns.
     ON_BLOCK_EXIT([&initSession] { sqlite3_close(initSession); });
 
-    sqlite3_stmt* stmt;
-    status = sqlite3_prepare_v2(initSession, "PRAGMA journal_mode=WAL;", -1, &stmt, NULL);
-    checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
+    // Ensure SQLite is operating in the WAL mode.
+    {
+        sqlite3_stmt* stmt;
+        status = sqlite3_prepare_v2(initSession, "PRAGMA journal_mode=WAL;", -1, &stmt, NULL);
+        checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
 
-    status = sqlite3_step(stmt);
-    checkStatus(status, SQLITE_ROW, "sqlite3_step");
+        status = sqlite3_step(stmt);
+        checkStatus(status, SQLITE_ROW, "sqlite3_step");
 
-    // Pragma returns current mode in SQLite, ensure it is "wal" mode.
-    const void* colText = sqlite3_column_text(stmt, 0);
-    const char* mode = reinterpret_cast<const char*>(colText);
-    fassert(37001, !strcmp(mode, "wal"));
-    status = sqlite3_finalize(stmt);
-    checkStatus(status, SQLITE_OK, "sqlite3_finalize");
+        // Pragma returns current mode in SQLite, ensure it is "wal" mode.
+        const void* colText = sqlite3_column_text(stmt, 0);
+        const char* mode = reinterpret_cast<const char*>(colText);
+        fassert(37001, !strcmp(mode, "wal"));
+        status = sqlite3_finalize(stmt);
+        checkStatus(status, SQLITE_OK, "sqlite3_finalize");
+
+        LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Confirmed SQLite database opened in WAL mode";
+    }
+
+    // Ensure SQLite is operating with "synchronous" flag set to FULL.
+    {
+#define PRAGMA_SYNC_FULL 2
+
+        sqlite3_stmt* stmt;
+        status = sqlite3_prepare_v2(initSession, "PRAGMA main.synchronous;", -1, &stmt, NULL);
+        checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
+
+        status = sqlite3_step(stmt);
+        checkStatus(status, SQLITE_ROW, "sqlite3_step");
+
+        // Pragma returns current "synchronous" setting, ensure it is FULL.
+        int sync_val = sqlite3_column_int(stmt, 0);
+        fassert(50867, sync_val == PRAGMA_SYNC_FULL);
+        status = sqlite3_finalize(stmt);
+        checkStatus(status, SQLITE_OK, "sqlite3_finalize");
+
+        LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Confirmed SQLite database has synchronous "
+                                  << "set to FULL";
+    }
+
+    // Set and ensure SQLite is operating with F_FULLFSYNC if the platform permits.
+    {
+        // Set to use F_FULLFSYNC
+        char* errMsg = NULL;
+        status = sqlite3_exec(initSession, "PRAGMA fullfsync = 1;", NULL, NULL, &errMsg);
+        checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
+        // When the error message is not NULL, it is allocated through sqlite3_malloc and must be
+        // freed before exiting the method. If the error message is NULL, sqlite3_free is a no-op.
+        sqlite3_free(errMsg);
+
+        // Confirm that the setting holds
+        sqlite3_stmt* stmt;
+        status = sqlite3_prepare_v2(initSession, "PRAGMA fullfsync;", -1, &stmt, NULL);
+        checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
+
+        status = sqlite3_step(stmt);
+        checkStatus(status, SQLITE_ROW, "sqlite3_step");
+
+        // Pragma returns current fullsync setting, ensure it is enabled.
+        int fullfsync_val = sqlite3_column_int(stmt, 0);
+        fassert(50868, fullfsync_val == 1);
+        status = sqlite3_finalize(stmt);
+        checkStatus(status, SQLITE_OK, "sqlite3_finalize");
+
+        LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Confirmed SQLite database is set to fsync "
+                                  << "with F_FULLFSYNC if the platform supports"
+                                  << ". Val: " << fullfsync_val;
+    }
 
     _sessionPool.reset(new MobileSessionPool(_path));
 }
