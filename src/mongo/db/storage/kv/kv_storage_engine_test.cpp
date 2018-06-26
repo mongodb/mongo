@@ -45,6 +45,7 @@
 #include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/unclean_shutdown.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -53,9 +54,11 @@ namespace {
 
 class KVStorageEngineTest : public ServiceContextMongoDTest {
 public:
-    KVStorageEngineTest()
-        : ServiceContextMongoDTest("ephemeralForTest"),
+    KVStorageEngineTest(RepairAction repair)
+        : ServiceContextMongoDTest("ephemeralForTest", repair),
           _storageEngine(checked_cast<KVStorageEngine*>(getServiceContext()->getStorageEngine())) {}
+
+    KVStorageEngineTest() : KVStorageEngineTest(RepairAction::kNoRepair) {}
 
     /**
      * Create a collection in the catalog and in the KVEngine. Return the storage engine's `ident`.
@@ -100,6 +103,17 @@ public:
         return _storageEngine->getEngine()->getAllIdents(opCtx);
     }
 
+    bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
+        std::vector<std::string> allCollections;
+        _storageEngine->getCatalog()->getAllCollections(&allCollections);
+        return std::find(allCollections.begin(), allCollections.end(), nss.toString()) !=
+            allCollections.end();
+    }
+    bool identExists(OperationContext* opCtx, std::string ident) {
+        auto idents = getAllKVEngineIdents(opCtx);
+        return std::find(idents.begin(), idents.end(), ident) != idents.end();
+    }
+
     /**
      * Create an index with a key of `{<key>: 1}` and a `name` of <key>.
      */
@@ -128,6 +142,11 @@ public:
     }
 
     KVStorageEngine* _storageEngine;
+};
+
+class KVStorageEngineRepairTest : public KVStorageEngineTest {
+public:
+    KVStorageEngineRepairTest() : KVStorageEngineTest(RepairAction::kRepair) {}
 };
 
 TEST_F(KVStorageEngineTest, ReconcileIdentsTest) {
@@ -220,6 +239,69 @@ TEST_F(KVStorageEngineTest, RecreateIndexes) {
     ASSERT_EQUALS(2, std::count_if(kvIdents.begin(), kvIdents.end(), [](const std::string& str) {
                       return str.find("index-") == 0;
                   }));
+}
+
+TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString collNs("db.coll1");
+    auto swIdentName = createCollection(opCtx.get(), collNs);
+    ASSERT_OK(swIdentName);
+
+    ASSERT_OK(dropIdent(opCtx.get(), swIdentName.getValue()));
+    ASSERT(collectionExists(opCtx.get(), collNs));
+
+    // After the catalog is reloaded, we expect that the collection has been dropped because the
+    // KVEngine was started after an unclean shutdown but not in a repair context.
+    {
+        Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
+        _storageEngine->closeCatalog(opCtx.get());
+        startingAfterUncleanShutdown(getGlobalServiceContext()) = true;
+        _storageEngine->loadCatalog(opCtx.get());
+    }
+
+    ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
+    ASSERT(!collectionExists(opCtx.get(), collNs));
+}
+
+TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphans) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString collNs("db.coll1");
+    auto swIdentName = createCollection(opCtx.get(), collNs);
+    ASSERT_OK(swIdentName);
+
+    ASSERT_OK(dropIdent(opCtx.get(), swIdentName.getValue()));
+    ASSERT(collectionExists(opCtx.get(), collNs));
+
+    // After the catalog is reloaded, we expect that the ident has been recovered because the
+    // KVEngine was started in a repair context.
+    {
+        Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
+        _storageEngine->closeCatalog(opCtx.get());
+        _storageEngine->loadCatalog(opCtx.get());
+    }
+
+    ASSERT(identExists(opCtx.get(), swIdentName.getValue()));
+    ASSERT(collectionExists(opCtx.get(), collNs));
+}
+
+TEST_F(KVStorageEngineRepairTest, ReconcileSucceeds) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString collNs("db.coll1");
+    auto swIdentName = createCollection(opCtx.get(), collNs);
+    ASSERT_OK(swIdentName);
+
+    ASSERT_OK(dropIdent(opCtx.get(), swIdentName.getValue()));
+    ASSERT(collectionExists(opCtx.get(), collNs));
+
+    // Reconcile would normally return an error if a collection existed with a missing ident in the
+    // storage engine. When in a repair context, that should not be the case.
+    ASSERT_OK(reconcile(opCtx.get()).getStatus());
+
+    ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
+    ASSERT(collectionExists(opCtx.get(), collNs));
 }
 
 }  // namespace

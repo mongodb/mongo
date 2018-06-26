@@ -47,6 +47,8 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/system/error_code.hpp>
 #include <valgrind/valgrind.h>
 
 #include "mongo/base/error_codes.h"
@@ -827,6 +829,68 @@ Status WiredTigerKVEngine::createGroupedRecordStore(OperationContext* opCtx,
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
 }
 
+Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
+                                                StringData ns,
+                                                StringData ident,
+                                                const CollectionOptions& options) {
+    invariant(_inRepairMode);
+
+    // Moves the data file to a temporary name so that a new RecordStore can be created with the
+    // same ident name. We will delete the new empty collection and rename the data file back so it
+    // can be salvaged.
+
+    boost::optional<boost::filesystem::path> identFilePath = getDataFilePathForIdent(ident);
+    if (!identFilePath) {
+        return {ErrorCodes::UnknownError, "Data file for ident " + ident + " not found"};
+    }
+
+    boost::system::error_code ec;
+    invariant(boost::filesystem::exists(*identFilePath, ec));
+
+    boost::filesystem::path tmpFile{*identFilePath};
+    tmpFile += ".tmp";
+    if (boost::filesystem::exists(tmpFile, ec)) {
+        return {ErrorCodes::FileRenameFailed,
+                "Attempted to rename data file to an existing temporary file: " + tmpFile.string()};
+    }
+
+    log() << "Renaming data file " + identFilePath->string() + " to temporary file " +
+            tmpFile.string();
+
+    boost::filesystem::rename(*identFilePath, tmpFile, ec);
+    if (ec) {
+        return {ErrorCodes::FileRenameFailed,
+                "Error renaming data file to temporary file: " + ec.message()};
+    }
+
+    log() << "Creating new RecordStore for collection " + ns + " with UUID: " +
+            (options.uuid ? options.uuid->toString() : "none");
+
+    auto status = createGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    log() << "Moving orphaned data file back as " + identFilePath->string();
+
+    boost::filesystem::remove(*identFilePath, ec);
+    if (ec) {
+        return {ErrorCodes::UnknownError, "Error deleting empty data file: " + ec.message()};
+    }
+
+    boost::filesystem::rename(tmpFile, *identFilePath, ec);
+    if (ec) {
+        return {ErrorCodes::FileRenameFailed,
+                "Error renaming data file back from temporary file: " + ec.message()};
+    }
+
+    log() << "Salvaging ident " + ident;
+
+    WiredTigerSession sessionWrapper(_conn);
+    WT_SESSION* session = sessionWrapper.getSession();
+    return wtRCToStatus(session->salvage(session, _uri(ident).c_str(), NULL), "Salvage failed: ");
+}
+
 std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
     OperationContext* opCtx,
     StringData ns,
@@ -1102,6 +1166,18 @@ std::vector<std::string> WiredTigerKVEngine::getAllIdents(OperationContext* opCt
     fassert(50663, ret == WT_NOTFOUND);
 
     return all;
+}
+
+boost::optional<boost::filesystem::path> WiredTigerKVEngine::getDataFilePathForIdent(
+    StringData ident) const {
+    boost::filesystem::path identPath = _path;
+    identPath /= ident.toString() + ".wt";
+
+    boost::system::error_code ec;
+    if (!boost::filesystem::exists(identPath, ec)) {
+        return boost::none;
+    }
+    return identPath;
 }
 
 int WiredTigerKVEngine::reconfigure(const char* str) {

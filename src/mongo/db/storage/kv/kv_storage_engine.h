@@ -191,6 +191,21 @@ private:
                                          CollIter begin,
                                          CollIter end);
 
+    /**
+     * When called in a repair context (_options.forRepair=true), attempts to recover a collection
+     * whose entry is present in the KVCatalog, but missing from the KVEngine. Returns 'false' and
+     * removes collection metadata from the KVCatalog if called outside of a repair context, the
+     * collection is unrecoverable, or the implementation of KVEngine::recoverOrphanedIdent returns
+     * an error.
+     *
+     * Returns 'true' if the collection was recovered in the KVEngine and a new record store was
+     * created. Recovery does not make any guarantees about the integrity of the data in the
+     * collection.
+     */
+    bool _recoverOrDropOrphanedCollection(OperationContext* opCtx,
+                                          StringData collectionName,
+                                          StringData collectionIdent);
+
     void _dumpCatalog(OperationContext* opCtx);
 
     class RemoveDBChange;

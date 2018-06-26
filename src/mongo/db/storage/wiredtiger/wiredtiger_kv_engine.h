@@ -35,6 +35,7 @@
 #include <memory>
 #include <string>
 
+#include <boost/filesystem/path.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/bson/ordering.h"
@@ -81,43 +82,43 @@ public:
     void setRecordStoreExtraOptions(const std::string& options);
     void setSortedDataInterfaceExtraOptions(const std::string& options);
 
-    virtual bool supportsDocLocking() const;
+    virtual bool supportsDocLocking() const override;
 
-    virtual bool supportsDirectoryPerDB() const;
+    virtual bool supportsDirectoryPerDB() const override;
 
-    virtual bool isDurable() const {
+    virtual bool isDurable() const override {
         return _durable;
     }
 
-    virtual bool isEphemeral() const {
+    virtual bool isEphemeral() const override {
         return _ephemeral;
     }
 
-    virtual RecoveryUnit* newRecoveryUnit();
+    virtual RecoveryUnit* newRecoveryUnit() override;
 
     virtual Status createRecordStore(OperationContext* opCtx,
                                      StringData ns,
                                      StringData ident,
-                                     const CollectionOptions& options) {
+                                     const CollectionOptions& options) override {
         return createGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
     }
 
     virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                         StringData ns,
                                                         StringData ident,
-                                                        const CollectionOptions& options) {
+                                                        const CollectionOptions& options) override {
         return getGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
     }
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
-                                             const IndexDescriptor* desc) {
+                                             const IndexDescriptor* desc) override {
         return createGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
     }
 
     virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
                                                         StringData ident,
-                                                        const IndexDescriptor* desc) {
+                                                        const IndexDescriptor* desc) override {
         return getGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
     }
 
@@ -125,51 +126,56 @@ public:
                                             StringData ns,
                                             StringData ident,
                                             const CollectionOptions& options,
-                                            KVPrefix prefix);
+                                            KVPrefix prefix) override;
 
     virtual std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
                                                                StringData ns,
                                                                StringData ident,
                                                                const CollectionOptions& options,
-                                                               KVPrefix prefix);
+                                                               KVPrefix prefix) override;
 
     virtual Status createGroupedSortedDataInterface(OperationContext* opCtx,
                                                     StringData ident,
                                                     const IndexDescriptor* desc,
-                                                    KVPrefix prefix);
+                                                    KVPrefix prefix) override;
 
     virtual SortedDataInterface* getGroupedSortedDataInterface(OperationContext* opCtx,
                                                                StringData ident,
                                                                const IndexDescriptor* desc,
-                                                               KVPrefix prefix);
+                                                               KVPrefix prefix) override;
 
-    virtual Status dropIdent(OperationContext* opCtx, StringData ident);
+    virtual Status dropIdent(OperationContext* opCtx, StringData ident) override;
 
     virtual void alterIdentMetadata(OperationContext* opCtx,
                                     StringData ident,
-                                    const IndexDescriptor* desc);
+                                    const IndexDescriptor* desc) override;
 
     virtual Status okToRename(OperationContext* opCtx,
                               StringData fromNS,
                               StringData toNS,
                               StringData ident,
-                              const RecordStore* originalRecordStore) const;
+                              const RecordStore* originalRecordStore) const override;
 
-    virtual int flushAllFiles(OperationContext* opCtx, bool sync);
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync) override;
 
-    virtual Status beginBackup(OperationContext* opCtx);
+    virtual Status beginBackup(OperationContext* opCtx) override;
 
-    virtual void endBackup(OperationContext* opCtx);
+    virtual void endBackup(OperationContext* opCtx) override;
 
-    virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident);
+    virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) override;
 
-    virtual Status repairIdent(OperationContext* opCtx, StringData ident);
+    virtual Status repairIdent(OperationContext* opCtx, StringData ident) override;
 
-    virtual bool hasIdent(OperationContext* opCtx, StringData ident) const;
+    virtual Status recoverOrphanedIdent(OperationContext* opCtx,
+                                        StringData ns,
+                                        StringData ident,
+                                        const CollectionOptions& options) override;
 
-    std::vector<std::string> getAllIdents(OperationContext* opCtx) const;
+    virtual bool hasIdent(OperationContext* opCtx, StringData ident) const override;
 
-    virtual void cleanShutdown();
+    std::vector<std::string> getAllIdents(OperationContext* opCtx) const override;
+
+    virtual void cleanShutdown() override;
 
     SnapshotManager* getSnapshotManager() const final {
         return &_sessionCache->snapshotManager();
@@ -276,6 +282,13 @@ public:
      */
     Timestamp getStableTimestamp() const;
     Timestamp getOldestTimestamp() const;
+
+    /**
+     * Returns the data file path associated with an ident on disk. Returns boost::none if the data
+     * file can not be found. This will attempt to locate a file even if the storage engine's own
+     * metadata is not aware of the ident. This is intented for database repair purposes only.
+     */
+    boost::optional<boost::filesystem::path> getDataFilePathForIdent(StringData ident) const;
 
 private:
     class WiredTigerJournalFlusher;

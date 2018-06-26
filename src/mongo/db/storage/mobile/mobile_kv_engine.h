@@ -109,6 +109,13 @@ public:
         return Status::OK();
     }
 
+    virtual Status recoverOrphanedIdent(OperationContext* opCtx,
+                                        StringData ns,
+                                        StringData ident,
+                                        const CollectionOptions& options) override {
+        return createRecordStore(opCtx, ns, ident, options);
+    }
+
     void cleanShutdown() override{};
 
     bool hasIdent(OperationContext* opCtx, StringData ident) const override;
