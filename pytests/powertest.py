@@ -1475,7 +1475,20 @@ def mongo_reconfig_replication(mongo, host_port, repl_set):
                 if ret["ok"] != 1:
                     LOGGER.error("Failed replSetGetConfig: %s", ret)
                     return 1
+
+                rs_config = ret["config"]
+                # We only reconfig if there is a change to 'host'.
+                if rs_config["members"][0]["host"] != host_port:
+                    # With force=True, version is ignored.
+                    # rs_config["version"] = rs_config["version"] + 1
+                    rs_config["members"][0]["host"] = host_port
+                    ret = mongo.admin.command("replSetReconfig", rs_config, force=True)
+                    if ret["ok"] != 1:
+                        LOGGER.error("Failed replSetReconfig: %s", ret)
+                        return 1
+                    LOGGER.info("Replication reconfigured: %s", ret)
                 break
+
             except pymongo.errors.AutoReconnect:
                 pass
             except pymongo.errors.OperationFailure as err:
@@ -1483,19 +1496,7 @@ def mongo_reconfig_replication(mongo, host_port, repl_set):
                 if err.code != 94:
                     LOGGER.error("Replication failed to initialize: %s", ret)
                     return 1
-        rs_config = ret["config"]
-        # We only reconfig if there is a change to 'host'.
-        if rs_config["members"][0]["host"] != host_port:
-            # With force=True, version is ignored.
-            # rs_config["version"] = rs_config["version"] + 1
-            rs_config["members"][0]["host"] = host_port
-            while True:
-                try:
-                    ret = mongo.admin.command("replSetReconfig", rs_config, force=True)
-                    break
-                except pymongo.errors.AutoReconnect:
-                    pass
-            LOGGER.info("Replication reconfigured: %s", ret)
+
     primary_available = mongod_wait_for_primary(mongo)
     LOGGER.debug("isMaster: %s", mongo.admin.command("isMaster"))
     LOGGER.debug("replSetGetStatus: %s", mongo.admin.command("replSetGetStatus"))
