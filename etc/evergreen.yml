@@ -8969,7 +8969,6 @@ buildvariants:
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
-    multiversion_platform: osx-ssl
     num_jobs_available: 1
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     tooltags: "-tags 'ssl openssl_pre_1.0'"
@@ -9021,7 +9020,6 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -9061,8 +9059,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
-  - name: update_fuzzer
-  - name: update_fuzzer_replication
   - name: write_concern_majority_passthrough
   - name: push
     distros:
@@ -9117,8 +9113,6 @@ buildvariants:
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
-    multiversion_platform: osx
-    multiversion_edition: enterprise
   display_tasks:
   - *unittests
   tasks:
@@ -9131,7 +9125,6 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -9165,8 +9158,6 @@ buildvariants:
     compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include"
     num_jobs_available: 1
     build_mongoreplay: true
-    multiversion_platform: osx
-    multiversion_edition: enterprise
     build_openssl: true
     openssl_config_flags: "-mmacosx-version-min=10.10"
     openssl_make_flags: "-j$(sysctl -n hw.logicalcpu)"
@@ -9182,7 +9173,6 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
