@@ -143,6 +143,7 @@ var BackupRestoreTest = function(options) {
                 'database_versioning.js',
                 'findAndModify_update_grow.js',  // can cause OOM kills on test hosts
                 'multi_statement_transaction_atomicity_isolation.js',
+                'multi_statement_transaction_atomicity_isolation_multi_db.js',
                 'multi_statement_transaction_atomicity_isolation_repeated_reads.js',
                 'multi_statement_transaction_simple.js',
                 'multi_statement_transaction_simple_repeated_reads.js',
