@@ -26,23 +26,29 @@
  * then also delete it in the license file.
  */
 
+#include <map>
+
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
 namespace catalog {
+
+using MinVisibleTimestamp = Timestamp;
+using MinVisibleTimestampMap = std::map<UUID, MinVisibleTimestamp>;
+
 /**
  * Closes the catalog, destroying all associated in-memory data structures for all databases. After
  * a call to this function, it is illegal to access the catalog before calling openCatalog().
  *
  * Must be called with the global lock acquired in exclusive mode.
  */
-void closeCatalog(OperationContext* opCtx);
+MinVisibleTimestampMap closeCatalog(OperationContext* opCtx);
 
 /**
  * Restores the catalog and all in-memory state after a call to closeCatalog().
  *
  * Must be called with the global lock acquired in exclusive mode.
  */
-void openCatalog(OperationContext* opCtx);
+void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& catalogState);
 }  // namespace catalog
 }  // namespace mongo
