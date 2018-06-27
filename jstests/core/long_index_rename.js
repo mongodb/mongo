@@ -3,16 +3,26 @@
 // but this caused secondaries to crash when replicating what should be a bad createIndex command.
 // Here we test that the too-long name is rejected in this situation as well
 
-t = db.long_index_rename;
-t.drop();
+(function() {
+    'use strict';
 
-for (i = 1; i < 10; i++) {
-    t.save({a: i});
-}
+    const coll = db.long_index_rename;
+    coll.drop();
 
-t.createIndex({a: 1}, {name: "aaa"});
-var result = t.createIndex({a: 1}, {
-    name: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-});
-assert(!result.ok);
+    for (let i = 1; i < 10; i++) {
+        coll.save({a: i});
+    }
+
+    // Compute maximum index name length for this collection under FCV 4.0.
+    const maxNsLength = 127;
+    const maxIndexNameLength = maxNsLength - (coll.getFullName() + ".$").length;
+    jsTestLog('Max index name length under FCV 4.0 = ' + maxIndexNameLength);
+
+    // Create an index with the longest name allowed for this collection.
+    assert.commandWorked(coll.createIndex({a: 1}, {name: 'a'.repeat(maxIndexNameLength)}));
+
+    // Index namespaces longer than 127 characters are not acceptable.
+    assert.commandFailedWithCode(
+        coll.createIndex({b: 1}, {name: 'b'.repeat(maxIndexNameLength) + 1}),
+        ErrorCodes.CannotCreateIndex);
+})();
