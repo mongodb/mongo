@@ -14,7 +14,6 @@ selector:
   - jstests/core/collation.js
   - jstests/core/commands_that_do_not_write_do_not_accept_wc.js
   - jstests/core/constructors.js
-  - jstests/core/eval_mr.js
   - jstests/core/function_string_representations.js
   - jstests/core/geo_big_polygon3.js
   - jstests/core/geo_mapreduce.js

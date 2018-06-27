@@ -77,52 +77,6 @@
     assert(s.admin.runCommand({shardcollection: "test.foo7", key: {num: 1}}).ok,
            "shard with ok unique index");
 
-    // ----- eval -----
-
-    db.foo2.save({num: 5, a: 7});
-    db.foo3.save({num: 5, a: 8});
-
-    assert.eq(1, db.foo3.count(), "eval pre1");
-    assert.eq(1, db.foo2.count(), "eval pre2");
-
-    assert.eq(8,
-              db.eval(function() {
-                  return db.foo3.findOne().a;
-              }),
-              "eval 1 ");
-    assert.throws(function() {
-        db.eval(function() {
-            return db.foo2.findOne().a;
-        });
-    }, [], "eval 2");
-
-    assert.eq(1,
-              db.eval(function() {
-                  return db.foo3.count();
-              }),
-              "eval 3 ");
-    assert.throws(function() {
-        db.eval(function() {
-            return db.foo2.count();
-        });
-    }, [], "eval 4");
-
-    // ----- "eval" new command name SERVER-5588 -----
-    var result;
-    result = db.runCommand({
-        eval: function() {
-            return db.foo3.count();
-        }
-    });  // non-sharded collection
-    assert.eq(1, result.ok, "eval should work for non-sharded collection in cluster");
-
-    result = db.runCommand({
-        eval: function() {
-            return db.foo2.count();
-        }
-    });  // sharded collection
-    assert.eq(0, result.ok, "eval should not work for sharded collection in cluster");
-
     // ---- unique shard key ----
 
     assert(s.admin.runCommand({shardcollection: "test.foo4", key: {num: 1}, unique: true}).ok,

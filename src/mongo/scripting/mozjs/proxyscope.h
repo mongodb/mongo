@@ -122,8 +122,6 @@ public:
 
     void unregisterOperation() override;
 
-    void localConnectForDbEval(OperationContext* opCtx, const char* dbName) override;
-
     void externalSetup() override;
 
     std::string getError() override;

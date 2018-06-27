@@ -25,27 +25,22 @@
     jsTestLog("Sleeping 30 seconds so the SECONDARY will be considered electable");
     sleep(30000);
 
-    // Run eval() in a separate thread to take the global write lock which would prevent stepdown
+    // Run sleep in a separate thread to take the global write lock which would prevent stepdown
     // from completing if it failed to kill all running operations.
-    jsTestLog("Running eval() to grab global write lock");
-    var evalCmd = function() {
-        var res = db.eval(function() {
-            for (var i = 0; i < 60 * 10; i++) {  // Run for 10 minutes if not interrupted.
-                // Sleep in 1 second intervals so the javascript engine will notice when
-                // it's killed
-                sleep(1000);
-            }
-        });
-        print("$eval completed without error. This shouldn't happen! Result: " + tojson(res));
+    jsTestLog("Running {sleep:1, lock: 'w'} to grab global write lock");
+    var sleepCmd = function() {
+        // Run for 10 minutes if not interrupted.
+        db.adminCommand({sleep: 1, lock: 'w', seconds: 60 * 10});
     };
-    var evalRunner = startParallelShell(evalCmd, primary.port);
+    const startTime = new Date().getTime() / 1000;
+    var sleepRunner = startParallelShell(sleepCmd, primary.port);
 
-    jsTestLog("Confirming that eval() is running and has the global lock");
+    jsTestLog("Confirming that sleep() is running and has the global lock");
     assert.soon(function() {
         var res = primary.getDB('admin').currentOp();
         for (var index in res.inprog) {
             var entry = res.inprog[index];
-            if (entry["command"] && entry["command"]["$eval"]) {
+            if (entry["command"] && entry["command"]["sleep"]) {
                 if ("W" === entry["locks"]["Global"]) {
                     return true;
                 }
@@ -53,7 +48,7 @@
         }
         printjson(res);
         return false;
-    }, "$eval never ran and grabbed the global write lock");
+    }, "sleep never ran and grabbed the global write lock");
 
     jsTestLog("Stepping down");
     try {
@@ -68,8 +63,12 @@
     var newPrimary = replSet.getPrimary();
     assert.neq(primary, newPrimary, "SECONDARY did not become PRIMARY");
 
-    var exitCode = evalRunner({checkExitSuccess: false});
-    assert.neq(
-        0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");
+    sleepRunner({checkExitSuccess: false});
+    const endTime = new Date().getTime() / 1000;
+    const duration = endTime - startTime;
+    assert.lt(duration,
+              60 * 9,  // In practice, this should be well under 1 minute.
+              "Sleep lock held longer than expected, possibly uninterrupted.");
+
     replSet.stopSet();
 })();

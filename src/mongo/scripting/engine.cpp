@@ -419,9 +419,6 @@ public:
     void init(const BSONObj* data) {
         _real->init(data);
     }
-    void localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
-        invariant(!"localConnectForDbEval should only be called from dbEval");
-    }
     void setLocalDB(const string& dbName) {
         _real->setLocalDB(dbName);
     }

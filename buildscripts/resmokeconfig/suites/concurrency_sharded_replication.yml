@@ -69,13 +69,6 @@ selector:
   # can cause OOM kills on test hosts
   - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
-  # eval doesn't work with sharded collections
-  - jstests/concurrency/fsm_workloads/indexed_insert_eval.js
-  - jstests/concurrency/fsm_workloads/indexed_insert_eval_nolock.js
-  - jstests/concurrency/fsm_workloads/remove_single_document_eval.js
-  - jstests/concurrency/fsm_workloads/remove_single_document_eval_nolock.js
-  - jstests/concurrency/fsm_workloads/update_simple_eval.js
-  - jstests/concurrency/fsm_workloads/update_simple_eval_nolock.js
 
   # cannot ensureIndex after dropDatabase without sharding first
   - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js

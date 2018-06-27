@@ -93,10 +93,6 @@
         "revokeRolesFromUser",
         "updateRole",
         "updateUser",
-
-        // Other commands.
-        "eval",  // May contain non-retryable commands.
-        "$eval",
     ]);
 
     // These commands are not idempotent because they return errors if retried after

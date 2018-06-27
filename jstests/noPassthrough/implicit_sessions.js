@@ -199,30 +199,6 @@
         MongoRunner.stopMongod(conn);
     }
 
-    // Tests for the shell parameter, and the function that exposes it, for disabling implicit
-    // sessions.
-    function runTestGlobalFlag() {
-        const conn = MongoRunner.runMongod();
-        const testDB = conn.getDB("test");
-
-        // The native disabled function should return false in the mongo shell by default.
-        assert(_shouldUseImplicitSessions());
-
-        // Commands run in eval should never use implicit sessions.
-        const evalFunc = function() {
-            assert(!_shouldUseImplicitSessions(),
-                   "expected implicit sessions to be disabled inside eval");
-
-            inspectCommandForSessionId(function() {
-                assert.writeOK(db.foo.insert({x: 1}));
-            }, {shouldIncludeId: false});
-        };
-        testDB.eval("inspectCommandForSessionId = " + inspectCommandForSessionId.toString() +
-                    "; (" + evalFunc.toString() + ")()");
-
-        MongoRunner.stopMongod(conn);
-    }
-
     // Tests behavior of implicit sessions when they are disabled via a test flag.
     function runTestDisabled() {
         const conn = MongoRunner.runMongod();
@@ -258,7 +234,7 @@
 
     runTestTransitionToDisabled();
 
-    runTestGlobalFlag();
+    assert(_shouldUseImplicitSessions());
 
     TestData.disableImplicitSessions = true;
     runTestDisabled();

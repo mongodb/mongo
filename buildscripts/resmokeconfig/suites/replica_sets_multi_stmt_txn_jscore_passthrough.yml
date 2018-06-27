@@ -256,7 +256,6 @@ selector:
   - jstests/core/coveredIndex3.js
   - jstests/core/currentop.js
   - jstests/core/distinct3.js
-  - jstests/core/evald.js
   - jstests/core/find_and_modify_concurrent_update.js
   - jstests/core/fsync.js
   - jstests/core/geo_update_btree.js

@@ -5,7 +5,7 @@
 //          auth user 'a' -> auth user 'b'
 //          auth user 'b' -> logout
 //
-//       These transitions are tested for dbEval, $where and MapReduce.
+//       These transitions are tested for $where and MapReduce.
 
 var conn = MongoRunner.runMongod({smallfiles: ""});
 var test = conn.getDB("test");
@@ -25,27 +25,6 @@ function missingOrEquals(string) {
         '    || someGlobal == unescape("' + escape(string) + '");' +
         '}()';
 }
-
-function testDbEval() {
-    // set the global variable 'someGlobal' before authenticating
-    test.eval('someGlobal = "noUsers";');
-
-    // test new user auth causes scope to be cleared
-    test.auth('a', 'a');
-    assert(test.eval('return ' + missingOrEquals('a')), "dbEval: Auth user 'a'");
-
-    // test auth as another user causes scope to be cleared
-    test.eval('someGlobal = "a";');
-    test.auth('b', 'b');
-    assert(test.eval('return ' + missingOrEquals('a&b')), "dbEval: Auth user 'b'");
-
-    // test user logout causes scope to be cleared
-    test.eval('someGlobal = "a&b";');
-    test.logout();
-    assert(test.eval('return ' + missingOrEquals('noUsers')), "dbEval: log out");
-}
-testDbEval();
-testDbEval();
 
 // test $where
 function testWhere() {

@@ -103,8 +103,6 @@ public:
 
     void unregisterOperation() override;
 
-    void localConnectForDbEval(OperationContext* opCtx, const char* dbName) override;
-
     void externalSetup() override;
 
     std::string getError() override;
@@ -242,11 +240,6 @@ public:
     typename std::enable_if<std::is_same<T, MongoHelpersInfo>::value, WrapType<T>&>::type
     getProto() {
         return _mongoHelpersProto;
-    }
-
-    template <typename T>
-    typename std::enable_if<std::is_same<T, MongoLocalInfo>::value, WrapType<T>&>::type getProto() {
-        return _mongoLocalProto;
     }
 
     template <typename T>
@@ -389,12 +382,9 @@ private:
 
     /**
      * The connection state of the scope.
-     *
-     * This is for dbeval and the shell
      */
     enum class ConnectState : char {
         Not,
-        Local,
         External,
     };
 
@@ -453,7 +443,6 @@ private:
     WrapType<MinKeyInfo> _minKeyProto;
     WrapType<MongoExternalInfo> _mongoExternalProto;
     WrapType<MongoHelpersInfo> _mongoHelpersProto;
-    WrapType<MongoLocalInfo> _mongoLocalProto;
     WrapType<NativeFunctionInfo> _nativeFunctionProto;
     WrapType<NumberDecimalInfo> _numberDecimalProto;
     WrapType<NumberIntInfo> _numberIntProto;

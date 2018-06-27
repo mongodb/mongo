@@ -237,7 +237,6 @@
         },
         enableSharding: {skip: "Tested as part of shardCollection"},
         endSessions: {skip: isUnrelated},
-        eval: {skip: isUnrelated},
         explain: {command: {explain: {count: "view"}}},
         features: {skip: isUnrelated},
         filemd5: {skip: isUnrelated},

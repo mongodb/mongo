@@ -91,24 +91,6 @@
 
     // The doTxn command is intentionally left out.
 
-    jsTestLog("Check that eval accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        eval: function() {
-            return 0;
-        },
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-    }));
-
-    jsTestLog("Check that $eval accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        $eval: function() {
-            return 0;
-        },
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-    }));
-
     jsTestLog("Check that explain accepts a statement ID");
     assert.commandWorked(sessionDb.runCommand({
         explain: {

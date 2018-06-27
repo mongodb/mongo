@@ -286,7 +286,6 @@ env.Library(
         "dbhash.cpp",
         "do_txn_cmd.cpp",
         "driverHelpers.cpp",
-        "eval.cpp",
         "haystack.cpp",
         "mr.cpp",
         "oplog_application_checks.cpp",

@@ -199,17 +199,6 @@
         echo: {skip: "does not forward command to primary shard"},
         enableSharding: {skip: "does not forward command to primary shard"},
         endSessions: {skip: "goes through the cluster write path"},
-        eval: {
-            sendsDbVersion: false,
-            // It is a known bug that eval does not send shardVersion (SERVER-33357).
-            sendsShardVersion: false,
-            command: {
-                eval: function(collName) {
-                    const doc = db[collName].findOne();
-                },
-                args: [collName]
-            }
-        },
         explain: {skip: "TODO SERVER-31226"},
         features: {skip: "executes locally on mongos (not sent to any remote node)"},
         filemd5: {

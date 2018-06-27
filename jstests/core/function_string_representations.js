@@ -34,7 +34,6 @@
     whereFunction += ";";
     assert.eq(1, col.find({$where: whereFunction}).itcount());
 
-    // db.eval does not need to be tested, as it accepts code fragments, not functions.
     // system.js does not need to be tested, as its contents types' are preserved, and
     // strings are not promoted into functions.
 })();

@@ -95,10 +95,6 @@ void MozJSProxyScope::unregisterOperation() {
     run([&] { _implScope->unregisterOperation(); });
 }
 
-void MozJSProxyScope::localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
-    run([&] { _implScope->localConnectForDbEval(opCtx, dbName); });
-}
-
 void MozJSProxyScope::externalSetup() {
     run([&] { _implScope->externalSetup(); });
 }

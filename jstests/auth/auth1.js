@@ -41,8 +41,6 @@ function runTest(m) {
 
     print("make sure we can't run certain commands w/out auth");
     var codeUnauthorized = 13;
-    var rslt = db.runCommand({eval: "function() { return 1; }"});
-    assert.eq(rslt.code, codeUnauthorized, tojson(rslt));
     var rslt = db.runCommand({getLog: "global"});
     assert.eq(rslt.code, codeUnauthorized, tojson(rslt));
 
@@ -75,19 +73,9 @@ function runTest(m) {
     assert.eq(1000, tRO.count(), "B6");
     db.getSiblingDB('admin').auth('super', 'super');
 
-    assert.eq(1000,
-              db.eval(function() {
-                  return db["jstests_auth_auth1"].count();
-              }),
-              "D1");
-    db.eval(function() {
-        db["jstests_auth_auth1"].save({i: 1000});
-    });
-    assert.eq(1001,
-              db.eval(function() {
-                  return db["jstests_auth_auth1"].count();
-              }),
-              "D2");
+    assert.eq(1000, t.count(), "D1");
+    t.insert({i: 1000});
+    assert.eq(1001, t.count(), "D2");
 
     print("SUCCESS auth1.js");
 }

@@ -63,7 +63,6 @@ public:
         init(&o);
     }
 
-    virtual void localConnectForDbEval(OperationContext* opCtx, const char* dbName) = 0;
     virtual void externalSetup() = 0;
     virtual void setLocalDB(const std::string& localDBName) {
         _localDBName = localDBName;

@@ -259,7 +259,7 @@ enum JsonStringFormat {
     /** strict RFC format */
     Strict,
     /** 10gen format, which is close to JS format.  This form is understandable by
-        javascript running inside the Mongo server via eval() */
+        javascript running inside the Mongo server via $where, mr, etc... */
     TenGen,
 };
 

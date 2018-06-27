@@ -3566,26 +3566,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "eval",
-          command: {
-              $eval: function() {
-                  print("noop");
-              }
-          },
-          testcases: [
-              {
-                runOnDb: firstDbName,
-                roles: {__system: 1},
-                privileges: [{resource: {anyResource: true}, actions: ["anyAction"]}]
-              },
-              {
-                runOnDb: secondDbName,
-                roles: {__system: 1},
-                privileges: [{resource: {anyResource: true}, actions: ["anyAction"]}]
-              }
-          ]
-        },
-        {
           testname: "features",
           command: {features: 1},
           testcases: [

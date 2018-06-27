@@ -576,27 +576,6 @@ bool DBClientBase::copyDatabase(const string& fromdb,
     return runCommand("admin", b.done(), *info);
 }
 
-bool DBClientBase::eval(const string& dbname,
-                        const string& jscode,
-                        BSONObj& info,
-                        BSONElement& retValue,
-                        BSONObj* args) {
-    BSONObjBuilder b;
-    b.appendCode("$eval", jscode);
-    if (args)
-        b.appendArray("args", *args);
-    bool ok = runCommand(dbname, b.done(), info);
-    if (ok)
-        retValue = info.getField("retval");
-    return ok;
-}
-
-bool DBClientBase::eval(const string& dbname, const string& jscode) {
-    BSONObj info;
-    BSONElement retValue;
-    return eval(dbname, jscode, info, retValue);
-}
-
 list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& filter) {
     list<BSONObj> infos;
 

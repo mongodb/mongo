@@ -75,13 +75,6 @@ struct MongoBase : public BaseInfo {
 };
 
 /**
- * The dbeval variant of "Mongo"
- */
-struct MongoLocalInfo : public MongoBase {
-    static void construct(JSContext* cx, JS::CallArgs args);
-};
-
-/**
  * The shell variant of "Mongo"
  */
 struct MongoExternalInfo : public MongoBase {

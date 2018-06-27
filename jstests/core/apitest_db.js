@@ -18,7 +18,6 @@ dd("b");
  *  be sure the public collection API is complete
  */
 assert(db.createCollection, "createCollection");
-assert(db.dbEval, "dbEval");
 
 dd("c");
 

@@ -61,7 +61,6 @@ namespace mongo {
    Also note that the server has some basic checks to enforce this limit but those checks are not
    exhaustive for example need to check for size too big after
      update $push (append) operation
-     various db.eval() type operations
 */
 const int BSONObjMaxUserSize = 16 * 1024 * 1024;
 

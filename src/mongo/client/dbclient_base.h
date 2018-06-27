@@ -449,27 +449,6 @@ public:
                       const std::string& fromhost = "",
                       BSONObj* info = 0);
 
-    /** Run javascript code on the database server.
-       dbname    database SavedContext in which the code runs. The javascript variable 'db' will be
-                 assigned to this database when the function is invoked.
-       jscode    source code for a javascript function.
-       info      the command object which contains any information on the invocation result
-                 including the return value and other information.  If an error occurs running the
-                 jscode, error information will be in info.  (try "log() << info.toString()")
-       retValue  return value from the jscode function.
-       args      args to pass to the jscode function.  when invoked, the 'args' variable will be
-                 defined for use by the jscode.
-
-       returns true if runs ok.
-
-       See testDbEval() in dbclient.cpp for an example of usage.
-    */
-    bool eval(const std::string& dbname,
-              const std::string& jscode,
-              BSONObj& info,
-              BSONElement& retValue,
-              BSONObj* args = 0);
-
     /** validate a collection, checking for errors and reporting back statistics.
         this operation is slow and blocking.
      */
@@ -477,35 +456,6 @@ public:
         BSONObj cmd = BSON("validate" << nsGetCollection(ns) << "scandata" << scandata);
         BSONObj info;
         return runCommand(nsGetDB(ns).c_str(), cmd, info);
-    }
-
-    /* The following helpers are simply more convenient forms of eval() for certain common cases */
-
-    /* invocation with no return value of interest -- with or without one simple parameter */
-    bool eval(const std::string& dbname, const std::string& jscode);
-    template <class T>
-    bool eval(const std::string& dbname, const std::string& jscode, T parm1) {
-        BSONObj info;
-        BSONElement retValue;
-        BSONObjBuilder b;
-        b.append("0", parm1);
-        BSONObj args = b.done();
-        return eval(dbname, jscode, info, retValue, &args);
-    }
-
-    /** eval invocation with one parm to server and one numeric field (either int or double)
-     * returned */
-    template <class T, class NumType>
-    bool eval(const std::string& dbname, const std::string& jscode, T parm1, NumType& ret) {
-        BSONObj info;
-        BSONElement retValue;
-        BSONObjBuilder b;
-        b.append("0", parm1);
-        BSONObj args = b.done();
-        if (!eval(dbname, jscode, info, retValue, &args))
-            return false;
-        ret = (NumType)retValue.number();
-        return true;
     }
 
     /**

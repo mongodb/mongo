@@ -44,7 +44,6 @@ env.Library(
         'cluster_drop_database_cmd.cpp',
         'cluster_drop_indexes_cmd.cpp',
         'cluster_enable_sharding_cmd.cpp',
-        'cluster_eval_cmd.cpp',
         'cluster_explain.cpp',
         'cluster_explain_cmd.cpp',
         'cluster_filemd5_cmd.cpp',

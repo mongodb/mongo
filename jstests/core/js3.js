@@ -1,8 +1,6 @@
 // @tags: [
-//   # Cannot implicitly shard accessed collections because unsupported use of sharded collection
-//   # from db.eval.
 //   assumes_unsharded_collection,
-//   requires_eval_command,
+//   requires_javascript,
 //   requires_non_retryable_commands,
 //   requires_fastcount,
 // ]
@@ -29,21 +27,12 @@ for (z = 0; z < 2; z++) {
             z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         });
 
-    assert(33 == db.dbEval(function() {
-        return 33;
-    }));
-
-    db.dbEval(function() {
-        db.jstests_js3.save({i: -1, z: "server side"});
-    });
-
-    assert(t.findOne({i: -1}));
-
     assert(2 == t.find({
                      $where: function() {
                          return obj.i == 7 || obj.i == 8;
                      }
                  }).length());
+    assert.eq(1000, t.count());
 
     // NPE test
     var ok = false;
@@ -82,7 +71,7 @@ for (z = 0; z < 2; z++) {
             z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         });
 
-    assert(t.find().count() == 2001);
+    assert(t.find().count() == 2000);
 
     assert(t.validate().valid);
 

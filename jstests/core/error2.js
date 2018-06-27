@@ -1,6 +1,5 @@
 // Test that client gets stack trace on failed invoke
 // @tags: [
-//   requires_eval_command,
 //   requires_non_retryable_commands,
 // ]
 
@@ -17,10 +16,4 @@ assert.throws(function() {
         }
     });
     c.next();
-});
-
-assert.throws(function() {
-    db.eval(function() {
-        return a();
-    });
 });

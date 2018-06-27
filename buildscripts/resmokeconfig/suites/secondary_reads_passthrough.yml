@@ -44,7 +44,6 @@ selector:
   - jstests/core/find_and_modify_concurrent_update.js
   - jstests/core/shellstartparallel.js
   - jstests/core/loadserverscripts.js
-  - jstests/core/evald.js
   - jstests/core/fsync.js
   # benchRun cannot be overridden to be causally consistent
   - jstests/core/bench_test*.js

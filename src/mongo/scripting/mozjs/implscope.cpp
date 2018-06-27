@@ -449,7 +449,6 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _minKeyProto(_context),
       _mongoExternalProto(_context),
       _mongoHelpersProto(_context),
-      _mongoLocalProto(_context),
       _nativeFunctionProto(_context),
       _numberDecimalProto(_context),
       _numberIntProto(_context),
@@ -816,48 +815,11 @@ void MozJSImplScope::sleep(Milliseconds ms) {
                 lk, ms.toSystemDuration(), [this] { return !_killStatus.isOK(); }));
 }
 
-void MozJSImplScope::localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
-
-    _runSafely([this, &opCtx, &dbName] {
-        if (_connectState == ConnectState::External)
-            uasserted(12510, "externalSetup already called, can't call localConnect");
-        if (_connectState == ConnectState::Local) {
-            if (_localDBName == dbName)
-                return;
-            uasserted(12511,
-                      str::stream() << "localConnect previously called with name " << _localDBName);
-        }
-
-        // NOTE: order is important here.  the following methods must be called after
-        //       the above conditional statements.
-
-        _connectState = ConnectState::Local;
-        _localDBName = dbName;
-
-        loadStored(opCtx);
-
-        // install db access functions in the global object
-        installDBAccess();
-
-        // install the Mongo function object and instantiate the 'db' global
-        _mongoLocalProto.install(_global);
-        execCoreFiles();
-
-        const char* const makeMongo = "const _mongo = new Mongo()";
-        exec(makeMongo, "local connect 2", false, true, true, 0);
-
-        std::string makeDB = str::stream() << "const db = _mongo.getDB(\"" << dbName << "\");";
-        exec(makeDB, "local connect 3", false, true, true, 0);
-    });
-}
-
 void MozJSImplScope::externalSetup() {
 
     _runSafely([&] {
         if (_connectState == ConnectState::External)
             return;
-        if (_connectState == ConnectState::Local)
-            uasserted(12512, "localConnect already called, can't call externalSetup");
 
         // install db access functions in the global object
         installDBAccess();

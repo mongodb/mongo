@@ -15,9 +15,9 @@
  *
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
- *   requires_eval_command,
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
+ *   requires_replication,
  * ]
  */
 (function() {
@@ -350,17 +350,5 @@
             assert.commandWorked(res);
             assert.eq(1, res.applied);
         }
-        // Test $jsonSchema in an eval function.
-        assert.eq(1,
-                  testDB.eval(
-                      function(coll, schema) {
-                          return db[coll].find({$jsonSchema: schema}).itcount();
-                      },
-                      coll.getName(),
-                      {}));
-
-        assert.eq(1, testDB.eval(function(coll, schema) {
-            return db[coll].find({$jsonSchema: schema}).itcount();
-        }, coll.getName(), {minProperties: 2}));
     }
 }());

@@ -3,7 +3,6 @@
 //
 // @tags: [
 //   does_not_support_stepdowns,
-//   requires_eval_command,
 //   requires_non_retryable_commands,
 // ]
 
@@ -17,17 +16,6 @@
         shellRecursion.apply();
     }
     assert.throws(shellRecursion);
-
-    // Make sure db.eval doesn't blow up
-    function dbEvalRecursion() {
-        db.eval(function() {
-            function recursion() {
-                recursion.apply();
-            }
-            recursion();
-        });
-    }
-    assert.commandFailedWithCode(assert.throws(dbEvalRecursion), ErrorCodes.JSInterpreterFailure);
 
     // Make sure mapReduce doesn't blow up
     function mapReduceRecursion() {

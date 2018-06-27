@@ -5,9 +5,8 @@
  * - Confirm that we cannot insert during fsyncLock
  * - Confirm that writes can progress after fsyncUnlock
  * - Confirm that the command can be run repeatedly without breaking things
- * - Confirm that the pseudo commands and eval can perform fsyncLock/Unlock
  *
- * @tags: [requires_eval_command, requires_fastcount]
+ * @tags: [requires_fastcount, requires_fsync]
  */
 (function() {
     "use strict";
@@ -76,9 +75,6 @@
 
     var fsyncUnlockRes = db.fsyncUnlock();
     assert(fsyncUnlockRes.ok, "Second execution of fsyncUnlock command failed");
-
-    // Ensure eval is not allowed to invoke fsyncLock
-    assert(!db.eval('db.fsyncLock()').ok, "eval('db.fsyncLock()') should fail.");
 
     // Make sure that insert attempts made during multiple fsyncLock requests will not execute until
     // all locks have been released.

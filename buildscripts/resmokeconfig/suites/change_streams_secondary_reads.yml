@@ -20,9 +20,6 @@ selector:
   - assumes_read_concern_unchanged
   # "Cowardly refusing to override write concern of command: ..."
   - assumes_write_concern_unchanged
-  # "Cowardly refusing to run test with overridden write concern when it uses a command that can
-  #  only perform w=1 writes: ..."
-  - requires_eval_command
   ##
   # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
   # override when it refuses to replace the readPreference of a particular command. Above each tag
