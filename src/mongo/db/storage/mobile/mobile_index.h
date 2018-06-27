@@ -148,8 +148,6 @@ public:
                         const IndexDescriptor* desc,
                         const std::string& ident);
 
-    MobileIndexStandard(const Ordering& ordering, const std::string& ident);
-
     SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
@@ -172,8 +170,6 @@ public:
     MobileIndexUnique(OperationContext* opCtx,
                       const IndexDescriptor* desc,
                       const std::string& ident);
-
-    MobileIndexUnique(const Ordering& ordering, const std::string& ident);
 
     SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
 

@@ -76,9 +76,6 @@ MobileIndex::MobileIndex(OperationContext* opCtx,
                          const std::string& ident)
     : _isUnique(desc->unique()), _ordering(Ordering::make(desc->keyPattern())), _ident(ident) {}
 
-MobileIndex::MobileIndex(bool isUnique, const Ordering& ordering, const std::string& ident)
-    : _isUnique(isUnique), _ordering(ordering), _ident(ident) {}
-
 Status MobileIndex::insert(OperationContext* opCtx,
                            const BSONObj& key,
                            const RecordId& recId,
@@ -180,7 +177,7 @@ void MobileIndex::fullValidate(OperationContext* opCtx,
 bool MobileIndex::appendCustomStats(OperationContext* opCtx,
                                     BSONObjBuilder* output,
                                     double scale) const {
-    return true;
+    return false;
 }
 
 long long MobileIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
@@ -656,9 +653,6 @@ MobileIndexStandard::MobileIndexStandard(OperationContext* opCtx,
                                          const std::string& ident)
     : MobileIndex(opCtx, desc, ident) {}
 
-MobileIndexStandard::MobileIndexStandard(const Ordering& ordering, const std::string& ident)
-    : MobileIndex(false, ordering, ident) {}
-
 SortedDataBuilderInterface* MobileIndexStandard::getBulkBuilder(OperationContext* opCtx,
                                                                 bool dupsAllowed) {
     invariant(dupsAllowed);
@@ -695,9 +689,6 @@ MobileIndexUnique::MobileIndexUnique(OperationContext* opCtx,
                                      const IndexDescriptor* desc,
                                      const std::string& ident)
     : MobileIndex(opCtx, desc, ident), _isPartial(desc->isPartial()) {}
-
-MobileIndexUnique::MobileIndexUnique(const Ordering& ordering, const std::string& ident)
-    : MobileIndex(true, ordering, ident) {}
 
 SortedDataBuilderInterface* MobileIndexUnique::getBulkBuilder(OperationContext* opCtx,
                                                               bool dupsAllowed) {
