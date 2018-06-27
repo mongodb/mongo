@@ -45,6 +45,8 @@ TEST(RouterSessionRuntimeStateTest, BasicStartTxn) {
                                   << "test"
                                   << "startTransaction"
                                   << true
+                                  << "coordinator"
+                                  << true
                                   << "autocommit"
                                   << false);
 
@@ -71,6 +73,8 @@ TEST(RouterSessionRuntimeStateTest, BasicStartTxn) {
                                                                << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
+                               << "coordinator"
+                               << true
                                << "autocommit"
                                << false),
                           newCmd);
@@ -99,6 +103,8 @@ TEST(RouterSessionRuntimeStateTest, NewParticipantMustAttachTxn) {
                                   << "test"
                                   << "startTransaction"
                                   << true
+                                  << "coordinator"
+                                  << true
                                   << "autocommit"
                                   << false);
 
@@ -116,12 +122,22 @@ TEST(RouterSessionRuntimeStateTest, NewParticipantMustAttachTxn) {
                                                                << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
+                               << "coordinator"
+                               << true
                                << "autocommit"
                                << false),
                           newCmd);
     }
 
     ShardId shard2("b");
+
+    expectedNewObj = BSON("insert"
+                          << "test"
+                          << "startTransaction"
+                          << true
+                          << "autocommit"
+                          << false);
+
     {
         auto& participant = sessionState.getOrCreateParticipant(shard2);
         auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
@@ -158,6 +174,8 @@ TEST(RouterSessionRuntimeStateTest, StartingNewTxnShouldClearState) {
                                                                << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
+                               << "coordinator"
+                               << true
                                << "autocommit"
                                << false),
                           newCmd);
@@ -170,6 +188,8 @@ TEST(RouterSessionRuntimeStateTest, StartingNewTxnShouldClearState) {
                                   << "test"
                                   << "startTransaction"
                                   << true
+                                  << "coordinator"
+                                  << true
                                   << "autocommit"
                                   << false);
 
@@ -178,6 +198,46 @@ TEST(RouterSessionRuntimeStateTest, StartingNewTxnShouldClearState) {
         auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
                                                                << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+    }
+}
+
+TEST(RouterSessionRuntimeStateTest, FirstParticipantIsCoordinator) {
+    TxnNumber txnNum{3};
+
+    RouterSessionRuntimeState sessionState({});
+    sessionState.checkOut();
+    sessionState.beginOrContinueTxn(txnNum, true);
+
+    ASSERT_FALSE(sessionState.getCoordinatorId());
+
+    ShardId shard1("a");
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard1);
+        ASSERT(participant.isCoordinator());
+        ASSERT(sessionState.getCoordinatorId());
+        ASSERT_EQ(*sessionState.getCoordinatorId(), shard1);
+    }
+
+    ShardId shard2("b");
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard2);
+        ASSERT_FALSE(participant.isCoordinator());
+        ASSERT(sessionState.getCoordinatorId());
+        ASSERT_EQ(*sessionState.getCoordinatorId(), shard1);
+    }
+
+    TxnNumber txnNum2{5};
+    sessionState.beginOrContinueTxn(txnNum2, true);
+
+    ASSERT_FALSE(sessionState.getCoordinatorId());
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard2);
+        ASSERT(participant.isCoordinator());
+        ASSERT(sessionState.getCoordinatorId());
+        ASSERT_EQ(*sessionState.getCoordinatorId(), shard2);
     }
 }
 

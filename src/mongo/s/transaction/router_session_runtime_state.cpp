@@ -40,6 +40,7 @@ namespace mongo {
 namespace {
 
 const char kAutoCommitField[] = "autocommit";
+const char kCoordinatorField[] = "coordinator";
 const char kStartTransactionField[] = "startTransaction";
 
 class RouterSessionCatalog {
@@ -109,12 +110,19 @@ bool isTransactionCommand(const BSONObj& cmd) {
 
 }  // unnamed namespace
 
+TransactionParticipant::TransactionParticipant(bool isCoordinator)
+    : _isCoordinator(isCoordinator) {}
+
 BSONObj TransactionParticipant::attachTxnFieldsIfNeeded(BSONObj cmd) {
     auto isTxnCmd = isTransactionCommand(cmd);  // check first before moving cmd.
     BSONObjBuilder newCmd(std::move(cmd));
 
     if (_state == State::kMustStart && !isTxnCmd) {
         newCmd.append(kStartTransactionField, true);
+    }
+
+    if (_isCoordinator) {
+        newCmd.append(kCoordinatorField, true);
     }
 
     newCmd.append(kAutoCommitField, false);
@@ -126,6 +134,10 @@ BSONObj TransactionParticipant::attachTxnFieldsIfNeeded(BSONObj cmd) {
 
 TransactionParticipant::State TransactionParticipant::getState() {
     return _state;
+}
+
+bool TransactionParticipant::isCoordinator() {
+    return _isCoordinator;
 }
 
 void TransactionParticipant::markAsCommandSent() {
@@ -158,6 +170,10 @@ bool RouterSessionRuntimeState::isCheckedOut() {
     return _isCheckedOut;
 }
 
+boost::optional<ShardId> RouterSessionRuntimeState::getCoordinatorId() const {
+    return _coordinatorId;
+}
+
 TransactionParticipant& RouterSessionRuntimeState::getOrCreateParticipant(const ShardId& shard) {
     auto iter = _participants.find(shard.toString());
 
@@ -165,7 +181,16 @@ TransactionParticipant& RouterSessionRuntimeState::getOrCreateParticipant(const 
         return iter->second;
     }
 
-    auto resultPair = _participants.try_emplace(shard.toString(), TransactionParticipant());
+    // The first participant is chosen as the coordinator.
+    auto isFirstParticipant = _participants.empty();
+    if (isFirstParticipant) {
+        invariant(!_coordinatorId);
+        _coordinatorId = shard.toString();
+    }
+
+    auto resultPair =
+        _participants.try_emplace(shard.toString(), TransactionParticipant(isFirstParticipant));
+
     return resultPair.first->second;
 }
 
@@ -207,6 +232,7 @@ void RouterSessionRuntimeState::beginOrContinueTxn(TxnNumber txnNumber, bool sta
 
     _txnNumber = txnNumber;
     _participants.clear();
+    _coordinatorId.reset();
 }
 
 ScopedRouterSession::ScopedRouterSession(OperationContext* opCtx) : _opCtx(opCtx) {

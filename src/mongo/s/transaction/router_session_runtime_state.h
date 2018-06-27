@@ -42,6 +42,8 @@ namespace mongo {
 
 class TransactionParticipant {
 public:
+    explicit TransactionParticipant(bool isCoordinator);
+
     enum class State {
         // Next transaction should include startTransaction.
         kMustStart,
@@ -57,12 +59,18 @@ public:
     State getState();
 
     /**
+     * True if the participant has been chosen as the coordinator for its transaction.
+     */
+    bool isCoordinator();
+
+    /**
      * Mark this participant as a node that has been successfully sent a command.
      */
     void markAsCommandSent();
 
 private:
     State _state{State::kMustStart};
+    bool _isCoordinator{false};
 };
 
 /**
@@ -89,6 +97,8 @@ public:
 
     const LogicalSessionId& getSessionId() const;
 
+    boost::optional<ShardId> getCoordinatorId() const;
+
     /**
      * Extract the runtimne state attached to the operation context. Returns nullptr if none is
      * attached.
@@ -104,6 +114,9 @@ private:
 
     // Map of current participants of the current transaction.
     StringMap<TransactionParticipant> _participants;
+
+    // The id of coordinator participant, used to construct prepare requests.
+    boost::optional<ShardId> _coordinatorId;
 };
 
 /**
