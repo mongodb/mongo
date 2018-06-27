@@ -114,12 +114,12 @@ public:
         });
 
         log() << "Closing database catalog";
-        auto state = catalog::closeCatalog(opCtx);
+        catalog::closeCatalog(opCtx);
 
         restoreOplogPointerGuard.Dismiss();
 
         log() << "Reopening database catalog";
-        catalog::openCatalog(opCtx, state);
+        catalog::openCatalog(opCtx);
 
         return true;
     }
