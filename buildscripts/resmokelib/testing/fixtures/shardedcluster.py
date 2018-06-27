@@ -110,7 +110,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
         # Turn off the balancer if it is not meant to be enabled.
         if not self.enable_balancer:
-            self._stop_balancer()
+            self.stop_balancer()
 
         # Turn off autosplit if it is not meant to be enabled.
         if not self.enable_autosplit:
@@ -147,11 +147,19 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
                                  password=self.auth_options["password"],
                                  mechanism=self.auth_options["authenticationMechanism"])
 
-    def _stop_balancer(self, timeout_ms=60000):
+    def stop_balancer(self, timeout_ms=60000):
         """Stop the balancer."""
         client = self.mongo_client()
         self._auth_to_db(client)
         client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
+        self.logger.info("Stopped the balancer")
+
+    def start_balancer(self, timeout_ms=60000):
+        """Start the balancer."""
+        client = self.mongo_client()
+        self._auth_to_db(client)
+        client.admin.command({"balancerStart": 1}, maxTimeMS=timeout_ms)
+        self.logger.info("Started the balancer")
 
     def _do_teardown(self):
         """Shut down the sharded cluster."""
@@ -163,7 +171,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
                                 "but weren't.")
 
         if self.enable_balancer:
-            self._stop_balancer()
+            self.stop_balancer()
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
