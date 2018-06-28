@@ -3542,7 +3542,7 @@ tasks:
           # Since mypy requires python3, we need to activate the venv_3
           ${activate_virtualenv_3}
           pip install -r buildscripts/requirements.txt
-          updated_mypy=$(which mypy)
+          updated_mypy=$(PATH=$PATH:/opt/mongodbtoolchain/v2/bin which mypy)
           deactivate
           ###
           ${activate_virtualenv}
