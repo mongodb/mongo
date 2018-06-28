@@ -36,12 +36,28 @@ using namespace std::literals::string_literals;
 
 namespace mongo {
 namespace {
+
+// To silence some warnings on some compilers at some aggressive warning levels, we use an "enum
+// wrapper" struct which provides a legitimate implicit conversion from the checked value to the
+// underlying type.
+template <typename Enum>
+struct Checked {
+    static_assert(std::is_enum<Enum>::value, "Checked Value test data type must be an enum.");
+    Enum value;
+    Checked(Enum v) : value(v) {}
+    using underlying_type = typename std::underlying_type<Enum>::type;
+    operator underlying_type() const {
+        return underlying_type(value);
+    }
+};
+
+
 TEST(DNSNameTest, CorrectParsing) {
     enum FQDNBool : bool { kIsFQDN = true, kNotFQDN = false };
     const struct {
         std::string input;
         std::vector<std::string> parsedDomains;
-        FQDNBool isFQDN;
+        Checked<FQDNBool> isFQDN;
     } tests[] = {
         {"com."s, {"com"s}, kIsFQDN},
         {"com"s, {"com"s}, kNotFQDN},
@@ -114,8 +130,8 @@ TEST(DNSNameTest, Contains) {
     const struct {
         std::string domain;
         std::string subdomain;
-        IsSubdomain isSubdomain;
-        TripsCheck tripsCheck;
+        Checked<IsSubdomain> isSubdomain;
+        Checked<TripsCheck> tripsCheck;
     } tests[] = {
         {"com."s, "mongodb.com."s, kIsSubdomain, kSuccess},
         {"com"s, "mongodb.com"s, kIsSubdomain, kFailure},
@@ -163,7 +179,7 @@ TEST(DNSNameTest, Contains) {
         const ::mongo::dns::HostName subdomain(test.subdomain);
 
         try {
-            ASSERT(test.isSubdomain == domain.contains(subdomain));
+            ASSERT(test.isSubdomain == IsSubdomain(domain.contains(subdomain)));
             ASSERT(!test.tripsCheck);
         } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
             ASSERT(test.tripsCheck);
@@ -179,8 +195,8 @@ TEST(DNSNameTest, Resolution) {
         std::string subdomain;
         std::string result;
 
-        Failure fails;
-        FQDNBool isFQDN;
+        Checked<Failure> fails;
+        Checked<FQDNBool> isFQDN;
     } tests[] = {
         {"mongodb.com."s, "atlas"s, "atlas.mongodb.com."s, kSucceeds, kIsFQDN},
         {"mongodb.com"s, "atlas"s, "atlas.mongodb.com"s, kSucceeds, kNotFQDN},
@@ -192,7 +208,7 @@ TEST(DNSNameTest, Resolution) {
         {"mongodb.com"s, "atlas."s, "FAILS"s, kFails, kNotFQDN},
     };
 
-    for (const auto& test : tests)
+    for (const auto& test : tests) {
         try {
             const ::mongo::dns::HostName domain(test.domain);
             const ::mongo::dns::HostName subdomain(test.subdomain);
@@ -212,6 +228,7 @@ TEST(DNSNameTest, Resolution) {
         } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
             ASSERT(test.fails);
         }
+    }
 }
 
 TEST(DNSNameTest, ForceQualification) {
@@ -219,9 +236,9 @@ TEST(DNSNameTest, ForceQualification) {
     using Qualification = ::mongo::dns::HostName::Qualification;
     const struct {
         std::string domain;
-        FQDNBool startedFQDN;
+        Checked<FQDNBool> startedFQDN;
         ::mongo::dns::HostName::Qualification forced;
-        FQDNBool becameFQDN;
+        Checked<FQDNBool> becameFQDN;
         std::string becameCanonical;
     } tests[] = {
         {"mongodb.com."s, kIsFQDN, Qualification::kFullyQualified, kIsFQDN, "mongodb.com."s},
