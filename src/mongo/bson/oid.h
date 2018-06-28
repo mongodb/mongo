@@ -176,8 +176,9 @@ public:
      */
     void initFromTermNumber(int64_t term);
 
+    time_t asTimeT() const;
     Date_t asDateT() const {
-        return Date_t::fromMillisSinceEpoch(getTimestamp() * 1000LL);
+        return Date_t::fromMillisSinceEpoch(asTimeT() * 1000LL);
     }
 
     // True iff the OID is not empty
@@ -197,8 +198,8 @@ public:
     static unsigned getMachineId();  // used by the 'features' command
     static void regenMachineId();
 
-    // Timestamp is a 4-byte positive integer so we use uint32_t
-    typedef uint32_t Timestamp;
+    // Timestamp is 4 bytes so we just use int32_t
+    typedef int32_t Timestamp;
 
     // Wrappers so we can return stuff by value.
     struct InstanceUnique {
