@@ -10,7 +10,7 @@
     testNumericServerParameter("maxTargetSnapshotHistoryWindowInSeconds",
                                true /*isStartupParameter*/,
                                true /*isRuntimeParameter*/,
-                               0 /*defaultValue*/,
+                               5 /*defaultValue*/,
                                30 /*nonDefaultValidValue*/,
                                true /*hasLowerBound*/,
                                -1 /*lowerOutOfBounds*/,
