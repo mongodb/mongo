@@ -4640,6 +4640,27 @@ tasks:
       mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path} --fcv=3.4
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
+- name: powercycle_kill_mongod
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_ec2_instance
+  - command: expansions.update
+    <<: *powercycle_expansions
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+    vars:
+      <<: *powercycle_test
+      crash_options: --crashMethod=kill --crashWaitTime=45 --jitterForCrashWaitTime=5 --instanceId=${instance_id}
+      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+
 - name: powercycle_replication_WT
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
@@ -5622,6 +5643,7 @@ buildvariants:
   - name: master_slave_jscore_passthrough_WT
   - name: powercycle_WT
   - name: powercycle_fcv3.4_WT
+  - name: powercycle_kill_mongod
   - name: powercycle_replication_WT
   - name: powercycle_replication_smalloplog_WT
   - name: powercycle_syncdelay_WT
@@ -6725,6 +6747,7 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: powercycle_WT
   - name: powercycle_fcv3.4_WT
+  - name: powercycle_kill_mongod
   - name: powercycle_replication_WT
   - name: powercycle_syncdelay_WT
   - name: read_concern_linearizable_passthrough_WT
