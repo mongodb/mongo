@@ -1,7 +1,6 @@
-// SERVER-7720 Building an index with a too-long name should always fail
-// Formerly, we would allow an index that already existed to be "created" with too long a name,
-// but this caused secondaries to crash when replicating what should be a bad createIndex command.
-// Here we test that the too-long name is rejected in this situation as well
+// SERVER-7720 Building an index with a too-long name is acceptable since 4.2.
+// Previously, we would disallow index creation with with too long a name.
+// @tags: [requires_non_retryable_commands]
 
 (function() {
     'use strict';
@@ -21,8 +20,6 @@
     // Create an index with the longest name allowed for this collection.
     assert.commandWorked(coll.createIndex({a: 1}, {name: 'a'.repeat(maxIndexNameLength)}));
 
-    // Index namespaces longer than 127 characters are not acceptable.
-    assert.commandFailedWithCode(
-        coll.createIndex({b: 1}, {name: 'b'.repeat(maxIndexNameLength) + 1}),
-        ErrorCodes.CannotCreateIndex);
+    // Beginning with 4.2, index namespaces longer than 127 characters are acceptable.
+    assert.commandWorked(coll.createIndex({b: 1}, {name: 'b'.repeat(maxIndexNameLength) + 1}));
 })();

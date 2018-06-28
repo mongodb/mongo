@@ -71,9 +71,8 @@
     collection.insert({});
     const maxIndexNameLength = maxNsLength - (collection.getFullName() + ".$").length;
     for (let i = maxIndexNameLength - 3; i <= maxIndexNameLength + 3; i++) {
-        assert.eq(canMakeIndexWithName(collection, mkStr(i)),
-                  i <= maxIndexNameLength,
-                  "index ns name length = " + ((collection.getFullName() + ".$").length + i));
+        assert(canMakeIndexWithName(collection, mkStr(i)),
+               "index ns name length = " + ((collection.getFullName() + ".$").length + i));
     }
 
     // test renaming collections with the destination around the name limit

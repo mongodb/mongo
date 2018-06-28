@@ -626,7 +626,11 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     // Drop pending collections are internal to the server and will not be exported to another
     // storage engine. The indexes contained in these collections are not subject to the same
     // namespace length constraints as the ones in created by users.
-    if (!nss.isDropPendingNamespace()) {
+    // Index names do not limit the maximum allowable length of the target namespace under FCV 4.2
+    // and above.
+    // TODO(SERVER-35824): Re-enable index namespace check under FCV 4.0.
+    const bool checkIndexNamespace = false;
+    if (checkIndexNamespace && !nss.isDropPendingNamespace()) {
         auto indexNamespace = IndexDescriptor::makeIndexNamespace(nss.ns(), name);
         if (indexNamespace.length() > NamespaceString::MaxNsLen)
             return Status(ErrorCodes::CannotCreateIndex,
