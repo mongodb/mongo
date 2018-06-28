@@ -144,33 +144,13 @@ private:
     /**
      * Thread which drives the migration apply process on the recipient side.
      */
-    void _migrateThread(BSONObj min,
-                        BSONObj max,
-                        BSONObj shardKeyPattern,
-                        OID epoch,
-                        WriteConcernOptions writeConcern);
+    void _migrateThread();
 
-    void _migrateDriver(OperationContext* opCtx,
-                        const BSONObj& min,
-                        const BSONObj& max,
-                        const BSONObj& shardKeyPattern,
-                        const OID& epoch,
-                        const WriteConcernOptions& writeConcern);
+    void _migrateDriver(OperationContext* opCtx);
 
-    bool _applyMigrateOp(OperationContext* opCtx,
-                         const NamespaceString& ns,
-                         const BSONObj& min,
-                         const BSONObj& max,
-                         const BSONObj& shardKeyPattern,
-                         const BSONObj& xfer,
-                         repl::OpTime* lastOpApplied);
+    bool _applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer, repl::OpTime* lastOpApplied);
 
-    bool _flushPendingWrites(OperationContext* opCtx,
-                             const std::string& ns,
-                             BSONObj min,
-                             BSONObj max,
-                             const repl::OpTime& lastOpApplied,
-                             const WriteConcernOptions& writeConcern);
+    bool _flushPendingWrites(OperationContext* opCtx, const repl::OpTime& lastOpApplied);
 
     /**
      * Remembers a chunk range between 'min' and 'max' as a range which will have data migrated
@@ -178,16 +158,13 @@ private:
      * it schedules deletion of any documents in the range, so that process must be seen to be
      * complete before migrating any new documents in.
      */
-    CollectionShardingState::CleanupNotification _notePending(OperationContext*,
-                                                              NamespaceString const&,
-                                                              OID const&,
-                                                              ChunkRange const&);
+    CollectionShardingState::CleanupNotification _notePending(OperationContext*, ChunkRange const&);
 
     /**
      * Stops tracking a chunk range between 'min' and 'max' that previously was having data
      * migrated into it, and schedules deletion of any such documents already migrated in.
      */
-    void _forgetPending(OperationContext*, NamespaceString const&, OID const&, ChunkRange const&);
+    void _forgetPending(OperationContext*, ChunkRange const&);
 
     /**
      * Checks whether the MigrationDestinationManager is currently handling a migration by checking
@@ -216,6 +193,10 @@ private:
     BSONObj _min;
     BSONObj _max;
     BSONObj _shardKeyPattern;
+
+    OID _epoch;
+
+    WriteConcernOptions _writeConcern;
 
     // Set to true once we have accepted the chunk as pending into our metadata. Used so that on
     // failure we can perform the appropriate cleanup.
