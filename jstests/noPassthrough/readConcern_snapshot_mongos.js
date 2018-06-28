@@ -46,6 +46,7 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
+    /* TODO SERVER-35825: write commands should only allow snapshot readConcern in a transaction.
     // readConcern 'snapshot' is not supported by insert on mongos.
     assert.commandFailedWithCode(sessionDb.runCommand({
         insert: collName,
@@ -72,6 +73,7 @@
         txnNumber: NumberLong(txnNumber++)
     }),
                                  ErrorCodes.InvalidOptions);
+     */
 
     // readConcern 'snapshot' is not supported by findAndModify on mongos.
     assert.commandFailedWithCode(sessionDb.runCommand({
