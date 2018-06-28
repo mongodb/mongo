@@ -1,6 +1,6 @@
 // SERVER-7720 Building an index with a too-long name is acceptable since 4.2.
 // Previously, we would disallow index creation with with too long a name.
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands, assumes_unsharded_collection]
 
 (function() {
     'use strict';
@@ -22,4 +22,9 @@
 
     // Beginning with 4.2, index namespaces longer than 127 characters are acceptable.
     assert.commandWorked(coll.createIndex({b: 1}, {name: 'b'.repeat(maxIndexNameLength) + 1}));
+
+    // Before 4.2, index namespace lengths were checked while renaming collections.
+    const dest = db.long_index_rename2;
+    dest.drop();
+    assert.commandWorked(coll.renameCollection(dest.getName()));
 })();

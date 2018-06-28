@@ -171,9 +171,12 @@ Status renameCollectionCommon(OperationContext* opCtx,
     }
 
     // Ensure that collection name does not exceed maximum length.
-    // Ensure that index names do not push the length over the max.
+    // Index names do not limit the maximum allowable length of the target namespace under
+    // FCV 4.2 and above.
+    // TODO(SERVER-35824): Re-enable index namespace check under FCV 4.0.
+    const bool checkIndexNamespace = false;
     std::string::size_type longestIndexNameLength =
-        sourceColl->getIndexCatalog()->getLongestIndexNameLength(opCtx);
+        checkIndexNamespace ? sourceColl->getIndexCatalog()->getLongestIndexNameLength(opCtx) : 0;
     auto status = target.checkLengthForRename(longestIndexNameLength);
     if (!status.isOK()) {
         return status;

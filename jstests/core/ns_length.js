@@ -89,8 +89,7 @@
         (myDb.getName() + "..$").length + 100;  // index ns name - collection name
     var maxCollectionNameWithIndex = maxNsLength - indexNsNameOverhead;
     for (let i = maxCollectionNameWithIndex - 3; i <= maxCollectionNameWithIndex + 3; i++) {
-        assert.eq(canRenameCollection("from", mkStr(i)),
-                  i <= maxCollectionNameWithIndex,
-                  "index ns name length = " + (indexNsNameOverhead + i));
+        assert(canRenameCollection("from", mkStr(i)),
+               "index ns name length = " + (indexNsNameOverhead + i));
     }
 })();

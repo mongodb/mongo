@@ -467,7 +467,7 @@ TEST_F(RenameCollectionTest, TargetCollectionNameTooLong) {
                   renameCollection(_opCtx.get(), _sourceNss, longTargetNss, {}));
 }
 
-TEST_F(RenameCollectionTest, IndexNameTooLongForTargetCollection) {
+TEST_F(RenameCollectionTest, LongIndexNameAllowedForTargetCollection) {
     ASSERT_GREATER_THAN(_targetNssDifferentDb.size(), _sourceNss.size());
     std::size_t longestIndexNameAllowedForSource =
         NamespaceString::MaxNsLen - 2U /*strlen(".$")*/ - _sourceNss.size();
@@ -478,11 +478,10 @@ TEST_F(RenameCollectionTest, IndexNameTooLongForTargetCollection) {
     _createCollection(_opCtx.get(), _sourceNss);
     const std::string indexName(longestIndexNameAllowedForSource, 'a');
     _createIndex(_opCtx.get(), _sourceNss, indexName);
-    ASSERT_EQUALS(ErrorCodes::InvalidLength,
-                  renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
+    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
 }
 
-TEST_F(RenameCollectionTest, IndexNameTooLongForTemporaryCollectionForRenameAcrossDatabase) {
+TEST_F(RenameCollectionTest, LongIndexNameAllowedForTemporaryCollectionForRenameAcrossDatabase) {
     ASSERT_GREATER_THAN(_targetNssDifferentDb.size(), _sourceNss.size());
     std::size_t longestIndexNameAllowedForTarget =
         NamespaceString::MaxNsLen - 2U /*strlen(".$")*/ - _targetNssDifferentDb.size();
@@ -498,8 +497,7 @@ TEST_F(RenameCollectionTest, IndexNameTooLongForTemporaryCollectionForRenameAcro
     _createCollection(_opCtx.get(), _sourceNss);
     const std::string indexName(longestIndexNameAllowedForTarget, 'a');
     _createIndex(_opCtx.get(), _sourceNss, indexName);
-    ASSERT_EQUALS(ErrorCodes::InvalidLength,
-                  renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
+    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseWithUuid) {
