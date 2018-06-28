@@ -37,6 +37,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_test_fixture.h"
@@ -86,6 +87,15 @@ public:
         shardedCollection.setKeyPattern(BSON(_shardKey << 1));
         ASSERT_OK(insertToConfigCollection(
             operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+
+        BSONObjBuilder tagDocBuilder;
+        tagDocBuilder.append("_id", BSON(TagsType::ns(dropNS().ns()) << TagsType::min(_min)));
+        tagDocBuilder.append(TagsType::ns(), dropNS().ns());
+        tagDocBuilder.append(TagsType::min(), _min);
+        tagDocBuilder.append(TagsType::max(), _max);
+        tagDocBuilder.append(TagsType::tag(), _zoneName);
+        ASSERT_OK(
+            insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDocBuilder.obj()));
 
         BSONObjBuilder chunkDocBuilder;
         chunkDocBuilder.append("ns", dropNS().ns());
@@ -142,6 +152,12 @@ public:
         ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
     }
 
+    void expectNoTagDocs() {
+        auto findStatus =
+            findOneOnConfigCollection(operationContext(), TagsType::ConfigNS, BSONObj());
+        ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
+    }
+
     void shutdownExecutor() {
         ConfigServerTestFixture::executor()->shutdown();
     }
@@ -194,6 +210,7 @@ TEST_F(DropColl2ShardTest, Basic) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, NSNotFound) {
@@ -238,6 +255,7 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, FirstShardTargeterError) {
@@ -356,6 +374,7 @@ TEST_F(DropColl2ShardTest, CleanupChunkError) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard1) {
@@ -377,6 +396,7 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard1) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
@@ -398,6 +418,7 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
@@ -421,6 +442,7 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
@@ -444,6 +466,7 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
@@ -468,6 +491,7 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
@@ -492,6 +516,7 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
@@ -518,6 +543,7 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
@@ -544,6 +570,7 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
 
     expectCollectionDocMarkedAsDropped();
     expectNoChunkDocs();
+    expectNoTagDocs();
 }
 
 }  // unnamed namespace

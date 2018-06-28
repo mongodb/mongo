@@ -57,6 +57,7 @@
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -383,6 +384,18 @@ Status ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Nam
     }
 
     LOG(1) << "dropCollection " << nss.ns() << " chunk data deleted";
+
+    // Remove tag data
+    result = catalogClient->removeConfigDocuments(opCtx,
+                                                  TagsType::ConfigNS,
+                                                  BSON(TagsType::ns(nss.ns())),
+                                                  ShardingCatalogClient::kMajorityWriteConcern);
+
+    if (!result.isOK()) {
+        return result;
+    }
+
+    LOG(1) << "dropCollection " << nss.ns() << " tag data deleted";
 
     // Mark the collection as dropped
     CollectionType coll;
