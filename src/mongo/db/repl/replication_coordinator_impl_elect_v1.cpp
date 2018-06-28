@@ -93,7 +93,6 @@ void ReplicationCoordinatorImpl::_startElectSelfV1(
 void ReplicationCoordinatorImpl::_startElectSelfV1_inlock(
     TopologyCoordinator::StartElectionReason reason) {
     invariant(!_voteRequester);
-    invariant(!_freshnessChecker);
 
     switch (_rsConfigState) {
         case kConfigSteady:

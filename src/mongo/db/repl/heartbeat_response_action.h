@@ -44,15 +44,7 @@ public:
     /**
      * Actions taken based on heartbeat responses
      */
-    enum Action {
-        NoAction,
-        Reconfig,
-        StartElection,
-        StepDownSelf,
-        StepDownRemotePrimary,
-        PriorityTakeover,
-        CatchupTakeover
-    };
+    enum Action { NoAction, Reconfig, StepDownSelf, PriorityTakeover, CatchupTakeover };
 
     /**
      * Makes a new action representing doing nothing.
@@ -63,11 +55,6 @@ public:
      * Makes a new action representing the instruction to reconfigure the current node.
      */
     static HeartbeatResponseAction makeReconfigAction();
-
-    /**
-     * Makes a new action telling the current node to attempt to elect itself primary.
-     */
-    static HeartbeatResponseAction makeElectAction();
 
     /**
      * Makes a new action telling the current node to schedule an event to attempt to elect itself
@@ -87,14 +74,6 @@ public:
      * It is an error to call this with primaryIndex != the index of the current node.
      */
     static HeartbeatResponseAction makeStepDownSelfAction(int primaryIndex);
-
-    /**
-     * Makes a new action telling the current node to ask the specified remote node to step
-     * down as primary.
-     *
-     * It is an error to call this with primaryIndex == the index of the current node.
-     */
-    static HeartbeatResponseAction makeStepDownRemoteAction(int primaryIndex);
 
     /**
      * Construct an action with unspecified action and a next heartbeat start date in the

@@ -816,11 +816,8 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     }
 
     HeartbeatResponseAction nextAction;
-    if (_rsConfig.getProtocolVersion() == 0) {
-        nextAction = _updatePrimaryFromHBData(memberIndex, originalState, now);
-    } else {
-        nextAction = _updatePrimaryFromHBDataV1(memberIndex, originalState, now);
-    }
+    invariant(_rsConfig.getProtocolVersion() == 1);
+    nextAction = _updatePrimaryFromHBDataV1(memberIndex, originalState, now);
 
     nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
     nextAction.setAdvancedOpTime(advancedOpTime);
@@ -1153,193 +1150,6 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
     return HeartbeatResponseAction::makeNoAction();
 }
 
-HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBData(
-    int updatedConfigIndex, const MemberState& originalState, Date_t now) {
-    // This method has two interrelated responsibilities, performed in two phases.
-    //
-    // First, it updates the local notion of which remote node, if any is primary.  In the
-    // process, it may request a remote primary to step down because there is a higher priority
-    // node waiting, or because the local node thinks it is primary and that it has a more
-    // recent electionTime.  It may instead decide that the local node should step down itself,
-    // because a remote has a more recent election time.
-    //
-    // Second, if there is no remote primary, and the local node is not primary, it considers
-    // whether or not to stand for election.
-    invariant(updatedConfigIndex != _selfIndex);
-
-    // We are missing from the config, so do not participate in primary maintenance or election.
-    if (_selfIndex == -1) {
-        return HeartbeatResponseAction::makeNoAction();
-    }
-
-    ////////////////////
-    // Phase 1
-    ////////////////////
-
-    // If we believe the node whose data was just updated is primary, confirm that
-    // the updated data supports that notion.  If not, erase our notion of who is primary.
-    if (updatedConfigIndex == _currentPrimaryIndex) {
-        const MemberData& updatedHBData = _memberData.at(updatedConfigIndex);
-        if (!updatedHBData.up() || !updatedHBData.getState().primary()) {
-            _currentPrimaryIndex = -1;
-        }
-    }
-
-    // If the current primary is not highest priority and up to date (within 10s),
-    // have them/me stepdown.
-    if (_currentPrimaryIndex != -1) {
-        // check if we should ask the primary (possibly ourselves) to step down
-        const int highestPriorityIndex = _getHighestPriorityElectableIndex(now);
-        if (highestPriorityIndex != -1) {
-            const MemberConfig& currentPrimaryMember = _rsConfig.getMemberAt(_currentPrimaryIndex);
-            const MemberConfig& highestPriorityMember = _rsConfig.getMemberAt(highestPriorityIndex);
-            const OpTime highestPriorityMemberOptime = highestPriorityIndex == _selfIndex
-                ? getMyLastAppliedOpTime()
-                : _memberData.at(highestPriorityIndex).getHeartbeatAppliedOpTime();
-
-            if ((highestPriorityMember.getPriority() > currentPrimaryMember.getPriority()) &&
-                _isOpTimeCloseEnoughToLatestToElect(highestPriorityMemberOptime)) {
-                const OpTime latestOpTime = _latestKnownOpTime();
-
-                if (_iAmPrimary()) {
-                    if (_leaderMode == LeaderMode::kSteppingDown) {
-                        return HeartbeatResponseAction::makeNoAction();
-                    }
-                    log() << "Stepping down self (priority " << currentPrimaryMember.getPriority()
-                          << ") because " << highestPriorityMember.getHostAndPort()
-                          << " has higher priority " << highestPriorityMember.getPriority()
-                          << " and is only "
-                          << (latestOpTime.getSecs() - highestPriorityMemberOptime.getSecs())
-                          << " seconds behind me";
-                    const Date_t until =
-                        now + VoteLease::leaseTime + _rsConfig.getHeartbeatInterval();
-                    if (_electionSleepUntil < until) {
-                        _electionSleepUntil = until;
-                    }
-                    return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
-                } else if ((highestPriorityIndex == _selfIndex) && (_electionSleepUntil <= now)) {
-                    // If this node is the highest priority node, and it is not in
-                    // an inter-election sleep period, ask the current primary to step down.
-                    // This is an optimization, because the remote primary will almost certainly
-                    // notice this node's electability promptly, via its own heartbeat process.
-                    log() << "Requesting that " << currentPrimaryMember.getHostAndPort()
-                          << " (priority " << currentPrimaryMember.getPriority()
-                          << ") step down because I have higher priority "
-                          << highestPriorityMember.getPriority() << " and am only "
-                          << (latestOpTime.getSecs() - highestPriorityMemberOptime.getSecs())
-                          << " seconds behind it";
-                    int primaryIndex = _currentPrimaryIndex;
-                    _currentPrimaryIndex = -1;
-                    return HeartbeatResponseAction::makeStepDownRemoteAction(primaryIndex);
-                }
-            }
-        }
-    }
-
-    // Scan the member list's heartbeat data for who is primary, and update
-    // _currentPrimaryIndex and _role, or request a remote to step down, as necessary.
-    {
-        int remotePrimaryIndex = -1;
-        for (std::vector<MemberData>::const_iterator it = _memberData.begin();
-             it != _memberData.end();
-             ++it) {
-            const int itIndex = indexOfIterator(_memberData, it);
-            if (itIndex == _selfIndex) {
-                continue;
-            }
-
-            if (it->getState().primary() && it->up()) {
-                if (remotePrimaryIndex != -1) {
-                    // two other nodes think they are primary (asynchronously polled)
-                    // -- wait for things to settle down.
-                    warning() << "two remote primaries (transiently)";
-                    return HeartbeatResponseAction::makeNoAction();
-                }
-                remotePrimaryIndex = itIndex;
-            }
-        }
-
-        if (remotePrimaryIndex != -1) {
-            // If it's the same as last time, don't do anything further.
-            if (_currentPrimaryIndex == remotePrimaryIndex) {
-                return HeartbeatResponseAction::makeNoAction();
-            }
-            // Clear last heartbeat message on ourselves (why?)
-            setMyHeartbeatMessage(now, "");
-
-            // If we are also primary, this is a problem.  Determine who should step down.
-            if (_iAmPrimary()) {
-                Timestamp remoteElectionTime = _memberData.at(remotePrimaryIndex).getElectionTime();
-                log() << "another primary seen with election time " << remoteElectionTime
-                      << " my election time is " << _electionTime;
-
-                // Step down whomever has the older election time.
-                if (remoteElectionTime > _electionTime) {
-                    if (_leaderMode == LeaderMode::kSteppingDown) {
-                        return HeartbeatResponseAction::makeNoAction();
-                    }
-                    log() << "stepping down; another primary was elected more recently";
-                    return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
-                } else {
-                    log() << "another PRIMARY detected and it should step down"
-                             " since it was elected earlier than me";
-                    return HeartbeatResponseAction::makeStepDownRemoteAction(remotePrimaryIndex);
-                }
-            }
-
-            _currentPrimaryIndex = remotePrimaryIndex;
-            return HeartbeatResponseAction::makeNoAction();
-        }
-    }
-
-    ////////////////////
-    // Phase 2
-    ////////////////////
-
-    // We do not believe any remote to be primary.
-
-    // If we are primary, check if we can still see majority of the set;
-    // stepdown if we can't.
-    if (_iAmPrimary()) {
-        if (CannotSeeMajority &
-            _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)) {
-            if (_leaderMode == LeaderMode::kSteppingDown) {
-                return HeartbeatResponseAction::makeNoAction();
-            }
-            log() << "can't see a majority of the set, relinquishing primary";
-            return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
-        }
-
-        LOG(2) << "Choosing to remain primary";
-        return HeartbeatResponseAction::makeNoAction();
-    }
-
-    fassert(18505, _currentPrimaryIndex == -1);
-
-    const MemberState currentState = getMemberState();
-    if (originalState.recovering() && currentState.secondary()) {
-        // We just transitioned from RECOVERING to SECONDARY, this can only happen if we
-        // received a heartbeat with an auth error when previously all the heartbeats we'd
-        // received had auth errors.  In this case, don't return makeElectAction() because
-        // that could cause the election to start before the ReplicationCoordinator has updated
-        // its notion of the member state to SECONDARY.  Instead return noAction so that the
-        // ReplicationCooridinator knows to update its tracking of the member state off of the
-        // TopologyCoordinator, and leave starting the election until the next heartbeat comes
-        // back.
-        return HeartbeatResponseAction::makeNoAction();
-    }
-
-    // At this point, there is no primary anywhere.  Check to see if we should become a candidate.
-    const auto status = checkShouldStandForElection(now);
-    if (!status.isOK()) {
-        // NOTE: This log line is checked in unit test(s).
-        LOG(2) << "TopologyCoordinator::_updatePrimaryFromHBData - " << status.reason();
-        return HeartbeatResponseAction::makeNoAction();
-    }
-    fassert(28816, becomeCandidateIfElectable(now, StartElectionReason::kElectionTimeout));
-    return HeartbeatResponseAction::makeElectAction();
-}
-
 Status TopologyCoordinator::checkShouldStandForElection(Date_t now) const {
     if (_currentPrimaryIndex != -1) {
         return {ErrorCodes::NodeNotElectable, "Not standing for election since there is a Primary"};
@@ -1352,15 +1162,6 @@ Status TopologyCoordinator::checkShouldStandForElection(Date_t now) const {
 
     const UnelectableReasonMask unelectableReason =
         _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout);
-    if (NotCloseEnoughToLatestOptime & unelectableReason) {
-        return {ErrorCodes::NodeNotElectable,
-                str::stream() << "Not standing for election because "
-                              << _getUnelectableReasonString(unelectableReason)
-                              << "; my last optime is "
-                              << getMyLastAppliedOpTime().toString()
-                              << " and the newest is "
-                              << _latestKnownOpTime().toString()};
-    }
     if (unelectableReason) {
         return {ErrorCodes::NodeNotElectable,
                 str::stream() << "Not standing for election because "
@@ -1412,12 +1213,6 @@ int TopologyCoordinator::_findHealthyPrimaryOfEqualOrGreaterPriority(
     }
 
     return -1;
-}
-
-bool TopologyCoordinator::_isOpTimeCloseEnoughToLatestToElect(const OpTime& otherOpTime) const {
-    const OpTime latestKnownOpTime = _latestKnownOpTime();
-    // Use addition instead of subtraction to avoid overflow.
-    return otherOpTime.getSecs() + 10 >= (latestKnownOpTime.getSecs());
 }
 
 bool TopologyCoordinator::_amIFreshEnoughForPriorityTakeover() const {
@@ -2189,10 +1984,6 @@ TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getUnelectableR
     if (hbData.getState() != MemberState::RS_SECONDARY) {
         result |= NotSecondary;
     }
-    if (_rsConfig.getProtocolVersion() == 0 &&
-        !_isOpTimeCloseEnoughToLatestToElect(hbData.getHeartbeatAppliedOpTime())) {
-        result |= NotCloseEnoughToLatestOptime;
-    }
     if (hbData.up() && hbData.isUnelectable()) {
         result |= RefusesToStand;
     }
@@ -2229,28 +2020,14 @@ TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getMyUnelectabl
         result |= NotSecondary;
     }
 
-    if (_rsConfig.getProtocolVersion() == 0) {
-        // Election rules only for protocol version 0.
-        if (_voteLease.whoId != -1 &&
-            _voteLease.whoId != _rsConfig.getMemberAt(_selfIndex).getId() &&
-            _voteLease.when + VoteLease::leaseTime >= now) {
-            result |= VotedTooRecently;
-        }
-        if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied)) {
-            result |= NotCloseEnoughToLatestOptime;
-        }
-    } else {
-        // Election rules only for protocol version 1.
-        invariant(_rsConfig.getProtocolVersion() == 1);
-        if (reason == StartElectionReason::kPriorityTakeover &&
-            !_amIFreshEnoughForPriorityTakeover()) {
-            result |= NotCloseEnoughToLatestForPriorityTakeover;
-        }
+    // Election rules only for protocol version 1.
+    invariant(_rsConfig.getProtocolVersion() == 1);
+    if (reason == StartElectionReason::kPriorityTakeover && !_amIFreshEnoughForPriorityTakeover()) {
+        result |= NotCloseEnoughToLatestForPriorityTakeover;
+    }
 
-        if (reason == StartElectionReason::kCatchupTakeover &&
-            !_amIFreshEnoughForCatchupTakeover()) {
-            result |= NotFreshEnoughForCatchupTakeover;
-        }
+    if (reason == StartElectionReason::kCatchupTakeover && !_amIFreshEnoughForCatchupTakeover()) {
+        result |= NotFreshEnoughForCatchupTakeover;
     }
     return result;
 }
@@ -2262,13 +2039,6 @@ std::string TopologyCoordinator::_getUnelectableReasonString(const UnelectableRe
     if (ur & NoData) {
         ss << "node has no applied oplog entries";
         hasWrittenToStream = true;
-    }
-    if (ur & VotedTooRecently) {
-        if (hasWrittenToStream) {
-            ss << "; ";
-        }
-        hasWrittenToStream = true;
-        ss << "I recently voted for " << _voteLease.whoHostAndPort.toString();
     }
     if (ur & CannotSeeMajority) {
         if (hasWrittenToStream) {
@@ -2305,13 +2075,6 @@ std::string TopologyCoordinator::_getUnelectableReasonString(const UnelectableRe
         }
         hasWrittenToStream = true;
         ss << "member is not currently a secondary";
-    }
-    if (ur & NotCloseEnoughToLatestOptime) {
-        if (hasWrittenToStream) {
-            ss << "; ";
-        }
-        hasWrittenToStream = true;
-        ss << "member is more than 10 seconds behind the most up-to-date member";
     }
     if (ur & NotCloseEnoughToLatestForPriorityTakeover) {
         if (hasWrittenToStream) {
@@ -2386,23 +2149,6 @@ std::vector<HostAndPort> TopologyCoordinator::getMaybeUpHostAndPorts() const {
         upHosts.push_back(_rsConfig.getMemberAt(itIndex).getHostAndPort());
     }
     return upHosts;
-}
-
-bool TopologyCoordinator::voteForMyself(Date_t now) {
-    if (_role != Role::kCandidate) {
-        return false;
-    }
-    int selfId = _selfConfig().getId();
-    if ((_voteLease.when + VoteLease::leaseTime >= now) && (_voteLease.whoId != selfId)) {
-        log() << "not voting yea for " << selfId << " voted for "
-              << _voteLease.whoHostAndPort.toString() << ' '
-              << durationCount<Seconds>(now - _voteLease.when) << " secs ago";
-        return false;
-    }
-    _voteLease.when = now;
-    _voteLease.whoId = selfId;
-    _voteLease.whoHostAndPort = _selfConfig().getHostAndPort();
-    return true;
 }
 
 bool TopologyCoordinator::isSteppingDown() const {

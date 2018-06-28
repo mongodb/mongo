@@ -256,9 +256,6 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
             invariant(responseStatus.isOK());
             _scheduleHeartbeatReconfig_inlock(responseStatus.getValue().getConfig());
             break;
-        case HeartbeatResponseAction::StartElection:
-            _startElectSelf_inlock();
-            break;
         case HeartbeatResponseAction::StepDownSelf:
             invariant(action.getPrimaryConfigIndex() == _selfIndex);
             if (_topCoord->prepareForUnconditionalStepDown()) {
@@ -269,12 +266,6 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
                           "process of stepping down";
             }
             break;
-        case HeartbeatResponseAction::StepDownRemotePrimary: {
-            invariant(action.getPrimaryConfigIndex() != _selfIndex);
-            _requestRemotePrimaryStepdown(
-                _rsConfig.getMemberAt(action.getPrimaryConfigIndex()).getHostAndPort());
-            break;
-        }
         case HeartbeatResponseAction::PriorityTakeover: {
             // Don't schedule a priority takeover if any takeover is already scheduled.
             if (!_priorityTakeoverCbh.isValid() && !_catchupTakeoverCbh.isValid()) {

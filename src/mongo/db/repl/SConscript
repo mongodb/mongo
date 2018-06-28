@@ -806,11 +806,8 @@ env.Library(
     target='repl_coordinator_impl',
     source=[
         'check_quorum_for_config_change.cpp',
-        'elect_cmd_runner.cpp',
-        'freshness_checker.cpp',
         'repl_set_config_checks.cpp',
         'replication_coordinator_impl.cpp',
-        'replication_coordinator_impl_elect.cpp',
         'replication_coordinator_impl_elect_v1.cpp',
         'replication_coordinator_impl_heartbeat.cpp',
         'vote_requester.cpp',

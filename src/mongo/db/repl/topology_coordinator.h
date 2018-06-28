@@ -409,16 +409,9 @@ public:
      * Updates internal topology coordinator state, and returns instructions about what action
      * to take next.
      *
-     * If the next action indicates StartElection, the topology coordinator has transitioned to
-     * the "candidate" role, and will remain there until processWinElection or
-     * processLoseElection are called.
-     *
      * If the next action indicates "StepDownSelf", the topology coordinator has transitioned
      * to the "follower" role from "leader", and the caller should take any necessary actions
      * to become a follower.
-     *
-     * If the next action indicates "StepDownRemotePrimary", the caller should take steps to
-     * cause the specified remote host to step down from primary to secondary.
      *
      * If the next action indicates "Reconfig", the caller should verify the configuration in
      * hbResponse is acceptable, perform any other reconfiguration actions it must, and call
@@ -524,12 +517,6 @@ public:
     StatusWith<bool> setLastOptime(const UpdatePositionArgs::UpdateInfo& args,
                                    Date_t now,
                                    long long* configVersion);
-
-    /**
-     * If getRole() == Role::candidate and this node has not voted too recently, updates the
-     * lastVote tracker and returns true.  Otherwise, returns false.
-     */
-    bool voteForMyself(Date_t now);
 
     /**
      * Sets lastVote to be for ourself in this term.
@@ -750,17 +737,15 @@ private:
     enum UnelectableReason {
         None = 0,
         CannotSeeMajority = 1 << 0,
-        NotCloseEnoughToLatestOptime = 1 << 1,
-        ArbiterIAm = 1 << 2,
-        NotSecondary = 1 << 3,
-        NoPriority = 1 << 4,
-        StepDownPeriodActive = 1 << 5,
-        NoData = 1 << 6,
-        NotInitialized = 1 << 7,
-        VotedTooRecently = 1 << 8,
-        RefusesToStand = 1 << 9,
-        NotCloseEnoughToLatestForPriorityTakeover = 1 << 10,
-        NotFreshEnoughForCatchupTakeover = 1 << 11,
+        ArbiterIAm = 1 << 1,
+        NotSecondary = 1 << 2,
+        NoPriority = 1 << 3,
+        StepDownPeriodActive = 1 << 4,
+        NoData = 1 << 5,
+        NotInitialized = 1 << 6,
+        RefusesToStand = 1 << 7,
+        NotCloseEnoughToLatestForPriorityTakeover = 1 << 8,
+        NotFreshEnoughForCatchupTakeover = 1 << 9,
     };
 
     // Set what type of PRIMARY this node currently is.
@@ -781,10 +766,6 @@ private:
     // Checks if the node can see a healthy primary of equal or greater priority to the
     // candidate. If so, returns the index of that node. Otherwise returns -1.
     int _findHealthyPrimaryOfEqualOrGreaterPriority(const int candidateIndex) const;
-
-    // Is otherOpTime close enough (within 10 seconds) to the latest known optime to qualify
-    // for an election
-    bool _isOpTimeCloseEnoughToLatestToElect(const OpTime& otherOpTime) const;
 
     // Is our optime close enough to the latest known optime to call for a priority takeover.
     bool _amIFreshEnoughForPriorityTakeover() const;
@@ -839,12 +820,7 @@ private:
     /**
      * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse(), and determines if an
      * election or stepdown should commence.
-     * _updatePrimaryFromHBDataV1() is a simplified version of _updatePrimaryFromHBData() to be used
-     * when in ProtocolVersion1.
      */
-    HeartbeatResponseAction _updatePrimaryFromHBData(int updatedConfigIndex,
-                                                     const MemberState& originalState,
-                                                     Date_t now);
     HeartbeatResponseAction _updatePrimaryFromHBDataV1(int updatedConfigIndex,
                                                        const MemberState& originalState,
                                                        Date_t now);

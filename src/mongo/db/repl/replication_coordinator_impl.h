@@ -70,8 +70,6 @@ class ReplSetMetadata;
 
 namespace repl {
 
-class ElectCmdRunner;
-class FreshnessChecker;
 class HeartbeatResponseAction;
 class LastVote;
 class OplogReader;
@@ -791,10 +789,6 @@ private:
      * believes it can be elected PRIMARY.
      * For proper concurrency, start methods must be called while holding _mutex.
      *
-     * For old style elections the election path is:
-     *      _startElectSelf_inlock()
-     *      _onFreshnessCheckComplete()
-     *      _onElectCmdRunnerComplete()
      * For V1 (raft) style elections the election path is:
      *      _startElectSelfV1() or _startElectSelfV1_inlock()
      *      _onDryRunComplete()
@@ -802,21 +796,8 @@ private:
      *      _startVoteRequester_inlock()
      *      _onVoteRequestComplete()
      */
-    void _startElectSelf_inlock();
     void _startElectSelfV1_inlock(TopologyCoordinator::StartElectionReason reason);
     void _startElectSelfV1(TopologyCoordinator::StartElectionReason reason);
-
-    /**
-     * Callback called when the FreshnessChecker has completed; checks the results and
-     * decides whether to continue election proceedings.
-     **/
-    void _onFreshnessCheckComplete();
-
-    /**
-     * Callback called when the ElectCmdRunner has completed; checks the results and
-     * decides whether to complete the election and change state to primary.
-     **/
-    void _onElectCmdRunnerComplete();
 
     /**
      * Callback called when the dryRun VoteRequester has completed; checks the results and
@@ -845,11 +826,6 @@ private:
      * changed, do not step up as primary.
      */
     void _onVoteRequestComplete(long long originalTerm);
-
-    /**
-     * Callback called after a random delay, to prevent repeated election ties.
-     */
-    void _recoverFromElectionTie(const executor::TaskExecutor::CallbackArgs& cbData);
 
     /**
      * Removes 'host' from the sync source blacklist. If 'host' isn't found, it's simply
@@ -1197,19 +1173,9 @@ private:
     // Condition to signal when new heartbeat data comes in.
     stdx::condition_variable _stepDownWaiters;  // (M)
 
-    // State for conducting an election of this node.
-    // the presence of a non-null _freshnessChecker pointer indicates that an election is
-    // currently in progress. When using the V1 protocol, a non-null _voteRequester pointer
-    // indicates this instead.
-    // Only one election is allowed at a time.
-    std::unique_ptr<FreshnessChecker> _freshnessChecker;  // (M)
-
-    std::unique_ptr<ElectCmdRunner> _electCmdRunner;  // (M)
-
     std::unique_ptr<VoteRequester> _voteRequester;  // (M)
 
     // Event that the election code will signal when the in-progress election completes.
-    // Unspecified value when _freshnessChecker is NULL.
     executor::TaskExecutor::EventHandle _electionFinishedEvent;  // (M)
 
     // Event that the election code will signal when the in-progress election dry run completes,

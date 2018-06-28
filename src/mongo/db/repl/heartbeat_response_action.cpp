@@ -55,22 +55,9 @@ HeartbeatResponseAction HeartbeatResponseAction::makeCatchupTakeoverAction() {
     return result;
 }
 
-HeartbeatResponseAction HeartbeatResponseAction::makeElectAction() {
-    HeartbeatResponseAction result;
-    result._action = StartElection;
-    return result;
-}
-
 HeartbeatResponseAction HeartbeatResponseAction::makeStepDownSelfAction(int primaryIndex) {
     HeartbeatResponseAction result;
     result._action = StepDownSelf;
-    result._primaryIndex = primaryIndex;
-    return result;
-}
-
-HeartbeatResponseAction HeartbeatResponseAction::makeStepDownRemoteAction(int primaryIndex) {
-    HeartbeatResponseAction result;
-    result._action = StepDownRemotePrimary;
     result._primaryIndex = primaryIndex;
     return result;
 }

@@ -48,8 +48,6 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
-#include "mongo/db/repl/elect_cmd_runner.h"
-#include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -3536,16 +3534,9 @@ executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionI
     if (_topCoord->getRole() != TopologyCoordinator::Role::kCandidate) {
         return {};
     }
-    if (isV1ElectionProtocol()) {
-        invariant(_voteRequester);
-        _voteRequester->cancel();
-    } else {
-        invariant(_freshnessChecker);
-        _freshnessChecker->cancel();
-        if (_electCmdRunner) {
-            _electCmdRunner->cancel();
-        }
-    }
+    invariant(isV1ElectionProtocol());
+    invariant(_voteRequester);
+    _voteRequester->cancel();
     return _electionFinishedEvent;
 }
 
