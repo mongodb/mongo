@@ -2519,23 +2519,6 @@ TEST_F(TopoCoordTest, ShouldStandForElectionDespiteNotCloseEnoughToLastOptime) {
     ASSERT_OK(getTopoCoord().checkShouldStandForElection(now()++));
 }
 
-TEST_F(TopoCoordTest, VoteForMyselfFailsWhileNotCandidate) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version"
-                      << 1
-                      << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2")
-                                    << BSON("_id" << 30 << "host"
-                                                  << "h3"))),
-                 0);
-    setSelfMemberState(MemberState::RS_SECONDARY);
-    ASSERT_FALSE(getTopoCoord().voteForMyself(now()++));
-}
-
 TEST_F(TopoCoordTest, NodeReturnsArbiterWhenGetMemberStateRunsAgainstArbiter) {
     updateConfig(BSON("_id"
                       << "rs0"
@@ -3374,26 +3357,6 @@ TEST_F(HeartbeatResponseTestV1,
         HostAndPort("host2"), makeReplSetMetadata(lastOpTimeApplied), boost::none, now()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
-}
-
-TEST_F(HeartbeatResponseTestV1, NodeReturnsBadValueWhenProcessingPV0ElectionCommandsInPV1) {
-    // Both the replSetFresh and replSetElect commands should fail in PV1.
-    ReplicationCoordinator::ReplSetFreshArgs freshArgs;
-    Status internalErrorStatus(ErrorCodes::InternalError, "didn't set status");
-    BSONObjBuilder responseBuilder;
-    Status status = internalErrorStatus;
-    getTopoCoord().prepareFreshResponse(freshArgs, Date_t(), &responseBuilder, &status);
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    ASSERT_EQUALS("replset: incompatible replset protocol version: 1", status.reason());
-    ASSERT_TRUE(responseBuilder.obj().isEmpty());
-
-    BSONObjBuilder electResponseBuilder;
-    ReplicationCoordinator::ReplSetElectArgs electArgs;
-    status = internalErrorStatus;
-    getTopoCoord().prepareElectResponse(electArgs, Date_t(), &electResponseBuilder, &status);
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    ASSERT_EQUALS("replset: incompatible replset protocol version: 1", status.reason());
-    ASSERT_TRUE(electResponseBuilder.obj().isEmpty());
 }
 
 TEST_F(HeartbeatResponseTestV1,

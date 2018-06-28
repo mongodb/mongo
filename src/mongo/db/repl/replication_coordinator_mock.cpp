@@ -332,17 +332,6 @@ Status ReplicationCoordinatorMock::processReplSetInitiate(OperationContext* opCt
     return Status::OK();
 }
 
-Status ReplicationCoordinatorMock::processReplSetFresh(const ReplSetFreshArgs& args,
-                                                       BSONObjBuilder* resultObj) {
-    return Status::OK();
-}
-
-Status ReplicationCoordinatorMock::processReplSetElect(const ReplSetElectArgs& args,
-                                                       BSONObjBuilder* resultObj) {
-    // TODO
-    return Status::OK();
-}
-
 Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                                 long long* configVersion) {
     // TODO

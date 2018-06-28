@@ -325,18 +325,6 @@ public:
                                  BSONObjBuilder* response,
                                  Status* result);
 
-    // produce a reply to a replSetFresh command
-    void prepareFreshResponse(const ReplicationCoordinator::ReplSetFreshArgs& args,
-                              Date_t now,
-                              BSONObjBuilder* response,
-                              Status* result);
-
-    // produce a reply to a received electCmd
-    void prepareElectResponse(const ReplicationCoordinator::ReplSetElectArgs& args,
-                              Date_t now,
-                              BSONObjBuilder* response,
-                              Status* result);
-
     // produce a reply to a V1 heartbeat
     Status prepareHeartbeatResponseV1(Date_t now,
                                       const ReplSetHeartbeatArgsV1& args,
@@ -783,12 +771,6 @@ private:
 
     // Returns the current "ping" value for the given member by their address
     Milliseconds _getPing(const HostAndPort& host);
-
-    // Determines if we will veto the member specified by "args.id".
-    // If we veto, the errmsg will be filled in with a reason
-    bool _shouldVetoMember(const ReplicationCoordinator::ReplSetFreshArgs& args,
-                           const Date_t& now,
-                           std::string* errmsg) const;
 
     // Returns the index of the member with the matching id, or -1 if none match.
     int _getMemberIndex(int id) const;

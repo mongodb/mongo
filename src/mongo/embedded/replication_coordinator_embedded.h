@@ -166,10 +166,6 @@ public:
 
     Status processReplSetInitiate(OperationContext*, const BSONObj&, BSONObjBuilder*) override;
 
-    Status processReplSetFresh(const ReplSetFreshArgs&, BSONObjBuilder*) override;
-
-    Status processReplSetElect(const ReplSetElectArgs& args, BSONObjBuilder* response) override;
-
     Status processReplSetUpdatePosition(const repl::UpdatePositionArgs&, long long*) override;
 
     std::vector<HostAndPort> getHostsWrittenTo(const repl::OpTime&, bool) override;

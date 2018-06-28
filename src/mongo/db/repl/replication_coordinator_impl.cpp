@@ -2730,22 +2730,6 @@ void ReplicationCoordinatorImpl::_enterDrainMode_inlock() {
     _externalState->stopProducer();
 }
 
-Status ReplicationCoordinatorImpl::processReplSetFresh(const ReplSetFreshArgs& args,
-                                                       BSONObjBuilder* resultObj) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    Status result(ErrorCodes::InternalError, "didn't set status in prepareFreshResponse");
-    _topCoord->prepareFreshResponse(args, _replExecutor->now(), resultObj, &result);
-    return result;
-}
-
-Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& args,
-                                                       BSONObjBuilder* responseObj) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    Status result = Status(ErrorCodes::InternalError, "status not set by callback");
-    _topCoord->prepareElectResponse(args, _replExecutor->now(), responseObj, &result);
-    return result;
-}
-
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
 ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
                                                        const ReplSetConfig& newConfig,

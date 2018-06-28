@@ -186,10 +186,6 @@ public:
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj);
 
-    virtual Status processReplSetFresh(const ReplSetFreshArgs& args, BSONObjBuilder* resultObj);
-
-    virtual Status processReplSetElect(const ReplSetElectArgs& args, BSONObjBuilder* resultObj);
-
     virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                 long long* configVersion);
 

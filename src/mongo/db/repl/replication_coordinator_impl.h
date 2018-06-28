@@ -219,12 +219,6 @@ public:
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj) override;
 
-    virtual Status processReplSetFresh(const ReplSetFreshArgs& args,
-                                       BSONObjBuilder* resultObj) override;
-
-    virtual Status processReplSetElect(const ReplSetElectArgs& args,
-                                       BSONObjBuilder* response) override;
-
     virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                 long long* configVersion) override;
 

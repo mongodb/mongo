@@ -615,39 +615,6 @@ public:
                                           BSONObjBuilder* resultObj) = 0;
 
     /**
-     * Arguments to the replSetFresh command.
-     */
-    struct ReplSetFreshArgs {
-        std::string setName;  // Name of the replset
-        HostAndPort who;      // host and port of the member that sent the replSetFresh command
-        unsigned id;          // replSet id of the member that sent the replSetFresh command
-        int cfgver;  // replSet config version that the member who sent the command thinks it has
-        Timestamp opTime;  // last optime seen by the member who sent the replSetFresh command
-    };
-
-    /*
-     * Handles an incoming replSetFresh command.
-     * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
-     */
-    virtual Status processReplSetFresh(const ReplSetFreshArgs& args, BSONObjBuilder* resultObj) = 0;
-
-    /**
-     * Arguments to the replSetElect command.
-     */
-    struct ReplSetElectArgs {
-        std::string set;  // Name of the replset
-        int whoid;        // replSet id of the member that sent the replSetFresh command
-        int cfgver;  // replSet config version that the member who sent the command thinks it has
-        OID round;   // unique ID for this election
-    };
-
-    /*
-     * Handles an incoming replSetElect command.
-     * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
-     */
-    virtual Status processReplSetElect(const ReplSetElectArgs& args, BSONObjBuilder* resultObj) = 0;
-
-    /**
      * Handles an incoming replSetUpdatePosition command, updating each node's oplog progress.
      * Returns Status::OK() if all updates are processed correctly, NodeNotFound
      * if any updating node cannot be found in the config, InvalidReplicaSetConfig if the

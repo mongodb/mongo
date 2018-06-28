@@ -916,20 +916,6 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='freshness_checker_test',
-    source=[
-        'freshness_checker_test.cpp',
-    ],
-    LIBDEPS=[
-        'repl_coordinator_impl',
-        'replica_set_messages',
-        'replmocks',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
     target='vote_requester_test',
     source=[
         'vote_requester_test.cpp',
@@ -939,21 +925,6 @@ env.CppUnitTest(
         'replica_set_messages',
         'replmocks',
         '$BUILD_DIR/mongo/db/auth/authmocks',
-    ],
-)
-
-
-env.CppUnitTest(
-    target='elect_cmd_runner_test',
-    source=[
-        'elect_cmd_runner_test.cpp',
-    ],
-    LIBDEPS=[
-        'repl_coordinator_impl',
-        'replica_set_messages',
-        'replmocks',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],
 )
 

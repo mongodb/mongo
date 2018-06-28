@@ -305,16 +305,6 @@ Status ReplicationCoordinatorEmbedded::abortCatchupIfNeeded() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::processReplSetFresh(const ReplSetFreshArgs&,
-                                                           BSONObjBuilder*) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
-Status ReplicationCoordinatorEmbedded::processReplSetElect(const ReplSetElectArgs&,
-                                                           BSONObjBuilder*) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 Status ReplicationCoordinatorEmbedded::processReplSetUpdatePosition(const UpdatePositionArgs&,
                                                                     long long*) {
     UASSERT_NOT_IMPLEMENTED;
