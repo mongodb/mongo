@@ -8,6 +8,8 @@ selector:
   exclude_files:
   # In MongoDB 4.0, transactions are not supported in sharded clusters.
   - jstests/core/txns/**/*.js
+  # Not expected to pass with replica-sets.
+  - jstests/core/opcounters_write_cmd.js
   # The following tests fail because a certain command or functionality is not supported by
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
@@ -80,22 +82,6 @@ selector:
   - jstests/core/queryoptimizer3.js
   # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
   - jstests/core/views/views_coll_stats.js
-  # Tests that won't work with an injected 'majority' readConcern
-  # and/or an injected 'majority' writeConcern. Where a function is
-  # listed the reason is we don't have a reliable solution to override
-  # the write concern for that function.
-  - jstests/core/batch_write_command*.js # these tests use various write concerns
-  - jstests/core/bench_test*.js # benchRun() used for writes
-  - jstests/core/crud_api.js # has specific w:0 tests
-  - jstests/core/mr_merge.js # mr temp tables aren't replicated
-  - jstests/core/mr_merge2.js # mr temp tables aren't replicated
-  - jstests/core/mr_outreduce.js # mr temp tables aren't replicated
-  - jstests/core/mr_outreduce2.js # mr temp tables aren't replicated
-  - jstests/core/opcounters_active.js  # off by n problem with opcounters
-  - jstests/core/opcounters_write_cmd.js # off by n problem with opcounters
-  - jstests/core/shell1.js # tests setSlaveOk() variations on standalone mongod
-  - jstests/core/shell_writeconcern.js # checks write concern shell helpers
-  - jstests/core/write_result.js # Tests invalid writeConcern, we shouldn't override.
   # Tests that need triaging & remediation | blacklist decision
   # Comments list possible problem point under review.
   - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
