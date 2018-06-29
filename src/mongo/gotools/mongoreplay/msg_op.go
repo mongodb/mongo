@@ -205,7 +205,7 @@ func (msgOp *MsgOp) Meta() OpMetadata {
 		msgOp.Database,
 		msgOp.CommandName,
 		map[string]interface{}{
-			"section": msgOp.Sections,
+			"sections": msgOp.Sections,
 		},
 	}
 }
