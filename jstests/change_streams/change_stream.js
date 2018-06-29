@@ -156,52 +156,5 @@
         db.getMongo().forceReadMode('commands');
     }
 
-    jsTestLog("Testing resumability");
-    assertDropAndRecreateCollection(db, "resume1");
-
-    // Note we do not project away 'id.ts' as it is part of the resume token.
-    let resumeCursor = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: db.resume1, includeToken: true});
-
-    // Insert a document and save the resulting change stream.
-    assert.writeOK(db.resume1.insert({_id: 1}));
-    const firstInsertChangeDoc = cst.getOneChange(resumeCursor);
-    assert.docEq(firstInsertChangeDoc.fullDocument, {_id: 1});
-
-    jsTestLog("Testing resume after one document.");
-    resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
-        collection: db.resume1,
-        includeToken: true,
-        aggregateOptions: {cursor: {batchSize: 0}},
-    });
-
-    jsTestLog("Inserting additional documents.");
-    assert.writeOK(db.resume1.insert({_id: 2}));
-    const secondInsertChangeDoc = cst.getOneChange(resumeCursor);
-    assert.docEq(secondInsertChangeDoc.fullDocument, {_id: 2});
-    assert.writeOK(db.resume1.insert({_id: 3}));
-    const thirdInsertChangeDoc = cst.getOneChange(resumeCursor);
-    assert.docEq(thirdInsertChangeDoc.fullDocument, {_id: 3});
-
-    jsTestLog("Testing resume after first document of three.");
-    resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
-        collection: db.resume1,
-        includeToken: true,
-        aggregateOptions: {cursor: {batchSize: 0}},
-    });
-    assert.docEq(cst.getOneChange(resumeCursor), secondInsertChangeDoc);
-    assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
-
-    jsTestLog("Testing resume after second document of three.");
-    resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: secondInsertChangeDoc._id}}],
-        collection: db.resume1,
-        includeToken: true,
-        aggregateOptions: {cursor: {batchSize: 0}},
-    });
-    assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
-
     cst.cleanUp();
 }());

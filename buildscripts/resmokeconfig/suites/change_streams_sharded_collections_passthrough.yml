@@ -20,6 +20,9 @@ selector:
   # "Cowardly refusing to run test with overridden write concern when it uses a command that can
   #  only perform w=1 writes: ..."
   - requires_eval_command
+  # SERVER-32088 Resuming a change stream may not work if not all shards have chunks for the
+  # collection, which can happen if the initial sharding of the collection has a failed migration.
+  - uses_resume_after
 
 executor:
   archive:

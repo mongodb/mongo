@@ -1,5 +1,5 @@
 // Test DBCollection.watch() shell helper and its options.
-
+// @tags: [uses_resume_after]
 (function() {
     "use strict";
 
