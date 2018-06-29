@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -150,9 +151,6 @@ ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
         return ScopedSession(_getOrCreateSessionRuntimeInfo(ul, opCtx, lsid));
     }();
 
-    // Perform the refresh outside of the mutex
-    ss->refreshFromStorageIfNeeded(opCtx);
-
     return ss;
 }
 
@@ -239,14 +237,8 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
     sri->availableCondVar.notify_one();
 }
 
-OperationContextSession::OperationContextSession(OperationContext* opCtx,
-                                                 bool checkOutSession,
-                                                 boost::optional<bool> autocommit,
-                                                 boost::optional<bool> startTransaction,
-                                                 StringData dbName,
-                                                 StringData cmdName)
+OperationContextSession::OperationContextSession(OperationContext* opCtx, bool checkOutSession)
     : _opCtx(opCtx) {
-
     if (!opCtx->getLogicalSessionId()) {
         return;
     }
@@ -272,13 +264,6 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx,
 
     const auto session = checkedOutSession->get();
     invariant(opCtx->getLogicalSessionId() == session->getSessionId());
-
-    checkedOutSession->get()->refreshFromStorageIfNeeded(opCtx);
-
-    if (opCtx->getTxnNumber()) {
-        checkedOutSession->get()->beginOrContinueTxn(
-            opCtx, *opCtx->getTxnNumber(), autocommit, startTransaction, dbName, cmdName);
-    }
 }
 
 OperationContextSession::~OperationContextSession() {

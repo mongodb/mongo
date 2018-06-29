@@ -36,6 +36,7 @@
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_gen.h"
+#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -171,7 +172,7 @@ public:
                                     const LogicalSessionId& sessionId,
                                     const TxnNumber& txnNum) {
         auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, sessionId);
-        scopedSession->beginOrContinueTxnOnMigration(opCtx, txnNum);
+        scopedSession->beginOrContinueTxn(opCtx, txnNum);
         return scopedSession;
     }
 
@@ -243,8 +244,8 @@ public:
             // up the session state and perform the insert.
             initializeOperationSessionInfo(
                 innerOpCtx.get(), insertBuilder.obj(), true, true, true, false);
-            OperationContextSession sessionTxnState(
-                innerOpCtx.get(), true, boost::none, boost::none, "testDB", "insert");
+            OperationContextSessionMongod sessionTxnState(
+                innerOpCtx.get(), true, boost::none, boost::none);
 
             const auto reply = performInserts(innerOpCtx.get(), insertRequest);
             ASSERT(reply.results.size() == 1);

@@ -72,6 +72,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"

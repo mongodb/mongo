@@ -55,6 +55,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/query/find.h"
@@ -71,10 +72,10 @@
 #include "mongo/db/s/sharding_config_optime_gossip.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_entry_point_common.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/snapshot_window_util.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
@@ -464,15 +465,16 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
 void invokeInTransaction(OperationContext* opCtx,
                          CommandInvocation* invocation,
                          rpc::ReplyBuilderInterface* replyBuilder) {
-    auto session = OperationContextSession::get(opCtx);
-    if (!session) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (!txnParticipant) {
         // Run the command directly if we're not in a transaction.
         invocation->run(opCtx, replyBuilder);
         return;
     }
 
-    session->unstashTransactionResources(opCtx, invocation->definition()->getName());
-    ScopeGuard guard = MakeGuard([session, opCtx]() { session->abortActiveTransaction(opCtx); });
+    txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
+    ScopeGuard guard =
+        MakeGuard([&txnParticipant, opCtx]() { txnParticipant->abortActiveTransaction(opCtx); });
 
     invocation->run(opCtx, replyBuilder);
 
@@ -484,7 +486,7 @@ void invokeInTransaction(OperationContext* opCtx,
     }
 
     // Stash or commit the transaction when the command succeeds.
-    session->stashTransactionResources(opCtx);
+    txnParticipant->stashTransactionResources(opCtx);
     guard.Dismiss();
 }
 
@@ -512,10 +514,11 @@ bool runCommandImpl(OperationContext* opCtx,
         invokeInTransaction(opCtx, invocation, replyBuilder);
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
-        auto session = OperationContextSession::get(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
         uassert(ErrorCodes::InvalidOptions,
                 "writeConcern is not allowed within a multi-statement transaction",
-                wcResult.usedDefault || !session || !session->inMultiDocumentTransaction() ||
+                wcResult.usedDefault || !txnParticipant ||
+                    !txnParticipant->inMultiDocumentTransaction() ||
                     invocation->definition()->getName() == "commitTransaction" ||
                     invocation->definition()->getName() == "abortTransaction" ||
                     invocation->definition()->getName() == "doTxn");
@@ -691,15 +694,15 @@ void execCommandDatabase(OperationContext* opCtx,
                     shouldCheckoutSession || !opCtx->getTxnNumber());
         }
 
+        if (autocommitVal) {
+            uassertStatusOK(TransactionParticipant::isValid(dbname, command->getName()));
+        }
+
         // This constructor will check out the session and start a transaction, if necessary. It
         // handles the appropriate state management for both multi-statement transactions and
         // retryable writes.
-        OperationContextSession sessionTxnState(opCtx,
-                                                shouldCheckoutSession,
-                                                autocommitVal,
-                                                startMultiDocTxn,
-                                                dbname,
-                                                command->getName());
+        OperationContextSessionMongod sessionTxnState(
+            opCtx, shouldCheckoutSession, autocommitVal, startMultiDocTxn);
 
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 
@@ -808,11 +811,11 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        auto session = OperationContextSession::get(opCtx);
-        if (!opCtx->getClient()->isInDirectClient() || !session ||
-            !session->inMultiDocumentTransaction()) {
-            const bool upconvertToSnapshot = session && session->inMultiDocumentTransaction() &&
-                sessionOptions &&
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        if (!opCtx->getClient()->isInDirectClient() || !txnParticipant ||
+            !txnParticipant->inMultiDocumentTransaction()) {
+            const bool upconvertToSnapshot = txnParticipant &&
+                txnParticipant->inMultiDocumentTransaction() && sessionOptions &&
                 (sessionOptions->getStartTransaction() == boost::optional<bool>(true));
             readConcernArgs = uassertStatusOK(
                 _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));
@@ -825,10 +828,9 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-            auto session = OperationContextSession::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot is only valid in multi-statement transactions",
-                    session && session->inMultiDocumentTransaction());
+                    txnParticipant && txnParticipant->inMultiDocumentTransaction());
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot requires a session ID",
                     opCtx->getLogicalSessionId());

@@ -45,7 +45,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
@@ -115,8 +115,8 @@ public:
         // We lock the entire database in S-mode in order to ensure that the contents will not
         // change for the snapshot.
         auto lockMode = LockMode::MODE_S;
-        auto* session = OperationContextSession::get(opCtx);
-        if (session && session->inMultiDocumentTransaction()) {
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
             // However, if we are inside a multi-statement transaction, then we only need to lock
             // the database in intent mode to ensure that none of the collections get dropped.
             lockMode = getLockModeForQuery(opCtx);
@@ -218,8 +218,8 @@ private:
             return "";
 
         boost::optional<Lock::CollectionLock> collLock;
-        auto* session = OperationContextSession::get(opCtx);
-        if (session && session->inMultiDocumentTransaction()) {
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
             // When inside a multi-statement transaction, we are only holding the database lock in
             // intent mode. We need to also acquire the collection lock in intent mode to ensure
             // reading from the consistent snapshot doesn't overlap with any catalog operations on

@@ -91,7 +91,8 @@
         insert: collName,
         documents: [{_id: "commit-txn-2"}],
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }),
                                  ErrorCodes.TransactionCommitted);
 

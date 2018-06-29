@@ -38,6 +38,9 @@
     }),
                                  ErrorCodes.PreparedTransactionInProgress);
 
+    /*
+    TODO: SERVER-36057 uncomment after the session options validation refactor is complete.
+
     jsTestLog(
         "Test error precedence when executing a malformed command during a prepared transaction.");
     // The following command specifies txnNumber: 2 without startTransaction: true.
@@ -50,7 +53,7 @@
         autocommit: false
     }),
                                  ErrorCodes.NoSuchTransaction);
-
+    */
     session.abortTransaction();
 
     session.endSession();

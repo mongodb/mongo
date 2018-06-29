@@ -90,7 +90,7 @@ TEST_F(SessionCatalogTest, OperationContextCheckedOutSession) {
     const TxnNumber txnNum = 20;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSession ocs(opCtx(), true, boost::none, boost::none, "testDB", "insert");
+    OperationContextSession ocs(opCtx(), true);
     auto session = OperationContextSession::get(opCtx());
     ASSERT(session);
     ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
@@ -99,7 +99,7 @@ TEST_F(SessionCatalogTest, OperationContextCheckedOutSession) {
 TEST_F(SessionCatalogTest, OperationContextNonCheckedOutSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
-    OperationContextSession ocs(opCtx(), false, boost::none, boost::none, "testDB", "insert");
+    OperationContextSession ocs(opCtx(), false);
     auto session = OperationContextSession::get(opCtx());
 
     ASSERT(!session);
@@ -118,7 +118,7 @@ TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
     opCtx()->setLogicalSessionId(lsid);
 
     boost::optional<OperationContextSession> ocs;
-    ocs.emplace(opCtx(), true, boost::none, false, "testDB", "insert");
+    ocs.emplace(opCtx(), true);
 
     stdx::async(stdx::launch::async, [&] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
@@ -149,13 +149,11 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession outerScopedSession(
-            opCtx(), true, boost::none, boost::none, "testDB", "insert");
+        OperationContextSession outerScopedSession(opCtx(), true);
 
         {
             DirectClientSetter inDirectClient(opCtx());
-            OperationContextSession innerScopedSession(
-                opCtx(), true, boost::none, boost::none, "testDB", "insert");
+            OperationContextSession innerScopedSession(opCtx(), true);
 
             auto session = OperationContextSession::get(opCtx());
             ASSERT(session);
@@ -171,89 +169,6 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     }
 
     ASSERT(!OperationContextSession::get(opCtx()));
-}
-
-TEST_F(SessionCatalogTest, StashInNestedSessionIsANoop) {
-    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
-    opCtx()->setTxnNumber(1);
-
-    {
-        OperationContextSession outerScopedSession(
-            opCtx(), true, /* autocommit */ false, /* startTransaction */ true, "testDB", "find");
-
-        Locker* originalLocker = opCtx()->lockState();
-        RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
-        ASSERT(originalLocker);
-        ASSERT(originalRecoveryUnit);
-
-        // Set the readConcern on the OperationContext.
-        repl::ReadConcernArgs readConcernArgs;
-        ASSERT_OK(readConcernArgs.initialize(BSON("find"
-                                                  << "test"
-                                                  << repl::ReadConcernArgs::kReadConcernFieldName
-                                                  << BSON(repl::ReadConcernArgs::kLevelFieldName
-                                                          << "snapshot"))));
-        repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
-
-        // Perform initial unstash, which sets up a WriteUnitOfWork.
-        OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "find");
-        ASSERT_EQUALS(originalLocker, opCtx()->lockState());
-        ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
-        ASSERT(opCtx()->getWriteUnitOfWork());
-
-        {
-            // Make it look like we're in a DBDirectClient running a nested operation.
-            DirectClientSetter inDirectClient(opCtx());
-            OperationContextSession innerScopedSession(
-                opCtx(), true, boost::none, boost::none, "testDB", "find");
-
-            OperationContextSession::get(opCtx())->stashTransactionResources(opCtx());
-
-            // The stash was a noop, so the locker, RecoveryUnit, and WriteUnitOfWork on the
-            // OperationContext are unaffected.
-            ASSERT_EQUALS(originalLocker, opCtx()->lockState());
-            ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
-            ASSERT(opCtx()->getWriteUnitOfWork());
-        }
-    }
-}
-
-TEST_F(SessionCatalogTest, UnstashInNestedSessionIsANoop) {
-    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
-    opCtx()->setTxnNumber(1);
-
-    {
-        OperationContextSession outerScopedSession(
-            opCtx(), true, /* autocommit */ false, /* startTransaction */ true, "testDB", "find");
-
-        Locker* originalLocker = opCtx()->lockState();
-        RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
-        ASSERT(originalLocker);
-        ASSERT(originalRecoveryUnit);
-
-        // Set the readConcern on the OperationContext.
-        repl::ReadConcernArgs readConcernArgs;
-        ASSERT_OK(readConcernArgs.initialize(BSON("find"
-                                                  << "test"
-                                                  << repl::ReadConcernArgs::kReadConcernFieldName
-                                                  << BSON(repl::ReadConcernArgs::kLevelFieldName
-                                                          << "snapshot"))));
-        repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
-
-        {
-            // Make it look like we're in a DBDirectClient running a nested operation.
-            DirectClientSetter inDirectClient(opCtx());
-            OperationContextSession innerScopedSession(
-                opCtx(), true, boost::none, boost::none, "testDB", "find");
-
-            OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "find");
-
-            // The unstash was a noop, so the OperationContext did not get a WriteUnitOfWork.
-            ASSERT_EQUALS(originalLocker, opCtx()->lockState());
-            ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
-            ASSERT_FALSE(opCtx()->getWriteUnitOfWork());
-        }
-    }
 }
 
 TEST_F(SessionCatalogTest, ScanSessions) {

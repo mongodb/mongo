@@ -47,6 +47,7 @@
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/cluster_write.h"
@@ -404,8 +405,8 @@ BSONObj MongoDInterface::_reportCurrentOpForClient(OperationContext* opCtx,
     OperationContext* clientOpCtx = client->getOperationContext();
 
     if (clientOpCtx) {
-        if (auto opCtxSession = OperationContextSession::get(clientOpCtx)) {
-            opCtxSession->reportUnstashedState(repl::ReadConcernArgs::get(clientOpCtx), &builder);
+        if (auto txnParticipant = TransactionParticipant::get(clientOpCtx)) {
+            txnParticipant->reportUnstashedState(repl::ReadConcernArgs::get(clientOpCtx), &builder);
         }
 
         // Append lock stats before returning.
@@ -433,14 +434,16 @@ void MongoDInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
                               ? makeSessionFilterForAuthenticatedUsers(opCtx)
                               : KillAllSessionsByPatternSet{{}});
 
-    sessionCatalog->scanSessions(opCtx,
-                                 {std::move(sessionFilter)},
-                                 [&](OperationContext* opCtx, Session* session) {
-                                     auto op = session->reportStashedState();
-                                     if (!op.isEmpty()) {
-                                         ops->emplace_back(op);
-                                     }
-                                 });
+    sessionCatalog->scanSessions(
+        opCtx,
+        {std::move(sessionFilter)},
+        [&](OperationContext* opCtx, Session* session) {
+            auto op =
+                TransactionParticipant::getFromNonCheckedOutSession(session)->reportStashedState();
+            if (!op.isEmpty()) {
+                ops->emplace_back(op);
+            }
+        });
 }
 
 std::unique_ptr<CollatorInterface> MongoDInterface::_getCollectionDefaultCollator(

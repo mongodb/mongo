@@ -33,6 +33,7 @@
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/repl/do_txn.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -40,6 +41,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/memory.h"
@@ -105,7 +107,7 @@ protected:
     OpObserverMock* _opObserver = nullptr;
     std::unique_ptr<StorageInterface> _storage;
     ServiceContext::UniqueOperationContext _opCtx;
-    boost::optional<OperationContextSession> _ocs;
+    boost::optional<OperationContextSessionMongod> _ocs;
 };
 
 void DoTxnTest::setUp() {
@@ -145,13 +147,10 @@ void DoTxnTest::setUp() {
     // Set up the transaction and session.
     _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     _opCtx->setTxnNumber(0);  // TxnNumber can always be 0 because we have a new session.
-    _ocs.emplace(_opCtx.get(),
-                 true /* checkOutSession */,
-                 false /* autocommit */,
-                 true /* startTransaction */,
-                 "admin" /* dbName */,
-                 "doTxn" /* cmdName */);
-    OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "doTxn");
+    _ocs.emplace(_opCtx.get(), true /* checkOutSession */, false, true);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "doTxn");
 }
 
 void DoTxnTest::tearDown() {

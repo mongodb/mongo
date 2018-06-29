@@ -49,8 +49,8 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
 
@@ -256,8 +256,8 @@ private:
     }
 
     void _transactionChecks(OperationContext* opCtx) const {
-        auto session = OperationContextSession::get(opCtx);
-        if (!session || !session->inMultiDocumentTransaction())
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        if (!txnParticipant || !txnParticipant->inMultiDocumentTransaction())
             return;
         uassert(50791,
                 str::stream() << "Cannot write to system collection " << ns().toString()

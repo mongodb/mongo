@@ -38,7 +38,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -323,8 +323,8 @@ LockMode getLockModeForQuery(OperationContext* opCtx) {
     invariant(opCtx);
 
     // Use IX locks for autocommit:false multi-statement transactions; otherwise, use IS locks.
-    auto session = OperationContextSession::get(opCtx);
-    if (session && session->inMultiDocumentTransaction()) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
         return MODE_IX;
     }
     return MODE_IS;

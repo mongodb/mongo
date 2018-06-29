@@ -39,6 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -54,7 +55,8 @@ void killSessionsLocalKillTransactions(OperationContext* opCtx,
                                        const SessionKiller::Matcher& matcher) {
     SessionCatalog::get(opCtx)->scanSessions(
         opCtx, matcher, [](OperationContext* opCtx, Session* session) {
-            session->abortArbitraryTransaction();
+            TransactionParticipant::getFromNonCheckedOutSession(session)
+                ->abortArbitraryTransaction();
         });
 }
 
@@ -73,25 +75,15 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
     SessionCatalog::get(opCtx)->scanSessions(
         opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
             try {
-                session->abortArbitraryTransactionIfExpired();
+                TransactionParticipant::getFromNonCheckedOutSession(session)
+                    ->abortArbitraryTransactionIfExpired();
             } catch (const DBException& ex) {
                 Status status = ex.toStatus();
                 std::string errmsg = str::stream()
                     << "May have failed to abort expired transaction with session id (lsid) '"
                     << session->getSessionId() << "'."
                     << " Caused by: " << status;
-
-                // LockTimeout errors are expected if we are unable to acquire an IS lock to clean
-                // up transaction cursors. The transaction abort (and lock resource release) should
-                // have succeeded despite failing to clean up cursors. The cursors will eventually
-                // be cleaned up by the cursor manager. We'll log such errors at a higher log level
-                // for diagnostic purposes in case something gets stuck.
-                if (ErrorCodes::isShutdownError(status.code()) ||
-                    status == ErrorCodes::LockTimeout) {
-                    LOG(1) << errmsg;
-                } else {
-                    warning() << errmsg;
-                }
+                warning() << errmsg;
             }
         });
 }

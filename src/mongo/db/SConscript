@@ -620,6 +620,7 @@ env.Library(
     target='catalog_raii',
     source=[
         'catalog_raii.cpp',
+        'operation_context_session_mongod.cpp',
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
         'session.cpp',
@@ -1904,6 +1905,19 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/client/read_preference'
+    ],
+)
+
+env.CppUnitTest(
+    target='transaction_participant_test',
+ source=[
+        'transaction_participant_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
+        'query_exec',
     ],
 )
 

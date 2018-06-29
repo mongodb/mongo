@@ -48,8 +48,8 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
@@ -228,11 +228,11 @@ public:
                 isExplain));
 
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            const auto session = OperationContextSession::get(opCtx);
+            const auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "It is illegal to open a tailable cursor in a transaction",
-                    session == nullptr ||
-                        !(session->inMultiDocumentTransaction() && qr->isTailable()));
+                    !txnParticipant ||
+                        !(txnParticipant->inMultiDocumentTransaction() && qr->isTailable()));
 
             // Validate term before acquiring locks, if provided.
             if (auto term = qr->getReplicationTerm()) {

@@ -51,6 +51,7 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/multiapplier.h"
@@ -71,8 +72,8 @@
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
@@ -2509,22 +2510,19 @@ public:
 
         const auto sessionId = makeLogicalSessionIdForTest();
         _opCtx->setLogicalSessionId(sessionId);
+        _opCtx->setTxnNumber(26);
 
-        ocs = std::make_unique<OperationContextSession>(
-            _opCtx, true, boost::none, boost::none, dbName, "insert");
-        auto session = OperationContextSession::get(_opCtx);
-        ASSERT(session);
+        ocs = std::make_unique<OperationContextSessionMongod>(_opCtx, true, false, true);
 
-        const TxnNumber txnNum = 26;
-        _opCtx->setTxnNumber(txnNum);
-        session->beginOrContinueTxn(_opCtx, txnNum, false, true, dbName, "insert");
+        auto txnParticipant = TransactionParticipant::get(_opCtx);
+        ASSERT(txnParticipant);
 
-        session->unstashTransactionResources(_opCtx, "insert");
+        txnParticipant->unstashTransactionResources(_opCtx, "insert");
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX, LockMode::MODE_IX);
             insertDocument(autoColl.getCollection(), InsertStatement(doc));
         }
-        session->stashTransactionResources(_opCtx);
+        txnParticipant->stashTransactionResources(_opCtx);
 
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
@@ -2553,7 +2551,7 @@ protected:
     Timestamp presentTs;
     Timestamp beforeTxnTs;
     Timestamp commitEntryTs;
-    std::unique_ptr<OperationContextSession> ocs;
+    std::unique_ptr<OperationContextSessionMongod> ocs;
 };
 
 class MultiDocumentTransaction : public MultiDocumentTransactionTest {
@@ -2561,15 +2559,15 @@ public:
     MultiDocumentTransaction() : MultiDocumentTransactionTest("multiDocumentTransaction") {}
 
     void run() {
-        auto session = OperationContextSession::get(_opCtx);
-        ASSERT(session);
+        auto txnParticipant = TransactionParticipant::get(_opCtx);
+        ASSERT(txnParticipant);
         logTimestamps();
 
-        session->unstashTransactionResources(_opCtx, "insert");
+        txnParticipant->unstashTransactionResources(_opCtx, "insert");
 
-        session->commitUnpreparedTransaction(_opCtx);
+        txnParticipant->commitUnpreparedTransaction(_opCtx);
 
-        session->stashTransactionResources(_opCtx);
+        txnParticipant->stashTransactionResources(_opCtx);
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();
@@ -2593,8 +2591,8 @@ public:
         : MultiDocumentTransactionTest("preparedMultiDocumentTransaction") {}
 
     void run() {
-        auto session = OperationContextSession::get(_opCtx);
-        ASSERT(session);
+        auto txnParticipant = TransactionParticipant::get(_opCtx);
+        ASSERT(txnParticipant);
 
         const auto currentTime = _clock->getClusterTime();
         const auto prepareTs = currentTime.addTicks(1).asTimestamp();
@@ -2624,11 +2622,11 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitTimestamp, false);
         }
-        session->unstashTransactionResources(_opCtx, "insert");
+        txnParticipant->unstashTransactionResources(_opCtx, "insert");
 
-        session->prepareTransaction(_opCtx);
+        txnParticipant->prepareTransaction(_opCtx);
 
-        session->stashTransactionResources(_opCtx);
+        txnParticipant->stashTransactionResources(_opCtx);
         {
             const auto prepareFilter = BSON("ts" << prepareTs);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
@@ -2646,11 +2644,11 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitTimestamp, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, false);
         }
-        session->unstashTransactionResources(_opCtx, "insert");
+        txnParticipant->unstashTransactionResources(_opCtx, "insert");
 
-        session->commitPreparedTransaction(_opCtx, commitTimestamp);
+        txnParticipant->commitPreparedTransaction(_opCtx, commitTimestamp);
 
-        session->stashTransactionResources(_opCtx);
+        txnParticipant->stashTransactionResources(_opCtx);
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();

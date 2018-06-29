@@ -68,7 +68,7 @@
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -1349,9 +1349,9 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     invariant(!readConcern.getArgsOpTime());
 
     // TODO SERVER-34620: Re-enable speculative behavior when "atClusterTime" is specified.
-    auto session = OperationContextSession::get(opCtx);
-    const bool speculative =
-        session && session->inMultiDocumentTransaction() && !readConcern.getArgsAtClusterTime();
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const bool speculative = txnParticipant && txnParticipant->inMultiDocumentTransaction() &&
+        !readConcern.getArgsAtClusterTime();
 
     const bool isMajorityCommittedRead =
         (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern ||
@@ -1927,8 +1927,8 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
         return Status::OK();
     }
 
-    auto session = OperationContextSession::get(opCtx);
-    if (session && session->inMultiDocumentTransaction()) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
         if (!_canAcceptNonLocalWrites && !getTestCommandsEnabled()) {
             return Status(ErrorCodes::NotMaster,
                           "Multi-document transactions are only allowed on replica set primaries.");

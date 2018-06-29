@@ -66,6 +66,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -335,8 +336,8 @@ public:
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);
 
-        const auto session = OperationContextSession::get(opCtx);
-        const auto inTransaction = session && session->inMultiDocumentTransaction();
+        const auto txnParticipant = TransactionParticipant::get(opCtx);
+        const auto inTransaction = txnParticipant && txnParticipant->inMultiDocumentTransaction();
         uassert(50781,
                 str::stream() << "Cannot write to system collection " << nsString.ns()
                               << " within a transaction.",
@@ -350,7 +351,7 @@ public:
 
 
         const auto stmtId = 0;
-        if (opCtx->getTxnNumber()) {
+        if (opCtx->getTxnNumber() && !inTransaction) {
             auto session = OperationContextSession::get(opCtx);
             if (auto entry =
                     session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {

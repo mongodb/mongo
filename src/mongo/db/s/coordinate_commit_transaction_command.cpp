@@ -33,7 +33,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/coordinate_commit_transaction_gen.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -47,13 +47,13 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            auto session = OperationContextSession::get(opCtx);
+            auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::CommandFailed,
-                    "commitTransaction must be run within a session",
-                    session);
+                    "commitTransaction must be run within a transaction",
+                    txnParticipant);
 
             // commitTransaction is retryable.
-            if (session->transactionIsCommitted()) {
+            if (txnParticipant->transactionIsCommitted()) {
                 // We set the client last op to the last optime observed by the system to ensure
                 // that we wait for the specified write concern on an optime greater than or equal
                 // to the commit oplog entry.
@@ -64,9 +64,9 @@ public:
 
             uassert(ErrorCodes::NoSuchTransaction,
                     "Transaction isn't in progress",
-                    session->inMultiDocumentTransaction());
+                    txnParticipant->inMultiDocumentTransaction());
 
-            session->commitUnpreparedTransaction(opCtx);
+            txnParticipant->commitUnpreparedTransaction(opCtx);
         }
 
     private:

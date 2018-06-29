@@ -62,8 +62,8 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/stdx/memory.h"
@@ -371,10 +371,10 @@ Status runAggregate(OperationContext* opCtx,
             // Check whether the parsed pipeline supports the given read concern.
             liteParsedPipeline.assertSupportsReadConcern(opCtx, request.getExplain());
         } catch (const DBException& ex) {
-            auto session = OperationContextSession::get(opCtx);
+            auto txnParticipant = TransactionParticipant::get(opCtx);
             // If we are in a multi-document transaction, we intercept the 'readConcern'
             // assertion in order to provide a more descriptive error message and code.
-            if (session && session->inMultiDocumentTransaction()) {
+            if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
                 return {ErrorCodes::OperationNotSupportedInTransaction,
                         ex.toStatus("Operation not permitted in transaction").reason()};
             }
@@ -495,8 +495,9 @@ Status runAggregate(OperationContext* opCtx,
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
                                   uuid));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-        auto session = OperationContextSession::get(opCtx);
-        expCtx->inMultiDocumentTransaction = session && session->inMultiDocumentTransaction();
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        expCtx->inMultiDocumentTransaction =
+            txnParticipant && txnParticipant->inMultiDocumentTransaction();
 
         auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
 

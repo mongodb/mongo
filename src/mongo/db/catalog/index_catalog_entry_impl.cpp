@@ -48,7 +48,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -162,12 +162,12 @@ const RecordId& IndexCatalogEntryImpl::head(OperationContext* opCtx) const {
 }
 
 bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
-    auto session = OperationContextSession::get(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
     // For multi-document transactions, we can open a snapshot prior to checking the
     // minimumSnapshotVersion on a collection.  This means we are unprotected from reading
     // out-of-sync index catalog entries.  To fix this, we uassert if we detect that the
     // in-memory catalog is out-of-sync with the on-disk catalog.
-    if (session && session->inMultiDocumentTransaction()) {
+    if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
         if (!_catalogIsPresent(opCtx) || _catalogIsReady(opCtx) != _isReady) {
             uasserted(ErrorCodes::SnapshotUnavailable,
                       str::stream() << "Unable to read from a snapshot due to pending collection"
@@ -192,12 +192,12 @@ bool IndexCatalogEntryImpl::isMultikey(OperationContext* opCtx) const {
     // To accomplish this, the write-path will persist multikey changes on the `Session` object
     // and the read-path will query this state before determining there is no interesting multikey
     // state. Note, it's always legal, though potentially wasteful, to return `true`.
-    auto session = OperationContextSession::get(opCtx);
-    if (!session || !session->inMultiDocumentTransaction()) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (!txnParticipant || !txnParticipant->inMultiDocumentTransaction()) {
         return false;
     }
 
-    for (const MultikeyPathInfo& path : session->getMultikeyPathInfo()) {
+    for (const MultikeyPathInfo& path : txnParticipant->getMultikeyPathInfo()) {
         if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
             return true;
         }
@@ -209,13 +209,13 @@ bool IndexCatalogEntryImpl::isMultikey(OperationContext* opCtx) const {
 MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
 
-    auto session = OperationContextSession::get(opCtx);
-    if (!session || !session->inMultiDocumentTransaction()) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (!txnParticipant || !txnParticipant->inMultiDocumentTransaction()) {
         return _indexMultikeyPaths;
     }
 
     MultikeyPaths ret = _indexMultikeyPaths;
-    for (const MultikeyPathInfo& path : session->getMultikeyPathInfo()) {
+    for (const MultikeyPathInfo& path : txnParticipant->getMultikeyPathInfo()) {
         if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
             MultikeyPathTracker::mergeMultikeyPaths(&ret, path.multikeyPaths);
         }
@@ -342,13 +342,13 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
         });
 
     // Keep multikey changes in memory to correctly service later reads using this index.
-    auto session = OperationContextSession::get(opCtx);
-    if (session && session->inMultiDocumentTransaction()) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
         MultikeyPathInfo info;
         info.nss = _collection->ns();
         info.indexName = _descriptor->indexName();
         info.multikeyPaths = paths;
-        session->addMultikeyPathInfo(std::move(info));
+        txnParticipant->addMultikeyPathInfo(std::move(info));
     }
 }
 
