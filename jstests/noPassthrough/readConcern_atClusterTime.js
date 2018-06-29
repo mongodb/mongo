@@ -2,7 +2,7 @@
 //
 // Only run this test with the WiredTiger storage engine, since we expect other storage engines to
 // return early because they do not support snapshot read concern.
-// @tags: [requires_wiredtiger]
+// @tags: [requires_wiredtiger, uses_transactions]
 
 function _getClusterTime(rst) {
     const pingRes = assert.commandWorked(rst.getPrimary().adminCommand({ping: 1}));
