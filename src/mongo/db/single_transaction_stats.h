@@ -53,14 +53,14 @@ public:
 
     /**
      * If the transaction is currently in progress, this method returns the duration
-     * the transaction has been running for in microseconds.
+     * the transaction has been running for in microseconds, given the current time value.
      *
      * For a completed transaction, this method returns the total duration of the
      * transaction in microseconds.
      *
      * This method cannot be called until setStartTime() has been called.
      */
-    unsigned long long getDuration() const;
+    unsigned long long getDuration(unsigned long long curTime) const;
 
     /**
      * Sets the transaction's end time, only if the start time has already been set.
@@ -70,10 +70,16 @@ public:
     void setEndTime(unsigned long long time);
 
     /**
-     * Returns the total active time of the transaction. A transaction is active when there is a
-     * running operation that is part of the transaction.
+     * Returns the total active time of the transaction, given the current time value. A transaction
+     * is active when there is a running operation that is part of the transaction.
      */
-    Microseconds getTimeActiveMicros() const;
+    Microseconds getTimeActiveMicros(unsigned long long curTime) const;
+
+    /**
+     * Returns the total inactive time of the transaction, given the current time value. A
+     * transaction is inactive when it is idly waiting for a new operation to occur.
+     */
+    Microseconds getTimeInactiveMicros(unsigned long long curTime) const;
 
     /**
      * Marks the transaction as active and sets the start of the transaction's active time.
