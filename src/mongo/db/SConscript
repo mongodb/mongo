@@ -658,6 +658,20 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='transaction_two_phase_commit_test',
+    source=[
+        'transaction_coordinator_participant_list_test.cpp',
+        'transaction_coordinator_state_machine_test.cpp',
+        'transaction_coordinator_test.cpp',
+        'transaction_participant_state_machine_test.cpp',
+    ],
+    LIBDEPS=[
+        'auth/authmocks',
+        'catalog_raii',
+    ],
+)
+
+env.CppUnitTest(
     target='catalog_raii_test',
     source=[
         'catalog_raii_test.cpp',

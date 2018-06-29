@@ -36,6 +36,10 @@
 
 namespace mongo {
 
+using Action = TransactionCoordinator::StateMachine::Action;
+using Event = TransactionCoordinator::StateMachine::Event;
+using State = TransactionCoordinator::StateMachine::State;
+
 namespace {
 const Session::Decoration<boost::optional<TransactionCoordinator>> getTransactionCoordinator =
     Session::declareDecoration<boost::optional<TransactionCoordinator>>();
@@ -48,6 +52,250 @@ boost::optional<TransactionCoordinator>& TransactionCoordinator::get(Session* se
 void TransactionCoordinator::create(Session* session) {
     invariant(!getTransactionCoordinator(session));
     getTransactionCoordinator(session).emplace();
+}
+
+void TransactionCoordinator::recvCoordinateCommit(const std::set<ShardId>& participants) {
+    _participantList.recordFullList(participants);
+}
+
+void TransactionCoordinator::recvVoteCommit(const ShardId& shardId, int prepareTimestamp) {
+    _participantList.recordVoteCommit(shardId, prepareTimestamp);
+    if (_participantList.allParticipantsVotedCommit()) {
+        _stateMachine.onEvent(Event::kRecvFinalVoteCommit);
+    }
+}
+
+void TransactionCoordinator::recvVoteAbort(const ShardId& shardId) {
+    _participantList.recordVoteAbort(shardId);
+    _stateMachine.onEvent(Event::kRecvVoteAbort);
+}
+
+void TransactionCoordinator::recvCommitAck(const ShardId& shardId) {
+    _participantList.recordCommitAck(shardId);
+    if (_participantList.allParticipantsAckedCommit()) {
+        _stateMachine.onEvent(Event::kRecvFinalCommitAck);
+    }
+}
+
+void TransactionCoordinator::recvAbortAck(const ShardId& shardId) {
+    _participantList.recordAbortAck(shardId);
+    if (_participantList.allParticipantsAckedAbort()) {
+        _stateMachine.onEvent(Event::kRecvFinalAbortAck);
+    }
+}
+
+//
+// StateMachine
+//
+
+/**
+ * This table shows the events that are legal to occur (given an asynchronous network) while in each
+ * state.
+ *
+ * For each legal event, it shows the associated action (if any) the coordinator should take, and
+ * the next state the coordinator should transition to.
+ *
+ * Empty ("{}") transitions mean "legal event, but no action to take and no new state to transition
+ * to.
+ * Missing transitions are illegal.
+ */
+const std::map<State, std::map<Event, TransactionCoordinator::StateMachine::Transition>>
+    TransactionCoordinator::StateMachine::transitionTable = {
+        // clang-format off
+        {State::kWaitingForVotes, {
+            {Event::kRecvFinalVoteCommit,   {Action::kSendCommit, State::kWaitingForCommitAcks}},
+            {Event::kRecvVoteAbort,         {Action::kSendAbort, State::kWaitingForAbortAcks}},
+        }},
+        {State::kWaitingForAbortAcks, {
+            {Event::kRecvVoteAbort,         {}},
+            {Event::kRecvFinalAbortAck,     {State::kAborted}},
+        }},
+        {State::kAborted, {
+            {Event::kRecvFinalVoteCommit,   {}},
+            {Event::kRecvVoteAbort,         {}},
+            {Event::kRecvFinalAbortAck,     {}},
+        }},
+        {State::kWaitingForCommitAcks, {
+            {Event::kRecvFinalVoteCommit,   {}},
+            {Event::kRecvFinalCommitAck,    {State::kCommitted}},
+        }},
+        {State::kCommitted, {
+            {Event::kRecvFinalVoteCommit,   {}},
+            {Event::kRecvFinalCommitAck,    {}},
+        }},
+        {State::kBroken, {}},
+        // clang-format on
+};
+
+Action TransactionCoordinator::StateMachine::onEvent(Event event) {
+    const auto legalTransitions = transitionTable.find(_state)->second;
+    if (!legalTransitions.count(event)) {
+        _state = State::kBroken;
+        uasserted(ErrorCodes::InternalError,
+                  str::stream() << "Transaction coordinator received illegal event '" << event
+                                << "' while in state '"
+                                << _state
+                                << "'");
+    }
+
+    const auto transition = legalTransitions.find(event)->second;
+    if (transition.nextState) {
+        _state = *transition.nextState;
+    }
+    return transition.action;
+}
+
+//
+// ParticipantList
+//
+
+void TransactionCoordinator::ParticipantList::recordFullList(
+    const std::set<ShardId>& participants) {
+    if (!_participantListReceived) {
+        for (auto& shardId : participants) {
+            _recordParticipant(shardId);
+        }
+        _participantListReceived = true;
+    }
+    _validate(participants);
+}
+
+void TransactionCoordinator::ParticipantList::recordVoteCommit(const ShardId& shardId,
+                                                               int prepareTimestamp) {
+    if (!_participantListReceived) {
+        _recordParticipant(shardId);
+    }
+
+    auto it = _participants.find(shardId);
+    uassert(
+        ErrorCodes::InternalError,
+        str::stream() << "Transaction commit coordinator received vote 'commit' from participant "
+                      << shardId.toString()
+                      << " not in participant list",
+        it != _participants.end());
+    auto& participant = it->second;
+
+    uassert(
+        ErrorCodes::InternalError,
+        str::stream() << "Transaction commit coordinator received vote 'commit' from participant "
+                      << shardId.toString()
+                      << " that previously voted to abort",
+        participant.vote != Participant::Vote::kAbort);
+
+    if (participant.vote == Participant::Vote::kUnknown) {
+        participant.vote = Participant::Vote::kCommit;
+        participant.prepareTimestamp = prepareTimestamp;
+    } else {
+        uassert(ErrorCodes::InternalError,
+                str::stream() << "Transaction commit coordinator received prepareTimestamp "
+                              << prepareTimestamp
+                              << " from participant "
+                              << shardId.toString()
+                              << " that previously reported prepareTimestamp "
+                              << participant.prepareTimestamp,
+                *participant.prepareTimestamp == prepareTimestamp);
+    }
+}
+
+void TransactionCoordinator::ParticipantList::recordVoteAbort(const ShardId& shardId) {
+    if (!_participantListReceived) {
+        _recordParticipant(shardId);
+    }
+
+    auto it = _participants.find(shardId);
+    uassert(
+        ErrorCodes::InternalError,
+        str::stream() << "Transaction commit coordinator received vote 'abort' from participant "
+                      << shardId.toString()
+                      << " not in participant list",
+        it != _participants.end());
+    auto& participant = it->second;
+
+    uassert(
+        ErrorCodes::InternalError,
+        str::stream() << "Transaction commit coordinator received vote 'commit' from participant "
+                      << shardId.toString()
+                      << " that previously voted to abort",
+        participant.vote != Participant::Vote::kCommit);
+
+    if (participant.vote == Participant::Vote::kUnknown) {
+        participant.vote = Participant::Vote::kAbort;
+    }
+}
+
+void TransactionCoordinator::ParticipantList::recordCommitAck(const ShardId& shardId) {
+    auto it = _participants.find(shardId);
+    uassert(
+        ErrorCodes::InternalError,
+        str::stream() << "Transaction commit coordinator processed 'commit' ack from participant "
+                      << shardId.toString()
+                      << " not in participant list",
+        it != _participants.end());
+    it->second.ack = Participant::Ack::kCommit;
+}
+
+void TransactionCoordinator::ParticipantList::recordAbortAck(const ShardId& shardId) {
+    auto it = _participants.find(shardId);
+    uassert(
+        ErrorCodes::InternalError,
+        str::stream() << "Transaction commit coordinator processed 'abort' ack from participant "
+                      << shardId.toString()
+                      << " not in participant list",
+        it != _participants.end());
+    it->second.ack = Participant::Ack::kAbort;
+}
+
+bool TransactionCoordinator::ParticipantList::allParticipantsVotedCommit() {
+    return _participantListReceived &&
+        std::all_of(_participants.begin(),
+                    _participants.end(),
+                    [](const std::pair<ShardId, Participant>& i) {
+                        return i.second.vote == Participant::Vote::kCommit;
+                    });
+}
+
+bool TransactionCoordinator::ParticipantList::allParticipantsAckedAbort() {
+    invariant(_participantListReceived);
+    return std::all_of(
+        _participants.begin(), _participants.end(), [](const std::pair<ShardId, Participant>& i) {
+            return i.second.ack == Participant::Ack::kAbort;
+        });
+}
+
+bool TransactionCoordinator::ParticipantList::allParticipantsAckedCommit() {
+    invariant(_participantListReceived);
+    return std::all_of(
+        _participants.begin(), _participants.end(), [](const std::pair<ShardId, Participant>& i) {
+            return i.second.ack == Participant::Ack::kCommit;
+        });
+}
+
+void TransactionCoordinator::ParticipantList::_recordParticipant(const ShardId& shardId) {
+    if (_participants.find(shardId) == _participants.end()) {
+        _participants[shardId] = {};
+    }
+}
+
+void TransactionCoordinator::ParticipantList::_validate(const std::set<ShardId>& participants) {
+    // Ensure that the participant list received contained only participants that we already know
+    // about.
+    for (auto& shardId : participants) {
+        uassert(ErrorCodes::InternalError,
+                str::stream() << "Transaction commit coordinator received a participant list with "
+                                 "unexpected participant "
+                              << shardId,
+                _participants.find(shardId) != _participants.end());
+    }
+
+    // Ensure that the participant list received is not missing a participant we already heard from.
+    for (auto& it : _participants) {
+        auto& shardId = it.first;
+        uassert(ErrorCodes::InternalError,
+                str::stream() << "Transaction commit coordinator received a participant list "
+                                 "missing expected participant "
+                              << shardId.toString(),
+                participants.find(shardId) != participants.end());
+    }
 }
 
 }  // namespace mongo

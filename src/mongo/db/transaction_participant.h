@@ -29,9 +29,13 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <iostream>
+#include <map>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -50,6 +54,140 @@ public:
 
     static boost::optional<TransactionParticipant>& get(Session* session);
     static void create(Session* session);
+
+    class StateMachine {
+    public:
+        friend class TransactionParticipant;
+
+        // Note: We must differentiate the 'committed/aborted' and 'committed/aborted after prepare'
+        // states, because it is illegal to receive, for example, a prepare request after a
+        // commit/abort if no prepare was received before the commit/abort.
+        enum class State {
+            kUnprepared,
+            kAborted,
+            kCommitted,
+            kWaitingForDecision,
+            kAbortedAfterPrepare,
+            kCommittedAfterPrepare,
+
+            // The state machine transitions to this state when a message that is considered illegal
+            // to receive in a particular state is received. This indicates either a byzantine
+            // message, or that the transition table does not accurately reflect an asynchronous
+            // network.
+            kBroken,
+        };
+
+        // State machine inputs
+        enum class Event {
+            kRecvPrepare,
+            kVoteCommitRejected,
+            kRecvAbort,
+            kRecvCommit,
+        };
+
+        // State machine outputs
+        enum class Action {
+            kNone,
+            kPrepare,
+            kAbort,
+            kCommit,
+            kSendCommitAck,
+            kSendAbortAck,
+        };
+
+        Action onEvent(Event e);
+
+        State state() {
+            return _state;
+        }
+
+    private:
+        struct Transition {
+            Transition() : action(Action::kNone) {}
+            Transition(Action action) : action(action) {}
+            Transition(Action action, State state) : action(action), nextState(state) {}
+
+            Action action;
+            boost::optional<State> nextState;
+        };
+
+        static const std::map<State, std::map<Event, Transition>> transitionTable;
+        State _state{State::kUnprepared};
+    };
+
+private:
+    StateMachine _stateMachine;
 };
+
+inline StringBuilder& operator<<(StringBuilder& sb,
+                                 const TransactionParticipant::StateMachine::State& state) {
+    using State = TransactionParticipant::StateMachine::State;
+    switch (state) {
+        // clang-format off
+        case State::kUnprepared:                return sb << "Unprepared";
+        case State::kAborted:                   return sb << "Aborted";
+        case State::kCommitted:                 return sb << "Committed";
+        case State::kWaitingForDecision:        return sb << "WaitingForDecision";
+        case State::kAbortedAfterPrepare:       return sb << "AbortedAfterPrepare";
+        case State::kCommittedAfterPrepare:     return sb << "CommittedAfterPrepare";
+        case State::kBroken:                    return sb << "Broken";
+        // clang-format on
+        default:
+            MONGO_UNREACHABLE;
+    };
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const TransactionParticipant::StateMachine::State& state) {
+    StringBuilder sb;
+    sb << state;
+    return os << sb.str();
+}
+
+inline StringBuilder& operator<<(StringBuilder& sb,
+                                 const TransactionParticipant::StateMachine::Event& event) {
+    using Event = TransactionParticipant::StateMachine::Event;
+    switch (event) {
+        // clang-format off
+        case Event::kRecvPrepare:               return sb << "RecvPrepare";
+        case Event::kVoteCommitRejected:        return sb << "VoteCommitRejected";
+        case Event::kRecvAbort:                 return sb << "RecvAbort";
+        case Event::kRecvCommit:                return sb << "RecvCommit";
+        // clang-format on
+        default:
+            MONGO_UNREACHABLE;
+    };
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const TransactionParticipant::StateMachine::Event& event) {
+    StringBuilder sb;
+    sb << event;
+    return os << sb.str();
+}
+
+inline StringBuilder& operator<<(StringBuilder& sb,
+                                 const TransactionParticipant::StateMachine::Action& action) {
+    using Action = TransactionParticipant::StateMachine::Action;
+    switch (action) {
+        // clang-format off
+        case Action::kNone:                     return sb << "None";
+        case Action::kPrepare:                  return sb << "Prepare";
+        case Action::kAbort:                    return sb << "Abort";
+        case Action::kCommit:                   return sb << "Commit";
+        case Action::kSendCommitAck:            return sb << "SendCommitAck";
+        case Action::kSendAbortAck:             return sb << "SendAbortAck";
+        // clang-format on
+        default:
+            MONGO_UNREACHABLE;
+    };
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const TransactionParticipant::StateMachine::Action& action) {
+    StringBuilder sb;
+    sb << action;
+    return os << sb.str();
+}
 
 }  // namespace mongo
