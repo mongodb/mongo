@@ -58,3 +58,18 @@ const (
 	OpCodeCompressed   = OpCode(2012)
 	OpCodeMessage      = OpCode(2013)
 )
+
+var goodOpCode = map[int32]bool{
+	1:    true, //OP_REPLY          Reply to a client request. responseTo is set.
+	2001: true, //OP_UPDATE         Update document.
+	2002: true, //OP_INSERT         Insert new document.
+	2003: true, //RESERVED          Formerly used for OP_GET_BY_OID.
+	2004: true, //OP_QUERY          Query a collection.
+	2005: true, //OP_GET_MORE       Get more data from a query. See Cursors.
+	2006: true, //OP_DELETE         Delete documents.
+	2007: true, //OP_KILL_CURSORS   Notify database that the client has finished with the cursor.
+	2010: true, //OP_COMMAND        A new wire protocol message representing a command request
+	2011: true, //OP_COMMANDREPLY   A new wire protocol message representing a command
+	2012: true, //OP_COMPRESSED     Compressed op
+	2013: true, //OP_MSG			New command/reply type
+}

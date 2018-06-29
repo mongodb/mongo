@@ -1,6 +1,8 @@
 package mgo
 
 import (
+	"bytes"
+	"compress/zlib"
 	"fmt"
 	"io"
 
@@ -19,6 +21,7 @@ type messageCompressor interface {
 const (
 	noopCompressorId   = 0
 	snappyCompressorId = 1
+	zlibCompressorId   = 2
 )
 
 var (
@@ -27,6 +30,7 @@ var (
 		tbl: map[uint8]messageCompressor{
 			noopCompressorId:   new(noopMessageCompressor),
 			snappyCompressorId: new(snappyMessageCompressor),
+			zlibCompressorId:   new(zlibMessageCompressor),
 		},
 	}
 )
@@ -167,5 +171,55 @@ func (snappyMessageCompressor) decompressData(dst, src []byte) (n int, err error
 		return
 	}
 	_, err = snappy.Decode(dst, src)
+	return
+}
+
+type zlibMessageCompressor struct{}
+
+func (zlibMessageCompressor) getId() uint8    { return zlibCompressorId }
+func (zlibMessageCompressor) getName() string { return "zlib" }
+func (zlibMessageCompressor) getMaxCompressedSize(srcLen int) int {
+	return srcLen
+}
+func (zlibMessageCompressor) compressData(dst, src []byte) (n int, err error) {
+	var buf bytes.Buffer
+	wtr := zlib.NewWriter(&buf)
+	_, err = wtr.Write(src)
+	if err != nil {
+		return
+	}
+	err = wtr.Close()
+	if err != nil {
+		return
+	}
+	if buf.Len() > len(dst) {
+		err = io.ErrShortBuffer
+		return
+	}
+	copy(dst, buf.Bytes())
+	n = buf.Len()
+	return
+}
+
+func (zlibMessageCompressor) decompressData(dst, src []byte) (n int, err error) {
+	var buf bytes.Buffer
+	rdr, err := zlib.NewReader(bytes.NewReader(src))
+	if err != nil {
+		return
+	}
+	_, err = buf.ReadFrom(rdr)
+	if err != nil {
+		return
+	}
+	err = rdr.Close()
+	if err != nil {
+		return
+	}
+	if buf.Len() > len(dst) {
+		err = io.ErrShortBuffer
+		return
+	}
+	copy(dst, buf.Bytes())
+	n = buf.Len()
 	return
 }
