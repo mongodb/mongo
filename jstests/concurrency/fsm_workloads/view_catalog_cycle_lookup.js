@@ -98,7 +98,15 @@ var $config = (function() {
 
         function readFromView(db, collName) {
             const viewName = this.getRandomView(this.viewList);
-            assertAlways.commandWorked(db.runCommand({find: viewName}));
+            const res = db.runCommand({find: viewName});
+            // When initializing an aggregation on a view, the server briefly releases its
+            // collection lock before creating and iterating the cursor on the underlying namespace.
+            // In this short window of time, it's possible that that namespace has been dropped and
+            // replaced with a view.
+            // TODO (SERVER-35635): It would be more appropriate for the server to return
+            // OperationFailed, as CommandNotSupportedOnView is misleading.
+            assertAlways(res.ok === 1 || res.code === ErrorCodes.CommandNotSupportedOnView,
+                         () => tojson(res));
         }
 
         return {
