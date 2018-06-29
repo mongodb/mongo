@@ -1837,8 +1837,7 @@ protected:
      */
     void simulateHeartbeatResponses(OpTime optimePrimary,
                                     OpTime optimeLagged,
-                                    int numNodesCaughtUp,
-                                    bool caughtUpAreElectable) {
+                                    int numNodesCaughtUp) {
         int hbNum = 1;
         while (getNet()->hasReadyRequests()) {
             NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -1855,7 +1854,6 @@ protected:
 
             // Catch up 'numNodesCaughtUp' nodes out of 5.
             OpTime optimeResponse = (hbNum <= numNodesCaughtUp) ? optimePrimary : optimeLagged;
-            bool isElectable = (hbNum <= numNodesCaughtUp) ? caughtUpAreElectable : true;
 
             ReplSetHeartbeatResponse hbResp;
             hbResp.setSetName(hbArgs.getSetName());
@@ -1863,7 +1861,6 @@ protected:
             hbResp.setConfigVersion(hbArgs.getConfigVersion());
             hbResp.setDurableOpTime(optimeResponse);
             hbResp.setAppliedOpTime(optimeResponse);
-            hbResp.setElectable(isElectable);
             BSONObjBuilder respObj;
             respObj << "ok" << 1;
             hbResp.addToBSON(&respObj, false);
@@ -1897,41 +1894,6 @@ private:
     }
 };
 
-TEST_F(
-    StepDownTestFiveNode,
-    NodeReturnsExceededTimeLimitWhenStepDownIsRunAndCaughtUpMajorityExistsButWithoutElectableNode) {
-    OpTime optimeLagged(Timestamp(100, 1), 1);
-    OpTime optimePrimary(Timestamp(100, 2), 1);
-
-    // All nodes are caught up
-    getReplCoord()->setMyLastAppliedOpTime(optimePrimary);
-    getReplCoord()->setMyLastDurableOpTime(optimePrimary);
-    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 1, optimeLagged));
-    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 2, optimeLagged));
-    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 3, optimeLagged));
-    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 4, optimeLagged));
-
-    simulateSuccessfulV1Election();
-
-    enterNetwork();
-    getNet()->runUntil(getNet()->now() + Seconds(2));
-    ASSERT(getNet()->hasReadyRequests());
-
-    // Make sure a majority are caught up (i.e. 3 out of 5). We catch up two secondaries since
-    // the primary counts as one towards majority
-    int numNodesCaughtUp = 2;
-    simulateHeartbeatResponses(optimePrimary, optimeLagged, numNodesCaughtUp, false);
-    getNet()->runReadyNetworkOperations();
-    exitNetwork();
-
-    const auto opCtx = makeOperationContext();
-
-    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-    auto status = getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000));
-    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
-    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-}
-
 TEST_F(StepDownTestFiveNode,
        NodeReturnsExceededTimeLimitWhenStepDownIsRunAndNoCaughtUpMajorityExists) {
     OpTime optimeLagged(Timestamp(100, 1), 1);
@@ -1954,7 +1916,7 @@ TEST_F(StepDownTestFiveNode,
     // Make sure less than a majority are caught up (i.e. 2 out of 5) We catch up one secondary
     // since the primary counts as one towards majority
     int numNodesCaughtUp = 1;
-    simulateHeartbeatResponses(optimePrimary, optimeLagged, numNodesCaughtUp, true);
+    simulateHeartbeatResponses(optimePrimary, optimeLagged, numNodesCaughtUp);
     getNet()->runReadyNetworkOperations();
     exitNetwork();
 
@@ -1989,7 +1951,7 @@ TEST_F(
     // Make sure a majority are caught up (i.e. 3 out of 5). We catch up two secondaries since
     // the primary counts as one towards majority
     int numNodesCaughtUp = 2;
-    simulateHeartbeatResponses(optimePrimary, optimeLagged, numNodesCaughtUp, true);
+    simulateHeartbeatResponses(optimePrimary, optimeLagged, numNodesCaughtUp);
     getNet()->runReadyNetworkOperations();
     exitNetwork();
 

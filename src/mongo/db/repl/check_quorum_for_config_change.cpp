@@ -238,15 +238,6 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
         }
     }
 
-    const bool isInitialConfig = _rsConfig->getConfigVersion() == 1;
-    if (isInitialConfig && hbResp.hasData()) {
-        std::string message = str::stream() << "'" << request.target.toString()
-                                            << "' has data already, cannot initiate set.";
-        _vetoStatus = Status(ErrorCodes::CannotInitializeNodeWithData, message);
-        warning() << message;
-        return;
-    }
-
     for (int i = 0; i < _rsConfig->getNumMembers(); ++i) {
         const MemberConfig& memberConfig = _rsConfig->getMemberAt(i);
         if (memberConfig.getHostAndPort() != request.target) {

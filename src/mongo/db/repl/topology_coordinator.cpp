@@ -697,18 +697,10 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     invariant(hbStats.getLastHeartbeatStartDate() != Date_t());
     const bool isUnauthorized = (hbResponse.getStatus().code() == ErrorCodes::Unauthorized) ||
         (hbResponse.getStatus().code() == ErrorCodes::AuthenticationFailed);
-    if (!hbResponse.isOK()) {
-        if (isUnauthorized) {
-            hbStats.hit(networkRoundTripTime);
-        } else {
-            hbStats.miss();
-        }
-    } else {
+    if (hbResponse.isOK() || isUnauthorized) {
         hbStats.hit(networkRoundTripTime);
-        // Log diagnostics.
-        if (hbResponse.getValue().isStateDisagreement()) {
-            LOG(1) << target << " thinks that we are down because they cannot send us heartbeats.";
-        }
+    } else {
+        hbStats.miss();
     }
 
     // If a node is not PRIMARY and has no sync source, we increase the heartbeat rate in order
@@ -1984,9 +1976,6 @@ TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getUnelectableR
     if (hbData.getState() != MemberState::RS_SECONDARY) {
         result |= NotSecondary;
     }
-    if (hbData.up() && hbData.isUnelectable()) {
-        result |= RefusesToStand;
-    }
     invariant(result || memberConfig.isElectable());
     return result;
 }
@@ -2099,13 +2088,6 @@ std::string TopologyCoordinator::_getUnelectableReasonString(const UnelectableRe
         }
         hasWrittenToStream = true;
         ss << "node is not a member of a valid replica set configuration";
-    }
-    if (ur & RefusesToStand) {
-        if (hasWrittenToStream) {
-            ss << "; ";
-        }
-        hasWrittenToStream = true;
-        ss << "most recent heartbeat indicates node will not stand for election";
     }
     if (!hasWrittenToStream) {
         severe() << "Invalid UnelectableReasonMask value 0x" << integerToHex(ur);

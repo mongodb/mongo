@@ -381,11 +381,14 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetNameMismatch) {
         ASSERT(seenHosts.insert(request.target).second) << "Already saw "
                                                         << request.target.toString();
         if (request.target == HostAndPort("h4", 1)) {
-            getNet()->scheduleResponse(noi,
-                                       startDate + Milliseconds(10),
-                                       (RemoteCommandResponse(BSON("ok" << 0 << "mismatch" << true),
-                                                              BSONObj(),
-                                                              Milliseconds(8))));
+            getNet()->scheduleResponse(
+                noi,
+                startDate + Milliseconds(10),
+                (RemoteCommandResponse(
+                    BSON("ok" << 0 << "code" << ErrorCodes::InconsistentReplicaSetNames << "errmsg"
+                              << "replica set name doesn't match."),
+                    BSONObj(),
+                    Milliseconds(8))));
         } else {
             getNet()->scheduleResponse(
                 noi,
@@ -621,66 +624,6 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNodeOnlyOneRespo
     ASSERT_REASON_CONTAINS(status, "h5:1");
 }
 
-TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToNodeWithData) {
-    // In this test, "we" are host "h3:1".  Only node "h5" responds before the test completes,
-    // and quorum check fails because "h5" declares that it has data already.
-
-    const ReplSetConfig rsConfig =
-        assertMakeRSConfig(BSON("_id"
-                                << "rs0"
-                                << "version"
-                                << 1
-                                << "protocolVersion"
-                                << 1
-                                << "members"
-                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                         << "h1:1")
-                                              << BSON("_id" << 2 << "host"
-                                                            << "h2:1")
-                                              << BSON("_id" << 3 << "host"
-                                                            << "h3:1")
-                                              << BSON("_id" << 4 << "host"
-                                                            << "h4:1")
-                                              << BSON("_id" << 5 << "host"
-                                                            << "h5:1"))));
-    const int myConfigIndex = 2;
-    const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
-
-    startQuorumCheck(rsConfig, myConfigIndex);
-    const Date_t startDate = getNet()->now();
-    const int numCommandsExpected = rsConfig.getNumMembers() - 1;
-    stdx::unordered_set<HostAndPort> seenHosts;
-    getNet()->enterNetwork();
-    for (int i = 0; i < numCommandsExpected; ++i) {
-        const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
-        const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
-        ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
-        ASSERT(seenHosts.insert(request.target).second) << "Already saw "
-                                                        << request.target.toString();
-        ReplSetHeartbeatResponse hbResp;
-        hbResp.setConfigVersion(0);
-        hbResp.noteHasData();
-        if (request.target == HostAndPort("h5", 1)) {
-            getNet()->scheduleResponse(
-                noi,
-                startDate + Milliseconds(10),
-                (RemoteCommandResponse(hbResp.toBSON(false), BSONObj(), Milliseconds(8))));
-        } else {
-            getNet()->blackHole(noi);
-        }
-    }
-    getNet()->runUntil(startDate + Milliseconds(10));
-    getNet()->exitNetwork();
-    Status status = waitForQuorumCheck();
-    ASSERT_EQUALS(ErrorCodes::CannotInitializeNodeWithData, status);
-    ASSERT_REASON_CONTAINS(status, "has data already");
-    ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
-    ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
-    ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
-    ASSERT_NOT_REASON_CONTAINS(status, "h4:1");
-    ASSERT_REASON_CONTAINS(status, "h5:1");
-}
 TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToHigherConfigVersion) {
     // In this test, "we" are host "h3:1".  The request to "h2" does not arrive before the end
     // of the test, and the request to "h1" comes back indicating a higher config version.
@@ -772,11 +715,14 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToIncompatibleSetName) {
         ASSERT(seenHosts.insert(request.target).second) << "Already saw "
                                                         << request.target.toString();
         if (request.target == HostAndPort("h2", 1)) {
-            getNet()->scheduleResponse(noi,
-                                       startDate + Milliseconds(10),
-                                       (RemoteCommandResponse(BSON("ok" << 0 << "mismatch" << true),
-                                                              BSONObj(),
-                                                              Milliseconds(8))));
+            getNet()->scheduleResponse(
+                noi,
+                startDate + Milliseconds(10),
+                (RemoteCommandResponse(
+                    BSON("ok" << 0 << "code" << ErrorCodes::InconsistentReplicaSetNames << "errmsg"
+                              << "replica set name doesn't match."),
+                    BSONObj(),
+                    Milliseconds(8))));
         } else {
             getNet()->scheduleResponse(
                 noi, startDate + Milliseconds(10), {ErrorCodes::NoSuchKey, "No response"});

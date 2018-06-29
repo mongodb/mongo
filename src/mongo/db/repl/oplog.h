@@ -91,7 +91,6 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
 
 /*
  * Shortcut for above function using oplogCollectionName = _oplogCollectionName,
- * and replEnabled = replCoord::isReplSet();
  */
 void createOplog(OperationContext* opCtx);
 

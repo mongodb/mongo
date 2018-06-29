@@ -750,9 +750,8 @@ private:
         StepDownPeriodActive = 1 << 4,
         NoData = 1 << 5,
         NotInitialized = 1 << 6,
-        RefusesToStand = 1 << 7,
-        NotCloseEnoughToLatestForPriorityTakeover = 1 << 8,
-        NotFreshEnoughForCatchupTakeover = 1 << 9,
+        NotCloseEnoughToLatestForPriorityTakeover = 1 << 7,
+        NotFreshEnoughForCatchupTakeover = 1 << 8,
     };
 
     // Set what type of PRIMARY this node currently is.

@@ -50,13 +50,8 @@ namespace {
 const std::string kConfigFieldName = "config";
 const std::string kConfigVersionFieldName = "v";
 const std::string kElectionTimeFieldName = "electionTime";
-const std::string kHasDataFieldName = "hasData";
-const std::string kHasStateDisagreementFieldName = "stateDisagreement";
 const std::string kHbMessageFieldName = "hbmsg";
-const std::string kIsElectableFieldName = "e";
-const std::string kIsReplSetFieldName = "rs";
 const std::string kMemberStateFieldName = "state";
-const std::string kMismatchFieldName = "mismatch";
 const std::string kOkFieldName = "ok";
 const std::string kDurableOpTimeFieldName = "durableOpTime";
 const std::string kAppliedOpTimeFieldName = "opTime";
@@ -64,37 +59,18 @@ const std::string kPrimaryIdFieldName = "primaryId";
 const std::string kReplSetFieldName = "set";
 const std::string kSyncSourceFieldName = "syncingTo";
 const std::string kTermFieldName = "term";
-const std::string kTimeFieldName = "time";
 const std::string kTimestampFieldName = "ts";
 
 }  // namespace
 
 void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder, bool isProtocolVersionV1) const {
-    if (_mismatch) {
-        *builder << kOkFieldName << 0.0;
-        *builder << kMismatchFieldName << _mismatch;
-        return;
-    }
-
     builder->append(kOkFieldName, 1.0);
-    if (_timeSet) {
-        *builder << kTimeFieldName << durationCount<Seconds>(_time);
-    }
     if (_electionTimeSet) {
         builder->appendDate(kElectionTimeFieldName,
                             Date_t::fromMillisSinceEpoch(_electionTime.asLL()));
     }
     if (_configSet) {
         *builder << kConfigFieldName << _config.toBSON();
-    }
-    if (_electableSet) {
-        *builder << kIsElectableFieldName << _electable;
-    }
-    if (_isReplSet) {
-        *builder << "rs" << _isReplSet;
-    }
-    if (_stateDisagreement) {
-        *builder << kHasStateDisagreementFieldName << _stateDisagreement;
     }
     if (_stateSet) {
         builder->appendIntOrLL(kMemberStateFieldName, _state.s);
@@ -108,9 +84,6 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder, bool isProtoco
     }
     if (!_syncingTo.empty()) {
         *builder << kSyncSourceFieldName << _syncingTo.toString();
-    }
-    if (_hasDataSet) {
-        builder->append(kHasDataFieldName, _hasData);
     }
     if (_term != -1) {
         builder->append(kTermFieldName, _term);
@@ -138,11 +111,6 @@ BSONObj ReplSetHeartbeatResponse::toBSON(bool isProtocolVersionV1) const {
 }
 
 Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) {
-    // Old versions set this even though they returned not "ok"
-    _mismatch = doc[kMismatchFieldName].trueValue();
-    if (_mismatch)
-        return Status(ErrorCodes::InconsistentReplicaSetNames, "replica set name doesn't match.");
-
     // Old versions sometimes set the replica set name ("set") but ok:0
     const BSONElement replSetNameElement = doc[kReplSetFieldName];
     if (replSetNameElement.eoo()) {
@@ -164,10 +132,6 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
         }
     }
 
-    const BSONElement hasDataElement = doc[kHasDataFieldName];
-    _hasDataSet = !hasDataElement.eoo();
-    _hasData = hasDataElement.trueValue();
-
     const BSONElement electionTimeElement = doc[kElectionTimeFieldName];
     if (electionTimeElement.eoo()) {
         _electionTimeSet = false;
@@ -184,22 +148,6 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
                                        "command to have type Date or Timestamp, but found type "
                                     << typeName(electionTimeElement.type()));
     }
-
-    const BSONElement timeElement = doc[kTimeFieldName];
-    if (timeElement.eoo()) {
-        _timeSet = false;
-    } else if (timeElement.isNumber()) {
-        _timeSet = true;
-        _time = Seconds(timeElement.numberLong());
-    } else {
-        return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "Expected \"" << kTimeFieldName
-                                    << "\" field in response to replSetHeartbeat "
-                                       "command to have a numeric type, but found type "
-                                    << typeName(timeElement.type()));
-    }
-
-    _isReplSet = doc[kIsReplSetFieldName].trueValue();
 
     Status termStatus = bsonExtractIntegerField(doc, kTermFieldName, &_term);
     if (!termStatus.isOK() && termStatus != ErrorCodes::NoSuchKey) {
@@ -231,22 +179,12 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     } else if (appliedOpTimeElement.type() == Object) {
         Status status = bsonExtractOpTimeField(doc, kAppliedOpTimeFieldName, &_appliedOpTime);
         _appliedOpTimeSet = true;
-        // since a v1 OpTime was in the response, the member must be part of a replset
-        _isReplSet = true;
     } else {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kAppliedOpTimeFieldName
                                     << "\" field in response to replSetHeartbeat "
                                        "command to have type Date or Timestamp, but found type "
                                     << typeName(appliedOpTimeElement.type()));
-    }
-
-    const BSONElement electableElement = doc[kIsElectableFieldName];
-    if (electableElement.eoo()) {
-        _electableSet = false;
-    } else {
-        _electableSet = true;
-        _electable = electableElement.trueValue();
     }
 
     const BSONElement memberStateElement = doc[kMemberStateFieldName];
@@ -272,9 +210,6 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
         _stateSet = true;
         _state = MemberState(static_cast<int>(stateInt));
     }
-
-    _stateDisagreement = doc[kHasStateDisagreementFieldName].trueValue();
-
 
     // Not required for the case of uninitialized members -- they have no config
     const BSONElement configVersionElement = doc[kConfigVersionFieldName];
@@ -348,16 +283,6 @@ MemberState ReplSetHeartbeatResponse::getState() const {
 Timestamp ReplSetHeartbeatResponse::getElectionTime() const {
     invariant(_electionTimeSet);
     return _electionTime;
-}
-
-bool ReplSetHeartbeatResponse::isElectable() const {
-    invariant(_electableSet);
-    return _electable;
-}
-
-Seconds ReplSetHeartbeatResponse::getTime() const {
-    invariant(_timeSet);
-    return _time;
 }
 
 const ReplSetConfig& ReplSetHeartbeatResponse::getConfig() const {

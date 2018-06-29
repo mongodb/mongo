@@ -5828,10 +5828,8 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
     // Confirm that the topology coordinator does not mark a node down on three
     // nonconsecutive heartbeat failures.
     ReplSetHeartbeatResponse response;
-    response.noteReplSet();
     response.setSetName("rs0");
     response.setState(MemberState::RS_SECONDARY);
-    response.setElectable(true);
     response.setConfigVersion(5);
 
     // successful response (third response due to the two failures in setUp())
@@ -5892,32 +5890,6 @@ public:
     }
 };
 
-// TODO(dannenberg) change the name and functionality of this to match what this claims it is
-TEST_F(HeartbeatResponseHighVerbosityTestV1, UpdateHeartbeatDataOldConfig) {
-    OpTime lastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
-
-    // request heartbeat
-    std::pair<ReplSetHeartbeatArgsV1, Milliseconds> request =
-        getTopoCoord().prepareHeartbeatRequestV1(now()++, "rs0", HostAndPort("host2"));
-
-    ReplSetHeartbeatResponse believesWeAreDownResponse;
-    believesWeAreDownResponse.noteReplSet();
-    believesWeAreDownResponse.setSetName("rs0");
-    believesWeAreDownResponse.setState(MemberState::RS_SECONDARY);
-    believesWeAreDownResponse.setElectable(true);
-    believesWeAreDownResponse.noteStateDisagreement();
-    startCapturingLogMessages();
-    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
-    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
-        now()++,            // Time is left.
-        Milliseconds(400),  // Spent 0.4 of the 0.5 second in the network.
-        HostAndPort("host2"),
-        StatusWith<ReplSetHeartbeatResponse>(believesWeAreDownResponse));
-    stopCapturingLogMessages();
-    ASSERT_NO_ACTION(action.getAction());
-    ASSERT_EQUALS(1, countLogLinesContaining("host2:27017 thinks that we are down"));
-}
-
 // TODO(dannenberg) figure out why this test is useful
 TEST_F(HeartbeatResponseHighVerbosityTestV1, UpdateHeartbeatDataSameConfig) {
     OpTime lastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
@@ -5948,11 +5920,8 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1, UpdateHeartbeatDataSameConfig) {
         .transitional_ignore();
 
     ReplSetHeartbeatResponse sameConfigResponse;
-    sameConfigResponse.noteReplSet();
     sameConfigResponse.setSetName("rs0");
     sameConfigResponse.setState(MemberState::RS_SECONDARY);
-    sameConfigResponse.setElectable(true);
-    sameConfigResponse.noteStateDisagreement();
     sameConfigResponse.setConfigVersion(2);
     sameConfigResponse.setConfig(originalConfig);
     startCapturingLogMessages();
@@ -5978,11 +5947,8 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1,
         getTopoCoord().prepareHeartbeatRequestV1(now()++, "rs0", HostAndPort("host5"));
 
     ReplSetHeartbeatResponse memberMissingResponse;
-    memberMissingResponse.noteReplSet();
     memberMissingResponse.setSetName("rs0");
     memberMissingResponse.setState(MemberState::RS_SECONDARY);
-    memberMissingResponse.setElectable(true);
-    memberMissingResponse.noteStateDisagreement();
     startCapturingLogMessages();
     getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
@@ -5993,32 +5959,6 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1,
     stopCapturingLogMessages();
     ASSERT_NO_ACTION(action.getAction());
     ASSERT_EQUALS(1, countLogLinesContaining("Could not find host5:27017 in current config"));
-}
-
-TEST_F(HeartbeatResponseHighVerbosityTestV1,
-       LogMessageAndTakeNoActionWhenReceivingAHeartbeatResponseFromANodeThatBelievesWeAreDown) {
-    OpTime lastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
-
-    // request heartbeat
-    std::pair<ReplSetHeartbeatArgsV1, Milliseconds> request =
-        getTopoCoord().prepareHeartbeatRequestV1(now()++, "rs0", HostAndPort("host2"));
-
-    ReplSetHeartbeatResponse believesWeAreDownResponse;
-    believesWeAreDownResponse.noteReplSet();
-    believesWeAreDownResponse.setSetName("rs0");
-    believesWeAreDownResponse.setState(MemberState::RS_SECONDARY);
-    believesWeAreDownResponse.setElectable(true);
-    believesWeAreDownResponse.noteStateDisagreement();
-    startCapturingLogMessages();
-    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
-    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
-        now()++,            // Time is left.
-        Milliseconds(400),  // Spent 0.4 of the 0.5 second in the network.
-        HostAndPort("host2"),
-        StatusWith<ReplSetHeartbeatResponse>(believesWeAreDownResponse));
-    stopCapturingLogMessages();
-    ASSERT_NO_ACTION(action.getAction());
-    ASSERT_EQUALS(1, countLogLinesContaining("host2:27017 thinks that we are down"));
 }
 
 }  // namespace
