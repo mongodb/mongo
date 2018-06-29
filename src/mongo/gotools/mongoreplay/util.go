@@ -416,6 +416,9 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 	case int32: // NumberInt
 		return json.NumberInt(v), nil
 
+	case uint8: // NumberInt
+		return json.NumberInt(v), nil
+
 	case float64:
 		return json.NumberFloat(v), nil
 
@@ -456,6 +459,21 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 			}
 		}
 		return json.JavaScript{v.Code, scope}, nil
+
+	case mgo.MsgSection:
+		out := map[string]interface{}{
+			"payloadType": v.PayloadType,
+			"payload":     v.Data,
+		}
+		return ConvertBSONValueToJSON(out)
+
+	case mgo.PayloadType1:
+		out := map[string]interface{}{
+			"size":       v.Size,
+			"identifier": v.Identifier,
+			"documents":  v.Docs,
+		}
+		return ConvertBSONValueToJSON(out)
 
 	default:
 		switch x {

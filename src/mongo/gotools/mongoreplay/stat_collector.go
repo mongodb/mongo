@@ -412,6 +412,24 @@ func (gen *RegularStatGenerator) GenerateOpStat(recordedOp *RecordedOp, parsedOp
 		case *ReplyOp:
 			return gen.ResolveOp(recordedOp, t, stat)
 		}
+	case OpCodeMessage:
+		switch t := parsedOp.(type) {
+		case *MsgOp:
+			stat.RequestData = meta.Data
+			stat.RequestID = recordedOp.Header.RequestID
+			gen.AddUnresolvedOp(recordedOp, parsedOp, stat)
+			// In 'PairedMode', the stat is not considered completed at this point.
+			// We save the op as 'unresolved' and return nil. When the reply is seen
+			// we retrieve the saved stat and generate a completed pair stat, which
+			// is then returned.
+			if gen.PairedMode {
+				return nil
+			}
+		case *MsgOpReply:
+			stat.RequestID = recordedOp.Header.ResponseTo
+			stat.ReplyData = meta.Data
+			return gen.ResolveOp(recordedOp, t, stat)
+		}
 	default:
 		stat.RequestData = meta.Data
 	}
