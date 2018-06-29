@@ -116,6 +116,15 @@ REPORT_JSON = {}  # type: ignore
 REPORT_JSON_FILE = ""
 REPORT_JSON_SUCCESS = False
 
+EXIT_YML = {"exit_code": 0}  # type: ignore
+EXIT_YML_FILE = None
+
+
+def local_exit(code):
+    """Capture exit code and invoke sys.exit."""
+    EXIT_YML["exit_code"] = code
+    sys.exit(code)
+
 
 def exit_handler():
     """Exit handler to generate report.json, kill spawned processes, delete temporary files."""
@@ -142,6 +151,14 @@ def exit_handler():
             with open(REPORT_JSON_FILE, "w") as jstream:
                 json.dump(REPORT_JSON, jstream)
             LOGGER.debug("Exit handler: report file contents %s", REPORT_JSON)
+        except:  # pylint: disable=bare-except
+            pass
+
+    if EXIT_YML_FILE:
+        LOGGER.debug("Exit handler: Saving exit file %s", EXIT_YML_FILE)
+        try:
+            with open(EXIT_YML_FILE, "w") as yaml_stream:
+                yaml.safe_dump(EXIT_YML, yaml_stream)
         except:  # pylint: disable=bare-except
             pass
 
@@ -1072,6 +1089,15 @@ class MongodControl(object):  # pylint: disable=too-many-instance-attributes
         return self.service.get_pids()
 
 
+def verify_remote_access(remote_op):
+    """Exit if the remote host is not accessible and save result to YML file."""
+    if not remote_op.access_established():
+        code, output = remote_op.access_info()
+        LOGGER.error("Exiting, unable to establish access (%d): %s", code, output)
+        EXIT_YML["ec2_ssh_failure"] = output
+        local_exit(code)
+
+
 class LocalToRemoteOperations(object):
     """Local operations handler class for sending commands to the remote host.
 
@@ -1079,13 +1105,13 @@ class LocalToRemoteOperations(object):
     """
 
     def __init__(  # pylint: disable=too-many-arguments
-            self, user_host, ssh_connection_options=None, ssh_options=None,
-            shell_binary="/bin/bash", use_shell=False):
+            self, user_host, retries=2, retry_sleep=30, ssh_connection_options=None,
+            ssh_options=None, shell_binary="/bin/bash", use_shell=False):
         """Initialize LocalToRemoteOperations."""
 
         self.remote_op = remote_operations.RemoteOperations(  # pylint: disable=undefined-variable
             user_host=user_host, ssh_connection_options=ssh_connection_options,
-            ssh_options=ssh_options, retries=10, retry_sleep=10, debug=True,
+            ssh_options=ssh_options, retries=retries, retry_sleep=retry_sleep, debug=True,
             shell_binary=shell_binary, use_shell=use_shell)
 
     def shell(self, cmds, remote_dir=None):
@@ -1099,6 +1125,14 @@ class LocalToRemoteOperations(object):
     def copy_to(self, files, remote_dir=None):
         """Return tuple (ret, output) from performing remote copy_from operation."""
         return self.remote_op.copy_to(files, remote_dir)
+
+    def access_established(self):
+        """Return True if remote access has been established."""
+        return self.remote_op.access_established()
+
+    def access_info(self):
+        """Return the return code and output buffer from initial access attempt(s)."""
+        return self.remote_op.access_info()
 
 
 def remote_handler(options, operations):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
@@ -1341,6 +1375,7 @@ def crash_server_or_kill_mongod(  # pylint: disable=too-many-arguments,,too-many
         local_ops = LocalToRemoteOperations(user_host=options.ssh_crash_user_host,
                                             ssh_connection_options=options.ssh_crash_option,
                                             shell_binary="/bin/sh")
+        verify_remote_access(local_ops)
 
     elif options.crash_method == "internal" or options.crash_method == "kill":
         crash_cmd = "crash_server" if options.crash_method == "internal" else "kill_mongod"
@@ -1614,6 +1649,8 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
     global REPORT_JSON
     global REPORT_JSON_FILE
     global REPORT_JSON_SUCCESS
+    global EXIT_YML_FILE
+    global EXIT_YML
     # pylint: enable=global-statement
 
     atexit.register(exit_handler)
@@ -1659,8 +1696,8 @@ Examples:
     default_ssh_connection_options = ("-o ServerAliveCountMax=10"
                                       " -o ServerAliveInterval=6"
                                       " -o StrictHostKeyChecking=no"
-                                      " -o ConnectTimeout=30"
-                                      " -o ConnectionAttempts=25")
+                                      " -o ConnectTimeout=10"
+                                      " -o ConnectionAttempts=20")
     test_options.add_option("--sshConnection", dest="ssh_connection_options",
                             help="Server ssh additional connection options, i.e., '-i ident.pem'"
                             " which are added to '{}'".format(default_ssh_connection_options),
@@ -1885,9 +1922,13 @@ Examples:
                                " If this options is specified the program only saves"
                                " the configuration file and exits.", default=None)
 
-    program_options.add_option("--reportJsonFile", dest="REPORT_JSON_FILE",
+    program_options.add_option("--reportJsonFile", dest="report_json_file",
                                help="Create or update the specified report file upon program"
                                " exit.", default=None)
+
+    program_options.add_option("--exitYamlFile", dest="exit_yml_file",
+                               help="If specified, create a YAML file on exit containing"
+                               " exit code.", default=None)
 
     program_options.add_option("--remotePython", dest="remote_python",
                                help="The python intepreter to use on the remote host"
@@ -1975,8 +2016,13 @@ Examples:
         print("{}:{}".format(script_name, __version__))
         sys.exit(0)
 
-    if options.REPORT_JSON_FILE:
-        REPORT_JSON_FILE = options.REPORT_JSON_FILE
+    if options.exit_yml_file:
+        EXIT_YML_FILE = options.exit_yml_file
+        # Disable this option such that the remote side does not generate exit_yml_file
+        options.exit_yml_file = None
+
+    if options.report_json_file:
+        REPORT_JSON_FILE = options.report_json_file
         if REPORT_JSON_FILE and os.path.exists(REPORT_JSON_FILE):
             with open(REPORT_JSON_FILE) as jstream:
                 REPORT_JSON = json.load(jstream)
@@ -1990,7 +2036,7 @@ Examples:
             }
         LOGGER.debug("Updating/creating report JSON %s", REPORT_JSON)
         # Disable this option such that the remote side does not generate report.json
-        options.REPORT_JSON_FILE = None
+        options.report_json_file = None
 
     # Setup the crash options
     if options.crash_method == "mpower" and options.crash_option is None:
@@ -2029,7 +2075,7 @@ Examples:
     if options.remote_operation:
         ret = remote_handler(options, args)
         # Exit here since the local operations are performed after this.
-        sys.exit(ret)
+        local_exit(ret)
 
     # Required option for non-remote commands.
     if options.ssh_user_host is None and not options.remote_operation:
@@ -2057,16 +2103,16 @@ Examples:
             or options.validate_collections == "local"):
         if not options.mongo_path:
             LOGGER.error("mongoPath must be specified")
-            sys.exit(1)
+            local_exit(1)
         if not os.path.isfile(options.mongo_path):
             LOGGER.error("mongoPath %s does not exist", options.mongo_path)
-            sys.exit(1)
+            local_exit(1)
         mongo_path = os.path.abspath(os.path.normpath(options.mongo_path))
 
     # Setup the CRUD & FSM clients.
     if not os.path.isfile(options.config_crud_client):
         LOGGER.error("configCrudClient %s does not exist", options.config_crud_client)
-        sys.exit(1)
+        local_exit(1)
     with_external_server = "buildscripts/resmokeconfig/suites/with_external_server.yml"
     fsm_client = "jstests/libs/fsm_serial_client.js"
     fsm_workload_files = []
@@ -2102,7 +2148,7 @@ Examples:
         mongo_repo_root_dir = os.getcwd()
     if not os.path.isdir(mongo_repo_root_dir):
         LOGGER.error("mongoRepoRoot %s does not exist", mongo_repo_root_dir)
-        sys.exit(1)
+        local_exit(1)
 
     # Setup the validate_collections option.
     if options.validate_collections == "remote":
@@ -2114,7 +2160,7 @@ Examples:
     if options.canary and "nojournal" in mongod_options_map:
         LOGGER.error("Cannot create and validate canary documents if the mongod option"
                      " '--nojournal' is used.")
-        sys.exit(1)
+        local_exit(1)
 
     internal_crash_options = ["internal", "kill"]
     if options.canary == "remote" and options.crash_method not in internal_crash_options:
@@ -2149,7 +2195,7 @@ Examples:
             ret, aws_status = ec2.control_instance(mode="status", image_id=options.instance_id)
             if not is_instance_running(ret, aws_status):
                 LOGGER.error("AWS instance is not running:  %d %s", ret, aws_status)
-                sys.exit(1)
+                local_exit(1)
             if (ssh_host == aws_status.private_ip_address
                     or ssh_host == aws_status.private_dns_name):
                 address_type = "private_ip_address"
@@ -2158,12 +2204,13 @@ Examples:
     local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
                                         ssh_connection_options=ssh_connection_options,
                                         ssh_options=ssh_options, use_shell=True)
+    verify_remote_access(local_ops)
 
     # Bootstrap the remote host with this script.
     ret, output = local_ops.copy_to(__file__)
     if ret:
         LOGGER.error("Cannot access remote system %s", output)
-        sys.exit(1)
+        local_exit(1)
 
     # Pass client_args to the remote script invocation.
     client_args = ""
@@ -2191,7 +2238,7 @@ Examples:
                                         "--remoteOperation install_mongod")
     LOGGER.info("****install_mongod: %d %s****", ret, output)
     if ret:
-        sys.exit(ret)
+        local_exit(ret)
 
     # test_time option overrides num_loops.
     if options.test_time:
@@ -2265,7 +2312,7 @@ Examples:
         rsync_text = "rsync_data beforerecovery & " if options.rsync_data else ""
         LOGGER.info("****%sstart mongod: %d %s****", rsync_text, ret, output)
         if ret:
-            sys.exit(ret)
+            local_exit(ret)
 
         # Optionally validate canary document locally.
         if validate_canary_local:
@@ -2275,7 +2322,7 @@ Examples:
             ret = mongo_validate_canary(mongo, options.db_name, options.collection_name, canary_doc)
             LOGGER.info("Local canary validation: %d", ret)
             if ret:
-                sys.exit(ret)
+                local_exit(ret)
 
         # Optionally, run local validation of collections.
         if options.validate_collections == "local":
@@ -2289,7 +2336,7 @@ Examples:
                                          new_config_file)
             LOGGER.info("Local collection validation: %d %s", ret, output)
             if ret:
-                sys.exit(ret)
+                local_exit(ret)
 
         # Shutdown mongod on secret port.
         remote_op = ("--remoteOperation" " --mongodPort {}" " shutdown_mongod").format(secret_port)
@@ -2297,7 +2344,7 @@ Examples:
                                             client_args, remote_op)
         LOGGER.info("****shutdown_mongod: %d %s****", ret, output)
         if ret:
-            sys.exit(ret)
+            local_exit(ret)
 
         # Since rsync requires Posix style paths, we do not use os.path.join to
         # construct the rsync destination directory.
@@ -2317,7 +2364,7 @@ Examples:
         rsync_text = "rsync_data afterrecovery & " if options.rsync_data else ""
         LOGGER.info("****%s start mongod: %d %s****", rsync_text, ret, output)
         if ret:
-            sys.exit(ret)
+            local_exit(ret)
 
         # Start CRUD clients
         host_port = "{}:{}".format(mongod_host, standard_port)
@@ -2404,6 +2451,7 @@ Examples:
         local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
                                             ssh_connection_options=ssh_connection_options,
                                             ssh_options=ssh_options, use_shell=True)
+        verify_remote_access(local_ops)
 
         canary_doc = copy.deepcopy(orig_canary_doc)
 
@@ -2413,7 +2461,7 @@ Examples:
             break
 
     REPORT_JSON_SUCCESS = True
-    sys.exit(0)
+    local_exit(0)
 
 
 if __name__ == "__main__":
