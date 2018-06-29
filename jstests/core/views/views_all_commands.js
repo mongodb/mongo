@@ -145,6 +145,7 @@
         connPoolSync: {skip: isUnrelated},
         connectionStatus: {skip: isUnrelated},
         convertToCapped: {command: {convertToCapped: "view", size: 12345}, expectFailure: true},
+        coordinateCommitTransaction: {skip: isUnrelated},
         copydb: {skip: "Tested in replsets/copydb.js"},
         copydbsaslstart: {skip: isUnrelated},
         count: {command: {count: "view"}},

@@ -122,6 +122,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/s/common_s',
     ],
 )
 
@@ -271,6 +272,7 @@ env.Library(
         'config/configsvr_shard_collection_command.cpp',
         'config/configsvr_split_chunk_command.cpp',
         'config/configsvr_update_zone_key_range_command.cpp',
+        'coordinate_commit_transaction_command.cpp',
         'flush_database_cache_updates_command.cpp',
         'flush_routing_table_cache_updates_command.cpp',
         'get_database_version_command.cpp',
@@ -298,6 +300,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         'balancer',
+        'sharded_transaction_types',
         'sharding_runtime_d',
     ],
 )

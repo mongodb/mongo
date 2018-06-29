@@ -87,6 +87,7 @@ namespace {
 const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"aggregate", 1},
                                         {"commitTransaction", 1},
+                                        {"coordinateCommitTransaction", 1},
                                         {"delete", 1},
                                         {"distinct", 1},
                                         {"doTxn", 1},
@@ -105,8 +106,11 @@ const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
 const StringMap<int> txnCmdForTestingWhitelist = {{"dbHash", 1}};
 
 // The commands that can be run on the 'admin' database in multi-document transactions.
-const StringMap<int> txnAdminCommands = {
-    {"abortTransaction", 1}, {"commitTransaction", 1}, {"doTxn", 1}, {"prepareTransaction", 1}};
+const StringMap<int> txnAdminCommands = {{"abortTransaction", 1},
+                                         {"commitTransaction", 1},
+                                         {"coordinateCommitTransaction", 1},
+                                         {"doTxn", 1},
+                                         {"prepareTransaction", 1}};
 
 void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
                                 TxnNumber txnNumber,
