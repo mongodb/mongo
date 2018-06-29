@@ -97,11 +97,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    Status acquireUser(OperationContext*, const UserName&, User**) override {
-        UASSERT_NOT_IMPLEMENTED;
-    }
-
-    void releaseUser(User* user) override {
+    StatusWith<UserHandle> acquireUser(OperationContext*, const UserName&) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
@@ -130,6 +126,10 @@ public:
                const NamespaceString&,
                const BSONObj&,
                const BSONObj*) override { /* do nothing*/
+    }
+
+    std::vector<AuthorizationManager::CachedUserInfo> getUserCacheInfo() const override {
+        UASSERT_NOT_IMPLEMENTED;
     }
 
 private:

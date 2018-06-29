@@ -64,7 +64,7 @@ class UserDocumentParser;
  * Internal secret key info.
  */
 struct AuthInfo {
-    User* user;
+    UserHandle user;
 };
 extern AuthInfo internalSecurity;  // set at startup and not changed after initialization.
 
@@ -252,24 +252,14 @@ public:
                                             std::vector<BSONObj>* result) = 0;
 
     /**
-     *  Returns the User object for the given userName in the out parameter "acquiredUser".
-     *  If the user cache already has a user object for this user, it increments the refcount
-     *  on that object and gives out a pointer to it.  If no user object for this user name
-     *  exists yet in the cache, reads the user's privilege document from disk, builds up
-     *  a User object, sets the refcount to 1, and gives that out.  The returned user may
-     *  be invalid by the time the caller gets access to it.
-     *  The AuthorizationManager retains ownership of the returned User object.
-     *  On non-OK Status return values, acquiredUser will not be modified.
+     * Returns a Status or UserHandle for the given userName. If the user cache already has a
+     * user object for this user, it returns a handle from the cache, otherwise it reads the
+     * user document from disk or LDAP - this may block for a long time.
+     *
+     * The returned user may be invalid by the time the caller gets access to it.
      */
-    virtual Status acquireUser(OperationContext* opCtx,
-                               const UserName& userName,
-                               User** acquiredUser) = 0;
-
-    /**
-     * Decrements the refcount of the given User object.  If the refcount has gone to zero,
-     * deletes the User.  Caller must stop using its pointer to "user" after calling this.
-     */
-    virtual void releaseUser(User* user) = 0;
+    virtual StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
+                                               const UserName& userName) = 0;
 
     /**
      * Marks the given user as invalid and removes it from the user cache.
@@ -310,6 +300,17 @@ public:
                        const NamespaceString& nss,
                        const BSONObj& obj,
                        const BSONObj* patt) = 0;
+
+    /*
+     * Represents a user in the user cache.
+     */
+    struct CachedUserInfo {
+        UserName userName;  // The username of the user
+        bool active;        // Whether the user is currently in use by a thread (a thread has
+                            // called acquireUser and still owns the returned shared_ptr)
+    };
+
+    virtual std::vector<CachedUserInfo> getUserCacheInfo() const = 0;
 };
 
 }  // namespace mongo

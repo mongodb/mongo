@@ -42,13 +42,9 @@ namespace {
 TEST(UserSetTest, BasicTest) {
     UserSet set;
 
-    User* p1 = new User(UserName("Bob", "test"));
-    User* p2 = new User(UserName("George", "test"));
-    User* p3 = new User(UserName("Bob", "test2"));
-
-    const std::unique_ptr<User> delp1(p1);
-    const std::unique_ptr<User> delp2(p2);
-    const std::unique_ptr<User> delp3(p3);
+    UserHandle p1 = std::make_shared<User>(UserName("Bob", "test"));
+    UserHandle p2 = std::make_shared<User>(UserName("George", "test"));
+    UserHandle p3 = std::make_shared<User>(UserName("Bob", "test2"));
 
     ASSERT_NULL(set.lookup(UserName("Bob", "test")));
     ASSERT_NULL(set.lookup(UserName("George", "test")));
@@ -56,7 +52,7 @@ TEST(UserSetTest, BasicTest) {
     ASSERT_NULL(set.lookupByDBName("test"));
     ASSERT_NULL(set.lookupByDBName("test2"));
 
-    ASSERT_NULL(set.add(p1));
+    set.add(p1);
 
     ASSERT_EQUALS(p1, set.lookup(UserName("Bob", "test")));
     ASSERT_EQUALS(p1, set.lookupByDBName("test"));
@@ -65,7 +61,7 @@ TEST(UserSetTest, BasicTest) {
     ASSERT_NULL(set.lookupByDBName("test2"));
 
     // This should not replace the existing user "Bob" because they are different databases
-    ASSERT_NULL(set.add(p3));
+    set.add(p3);
 
     ASSERT_EQUALS(p1, set.lookup(UserName("Bob", "test")));
     ASSERT_EQUALS(p1, set.lookupByDBName("test"));
@@ -73,18 +69,16 @@ TEST(UserSetTest, BasicTest) {
     ASSERT_EQUALS(p3, set.lookup(UserName("Bob", "test2")));
     ASSERT_EQUALS(p3, set.lookupByDBName("test2"));
 
-    User* replaced = set.add(p2);  // This should replace Bob since they're on the same database
+    set.add(p2);  // This should replace Bob since they're on the same database
 
-    ASSERT_EQUALS(replaced, p1);
     ASSERT_NULL(set.lookup(UserName("Bob", "test")));
     ASSERT_EQUALS(p2, set.lookup(UserName("George", "test")));
     ASSERT_EQUALS(p2, set.lookupByDBName("test"));
     ASSERT_EQUALS(p3, set.lookup(UserName("Bob", "test2")));
     ASSERT_EQUALS(p3, set.lookupByDBName("test2"));
 
-    User* removed = set.removeByDBName("test");
+    set.removeByDBName("test"_sd);
 
-    ASSERT_EQUALS(removed, p2);
     ASSERT_NULL(set.lookup(UserName("Bob", "test")));
     ASSERT_NULL(set.lookup(UserName("George", "test")));
     ASSERT_NULL(set.lookupByDBName("test"));
@@ -102,8 +96,8 @@ TEST(UserSetTest, IterateNames) {
     UserNameIterator iter = pset.getNames();
     ASSERT(!iter.more());
 
-    std::unique_ptr<User> user(new User(UserName("bob", "test")));
-    ASSERT_NULL(pset.add(user.get()));
+    UserHandle user = std::make_shared<User>(UserName("bob", "test"));
+    pset.add(std::move(user));
 
     iter = pset.getNames();
     ASSERT(iter.more());

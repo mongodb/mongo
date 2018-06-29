@@ -59,6 +59,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -77,14 +78,12 @@ using std::back_inserter;
 using std::string;
 using std::vector;
 
-
 MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
                           ("EndStartupOptionStorage"),
                           ("CreateAuthorizationManager"))
 (InitializerContext* const context) try {
-    User* user = new User(UserName("__system", "local"));
+    UserHandle user = std::make_shared<User>(UserName("__system", "local"));
 
-    user->incrementRefCount();  // Pin this user so the ref count never drops below 1.
     ActionSet allActions;
     allActions.addAllActions();
     PrivilegeVector privileges;
@@ -111,6 +110,8 @@ MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
 } catch (...) {
     return exceptionToStatus();
 }
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(authorizationManagerCacheSize, int, 100);
 }  // namespace
 
 
@@ -205,7 +206,7 @@ public:
         fassert(17191, !_authzManager->_isFetchPhaseBusy);
         _isThisGuardInFetchPhase = true;
         _authzManager->_isFetchPhaseBusy = true;
-        _startGeneration = _authzManager->_cacheGeneration;
+        _startGeneration = _authzManager->_fetchGeneration;
         _lock.unlock();
     }
 
@@ -224,7 +225,7 @@ public:
     }
 
     /**
-     * Returns true if _authzManager->_cacheGeneration remained the same while this guard was
+     * Returns true if _authzManager->_fetchGeneration remained the same while this guard was
      * in fetch phase.  Behavior is undefined if this guard never entered fetch phase.
      *
      * If this returns true, do not update the cached data with this
@@ -232,7 +233,7 @@ public:
     bool isSameCacheGeneration() const {
         fassert(17223, _isThisGuardInFetchPhase);
         fassert(17231, _lock.owns_lock());
-        return _startGeneration == _authzManager->_cacheGeneration;
+        return _startGeneration == _authzManager->_fetchGeneration;
     }
 
 private:
@@ -260,18 +261,12 @@ AuthorizationManagerImpl::AuthorizationManagerImpl(
       _privilegeDocsExist(false),
       _externalState(std::move(externalState)),
       _version(schemaVersionInvalid),
+      _userCache(authorizationManagerCacheSize, UserCacheInvalidator()),
       _isFetchPhaseBusy(false) {
     _updateCacheGeneration_inlock();
 }
 
-AuthorizationManagerImpl::~AuthorizationManagerImpl() {
-    for (stdx::unordered_map<UserName, User*>::iterator it = _userCache.begin();
-         it != _userCache.end();
-         ++it) {
-        fassert(17265, it->second != internalSecurity.user);
-        delete it->second;
-    }
-}
+AuthorizationManagerImpl::~AuthorizationManagerImpl() {}
 
 std::unique_ptr<AuthorizationSession> AuthorizationManagerImpl::makeAuthorizationSession() {
     return std::make_unique<AuthorizationSessionImpl>(
@@ -313,7 +308,7 @@ Status AuthorizationManagerImpl::getAuthorizationVersion(OperationContext* opCtx
 
 OID AuthorizationManagerImpl::getCacheGeneration() {
     CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
-    return _cacheGeneration;
+    return _fetchGeneration;
 }
 
 void AuthorizationManagerImpl::setAuthEnabled(bool enabled) {
@@ -413,32 +408,29 @@ Status AuthorizationManagerImpl::getRoleDescriptionsForDB(
         opCtx, dbname, privileges, restrictions, showBuiltinRoles, result);
 }
 
-Status AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
-                                             const UserName& userName,
-                                             User** acquiredUser) {
+void AuthorizationManagerImpl::UserCacheInvalidator::operator()(User* user) {
+    user->_invalidate();
+}
+
+StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
+                                                             const UserName& userName) {
     if (userName == internalSecurity.user->getName()) {
-        *acquiredUser = internalSecurity.user;
-        return Status::OK();
+        return internalSecurity.user;
     }
 
-    stdx::unordered_map<UserName, User*>::iterator it;
-
     CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
-    while ((_userCache.end() == (it = _userCache.find(userName))) &&
+    boost::optional<std::shared_ptr<User>> cachedUser;
+    while ((boost::none == (cachedUser = _userCache.get(userName))) &&
            guard.otherUpdateInFetchPhase()) {
         guard.wait();
     }
 
-    if (it != _userCache.end()) {
-        fassert(16914, it->second);
-        fassert(17003, it->second->isValid());
-        fassert(17008, it->second->getRefCount() > 0);
-        it->second->incrementRefCount();
-        *acquiredUser = it->second;
-        return Status::OK();
+    if (cachedUser != boost::none) {
+        auto ret = *cachedUser;
+        fassert(16914, ret.get());
+        fassert(17003, ret->isValid());
+        return ret;
     }
-
-    std::unique_ptr<User> user;
 
     int authzVersion = _version;
     guard.beginFetchPhase();
@@ -448,6 +440,7 @@ Status AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
     // after schema upgrades.
     static const int maxAcquireRetries = 2;
     Status status = Status::OK();
+    std::unique_ptr<User> user;
     for (int i = 0; i < maxAcquireRetries; ++i) {
         if (authzVersion == schemaVersionInvalid) {
             Status status = _externalState->getStoredAuthorizationVersion(opCtx, &authzVersion);
@@ -487,87 +480,50 @@ Status AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
 
     guard.endFetchPhase();
 
-    user->incrementRefCount();
-    // NOTE: It is not safe to throw an exception from here to the end of the method.
     if (guard.isSameCacheGeneration()) {
-        _userCache.insert(std::make_pair(userName, user.get()));
         if (_version == schemaVersionInvalid)
             _version = authzVersion;
+        return _userCache.insertOrAssignAndGet(userName, std::move(user));
     } else {
         // If the cache generation changed while this thread was in fetch mode, the data
         // associated with the user may now be invalid, so we must mark it as such.  The caller
         // may still opt to use the information for a short while, but not indefinitely.
-        user->invalidate();
+        user->_invalidate();
+        return UserHandle(std::move(user));
     }
-    *acquiredUser = user.release();
-
-    return Status::OK();
 }
 
 Status AuthorizationManagerImpl::_fetchUserV2(OperationContext* opCtx,
                                               const UserName& userName,
-                                              std::unique_ptr<User>* acquiredUser) {
+                                              std::unique_ptr<User>* out) {
     BSONObj userObj;
     Status status = getUserDescription(opCtx, userName, &userObj);
     if (!status.isOK()) {
         return status;
     }
 
-    // Put the new user into an unique_ptr temporarily in case there's an error while
-    // initializing the user.
-    auto user = stdx::make_unique<User>(userName);
+    auto user = std::make_unique<User>(userName);
 
     status = _initializeUserFromPrivilegeDocument(user.get(), userObj);
     if (!status.isOK()) {
         return status;
     }
-    acquiredUser->reset(user.release());
+
+    std::swap(*out, user);
     return Status::OK();
-}
-
-void AuthorizationManagerImpl::releaseUser(User* user) {
-    if (user == internalSecurity.user) {
-        return;
-    }
-
-    CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
-    user->decrementRefCount();
-    if (user->getRefCount() == 0) {
-        // If it's been invalidated then it's not in the _userCache anymore.
-        if (user->isValid()) {
-            MONGO_COMPILER_VARIABLE_UNUSED bool erased = _userCache.erase(user->getName());
-            dassert(erased);
-        }
-        delete user;
-    }
 }
 
 void AuthorizationManagerImpl::invalidateUserByName(const UserName& userName) {
     CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
     _updateCacheGeneration_inlock();
-    stdx::unordered_map<UserName, User*>::iterator it = _userCache.find(userName);
-    if (it == _userCache.end()) {
-        return;
-    }
-
-    User* user = it->second;
-    _userCache.erase(it);
-    user->invalidate();
+    _userCache.invalidate(userName);
 }
 
 void AuthorizationManagerImpl::invalidateUsersFromDB(StringData dbname) {
     CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
     _updateCacheGeneration_inlock();
-    stdx::unordered_map<UserName, User*>::iterator it = _userCache.begin();
-    while (it != _userCache.end()) {
-        User* user = it->second;
-        if (user->getName().getDB() == dbname) {
-            _userCache.erase(it++);
-            user->invalidate();
-        } else {
-            ++it;
-        }
-    }
+    _userCache.invalidateIf(
+        [&](const UserName& user, const User*) { return user.getDB() == dbname; });
 }
 
 void AuthorizationManagerImpl::invalidateUserCache() {
@@ -577,13 +533,7 @@ void AuthorizationManagerImpl::invalidateUserCache() {
 
 void AuthorizationManagerImpl::_invalidateUserCache_inlock() {
     _updateCacheGeneration_inlock();
-    for (stdx::unordered_map<UserName, User*>::iterator it = _userCache.begin();
-         it != _userCache.end();
-         ++it) {
-        fassert(17266, it->second != internalSecurity.user);
-        it->second->invalidate();
-    }
-    _userCache.clear();
+    _userCache.invalidateIf([](const UserName& a, const User*) { return true; });
 
     // Reread the schema version before acquiring the next user.
     _version = schemaVersionInvalid;
@@ -667,7 +617,7 @@ StatusWith<UserName> extractUserNameFromIdString(StringData idstr) {
 }  // namespace
 
 void AuthorizationManagerImpl::_updateCacheGeneration_inlock() {
-    _cacheGeneration = OID::gen();
+    _fetchGeneration = OID::gen();
 }
 
 void AuthorizationManagerImpl::_invalidateRelevantCacheData(const char* op,
@@ -711,6 +661,19 @@ void AuthorizationManagerImpl::logOp(OperationContext* opCtx,
         _externalState->logOp(opCtx, op, nss, o, o2);
         _invalidateRelevantCacheData(op, nss, o, o2);
     }
+}
+
+std::vector<AuthorizationManager::CachedUserInfo> AuthorizationManagerImpl::getUserCacheInfo()
+    const {
+    auto cacheData = _userCache.getCacheInfo();
+    std::vector<AuthorizationManager::CachedUserInfo> ret;
+    ret.reserve(cacheData.size());
+    std::transform(
+        cacheData.begin(), cacheData.end(), std::back_inserter(ret), [](const auto& info) {
+            return AuthorizationManager::CachedUserInfo{info.key, info.active};
+        });
+
+    return ret;
 }
 
 }  // namespace mongo
