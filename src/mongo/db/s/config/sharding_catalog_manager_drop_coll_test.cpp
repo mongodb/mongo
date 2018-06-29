@@ -34,6 +34,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
@@ -60,6 +62,11 @@ public:
         _shard2.setName("shard0002");
         _shard2.setHost("s:2");
 
+        _zoneName = "zoneName";
+        _shardKey = "x";
+        _min = BSON(_shardKey << 0);
+        _max = BSON(_shardKey << 10);
+
         ASSERT_OK(setupShards({_shard1, _shard2}));
 
         auto shard1Targeter = RemoteCommandTargeterMock::get(
@@ -71,6 +78,22 @@ public:
             uassertStatusOK(shardRegistry()->getShard(operationContext(), _shard2.getName()))
                 ->getTargeter());
         shard2Targeter->setFindHostReturnValue(HostAndPort(_shard2.getHost()));
+
+        // insert documents into the config database
+        CollectionType shardedCollection;
+        shardedCollection.setNs(dropNS());
+        shardedCollection.setEpoch(OID::gen());
+        shardedCollection.setKeyPattern(BSON(_shardKey << 1));
+        ASSERT_OK(insertToConfigCollection(
+            operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+
+        BSONObjBuilder chunkDocBuilder;
+        chunkDocBuilder.append("ns", dropNS().ns());
+        chunkDocBuilder.append("min", _min);
+        chunkDocBuilder.append("max", _max);
+        chunkDocBuilder.append("shard", _shard1.getName());
+        ASSERT_OK(insertToConfigCollection(
+            operationContext(), ChunkType::ConfigNS, chunkDocBuilder.obj()));
     }
 
     void expectDrop(const ShardType& shard) {
@@ -106,6 +129,19 @@ public:
         });
     }
 
+    void expectCollectionDocMarkedAsDropped() {
+        auto findStatus =
+            findOneOnConfigCollection(operationContext(), CollectionType::ConfigNS, BSONObj());
+        ASSERT_OK(findStatus.getStatus());
+        ASSERT_TRUE(findStatus.getValue().getField("dropped"));
+    }
+
+    void expectNoChunkDocs() {
+        auto findStatus =
+            findOneOnConfigCollection(operationContext(), ChunkType::ConfigNS, BSONObj());
+        ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
+    }
+
     void shutdownExecutor() {
         ConfigServerTestFixture::executor()->shutdown();
     }
@@ -133,6 +169,10 @@ private:
     const NamespaceString _dropNS{"test.user"};
     ShardType _shard1;
     ShardType _shard2;
+    string _zoneName;
+    string _shardKey;
+    BSONObj _min;
+    BSONObj _max;
 };
 
 TEST_F(DropColl2ShardTest, Basic) {
@@ -151,6 +191,9 @@ TEST_F(DropColl2ShardTest, Basic) {
     expectUnsetSharding(shard2());
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, NSNotFound) {
@@ -192,6 +235,9 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
     expectUnsetSharding(shard2());
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, FirstShardTargeterError) {
@@ -307,6 +353,9 @@ TEST_F(DropColl2ShardTest, CleanupChunkError) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard1) {
@@ -325,6 +374,9 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard1) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
@@ -343,6 +395,9 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
@@ -363,6 +418,9 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
@@ -383,6 +441,9 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
@@ -404,6 +465,9 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
@@ -425,6 +489,9 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
@@ -448,6 +515,9 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
@@ -471,6 +541,9 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
 }
 
 }  // unnamed namespace
