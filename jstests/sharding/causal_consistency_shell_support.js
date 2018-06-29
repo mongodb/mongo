@@ -33,20 +33,19 @@
         }
     }
 
-    // Verifies the command works and its response satisfies the callback.
-    function commandReturnsExpectedResult(cmdObj, db, resCallback) {
+    // Verifies the command works and correctly updates the shell's operationTime.
+    function commandWorksAndUpdatesOperationTime(cmdObj, db) {
         const session = db.getSession();
 
         // Use the latest cluster time returned as a new operationTime and run command.
         const clusterTimeObj = session.getClusterTime();
         session.advanceOperationTime(clusterTimeObj.clusterTime);
-        const res = assert.commandWorked(testDB.runCommand(cmdObj));
+        assert.commandWorked(testDB.runCommand(cmdObj));
 
         // Verify the response contents and that new operation time is >= passed in time.
         assert(bsonWoCompare(session.getOperationTime(), clusterTimeObj.clusterTime) >= 0,
                "expected the shell's operationTime to be >= to:" + clusterTimeObj.clusterTime +
                    " after running command: " + tojson(cmdObj));
-        resCallback(res);
     }
 
     // Manually create a shard so tests on storage engines that don't support majority readConcern
@@ -114,47 +113,35 @@
     // Aggregate command.
     let aggColl = "aggColl";
     let aggCmd = {aggregate: aggColl, pipeline: [{$match: {x: 1}}], cursor: {}};
-    let aggCallback = function(res) {
-        assert.eq(res.cursor.firstBatch, [{_id: 1, x: 1}]);
-    };
 
     runCommandAndCheckLogicalTimes({insert: aggColl, documents: [{_id: 1, x: 1}]}, testDB, true);
     runCommandAndCheckLogicalTimes(aggCmd, testDB, false);
-    commandReturnsExpectedResult(aggCmd, testDB, aggCallback);
+    commandWorksAndUpdatesOperationTime(aggCmd, testDB);
 
     // Count command.
     let countColl = "countColl";
     let countCmd = {count: countColl};
-    let countCallback = function(res) {
-        assert.eq(res.n, 1);
-    };
 
     runCommandAndCheckLogicalTimes({insert: countColl, documents: [{_id: 1, x: 1}]}, testDB, true);
     runCommandAndCheckLogicalTimes(countCmd, testDB, false);
-    commandReturnsExpectedResult(countCmd, testDB, countCallback);
+    commandWorksAndUpdatesOperationTime(countCmd, testDB);
 
     // Distinct command.
     let distinctColl = "distinctColl";
     let distinctCmd = {distinct: distinctColl, key: "x"};
-    let distinctCallback = function(res) {
-        assert.eq(res.values, [1]);
-    };
 
     runCommandAndCheckLogicalTimes(
         {insert: distinctColl, documents: [{_id: 1, x: 1}]}, testDB, true);
     runCommandAndCheckLogicalTimes(distinctCmd, testDB, false);
-    commandReturnsExpectedResult(distinctCmd, testDB, distinctCallback);
+    commandWorksAndUpdatesOperationTime(distinctCmd, testDB);
 
     // Find command.
     let findColl = "findColl";
     let findCmd = {find: findColl};
-    let findCallback = function(res) {
-        assert.eq(res.cursor.firstBatch, [{_id: 1, x: 1}]);
-    };
 
     runCommandAndCheckLogicalTimes({insert: findColl, documents: [{_id: 1, x: 1}]}, testDB, true);
     runCommandAndCheckLogicalTimes(findCmd, testDB, false);
-    commandReturnsExpectedResult(findCmd, testDB, findCallback);
+    commandWorksAndUpdatesOperationTime(findCmd, testDB);
 
     // Aggregate command with $geoNear.
     let geoNearColl = "geoNearColl";
@@ -171,10 +158,6 @@
             },
         ],
     };
-    let geoNearCallback = function(res) {
-        assert.eq(res.cursor.firstBatch,
-                  [{_id: 1, loc: {type: "Point", coordinates: [-10, 10]}, dist: 0}]);
-    };
 
     assert.commandWorked(testDB[geoNearColl].createIndex({loc: "2dsphere"}));
     runCommandAndCheckLogicalTimes(
@@ -182,7 +165,7 @@
         testDB,
         true);
     runCommandAndCheckLogicalTimes(geoNearCmd, testDB, false);
-    commandReturnsExpectedResult(geoNearCmd, testDB, geoNearCallback);
+    commandWorksAndUpdatesOperationTime(geoNearCmd, testDB);
 
     // GeoSearch is not supported for sharded clusters.
 
