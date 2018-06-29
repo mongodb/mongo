@@ -910,6 +910,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       silent: true
       script: |
         report_file="report.json"
