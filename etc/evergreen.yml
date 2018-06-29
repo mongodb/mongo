@@ -1080,30 +1080,6 @@ functions:
             $sudo umount /efs || true
         fi
 
-  "build cdriver" :
-    command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        set -o verbose
-
-        VERSION=${version}
-        WORKDIR=${workdir}
-
-        CDRIVER_VERSION=1.10.3
-        rm -rf mongo-c-driver-$CDRIVER_VERSION
-        rm -rf mongo-c-driver
-        curl -LO https://github.com/mongodb/mongo-c-driver/releases/download/$CDRIVER_VERSION/mongo-c-driver-$CDRIVER_VERSION.tar.gz
-        tar xzf mongo-c-driver-$CDRIVER_VERSION.tar.gz
-        mv mongo-c-driver-$CDRIVER_VERSION mongo-c-driver
-        cd mongo-c-driver
-
-        trap "cat CMakeFiles/CMakeOutput.log" EXIT
-        export ${compile_env|}
-        ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_ZLIB=OFF -DENABLE_SSL=OFF -DENABLE_SASL=OFF -DENABLE_TESTS=OFF -DENABLE_SRV=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${cdriver_cmake_flags}
-        make install VERBOSE=1
-        mv $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp $WORKDIR/src/build/mongo-embedded-sdk-$VERSION
-
   "build new tools" :
     command: shell.exec
     params:
@@ -1724,30 +1700,6 @@ functions:
 
           ${activate_virtualenv}
           $python buildscripts/idl/run_tests.py
-
-  "run embedded tests" :
-    command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o verbose
-        set -o errexit
-
-        ${activate_virtualenv}
-        if [ ${enable_embedded_tests|false} = "ios_tvos_simulator" ]; then
-            ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test" --tempPath /data
-            ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_mongoc_client_test" --tempPath /data
-        elif [ ${enable_embedded_tests|false} = "android_emulator" ]; then
-            # strip because the binaries with debug symbols are too big for the default storage on the emulator
-            find build/mongo-embedded-sdk-${version}/bin -type f | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
-            find build/mongo-embedded-sdk-${version}/lib -type f -name "*.so" | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
-            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_capi_test" --tempPath /data
-            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_mongoc_client_test" --tempPath /data
-        elif [ ${enable_embedded_tests|false} = "native" ]; then
-          "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test"
-          "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_mongoc_client_test"
-        fi
 
   "run powercycle test" :
     - command: shell.exec
@@ -3429,7 +3381,28 @@ tasks:
 
 - name: embedded_sdk_build_cdriver
   commands:
-    - func: "build cdriver"
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          VERSION=${version}
+          WORKDIR=${workdir}
+
+          CDRIVER_VERSION=1.10.3
+          rm -rf mongo-c-driver-$CDRIVER_VERSION
+          rm -rf mongo-c-driver
+          curl -LO https://github.com/mongodb/mongo-c-driver/releases/download/$CDRIVER_VERSION/mongo-c-driver-$CDRIVER_VERSION.tar.gz
+          tar xzf mongo-c-driver-$CDRIVER_VERSION.tar.gz
+          mv mongo-c-driver-$CDRIVER_VERSION mongo-c-driver
+          cd mongo-c-driver
+
+          trap "cat CMakeFiles/CMakeOutput.log" EXIT
+          export ${compile_env|}
+          ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_ZLIB=OFF -DENABLE_SSL=OFF -DENABLE_SASL=OFF -DENABLE_TESTS=OFF -DENABLE_SRV=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${cdriver_cmake_flags}
+          make install VERBOSE=1
+          mv $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp $WORKDIR/src/build/mongo-embedded-sdk-$VERSION
 
 - name: embedded_sdk_install_dev
   commands:
@@ -3451,18 +3424,6 @@ tasks:
 
 - name: embedded_sdk_s3_put
   commands:
-    # Need to sign artifacts on iOS-ish.
-    - command: shell.exec
-      params:
-        working_dir: "src/build/mongo-embedded-sdk-${version}"
-        script: |
-          set -o errexit
-          set -o verbose
-          if command -v xcrun; then
-            # Do ad-hoc signing for now, until we have a better answer
-            find ./lib -type f -name "*.dylib" -print0 | xargs -0 -L 1 xcrun codesign -s -
-          fi
-
     # Not using archive.targz_pack here because I can't get it to work.
     - command: shell.exec
       params:
@@ -3491,21 +3452,41 @@ tasks:
       vars:
         targets: install-mobile-test
         task_compile_flags: *embedded_sdk_compile_flags
+
+- name: embedded_sdk_run_tests
+  commands:
     - command: shell.exec
       params:
         working_dir: "src/build/mongo-embedded-sdk-${version}"
         script: |
           set -o errexit
           set -o verbose
-          if command -v xcrun; then
-            # Do ad-hoc signing for now, until we have a better answer
-            find ./lib -type f -name "*.dylib" -print0 | \
-              xargs -0 -L 1 -I "{}" bash -c "xcrun codesign -v {} || xcrun codesign -s - {}"
+          if [ ${enable_embedded_tests|false} = "ios_tvos_simulator" -a $(command -v xcrun) ]; then
+            find ./lib -type f -name "*.dylib" -print0 | xargs -0 -L 1 xcrun codesign -s -
           fi
 
-- name: embedded_sdk_run_tests
-  commands:
-    - func: "run embedded tests"
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          set -o errexit
+
+          ${activate_virtualenv}
+          if [ ${enable_embedded_tests|false} = "ios_tvos_simulator" ]; then
+              ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test" --tempPath /data
+              ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_mongoc_client_test" --tempPath /data
+          elif [ ${enable_embedded_tests|false} = "android_emulator" ]; then
+              # strip because the binaries with debug symbols are too big for the default storage on the emulator
+              find build/mongo-embedded-sdk-${version}/bin -type f | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
+              find build/mongo-embedded-sdk-${version}/lib -type f -name "*.so" | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
+              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_capi_test" --tempPath /data
+              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_mongoc_client_test" --tempPath /data
+          elif [ ${enable_embedded_tests|false} = "native" ]; then
+            "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test"
+            "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_mongoc_client_test"
+          fi
 
     # If this is a patch build, blow away the file so our subsequent and optional s3.put
     # doesn't run. That way, we won't overwrite the latest part in our patches.
