@@ -101,7 +101,6 @@ public:
     typedef stdx::unordered_map<ResourcePattern, Privilege> ResourcePrivilegeMap;
 
     explicit User(const UserName& name);
-    ~User();
 
     /**
      * Returns the user name for this user.
@@ -162,12 +161,6 @@ public:
      */
     bool isValid() const;
 
-    /**
-     * This returns the reference count for this User.  The AuthorizationManager should be the
-     * only caller of this.
-     */
-    uint32_t getRefCount() const;
-
     // Mutators below.  Mutation functions should *only* be called by the AuthorizationManager
 
     /**
@@ -224,30 +217,15 @@ public:
     }
     void getRestrictions() && = delete;
 
+protected:
+    friend class AuthorizationManagerImpl;
     /**
      * Marks this instance of the User object as invalid, most likely because information about
      * the user has been updated and needs to be reloaded from the AuthorizationManager.
      *
      * This method should *only* be called by the AuthorizationManager.
      */
-    void invalidate();
-
-    /**
-     * Increments the reference count for this User object, which records how many threads have
-     * a reference to it.
-     *
-     * This method should *only* be called by the AuthorizationManager.
-     */
-    void incrementRefCount();
-
-    /**
-     * Decrements the reference count for this User object, which records how many threads have
-     * a reference to it.  Once the reference count goes to zero, the AuthorizationManager is
-     * allowed to destroy this instance.
-     *
-     * This method should *only* be called by the AuthorizationManager.
-     */
-    void decrementRefCount();
+    void _invalidate();
 
 private:
     UserName _name;
@@ -270,11 +248,10 @@ private:
     // Restrictions which must be met by a Client in order to authenticate as this user.
     RestrictionDocuments _restrictions;
 
-    // _refCount and _isInvalidated are modified exclusively by the AuthorizationManager
-    // _isInvalidated can be read by any consumer of User, but _refCount can only be
-    // meaningfully read by the AuthorizationManager, as _refCount is guarded by the AM's _lock
-    uint32_t _refCount;
-    AtomicUInt32 _isValid;  // Using as a boolean
+    // Indicates whether the user has been marked as invalid by the AuthorizationManager.
+    AtomicBool _isValid{true};
 };
+
+using UserHandle = std::shared_ptr<User>;
 
 }  // namespace mongo

@@ -52,28 +52,27 @@ void AuthorizationSessionForTest::assumePrivilegesForDB(Privilege privilege, Str
 
 void AuthorizationSessionForTest::assumePrivilegesForDB(PrivilegeVector privileges,
                                                         StringData dbName) {
-    auto user = stdx::make_unique<User>(UserName("authorizationSessionForTestUser", dbName));
+    auto user = std::make_shared<User>(UserName("authorizationSessionForTestUser", dbName));
     user->addPrivileges(privileges);
 
-    _authenticatedUsers.add(user.get());
+    _authenticatedUsers.add(user);
     _testUsers.emplace_back(std::move(user));
     _buildAuthenticatedRolesVector();
 }
 
 void AuthorizationSessionForTest::revokePrivilegesForDB(StringData dbName) {
     _authenticatedUsers.removeByDBName(dbName);
-    _testUsers.erase(std::remove_if(_testUsers.begin(),
-                                    _testUsers.end(),
-                                    [&](const std::unique_ptr<User>& user) {
-                                        return dbName == user->getName().getDB();
-                                    }),
-                     _testUsers.end());
+    _testUsers.erase(
+        std::remove_if(_testUsers.begin(),
+                       _testUsers.end(),
+                       [&](const auto& user) { return dbName == user->getName().getDB(); }),
+        _testUsers.end());
 }
 
 void AuthorizationSessionForTest::revokeAllPrivileges() {
     _testUsers.erase(std::remove_if(_testUsers.begin(),
                                     _testUsers.end(),
-                                    [&](const std::unique_ptr<User>& user) {
+                                    [&](const auto& user) {
                                         _authenticatedUsers.removeByDBName(user->getName().getDB());
                                         return true;
                                     }),

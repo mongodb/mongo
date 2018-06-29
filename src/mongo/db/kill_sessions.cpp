@@ -110,12 +110,10 @@ KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx,
 
     auto authMgr = AuthorizationManager::get(opCtx->getServiceContext());
 
-    User* user;
     UserName un(kasu.getUser(), kasu.getDb());
 
-    uassertStatusOK(authMgr->acquireUser(opCtx, un, &user));
+    auto user = uassertStatusOK(authMgr->acquireUser(opCtx, un));
     kasbp.setUid(user->getDigest());
-    authMgr->releaseUser(user);
 
     return kasbp;
 }
