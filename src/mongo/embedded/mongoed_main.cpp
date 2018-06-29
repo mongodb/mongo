@@ -85,7 +85,15 @@ int mongoedMain(int argc, char* argv[], char** envp) {
             tl->shutdown();
         }
 
-        embedded::shutdown(serviceContext);
+        if (auto sep = serviceContext->getServiceEntryPoint()) {
+            if (sep->shutdown(Seconds(10))) {
+                embedded::shutdown(serviceContext);
+            } else {
+                log(logger::LogComponent::kNetwork) << "Failed to shutdown service entry point "
+                                                       "within timelimit, skipping embedded "
+                                                       "shutdown.";
+            }
+        }
     });
 
     setupSignalHandlers();
