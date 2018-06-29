@@ -57,9 +57,11 @@
     let currentOp = adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).toArray();
     let transactionDocument = currentOp[0].transaction;
     assert.eq(transactionDocument.parameters.autocommit, false);
+    assert.gte(ISODate(transactionDocument.startWallClockTime), timeBeforeTransactionStarts);
     assert.gt(transactionDocument.timeOpenMicros,
               (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
-    assert.gte(ISODate(transactionDocument.startWallClockTime), timeBeforeTransactionStarts);
+    assert.gte(transactionDocument.timeActiveMicros, 0);
+    assert.gte(transactionDocument.timeInactiveMicros, 0);
 
     // Now the transaction can proceed.
     assert.commandWorked(testDB.adminCommand(

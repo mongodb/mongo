@@ -44,12 +44,12 @@ void SingleTransactionStats::setStartTime(unsigned long long time) {
     _startTime = time;
 }
 
-unsigned long long SingleTransactionStats::getDuration() const {
+unsigned long long SingleTransactionStats::getDuration(unsigned long long curTime) const {
     invariant(_startTime > 0);
 
     // The transaction hasn't ended yet, so we return how long it has currently been running for.
     if (_endTime == 0) {
-        return curTimeMicros64() - _startTime;
+        return curTime - _startTime;
     }
     return _endTime - _startTime;
 }
@@ -60,16 +60,23 @@ void SingleTransactionStats::setEndTime(unsigned long long time) {
     _endTime = time;
 }
 
-Microseconds SingleTransactionStats::getTimeActiveMicros() const {
+Microseconds SingleTransactionStats::getTimeActiveMicros(unsigned long long curTime) const {
     invariant(_startTime > 0);
 
     // The transaction is currently active, so we return the recorded active time so far plus the
     // time since _timeActiveStart.
     if (isActive()) {
         return _timeActiveMicros +
-            Microseconds{static_cast<long long>(curTimeMicros64() - _lastTimeActiveStart)};
+            Microseconds{static_cast<long long>(curTime - _lastTimeActiveStart)};
     }
     return _timeActiveMicros;
+}
+
+Microseconds SingleTransactionStats::getTimeInactiveMicros(unsigned long long curTime) const {
+    invariant(_startTime > 0);
+
+    return Microseconds{static_cast<long long>(getDuration(curTime))} -
+        getTimeActiveMicros(curTime);
 }
 
 void SingleTransactionStats::setActive(unsigned long long time) {
