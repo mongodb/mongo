@@ -1,4 +1,4 @@
-// @tags: [requires_replication]
+// @tags: [requires_replication, uses_transactions]
 
 // Test the correct timestamping of insert, update, and delete writes along with their accompanying
 // index updates.
