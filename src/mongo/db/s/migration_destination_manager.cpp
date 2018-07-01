@@ -1114,7 +1114,7 @@ CollectionShardingState::CleanupNotification MigrationDestinationManager::_noteP
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
     // checking this here is that in the future we shouldn't have this problem.
-    if (!metadata || metadata->getCollVersion().epoch() != _epoch) {
+    if (!metadata->isSharded() || metadata->getCollVersion().epoch() != _epoch) {
         return Status{ErrorCodes::StaleShardVersion,
                       str::stream() << "not noting chunk " << redact(range.toString())
                                     << " as pending because the epoch of "
@@ -1145,7 +1145,7 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx, ChunkR
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
     // checking this here is that in the future we shouldn't have this problem.
-    if (!metadata || metadata->getCollVersion().epoch() != _epoch) {
+    if (!metadata->isSharded() || metadata->getCollVersion().epoch() != _epoch) {
         log() << "no need to forget pending chunk " << redact(range.toString())
               << " because the epoch for " << _nss.ns() << " changed";
         return;

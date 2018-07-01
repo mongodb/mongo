@@ -29,11 +29,11 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_server_test_fixture.h"
 
 namespace mongo {

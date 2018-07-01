@@ -110,15 +110,15 @@ public:
         CollectionShardingState* const css = CollectionShardingState::get(opCtx, nss);
 
         const auto metadata = css->getMetadata(opCtx);
-        if (metadata) {
+        if (metadata->isSharded()) {
             result.appendTimestamp("global", metadata->getShardVersion().toLong());
         } else {
-            result.appendTimestamp("global", ChunkVersion(0, 0, OID()).toLong());
+            result.appendTimestamp("global", ChunkVersion::UNSHARDED().toLong());
         }
 
         if (cmdObj["fullMetadata"].trueValue()) {
             BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));
-            if (metadata) {
+            if (metadata->isSharded()) {
                 metadata->toBSONBasic(metadataBuilder);
 
                 BSONArrayBuilder chunksArr(metadataBuilder.subarrayStart("chunks"));

@@ -110,7 +110,7 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
 }
 
 Status checkCollectionEpochMatches(const ScopedCollectionMetadata& metadata, OID expectedEpoch) {
-    if (metadata && metadata->getCollVersion().epoch() == expectedEpoch)
+    if (metadata->isSharded() && metadata->getCollVersion().epoch() == expectedEpoch)
         return Status::OK();
 
     return {ErrorCodes::IncompatibleShardingMetadata,
@@ -118,8 +118,8 @@ Status checkCollectionEpochMatches(const ScopedCollectionMetadata& metadata, OID
                           << "Expected collection epoch: "
                           << expectedEpoch.toString()
                           << ", but found: "
-                          << (metadata ? metadata->getCollVersion().epoch().toString()
-                                       : "unsharded collection.")};
+                          << (metadata->isSharded() ? metadata->getCollVersion().epoch().toString()
+                                                    : "unsharded collection.")};
 }
 
 }  // namespace
@@ -170,7 +170,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         auto metadata = CollectionShardingState::get(opCtx, getNss())->getMetadata(opCtx);
         uassert(ErrorCodes::IncompatibleShardingMetadata,
                 str::stream() << "cannot move chunks for an unsharded collection",
-                metadata);
+                metadata->isSharded());
 
         return std::make_tuple(std::move(metadata), std::move(collectionUUID));
     }();
@@ -529,7 +529,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         return CollectionShardingState::get(opCtx, getNss())->getMetadata(opCtx);
     }();
 
-    if (!refreshedMetadata) {
+    if (!refreshedMetadata->isSharded()) {
         return {ErrorCodes::NamespaceNotSharded,
                 str::stream() << "Chunk move failed because collection '" << getNss().ns()
                               << "' is no longer sharded. The migration commit error was: "

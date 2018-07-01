@@ -230,10 +230,12 @@ public:
             boost::optional<Lock::CollectionLock> collLock;
             collLock.emplace(opCtx->lockState(), nss.ns(), MODE_IS);
 
-            auto css = CollectionShardingState::get(opCtx, nss);
-            const ChunkVersion collectionShardVersion =
-                (css->getMetadata(opCtx) ? css->getMetadata(opCtx)->getShardVersion()
-                                         : ChunkVersion::UNSHARDED());
+            auto const css = CollectionShardingState::get(opCtx, nss);
+            const ChunkVersion collectionShardVersion = [&] {
+                auto metadata = css->getMetadata(opCtx);
+                return metadata->isSharded() ? metadata->getShardVersion()
+                                             : ChunkVersion::UNSHARDED();
+            }();
 
             if (requestedVersion.isWriteCompatibleWith(collectionShardVersion)) {
                 // MongoS and MongoD agree on what is the collection's shard version
@@ -347,9 +349,9 @@ public:
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
             ChunkVersion currVersion = ChunkVersion::UNSHARDED();
-            auto collMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
-            if (collMetadata) {
-                currVersion = collMetadata->getShardVersion();
+            auto metadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
+            if (metadata->isSharded()) {
+                currVersion = metadata->getShardVersion();
             }
 
             if (!status.isOK()) {

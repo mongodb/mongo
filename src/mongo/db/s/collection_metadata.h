@@ -48,6 +48,12 @@ namespace mongo {
 class CollectionMetadata {
 public:
     /**
+     * Instantiates a metadata object, which represents an unsharded collection. This 'isSharded'
+     * for this object will return false and it is illegal to use it for filtering.
+     */
+    CollectionMetadata() = default;
+
+    /**
      * The main way to construct CollectionMetadata is through MetadataLoader or clone() methods.
      *
      * "thisShardId" is the shard identity of this shard for purposes of answering questions like
@@ -56,9 +62,53 @@ public:
     CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId);
 
     /**
+     * Returns whether this metadata object represents a sharded collection which requires
+     * filtering.
+     */
+    bool isSharded() const {
+        return bool(_cm);
+    }
+
+    /**
+     * Returns the current shard version for the collection or UNSHARDED if it is not sharded.
+     */
+    ChunkVersion getShardVersion() const {
+        return (isSharded() ? _cm->getVersion(_thisShardId) : ChunkVersion::UNSHARDED());
+    }
+
+    /**
+     * Returns the current collection version or UNSHARDED if it is not sharded.
+     */
+    ChunkVersion getCollVersion() const {
+        return (isSharded() ? _cm->getVersion() : ChunkVersion::UNSHARDED());
+    }
+
+    /**
+     * Returns just the shard key fields, if the collection is sharded, and the _id field, from
+     * `doc`. Does not alter any field values (e.g. by hashing); values are copied verbatim.
+     */
+    BSONObj extractDocumentKey(const BSONObj& doc) const;
+
+    /**
+     * BSON output of the basic metadata information (chunk and shard version).
+     */
+    void toBSONBasic(BSONObjBuilder& bb) const;
+
+    /**
+     * BSON output of the chunks metadata into a BSONArray
+     */
+    void toBSONChunks(BSONArrayBuilder& bb) const;
+
+    /**
+     * String output of the collection and shard versions.
+     */
+    std::string toStringBasic() const;
+
+    /**
      * Obtains the shard id with which this collection metadata is configured.
      */
     const ShardId& shardId() const {
+        invariant(isSharded());
         return _thisShardId;
     }
 
@@ -66,6 +116,7 @@ public:
      * Returns true if 'key' contains exactly the same fields as the shard key pattern.
      */
     bool isValidKey(const BSONObj& key) const {
+        invariant(isSharded());
         return _cm->getShardKeyPattern().isShardKey(key);
     }
 
@@ -74,6 +125,7 @@ public:
      * returns false. If key is not a valid shard key, the behaviour is undefined.
      */
     bool keyBelongsToMe(const BSONObj& key) const {
+        invariant(isSharded());
         return _cm->keyBelongsToShard(key, _thisShardId);
     }
 
@@ -94,6 +146,7 @@ public:
      * Returns true if the argument range overlaps any chunk.
      */
     bool rangeOverlapsChunk(ChunkRange const& range) const {
+        invariant(isSharded());
         return _cm->rangeOverlapsShard(range, _thisShardId);
     }
 
@@ -118,52 +171,38 @@ public:
     boost::optional<ChunkRange> getNextOrphanRange(RangeMap const& receiveMap,
                                                    BSONObj const& lookupKey) const;
 
-    ChunkVersion getCollVersion() const {
-        return _cm->getVersion();
-    }
-
-    ChunkVersion getShardVersion() const {
-        return _cm->getVersion(_thisShardId);
-    }
-
+    /**
+     * Returns all the chunks which are contained on this shard.
+     */
     RangeMap getChunks() const;
 
     const BSONObj& getKeyPattern() const {
+        invariant(isSharded());
         return _cm->getShardKeyPattern().toBSON();
     }
 
     const std::vector<std::unique_ptr<FieldRef>>& getKeyPatternFields() const {
+        invariant(isSharded());
         return _cm->getShardKeyPattern().getKeyPatternFields();
     }
 
     BSONObj getMinKey() const {
+        invariant(isSharded());
         return _cm->getShardKeyPattern().getKeyPattern().globalMin();
     }
 
     BSONObj getMaxKey() const {
+        invariant(isSharded());
         return _cm->getShardKeyPattern().getKeyPattern().globalMax();
     }
 
-    /**
-     * BSON output of the basic metadata information (chunk and shard version).
-     */
-    void toBSONBasic(BSONObjBuilder& bb) const;
-
-    /**
-     * BSON output of the chunks metadata into a BSONArray
-     */
-    void toBSONChunks(BSONArrayBuilder& bb) const;
-
-    /**
-     * String output of the collection and shard versions.
-     */
-    std::string toStringBasic() const;
-
     std::shared_ptr<ChunkManager> getChunkManager() const {
+        invariant(isSharded());
         return _cm;
     }
 
     bool uuidMatches(UUID uuid) const {
+        invariant(isSharded());
         return _cm->uuidMatches(uuid);
     }
 

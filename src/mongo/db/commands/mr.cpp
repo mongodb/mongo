@@ -1514,7 +1514,7 @@ public:
                     o = o.getOwned();  // we will be accessing outside of the lock
                     // check to see if this is a new object we don't own yet
                     // because of a chunk migration
-                    if (collMetadata) {
+                    if (collMetadata->isSharded()) {
                         ShardKeyPattern kp(collMetadata->getKeyPattern());
                         if (!collMetadata->keyBelongsToMe(kp.extractShardKeyFromDoc(o))) {
                             continue;

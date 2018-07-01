@@ -67,7 +67,7 @@ bool checkMetadataForSuccess(OperationContext* opCtx,
 
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "Collection " << nss.ns() << " became unsharded",
-            metadataAfterMerge);
+            metadataAfterMerge->isSharded());
 
     ChunkType chunk;
     if (!metadataAfterMerge->getNextChunk(minKey, &chunk)) {
@@ -110,7 +110,7 @@ Status mergeChunks(OperationContext* opCtx,
         return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
-    if (!metadata) {
+    if (!metadata->isSharded()) {
         std::string errmsg = stream() << "could not merge chunks, collection " << nss.ns()
                                       << " is not sharded";
 

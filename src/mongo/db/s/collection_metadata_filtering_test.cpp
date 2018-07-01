@@ -28,51 +28,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/query_request.h"
-#include "mongo/db/s/metadata_manager.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/shard_server_test_fixture.h"
 
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
-using unittest::assertGet;
-
 const NamespaceString kNss("TestDB", "TestColl");
 
-class MetadataFilteringTest : public CatalogCacheTestFixture {
+class CollectionMetadataFilteringTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
-        CatalogCacheTestFixture::setUp();
-
-        setupNShards(2);
-
+        ShardServerTestFixture::setUp();
         _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor());
-    }
-
-    void expectGetDatabase() {
-        expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            DatabaseType db(kNss.db().toString(), {"0"}, true, databaseVersion::makeNew());
-            return std::vector<BSONObj>{db.toBSON()};
-        }());
-    }
-
-    void expectGetCollection(OID epoch, const ShardKeyPattern& shardKeyPattern) {
-        expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            CollectionType collType;
-            collType.setNs(kNss);
-            collType.setEpoch(epoch);
-            collType.setKeyPattern(shardKeyPattern.toBSON());
-            collType.setUnique(false);
-
-            return std::vector<BSONObj>{collType.toBSON()};
-        }());
     }
 
     // Prepares data with a history array populated:
@@ -88,55 +58,47 @@ protected:
         const OID epoch = OID::gen();
         const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
-        auto future = scheduleRoutingInfoRefresh(kNss);
+        auto rt = RoutingTableHistory::makeNew(
+            kNss, UUID::gen(), shardKeyPattern.getKeyPattern(), nullptr, false, epoch, [&] {
+                ChunkVersion version(1, 0, epoch);
 
-        expectGetDatabase();
-        expectGetCollection(epoch, shardKeyPattern);
+                ChunkType chunk1(kNss,
+                                 {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
+                                 version,
+                                 {"0"});
+                chunk1.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("0")),
+                                   ChunkHistory(Timestamp(25, 0), ShardId("1"))});
+                version.incMinor();
 
-        expectGetCollection(epoch, shardKeyPattern);
-        expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            ChunkVersion version(1, 0, epoch);
+                ChunkType chunk2(kNss, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
+                chunk2.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("1")),
+                                   ChunkHistory(Timestamp(25, 0), ShardId("0"))});
+                version.incMinor();
 
-            ChunkType chunk1(kNss,
-                             {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
-                             version,
-                             {"0"});
-            chunk1.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("0")),
-                               ChunkHistory(Timestamp(25, 0), ShardId("1"))});
-            version.incMinor();
+                ChunkType chunk3(kNss, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
+                chunk3.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("0")),
+                                   ChunkHistory(Timestamp(25, 0), ShardId("1"))});
+                version.incMinor();
 
-            ChunkType chunk2(kNss, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
-            chunk2.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("1")),
-                               ChunkHistory(Timestamp(25, 0), ShardId("0"))});
-            version.incMinor();
+                ChunkType chunk4(kNss,
+                                 {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
+                                 version,
+                                 {"1"});
+                chunk4.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("1")),
+                                   ChunkHistory(Timestamp(25, 0), ShardId("0"))});
+                version.incMinor();
 
-            ChunkType chunk3(kNss, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
-            chunk3.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("0")),
-                               ChunkHistory(Timestamp(25, 0), ShardId("1"))});
-            version.incMinor();
+                return std::vector<ChunkType>{chunk1, chunk2, chunk3, chunk4};
+            }());
 
-            ChunkType chunk4(kNss,
-                             {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
-                             version,
-                             {"1"});
-            chunk4.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("1")),
-                               ChunkHistory(Timestamp(25, 0), ShardId("0"))});
-            version.incMinor();
-
-            return std::vector<BSONObj>{chunk1.toConfigBSON(),
-                                        chunk2.toConfigBSON(),
-                                        chunk3.toConfigBSON(),
-                                        chunk4.toConfigBSON()};
-        }());
-
-        auto routingInfo = future.timed_get(kFutureTimeout);
-        auto cm = routingInfo->cm();
-        ASSERT(cm);
+        auto cm = std::make_shared<ChunkManager>(rt, Timestamp(100, 0));
         ASSERT_EQ(4, cm->numChunks());
-
-        auto const css = CollectionShardingState::get(operationContext(), kNss);
-        css->refreshMetadata(operationContext(),
-                             std::make_unique<CollectionMetadata>(cm, ShardId("0")));
+        {
+            AutoGetCollection autoColl(operationContext(), kNss, MODE_X);
+            auto const css = CollectionShardingState::get(operationContext(), kNss);
+            css->refreshMetadata(operationContext(),
+                                 std::make_unique<CollectionMetadata>(cm, ShardId("0")));
+        }
 
         _manager->refreshActiveMetadata(std::make_unique<CollectionMetadata>(cm, ShardId("0")));
     }
@@ -145,10 +107,8 @@ protected:
 };
 
 // Verifies that right set of documents is visible.
-TEST_F(MetadataFilteringTest, FilterDocumentsPresent) {
+TEST_F(CollectionMetadataFilteringTest, FilterDocumentsPresent) {
     prepareTestData();
-
-    ShardingState::get(operationContext())->setEnabledForTest(ShardId("0").toString());
 
     auto metadata = _manager->getActiveMetadata(_manager, LogicalTime(Timestamp(100, 0)));
 
@@ -159,10 +119,8 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPresent) {
 }
 
 // Verifies that a different set of documents is visible for a timestamp in the past.
-TEST_F(MetadataFilteringTest, FilterDocumentsPast) {
+TEST_F(CollectionMetadataFilteringTest, FilterDocumentsPast) {
     prepareTestData();
-
-    ShardingState::get(operationContext())->setEnabledForTest(ShardId("0").toString());
 
     auto metadata = _manager->getActiveMetadata(_manager, LogicalTime(Timestamp(50, 0)));
 
@@ -173,10 +131,8 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPast) {
 }
 
 // Verifies that when accessing too far into the past we get the stale error.
-TEST_F(MetadataFilteringTest, FilterDocumentsStale) {
+TEST_F(CollectionMetadataFilteringTest, FilterDocumentsStale) {
     prepareTestData();
-
-    ShardingState::get(operationContext())->setEnabledForTest(ShardId("0").toString());
 
     auto metadata = _manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10, 0)));
 
@@ -195,10 +151,8 @@ TEST_F(MetadataFilteringTest, FilterDocumentsStale) {
 }
 
 // The same test as FilterDocumentsPresent but using "readConcern"
-TEST_F(MetadataFilteringTest, FilterDocumentsPresentShardingState) {
+TEST_F(CollectionMetadataFilteringTest, FilterDocumentsPresentShardingState) {
     prepareTestData();
-
-    ShardingState::get(operationContext())->setEnabledForTest(ShardId("0").toString());
 
     BSONObj readConcern = BSON("readConcern" << BSON("level"
                                                      << "snapshot"
@@ -208,6 +162,7 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPresentShardingState) {
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
+    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
     auto const css = CollectionShardingState::get(operationContext(), kNss);
     auto metadata = css->getMetadata(operationContext());
 
@@ -218,10 +173,8 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPresentShardingState) {
 }
 
 // The same test as FilterDocumentsPast but using "readConcern"
-TEST_F(MetadataFilteringTest, FilterDocumentsPastShardingState) {
+TEST_F(CollectionMetadataFilteringTest, FilterDocumentsPastShardingState) {
     prepareTestData();
-
-    ShardingState::get(operationContext())->setEnabledForTest(ShardId("0").toString());
 
     BSONObj readConcern = BSON("readConcern" << BSON("level"
                                                      << "snapshot"
@@ -231,6 +184,7 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPastShardingState) {
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
+    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
     auto const css = CollectionShardingState::get(operationContext(), kNss);
     auto metadata = css->getMetadata(operationContext());
 
@@ -241,10 +195,8 @@ TEST_F(MetadataFilteringTest, FilterDocumentsPastShardingState) {
 }
 
 // The same test as FilterDocumentsStale but using "readConcern"
-TEST_F(MetadataFilteringTest, FilterDocumentsStaleShardingState) {
+TEST_F(CollectionMetadataFilteringTest, FilterDocumentsStaleShardingState) {
     prepareTestData();
-
-    ShardingState::get(operationContext())->setEnabledForTest(ShardId("0").toString());
 
     BSONObj readConcern = BSON("readConcern" << BSON("level"
                                                      << "snapshot"
@@ -254,6 +206,7 @@ TEST_F(MetadataFilteringTest, FilterDocumentsStaleShardingState) {
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
+    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
     auto const css = CollectionShardingState::get(operationContext(), kNss);
     auto metadata = css->getMetadata(operationContext());
 

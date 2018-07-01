@@ -214,7 +214,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             }
         }
 
-        if (metadata) {
+        if (metadata->isSharded()) {
             incrementChunkOnInsertOrUpdate(
                 opCtx, nss, *metadata->getChunkManager(), insertedDoc, insertedDoc.objsize());
         }
@@ -311,7 +311,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    if (metadata) {
+    if (metadata->isSharded()) {
         incrementChunkOnInsertOrUpdate(opCtx,
                                        args.nss,
                                        *metadata->getChunkManager(),
@@ -430,7 +430,8 @@ ShardObserverDeleteState ShardObserverDeleteState::make(OperationContext* opCtx,
                                                         CollectionShardingState* css,
                                                         const BSONObj& docToDelete) {
     auto msm = MigrationSourceManager::get(css);
-    return {css->getMetadata(opCtx).extractDocumentKey(docToDelete).getOwned(),
+    auto metadata = css->getMetadata(opCtx);
+    return {metadata->extractDocumentKey(docToDelete).getOwned(),
             msm && msm->getCloner()->isDocumentInMigratingChunk(docToDelete)};
 }
 

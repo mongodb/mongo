@@ -175,7 +175,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         auto collMetadata =
             CollectionShardingState::get(opCtx, canonicalQuery->nss())->getMetadata(opCtx);
-        if (collMetadata) {
+        if (collMetadata->isSharded()) {
             plannerParams->shardKey = collMetadata->getKeyPattern();
         } else {
             // If there's no metadata don't bother w/the shard filter since we won't know what

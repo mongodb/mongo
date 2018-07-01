@@ -143,7 +143,7 @@ public:
 
             for (auto& coll : _collections) {
                 ScopedCollectionMetadata metadata = coll.second->getMetadata(opCtx);
-                if (metadata) {
+                if (metadata->isSharded()) {
                     versionB.appendTimestamp(coll.first, metadata->getShardVersion().toLong());
                 } else {
                     versionB.appendTimestamp(coll.first, ChunkVersion::UNSHARDED().toLong());
@@ -280,7 +280,7 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     // Set this for error messaging purposes before potentially returning false.
     auto metadata = getMetadata(opCtx);
     const auto wantedShardVersion =
-        metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
+        metadata->isSharded() ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
     auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()
                                                         ? ShardingMigrationCriticalSection::kWrite
@@ -352,8 +352,10 @@ Status CollectionShardingState::waitForClean(OperationContext* opCtx,
                 // not hold reference on it, which would make it appear in use
                 auto metadata =
                     css->_metadataManager->getActiveMetadata(css->_metadataManager, boost::none);
-                if (!metadata || metadata->getCollVersion().epoch() != epoch) {
-                    return {ErrorCodes::StaleShardVersion, "Collection being migrated was dropped"};
+
+                if (!metadata->isSharded() || metadata->getCollVersion().epoch() != epoch) {
+                    return {ErrorCodes::ConflictingOperationInProgress,
+                            "Collection being migrated was dropped"};
                 }
             }
 

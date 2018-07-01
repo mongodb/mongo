@@ -117,16 +117,24 @@ protected:
     }
 
     /**
+     * Inserts the specified docs in 'kNss' and ensures the insert succeeded.
+     */
+    void insertDocsInShardedCollection(const std::vector<BSONObj>& docs) {
+        if (docs.empty())
+            return;
+
+        client()->insert(kNss.ns(), docs);
+        ASSERT_EQ("", client()->getLastError());
+    }
+
+    /**
      * Creates a collection, which contains an index corresponding to kShardKeyPattern and insers
      * the specified initial documents.
      */
-    void createShardedCollection(std::vector<BSONObj> initialDocs) {
+    void createShardedCollection(const std::vector<BSONObj>& initialDocs) {
         ASSERT(_client->createCollection(kNss.ns()));
         _client->createIndex(kNss.ns(), kShardKeyPattern);
-
-        if (!initialDocs.empty()) {
-            _client->insert(kNss.ns(), initialDocs);
-        }
+        insertDocsInShardedCollection(initialDocs);
     }
 
     /**
@@ -232,13 +240,13 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
     }
 
     // Insert some documents in the chunk range to be included for migration
-    client()->insert(kNss.ns(), createCollectionDocument(150));
-    client()->insert(kNss.ns(), createCollectionDocument(151));
+    insertDocsInShardedCollection({createCollectionDocument(150)});
+    insertDocsInShardedCollection({createCollectionDocument(151)});
 
     // Insert some documents which are outside of the chunk range and should not be included for
     // migration
-    client()->insert(kNss.ns(), createCollectionDocument(90));
-    client()->insert(kNss.ns(), createCollectionDocument(210));
+    insertDocsInShardedCollection({createCollectionDocument(90)});
+    insertDocsInShardedCollection({createCollectionDocument(210)});
 
     // Normally the insert above and the onInsert/onDelete callbacks below will happen under the
     // same lock and write unit of work

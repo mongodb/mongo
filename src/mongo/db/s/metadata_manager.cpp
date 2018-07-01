@@ -35,7 +35,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -185,7 +184,8 @@ ScopedCollectionMetadata MetadataManager::getActiveMetadata(
     std::shared_ptr<MetadataManager> self, const boost::optional<LogicalTime>& atClusterTime) {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
     if (_metadata.empty()) {
-        return ScopedCollectionMetadata();
+        return ScopedCollectionMetadata(
+            std::make_shared<MetadataManager::CollectionMetadataTracker>(CollectionMetadata()));
     }
 
     auto metadataTracker = _metadata.back();
@@ -540,8 +540,6 @@ boost::optional<ChunkRange> MetadataManager::getNextOrphanRange(BSONObj const& f
     return _metadata.back()->metadata.getNextOrphanRange(_receivingChunks, from);
 }
 
-ScopedCollectionMetadata::ScopedCollectionMetadata() = default;
-
 ScopedCollectionMetadata::ScopedCollectionMetadata(
     WithLock,
     std::shared_ptr<MetadataManager> metadataManager,
@@ -573,29 +571,6 @@ ScopedCollectionMetadata& ScopedCollectionMetadata::operator=(ScopedCollectionMe
         other._metadataTracker = nullptr;
     }
     return *this;
-}
-
-CollectionMetadata* ScopedCollectionMetadata::getMetadata() const {
-    return _metadataTracker ? &_metadataTracker->metadata : nullptr;
-}
-
-BSONObj ScopedCollectionMetadata::extractDocumentKey(BSONObj const& doc) const {
-    BSONObj key;
-    if (*this) {  // is sharded
-        auto const& pattern = _metadataTracker->metadata.getChunkManager()->getShardKeyPattern();
-        key = dotted_path_support::extractElementsBasedOnTemplate(doc, pattern.toBSON());
-        if (pattern.hasId()) {
-            return key;
-        }
-        // else, try to append an _id field from the document.
-    }
-
-    if (auto id = doc["_id"]) {
-        return key.isEmpty() ? id.wrap() : BSONObjBuilder(std::move(key)).append(id).obj();
-    }
-
-    // For legacy documents that lack an _id, use the document itself as its key.
-    return doc;
 }
 
 void ScopedCollectionMetadata::_clear() {
