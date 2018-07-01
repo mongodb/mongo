@@ -11,6 +11,8 @@ def generate(env):
         env.subst('$PROGSUFFIX') : 'bin',
         '.dylib' : 'lib',
         '.so' : 'lib',
+        '.dll' : 'bin',
+        '.lib' : 'lib',
     }
 
     def auto_install(env, target, source, **kwargs):

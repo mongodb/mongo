@@ -37,13 +37,13 @@ def exists(env):
     if pipe.wait() != 0:
         return False
 
-    isgnu = False
+    found = False
     for line in pipe.stdout:
-        if isgnu:
+        if found:
             continue  # consume all data
-        isgnu = re.search(r'^GNU ar', line)
+        found = re.search(r'^GNU ar|^LLVM', line)
 
-    return bool(isgnu)
+    return bool(found)
 
 def _add_emitter(builder):
     base_emitter = builder.emitter
@@ -84,9 +84,8 @@ def generate(env):
     env['RANLIBCOM'] = noop_action
     env['RANLIBCOMSTR'] = 'Skipping ranlib for thin archive $TARGET'
 
-    builder = env['BUILDERS']['StaticLibrary']
-    _add_emitter(builder)
+    for builder in ['StaticLibrary', 'SharedArchive']:
+        _add_emitter(env['BUILDERS'][builder])
 
-    _add_scanner(env['BUILDERS']['SharedLibrary'])
-    _add_scanner(env['BUILDERS']['LoadableModule'])
-    _add_scanner(env['BUILDERS']['Program'])
+    for builder in ['SharedLibrary', 'LoadableModule', 'Program']:
+        _add_scanner(env['BUILDERS'][builder])

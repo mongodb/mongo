@@ -63,13 +63,24 @@ missing_syslibdep = 'MISSING_LIBDEP_'
 class dependency(object):
     Public, Private, Interface = range(3)
 
-    def __init__(self, value, dynamic, deptype):
+    def __init__(self, value, deptype):
         self.target_node = value
-        # In static mode, all dependencies are public
-        self.dependency_type = deptype if dynamic else dependency.Public
+        self.dependency_type = deptype
 
     def __str__(self):
         return str(self.target_node)
+
+dependency_visibility_ignored = {
+    dependency.Public : dependency.Public,
+    dependency.Private : dependency.Public,
+    dependency.Interface : dependency.Public,
+}
+
+dependency_visibility_honored = {
+    dependency.Public : dependency.Public,
+    dependency.Private : dependency.Private,
+    dependency.Interface : dependency.Interface,
+}
 
 class DependencyCycleError(SCons.Errors.UserError):
     """Exception representing a cycle discovered in library dependencies."""
@@ -223,128 +234,78 @@ def __append_direct_libdeps(node, prereq_nodes):
         node.attributes.libdeps_direct = []
     node.attributes.libdeps_direct.extend(prereq_nodes)
 
-def libdeps_emitter(target, source, env):
-    """SCons emitter that takes values from the LIBDEPS environment variable and
-    converts them to File node objects, binding correct path information into
-    those File objects.
+def make_libdeps_emitter(dependency_builder, dependency_map=dependency_visibility_ignored):
 
-    Emitters run on a particular "target" node during the initial execution of
-    the SConscript file, rather than during the later build phase.  When they
-    run, the "env" environment's working directory information is what you
-    expect it to be -- that is, the working directory is considered to be the
-    one that contains the SConscript file.  This allows specification of
-    relative paths to LIBDEPS elements.
+    def libdeps_emitter(target, source, env):
+        """SCons emitter that takes values from the LIBDEPS environment variable and
+        converts them to File node objects, binding correct path information into
+        those File objects.
 
-    This emitter also adds LIBSUFFIX and LIBPREFIX appropriately.
+        Emitters run on a particular "target" node during the initial execution of
+        the SConscript file, rather than during the later build phase.  When they
+        run, the "env" environment's working directory information is what you
+        expect it to be -- that is, the working directory is considered to be the
+        one that contains the SConscript file.  This allows specification of
+        relative paths to LIBDEPS elements.
 
-    NOTE: For purposes of LIBDEPS_DEPENDENTS propagation, only the first member
-    of the "target" list is made a prerequisite of the elements of LIBDEPS_DEPENDENTS.
-    """
+        This emitter also adds LIBSUFFIX and LIBPREFIX appropriately.
 
-    lib_builder = env['BUILDERS']['StaticLibrary']
-    lib_node_factory = lib_builder.target_factory or env.File
+        NOTE: For purposes of LIBDEPS_DEPENDENTS propagation, only the first member
+        of the "target" list is made a prerequisite of the elements of LIBDEPS_DEPENDENTS.
+        """
 
-    prog_builder = env['BUILDERS']['Program']
-    prog_node_factory = prog_builder.target_factory or env.File
+        lib_builder = env['BUILDERS'][dependency_builder]
+        lib_node_factory = lib_builder.target_factory or env.File
 
-    prereqs = [dependency(l, False, dependency.Public) for l in env.get(libdeps_env_var, []) if l]
-    prereqs.extend(dependency(l, False, dependency.Interface) for l in env.get(libdeps_env_var + '_INTERFACE', []) if l)
-    prereqs.extend(dependency(l, False, dependency.Private) for l in env.get(libdeps_env_var + '_PRIVATE', []) if l)
+        prog_builder = env['BUILDERS']['Program']
+        prog_node_factory = prog_builder.target_factory or env.File
 
-    for prereq in prereqs:
-        prereqWithIxes = SCons.Util.adjustixes(
-            prereq.target_node, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
-        prereq.target_node = lib_node_factory(prereqWithIxes)
+        prereqs = [dependency(l, dependency_map[dependency.Public]) for l in env.get(libdeps_env_var, []) if l]
+        prereqs.extend(dependency(l, dependency_map[dependency.Interface]) for l in env.get(libdeps_env_var + '_INTERFACE', []) if l)
+        prereqs.extend(dependency(l, dependency_map[dependency.Private]) for l in env.get(libdeps_env_var + '_PRIVATE', []) if l)
 
-    for t in target:
-        # target[0] must be a Node and not a string, or else libdeps will fail to
-        # work properly.
-        __append_direct_libdeps(t, prereqs)
+        for prereq in prereqs:
+            prereqWithIxes = SCons.Util.adjustixes(
+                prereq.target_node, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
+            prereq.target_node = lib_node_factory(prereqWithIxes)
 
-    for dependent in env.get('LIBDEPS_DEPENDENTS', []):
-        if dependent is None:
-            continue
+        for t in target:
+            # target[0] must be a Node and not a string, or else libdeps will fail to
+            # work properly.
+            __append_direct_libdeps(t, prereqs)
 
-        # Ignore any tuple'd in visibility override.
-        if isinstance(dependent, tuple):
-            dependent = dependent[0]
+        for dependent in env.get('LIBDEPS_DEPENDENTS', []):
+            if dependent is None:
+                continue
 
-        dependentWithIxes = SCons.Util.adjustixes(
-            dependent, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
-        dependentNode = lib_node_factory(dependentWithIxes)
-        __append_direct_libdeps(dependentNode, [dependency(target[0], False, dependency.Public)])
+            visibility = dependency.Private
+            if isinstance(dependent, tuple):
+                visibility = dependent[1]
+                dependent = dependent[0]
 
-    for dependent in env.get('PROGDEPS_DEPENDENTS', []):
-        if dependent is None:
-            continue
-        dependentWithIxes = SCons.Util.adjustixes(
-            dependent, prog_builder.get_prefix(env), prog_builder.get_suffix(env))
-        dependentNode = prog_node_factory(dependentWithIxes)
-        __append_direct_libdeps(dependentNode, [dependency(target[0], False, dependency.Public)])
+            dependentWithIxes = SCons.Util.adjustixes(
+                dependent, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
+            dependentNode = lib_node_factory(dependentWithIxes)
+            __append_direct_libdeps(dependentNode, [dependency(target[0], dependency_map[visibility])])
 
-    return target, source
+        for dependent in env.get('PROGDEPS_DEPENDENTS', []):
+            if dependent is None:
+                continue
 
-def shlibdeps_emitter(target, source, env):
-    """SCons emitter that takes values from the LIBDEPS environment variable and
-    converts them to File node objects, binding correct path information into
-    those File objects.
+            visibility = dependency.Public
+            if isinstance(dependent, tuple):
+                # TODO: Error here? Non-public PROGDEPS_DEPENDENTS probably are meaningless
+                visibility = dependent[1]
+                dependent = dependent[0]
 
-    Emitters run on a particular "target" node during the initial execution of
-    the SConscript file, rather than during the later build phase.  When they
-    run, the "env" environment's working directory information is what you
-    expect it to be -- that is, the working directory is considered to be the
-    one that contains the SConscript file.  This allows specification of
-    relative paths to LIBDEPS elements.
+            dependentWithIxes = SCons.Util.adjustixes(
+                dependent, prog_builder.get_prefix(env), prog_builder.get_suffix(env))
+            dependentNode = prog_node_factory(dependentWithIxes)
+            __append_direct_libdeps(dependentNode, [dependency(target[0], dependency_map[visibility])])
 
-    This emitter also adds LIBSUFFIX and LIBPREFIX appropriately.
+        return target, source
 
-    NOTE: For purposes of LIBDEPS_DEPENDENTS propagation, only the first member
-    of the "target" list is made a prerequisite of the elements of LIBDEPS_DEPENDENTS.
-    """
-
-    lib_builder = env['BUILDERS']['SharedLibrary']
-    lib_node_factory = lib_builder.target_factory or env.File
-
-    prog_builder = env['BUILDERS']['Program']
-    prog_node_factory = prog_builder.target_factory or env.File
-
-    prereqs = [dependency(l, True, dependency.Public) for l in env.get(libdeps_env_var, []) if l]
-    prereqs.extend(dependency(l, True, dependency.Interface) for l in env.get(libdeps_env_var + '_INTERFACE', []) if l)
-    prereqs.extend(dependency(l, True, dependency.Private) for l in env.get(libdeps_env_var + '_PRIVATE', []) if l)
-
-    for prereq in prereqs:
-        prereqWithIxes = SCons.Util.adjustixes(
-            prereq.target_node, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
-        prereq.target_node = lib_node_factory(prereqWithIxes)
-
-    for t in target:
-        # target[0] must be a Node and not a string, or else libdeps will fail to
-        # work properly.
-        __append_direct_libdeps(t, prereqs)
-
-    for dependent in env.get('LIBDEPS_DEPENDENTS', []):
-        if dependent is None:
-            continue
-
-        visibility = dependency.Private
-        if isinstance(dependent, tuple):
-            visibility = dependent[1]
-            dependent = dependent[0]
-
-        dependentWithIxes = SCons.Util.adjustixes(
-            dependent, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
-        dependentNode = lib_node_factory(dependentWithIxes)
-        __append_direct_libdeps(dependentNode, [dependency(target[0], True, visibility)])
-
-    for dependent in env.get('PROGDEPS_DEPENDENTS', []):
-        if dependent is None:
-            continue
-        dependentWithIxes = SCons.Util.adjustixes(
-            dependent, prog_builder.get_prefix(env), prog_builder.get_suffix(env))
-        dependentNode = prog_node_factory(dependentWithIxes)
-        __append_direct_libdeps(dependentNode, [dependency(target[0], True, dependency.Public)])
-
-    return target, source
+    return libdeps_emitter
 
 def expand_libdeps_tags(source, target, env, for_signature):
     results = []
@@ -368,38 +329,53 @@ def setup_environment(env, emitting_shared=False):
     env[libdeps_env_var] = SCons.Util.CLVar()
     env[syslibdeps_env_var] = SCons.Util.CLVar()
 
-    env.Append(LIBEMITTER=libdeps_emitter)
-    if emitting_shared:
-        env['_LIBDEPS_LIBS'] = '$_LIBDEPS_GET_LIBS'
-        env.Append(
-            PROGEMITTER=shlibdeps_emitter,
-            SHLIBEMITTER=shlibdeps_emitter)
-    else:
+    # We need a way for environments to alter just which libdeps
+    # emitter they want, without altering the overall program or
+    # library emitter which may have important effects. The
+    # subsitution rules for emitters are a little strange, so build
+    # ourselves a little trampoline to use below so we don't have to
+    # deal with it.
+    def make_indirect_emitter(variable):
+        def indirect_emitter(target, source, env):
+            return env[variable](target, source, env)
+        return indirect_emitter
 
-        def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
-            result = []
-            libs = get_libdeps(source, target, env, for_signature)
-            for lib in libs:
-                if 'init-no-global-side-effects' in env.Entry(lib).get_env().get('LIBDEPS_TAGS', []):
-                    result.append(str(lib))
-                else:
-                    result.extend(env.subst('$LINK_WHOLE_ARCHIVE_LIB_START'
-                                            '$TARGET'
-                                            '$LINK_WHOLE_ARCHIVE_LIB_END', target=lib).split())
-            return result
+    env.Append(
+        LIBDEPS_LIBEMITTER=make_libdeps_emitter('StaticLibrary'),
+        LIBEMITTER=make_indirect_emitter('LIBDEPS_LIBEMITTER'),
 
-        env['_LIBDEPS_LIBS_WITH_TAGS'] = expand_libdeps_with_extraction_flags
+        LIBDEPS_SHAREMITTER=make_libdeps_emitter('SharedArchive'),
+        SHAREMITTER=make_indirect_emitter('LIBDEPS_SHAREMITTER'),
 
-        env['_LIBDEPS_LIBS'] = ('$LINK_WHOLE_ARCHIVE_START '
-                                '$LINK_LIBGROUP_START '
-                                '$_LIBDEPS_LIBS_WITH_TAGS '
-                                '$LINK_LIBGROUP_END '
-                                '$LINK_WHOLE_ARCHIVE_END')
-        env.Append(
-            PROGEMITTER=libdeps_emitter,
-            SHLIBEMITTER=libdeps_emitter)
+        LIBDEPS_SHLIBEMITTER=make_libdeps_emitter('SharedLibrary', dependency_visibility_honored),
+        SHLIBEMITTER=make_indirect_emitter('LIBDEPS_SHLIBEMITTER'),
+
+        LIBDEPS_PROGEMITTER=make_libdeps_emitter('SharedLibrary' if emitting_shared else 'StaticLibrary'),
+        PROGEMITTER=make_indirect_emitter('LIBDEPS_PROGEMITTER'),
+    )
+
+    def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
+        result = []
+        libs = get_libdeps(source, target, env, for_signature)
+        for lib in libs:
+            if 'init-no-global-side-effects' in env.Entry(lib).get_env().get('LIBDEPS_TAGS', []):
+                result.append(str(lib))
+            else:
+                result.extend(env.subst('$LINK_WHOLE_ARCHIVE_LIB_START'
+                                        '$TARGET'
+                                        '$LINK_WHOLE_ARCHIVE_LIB_END', target=lib).split())
+        return result
+
+    env['_LIBDEPS_LIBS_WITH_TAGS'] = expand_libdeps_with_extraction_flags
+
+    env['_LIBDEPS_LIBS'] = ('$LINK_WHOLE_ARCHIVE_START '
+                            '$LINK_LIBGROUP_START '
+                            '$_LIBDEPS_LIBS_WITH_TAGS '
+                            '$LINK_LIBGROUP_END '
+                            '$LINK_WHOLE_ARCHIVE_END')
+
     env.Prepend(_LIBFLAGS='$_LIBDEPS_TAGS $_LIBDEPS $_SYSLIBDEPS ')
-    for builder_name in ('Program', 'SharedLibrary', 'LoadableModule'):
+    for builder_name in ('Program', 'SharedLibrary', 'LoadableModule', 'SharedArchive'):
         try:
             update_scanner(env['BUILDERS'][builder_name])
         except KeyError:
