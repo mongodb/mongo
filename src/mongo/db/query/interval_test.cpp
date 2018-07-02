@@ -293,4 +293,41 @@ TEST(Union, Succeds) {
     ASSERT_EQUALS(a.compare(Interval(itv, true, true)), Interval::INTERVAL_EQUALS);
 }
 
+TEST(Introspection, GetDirection) {
+    // Empty/uninitialized Interval.
+    boost::optional<Interval> i;
+    i.emplace();
+    ASSERT(i->getDirection() == Interval::Direction::kDirectionNone);
+
+    // Empty Interval.
+    i.emplace(BSON("" << 10 << "" << 10), false, false);
+    ASSERT(i->getDirection() == Interval::Direction::kDirectionNone);
+
+    // Point bound Interval.
+    i.emplace(BSON("" << 10 << "" << 10), true, true);
+    ASSERT(i->getDirection() == Interval::Direction::kDirectionNone);
+
+    // Ascending interval.
+    i.emplace(BSON("" << 10 << "" << 20), true, true);
+    ASSERT(i->getDirection() == Interval::Direction::kDirectionAscending);
+
+    // Descending interval.
+    i.emplace(BSON("" << 11 << "" << 10), true, true);
+    ASSERT(i->getDirection() == Interval::Direction::kDirectionDescending);
+}
+
+TEST(Copying, ReverseClone) {
+    Interval a(BSON("" << 10 << "" << 20), false, true);
+    ASSERT(a.reverseClone() == Interval(BSON("" << 20 << "" << 10), true, false));
+    ASSERT(a.reverseClone() != a);
+
+    Interval b(BSON("" << 10 << "" << 5), true, true);
+    ASSERT(b.reverseClone() == Interval(BSON("" << 5 << "" << 10), true, true));
+    ASSERT(b.reverseClone() != b);
+
+    Interval c(BSON("" << 1 << "" << 1), true, true);
+    ASSERT(c.reverseClone() == c);
+}
+
+
 }  // unnamed namespace

@@ -46,27 +46,11 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
         if (isn->bounds.isSimpleRange) {
             std::swap(isn->bounds.startKey, isn->bounds.endKey);
             // If only one bound is included, swap which one is included.
-            switch (isn->bounds.boundInclusion) {
-                case BoundInclusion::kIncludeStartKeyOnly:
-                    isn->bounds.boundInclusion = BoundInclusion::kIncludeEndKeyOnly;
-                    break;
-                case BoundInclusion::kIncludeEndKeyOnly:
-                    isn->bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
-                    break;
-                case BoundInclusion::kIncludeBothStartAndEndKeys:
-                case BoundInclusion::kExcludeBothStartAndEndKeys:
-                    // These are both symmetric so no change needed.
-                    break;
-            }
+            isn->bounds.boundInclusion =
+                IndexBounds::reverseBoundInclusion(isn->bounds.boundInclusion);
         } else {
             for (size_t i = 0; i < isn->bounds.fields.size(); ++i) {
-                std::vector<Interval>& iv = isn->bounds.fields[i].intervals;
-                // Step 1: reverse the list.
-                std::reverse(iv.begin(), iv.end());
-                // Step 2: reverse each interval.
-                for (size_t j = 0; j < iv.size(); ++j) {
-                    iv[j].reverse();
-                }
+                isn->bounds.fields[i].reverse();
             }
         }
 

@@ -2979,4 +2979,19 @@ TEST(IndexBoundsBuilderTest, CanUseCoveredMatchingForExistsTrueWithSparseIndex) 
     ASSERT_TRUE(IndexBoundsBuilder::canUseCoveredMatching(expr.get(), testIndex));
 }
 
+TEST(IndexBoundsBuilderTest, IntersectizeBasic) {
+    OrderedIntervalList oil1("xyz");
+    oil1.intervals = {Interval(BSON("" << 0 << "" << 5), false, false)};
+
+    OrderedIntervalList oil2("xyz");
+    oil2.intervals = {Interval(BSON("" << 1 << "" << 6), false, false)};
+
+    IndexBoundsBuilder::intersectize(oil1, &oil2);
+
+    OrderedIntervalList expectedIntersection("xyz");
+    expectedIntersection.intervals = {Interval(BSON("" << 1 << "" << 5), false, false)};
+
+    ASSERT_TRUE(oil2 == expectedIntersection);
+}
+
 }  // namespace

@@ -597,8 +597,12 @@ bool IndexScanNode::sortedByDiskLoc() const {
 }
 
 // static
-std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds& bounds,
+std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds& inputBounds,
                                                               const BSONObj& indexKeyPattern) {
+    // Produce a copy of the bounds which are all ascending, as we can only compute intersections
+    // of ascending bounds.
+    IndexBounds bounds = inputBounds.forwardize();
+
     BSONObjIterator keyPatternIterator(indexKeyPattern);
 
     if (bounds.isSimpleRange) {

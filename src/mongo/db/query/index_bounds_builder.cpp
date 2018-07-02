@@ -56,6 +56,23 @@ namespace mongo {
 
 namespace {
 
+// Helper for checking that an OIL "appears" to be ascending given one interval.
+void assertOILIsAscendingLocally(const vector<Interval>& intervals, size_t idx) {
+    // Each individual interval being examined should be ascending or none.
+    const auto dir = intervals[idx].getDirection();
+
+    // Should be either ascending, or have no direction (be a point/null/empty interval).
+    invariant(dir == Interval::Direction::kDirectionAscending ||
+              dir == Interval::Direction::kDirectionNone);
+
+    // The previous OIL's end value should be <= the next OIL's start value.
+    if (idx > 0) {
+        // Pass 'false' to avoid comparing the field names.
+        const int res = intervals[idx - 1].end.woCompare(intervals[idx].start, false);
+        invariant(res <= 0);
+    }
+}
+
 // Tightness rules are shared for $lt, $lte, $gt, $gte.
 IndexBoundsBuilder::BoundsTightness getInequalityPredicateTightness(const BSONElement& dataElt,
                                                                     const IndexEntry& index) {
@@ -712,52 +729,57 @@ Interval IndexBoundsBuilder::makeRangeInterval(const BSONObj& obj, BoundInclusio
 }
 
 // static
-void IndexBoundsBuilder::intersectize(const OrderedIntervalList& arg, OrderedIntervalList* oilOut) {
-    verify(arg.name == oilOut->name);
+void IndexBoundsBuilder::intersectize(const OrderedIntervalList& oilA, OrderedIntervalList* oilB) {
+    invariant(oilB);
+    invariant(oilA.name == oilB->name);
 
-    size_t argidx = 0;
-    const vector<Interval>& argiv = arg.intervals;
+    size_t oilAIdx = 0;
+    const vector<Interval>& oilAIntervals = oilA.intervals;
 
-    size_t ividx = 0;
-    vector<Interval>& iv = oilOut->intervals;
+    size_t oilBIdx = 0;
+    vector<Interval>& oilBIntervals = oilB->intervals;
 
     vector<Interval> result;
 
-    while (argidx < argiv.size() && ividx < iv.size()) {
-        Interval::IntervalComparison cmp = argiv[argidx].compare(iv[ividx]);
+    while (oilAIdx < oilAIntervals.size() && oilBIdx < oilBIntervals.size()) {
+        if (kDebugBuild) {
+            // Ensure that both OILs are ascending.
+            assertOILIsAscendingLocally(oilAIntervals, oilAIdx);
+            assertOILIsAscendingLocally(oilBIntervals, oilBIdx);
+        }
 
+        Interval::IntervalComparison cmp = oilAIntervals[oilAIdx].compare(oilBIntervals[oilBIdx]);
         verify(Interval::INTERVAL_UNKNOWN != cmp);
 
         if (cmp == Interval::INTERVAL_PRECEDES || cmp == Interval::INTERVAL_PRECEDES_COULD_UNION) {
-            // argiv is before iv.  move argiv forward.
-            ++argidx;
+            // oilAIntervals is before oilBIntervals. move oilAIntervals forward.
+            ++oilAIdx;
         } else if (cmp == Interval::INTERVAL_SUCCEEDS) {
-            // iv is before argiv.  move iv forward.
-            ++ividx;
+            // oilBIntervals is before oilAIntervals. move oilBIntervals forward.
+            ++oilBIdx;
         } else {
-            // argiv[argidx] (cmpresults) iv[ividx]
-            Interval newInt = argiv[argidx];
-            newInt.intersect(iv[ividx], cmp);
+            Interval newInt = oilAIntervals[oilAIdx];
+            newInt.intersect(oilBIntervals[oilBIdx], cmp);
             result.push_back(newInt);
 
             if (Interval::INTERVAL_EQUALS == cmp) {
-                ++argidx;
-                ++ividx;
+                ++oilAIdx;
+                ++oilBIdx;
             } else if (Interval::INTERVAL_WITHIN == cmp) {
-                ++argidx;
+                ++oilAIdx;
             } else if (Interval::INTERVAL_CONTAINS == cmp) {
-                ++ividx;
+                ++oilBIdx;
             } else if (Interval::INTERVAL_OVERLAPS_BEFORE == cmp) {
-                ++argidx;
+                ++oilAIdx;
             } else if (Interval::INTERVAL_OVERLAPS_AFTER == cmp) {
-                ++ividx;
+                ++oilBIdx;
             } else {
-                verify(0);
+                MONGO_UNREACHABLE;
             }
         }
     }
 
-    oilOut->intervals.swap(result);
+    oilB->intervals.swap(result);
 }
 
 // static
@@ -986,13 +1008,7 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int
         int direction = (elt.number() >= 0) ? 1 : -1;
         direction *= scanDir;
         if (-1 == direction) {
-            vector<Interval>& iv = bounds->fields[oilIdx].intervals;
-            // Step 1: reverse the list.
-            std::reverse(iv.begin(), iv.end());
-            // Step 2: reverse each interval.
-            for (size_t i = 0; i < iv.size(); ++i) {
-                iv[i].reverse();
-            }
+            bounds->fields[oilIdx].reverse();
         }
         ++oilIdx;
     }
