@@ -587,8 +587,9 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
                 _scan->possibleNodes.insert(reply.normalHosts.begin(), reply.normalHosts.end());
             }
         } else {
-            warning() << "node: " << from << " isn't a part of set: " << _set->name
-                      << " ismaster: " << replyObj;
+            error() << "replset name mismatch: expected \"" << _set->name << "\", "
+                    << "but remote node " << from << " has replset name \"" << reply.setName << "\""
+                    << ", ismaster: " << replyObj;
         }
 
         failedHost(from,
