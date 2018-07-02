@@ -276,8 +276,10 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             self.logger.info("%s the primary on port %d of replica set '%s'.", action, primary.port,
                              rs_fixture.replset_name)
 
+            # We send the mongod process the signal to exit but don't immediately wait for it to
+            # exit because clean shutdown may take a while and we want to restore write availability
+            # as quickly as possible.
             primary.mongod.stop(kill=should_kill)
-            primary.mongod.wait()
         else:
             self.logger.info("Stepping down the primary on port %d of replica set '%s'.",
                              primary.port, rs_fixture.replset_name)
@@ -305,11 +307,11 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                     primary.port, rs_fixture.replset_name)
                 raise
 
-        # We pick arbitrary secondary to run for election immediately in order to avoid a long
+        # We pick an arbitrary secondary to run for election immediately in order to avoid a long
         # period where the replica set doesn't have write availability. If none of the secondaries
-        # are eligible, or their election attempt fails, then we'll simply not have write
-        # availability until the self._stepdown_duration_secs duration expires and 'primary' steps
-        # back up again.
+        # are eligible, or their election attempt fails, then we'll run the replSetStepUp command on
+        # 'primary' to ensure we have write availability sooner than the
+        # self._stepdown_duration_secs duration expires.
         while secondaries:
             chosen = random.choice(secondaries)
 
@@ -330,6 +332,11 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                 secondaries.remove(chosen)
 
         if self._terminate:
+            self.logger.info("Waiting for the old primary on port %d of replica set '%s' to exit.",
+                             primary.port, rs_fixture.replset_name)
+
+            primary.mongod.wait()
+
             self.logger.info("Attempting to restart the old primary on port %d of replica set '%s.",
                              primary.port, rs_fixture.replset_name)
 
@@ -342,6 +349,27 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                 primary.await_ready()
             finally:
                 primary.preserve_dbpath = original_preserve_dbpath
+        else:
+            # We always run the {replSetFreeze: 0} command to ensure the former primary is electable
+            # in the next round of _step_down().
+            client = primary.mongo_client()
+            client.admin.command({"replSetFreeze": 0})
+
+        if not secondaries:
+            # If we failed to step up one of the secondaries, then we run the replSetStepUp to try
+            # and elect the former primary again. This way we don't need to wait
+            # self._stepdown_duration_secs seconds to restore write availability to the cluster.
+            try:
+                client = primary.mongo_client()
+                client.admin.command("replSetStepUp")
+            except pymongo.errors.OperationFailure as err:
+                # It is possible that by the time we've run the replSetStepUp command that
+                # self._stepdown_duration_secs seconds have already passed and the former primary is
+                # running for election on its own. We just ignore the error response from the former
+                # primary.
+                self.logger.info(
+                    "Failed to step up the old primary on port %d of replica set '%s': %s",
+                    primary.port, rs_fixture.replset_name, err)
 
         # Bump the counter for the chosen secondary to indicate that the replSetStepUp command
         # executed successfully.

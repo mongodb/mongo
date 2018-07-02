@@ -195,6 +195,4 @@ executor:
     num_nodes: 3
     replset_config_options:
       settings:
-        # Speeds up failover, reduces chance DBClientRS times out retargeting the primary.
-        electionTimeoutMillis: 6500
         catchUpTimeoutMillis: 0

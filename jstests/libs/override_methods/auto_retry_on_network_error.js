@@ -161,6 +161,7 @@
         const isRetryableWriteCmd = RetryableWritesUtil.isRetryableWriteCmdName(cmdName);
         const canRetryWrites = _serverSession.canRetryWrites(cmdObj);
 
+        const startTime = Date.now();
         let numRetries = !jsTest.options().skipRetryOnNetworkError ? kMaxNumRetries : 0;
 
         // Validate the command before running it, to prevent tests with non-retryable commands
@@ -330,7 +331,21 @@
 
                 return res;
             } catch (e) {
-                if (!isNetworkError(e) || numRetries === 0) {
+                const kReplicaSetMonitorError =
+                    /^Could not find host matching read preference.*mode: "primary"/;
+
+                if (numRetries === 0) {
+                    throw e;
+                } else if (e.message.match(kReplicaSetMonitorError) &&
+                           Date.now() - startTime < 5 * 60 * 1000) {
+                    // ReplicaSetMonitor::getHostOrRefresh() waits up to 15 seconds to find the
+                    // primary of the replica set. It is possible for the step up attempt of another
+                    // node in the replica set to take longer than 15 seconds so we allow retrying
+                    // for up to 5 minutes.
+                    print("=-=-=-= Failed to find primary when attempting to run " + cmdName +
+                          " command, will retry for another 15 seconds");
+                    continue;
+                } else if (!isNetworkError(e)) {
                     throw e;
                 } else if (isRetryableWriteCmd) {
                     if (canRetryWrites) {

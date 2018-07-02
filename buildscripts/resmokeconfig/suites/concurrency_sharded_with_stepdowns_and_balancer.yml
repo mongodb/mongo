@@ -207,7 +207,6 @@ executor:
       replset_config_options:
         settings:
           catchUpTimeoutMillis: 0
-          electionTimeoutMillis: 5000
       voting_secondaries: true
     shard_options:
       all_nodes_electable: true
@@ -216,7 +215,6 @@ executor:
       replset_config_options:
         settings:
           catchUpTimeoutMillis: 0
-          electionTimeoutMillis: 5000
       voting_secondaries: true
     mongod_options:
       set_parameters:
