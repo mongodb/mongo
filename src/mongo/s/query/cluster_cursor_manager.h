@@ -67,10 +67,6 @@ class StatusWith;
  * with the kill*() suite of methods.
  *
  * No public methods throw exceptions, and all public methods are thread-safe.
- *
- * TODO: Add maxTimeMS support.  SERVER-19410.
- * TODO: Add method "size_t killCursorsOnNamespace(const NamespaceString& nss)" for
- *       dropCollection()?
  */
 class ClusterCursorManager {
     MONGO_DISALLOW_COPYING(ClusterCursorManager);

@@ -203,7 +203,6 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
             ChunkVersion::UNSHARDED().appendToCommand(&cmdBuilder);
         }
 
-        // TODO SERVER-33702: standardize method for attaching txnNumber through mongos.
         if (opCtx->getTxnNumber()) {
             cmdBuilder.append(OperationSessionInfo::kTxnNumberFieldName, *opCtx->getTxnNumber());
         }

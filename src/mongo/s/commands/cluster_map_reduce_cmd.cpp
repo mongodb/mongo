@@ -719,9 +719,6 @@ private:
         configShardCollRequest.set_configsvrShardCollection(nss);
         configShardCollRequest.setKey(BSON("_id" << 1));
         configShardCollRequest.setUnique(true);
-        // TODO (SERVER-29622): Setting the numInitialChunks to 0 will be unnecessary once the
-        // constructor automatically respects default values specified in the .idl.
-        configShardCollRequest.setNumInitialChunks(0);
         configShardCollRequest.setInitialSplitPoints(sortedSplitPts);
         configShardCollRequest.setGetUUIDfromPrimaryShard(false);
 
