@@ -14,17 +14,15 @@
     resetDbpath(dbpath);
 
     let getUriForColl = function(coll) {
-        let ret = coll.stats();
-        assert.commandWorked(ret);
-        let uri = ret.wiredTiger.uri.split("table:")[1];
+        assert(coll.exists());  // Collection must exist
+        let uri = coll.stats().wiredTiger.uri.split("table:")[1];
         assert.neq(typeof(uri), 'undefined');
         return uri;
     };
 
     let getUriForIndex = function(coll, indexName) {
+        assert(coll.exists());  // Collection must exist
         let ret = coll.getDB().runCommand({collStats: coll.getName()});
-        assert.commandWorked(ret);
-
         let uri = ret.indexDetails[indexName].uri.split("table:")[1];
         assert.neq(typeof(uri), 'undefined');
         return uri;
@@ -112,7 +110,7 @@
 
     mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
     testColl = mongod.getDB(baseName)[collName];
-    assert.commandFailed(testColl.stats());
+    assert.isnull(testColl.exists());
 
     assert.eq(testColl.find(doc).itcount(), 0);
     assert.eq(testColl.count(), 0);
