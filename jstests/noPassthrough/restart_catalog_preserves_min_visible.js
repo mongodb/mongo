@@ -9,7 +9,7 @@
  * This test verifies the collection's minimum visible snapshot timestamp is appropriately copied
  * over.
  *
- * @tags: [requires_replication]
+ * @tags: [requires_replication, uses_transactions]
  */
 (function() {
     "use strict";
