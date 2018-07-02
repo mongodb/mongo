@@ -887,8 +887,11 @@ void execCommandDatabase(OperationContext* opCtx,
                                 sessionOptions)) {
                 command->incrementCommandsFailed();
             }
-        } catch (const DBException&) {
+        } catch (const DBException& e) {
             command->incrementCommandsFailed();
+            if (e.code() == ErrorCodes::Unauthorized) {
+                CommandHelpers::auditLogAuthEvent(opCtx, invocation.get(), request, e.code());
+            }
             throw;
         }
     } catch (const DBException& e) {

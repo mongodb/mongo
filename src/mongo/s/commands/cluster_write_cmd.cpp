@@ -303,14 +303,10 @@ private:
     }
 
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-        try {
-            BSONObjBuilder bob = result->getBodyBuilder();
-            bool ok = runImpl(opCtx, *_request, _batchedRequest, bob);
+        BSONObjBuilder bob = result->getBodyBuilder();
+        bool ok = runImpl(opCtx, *_request, _batchedRequest, bob);
+        if (!ok)
             CommandHelpers::appendSimpleCommandStatus(bob, ok);
-        } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::auditLogAuthEvent(opCtx, this, *_request, ErrorCodes::Unauthorized);
-            throw;
-        }
     }
 
     void explain(OperationContext* opCtx,

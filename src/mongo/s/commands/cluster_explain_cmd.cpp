@@ -96,14 +96,8 @@ public:
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-        try {
-            auto bob = result->getBodyBuilder();
-            _innerInvocation->explain(opCtx, _verbosity, &bob);
-        } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::auditLogAuthEvent(
-                opCtx, this, *_outerRequest, ErrorCodes::Unauthorized);
-            throw;
-        }
+        auto bob = result->getBodyBuilder();
+        _innerInvocation->explain(opCtx, _verbosity, &bob);
     }
 
     void explain(OperationContext* opCtx,

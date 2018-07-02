@@ -427,8 +427,8 @@ Status MapReduceCommandTest::_runCommand(StringData mapCode, StringData reduceCo
 
     auto request = OpMsgRequest::fromDBAndBody(inputNss.db(), _makeCmdObj(mapCode, reduceCode));
     auto replyBuilder = rpc::makeReplyBuilder(rpc::Protocol::kOpMsg);
-    command->parse(_opCtx.get(), request)->run(_opCtx.get(), replyBuilder.get());
-    auto status = getStatusFromCommandResult(replyBuilder->getBodyBuilder().asTempObj());
+    auto result = CommandHelpers::runCommandDirectly(_opCtx.get(), request);
+    auto status = getStatusFromCommandResult(result);
     if (!status.isOK()) {
         return status.withContext(str::stream() << "mapReduce command failed: " << request.body);
     }
@@ -466,8 +466,7 @@ TEST_F(MapReduceCommandTest, DropTemporaryCollectionsOnInsertError) {
 
     auto mapCode = "function() { emit(this._id, this._id); }"_sd;
     auto reduceCode = "function(k, v) { return Array.sum(v); }"_sd;
-    ASSERT_THROWS_CODE(
-        _runCommand(mapCode, reduceCode).ignore(), AssertionException, ErrorCodes::OperationFailed);
+    ASSERT_EQ(_runCommand(mapCode, reduceCode), ErrorCodes::OperationFailed);
 
     // Temporary collections created by mapReduce will be removed on failure if the server is able
     // to accept writes.
@@ -485,8 +484,7 @@ TEST_F(MapReduceCommandTest, PrimaryStepDownPreventsTemporaryCollectionDrops) {
 
     auto mapCode = "function() { emit(this._id, this._id); }"_sd;
     auto reduceCode = "function(k, v) { return Array.sum(v); }"_sd;
-    ASSERT_THROWS_CODE(
-        _runCommand(mapCode, reduceCode).ignore(), AssertionException, ErrorCodes::OperationFailed);
+    ASSERT_EQ(_runCommand(mapCode, reduceCode), ErrorCodes::OperationFailed);
 
     // Temporary collections should still be present because the server will not accept writes after
     // stepping down.

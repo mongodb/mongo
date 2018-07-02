@@ -97,14 +97,8 @@ public:
                 "Explain's child command cannot run on this node. "
                 "Are you explaining a write command on a secondary?",
                 commandCanRunHere(opCtx, _dbName, _innerInvocation->definition()));
-        try {
-            BSONObjBuilder bob = result->getBodyBuilder();
-            _innerInvocation->explain(opCtx, _verbosity, &bob);
-        } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::auditLogAuthEvent(
-                opCtx, this, *_outerRequest, ErrorCodes::Unauthorized);
-            throw;
-        }
+        BSONObjBuilder bob = result->getBodyBuilder();
+        _innerInvocation->explain(opCtx, _verbosity, &bob);
     }
 
     void explain(OperationContext* opCtx,

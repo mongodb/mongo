@@ -227,17 +227,12 @@ private:
 
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) final {
         try {
-            try {
-                _transactionChecks(opCtx);
-                BSONObjBuilder bob = result->getBodyBuilder();
-                runImpl(opCtx, bob);
-                CommandHelpers::extractOrAppendOk(bob);
-            } catch (const DBException& ex) {
-                LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
-                throw;
-            }
-        } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::auditLogAuthEvent(opCtx, this, *_request, ErrorCodes::Unauthorized);
+            _transactionChecks(opCtx);
+            BSONObjBuilder bob = result->getBodyBuilder();
+            runImpl(opCtx, bob);
+            CommandHelpers::extractOrAppendOk(bob);
+        } catch (const DBException& ex) {
+            LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
             throw;
         }
     }

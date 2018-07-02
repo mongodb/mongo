@@ -113,8 +113,9 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
     auto command = globalCommandRegistry()->findCommand(request.getCommandName());
     invariant(command);
     rpc::OpMsgReplyBuilder replyBuilder;
+    std::unique_ptr<CommandInvocation> invocation;
     try {
-        auto invocation = command->parse(opCtx, request);
+        invocation = command->parse(opCtx, request);
         invocation->run(opCtx, &replyBuilder);
         auto body = replyBuilder.getBodyBuilder();
         CommandHelpers::extractOrAppendOk(body);
@@ -122,6 +123,9 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
         // These exceptions are intended to be handled at a higher level.
         throw;
     } catch (const DBException& ex) {
+        if (ex.code() == ErrorCodes::Unauthorized) {
+            CommandHelpers::auditLogAuthEvent(opCtx, invocation.get(), request, ex.code());
+        }
         auto body = replyBuilder.getBodyBuilder();
         body.resetToEmpty();
         appendCommandStatusNoThrow(body, ex.toStatus());
@@ -428,14 +432,10 @@ public:
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-        try {
-            BSONObjBuilder bob = result->getBodyBuilder();
-            bool ok = _command->run(opCtx, _dbName, _request->body, bob);
+        BSONObjBuilder bob = result->getBodyBuilder();
+        bool ok = _command->run(opCtx, _dbName, _request->body, bob);
+        if (!ok)
             CommandHelpers::appendSimpleCommandStatus(bob, ok);
-        } catch (const ExceptionFor<ErrorCodes::Unauthorized>& e) {
-            CommandHelpers::auditLogAuthEvent(opCtx, this, *_request, e.code());
-            throw;
-        }
     }
 
     void explain(OperationContext* opCtx,
