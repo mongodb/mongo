@@ -125,94 +125,25 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectEmptyArray) {
     auto spec = BSON("$mergeCursors" << BSONArray());
     ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       50729);
+                       17026);
 }
 
-TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectCursorWithNoNamespace) {
-    auto spec =
-        BSON("$mergeCursors" << BSON_ARRAY(BSON("id" << 0LL << "host" << kTestHost.toString())));
+TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectLegacySerializationFormats) {
+    // Formats like this were used in old versions of the server but are no longer supported.
+    auto spec = BSON("$mergeCursors" << BSON_ARRAY(BSON(
+                         "ns" << kTestNss.ns() << "id" << 0LL << "host" << kTestHost.toString())));
     ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       50731);
-}
-
-TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectCursorWithNonStringNamespace) {
-    auto spec = BSON("$mergeCursors" << BSON_ARRAY(
-                         BSON("ns" << 4 << "id" << 0LL << "host" << kTestHost.toString())));
+                       17026);
+    spec = BSON("$mergeCursors" << BSONArray());
     ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       50731);
-}
-
-TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectCursorsWithDifferentNamespaces) {
-    auto spec = BSON(
-        "$mergeCursors"
-        << BSON_ARRAY(BSON("ns" << kTestNss.ns() << "id" << 0LL << "host" << kTestHost.toString())
-                      << BSON("ns"
-                              << "test.other"_sd
-                              << "id"
-                              << 0LL
-                              << "host"
-                              << kTestHost.toString())));
-    ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       50720);
-}
-
-TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectCursorWithNoHost) {
-    auto spec = BSON("$mergeCursors" << BSON_ARRAY(BSON("ns" << kTestNss.ns() << "id" << 0LL)));
-    ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       50721);
-}
-
-TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectCursorWithNonStringHost) {
-    auto spec = BSON("$mergeCursors"
-                     << BSON_ARRAY(BSON("ns" << kTestNss.ns() << "id" << 0LL << "host" << 4LL)));
-    ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       50721);
-}
-
-TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectCursorWithNonLongId) {
-    auto spec = BSON("$mergeCursors" << BSON_ARRAY(BSON("ns" << kTestNss.ns() << "id"
-                                                             << "zero"
-                                                             << "host"
-                                                             << kTestHost.toString())));
-    ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       50722);
+                       17026);
     spec = BSON("$mergeCursors" << BSON_ARRAY(
-                    BSON("ns" << kTestNss.ns() << "id" << 0 << "host" << kTestHost.toString())));
+                    BSON("ns" << 4 << "id" << 0LL << "host" << kTestHost.toString())));
     ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       50722);
-}
-
-TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectCursorWithExtraField) {
-    auto spec =
-        BSON("$mergeCursors" << BSON_ARRAY(BSON(
-                 "ns" << kTestNss.ns() << "id" << 0LL << "host" << kTestHost.toString() << "extra"
-                      << "unexpected")));
-    ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       50730);
-}
-
-TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToParseTheSerializedVersionOfItself) {
-    auto spec =
-        BSON("$mergeCursors" << BSON_ARRAY(
-                 BSON("ns" << kTestNss.ns() << "id" << 1LL << "host" << kTestHost.toString())
-                 << BSON("ns" << kTestNss.ns() << "id" << 2LL << "host" << kTestHost.toString())));
-    auto mergeCursors =
-        DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx());
-    std::vector<Value> serializationArray;
-    mergeCursors->serializeToArray(serializationArray);
-    ASSERT_EQ(serializationArray.size(), 1UL);
-    // The serialized version might not be identical to 'spec', the fields might be in a different
-    // order, etc. Here we just make sure that the final parse doesn't throw.
-    auto newSpec = serializationArray[0].getDocument().toBson();
-    ASSERT(DocumentSourceMergeCursors::createFromBson(newSpec.firstElement(), getExpCtx()));
+                       17026);
 }
 
 RemoteCursor makeRemoteCursor(ShardId shardId, HostAndPort host, CursorResponse response) {
@@ -396,63 +327,6 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(DocumentSourceMergeCursorsTest, ShouldOptimizeWithASortToEnsureCorrectOrder) {
-    auto expCtx = getExpCtx();
-
-    // Make a pipeline with a single $sort stage that is merging pre-sorted results.
-    const bool mergingPresorted = true;
-    const long long noLimit = -1;
-    auto sortStage = DocumentSourceSort::create(expCtx,
-                                                BSON("x" << 1),
-                                                noLimit,
-                                                DocumentSourceSort::kMaxMemoryUsageBytes,
-                                                mergingPresorted);
-    auto pipeline = uassertStatusOK(Pipeline::create({std::move(sortStage)}, expCtx));
-
-    // Make a $mergeCursors stage and add it to the front of the pipeline.
-    AsyncResultsMergerParams armParams;
-    armParams.setNss(kTestNss);
-    std::vector<RemoteCursor> cursors;
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, 1, {})));
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->ns, 2, {})));
-    armParams.setRemotes(std::move(cursors));
-    pipeline->addInitialSource(
-        DocumentSourceMergeCursors::create(executor(), std::move(armParams), expCtx));
-
-    // After optimization we should only have a $mergeCursors stage.
-    pipeline->optimizePipeline();
-    ASSERT_EQ(pipeline->getSources().size(), 1UL);
-    ASSERT_TRUE(dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
-
-    // Iterate the pipeline asynchronously on a different thread, since it will block waiting for
-    // network responses, which we will manually schedule below.
-    auto future = launchAsync([&pipeline]() {
-        ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 1}}));
-        ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 2}}));
-        ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 3}}));
-        ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 4}}));
-        ASSERT_FALSE(static_cast<bool>(pipeline->getNext()));
-        std::cout << "Finished";
-    });
-
-    onCommand([&](const auto& request) {
-        return cursorResponseObj(expCtx->ns,
-                                 kExhaustedCursorID,
-                                 {BSON("x" << 1 << "$sortKey" << BSON("" << 1)),
-                                  BSON("x" << 3 << "$sortKey" << BSON("" << 3))});
-    });
-    onCommand([&](const auto& request) {
-        return cursorResponseObj(expCtx->ns,
-                                 kExhaustedCursorID,
-                                 {BSON("x" << 2 << "$sortKey" << BSON("" << 2)),
-                                  BSON("x" << 4 << "$sortKey" << BSON("" << 4))});
-    });
-
-    future.timed_get(kFutureTimeout);
-}
-
 TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
     auto expCtx = getExpCtx();
     auto pipeline = uassertStatusOK(Pipeline::create({}, expCtx));
@@ -482,59 +356,6 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
         ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 2}}));
         ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 3}}));
         ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 4}}));
-        ASSERT_FALSE(static_cast<bool>(pipeline->getNext()));
-    });
-
-    onCommand([&](const auto& request) {
-        return cursorResponseObj(expCtx->ns,
-                                 kExhaustedCursorID,
-                                 {BSON("x" << 1 << "$sortKey" << BSON("" << 1)),
-                                  BSON("x" << 3 << "$sortKey" << BSON("" << 3))});
-    });
-    onCommand([&](const auto& request) {
-        return cursorResponseObj(expCtx->ns,
-                                 kExhaustedCursorID,
-                                 {BSON("x" << 2 << "$sortKey" << BSON("" << 2)),
-                                  BSON("x" << 4 << "$sortKey" << BSON("" << 4))});
-    });
-
-    future.timed_get(kFutureTimeout);
-}
-
-TEST_F(DocumentSourceMergeCursorsTest, ShouldNotRemoveLimitWhenOptimizingWithLeadingSort) {
-    auto expCtx = getExpCtx();
-
-    // Make a pipeline with a single $sort stage that is merging pre-sorted results.
-    const bool mergingPresorted = true;
-    const long long limit = 3;
-    auto sortStage = DocumentSourceSort::create(
-        expCtx, BSON("x" << 1), limit, DocumentSourceSort::kMaxMemoryUsageBytes, mergingPresorted);
-    auto pipeline = uassertStatusOK(Pipeline::create({std::move(sortStage)}, expCtx));
-
-    // Make a $mergeCursors stage and add it to the front of the pipeline.
-    AsyncResultsMergerParams armParams;
-    armParams.setNss(kTestNss);
-    std::vector<RemoteCursor> cursors;
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, 1, {})));
-    cursors.emplace_back(
-        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->ns, 2, {})));
-    armParams.setRemotes(std::move(cursors));
-    pipeline->addInitialSource(
-        DocumentSourceMergeCursors::create(executor(), std::move(armParams), expCtx));
-
-    // After optimization, we should still have a $limit stage.
-    pipeline->optimizePipeline();
-    ASSERT_EQ(pipeline->getSources().size(), 2UL);
-    ASSERT_TRUE(dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
-    ASSERT_TRUE(dynamic_cast<DocumentSourceLimit*>(pipeline->getSources().back().get()));
-
-    // Iterate the pipeline asynchronously on a different thread, since it will block waiting for
-    // network responses, which we will manually schedule below.
-    auto future = launchAsync([&]() {
-        for (int i = 1; i <= limit; ++i) {
-            ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", i}}));
-        }
         ASSERT_FALSE(static_cast<bool>(pipeline->getNext()));
     });
 

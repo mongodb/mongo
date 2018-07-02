@@ -66,11 +66,6 @@ public:
         return kStageName.rawData();
     }
 
-    /**
-     * Absorbs a subsequent $sort if it's merging pre-sorted streams.
-     */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container);
     void detachFromOperationContext() final;
     void reattachToOperationContext(OperationContext*) final;
 
@@ -82,7 +77,7 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kAnyShard,
+                                     HostTypeRequirement::kNone,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      // TODO SERVER-33683: Permit $mergeCursors with readConcern
