@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/grid.h"
 
@@ -51,14 +52,39 @@ DocumentSourceMergeCursors::DocumentSourceMergeCursors(
       _executor(executor),
       _armParams(std::move(armParams)) {}
 
-DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
-    // We don't expect or support tailable cursors to be executing through this stage.
-    invariant(pExpCtx->tailableMode == TailableModeEnum::kNormal);
-    if (!_arm) {
-        _arm.emplace(pExpCtx->opCtx, _executor, std::move(*_armParams));
-        _armParams = boost::none;
+std::size_t DocumentSourceMergeCursors::getNumRemotes() const {
+    if (_armParams) {
+        return _armParams->getRemotes().size();
     }
-    auto next = uassertStatusOK(_arm->blockingNext());
+    return _blockingResultsMerger->getNumRemotes();
+}
+
+bool DocumentSourceMergeCursors::remotesExhausted() const {
+    if (_armParams) {
+        // We haven't started iteration yet.
+        return false;
+    }
+    return _blockingResultsMerger->remotesExhausted();
+}
+
+void DocumentSourceMergeCursors::populateMerger() {
+    invariant(!_blockingResultsMerger);
+    invariant(_armParams);
+    _blockingResultsMerger.emplace(pExpCtx->opCtx, std::move(*_armParams), _executor);
+    _armParams = boost::none;
+}
+
+std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterStage() {
+    invariant(!_blockingResultsMerger, "Expected conversion to happen before execution");
+    return stdx::make_unique<RouterStageMerge>(pExpCtx->opCtx, _executor, std::move(*_armParams));
+}
+
+DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
+    if (!_blockingResultsMerger) {
+        populateMerger();
+    }
+
+    auto next = uassertStatusOK(_blockingResultsMerger->next(pExpCtx->opCtx, _execContext));
     if (next.isEOF()) {
         return GetNextResult::makeEOF();
     }
@@ -67,7 +93,7 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
 
 Value DocumentSourceMergeCursors::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    invariant(!_arm);
+    invariant(!_blockingResultsMerger);
     invariant(_armParams);
     return Value(Document{{kStageName, _armParams->toBSON()}});
 }
@@ -86,7 +112,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
         std::move(ownedObj));
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
+boost::intrusive_ptr<DocumentSourceMergeCursors> DocumentSourceMergeCursors::create(
     executor::TaskExecutor* executor,
     AsyncResultsMergerParams params,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -94,20 +120,20 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
 }
 
 void DocumentSourceMergeCursors::detachFromOperationContext() {
-    if (_arm) {
-        _arm->detachFromOperationContext();
+    if (_blockingResultsMerger) {
+        _blockingResultsMerger->detachFromOperationContext();
     }
 }
 
 void DocumentSourceMergeCursors::reattachToOperationContext(OperationContext* opCtx) {
-    if (_arm) {
-        _arm->reattachToOperationContext(opCtx);
+    if (_blockingResultsMerger) {
+        _blockingResultsMerger->reattachToOperationContext(opCtx);
     }
 }
 
 void DocumentSourceMergeCursors::doDispose() {
-    if (_arm) {
-        _arm->blockingKill(pExpCtx->opCtx);
+    if (_blockingResultsMerger) {
+        _blockingResultsMerger->kill(pExpCtx->opCtx);
     }
 }
 

@@ -839,13 +839,13 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getShardSource() {
     return this;  // No modifications necessary when on shard
 }
 
-std::list<intrusive_ptr<DocumentSource>> DocumentSourceGroup::getMergeSources() {
-    intrusive_ptr<DocumentSourceGroup> pMerger(new DocumentSourceGroup(pExpCtx));
-    pMerger->setDoingMerge(true);
+NeedsMergerDocumentSource::MergingLogic DocumentSourceGroup::mergingLogic() {
+    intrusive_ptr<DocumentSourceGroup> mergingGroup(new DocumentSourceGroup(pExpCtx));
+    mergingGroup->setDoingMerge(true);
 
     VariablesParseState vps = pExpCtx->variablesParseState;
     /* the merger will use the same grouping key */
-    pMerger->setIdExpression(ExpressionFieldPath::parse(pExpCtx, "$$ROOT._id", vps));
+    mergingGroup->setIdExpression(ExpressionFieldPath::parse(pExpCtx, "$$ROOT._id", vps));
 
     for (auto&& accumulatedField : _accumulatedFields) {
         // The merger's output field names will be the same, as will the accumulator factories.
@@ -855,12 +855,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceGroup::getMergeSources() 
         auto copiedAccumuledField = accumulatedField;
         copiedAccumuledField.expression =
             ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + accumulatedField.fieldName, vps);
-        pMerger->addAccumulator(copiedAccumuledField);
+        mergingGroup->addAccumulator(copiedAccumuledField);
     }
 
-    return {pMerger};
+    return {mergingGroup};
 }
-}
+}  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
 // Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

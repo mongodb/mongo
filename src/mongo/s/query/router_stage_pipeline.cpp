@@ -35,26 +35,20 @@
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/s/query/document_source_router_adapter.h"
 
 namespace mongo {
 
-RouterStagePipeline::RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
-                                         std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline)
+RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline)
     : RouterExecStage(mergePipeline->getContext()->opCtx),
-      _mergePipeline(std::move(mergePipeline)),
-      _mongosOnlyPipeline(!_mergePipeline->isSplitForMerge()) {
-    if (!_mongosOnlyPipeline) {
-        // Add an adapter to the front of the pipeline to draw results from 'child'.
-        _routerAdapter =
-            DocumentSourceRouterAdapter::create(_mergePipeline->getContext(), std::move(child)),
-        _mergePipeline->addInitialSource(_routerAdapter);
-    }
+      _mergePipeline(std::move(mergePipeline)) {
+    invariant(!_mergePipeline->getSources().empty());
+    _mergeCursorsStage =
+        dynamic_cast<DocumentSourceMergeCursors*>(_mergePipeline->getSources().front().get());
 }
 
 StatusWith<ClusterQueryResult> RouterStagePipeline::next(RouterExecStage::ExecContext execContext) {
-    if (_routerAdapter) {
-        _routerAdapter->setExecContext(execContext);
+    if (_mergeCursorsStage) {
+        _mergeCursorsStage->setExecContext(execContext);
     }
 
     // Pipeline::getNext will return a boost::optional<Document> or boost::none if EOF.
@@ -85,15 +79,20 @@ void RouterStagePipeline::kill(OperationContext* opCtx) {
 }
 
 std::size_t RouterStagePipeline::getNumRemotes() const {
-    return _mongosOnlyPipeline ? 0 : _routerAdapter->getNumRemotes();
+    if (_mergeCursorsStage) {
+        return _mergeCursorsStage->getNumRemotes();
+    }
+    return 0;
 }
 
 bool RouterStagePipeline::remotesExhausted() {
-    return _mongosOnlyPipeline || _routerAdapter->remotesExhausted();
+    return !_mergeCursorsStage || _mergeCursorsStage->remotesExhausted();
 }
 
 Status RouterStagePipeline::doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    return _routerAdapter->setAwaitDataTimeout(awaitDataTimeout);
+    invariant(_mergeCursorsStage,
+              "The only cursors which should be tailable are those with remote cursors.");
+    return _mergeCursorsStage->setAwaitDataTimeout(awaitDataTimeout);
 }
 
 }  // namespace mongo

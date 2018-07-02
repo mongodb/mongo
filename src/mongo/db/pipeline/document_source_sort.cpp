@@ -1,30 +1,30 @@
 /**
-*    Copyright (C) 2011 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2011 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #include "mongo/platform/basic.h"
 
@@ -44,9 +44,9 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::unique_ptr;
 using std::make_pair;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 namespace {
@@ -98,7 +98,7 @@ Value deserializeSortKey(size_t sortPatternSize, BSONObj bsonSortKey) {
 constexpr StringData DocumentSourceSort::kStageName;
 
 DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _mergingPresorted(false) {}
+    : DocumentSource(pExpCtx) {}
 
 REGISTER_DOCUMENT_SOURCE(sort,
                          LiteParsedDocumentSourceDefault::parse,
@@ -106,8 +106,6 @@ REGISTER_DOCUMENT_SOURCE(sort,
 
 DocumentSource::GetNextResult DocumentSourceSort::getNext() {
     pExpCtx->checkForInterrupt();
-    invariant(!_mergingPresorted);  // A presorted-merge should be optimized into the merge, and
-                                    // never executed.
 
     if (!_populated) {
         const auto populationResult = populate();
@@ -118,9 +116,6 @@ DocumentSource::GetNextResult DocumentSourceSort::getNext() {
     }
 
     if (!_output || !_output->more()) {
-        // Need to be sure connections are marked as done so they can be returned to the connection
-        // pool. This only needs to happen in the _mergingPresorted case, but it doesn't hurt to
-        // always do it.
         dispose();
         return GetNextResult::makeEOF();
     }
@@ -131,17 +126,12 @@ DocumentSource::GetNextResult DocumentSourceSort::getNext() {
 void DocumentSourceSort::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {  // always one Value for combined $sort + $limit
-        array.push_back(Value(DOC(
-            kStageName << DOC("sortKey" << sortKeyPattern(SortKeySerialization::kForExplain)
-                                        << "mergePresorted"
-                                        << (_mergingPresorted ? Value(true) : Value())
-                                        << "limit"
-                                        << (_limitSrc ? Value(_limitSrc->getLimit()) : Value())))));
+        array.push_back(
+            Value(DOC(kStageName << DOC(
+                          "sortKey" << sortKeyPattern(SortKeySerialization::kForExplain) << "limit"
+                                    << (_limitSrc ? Value(_limitSrc->getLimit()) : Value())))));
     } else {  // one Value for $sort and maybe a Value for $limit
         MutableDocument inner(sortKeyPattern(SortKeySerialization::kForPipelineSerialization));
-        if (_mergingPresorted) {
-            inner["$mergePresorted"] = Value(true);
-        }
         array.push_back(Value(DOC(kStageName << inner.freeze())));
 
         if (_limitSrc) {
@@ -243,23 +233,15 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     BSONObj sortOrder,
     long long limit,
-    boost::optional<uint64_t> maxMemoryUsageBytes,
-    bool mergingPresorted) {
+    boost::optional<uint64_t> maxMemoryUsageBytes) {
     intrusive_ptr<DocumentSourceSort> pSort(new DocumentSourceSort(pExpCtx));
     pSort->_maxMemoryUsageBytes = maxMemoryUsageBytes
         ? *maxMemoryUsageBytes
         : internalDocumentSourceSortMaxBlockingSortBytes.load();
     pSort->_rawSort = sortOrder.getOwned();
-    pSort->_mergingPresorted = mergingPresorted;
 
     for (auto&& keyField : sortOrder) {
         auto fieldName = keyField.fieldNameStringData();
-
-        if ("$mergePresorted" == fieldName) {
-            verify(keyField.Bool());
-            pSort->_mergingPresorted = true;
-            continue;
-        }
 
         SortPatternPart patternPart;
 
@@ -524,25 +506,14 @@ int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSort::getShardSource() {
-    verify(!_mergingPresorted);
     return this;
 }
 
-std::list<intrusive_ptr<DocumentSource>> DocumentSourceSort::getMergeSources() {
-    verify(!_mergingPresorted);
-    intrusive_ptr<DocumentSourceSort> other = new DocumentSourceSort(pExpCtx);
-    other->_sortPattern = _sortPattern;
-    other->_sortKeyGen = SortKeyGenerator{
-        other->sortKeyPattern(SortKeySerialization::kForPipelineSerialization).toBson(),
-        pExpCtx->getCollator()};
-    other->_paths = _paths;
-    other->_limitSrc = _limitSrc;
-    other->_maxMemoryUsageBytes = _maxMemoryUsageBytes;
-    other->_mergingPresorted = true;
-    other->_rawSort = _rawSort;
-    return {other};
+NeedsMergerDocumentSource::MergingLogic DocumentSourceSort::mergingLogic() {
+    return {_limitSrc ? DocumentSourceLimit::create(pExpCtx, _limitSrc->getLimit()) : nullptr,
+            sortKeyPattern(SortKeySerialization::kForSortKeyMerging).toBson()};
 }
-}
+}  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
 // Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

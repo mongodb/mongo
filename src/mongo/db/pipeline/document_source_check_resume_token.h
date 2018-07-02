@@ -105,13 +105,12 @@ public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        // This stage should never be in the shards part of a split pipeline.
-        invariant(pipeState != Pipeline::SplitState::kSplitForShards);
+    StageConstraints constraints(Pipeline::SplitState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                (pipeState == Pipeline::SplitState::kUnsplit ? HostTypeRequirement::kNone
-                                                             : HostTypeRequirement::kMongoS),
+                // If this is parsed on mongos it should stay on mongos. If we're not in a sharded
+                // cluster then it's okay to run on mongod.
+                HostTypeRequirement::kLocalOnly,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,
@@ -128,19 +127,11 @@ public:
                                                             _tokenFromClient.getClusterTime());
     };
 
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+    MergingLogic mergingLogic() final {
         // This stage must run on mongos to ensure it sees the resume token, which could have come
         // from any shard.  We also must include a mergingPresorted $sort stage to communicate to
         // the AsyncResultsMerger that we need to merge the streams in a particular order.
-        const bool mergingPresorted = true;
-        const long long noLimit = -1;
-        auto sortMergingPresorted =
-            DocumentSourceSort::create(pExpCtx,
-                                       change_stream_constants::kSortSpec,
-                                       noLimit,
-                                       internalDocumentSourceSortMaxBlockingSortBytes.load(),
-                                       mergingPresorted);
-        return {sortMergingPresorted, this};
+        return {this, change_stream_constants::kSortSpec};
     };
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;

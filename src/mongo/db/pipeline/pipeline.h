@@ -48,9 +48,9 @@
 namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
-class ExpressionContext;
-class DocumentSource;
 class CollatorInterface;
+class DocumentSource;
+class ExpressionContext;
 class OperationContext;
 class PipelineDeleter;
 
@@ -172,17 +172,11 @@ public:
     bool usedDisk();
 
     /**
-     * Split the current Pipeline into a Pipeline for each shard, and a Pipeline that combines the
-     * results within mongos. This permanently alters this pipeline for the merging operation, and
-     * returns a Pipeline object that should be executed on each targeted shard.
-    */
-    std::unique_ptr<Pipeline, PipelineDeleter> splitForSharded();
-
-    /**
-     * Returns true if this pipeline has not been split.
+     * Communicates to the pipeline which part of a split pipeline it is when the pipeline has been
+     * split in two.
      */
-    bool isUnsplit() const {
-        return _splitState == SplitState::kUnsplit;
+    void setSplitState(SplitState state) {
+        _splitState = state;
     }
 
     /**

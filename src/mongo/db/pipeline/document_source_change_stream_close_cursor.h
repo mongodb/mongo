@@ -54,8 +54,9 @@ public:
         invariant(pipeState != Pipeline::SplitState::kSplitForShards);
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                (pipeState == Pipeline::SplitState::kUnsplit ? HostTypeRequirement::kNone
-                                                             : HostTypeRequirement::kMongoS),
+                // If this is parsed on mongos it should stay on mongos. If we're not in a sharded
+                // cluster then it's okay to run on mongod.
+                HostTypeRequirement::kLocalOnly,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,
@@ -77,20 +78,10 @@ public:
         return nullptr;
     }
 
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+    MergingLogic mergingLogic() final {
         // This stage must run on mongos to ensure it sees any invalidation in the correct order,
-        // and to ensure that all remote cursors are cleaned up properly. We also must include a
-        // mergingPresorted $sort stage to communicate to the AsyncResultsMerger that we need to
-        // merge the streams in a particular order.
-        const bool mergingPresorted = true;
-        const long long noLimit = -1;
-        auto sortMergingPresorted =
-            DocumentSourceSort::create(pExpCtx,
-                                       change_stream_constants::kSortSpec,
-                                       noLimit,
-                                       internalDocumentSourceSortMaxBlockingSortBytes.load(),
-                                       mergingPresorted);
-        return {sortMergingPresorted, this};
+        // and to ensure that all remote cursors are cleaned up properly.
+        return {this, change_stream_constants::kSortSpec};
     }
 
 private:

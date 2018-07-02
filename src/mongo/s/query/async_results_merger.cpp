@@ -88,8 +88,7 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
       // This strange initialization is to work around the fact that the IDL does not currently
       // support a default value for an enum. The default tailable mode should be 'kNormal', but
       // since that is not supported we treat boost::none (unspecified) to mean 'kNormal'.
-      _tailableMode(params.getTailableMode() ? *params.getTailableMode()
-                                             : TailableModeEnum::kNormal),
+      _tailableMode(params.getTailableMode().value_or(TailableModeEnum::kNormal)),
       _params(std::move(params)),
       _mergeQueue(MergingComparator(_remotes,
                                     _params.getSort() ? *_params.getSort() : BSONObj(),
@@ -116,12 +115,12 @@ AsyncResultsMerger::~AsyncResultsMerger() {
     invariant(_remotesExhausted(lk) || _lifecycleState == kKillComplete);
 }
 
-bool AsyncResultsMerger::remotesExhausted() {
+bool AsyncResultsMerger::remotesExhausted() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _remotesExhausted(lk);
 }
 
-bool AsyncResultsMerger::_remotesExhausted(WithLock) {
+bool AsyncResultsMerger::_remotesExhausted(WithLock) const {
     for (const auto& remote : _remotes) {
         if (!remote.exhausted()) {
             return false;
@@ -767,38 +766,6 @@ bool AsyncResultsMerger::MergingComparator::operator()(const size_t& lhs, const 
     return compareSortKeys(extractSortKey(*leftDoc.getResult(), _compareWholeSortKey),
                            extractSortKey(*rightDoc.getResult(), _compareWholeSortKey),
                            _sort) > 0;
-}
-
-void AsyncResultsMerger::blockingKill(OperationContext* opCtx) {
-    auto killEvent = kill(opCtx);
-    if (!killEvent) {
-        // We are shutting down.
-        return;
-    }
-    _executor->waitForEvent(killEvent);
-}
-
-StatusWith<ClusterQueryResult> AsyncResultsMerger::blockingNext() {
-    while (!ready()) {
-        auto nextEventStatus = nextEvent();
-        if (!nextEventStatus.isOK()) {
-            return nextEventStatus.getStatus();
-        }
-        auto event = nextEventStatus.getValue();
-
-        // Block until there are further results to return.
-        auto status = _executor->waitForEvent(_opCtx, event);
-
-        if (!status.isOK()) {
-            return status.getStatus();
-        }
-
-        // We have not provided a deadline, so if the wait returns without interruption, we do not
-        // expect to have timed out.
-        invariant(status.getValue() == stdx::cv_status::no_timeout);
-    }
-
-    return nextReady();
 }
 
 }  // namespace mongo

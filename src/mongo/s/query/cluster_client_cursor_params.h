@@ -123,21 +123,12 @@ struct ClusterClientCursorParams {
     // Should be forwarded to the remote hosts in 'cmdObj'.
     boost::optional<long long> limit;
 
-    // If set, we use this pipeline to merge the output of aggregations on each remote.
-    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
-
     // Whether this cursor is tailing a capped collection, and whether it has the awaitData option
     // set.
     TailableModeEnum tailableMode = TailableModeEnum::kNormal;
 
     // Set if a readPreference must be respected throughout the lifetime of the cursor.
     boost::optional<ReadPreferenceSetting> readPreference;
-
-    // If valid, is called to return the RouterExecStage which becomes the initial source in this
-    // cursor's execution plan. Otherwise, a RouterStageMerge is used.
-    stdx::function<std::unique_ptr<RouterExecStage>(
-        OperationContext*, executor::TaskExecutor*, ClusterClientCursorParams*)>
-        createCustomCursorSource;
 
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.

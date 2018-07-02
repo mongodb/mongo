@@ -38,7 +38,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/cluster_aggregation_planner.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
@@ -335,25 +334,6 @@ bool Pipeline::usedDisk() {
         _sources.begin(), _sources.end(), [](const auto& stage) { return stage->usedDisk(); });
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::splitForSharded() {
-    invariant(!isSplitForShards());
-    invariant(!isSplitForMerge());
-
-    // Create and initialize the shard spec we'll return. We start with an empty pipeline on the
-    // shards and all work being done in the merger. Optimizations can move operations between
-    // the pipelines to be more efficient.
-    std::unique_ptr<Pipeline, PipelineDeleter> shardPipeline(new Pipeline(pCtx),
-                                                             PipelineDeleter(pCtx->opCtx));
-
-    cluster_aggregation_planner::performSplitPipelineOptimizations(shardPipeline.get(), this);
-    shardPipeline->_splitState = SplitState::kSplitForShards;
-    _splitState = SplitState::kSplitForMerge;
-
-    stitch();
-
-    return shardPipeline;
-}
-
 BSONObj Pipeline::getInitialQuery() const {
     if (_sources.empty())
         return BSONObj();
@@ -399,12 +379,13 @@ bool Pipeline::canRunOnMongos() const {
 }
 
 bool Pipeline::requiredToRunOnMongos() const {
-    invariant(!isSplitForShards());
+    invariant(_splitState != SplitState::kSplitForShards);
 
     for (auto&& stage : _sources) {
         // If this pipeline is capable of splitting before the mongoS-only stage, then the pipeline
         // as a whole is not required to run on mongoS.
-        if (isUnsplit() && dynamic_cast<NeedsMergerDocumentSource*>(stage.get())) {
+        if (_splitState == SplitState::kUnsplit &&
+            dynamic_cast<NeedsMergerDocumentSource*>(stage.get())) {
             return false;
         }
 

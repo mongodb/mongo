@@ -92,7 +92,7 @@ public:
      * merge pipeline. Unlike the shards source, it is necessary for this stage to run on the
      * merging host in order to produce correct pipeline output.
      */
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+    MergingLogic mergingLogic() final {
         return {DocumentSourceLimit::create(pExpCtx, _limit)};
     }
 

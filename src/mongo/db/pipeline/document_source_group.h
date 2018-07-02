@@ -100,7 +100,7 @@ public:
 
     // Virtuals for NeedsMergerDocumentSource.
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final;
+    MergingLogic mergingLogic() final;
 
     /**
      * Returns true if this $group stage used disk during execution and false otherwise.

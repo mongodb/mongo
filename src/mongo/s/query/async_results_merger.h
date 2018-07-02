@@ -109,7 +109,7 @@ public:
     /**
      * Returns true if all of the remote cursors are exhausted.
      */
-    bool remotesExhausted();
+    bool remotesExhausted() const;
 
     /**
      * Sets the maxTimeMS value that the ARM should forward with any internally issued getMore
@@ -165,12 +165,6 @@ public:
      * result requires scheduling remote work).
      */
     StatusWith<ClusterQueryResult> nextReady();
-
-    /**
-     * Blocks until the next result is ready, all remote cursors are exhausted, or there is an
-     * error.
-     */
-    StatusWith<ClusterQueryResult> blockingNext();
 
     /**
      * Schedules remote work as required in order to make further results available. If there is an
@@ -237,11 +231,6 @@ public:
      * operation context.
      */
     executor::TaskExecutor::EventHandle kill(OperationContext* opCtx);
-
-    /**
-     * A blocking version of kill() that will not return until this is safe to destroy.
-     */
-    void blockingKill(OperationContext*);
 
 private:
     /**
@@ -346,7 +335,7 @@ private:
     /**
      * Checks whether or not the remote cursors are all exhausted.
      */
-    bool _remotesExhausted(WithLock);
+    bool _remotesExhausted(WithLock) const;
 
     //
     // Helpers for ready().
@@ -433,7 +422,7 @@ private:
     AsyncResultsMergerParams _params;
 
     // Must be acquired before accessing any data members (other than _params, which is read-only).
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // Data tracking the state of our communication with each of the remote nodes.
     std::vector<RemoteCursorData> _remotes;

@@ -61,16 +61,14 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(
-            _mergingPresorted ? StreamType::kStreaming : StreamType::kBlocking,
-            PositionRequirement::kNone,
-            HostTypeRequirement::kNone,
-            _mergingPresorted ? DiskUseRequirement::kNoDiskUse : DiskUseRequirement::kWritesTmpData,
-            _mergingPresorted ? FacetRequirement::kNotAllowed : FacetRequirement::kAllowed,
-            TransactionRequirement::kAllowed,
-            _mergingPresorted ? ChangeStreamRequirement::kWhitelist
-                              : ChangeStreamRequirement::kBlacklist);
+    StageConstraints constraints(Pipeline::SplitState) const final {
+        StageConstraints constraints(StreamType::kBlocking,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kWritesTmpData,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     ChangeStreamRequirement::kBlacklist);
 
         // Can't swap with a $match if a limit has been absorbed, as $match can't swap with $limit.
         constraints.canSwapWithMatch = !_limitSrc;
@@ -84,7 +82,7 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final;
+    MergingLogic mergingLogic() final;
 
     /**
      * Write out a Document whose contents are the sort key pattern.
@@ -105,15 +103,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         BSONObj sortOrder,
         long long limit = -1,
-        boost::optional<uint64_t> maxMemoryUsageBytes = boost::none,
-        bool mergingPresorted = false);
-
-    /**
-     * Returns true if this $sort stage is merging presorted streams.
-     */
-    bool mergingPresorted() const {
-        return _mergingPresorted;
-    }
+        boost::optional<uint64_t> maxMemoryUsageBytes = boost::none);
 
     /**
      * Returns -1 for no limit.
@@ -267,7 +257,6 @@ private:
 
     uint64_t _maxMemoryUsageBytes;
     bool _done;
-    bool _mergingPresorted;  // TODO SERVER-34009 Remove this flag.
     std::unique_ptr<MySorter> _sorter;
     std::unique_ptr<MySorter::Iterator> _output;
     bool _usedDisk = false;

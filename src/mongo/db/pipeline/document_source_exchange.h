@@ -167,7 +167,7 @@ public:
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
         return this;
     }
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+    MergingLogic mergingLogic() final {
         // TODO SERVER-35974 we have to revisit this when we implement consumers.
         return {this};
     }

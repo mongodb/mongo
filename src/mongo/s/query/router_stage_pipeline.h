@@ -31,8 +31,8 @@
 #include "mongo/s/query/router_exec_stage.h"
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/s/query/document_source_router_adapter.h"
 
 namespace mongo {
 
@@ -42,8 +42,7 @@ namespace mongo {
  */
 class RouterStagePipeline final : public RouterExecStage {
 public:
-    RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
-                        std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline);
+    RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline);
 
     StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext execContext) final;
 
@@ -61,8 +60,10 @@ protected:
     void doDetachFromOperationContext() final;
 
 private:
-    boost::intrusive_ptr<DocumentSourceRouterAdapter> _routerAdapter;
     std::unique_ptr<Pipeline, PipelineDeleter> _mergePipeline;
-    bool _mongosOnlyPipeline;
+
+    // May be null if this pipeline is executing exclusively on mongos and will not contact the
+    // shards at all.
+    boost::intrusive_ptr<DocumentSourceMergeCursors> _mergeCursorsStage;
 };
 }  // namespace mongo

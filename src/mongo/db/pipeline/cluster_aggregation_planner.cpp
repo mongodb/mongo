@@ -30,11 +30,21 @@
 
 #include "mongo/db/pipeline/cluster_aggregation_planner.h"
 
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/document_source_update_on_add_shard.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/query/router_stage_limit.h"
+#include "mongo/s/query/router_stage_pipeline.h"
+#include "mongo/s/query/router_stage_remove_metadata_fields.h"
+#include "mongo/s/query/router_stage_skip.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 namespace cluster_aggregation_planner {
@@ -47,8 +57,10 @@ namespace {
  * It is not safe to call this optimization multiple times.
  *
  * NOTE: looks for NeedsMergerDocumentSources and uses that API
+ *
+ * Returns the sort specification if the input streams are sorted, and false otherwise.
  */
-void findSplitPoint(Pipeline* shardPipe, Pipeline* mergePipe) {
+boost::optional<BSONObj> findSplitPoint(Pipeline::SourceContainer* shardPipe, Pipeline* mergePipe) {
     while (!mergePipe->getSources().empty()) {
         boost::intrusive_ptr<DocumentSource> current = mergePipe->popFront();
 
@@ -58,28 +70,25 @@ void findSplitPoint(Pipeline* shardPipe, Pipeline* mergePipe) {
 
         if (!splittable) {
             // Move the source from the merger _sources to the shard _sources.
-            shardPipe->pushBack(current);
+            shardPipe->push_back(current);
         } else {
             // Split this source into 'merge' and 'shard' _sources.
             boost::intrusive_ptr<DocumentSource> shardSource = splittable->getShardSource();
-            auto mergeSources = splittable->getMergeSources();
+            auto mergeLogic = splittable->mergingLogic();
 
             // A source may not simultaneously be present on both sides of the split.
-            invariant(std::find(mergeSources.begin(), mergeSources.end(), shardSource) ==
-                      mergeSources.end());
+            invariant(shardSource != mergeLogic.mergingStage);
 
             if (shardSource)
-                shardPipe->pushBack(shardSource);
+                shardPipe->push_back(std::move(shardSource));
 
-            // Add the stages in reverse order, so that they appear in the pipeline in the same
-            // order as they were returned by the stage.
-            for (auto it = mergeSources.rbegin(); it != mergeSources.rend(); ++it) {
-                mergePipe->addInitialSource(*it);
-            }
+            if (mergeLogic.mergingStage)
+                mergePipe->addInitialSource(std::move(mergeLogic.mergingStage));
 
-            break;
+            return mergeLogic.inputSortPattern;
         }
     }
+    return boost::none;
 }
 
 /**
@@ -131,48 +140,118 @@ void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
         BSON("$project" << mergeDeps.toProjection()).firstElement(), shardPipe->getContext());
     shardPipe->pushBack(project);
 }
-}  // namespace
 
-void performSplitPipelineOptimizations(Pipeline* shardPipeline, Pipeline* mergingPipeline) {
-    // The order in which optimizations are applied can have significant impact on the
-    // efficiency of the final pipeline. Be Careful!
-    findSplitPoint(shardPipeline, mergingPipeline);
-    moveFinalUnwindFromShardsToMerger(shardPipeline, mergingPipeline);
-    limitFieldsSentFromShardsToMerger(shardPipeline, mergingPipeline);
+bool isMergeSkipOrLimit(const boost::intrusive_ptr<DocumentSource>& stage) {
+    return (dynamic_cast<DocumentSourceLimit*>(stage.get()) ||
+            dynamic_cast<DocumentSourceMergeCursors*>(stage.get()) ||
+            dynamic_cast<DocumentSourceSkip*>(stage.get()));
 }
 
-boost::optional<BSONObj> popLeadingMergeSort(Pipeline* pipeline) {
-    // Remove a leading $sort iff it is a mergesort, since the ARM cannot handle blocking $sort.
-    auto frontSort = pipeline->popFrontWithNameAndCriteria(
-        DocumentSourceSort::kStageName, [](const DocumentSource* const source) {
-            return static_cast<const DocumentSourceSort* const>(source)->mergingPresorted();
-        });
+bool isAllLimitsAndSkips(Pipeline* pipeline) {
+    const auto stages = pipeline->getSources();
+    return std::all_of(
+        stages.begin(), stages.end(), [](const auto& stage) { return isMergeSkipOrLimit(stage); });
+}
 
-    if (frontSort) {
-        auto sortStage = static_cast<DocumentSourceSort*>(frontSort.get());
-        if (auto sortLimit = sortStage->getLimitSrc()) {
-            // There was a limit stage absorbed into the sort stage, so we need to preserve that.
-            pipeline->addInitialSource(sortLimit);
+ClusterClientCursorGuard convertPipelineToRouterStages(
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline, ClusterClientCursorParams&& cursorParams) {
+    auto* opCtx = pipeline->getContext()->opCtx;
+
+    // We expect the pipeline to be fully executable at this point, so if the pipeline was all skips
+    // and limits we expect it to start with a $mergeCursors stage.
+    auto mergeCursors =
+        checked_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get());
+    // Replace the pipeline with RouterExecStages.
+    std::unique_ptr<RouterExecStage> root = mergeCursors->convertToRouterStage();
+    pipeline->popFront();
+    while (!pipeline->getSources().empty()) {
+        if (auto skip = pipeline->popFrontWithName(DocumentSourceSkip::kStageName)) {
+            root = std::make_unique<RouterStageSkip>(
+                opCtx, std::move(root), static_cast<DocumentSourceSkip*>(skip.get())->getSkip());
+        } else if (auto limit = pipeline->popFrontWithName(DocumentSourceLimit::kStageName)) {
+            root = std::make_unique<RouterStageLimit>(
+                opCtx, std::move(root), static_cast<DocumentSourceLimit*>(limit.get())->getLimit());
+        } else {
+            // We previously checked that everything was a $mergeCursors, $skip, or $limit. We
+            // already popped off the $mergeCursors, so everything else should be a $skip or a
+            // $limit.
+            MONGO_UNREACHABLE;
         }
-        return sortStage
-            ->sortKeyPattern(DocumentSourceSort::SortKeySerialization::kForSortKeyMerging)
-            .toBson();
     }
-    return boost::none;
+    // We are executing the pipeline without using an actual Pipeline, so we need to strip out any
+    // Document metadata ourselves.
+    return ClusterClientCursorImpl::make(
+        opCtx,
+        std::make_unique<RouterStageRemoveMetadataFields>(
+            opCtx, std::move(root), Document::allMetadataFieldNames),
+        std::move(cursorParams));
+}
+}  // namespace
+
+SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
+    auto& expCtx = pipeline->getContext();
+    // Re-brand 'pipeline' as the merging pipeline. We will move stages one by one from the merging
+    // half to the shards, as possible.
+    auto mergePipeline = std::move(pipeline);
+
+    Pipeline::SourceContainer shardStages;
+    boost::optional<BSONObj> inputsSort = findSplitPoint(&shardStages, mergePipeline.get());
+    auto shardsPipeline = uassertStatusOK(Pipeline::create(std::move(shardStages), expCtx));
+
+    // The order in which optimizations are applied can have significant impact on the efficiency of
+    // the final pipeline. Be Careful!
+    moveFinalUnwindFromShardsToMerger(shardsPipeline.get(), mergePipeline.get());
+    limitFieldsSentFromShardsToMerger(shardsPipeline.get(), mergePipeline.get());
+    shardsPipeline->setSplitState(Pipeline::SplitState::kSplitForShards);
+    mergePipeline->setSplitState(Pipeline::SplitState::kSplitForMerge);
+
+    return {std::move(shardsPipeline), std::move(mergePipeline), std::move(inputsSort)};
 }
 
 void addMergeCursorsSource(Pipeline* mergePipeline,
+                           const LiteParsedPipeline& liteParsedPipeline,
+                           BSONObj cmdSentToShards,
                            std::vector<RemoteCursor> remoteCursors,
+                           const std::vector<ShardId>& targetedShards,
+                           boost::optional<BSONObj> shardCursorsSortSpec,
                            executor::TaskExecutor* executor) {
+    auto* opCtx = mergePipeline->getContext()->opCtx;
     AsyncResultsMergerParams armParams;
-    if (auto sort = popLeadingMergeSort(mergePipeline)) {
-        armParams.setSort(std::move(*sort));
-    }
+    armParams.setSort(shardCursorsSortSpec);
     armParams.setRemotes(std::move(remoteCursors));
     armParams.setTailableMode(mergePipeline->getContext()->tailableMode);
     armParams.setNss(mergePipeline->getContext()->ns);
-    mergePipeline->addInitialSource(DocumentSourceMergeCursors::create(
-        executor, std::move(armParams), mergePipeline->getContext()));
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(opCtx->getLogicalSessionId());
+    sessionInfo.setTxnNumber(opCtx->getTxnNumber());
+    armParams.setOperationSessionInfo(sessionInfo);
+
+    // For change streams, we need to set up a custom stage to establish cursors on new shards when
+    // they are added, to ensure we don't miss results from the new shards.
+    auto mergeCursorsStage = DocumentSourceMergeCursors::create(
+        executor, std::move(armParams), mergePipeline->getContext());
+    if (liteParsedPipeline.hasChangeStream()) {
+        mergePipeline->addInitialSource(DocumentSourceUpdateOnAddShard::create(
+            mergePipeline->getContext(),
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+            mergeCursorsStage,
+            targetedShards,
+            cmdSentToShards));
+    }
+    mergePipeline->addInitialSource(std::move(mergeCursorsStage));
+}
+
+ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
+                                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+                                            ClusterClientCursorParams&& cursorParams) {
+    if (isAllLimitsAndSkips(pipeline.get())) {
+        // We can optimize this Pipeline to avoid going through any DocumentSources at all and thus
+        // skip the expensive BSON->Document->BSON conversion.
+        return convertPipelineToRouterStages(std::move(pipeline), std::move(cursorParams));
+    }
+    return ClusterClientCursorImpl::make(
+        opCtx, std::make_unique<RouterStagePipeline>(std::move(pipeline)), std::move(cursorParams));
 }
 
 }  // namespace cluster_aggregation_planner

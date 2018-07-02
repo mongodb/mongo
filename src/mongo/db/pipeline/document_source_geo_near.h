@@ -128,7 +128,8 @@ public:
     /**
      * In a sharded cluster, this becomes a merge sort by distance, from nearest to furthest.
      */
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final;
+    MergingLogic mergingLogic() final;
+
 
 private:
     explicit DocumentSourceGeoNear(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

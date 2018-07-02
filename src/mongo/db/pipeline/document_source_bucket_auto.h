@@ -63,7 +63,7 @@ public:
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
         return nullptr;
     }
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+    MergingLogic mergingLogic() final {
         return {this};
     }
 

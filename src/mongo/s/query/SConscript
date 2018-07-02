@@ -40,7 +40,6 @@ env.Library(
         "cluster_client_cursor_impl.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "router_exec_stage",
     ],
 )
@@ -48,20 +47,14 @@ env.Library(
 env.Library(
     target="router_exec_stage",
     source=[
-        "document_source_router_adapter.cpp",
         "router_stage_limit.cpp",
-        "router_stage_merge.cpp",
         "router_stage_mock.cpp",
         "router_stage_pipeline.cpp",
         "router_stage_remove_metadata_fields.cpp",
         "router_stage_skip.cpp",
-        "router_stage_update_on_add_shard.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/query_common",
         "async_results_merger",
-    ],
-    LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
     ],
 )
@@ -83,11 +76,13 @@ env.Library(
     target="async_results_merger",
     source=[
         "async_results_merger.cpp",
+        "blocking_results_merger.cpp",
         "establish_cursors.cpp",
         env.Idlc('async_results_merger_params.idl')[0],
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/db/query/query_common",
         "$BUILD_DIR/mongo/executor/task_executor_interface",
         "$BUILD_DIR/mongo/s/async_requests_sender",
         "$BUILD_DIR/mongo/s/client/sharding_client",
@@ -106,9 +101,11 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="async_results_merger_test",
+    target="results_merger_test",
     source=[
+        "blocking_results_merger_test.cpp",
         "async_results_merger_test.cpp",
+        "results_merger_test_fixture.cpp",
     ],
     LIBDEPS=[
         'async_results_merger',

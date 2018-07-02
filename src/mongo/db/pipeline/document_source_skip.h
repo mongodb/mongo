@@ -82,12 +82,10 @@ public:
         return DepsTracker::State::SEE_NEXT;  // This doesn't affect needed fields
     }
 
-    // Virtuals for NeedsMergerDocumentSource
-    // Need to run on rounter. Can't run on shards.
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return NULL;
+        return nullptr;
     }
-    std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
+    MergingLogic mergingLogic() final {
         return {this};
     }
 

@@ -168,6 +168,17 @@ env.Library(
 )
 
 env.Library(
+    target='cluster_aggregation_planner',
+    source=[
+        'cluster_aggregation_planner.cpp',
+    ],
+    LIBDEPS=[
+        'pipeline',
+        '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
+    ]
+)
+
+env.Library(
     target='granularity_rounder',
     source=[
         'granularity_rounder.cpp',
@@ -303,7 +314,6 @@ pipelineeEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 pipelineeEnv.Library(
     target='pipeline',
     source=[
-        "cluster_aggregation_planner.cpp",
         'document_source.cpp',
         'document_source_add_fields.cpp',
         'document_source_backup_cursor.cpp',
@@ -334,6 +344,7 @@ pipelineeEnv.Library(
         'document_source_lookup_change_post_image.cpp',
         'document_source_match.cpp',
         'document_source_merge_cursors.cpp',
+        'document_source_update_on_add_shard.cpp',
         'document_source_out.cpp',
         'document_source_out_replace_coll.cpp',
         'document_source_project.cpp',
@@ -439,8 +450,9 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/s/is_mongos',
-        'document_value_test_util',
+        'cluster_aggregation_planner',
         'document_source_mock',
+        'document_value_test_util',
         'pipeline',
         ],
     )

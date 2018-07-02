@@ -29,74 +29,56 @@
 #pragma once
 
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/query/async_results_merger.h"
+#include "mongo/s/query/blocking_results_merger.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/router_exec_stage.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
-namespace {
-using EventHandle = executor::TaskExecutor::EventHandle;
-}  // namespace
-
 /**
- * Draws results from the AsyncResultsMerger, which is the underlying source of the stream of merged
- * documents manipulated by the RouterExecStage pipeline. Used to present a stream of documents
- * merged from the shards to the stages later in the pipeline.
+ * Serves as an adapter between the RouterExecStage interface and the BlockingResultsMerger
+ * interface, providing a single stream of results populated from many remote streams.
  */
 class RouterStageMerge final : public RouterExecStage {
 public:
     RouterStageMerge(OperationContext* opCtx,
                      executor::TaskExecutor* executor,
-                     ClusterClientCursorParams* params);
+                     AsyncResultsMergerParams&& armParams)
+        : RouterExecStage(opCtx), _resultsMerger(opCtx, std::move(armParams), executor) {}
 
-    StatusWith<ClusterQueryResult> next(ExecContext) final;
+    StatusWith<ClusterQueryResult> next(ExecContext execCtx) final {
+        return _resultsMerger.next(getOpCtx(), execCtx);
+    }
 
-    void kill(OperationContext* opCtx) final;
+    void kill(OperationContext* opCtx) final {
+        _resultsMerger.kill(opCtx);
+    }
 
-    bool remotesExhausted() final;
+    bool remotesExhausted() final {
+        return _resultsMerger.remotesExhausted();
+    }
 
-    std::size_t getNumRemotes() const final;
-
-    /**
-     * Adds the cursors in 'newShards' to those being merged by the ARM.
-     */
-    void addNewShardCursors(std::vector<RemoteCursor>&& newShards);
+    std::size_t getNumRemotes() const final {
+        return _resultsMerger.getNumRemotes();
+    }
 
 protected:
-    Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+    Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final {
+        return _resultsMerger.setAwaitDataTimeout(awaitDataTimeout);
+    }
 
     void doReattachToOperationContext() override {
-        _arm.reattachToOperationContext(getOpCtx());
+        _resultsMerger.reattachToOperationContext(getOpCtx());
     }
 
     virtual void doDetachFromOperationContext() {
-        _arm.detachFromOperationContext();
+        _resultsMerger.detachFromOperationContext();
     }
 
 private:
-    /**
-     * Awaits the next result from the ARM up to a specified time limit. If this is the user's
-     * initial find or we have already obtained at least one result for this batch, this method
-     * returns EOF immediately rather than blocking.
-     */
-    StatusWith<ClusterQueryResult> awaitNextWithTimeout(ExecContext execCtx);
-
-    /**
-     * Returns the next event to wait upon - either a new event from the ARM, or a valid preceding
-     * event which we scheduled during the previous call to next().
-     */
-    StatusWith<EventHandle> getNextEvent();
-
-    // Not owned here.
-    executor::TaskExecutor* _executor;
-    EventHandle _leftoverEventFromLastTimeout;
-
-    ClusterClientCursorParams* _params;
-
     // Schedules remote work and merges results from 'remotes'.
-    AsyncResultsMerger _arm;
+    BlockingResultsMerger _resultsMerger;
 };
 
 }  // namespace mongo

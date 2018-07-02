@@ -59,6 +59,23 @@ TEST_F(DocumentSourceLimitTest, ShouldDisposeSourceWhenLimitIsReached) {
     ASSERT_TRUE(source->isDisposed);
 }
 
+TEST_F(DocumentSourceLimitTest, ShouldNotBeAbleToLimitToZeroDocuments) {
+    auto source = DocumentSourceMock::create({"{a: 1}", "{a: 2}"});
+    ASSERT_THROWS_CODE(DocumentSourceLimit::create(getExpCtx(), 0), AssertionException, 15958);
+}
+
+TEST_F(DocumentSourceLimitTest, ShouldRejectUserLimitOfZero) {
+    ASSERT_THROWS_CODE(
+        DocumentSourceLimit::createFromBson(BSON("$limit" << 0).firstElement(), getExpCtx()),
+        AssertionException,
+        15958);
+
+    // A $limit with size 1 should be okay.
+    auto shouldNotThrow =
+        DocumentSourceLimit::createFromBson(BSON("$limit" << 1).firstElement(), getExpCtx());
+    ASSERT(dynamic_cast<DocumentSourceLimit*>(shouldNotThrow.get()));
+}
+
 TEST_F(DocumentSourceLimitTest, TwoLimitStagesShouldCombineIntoOne) {
     Pipeline::SourceContainer container;
     auto firstLimit = DocumentSourceLimit::create(getExpCtx(), 10);
