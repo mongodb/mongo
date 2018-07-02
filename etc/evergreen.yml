@@ -697,7 +697,6 @@ functions:
       directory: ${git_project_directory|src}
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
-        rocksdb: ${rocksdb_rev}
         wtdevelop: ${wtdevelop_rev}
 
   "fetch artifacts" : &fetch_artifacts
@@ -994,19 +993,6 @@ functions:
             rm -r mongodb*/*.$file_ext 2>/dev/null || true
         done
         rm mongo-debugsymbols.tgz 2>/dev/null || true
-
-  "build rocksdb" :
-    command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        set -o verbose
-        if [ "${build_rocksdb|}" = "true" ]; then
-        rm -rf rocksdb
-        git clone https://github.com/facebook/rocksdb.git
-        cd rocksdb
-        make USE_RTTI=1 CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ static_lib
-        fi
 
   "fetch and build OpenSSL" :
     command: shell.exec
@@ -3243,7 +3229,6 @@ tasks:
   depends_on: []
   commands:
     - func: "build new tools"
-    - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - func: "scons compile"
       vars:
         targets: core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
@@ -3401,7 +3386,6 @@ tasks:
 - name: compile_all
   commands:
     - func: "build new tools"
-    - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - func: "scons compile"
       vars:
         targets: all
@@ -7074,11 +7058,6 @@ task_groups:
 modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: master
-
-- name: rocksdb
-  repo: git@github.com:mongodb-partners/mongo-rocks.git
   prefix: src/mongo/db/modules
   branch: master
 
@@ -12630,30 +12609,6 @@ buildvariants:
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough
 
-- name: ubuntu1404-rocksdb
-  display_name: Ubuntu 14.04 (RocksDB)
-  modules:
-  - rocksdb
-  run_on:
-  - ubuntu1404-test
-  batchtime: 120960 # 12 weeks
-  expansions:
-    build_rocksdb: true
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb --variables-files=etc/scons/mongodbtoolchain_gcc.vars --runtime-hardening=off
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    # Transactions are not explicitly supported on the RocksDB storage engine.
-    test_flags: --storageEngine=rocksdb --excludeWithAnyTags=requires_wiredtiger,uses_transactions
-    use_scons_cache: true
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
-    tooltags: ""
-    build_mongoreplay: true
-  stepback: false
-  tasks:
-  - name: compile_TG
-    distros:
-    - ubuntu1404-build
-  - name: dbtest
-  - name: jsCore
 
 ###########################################
 #     Experimental buildvariants          #
