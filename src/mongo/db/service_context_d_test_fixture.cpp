@@ -44,6 +44,8 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util.h"
 
+#include "mongo/db/catalog/database_holder.h"
+
 namespace mongo {
 
 ServiceContextMongoDTest::ServiceContextMongoDTest()
@@ -79,7 +81,7 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
     {
         auto opCtx = getClient()->makeOperationContext();
         Lock::GlobalLock glk(opCtx.get(), MODE_X);
-        catalog::closeCatalog(opCtx.get());
+        DatabaseHolder::getDatabaseHolder().closeAll(opCtx.get(), "all databases dropped");
     }
     shutdownGlobalStorageEngineCleanly(getGlobalServiceContext());
     std::swap(storageGlobalParams.engine, _stashedStorageParams.engine);

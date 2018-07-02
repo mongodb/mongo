@@ -543,14 +543,14 @@ StatusWith<Timestamp> KVStorageEngine::recoverToStableTimestamp(OperationContext
         wuow.commit();
     }
 
-    catalog::closeCatalog(opCtx);
+    auto state = catalog::closeCatalog(opCtx);
 
     StatusWith<Timestamp> swTimestamp = _engine->recoverToStableTimestamp(opCtx);
     if (!swTimestamp.isOK()) {
         return swTimestamp;
     }
 
-    catalog::openCatalog(opCtx);
+    catalog::openCatalog(opCtx, state);
 
     log() << "recoverToStableTimestamp successful. Stable Timestamp: " << swTimestamp.getValue();
     return {swTimestamp.getValue()};
