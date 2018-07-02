@@ -49,6 +49,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
+#include "mongo/db/catalog/database_holder.h"
+
 namespace mongo {
 
 void ServiceContextMongoDTest::setUp() {
