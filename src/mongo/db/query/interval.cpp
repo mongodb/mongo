@@ -66,6 +66,19 @@ bool Interval::isNull() const {
     return (!startInclusive || !endInclusive) && 0 == start.woCompare(end, false);
 }
 
+Interval::Direction Interval::getDirection() const {
+    if (isEmpty() || isPoint() || isNull()) {
+        return Direction::kDirectionNone;
+    }
+
+    // 'false' to not consider the field name.
+    const int res = start.woCompare(end, false);
+
+    invariant(res != 0);
+    return res < 0 ? Direction::kDirectionAscending : Direction::kDirectionDescending;
+}
+
+
 //
 // Comparison
 //
@@ -93,6 +106,17 @@ bool Interval::equals(const Interval& other) const {
 }
 
 bool Interval::intersects(const Interval& other) const {
+    if (kDebugBuild) {
+        // This function assumes that both intervals are ascending (or are empty/point intervals).
+        // Determining this may be expensive, so we only do these checks when in a debug build.
+        const auto thisDir = getDirection();
+        invariant(thisDir == Direction::kDirectionAscending ||
+                  thisDir == Direction::kDirectionNone);
+        const auto otherDir = other.getDirection();
+        invariant(otherDir == Direction::kDirectionAscending ||
+                  otherDir == Direction::kDirectionNone);
+    }
+
     int res = this->start.woCompare(other.end, false);
     if (res > 0) {
         return false;
@@ -259,6 +283,17 @@ void Interval::combine(const Interval& other, IntervalComparison cmp) {
 void Interval::reverse() {
     std::swap(start, end);
     std::swap(startInclusive, endInclusive);
+}
+
+Interval Interval::reverseClone() const {
+    Interval reversed;
+    reversed.start = end;
+    reversed.end = start;
+    reversed.startInclusive = endInclusive;
+    reversed.endInclusive = startInclusive;
+    reversed._intervalData = _intervalData;
+
+    return reversed;
 }
 
 }  // namespace mongo

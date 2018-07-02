@@ -74,6 +74,15 @@ struct OrderedIntervalList {
 
     bool operator==(const OrderedIntervalList& other) const;
     bool operator!=(const OrderedIntervalList& other) const;
+
+    void reverse();
+
+    /**
+     * Return a clone of this OIL, that is reversed.
+     */
+    OrderedIntervalList reverseClone() const;
+
+    Interval::Direction computeDirection() const;
 };
 
 /**
@@ -126,6 +135,11 @@ struct IndexBounds {
     static BoundInclusion makeBoundInclusionFromBoundBools(bool startKeyInclusive,
                                                            bool endKeyInclusive);
 
+    /**
+     * Reverse the BoundInclusion.
+     */
+    static BoundInclusion reverseBoundInclusion(BoundInclusion b);
+
 
     /**
      * BSON format for explain. The format is an array of strings for each field.
@@ -136,6 +150,12 @@ struct IndexBounds {
      *  {a: ["[1, 1]", "(3, 10)"], b: ["[Infinity, 10)"] }
      */
     BSONObj toBSON() const;
+
+    /**
+     * Return a copy of the index bounds, but with each of the OILs going in the ascending
+     * direction.
+     */
+    IndexBounds forwardize() const;
 
     // TODO: we use this for max/min scan.  Consider migrating that.
     bool isSimpleRange;

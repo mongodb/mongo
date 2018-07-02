@@ -98,6 +98,18 @@ struct Interval {
      */
     bool isNull() const;
 
+    enum class Direction {
+        // Point intervals, empty intervals, and null intervals have no direction.
+        kDirectionNone,
+        kDirectionAscending,
+        kDirectionDescending
+    };
+
+    /**
+     * Compute the direction.
+     */
+    Direction getDirection() const;
+
     //
     // Comparison with other intervals
     //
@@ -169,6 +181,11 @@ struct Interval {
     void reverse();
 
     /**
+     * Return a new Interval that's a reverse of this one.
+     */
+    Interval reverseClone() const;
+
+    /**
      * Updates 'this' with the intersection of 'this' and 'other'. If 'this' and 'other'
      * have been compare()d before, that result can be optionally passed in 'cmp'
      */
@@ -182,7 +199,7 @@ struct Interval {
 };
 
 inline bool operator==(const Interval& lhs, const Interval& rhs) {
-    return lhs.compare(rhs) == Interval::INTERVAL_EQUALS;
+    return lhs.equals(rhs);
 }
 
 inline bool operator!=(const Interval& lhs, const Interval& rhs) {
