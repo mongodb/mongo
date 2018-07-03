@@ -688,6 +688,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             if (!shardUpsertCmdStatus.isOK()) {
                 return shardUpsertCmdStatus;
             }
+        } else {
+            return addShardStatus;
         }
     }
 

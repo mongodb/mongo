@@ -25,7 +25,7 @@
     assert.eq(shardsArray.length, 1);
 
     // add standalone mongod
-    var standaloneShard = MongoRunner.runMongod({useHostName: true});
+    var standaloneShard = MongoRunner.runMongod({useHostName: true, shardsvr: ""});
     res = shardTest.admin.runCommand({addShard: standaloneShard.host, name: 'standalone'});
     assert.commandWorked(res, 'addShard command failed');
     res = mongos.adminCommand('listShards');
@@ -36,7 +36,8 @@
            'listShards command didn\'t return standalone shard: ' + tojson(shardsArray));
 
     // add replica set named 'repl'
-    var rs1 = new ReplSetTest({name: 'repl', nodes: 1, useHostName: true});
+    var rs1 =
+        new ReplSetTest({name: 'repl', nodes: 1, useHostName: true, nodeOptions: {shardsvr: ""}});
     rs1.startSet();
     rs1.initiate();
     res = shardTest.admin.runCommand({addShard: rs1.getURL()});

@@ -15,7 +15,7 @@
                                  ErrorCodes.IllegalOperation);
 
     // Can't add a mongod with a lower binary version than our featureCompatibilityVersion.
-    var lastStableMongod = MongoRunner.runMongod({binVersion: "last-stable"});
+    var lastStableMongod = MongoRunner.runMongod({binVersion: "last-stable", shardsvr: ""});
     assert.commandFailedWithCode(st.admin.runCommand({addshard: lastStableMongod.host}),
                                  ErrorCodes.IncompatibleServerVersion);
     MongoRunner.stopMongod(lastStableMongod);
@@ -23,7 +23,7 @@
     // Can't add config servers as shard.
     assert.commandFailed(st.admin.runCommand({addshard: st._configDB}));
 
-    var replTest = new ReplSetTest({nodes: 2});
+    var replTest = new ReplSetTest({nodes: 2, nodeOptions: {shardsvr: ""}});
     replTest.startSet({oplogSize: 10});
     replTest.initiate();
 

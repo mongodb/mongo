@@ -5,7 +5,7 @@
     var st = new ShardingTest({name: "add_shard_idempotent", shards: 0});
 
     jsTestLog("Testing adding a standalone shard multiple times");
-    var shard1 = MongoRunner.runMongod({});
+    var shard1 = MongoRunner.runMongod({'shardsvr': ""});
     assert.commandWorked(
         st.admin.runCommand({addshard: shard1.host, name: "newShard1", maxSize: 1024}));
 
@@ -21,7 +21,7 @@
         {addshard: shard1.host, name: "a different shard name", maxSize: 1024}));
 
     jsTestLog("Testing adding a replica set shard multiple times");
-    var shard2 = new ReplSetTest({name: 'rsShard', nodes: 3});
+    var shard2 = new ReplSetTest({name: 'rsShard', nodes: 3, nodeOptions: {shardsvr: ""}});
     shard2.startSet();
     shard2.initiate();
     shard2.getPrimary();  // Wait for there to be a primary

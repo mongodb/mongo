@@ -4,8 +4,8 @@
 
     var st = new ShardingTest({shards: 0, mongos: 1});
 
-    var rsA = new ReplSetTest({nodes: 2, name: "rsA"});
-    var rsB = new ReplSetTest({nodes: 2, name: "rsB"});
+    var rsA = new ReplSetTest({nodes: 2, name: "rsA", nodeOptions: {shardsvr: ""}});
+    var rsB = new ReplSetTest({nodes: 2, name: "rsB", nodeOptions: {shardsvr: ""}});
 
     rsA.startSet();
     rsB.startSet();

@@ -40,6 +40,8 @@
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -55,6 +57,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(99981,
+                    "Cannot run addShard on a node started without --shardsvr",
+                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
             auto addShardCmd = request();
             auto shardIdUpsertCmd =
                 add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
@@ -62,7 +68,13 @@ public:
             BSONObj res;
 
             localClient.runCommand(NamespaceString::kAdminDb.toString(), shardIdUpsertCmd, res);
+
             uassertStatusOK(getStatusFromCommandResult(res));
+
+            const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+            invariant(balancerConfig);
+            // Ensure we have the most up-to-date balancer configuration
+            uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
         }
 
     private:

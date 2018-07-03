@@ -31,7 +31,7 @@
     assert.neq(null, fooDBDoc);
     assert(fooDBDoc.partitioned);
 
-    var newShardConn = MongoRunner.runMongod({});
+    var newShardConn = MongoRunner.runMongod({'shardsvr': ""});
     var unshardedDB = newShardConn.getDB('unshardedDB');
 
     unshardedDB.user.insert({z: 1});
