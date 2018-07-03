@@ -319,7 +319,11 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefore,
     // we pass down to the logical session cache and vivify the record (updating last use).
     if (cursor->getLsid()) {
-        LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getLsid().get());
+        auto vivifyCursorStatus =
+            LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getLsid().get());
+        if (!vivifyCursorStatus.isOK()) {
+            return vivifyCursorStatus;
+        }
     }
 
     cursor->reattachToOperationContext(opCtx);

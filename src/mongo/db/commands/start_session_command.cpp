@@ -79,7 +79,7 @@ public:
         auto lsCache = LogicalSessionCache::get(serviceContext);
         boost::optional<LogicalSessionRecord> record =
             makeLogicalSessionRecord(opCtx, lsCache->now());
-        lsCache->startSession(opCtx, record.get());
+        uassertStatusOK(lsCache->startSession(opCtx, record.get()));
 
         makeLogicalSessionToClient(record->getId()).serialize(&result);
 

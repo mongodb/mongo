@@ -73,7 +73,7 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
         }
 
         opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
-        lsc->vivify(opCtx, opCtx->getLogicalSessionId().get());
+        uassertStatusOK(lsc->vivify(opCtx, opCtx->getLogicalSessionId().get()));
     } else {
         uassert(ErrorCodes::InvalidOptions,
                 "Transaction number requires a session ID to also be specified",

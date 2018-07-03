@@ -99,14 +99,14 @@ public:
 
     Status promote(LogicalSessionId lsid) override;
 
-    void startSession(OperationContext* opCtx, LogicalSessionRecord record) override;
+    Status startSession(OperationContext* opCtx, LogicalSessionRecord record) override;
 
     Status refreshSessions(OperationContext* opCtx,
                            const RefreshSessionsCmdFromClient& cmd) override;
     Status refreshSessions(OperationContext* opCtx,
                            const RefreshSessionsCmdFromClusterMember& cmd) override;
 
-    void vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override;
+    Status vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override;
 
     Status refreshNow(Client* client) override;
 
@@ -146,7 +146,7 @@ private:
     /**
      * Takes the lock and inserts the given record into the cache.
      */
-    void _addToCache(LogicalSessionRecord record);
+    Status _addToCache(LogicalSessionRecord record);
 
     const Minutes _refreshInterval;
     const Minutes _sessionTimeout;

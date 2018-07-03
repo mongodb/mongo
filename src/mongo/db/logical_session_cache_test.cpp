@@ -142,7 +142,7 @@ TEST_F(LogicalSessionCacheTest, PromoteUpdatesLastUse) {
     auto start = service()->now();
 
     // Insert the record into the sessions collection with 'start'
-    cache()->startSession(opCtx(), makeLogicalSessionRecord(lsid, start));
+    ASSERT_OK(cache()->startSession(opCtx(), makeLogicalSessionRecord(lsid, start)));
 
     // Fast forward time and promote
     service()->fastForward(Milliseconds(500));
@@ -182,7 +182,7 @@ TEST_F(LogicalSessionCacheTest, StartSession) {
     auto lsid = record.getId();
 
     // Test starting a new session
-    cache()->startSession(opCtx(), record);
+    ASSERT_OK(cache()->startSession(opCtx(), record));
 
     // Record will not be in the collection yet; refresh must happen first.
     ASSERT(!sessions()->has(lsid));
@@ -193,27 +193,27 @@ TEST_F(LogicalSessionCacheTest, StartSession) {
     ASSERT(sessions()->has(lsid));
 
     // Try to start the same session again, should succeed.
-    cache()->startSession(opCtx(), record);
+    ASSERT_OK(cache()->startSession(opCtx(), record));
 
     // Try to start a session that is already in the sessions collection but
     // is not in our local cache, should succeed.
     auto record2 = makeLogicalSessionRecord(makeLogicalSessionIdForTest(), service()->now());
     sessions()->add(record2);
-    cache()->startSession(opCtx(), record2);
+    ASSERT_OK(cache()->startSession(opCtx(), record2));
 
     // Try to start a session that has expired from our cache, and is no
     // longer in the sessions collection, should succeed
     service()->fastForward(Milliseconds(kSessionTimeout.count() + 5));
     sessions()->remove(lsid);
     ASSERT(!sessions()->has(lsid));
-    cache()->startSession(opCtx(), record);
+    ASSERT_OK(cache()->startSession(opCtx(), record));
 }
 
 // Test that session cache properly expires lsids after 30 minutes of no use
 TEST_F(LogicalSessionCacheTest, BasicSessionExpiration) {
     // Insert a lsid
     auto record = makeLogicalSessionRecordForTest();
-    cache()->startSession(opCtx(), record);
+    ASSERT_OK(cache()->startSession(opCtx(), record));
     auto res = cache()->promote(record.getId());
     ASSERT(res.isOK());
 
@@ -232,7 +232,7 @@ TEST_F(LogicalSessionCacheTest, ManySignedLsidsInCacheRefresh) {
     int count = 10000;
     for (int i = 0; i < count; i++) {
         auto record = makeLogicalSessionRecordForTest();
-        cache()->startSession(opCtx(), record);
+        ASSERT_OK(cache()->startSession(opCtx(), record));
     }
 
     // Check that all signedLsids refresh
@@ -344,7 +344,7 @@ TEST_F(LogicalSessionCacheTest, RefreshMatrixSessionState) {
             service()->add(lsid);
         }
         if (active) {
-            cache()->startSession(opCtx(), lsRecord);
+            ASSERT_OK(cache()->startSession(opCtx(), lsRecord));
         }
         if (!expired) {
             sessions()->add(lsRecord);

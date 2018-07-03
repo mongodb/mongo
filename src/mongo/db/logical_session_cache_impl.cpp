@@ -52,6 +52,8 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(disableLogicalSessionCacheRefresh, bool, false);
 
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxSessions, int, 1'000'000);
+
 constexpr Minutes LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh;
 
 LogicalSessionCacheImpl::LogicalSessionCacheImpl(
@@ -99,11 +101,11 @@ Status LogicalSessionCacheImpl::promote(LogicalSessionId lsid) {
     return Status::OK();
 }
 
-void LogicalSessionCacheImpl::startSession(OperationContext* opCtx, LogicalSessionRecord record) {
+Status LogicalSessionCacheImpl::startSession(OperationContext* opCtx, LogicalSessionRecord record) {
     // Add the new record to our local cache. We will insert it into the sessions collection
     // the next time _refresh is called. If there is already a record in the cache for this
     // session, we'll just write over it with our newer, more recent one.
-    _addToCache(record);
+    return _addToCache(record);
 }
 
 Status LogicalSessionCacheImpl::refreshSessions(OperationContext* opCtx,
@@ -113,7 +115,10 @@ Status LogicalSessionCacheImpl::refreshSessions(OperationContext* opCtx,
     for (const auto& lsid : sessions) {
         if (!promote(lsid).isOK()) {
             // This is a new record, insert it.
-            _addToCache(makeLogicalSessionRecord(opCtx, lsid, now()));
+            auto addToCacheStatus = _addToCache(makeLogicalSessionRecord(opCtx, lsid, now()));
+            if (!addToCacheStatus.isOK()) {
+                return addToCacheStatus;
+            }
         }
     }
 
@@ -127,17 +132,21 @@ Status LogicalSessionCacheImpl::refreshSessions(OperationContext* opCtx,
     for (const auto& record : records) {
         if (!promote(record.getId()).isOK()) {
             // This is a new record, insert it.
-            _addToCache(record);
+            auto addToCacheStatus = _addToCache(record);
+            if (!addToCacheStatus.isOK()) {
+                return addToCacheStatus;
+            }
         }
     }
 
     return Status::OK();
 }
 
-void LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSessionId& lsid) {
+Status LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSessionId& lsid) {
     if (!promote(lsid).isOK()) {
-        startSession(opCtx, makeLogicalSessionRecord(opCtx, lsid, now()));
+        return startSession(opCtx, makeLogicalSessionRecord(opCtx, lsid, now()));
     }
+    return Status::OK();
 }
 
 Status LogicalSessionCacheImpl::refreshNow(Client* client) {
@@ -401,9 +410,13 @@ LogicalSessionCacheStats LogicalSessionCacheImpl::getStats() {
     return _stats;
 }
 
-void LogicalSessionCacheImpl::_addToCache(LogicalSessionRecord record) {
+Status LogicalSessionCacheImpl::_addToCache(LogicalSessionRecord record) {
     stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    if (_activeSessions.size() >= static_cast<size_t>(maxSessions)) {
+        return {ErrorCodes::TooManyLogicalSessions, "cannot add session into the cache"};
+    }
     _activeSessions.insert(std::make_pair(record.getId(), record));
+    return Status::OK();
 }
 
 std::vector<LogicalSessionId> LogicalSessionCacheImpl::listIds() const {

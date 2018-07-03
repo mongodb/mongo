@@ -593,7 +593,11 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
     // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefor,
     // we pass down to the logical session cache and vivify the record (updating last use).
     if (cursor->getSessionId()) {
-        LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getSessionId().get());
+        auto vivifyCursorStatus =
+            LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getSessionId().get());
+        if (!vivifyCursorStatus.isOK()) {
+            return vivifyCursorStatus;
+        }
     }
 
     return ClientCursorPin(opCtx, cursor);
