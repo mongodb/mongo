@@ -724,6 +724,9 @@ ExitCode _initAndListen(int listenPort) {
             log() << redact(status);
             if (status.code() == ErrorCodes::AuthSchemaIncompatible) {
                 exitCleanly(EXIT_NEED_UPGRADE);
+            } else if (status == ErrorCodes::NotMaster) {
+                // Try creating the indexes if we become master.  If we do not become master,
+                // the master will create the indexes and we will replicate them.
             } else {
                 quickExit(EXIT_FAILURE);
             }

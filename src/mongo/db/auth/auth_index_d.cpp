@@ -47,6 +47,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -105,6 +106,15 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
         return;
     }
 
+    // Do not try to generate any system indexes on a secondary.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    uassert(ErrorCodes::NotMaster,
+            "Not primary while creating authorization index",
+            replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
+                replCoord->canAcceptWritesForDatabase(ns.db()));
+
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
     try {
         auto indexSpecStatus = index_key_validate::validateIndexSpec(
             spec.toBSON(), ns, serverGlobalParams.featureCompatibility);
@@ -115,8 +125,10 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
 
         MultiIndexBlock indexer(opCtx, collection);
 
+        std::vector<BSONObj> indexInfoObjs;
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            fassertStatusOK(40453, indexer.init(indexSpec));
+            indexInfoObjs = fassertStatusOK(40453, indexer.init(indexSpec));
+            invariant(indexInfoObjs.size() == 1);
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "authorization index regeneration", ns.ns());
 
@@ -126,6 +138,8 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
 
             indexer.commit();
+            opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                opCtx, ns.getSystemIndexesCollection(), indexInfoObjs[0], false /* fromMigrate */);
 
             wunit.commit();
         }
@@ -205,22 +219,23 @@ Status verifySystemIndexes(OperationContext* txn) {
 void createSystemIndexes(OperationContext* txn, Collection* collection) {
     invariant(collection);
     const NamespaceString& ns = collection->ns();
+    BSONObj indexSpec;
     if (ns == AuthorizationManager::usersCollectionNamespace) {
-        auto indexSpec = fassertStatusOK(
+        indexSpec = fassertStatusOK(
             40455,
             index_key_validate::validateIndexSpec(
                 v3SystemUsersIndexSpec.toBSON(), ns, serverGlobalParams.featureCompatibility));
-
-        fassertStatusOK(
-            40456, collection->getIndexCatalog()->createIndexOnEmptyCollection(txn, indexSpec));
     } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
-        auto indexSpec = fassertStatusOK(
+        indexSpec = fassertStatusOK(
             40457,
             index_key_validate::validateIndexSpec(
                 v3SystemRolesIndexSpec.toBSON(), ns, serverGlobalParams.featureCompatibility));
-
+    }
+    if (!indexSpec.isEmpty()) {
+        txn->getServiceContext()->getOpObserver()->onCreateIndex(
+            txn, ns.getSystemIndexesCollection(), indexSpec, false /* fromMigrate */);
         fassertStatusOK(
-            40458, collection->getIndexCatalog()->createIndexOnEmptyCollection(txn, indexSpec));
+            40456, collection->getIndexCatalog()->createIndexOnEmptyCollection(txn, indexSpec));
     }
 }
 

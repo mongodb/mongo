@@ -564,15 +564,26 @@ Collection* Database::createCollection(OperationContext* txn,
                                        : ic->getDefaultIdIndexSpec(featureCompatibilityVersion)));
             }
         }
-
-        if (nss.isSystem()) {
-            authindex::createSystemIndexes(txn, collection);
-        }
     }
 
     getGlobalServiceContext()->getOpObserver()->onCreateCollection(
         txn, nss, options, fullIdIndexSpec);
 
+    // It is necessary to create the system index *after* running the onCreateCollection so that
+    // the oplog timestamp for the index creation is after the oplog timestamp for the
+    // collection creation. This way both primary and any secondaries will see the index created
+    // after the collection is created.
+    if (createIdIndex && nss.isSystem()) {
+        // We only want to create the indexes here on the primary.  On secondaries, they will
+        // be created by the normal oplog application process.
+        auto coordinator = repl::ReplicationCoordinator::get(txn);
+        const bool canAcceptWrites =
+            (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) ||
+            coordinator->canAcceptWritesForDatabase(nss.db()) || nss.isSystemDotProfile();
+        if (canAcceptWrites) {
+            authindex::createSystemIndexes(txn, collection);
+        }
+    }
     return collection;
 }
 
