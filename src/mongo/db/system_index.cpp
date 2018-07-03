@@ -105,6 +105,15 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
         return;
     }
 
+    // Do not try to generate any system indexes on a secondary.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    uassert(ErrorCodes::NotMaster,
+            "Not primary while creating authorization index",
+            replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
+                replCoord->canAcceptWritesForDatabase(opCtx, ns.db()));
+
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
     try {
         auto indexSpecStatus = index_key_validate::validateIndexSpec(
             opCtx, spec.toBSON(), ns, serverGlobalParams.featureCompatibility);
@@ -125,6 +134,8 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
 
             indexer.commit();
+            opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                opCtx, ns, collection->uuid(), indexSpec, false /* fromMigrate */);
 
             wunit.commit();
         });
@@ -203,26 +214,30 @@ Status verifySystemIndexes(OperationContext* opCtx) {
 void createSystemIndexes(OperationContext* opCtx, Collection* collection) {
     invariant(collection);
     const NamespaceString& ns = collection->ns();
+    BSONObj indexSpec;
     if (ns == AuthorizationManager::usersCollectionNamespace) {
-        auto indexSpec = fassertStatusOK(
+        indexSpec = fassertStatusOK(
             40455,
             index_key_validate::validateIndexSpec(opCtx,
                                                   v3SystemUsersIndexSpec.toBSON(),
                                                   ns,
                                                   serverGlobalParams.featureCompatibility));
 
-        fassertStatusOK(
-            40456, collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, indexSpec));
     } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
-        auto indexSpec = fassertStatusOK(
+        indexSpec = fassertStatusOK(
             40457,
             index_key_validate::validateIndexSpec(opCtx,
                                                   v3SystemRolesIndexSpec.toBSON(),
                                                   ns,
                                                   serverGlobalParams.featureCompatibility));
-
+    }
+    if (!indexSpec.isEmpty()) {
+        opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+            opCtx, ns, collection->uuid(), indexSpec, false /* fromMigrate */);
+        // Note that the opObserver is called prior to creating the index.  This ensures the index
+        // write gets the same storage timestamp as the oplog entry.
         fassertStatusOK(
-            40458, collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, indexSpec));
+            40456, collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, indexSpec));
     }
 }
 

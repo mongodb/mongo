@@ -73,7 +73,8 @@ void OpObserverNoop::onCreateCollection(OperationContext* opCtx,
                                         Collection* coll,
                                         const NamespaceString& collectionName,
                                         const CollectionOptions& options,
-                                        const BSONObj& idIndex) {
+                                        const BSONObj& idIndex,
+                                        const OplogSlot& createOpTime) {
     if (options.uuid) {
         UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
         catalog.onCreateCollection(opCtx, coll, options.uuid.get());

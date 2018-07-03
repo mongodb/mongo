@@ -292,7 +292,8 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
                                            *oplogEntry.getWallClockTime(),
                                            sessionInfo,
                                            stmtId,
-                                           oplogLink);
+                                           oplogLink,
+                                           OplogSlot());
 
             auto oplogOpTime = result.oplogTime;
             uassert(40633,

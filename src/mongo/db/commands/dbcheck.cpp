@@ -475,7 +475,8 @@ private:
                                                   wallClockTime,
                                                   {},
                                                   kUninitializedStmtId,
-                                                  {});
+                                                  {},
+                                                  OplogSlot());
                 uow.commit();
                 return result;
             });

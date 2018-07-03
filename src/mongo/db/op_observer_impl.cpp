@@ -169,7 +169,8 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                             opTimes.wallClockTime,
                                             sessionInfo,
                                             args.stmtId,
-                                            {});
+                                            {},
+                                            OplogSlot());
 
         opTimes.prePostImageOpTime = noteUpdateOpTime;
 
@@ -190,7 +191,8 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                       opTimes.wallClockTime,
                                       sessionInfo,
                                       args.stmtId,
-                                      oplogLink);
+                                      oplogLink,
+                                      OplogSlot());
 
     return opTimes;
 }
@@ -229,7 +231,8 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                                      opTimes.wallClockTime,
                                      sessionInfo,
                                      stmtId,
-                                     {});
+                                     {},
+                                     OplogSlot());
         opTimes.prePostImageOpTime = noteOplog;
         oplogLink.preImageOpTime = noteOplog;
     }
@@ -244,7 +247,8 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                                       opTimes.wallClockTime,
                                       sessionInfo,
                                       stmtId,
-                                      oplogLink);
+                                      oplogLink,
+                                      OplogSlot());
     return opTimes;
 }
 
@@ -276,7 +280,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                     getWallClockTimeForOpLog(opCtx),
                     {},
                     kUninitializedStmtId,
-                    {});
+                    {},
+                    OplogSlot());
     } else {
         repl::logOp(opCtx,
                     "i",
@@ -288,7 +293,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                     getWallClockTimeForOpLog(opCtx),
                     {},
                     kUninitializedStmtId,
-                    {});
+                    {},
+                    OplogSlot());
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -473,14 +479,16 @@ void OpObserverImpl::onInternalOpMessage(OperationContext* opCtx,
                 getWallClockTimeForOpLog(opCtx),
                 {},
                 kUninitializedStmtId,
-                {});
+                {},
+                OplogSlot());
 }
 
 void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                                         Collection* coll,
                                         const NamespaceString& collectionName,
                                         const CollectionOptions& options,
-                                        const BSONObj& idIndex) {
+                                        const BSONObj& idIndex,
+                                        const OplogSlot& createOpTime) {
     const auto cmdNss = collectionName.getCommandNS();
 
     BSONObjBuilder b;
@@ -516,7 +524,8 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                     getWallClockTimeForOpLog(opCtx),
                     {},
                     kUninitializedStmtId,
-                    {});
+                    {},
+                    OplogSlot());
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -564,7 +573,8 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                     getWallClockTimeForOpLog(opCtx),
                     {},
                     kUninitializedStmtId,
-                    {});
+                    {},
+                    OplogSlot());
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -604,7 +614,8 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
                 getWallClockTimeForOpLog(opCtx),
                 {},
                 kUninitializedStmtId,
-                {});
+                {},
+                OplogSlot());
 
     if (dbName == FeatureCompatibilityVersion::kDatabase) {
         FeatureCompatibilityVersion::onDropCollection(opCtx);
@@ -637,7 +648,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                  getWallClockTimeForOpLog(opCtx),
                                  {},
                                  kUninitializedStmtId,
-                                 {});
+                                 {},
+                                 OplogSlot());
     }
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
@@ -684,7 +696,8 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                 getWallClockTimeForOpLog(opCtx),
                 {},
                 kUninitializedStmtId,
-                {});
+                {},
+                OplogSlot());
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
@@ -721,7 +734,8 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
                                           getWallClockTimeForOpLog(opCtx),
                                           {},
                                           kUninitializedStmtId,
-                                          {});
+                                          {},
+                                          OplogSlot());
 
     if (fromCollection.isSystemDotViews())
         DurableViewCatalog::onExternalChange(opCtx, fromCollection);
@@ -767,7 +781,8 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
                 getWallClockTimeForOpLog(opCtx),
                 {},
                 kUninitializedStmtId,
-                {});
+                {},
+                OplogSlot());
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
@@ -791,7 +806,8 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
                     getWallClockTimeForOpLog(opCtx),
                     {},
                     kUninitializedStmtId,
-                    {});
+                    {},
+                    OplogSlot());
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())

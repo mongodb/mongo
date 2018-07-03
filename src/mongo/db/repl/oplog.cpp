@@ -435,7 +435,8 @@ OpTime logOp(OperationContext* opCtx,
              Date_t wallClockTime,
              const OperationSessionInfo& sessionInfo,
              StmtId statementId,
-             const OplogLink& oplogLink) {
+             const OplogLink& oplogLink,
+             const OplogSlot& oplogSlot) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
         uassert(ErrorCodes::IllegalOperation,
@@ -451,7 +452,11 @@ OpTime logOp(OperationContext* opCtx,
 
     OplogSlot slot;
     WriteUnitOfWork wuow(opCtx);
-    _getNextOpTimes(opCtx, oplog, 1, &slot);
+    if (oplogSlot.opTime.isNull()) {
+        _getNextOpTimes(opCtx, oplog, 1, &slot);
+    } else {
+        slot = oplogSlot;
+    }
 
     auto writer = _logOpWriter(opCtx,
                                opstr,

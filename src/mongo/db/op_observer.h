@@ -41,6 +41,7 @@ struct CollectionOptions;
 struct InsertStatement;
 class NamespaceString;
 class OperationContext;
+struct OplogSlot;
 
 namespace repl {
 class OpTime;
@@ -144,7 +145,8 @@ public:
                                     Collection* coll,
                                     const NamespaceString& collectionName,
                                     const CollectionOptions& options,
-                                    const BSONObj& idIndex) = 0;
+                                    const BSONObj& idIndex,
+                                    const OplogSlot& createOpTime) = 0;
     /**
      * This function logs an oplog entry when a 'collMod' command on a collection is executed.
      * Since 'collMod' commands can take a variety of different formats, the 'o' field of the
