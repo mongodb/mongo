@@ -774,24 +774,36 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
             "request doesn't allow collection to be created implicitly",
             OperationShardingState::get(opCtx).allowImplicitCollectionCreation());
 
+    auto coordinator = repl::ReplicationCoordinator::get(opCtx);
+    bool canAcceptWrites =
+        (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) ||
+        coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) || nss.isSystemDotProfile();
+
+
     CollectionOptions optionsWithUUID = options;
     bool generatedUUID = false;
     if (!optionsWithUUID.uuid) {
-        auto coordinator = repl::ReplicationCoordinator::get(opCtx);
-        bool canGenerateUUID =
-            (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) ||
-            coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) || nss.isSystemDotProfile();
-
-        if (!canGenerateUUID) {
+        if (!canAcceptWrites) {
             std::string msg = str::stream() << "Attempted to create a new collection " << nss.ns()
                                             << " without a UUID";
             severe() << msg;
             uasserted(ErrorCodes::InvalidOptions, msg);
         }
-        if (canGenerateUUID) {
+        if (canAcceptWrites) {
             optionsWithUUID.uuid.emplace(CollectionUUID::gen());
             generatedUUID = true;
         }
+    }
+
+    // Because writing the oplog entry depends on having the full spec for the _id index, which is
+    // not available until the collection is actually created, we can't write the oplog entry until
+    // after we have created the collection.  In order to make the storage timestamp for the
+    // collection create always correct even when other operations are present in the same storage
+    // transaction, we reserve an opTime before the collection creation, then pass it to the
+    // opObserver.  Reserving the optime automatically sets the storage timestamp.
+    OplogSlot createOplogSlot;
+    if (canAcceptWrites && supportsDocLocking() && !coordinator->isOplogDisabledFor(opCtx, nss)) {
+        createOplogSlot = repl::getNextOpTime(opCtx);
     }
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
@@ -833,16 +845,21 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                         !nss.isReplicated());
             }
         }
-
-        if (nss.isSystem()) {
-            createSystemIndexes(opCtx, collection);
-        }
     }
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLoggingCreateCollection);
 
     opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
-        opCtx, collection, nss, optionsWithUUID, fullIdIndexSpec);
+        opCtx, collection, nss, optionsWithUUID, fullIdIndexSpec, createOplogSlot);
+
+    // It is necessary to create the system index *after* running the onCreateCollection so that
+    // the storage timestamp for the index creation is after the storage timestamp for the
+    // collection creation, and the opTimes for the corresponding oplog entries are the same as the
+    // storage timestamps.  This way both primary and any secondaries will see the index created
+    // after the collection is created.
+    if (canAcceptWrites && createIdIndex && nss.isSystem()) {
+        createSystemIndexes(opCtx, collection);
+    }
 
     return collection;
 }

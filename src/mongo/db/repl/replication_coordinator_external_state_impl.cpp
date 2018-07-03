@@ -79,6 +79,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/system_index.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -518,6 +519,16 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     _shardingOnTransitionToPrimaryHook(opCtx);
     _dropAllTempCollections(opCtx);
+
+    // It is only necessary to check the system indexes on the first transition to master.
+    // On subsequent transitions to master the indexes will have already been created.
+    static std::once_flag verifySystemIndexesOnce;
+    std::call_once(verifySystemIndexesOnce, [opCtx] {
+        const auto globalAuthzManager = AuthorizationManager::get(opCtx->getServiceContext());
+        if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
+            fassert(65536, verifySystemIndexes(opCtx));
+        }
+    });
 
     serverGlobalParams.validateFeaturesAsMaster.store(true);
 

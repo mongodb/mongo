@@ -159,7 +159,8 @@ protected:
                            osi,
                            stmtId,
                            link,
-                           false /* prepare */);
+                           false /* prepare */,
+                           OplogSlot());
     }
 
     void bumpTxnNumberFromDifferentOpCtx(Session* session, TxnNumber newTxnNum) {
@@ -554,7 +555,8 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
                                   osi,
                                   1,
                                   {},
-                                  false /* prepare */);
+                                  false /* prepare */,
+                                  OplogSlot());
         session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {1}, opTime, wallClockTime);
         wuow.commit();
 
@@ -581,7 +583,8 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
                                   osi,
                                   kIncompleteHistoryStmtId,
                                   link,
-                                  false /* prepare */);
+                                  false /* prepare */,
+                                  OplogSlot());
 
         session.onWriteOpCompletedOnPrimary(
             opCtx(), txnNum, {kIncompleteHistoryStmtId}, opTime, wallClockTime);

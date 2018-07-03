@@ -292,7 +292,8 @@ public:
                             Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
-                            const BSONObj& idIndex) override;
+                            const BSONObj& idIndex,
+                            const OplogSlot& createOpTime) override;
 
     // Hook for onInserts. Defaults to a no-op function but may be overridden to inject exceptions
     // while mapReduce inserts its results into the temporary output collection.
@@ -315,7 +316,8 @@ void MapReduceOpObserver::onCreateCollection(OperationContext*,
                                              Collection*,
                                              const NamespaceString& collectionName,
                                              const CollectionOptions& options,
-                                             const BSONObj&) {
+                                             const BSONObj&,
+                                             const OplogSlot&) {
     if (!options.temp) {
         return;
     }

@@ -2260,6 +2260,65 @@ public:
     }
 };
 
+class CreateCollectionWithSystemIndex : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        const LogicalTime indexCreateLt = futureLt.addTicks(1);
+        const Timestamp indexCreateTs = indexCreateLt.asTimestamp();
+
+        NamespaceString nss("admin.system.users");
+
+        { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+
+        ASSERT_OK(createCollection(_opCtx, nss.db().toString(), BSON("create" << nss.coll())));
+
+        { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+
+        BSONObj result = queryOplog(BSON("op"
+                                         << "c"
+                                         << "ns"
+                                         << nss.getCommandNS().ns()
+                                         << "o.create"
+                                         << nss.coll()));
+        repl::OplogEntry op(result);
+        // The logOp() call for createCollection should have timestamp 'futureTs', which will also
+        // be the timestamp at which we do the write which creates the collection. Thus we expect
+        // the collection to appear at 'futureTs' and not before.
+        ASSERT_EQ(op.getTimestamp(), futureTs) << op.toBSON();
+
+        assertNamespaceInIdents(nss, pastTs, false);
+        assertNamespaceInIdents(nss, presentTs, false);
+        assertNamespaceInIdents(nss, futureTs, true);
+        assertNamespaceInIdents(nss, indexCreateTs, true);
+        assertNamespaceInIdents(nss, nullTs, true);
+
+        result = queryOplog(BSON("op"
+                                 << "c"
+                                 << "ns"
+                                 << nss.getCommandNS().ns()
+                                 << "o.createIndexes"
+                                 << nss.coll()));
+        repl::OplogEntry indexOp(result);
+        ASSERT_EQ(indexOp.getObject()["name"].str(), "user_1_db_1");
+        ASSERT_GT(indexOp.getTimestamp(), futureTs) << op.toBSON();
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+        auto kvStorageEngine =
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
+        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+        auto indexIdent = kvCatalog->getIndexIdent(_opCtx, nss.ns(), "user_1_db_1");
+        assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdent, pastTs);
+        assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdent, presentTs);
+        assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdent, futureTs);
+        assertIdentsExistAtTimestamp(kvCatalog, "", indexIdent, indexCreateTs);
+        assertIdentsExistAtTimestamp(kvCatalog, "", indexIdent, nullTs);
+    }
+};
+
 class AllStorageTimestampTests : public unittest::Suite {
 public:
     AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
@@ -2304,6 +2363,7 @@ public:
         add<TimestampIndexBuilderOnPrimary<true>>();
         add<SecondaryReadsDuringBatchApplicationAreAllowed>();
         add<ViewCreationSeparateTransaction>();
+        add<CreateCollectionWithSystemIndex>();
     }
 };
 

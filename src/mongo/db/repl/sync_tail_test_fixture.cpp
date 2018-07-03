@@ -78,7 +78,8 @@ void SyncTailOpObserver::onCreateCollection(OperationContext* opCtx,
                                             Collection* coll,
                                             const NamespaceString& collectionName,
                                             const CollectionOptions& options,
-                                            const BSONObj& idIndex) {
+                                            const BSONObj& idIndex,
+                                            const OplogSlot& createOpTime) {
     if (!onCreateCollectionFn) {
         return;
     }

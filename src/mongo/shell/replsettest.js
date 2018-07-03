@@ -1816,6 +1816,7 @@ var ReplSetTest = function(opts) {
             // '_master' must have been populated.
             var primary = rst._master;
             var combinedDBs = new Set(primary.getDBNames());
+            const replSetConfig = rst.getReplSetConfigFromNode();
 
             slaves.forEach(secondary => {
                 secondary.getDBNames().forEach(dbName => combinedDBs.add(dbName));
@@ -1915,8 +1916,10 @@ var ReplSetTest = function(opts) {
                     // Check that the following collection stats are the same across replica set
                     // members:
                     //  capped
-                    //  nindexes
+                    //  nindexes, except on nodes with buildIndexes: false
                     //  ns
+                    const hasSecondaryIndexes =
+                        replSetConfig.members[rst.getNodeId(secondary)].buildIndexes !== false;
                     primaryCollections.forEach(collName => {
                         var primaryCollStats =
                             primary.getDB(dbName).runCommand({collStats: collName});
@@ -1928,7 +1931,8 @@ var ReplSetTest = function(opts) {
                             printCollectionInfo('secondary', secondary, dbName, collName);
                             success = false;
                         } else if (primaryCollStats.capped !== secondaryCollStats.capped ||
-                                   primaryCollStats.nindexes !== secondaryCollStats.nindexes ||
+                                   (hasSecondaryIndexes &&
+                                    primaryCollStats.nindexes !== secondaryCollStats.nindexes) ||
                                    primaryCollStats.ns !== secondaryCollStats.ns) {
                             print(msgPrefix +
                                   ', the primary and secondary have different stats for the ' +
