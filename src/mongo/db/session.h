@@ -315,17 +315,17 @@ public:
      */
     bool inMultiDocumentTransaction() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _inMultiDocumentTransaction(lk);
+        return _txnState.inMultiDocumentTransaction(lk);
     };
 
     bool transactionIsCommitted() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _txnState == MultiDocumentTransactionState::kCommitted;
+        return _txnState.isCommitted(lk);
     }
 
     bool transactionIsAborted() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _txnState == MultiDocumentTransactionState::kAborted;
+        return _txnState.isAborted(lk);
     }
 
     /**
@@ -385,6 +385,16 @@ public:
     static boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
         const repl::OplogEntry& entry);
 
+    void transitionToPreparedforTest() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _txnState.transitionTo(lk, TransitionTable::State::kPrepared);
+    }
+
+    void transitionToCommittingforTest() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _txnState.transitionTo(lk, TransitionTable::State::kCommitting);
+    }
+
 private:
     // Holds function which determines whether the CursorManager has client cursor references for a
     // given transaction.
@@ -399,11 +409,6 @@ private:
 
     // Checks if there is a conflicting operation on the current Session
     void _checkValid(WithLock) const;
-
-    bool _inMultiDocumentTransaction(WithLock) const {
-        return _txnState == MultiDocumentTransactionState::kInProgress ||
-            _txnState == MultiDocumentTransactionState::kPrepared;
-    }
 
     // Checks that a new txnNumber is higher than the activeTxnNumber so
     // we don't start a txn that is too old.
@@ -432,6 +437,74 @@ private:
                                       TxnNumber newTxnNumber,
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
+
+    /**
+     * Indicates the state of the current multi-document transaction, if any.  If the transaction is
+     * in any state but kInProgress, no more operations can be collected. Once the transaction is in
+     * kPrepared, the transaction is not allowed to abort outside of an 'abortTransaction' command.
+     * At this point, aborting the transaction must log an 'abortTransaction' oplog entry.
+     */
+    class TransitionTable {
+    public:
+        enum class State { kNone, kInProgress, kPrepared, kCommitting, kCommitted, kAborted };
+
+        /**
+         * Transitions the session from the current state to the new state. If transition validation
+         * is not relaxed, invariants if the transition is illegal.
+         */
+        enum class TransitionValidation { kValidateTransition, kRelaxTransitionValidation };
+        void transitionTo(
+            WithLock,
+            State newState,
+            TransitionValidation shouldValidate = TransitionValidation::kValidateTransition);
+
+        bool inMultiDocumentTransaction(WithLock) const {
+            return _state == State::kInProgress || _state == State::kPrepared;
+        }
+
+        bool isNone(WithLock) const {
+            return _state == State::kNone;
+        }
+
+        bool isInProgress(WithLock) const {
+            return _state == State::kInProgress;
+        }
+
+        bool isPrepared(WithLock) const {
+            return _state == State::kPrepared;
+        }
+
+        bool isCommitting(WithLock) const {
+            return _state == State::kCommitting;
+        }
+
+        bool isCommitted(WithLock) const {
+            return _state == State::kCommitted;
+        }
+
+        bool isAborted(WithLock) const {
+            return _state == State::kAborted;
+        }
+
+        std::string toString() const {
+            return toString(_state);
+        }
+
+        static std::string toString(State state);
+
+    private:
+        static bool _isLegalTransition(State oldState, State newState);
+
+        State _state = State::kNone;
+    };
+
+    friend std::ostream& operator<<(std::ostream& s, TransitionTable txnState) {
+        return (s << txnState.toString());
+    }
+
+    friend StringBuilder& operator<<(StringBuilder& s, TransitionTable txnState) {
+        return (s << txnState.toString());
+    }
 
     void _abortArbitraryTransaction(WithLock);
 
@@ -479,19 +552,8 @@ private:
     // Holds transaction resources between network operations.
     boost::optional<TxnResources> _txnResourceStash;
 
-    // Indicates the state of the current multi-document transaction or snapshot read, if any.  If
-    // the transaction is in any state but kInProgress, no more operations can be collected. Once
-    // the transaction is in kPrepared, the transaction is not allowed to abort outside of an
-    // 'abortTransaction' command. At this point, aborting the transaction must log an
-    // 'abortTransaction' oplog entry.
-    enum class MultiDocumentTransactionState {
-        kNone,
-        kInProgress,
-        kPrepared,
-        kCommitting,
-        kCommitted,
-        kAborted
-    } _txnState = MultiDocumentTransactionState::kNone;
+    // Maintains the transaction state and the transition table for legal state transitions.
+    TransitionTable _txnState;
 
     // Holds oplog data for operations which have been applied in the current multi-document
     // transaction.  Not used for retryable writes.

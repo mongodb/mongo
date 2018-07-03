@@ -431,6 +431,7 @@ TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
                   << BSONBinData(halfTransactionData.get(), kHalfTransactionSize, BinDataGeneral)));
     session->addTransactionOperation(opCtx.get(), operation);
     session->addTransactionOperation(opCtx.get(), operation);
+    session->transitionToCommittingforTest();
     ASSERT_THROWS_CODE(opObserver.onTransactionCommit(opCtx.get()),
                        AssertionException,
                        ErrorCodes::TransactionTooLarge);
@@ -591,6 +592,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
                                           << "x"));
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, false, boost::none);
 
+    session()->transitionToPreparedforTest();
     opObserver().onTransactionPrepare(opCtx());
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
@@ -651,6 +653,7 @@ TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
                                       "prepareTransaction");
 
     session()->unstashTransactionResources(opCtx(), "prepareTransaction");
+    session()->transitionToPreparedforTest();
     opObserver().onTransactionPrepare(opCtx());
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
@@ -699,6 +702,7 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onInserts(opCtx(), nss1, uuid1, inserts1.begin(), inserts1.end(), false);
     opObserver().onInserts(opCtx(), nss2, uuid2, inserts2.begin(), inserts2.end(), false);
+    session()->transitionToCommittingforTest();
     opObserver().onTransactionCommit(opCtx());
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);
@@ -786,6 +790,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
+    session()->transitionToCommittingforTest();
     opObserver().onTransactionCommit(opCtx());
     auto oplogEntry = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntry);
@@ -846,6 +851,7 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
                                BSON("_id" << 1 << "data"
                                           << "y"));
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, false, boost::none);
+    session()->transitionToCommittingforTest();
     opObserver().onTransactionCommit(opCtx());
     auto oplogEntry = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntry);
