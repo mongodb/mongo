@@ -253,6 +253,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             self._stepdown_completed()
             self._is_idle_evt.set()
 
+    # pylint: disable=R0912,R0915
     def _step_down(self, rs_fixture):
         try:
             primary = rs_fixture.get_primary(timeout_secs=self._stepdown_interval_secs)
@@ -290,6 +291,14 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             except pymongo.errors.AutoReconnect:
                 # AutoReconnect exceptions are expected as connections are closed during stepdown.
                 pass
+            except pymongo.errors.ExecutionTimeout as err:
+                # ExecutionTimeout exceptions are expected when the election attempt fails due to
+                # not being able to acquire the global X lock within self._stepdown_duration_secs
+                # seconds. We'll try again after self._stepdown_interval_secs seconds.
+                self.logger.info(
+                    "Failed to step down the primary on port %d of replica set '%s': %s",
+                    primary.port, rs_fixture.replset_name, err)
+                return
             except pymongo.errors.PyMongoError:
                 self.logger.exception(
                     "Error while stepping down the primary on port %d of replica set '%s'.",
