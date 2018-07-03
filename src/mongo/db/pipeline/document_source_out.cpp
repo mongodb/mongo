@@ -28,9 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_out.h"
-
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/pipeline/document_source_out.h"
+#include "mongo/db/pipeline/document_source_out_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"
 
@@ -51,12 +51,27 @@ DocumentSourceOut::~DocumentSourceOut() {
 
 std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::liteParse(
     const AggregationRequest& request, const BSONElement& spec) {
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "$out stage requires a string argument, but found "
-                          << typeName(spec.type()),
-            spec.type() == BSONType::String);
 
-    NamespaceString targetNss(request.getNamespaceString().db(), spec.valueStringData());
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "$out stage requires a string or object argument, but found "
+                          << typeName(spec.type()),
+            spec.type() == BSONType::String || spec.type() == BSONType::Object);
+
+    NamespaceString targetNss;
+    if (spec.type() == BSONType::String) {
+        targetNss = NamespaceString(request.getNamespaceString().db(), spec.valueStringData());
+    } else if (spec.type() == BSONType::Object) {
+        auto outSpec =
+            DocumentSourceOutSpec::parse(IDLParserErrorContext("$out"), spec.embeddedObject());
+
+        if (auto targetDb = outSpec.getTargetDb()) {
+            targetNss = NamespaceString(*targetDb, outSpec.getTargetCollection());
+        } else {
+            targetNss =
+                NamespaceString(request.getNamespaceString().db(), outSpec.getTargetCollection());
+        }
+    }
+
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid $out target namespace, " << targetNss.ns(),
             targetNss.isValid());
@@ -211,37 +226,79 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
 }
 
 DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
-                                     const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx),
+                                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     WriteModeEnum mode,
+                                     bool dropTarget,
+                                     boost::optional<Document> uniqueKey)
+    : DocumentSource(expCtx),
       _done(false),
       _tempNs(""),  // Filled in during getNext().
-      _outputNs(outputNs) {}
+      _outputNs(outputNs),
+      _mode(mode),
+      _dropTarget(dropTarget),
+      _uniqueKey(uniqueKey) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(16990,
-            str::stream() << "$out only supports a string argument, not " << typeName(elem.type()),
-            elem.type() == String);
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "$out cannot be used in a transaction",
-            !pExpCtx->inMultiDocumentTransaction);
+            !expCtx->inMultiDocumentTransaction);
 
-    auto readConcernLevel = repl::ReadConcernArgs::get(pExpCtx->opCtx).getLevel();
+    auto readConcernLevel = repl::ReadConcernArgs::get(expCtx->opCtx).getLevel();
     uassert(ErrorCodes::InvalidOptions,
             "$out cannot be used with a 'majority' read concern level",
             readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern);
 
-    NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + elem.str());
-    uassert(17385, "Can't $out to special collection: " + elem.str(), !outputNs.isSpecial());
-    return new DocumentSourceOut(outputNs, pExpCtx);
+    bool dropTarget = true;
+    auto mode = WriteModeEnum::kModeInsert;
+    boost::optional<Document> uniqueKey;
+    NamespaceString outputNs;
+    if (elem.type() == BSONType::String) {
+        outputNs = NamespaceString(expCtx->ns.db().toString() + '.' + elem.str());
+    } else if (elem.type() == BSONType::Object) {
+        auto spec =
+            DocumentSourceOutSpec::parse(IDLParserErrorContext("$out"), elem.embeddedObject());
+
+        dropTarget = spec.getDropTarget();
+        mode = spec.getMode();
+        uassert(ErrorCodes::InvalidOptions,
+                "$out is currently supported only with dropTarget: true and mode: insert.",
+                dropTarget && mode == WriteModeEnum::kModeInsert);
+
+        if (auto uniqueKeyDoc = spec.getUniqueKey()) {
+            uniqueKey = Document{{uniqueKeyDoc.get()}};
+        }
+
+        // Retrieve the target database from the user command, otherwise use the namespace from the
+        // expression context.
+        if (auto targetDb = spec.getTargetDb()) {
+            outputNs = NamespaceString(*targetDb, spec.getTargetCollection());
+        } else {
+            outputNs = NamespaceString(expCtx->ns.db(), spec.getTargetCollection());
+        }
+
+    } else {
+        uasserted(16990,
+                  str::stream() << "$out only supports a string or object argument, not "
+                                << typeName(elem.type()));
+    }
+
+    uassert(17385, "Can't $out to special collection: " + outputNs.coll(), !outputNs.isSpecial());
+
+    return new DocumentSourceOut(outputNs, expCtx, mode, dropTarget, uniqueKey);
 }
 
 Value DocumentSourceOut::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    massert(
-        17000, "$out shouldn't have different db than input", _outputNs.db() == pExpCtx->ns.db());
-
-    return Value(DOC(getSourceName() << _outputNs.coll()));
+    MutableDocument serialized(
+        Document{{DocumentSourceOutSpec::kTargetCollectionFieldName, _outputNs.coll()},
+                 {DocumentSourceOutSpec::kDropTargetFieldName, _dropTarget},
+                 {DocumentSourceOutSpec::kTargetDbFieldName, _outputNs.db()},
+                 {DocumentSourceOutSpec::kModeFieldName, WriteMode_serializer(_mode)}});
+    if (_uniqueKey) {
+        serialized[DocumentSourceOutSpec::kUniqueKeyFieldName] = Value(_uniqueKey.get());
+    }
+    return Value(Document{{getSourceName(), serialized.freeze()}});
 }
 
 DepsTracker::State DocumentSourceOut::getDependencies(DepsTracker* deps) const {

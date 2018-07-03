@@ -1,4 +1,4 @@
-# Copyright (C) 2017 MongoDB Inc.
+# Copyright (C) 2018 MongoDB Inc.
 #
 # This program is free software: you can redistribute it and/or  modify
 # it under the terms of the GNU Affero General Public License, version 3,
@@ -24,7 +24,7 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 
-# Document source pipeline stage IDL file
+# Document source change stream stage IDL file
 
 global:
    cpp_namespace: "mongo"
@@ -105,21 +105,3 @@ structs:
               default: false
               description: A flag indicating whether the stream should report all changes that occur
                            on the deployment, aside from those on internal databases or collections.
-
-  ListSessionsUser:
-    description: "A struct representing a $listSessions/$listLocalSessions User"
-    strict: true
-    fields:
-      user: string
-      db: string
-
-  ListSessionsSpec:
-    description: "$listSessions and $listLocalSessions pipeline spec"
-    strict: true
-    fields:
-      allUsers:
-        type: bool
-        default: false
-      users:
-        type: array<ListSessionsUser>
-        optional: true

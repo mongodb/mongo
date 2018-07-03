@@ -2119,7 +2119,7 @@ class Out : public needsPrimaryShardMergerBase {
         return "[]";
     }
     string mergePipeJson() {
-        return "[{$out: 'outColl'}]";
+        return "[{$out: {to: 'outColl', dropTarget: true, db: 'a', mode: 'insert'}}]";
     }
 };
 

@@ -35,7 +35,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/document_sources_gen.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/hex.h"

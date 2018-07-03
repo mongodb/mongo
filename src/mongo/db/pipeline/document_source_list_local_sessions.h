@@ -35,7 +35,7 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_sources_gen.h"
+#include "mongo/db/pipeline/document_source_list_sessions_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {

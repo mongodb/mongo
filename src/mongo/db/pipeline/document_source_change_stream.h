@@ -29,9 +29,9 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/document_sources_gen.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/resume_token.h"
 

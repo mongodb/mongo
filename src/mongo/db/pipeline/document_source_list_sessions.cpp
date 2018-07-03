@@ -33,7 +33,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document_source_list_sessions.h"
-#include "mongo/db/pipeline/document_sources_gen.h"
+#include "mongo/db/pipeline/document_source_list_sessions_gen.h"
 
 namespace mongo {
 

@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/generic_cursor.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_sources_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {

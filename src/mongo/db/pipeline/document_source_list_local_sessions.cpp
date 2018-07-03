@@ -32,7 +32,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
-#include "mongo/db/pipeline/document_sources_gen.h"
+#include "mongo/db/pipeline/document_source_list_sessions_gen.h"
 
 namespace mongo {
 
