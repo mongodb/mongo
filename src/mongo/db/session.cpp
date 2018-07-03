@@ -723,6 +723,11 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
 
     invariant(!_txnResourceStash);
     _txnResourceStash = TxnResources(opCtx);
+
+    // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
+    // with this Client's information. This is the last client that ran a transaction operation on
+    // the Session.
+    _singleTransactionStats->getLastClientInfo()->update(opCtx->getClient());
 }
 
 void Session::unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName) {
@@ -860,6 +865,10 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
     // SingleTransactionStats instance on the Session.
     _singleTransactionStats->getOpDebug()->additiveMetrics.add(
         CurOp::get(opCtx)->debug().additiveMetrics);
+
+    // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
+    // with this Client's information.
+    _singleTransactionStats->getLastClientInfo()->update(opCtx->getClient());
 }
 
 void Session::_abortTransaction(WithLock wl) {
@@ -1000,6 +1009,9 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
                 // SingleTransactionStats instance on the Session.
                 _singleTransactionStats->getOpDebug()->additiveMetrics.add(
                     CurOp::get(opCtx)->debug().additiveMetrics);
+                // Update the LastClientInfo object stored in the SingleTransactionStats instance on
+                // the Session with this Client's information.
+                _singleTransactionStats->getLastClientInfo()->update(opCtx->getClient());
             }
         }
         // We must clear the recovery unit and locker so any post-transaction writes can run without
@@ -1035,6 +1047,9 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     // SingleTransactionStats instance on the Session.
     _singleTransactionStats->getOpDebug()->additiveMetrics.add(
         CurOp::get(opCtx)->debug().additiveMetrics);
+    // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
+    // with this Client's information.
+    _singleTransactionStats->getLastClientInfo()->update(opCtx->getClient());
 }
 
 BSONObj Session::reportStashedState() const {
