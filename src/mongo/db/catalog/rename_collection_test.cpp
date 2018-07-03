@@ -88,7 +88,8 @@ public:
                             Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
-                            const BSONObj& idIndex) override;
+                            const BSONObj& idIndex,
+                            const OplogSlot& createOpTime) override;
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
@@ -165,9 +166,10 @@ void OpObserverMock::onCreateCollection(OperationContext* opCtx,
                                         Collection* coll,
                                         const NamespaceString& collectionName,
                                         const CollectionOptions& options,
-                                        const BSONObj& idIndex) {
+                                        const BSONObj& idIndex,
+                                        const OplogSlot& createOpTime) {
     _logOp(opCtx, collectionName, "create");
-    OpObserverNoop::onCreateCollection(opCtx, coll, collectionName, options, idIndex);
+    OpObserverNoop::onCreateCollection(opCtx, coll, collectionName, options, idIndex, createOpTime);
 }
 
 repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,

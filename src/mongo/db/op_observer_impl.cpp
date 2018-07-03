@@ -73,7 +73,8 @@ repl::OpTime logOperation(OperationContext* opCtx,
                           Date_t wallClockTime,
                           const OperationSessionInfo& sessionInfo,
                           StmtId stmtId,
-                          const repl::OplogLink& oplogLink) {
+                          const repl::OplogLink& oplogLink,
+                          const OplogSlot& oplogSlot) {
     auto& times = OpObserver::Times::get(opCtx).reservedOpTimes;
     auto opTime = repl::logOp(opCtx,
                               opstr,
@@ -85,7 +86,9 @@ repl::OpTime logOperation(OperationContext* opCtx,
                               wallClockTime,
                               sessionInfo,
                               stmtId,
-                              oplogLink);
+                              oplogLink,
+                              oplogSlot);
+
     times.push_back(opTime);
     return opTime;
 }
@@ -193,7 +196,8 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                              opTimes.wallClockTime,
                                              sessionInfo,
                                              args.stmtId,
-                                             {});
+                                             {},
+                                             OplogSlot());
 
         opTimes.prePostImageOpTime = noteUpdateOpTime;
 
@@ -214,7 +218,8 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                        opTimes.wallClockTime,
                                        sessionInfo,
                                        args.stmtId,
-                                       oplogLink);
+                                       oplogLink,
+                                       OplogSlot());
 
     return opTimes;
 }
@@ -252,7 +257,8 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                                       opTimes.wallClockTime,
                                       sessionInfo,
                                       stmtId,
-                                      {});
+                                      {},
+                                      OplogSlot());
         opTimes.prePostImageOpTime = noteOplog;
         oplogLink.preImageOpTime = noteOplog;
     }
@@ -268,7 +274,8 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                                        opTimes.wallClockTime,
                                        sessionInfo,
                                        stmtId,
-                                       oplogLink);
+                                       oplogLink,
+                                       OplogSlot());
     return opTimes;
 }
 
@@ -293,7 +300,8 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
                                      times.wallClockTime,
                                      sessionInfo,
                                      stmtId,
-                                     oplogLink);
+                                     oplogLink,
+                                     OplogSlot());
     return times;
 }
 
@@ -325,7 +333,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     OplogSlot());
     } else {
         logOperation(opCtx,
                      "i",
@@ -337,7 +346,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     OplogSlot());
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -561,14 +571,16 @@ void OpObserverImpl::onInternalOpMessage(OperationContext* opCtx,
                  getWallClockTimeForOpLog(opCtx),
                  {},
                  kUninitializedStmtId,
-                 {});
+                 {},
+                 OplogSlot());
 }
 
 void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                                         Collection* coll,
                                         const NamespaceString& collectionName,
                                         const CollectionOptions& options,
-                                        const BSONObj& idIndex) {
+                                        const BSONObj& idIndex,
+                                        const OplogSlot& createOpTime) {
     const auto cmdNss = collectionName.getCommandNS();
 
     BSONObjBuilder b;
@@ -604,7 +616,8 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     createOpTime);
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -650,7 +663,8 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     OplogSlot());
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -687,7 +701,8 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
                  getWallClockTimeForOpLog(opCtx),
                  {},
                  kUninitializedStmtId,
-                 {});
+                 {},
+                 OplogSlot());
 
     uassert(
         50714, "dropping the admin database is not allowed.", dbName != NamespaceString::kAdminDb);
@@ -720,7 +735,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     OplogSlot());
     }
 
     uassert(50715,
@@ -760,7 +776,8 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                  getWallClockTimeForOpLog(opCtx),
                  {},
                  kUninitializedStmtId,
-                 {});
+                 {},
+                 OplogSlot());
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
@@ -795,7 +812,8 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                  getWallClockTimeForOpLog(opCtx),
                  {},
                  kUninitializedStmtId,
-                 {});
+                 {},
+                 OplogSlot());
 
     return {};
 }
@@ -872,7 +890,8 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     OplogSlot());
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())

@@ -116,10 +116,11 @@ public:
                             Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
-                            const BSONObj& idIndex) override {
+                            const BSONObj& idIndex,
+                            const OplogSlot& createOpTime) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onCreateCollection(opCtx, coll, collectionName, options, idIndex);
+            o->onCreateCollection(opCtx, coll, collectionName, options, idIndex, createOpTime);
     }
 
     void onCollMod(OperationContext* const opCtx,

@@ -126,6 +126,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
  * oplogLink this contains the timestamp that points to the previous write that will be
  *   linked via prevTs, and the timestamps of the oplog entry that contains the document
  *   before/after update was applied. The timestamps are ignored if isNull() is true.
+ * oplogSlot If non-null, use this reserved oplog slot instead of a new one.
  *
  * Returns the optime of the oplog entry written to the oplog.
  * Returns a null optime if oplog was not modified.
@@ -140,7 +141,8 @@ OpTime logOp(OperationContext* opCtx,
              Date_t wallClockTime,
              const OperationSessionInfo& sessionInfo,
              StmtId stmtId,
-             const OplogLink& oplogLink);
+             const OplogLink& oplogLink,
+             const OplogSlot& oplogSlot);
 
 // Flush out the cached pointer to the oplog.
 // Used by the closeDatabase command to ensure we don't cache closed things.
