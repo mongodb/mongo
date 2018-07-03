@@ -211,7 +211,6 @@ functions:
       directory: ${git_project_directory|src}
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
-        rocksdb: ${rocksdb_rev}
 
   "fetch artifacts" : &fetch_artifacts
     command: s3.get
@@ -474,19 +473,6 @@ functions:
             rm -r mongodb*/*.$file_ext 2>/dev/null || true
         done
         rm mongo-debugsymbols.tgz 2>/dev/null || true
-
-  "build rocksdb" :
-    command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        set -o verbose
-        if [ "${build_rocksdb|}" = "true" ]; then
-        rm -rf rocksdb
-        git clone https://github.com/facebook/rocksdb.git
-        cd rocksdb
-        make USE_RTTI=1 CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ static_lib
-        fi
 
   "fetch and build OpenSSL" :
     command: shell.exec
@@ -2292,7 +2278,6 @@ tasks:
     - func: "set up credentials"
     - func: "fetch and build OpenSSL"
     - func: "build new tools" # noop if ${newtools} is not "true"
-    - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
     - func: "apply compile expansions"
@@ -2438,7 +2423,6 @@ tasks:
     - func: "set up credentials"
     - func: "fetch and build OpenSSL"
     - func: "build new tools" # noop if ${newtools} is not "true"
-    - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions.
     - func: "apply compile expansions"
@@ -5344,11 +5328,6 @@ tasks:
 modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: v3.6
-
-- name: rocksdb
-  repo: git@github.com:mongodb-partners/mongo-rocks.git
   prefix: src/mongo/db/modules
   branch: v3.6
 
@@ -9085,28 +9064,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough_WT
-
-- name: ubuntu1404-rocksdb
-  display_name: Ubuntu 14.04 (RocksDB)
-  modules:
-  - rocksdb
-  run_on:
-  - ubuntu1404-test
-  batchtime: 120960 # 12 weeks
-  expansions:
-    build_rocksdb: true
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb --variables-files=etc/scons/mongodbtoolchain_gcc.vars --runtime-hardening=off
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --storageEngine=rocksdb
-    use_scons_cache: true
-    build_mongoreplay: true
-  stepback: false
-  tasks:
-  - name: compile
-    distros:
-    - ubuntu1404-build
-  - name: dbtest
-  - name: jsCore
 
 ###########################################
 #     Experimental buildvariants          #
