@@ -49,9 +49,6 @@ void aggregateResults(const std::vector<AsyncRequestsSender::Response>& response
     long long indexSize = 0;
     long long fileSize = 0;
 
-    long long freeListNum = 0;
-    long long freeListSize = 0;
-
     for (const auto& response : responses) {
         invariant(response.swResponse.getStatus().isOK());
         const BSONObj& b = response.swResponse.getValue().data;
@@ -64,11 +61,6 @@ void aggregateResults(const std::vector<AsyncRequestsSender::Response>& response
         indexes += b["indexes"].numberLong();
         indexSize += b["indexSize"].numberLong();
         fileSize += b["fileSize"].numberLong();
-
-        if (b["extentFreeList"].isABSONObj()) {
-            freeListNum += b["extentFreeList"].Obj()["num"].numberLong();
-            freeListSize += b["extentFreeList"].Obj()["totalSize"].numberLong();
-        }
     }
 
     // TODO SERVER-26110: Add aggregated 'collections' and 'views' metrics.
@@ -83,13 +75,6 @@ void aggregateResults(const std::vector<AsyncRequestsSender::Response>& response
     output.appendNumber("indexes", indexes);
     output.appendNumber("indexSize", indexSize);
     output.appendNumber("fileSize", fileSize);
-
-    {
-        BSONObjBuilder extentFreeList(output.subobjStart("extentFreeList"));
-        extentFreeList.appendNumber("num", freeListNum);
-        extentFreeList.appendNumber("totalSize", freeListSize);
-        extentFreeList.done();
-    }
 }
 
 class DBStatsCmd : public ErrmsgCommandDeprecated {

@@ -52,13 +52,6 @@
         assert(dbStats.hasOwnProperty("fsTotalSize"), tojson(dbStats));
     }
 
-    // Confirm extentFreeList field existence. Displayed for mongoS regardless of storage engine.
-    if (isMongoS) {
-        assert(dbStats.hasOwnProperty("extentFreeList"), tojson(dbStats));
-        assert(dbStats.extentFreeList.hasOwnProperty("num"), tojson(dbStats));
-        assert(dbStats.extentFreeList.hasOwnProperty("totalSize"), tojson(dbStats));
-    }
-
     // Confirm collection and view counts on mongoD
     if (!isMongoS) {
         assert.eq(testDB.getName(), dbStats.db, tojson(dbStats));
