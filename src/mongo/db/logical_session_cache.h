@@ -69,7 +69,7 @@ public:
      * should only be used when starting new sessions and should not be used to
      * insert records for existing sessions.
      */
-    virtual void startSession(OperationContext* opCtx, LogicalSessionRecord record) = 0;
+    virtual Status startSession(OperationContext* opCtx, LogicalSessionRecord record) = 0;
 
     /**
      * Refresh the given sessions. Updates the timestamps of these records in
@@ -84,7 +84,7 @@ public:
      * Vivifies the session in the cache. I.e. creates it if it isn't there, updates last use if it
      * is.
      */
-    virtual void vivify(OperationContext* opCtx, const LogicalSessionId& lsid) = 0;
+    virtual Status vivify(OperationContext* opCtx, const LogicalSessionId& lsid) = 0;
 
     /**
      * enqueues LogicalSessionIds for removal during the next _refresh()
