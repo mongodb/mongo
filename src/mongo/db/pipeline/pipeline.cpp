@@ -50,9 +50,17 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+/**
+ * Enabling the disablePipelineOptimization fail point will stop the aggregate command from
+ * attempting to optimize the pipeline or the pipeline stages. Neither DocumentSource::optimizeAt()
+ * nor DocumentSource::optimize() will be attempted.
+ */
+MONGO_FAIL_POINT_DEFINE(disablePipelineOptimization);
 
 using boost::intrusive_ptr;
 using std::endl;
@@ -241,6 +249,11 @@ void Pipeline::validateCommon() const {
 }
 
 void Pipeline::optimizePipeline() {
+    // If the disablePipelineOptimization failpoint is enabled, the pipeline won't be optimized.
+    if (MONGO_FAIL_POINT(disablePipelineOptimization)) {
+        return;
+    }
+
     SourceContainer optimizedSources;
 
     SourceContainer::iterator itr = _sources.begin();

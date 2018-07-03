@@ -40,8 +40,15 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+/**
+ * Enabling the disableMatchExpressionOptimization fail point will stop match expressions from
+ * being optimized.
+ */
+MONGO_FAIL_POINT_DECLARE(disableMatchExpressionOptimization);
 
 class CollatorInterface;
 class MatchExpression;
@@ -135,6 +142,12 @@ public:
      * The value of 'expression' must not be nullptr.
      */
     static std::unique_ptr<MatchExpression> optimize(std::unique_ptr<MatchExpression> expression) {
+        // If the disableMatchExpressionOptimization failpoint is enabled, optimizations are skipped
+        // and the expression is left unmodified.
+        if (MONGO_FAIL_POINT(disableMatchExpressionOptimization)) {
+            return expression;
+        }
+
         auto optimizer = expression->getOptimizer();
         return optimizer(std::move(expression));
     }
