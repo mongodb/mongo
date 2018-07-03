@@ -193,16 +193,6 @@
             assert.eq(cst.getOneChange(aggCursor).operationType, "insert");
         }
 
-        // Dropping a collection should generate a 'drop' entry.
-        assertDropCollection(testDB, collToInvalidate.getName());
-        cst.assertNextChangesEqual({
-            cursor: aggCursor,
-            expectedChanges: [{
-                operationType: "drop",
-                ns: {db: testDB.getName(), coll: collToInvalidate.getName()}
-            }]
-        });
-
         // Operations on internal "system" collections should be filtered out and not included in
         // the change stream.
         aggCursor = cst.startWatchingAllChangesForCluster();

@@ -75,9 +75,6 @@
     ];
     const dropDbChanges = cst.assertNextChangesEqual(
         {cursor: resumeCursor, expectedChanges: expectedChangesAfterFirstDrop});
-    const resumeTokenDrop = dropDbChanges[0]._id;
-    const resumeTokenDropDb = dropDbChanges[1]._id;
-    const resumeTokenInvalidate = dropDbChanges[2]._id;
 
     // Resume from the first collection drop.
     resumeCursor = cst.startWatchingChanges({
@@ -89,39 +86,41 @@
 
     // Resume from the second collection drop.
     resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: resumeTokenDrop}}],
+        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[0]._id}}],
         collection: 1,
     });
     cst.assertNextChangesEqual(
         {cursor: resumeCursor, expectedChanges: expectedChangesAfterFirstDrop.slice(1)});
 
     // Recreate the test collection.
-    assert.writeOK(coll.insert({_id: "after recreate"}));
-
-    let expectedInsert = [{
-        operationType: "insert",
-        ns: {db: testDB.getName(), coll: coll.getName()},
-        fullDocument: {_id: "after recreate"},
-        documentKey: {_id: "after recreate"}
-    }];
+    coll = assertCreateCollection(testDB, coll.getName());
+    assert.writeOK(coll.insert({_id: 0}));
 
     // Test resuming from the 'dropDatabase' entry.
+    // TODO SERVER-34789: Resuming from the 'dropDatabase' should return a single invalidate
+    // notification.
     resumeCursor = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {resumeAfter: resumeTokenDropDb}}],
+        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[1]._id}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
-    cst.assertNextChangesEqual(
-        {cursor: resumeCursor, expectedChanges: [{operationType: "invalidate"}]});
+    let change = cst.getOneChange(resumeCursor);
+    assert.eq(change.operationType, "insert", tojson(change));
+    assert.eq(change.fullDocument, {_id: 0}, tojson(change));
+    assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()}, tojson(change));
 
-    // Test resuming from the 'invalidate' entry using 'resumeAfter'.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: 1,
-        pipeline: [{$changeStream: {resumeAfter: resumeTokenInvalidate}}],
-        cursor: {},
-        collation: {locale: "simple"},
-    }),
-                                 ErrorCodes.InvalidResumeToken);
+    // Test resuming from the 'invalidate' entry.
+    // TODO SERVER-34789: Resuming from an invalidate should error or return an invalidate
+    // notification.
+    resumeCursor = cst.startWatchingChanges({
+        pipeline: [{$changeStream: {resumeAfter: dropDbChanges[2]._id}}],
+        collection: 1,
+        aggregateOptions: {cursor: {batchSize: 0}},
+    });
+    change = cst.getOneChange(resumeCursor);
+    assert.eq(change.operationType, "insert", tojson(change));
+    assert.eq(change.fullDocument, {_id: 0}, tojson(change));
+    assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()}, tojson(change));
 
     cst.cleanUp();
 })();

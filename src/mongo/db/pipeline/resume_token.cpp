@@ -105,14 +105,13 @@ ResumeToken::ResumeToken(const Document& resumeDoc) {
 }
 
 // We encode the resume token as a KeyString with the sequence:
-// clusterTime, version, applyOpsIndex, fromInvalidate, uuid, documentKey
+// clusterTime, version, applyOpsIndex, uuid, documentKey
 // Only the clusterTime is required.
 ResumeToken::ResumeToken(const ResumeTokenData& data) {
     BSONObjBuilder builder;
     builder.append("", data.clusterTime);
     builder.append("", data.version);
     builder.appendNumber("", data.applyOpsIndex);
-    builder.appendBool("", data.fromInvalidate);
     uassert(50788,
             "Unexpected resume token with a documentKey but no UUID",
             data.uuid || data.documentKey.missing());
@@ -212,13 +211,6 @@ ResumeTokenData ResumeToken::getData() const {
                     applyOpsInd >= 0);
             result.applyOpsIndex = applyOpsInd;
 
-            uassert(50872, "Resume Token does not contain fromInvalidate", i.more());
-            auto fromInvalidate = i.next();
-            uassert(50870,
-                    "Resume Token fromInvalidate is not a boolean.",
-                    fromInvalidate.type() == BSONType::Bool);
-            result.fromInvalidate = ResumeTokenData::FromInvalidate(fromInvalidate.boolean());
-
             // The the UUID and documentKey are not required.
             if (!i.more()) {
                 return result;
@@ -233,7 +225,6 @@ ResumeTokenData ResumeToken::getData() const {
         }
         default: { MONGO_UNREACHABLE }
     }
-
     uassert(40646, "invalid oversized resume token", !i.more());
     return result;
 }

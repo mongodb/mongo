@@ -40,14 +40,6 @@
 namespace mongo {
 
 struct ResumeTokenData {
-    /**
-     * Flag to indicate if the resume token is from an invalidate notification.
-     */
-    enum FromInvalidate : bool {
-        kFromInvalidate = true,
-        kNotFromInvalidate = false,
-    };
-
     ResumeTokenData(){};
     ResumeTokenData(Timestamp clusterTimeIn,
                     int versionIn,
@@ -70,10 +62,6 @@ struct ResumeTokenData {
     size_t applyOpsIndex = 0;
     Value documentKey;
     boost::optional<UUID> uuid;
-    // Flag to indicate that this resume token is from an "invalidate" entry. This will not be set
-    // on a token from a command that *would* invalidate a change stream, but rather the invalidate
-    // notification itself.
-    FromInvalidate fromInvalidate = FromInvalidate::kNotFromInvalidate;
 };
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
