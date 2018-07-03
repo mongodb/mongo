@@ -39,6 +39,12 @@ structs:
       transactionsCollectionWriteCount:
         type: long
         default: 0
+      currentActive:
+        type: long
+        default: 0
+      currentInactive:
+        type: long
+        default: 0
       currentOpen:
         type: long
         default: 0
