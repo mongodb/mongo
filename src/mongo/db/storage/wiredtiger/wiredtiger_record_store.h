@@ -268,10 +268,6 @@ public:
      */
     void reclaimOplog(OperationContext* opCtx, Timestamp persistedTimestamp);
 
-    int64_t cappedDeleteAsNeeded(OperationContext* opCtx, const RecordId& justInserted);
-
-    int64_t cappedDeleteAsNeeded_inlock(OperationContext* opCtx, const RecordId& justInserted);
-
     // Returns false if the oplog was dropped while waiting for a deletion request.
     bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx);
 
@@ -339,6 +335,14 @@ private:
     void _changeNumRecords(OperationContext* opCtx, int64_t diff);
     void _increaseDataSize(OperationContext* opCtx, int64_t amount);
 
+    /**
+     * Delete records from this record store as needed while _cappedMaxSize or _cappedMaxDocs is
+     * exceeded.
+     *
+     * _inlock version to be called once a lock has been acquired.
+     */
+    int64_t _cappedDeleteAsNeeded(OperationContext* opCtx, const RecordId& justInserted);
+    int64_t _cappedDeleteAsNeeded_inlock(OperationContext* opCtx, const RecordId& justInserted);
 
     const std::string _uri;
     const uint64_t _tableId;  // not persisted

@@ -893,8 +893,8 @@ bool WiredTigerRecordStore::cappedAndNeedDelete() const {
     return false;
 }
 
-int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx,
-                                                    const RecordId& justInserted) {
+int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded(OperationContext* opCtx,
+                                                     const RecordId& justInserted) {
     // If the collection does not need size adjustment, then we are in replication recovery and
     // replaying operations we've already played. This may occur after rollback or after a shutdown.
     // Any inserts beyond the stable timestamp have been undone, but any documents deleted from
@@ -953,7 +953,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx,
         }
     }
 
-    return cappedDeleteAsNeeded_inlock(opCtx, justInserted);
+    return _cappedDeleteAsNeeded_inlock(opCtx, justInserted);
 }
 
 boost::optional<Timestamp> WiredTigerRecordStore::getLastStableCheckpointTimestamp() const {
@@ -992,8 +992,8 @@ void WiredTigerRecordStore::_positionAtFirstRecordId(OperationContext* opCtx,
     }
 }
 
-int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opCtx,
-                                                           const RecordId& justInserted) {
+int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* opCtx,
+                                                            const RecordId& justInserted) {
     // we do this in a side transaction in case it aborts
     WiredTigerRecoveryUnit* realRecoveryUnit =
         checked_cast<WiredTigerRecoveryUnit*>(opCtx->releaseRecoveryUnit());
@@ -1318,7 +1318,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         _oplogStones->updateCurrentStoneAfterInsertOnCommit(
             opCtx, totalLength, highestId, nRecords);
     } else {
-        cappedDeleteAsNeeded(opCtx, highestId);
+        _cappedDeleteAsNeeded(opCtx, highestId);
     }
 
     return Status::OK();
@@ -1428,7 +1428,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
 
     _increaseDataSize(opCtx, len - old_length);
     if (!_oplogStones) {
-        cappedDeleteAsNeeded(opCtx, id);
+        _cappedDeleteAsNeeded(opCtx, id);
     }
 
     return Status::OK();
@@ -2014,7 +2014,7 @@ bool WiredTigerRecordStoreCursorBase::restore() {
         return true;  // Landed right where we left off.
 
     if (_rs._isCapped) {
-        // Doc was deleted either by cappedDeleteAsNeeded() or cappedTruncateAfter().
+        // Doc was deleted either by _cappedDeleteAsNeeded() or cappedTruncateAfter().
         // It is important that we error out in this case so that consumers don't
         // silently get 'holes' when scanning capped collections. We don't make
         // this guarantee for normal collections so it is ok to skip ahead in that case.
