@@ -197,7 +197,7 @@ public:
     }
 
     virtual bool isW() const {
-        MONGO_UNREACHABLE;
+        return true;
     }
 
     virtual bool isR() const {

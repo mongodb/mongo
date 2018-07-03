@@ -161,7 +161,8 @@ void UUIDCatalog::onCloseDatabase(Database* db) {
     }
 }
 
-void UUIDCatalog::onCloseCatalog() {
+void UUIDCatalog::onCloseCatalog(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isW());
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     invariant(!_shadowCatalog);
     _shadowCatalog.emplace();
@@ -169,7 +170,8 @@ void UUIDCatalog::onCloseCatalog() {
         _shadowCatalog->insert({entry.first, entry.second->ns()});
 }
 
-void UUIDCatalog::onOpenCatalog() {
+void UUIDCatalog::onOpenCatalog(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isW());
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     invariant(_shadowCatalog);
     _shadowCatalog.reset();
