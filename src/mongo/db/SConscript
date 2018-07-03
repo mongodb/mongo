@@ -213,6 +213,16 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='curop_test',
+    source=[
+        'curop_test.cpp',
+    ],
+    LIBDEPS=[
+        'curop',
+    ],
+)
+
 env.Library(
     target='curop_failpoint_helpers',
     source=[

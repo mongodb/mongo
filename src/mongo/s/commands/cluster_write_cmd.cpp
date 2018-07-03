@@ -273,22 +273,22 @@ private:
                 for (size_t i = 0; i < numAttempts; ++i) {
                     globalOpCounters.gotInsert();
                 }
-                debug.ninserted = response.getN();
+                debug.additiveMetrics.ninserted = response.getN();
                 break;
             case BatchedCommandRequest::BatchType_Update:
                 for (size_t i = 0; i < numAttempts; ++i) {
                     globalOpCounters.gotUpdate();
                 }
                 debug.upsert = response.isUpsertDetailsSet();
-                debug.nMatched =
+                debug.additiveMetrics.nMatched =
                     response.getN() - (debug.upsert ? response.sizeUpsertDetails() : 0);
-                debug.nModified = response.getNModified();
+                debug.additiveMetrics.nModified = response.getNModified();
                 break;
             case BatchedCommandRequest::BatchType_Delete:
                 for (size_t i = 0; i < numAttempts; ++i) {
                     globalOpCounters.gotDelete();
                 }
-                debug.ndeleted = response.getN();
+                debug.additiveMetrics.ndeleted = response.getN();
                 break;
         }
 

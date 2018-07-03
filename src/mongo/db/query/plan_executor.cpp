@@ -605,7 +605,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
             if (id == WorkingSet::INVALID_ID) {
                 if (!_yieldPolicy->canAutoYield())
                     throw WriteConflictException();
-                CurOp::get(_opCtx)->debug().writeConflicts++;
+                CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
                 writeConflictsInARow++;
                 WriteConflictException::logAndBackoff(
                     writeConflictsInARow, "plan execution", _nss.ns());

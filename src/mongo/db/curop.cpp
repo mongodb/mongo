@@ -496,6 +496,9 @@ StringData getProtoString(int op) {
 #define OPDEBUG_TOSTRING_HELP_BOOL(x) \
     if (x)                            \
     s << " " #x ":" << (x)
+#define OPDEBUG_TOSTRING_HELP_OPTIONAL(x, y) \
+    if (y)                                   \
+    s << " " x ":" << (*y)
 
 string OpDebug::report(Client* client,
                        const CurOp& curop,
@@ -553,38 +556,24 @@ string OpDebug::report(Client* client,
     OPDEBUG_TOSTRING_HELP(ntoskip);
     OPDEBUG_TOSTRING_HELP_BOOL(exhaust);
 
-    OPDEBUG_TOSTRING_HELP(keysExamined);
-    OPDEBUG_TOSTRING_HELP(docsExamined);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
     OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
     OPDEBUG_TOSTRING_HELP_BOOL(fromMultiPlanner);
     OPDEBUG_TOSTRING_HELP_BOOL(replanned);
-    OPDEBUG_TOSTRING_HELP(nMatched);
-    OPDEBUG_TOSTRING_HELP(nModified);
-    OPDEBUG_TOSTRING_HELP(ninserted);
-    OPDEBUG_TOSTRING_HELP(ndeleted);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nMatched", additiveMetrics.nMatched);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nModified", additiveMetrics.nModified);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("ninserted", additiveMetrics.ninserted);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("ndeleted", additiveMetrics.ndeleted);
     OPDEBUG_TOSTRING_HELP_BOOL(fastmodinsert);
     OPDEBUG_TOSTRING_HELP_BOOL(upsert);
     OPDEBUG_TOSTRING_HELP_BOOL(cursorExhausted);
 
-    if (nmoved > 0) {
-        s << " nmoved:" << nmoved;
-    }
-
-    if (keysInserted > 0) {
-        s << " keysInserted:" << keysInserted;
-    }
-
-    if (keysDeleted > 0) {
-        s << " keysDeleted:" << keysDeleted;
-    }
-
-    if (prepareReadConflicts > 0) {
-        s << " prepareReadConflicts:" << prepareReadConflicts;
-    }
-
-    if (writeConflicts > 0) {
-        s << " writeConflicts:" << writeConflicts;
-    }
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nmoved", additiveMetrics.nmoved);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("keysInserted", additiveMetrics.keysInserted);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("prepareReadConflicts", additiveMetrics.prepareReadConflicts);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("writeConflicts", additiveMetrics.writeConflicts);
 
     s << " numYields:" << curop.numYields();
     OPDEBUG_TOSTRING_HELP(nreturned);
@@ -623,6 +612,9 @@ string OpDebug::report(Client* client,
 #define OPDEBUG_APPEND_BOOL(x) \
     if (x)                     \
     b.appendBool(#x, (x))
+#define OPDEBUG_APPEND_OPTIONAL(x, y) \
+    if (y)                            \
+    b.appendNumber(x, (*y))
 
 void OpDebug::append(const CurOp& curop,
                      const SingleThreadedLockStats& lockStats,
@@ -645,38 +637,24 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_NUMBER(cursorid);
     OPDEBUG_APPEND_BOOL(exhaust);
 
-    OPDEBUG_APPEND_NUMBER(keysExamined);
-    OPDEBUG_APPEND_NUMBER(docsExamined);
+    OPDEBUG_APPEND_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
+    OPDEBUG_APPEND_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
     OPDEBUG_APPEND_BOOL(hasSortStage);
     OPDEBUG_APPEND_BOOL(fromMultiPlanner);
     OPDEBUG_APPEND_BOOL(replanned);
-    OPDEBUG_APPEND_NUMBER(nMatched);
-    OPDEBUG_APPEND_NUMBER(nModified);
-    OPDEBUG_APPEND_NUMBER(ninserted);
-    OPDEBUG_APPEND_NUMBER(ndeleted);
+    OPDEBUG_APPEND_OPTIONAL("nMatched", additiveMetrics.nMatched);
+    OPDEBUG_APPEND_OPTIONAL("nModified", additiveMetrics.nModified);
+    OPDEBUG_APPEND_OPTIONAL("ninserted", additiveMetrics.ninserted);
+    OPDEBUG_APPEND_OPTIONAL("ndeleted", additiveMetrics.ndeleted);
     OPDEBUG_APPEND_BOOL(fastmodinsert);
     OPDEBUG_APPEND_BOOL(upsert);
     OPDEBUG_APPEND_BOOL(cursorExhausted);
 
-    if (nmoved > 0) {
-        b.appendNumber("nmoved", nmoved);
-    }
-
-    if (keysInserted > 0) {
-        b.appendNumber("keysInserted", keysInserted);
-    }
-
-    if (keysDeleted > 0) {
-        b.appendNumber("keysDeleted", keysDeleted);
-    }
-
-    if (prepareReadConflicts > 0) {
-        b.appendNumber("prepareReadConflicts", prepareReadConflicts);
-    }
-
-    if (writeConflicts > 0) {
-        b.appendNumber("writeConflicts", writeConflicts);
-    }
+    OPDEBUG_APPEND_OPTIONAL("nmoved", additiveMetrics.nmoved);
+    OPDEBUG_APPEND_OPTIONAL("keysInserted", additiveMetrics.keysInserted);
+    OPDEBUG_APPEND_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
+    OPDEBUG_APPEND_OPTIONAL("prepareReadConflicts", additiveMetrics.prepareReadConflicts);
+    OPDEBUG_APPEND_OPTIONAL("writeConflicts", additiveMetrics.writeConflicts);
 
     b.appendNumber("numYield", curop.numYields());
     OPDEBUG_APPEND_NUMBER(nreturned);
@@ -711,11 +689,84 @@ void OpDebug::append(const CurOp& curop,
 }
 
 void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
-    keysExamined = planSummaryStats.totalKeysExamined;
-    docsExamined = planSummaryStats.totalDocsExamined;
+    additiveMetrics.keysExamined = planSummaryStats.totalKeysExamined;
+    additiveMetrics.docsExamined = planSummaryStats.totalDocsExamined;
     hasSortStage = planSummaryStats.hasSortStage;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
     replanned = planSummaryStats.replanned;
+}
+
+namespace {
+
+/**
+ * Adds two boost::optional long longs together. Returns boost::none if both 'lhs' and 'rhs' are
+ * uninitialized, or the sum of 'lhs' and 'rhs' if they are both initialized. Returns 'lhs' if only
+ * 'rhs' is uninitialized and vice-versa.
+ */
+boost::optional<long long> addOptionalLongs(const boost::optional<long long>& lhs,
+                                            const boost::optional<long long>& rhs) {
+    if (!rhs) {
+        return lhs;
+    }
+    return lhs ? (*lhs + *rhs) : rhs;
+}
+}  // namespace
+
+void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
+    keysExamined = addOptionalLongs(keysExamined, otherMetrics.keysExamined);
+    docsExamined = addOptionalLongs(docsExamined, otherMetrics.docsExamined);
+    nMatched = addOptionalLongs(nMatched, otherMetrics.nMatched);
+    nModified = addOptionalLongs(nModified, otherMetrics.nModified);
+    ninserted = addOptionalLongs(ninserted, otherMetrics.ninserted);
+    ndeleted = addOptionalLongs(ndeleted, otherMetrics.ndeleted);
+    nmoved = addOptionalLongs(nmoved, otherMetrics.nmoved);
+    keysInserted = addOptionalLongs(keysInserted, otherMetrics.keysInserted);
+    keysDeleted = addOptionalLongs(keysDeleted, otherMetrics.keysDeleted);
+    prepareReadConflicts =
+        addOptionalLongs(prepareReadConflicts, otherMetrics.prepareReadConflicts);
+    writeConflicts = addOptionalLongs(writeConflicts, otherMetrics.writeConflicts);
+}
+
+void OpDebug::AdditiveMetrics::incrementWriteConflicts(long long n) {
+    if (!writeConflicts) {
+        writeConflicts = 0;
+    }
+    *writeConflicts += n;
+}
+
+void OpDebug::AdditiveMetrics::incrementKeysInserted(long long n) {
+    if (!keysInserted) {
+        keysInserted = 0;
+    }
+    *keysInserted += n;
+}
+
+void OpDebug::AdditiveMetrics::incrementKeysDeleted(long long n) {
+    if (!keysDeleted) {
+        keysDeleted = 0;
+    }
+    *keysDeleted += n;
+}
+
+void OpDebug::AdditiveMetrics::incrementNmoved(long long n) {
+    if (!nmoved) {
+        nmoved = 0;
+    }
+    *nmoved += n;
+}
+
+void OpDebug::AdditiveMetrics::incrementNinserted(long long n) {
+    if (!ninserted) {
+        ninserted = 0;
+    }
+    *ninserted += n;
+}
+
+void OpDebug::AdditiveMetrics::incrementPrepareReadConflicts(long long n) {
+    if (!prepareReadConflicts) {
+        prepareReadConflicts = 0;
+    }
+    *prepareReadConflicts += n;
 }
 
 }  // namespace mongo

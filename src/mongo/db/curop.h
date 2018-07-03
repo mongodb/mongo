@@ -50,6 +50,69 @@ struct PlanSummaryStats;
 /* lifespan is different than CurOp because of recursives with DBDirectClient */
 class OpDebug {
 public:
+    /**
+     * Holds counters for execution statistics that are meaningful both for multi-statement
+     * transactions and for individual operations outside of a transaction.
+     */
+    class AdditiveMetrics {
+    public:
+        /**
+         * Adds all the fields of another AdditiveMetrics object together with the fields of this
+         * AdditiveMetrics instance.
+         */
+        void add(const AdditiveMetrics& otherMetrics);
+
+        /**
+         * Increments writeConflicts by n.
+         */
+        void incrementWriteConflicts(long long n);
+
+        /**
+         * Increments keysInserted by n.
+         */
+        void incrementKeysInserted(long long n);
+
+        /**
+         * Increments keysDeleted by n.
+         */
+        void incrementKeysDeleted(long long n);
+
+        /**
+         * Increments nmoved by n.
+         */
+        void incrementNmoved(long long n);
+
+        /**
+         * Increments ninserted by n.
+         */
+        void incrementNinserted(long long n);
+
+        /**
+         * Increments prepareReadConflicts by n.
+         */
+        void incrementPrepareReadConflicts(long long n);
+
+        boost::optional<long long> keysExamined;
+        boost::optional<long long> docsExamined;
+
+        // Number of records that match the query.
+        boost::optional<long long> nMatched;
+        // Number of records written (no no-ops).
+        boost::optional<long long> nModified;
+        boost::optional<long long> ninserted;
+        boost::optional<long long> ndeleted;
+
+        // Updates resulted in a move (moves are expensive).
+        boost::optional<long long> nmoved;
+        // Number of index keys inserted.
+        boost::optional<long long> keysInserted;
+        // Number of index keys removed.
+        boost::optional<long long> keysDeleted;
+        // Number of read conflicts caused by a prepared transaction.
+        boost::optional<long long> prepareReadConflicts;
+        boost::optional<long long> writeConflicts;
+    };
+
     OpDebug() = default;
 
     std::string report(Client* client,
@@ -88,10 +151,6 @@ public:
     long long ntoskip{-1};
     bool exhaust{false};
 
-    // debugging/profile info
-    long long keysExamined{-1};
-    long long docsExamined{-1};
-
     bool hasSortStage{false};  // true if the query plan involves an in-memory sort
 
     // True if the plan came from the multi-planner (not from the plan cache and not a query with a
@@ -101,22 +160,10 @@ public:
     // True if a replan was triggered during the execution of this operation.
     bool replanned{false};
 
-    long long nMatched{-1};   // number of records that match the query
-    long long nModified{-1};  // number of records written (no no-ops)
-    long long ninserted{-1};
-    long long ndeleted{-1};
     bool fastmodinsert{false};  // upsert of an $operation. builds a default object
     bool upsert{false};         // true if the update actually did an insert
     bool cursorExhausted{
         false};  // true if the cursor has been closed at end a find/getMore operation
-
-    // The following metrics are initialized with 0 rather than -1 in order to simplify use by the
-    // CRUD path.
-    long long nmoved{0};                // updates resulted in a move (moves are expensive)
-    long long keysInserted{0};          // Number of index keys inserted.
-    long long keysDeleted{0};           // Number of index keys removed.
-    long long prepareReadConflicts{0};  // Number of read conflicts caused by a prepared transaction
-    long long writeConflicts{0};
 
     BSONObj execStats;  // Owned here.
 
@@ -130,6 +177,9 @@ public:
 
     // Shard targeting info.
     int nShards{-1};
+
+    // Stores additive metrics.
+    AdditiveMetrics additiveMetrics;
 };
 
 /**

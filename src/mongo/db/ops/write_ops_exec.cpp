@@ -290,7 +290,7 @@ SingleWriteResult createIndex(OperationContext* opCtx,
     // Unlike normal inserts, it is not an error to "insert" a duplicate index.
     long long n =
         cmdResult["numIndexesAfter"].numberInt() - cmdResult["numIndexesBefore"].numberInt();
-    CurOp::get(opCtx)->debug().ninserted += n;
+    CurOp::get(opCtx)->debug().additiveMetrics.incrementNinserted(n);
 
     SingleWriteResult result;
     result.setN(n);
@@ -410,7 +410,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             result.setN(1);
 
             std::fill_n(std::back_inserter(out->results), batch.size(), std::move(result));
-            curOp.debug().ninserted += batch.size();
+            curOp.debug().additiveMetrics.incrementNinserted(batch.size());
             return true;
         }
     } catch (const DBException&) {
@@ -441,7 +441,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     SingleWriteResult result;
                     result.setN(1);
                     out->results.emplace_back(std::move(result));
-                    curOp.debug().ninserted++;
+                    curOp.debug().additiveMetrics.incrementNinserted(1);
                 } catch (...) {
                     // Release the lock following any error if we are not in multi-statement
                     // transaction. Among other things, this ensures that we don't sleep in the WCE
@@ -505,7 +505,7 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
         curOp.setNS_inlock(wholeOp.getNamespace().ns());
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
         curOp.ensureStarted();
-        curOp.debug().ninserted = 0;
+        curOp.debug().additiveMetrics.ninserted = 0;
     }
 
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
@@ -762,7 +762,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         curOp.ensureStarted();
     }
 
-    curOp.debug().ndeleted = 0;
+    curOp.debug().additiveMetrics.ndeleted = 0;
 
     DeleteRequest request(ns);
     request.setQuery(op.getQ());
@@ -802,7 +802,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     uassertStatusOK(exec->executePlan());
     long long n = DeleteStage::getNumDeleted(*exec);
-    curOp.debug().ndeleted = n;
+    curOp.debug().additiveMetrics.ndeleted = n;
 
     PlanSummaryStats summary;
     Explain::getSummaryStats(*exec, &summary);

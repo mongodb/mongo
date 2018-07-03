@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional/optional_io.hpp>
 #include <string>
 #include <vector>
 
@@ -132,14 +133,14 @@ TEST_F(DConcurrencyTestFixture, WriteConflictRetryRetriesFunctionOnWriteConflict
     auto opCtx = makeOperationContext();
     opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto&& opDebug = CurOp::get(opCtx.get())->debug();
-    ASSERT_EQUALS(0LL, opDebug.writeConflicts);
+    ASSERT_EQUALS(boost::none, opDebug.additiveMetrics.writeConflicts);
     ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", "", [&opDebug] {
-                      if (opDebug.writeConflicts == 0LL) {
+                      if (!opDebug.additiveMetrics.writeConflicts) {
                           throw WriteConflictException();
                       }
                       return 100;
                   }));
-    ASSERT_EQUALS(1LL, opDebug.writeConflicts);
+    ASSERT_EQUALS(1LL, *opDebug.additiveMetrics.writeConflicts);
 }
 
 TEST_F(DConcurrencyTestFixture, WriteConflictRetryPropagatesNonWriteConflictException) {
