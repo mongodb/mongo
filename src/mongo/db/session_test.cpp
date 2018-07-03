@@ -2279,5 +2279,127 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldIncreaseUntilCommit) {
               timeInactiveSoFar);
 }
 
+namespace {
+
+/*
+ * Constructs a ClientMetadata BSONObj with the given application name.
+ */
+BSONObj constructClientMetadata(StringData appName) {
+    BSONObjBuilder builder;
+    ASSERT_OK(ClientMetadata::serializePrivate("driverName",
+                                               "driverVersion",
+                                               "osType",
+                                               "osName",
+                                               "osArchitecture",
+                                               "osVersion",
+                                               appName,
+                                               &builder));
+    return builder.obj();
+}
+}  // namespace
+
+TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponStash) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    // Create a ClientMetadata object and set it on ClientMetadataIsMasterState.
+    auto obj = constructClientMetadata("appName");
+    auto clientMetadata = ClientMetadata::parse(obj["client"]);
+    auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx()->getClient());
+    clientMetadataIsMasterState.setClientMetadata(opCtx()->getClient(),
+                                                  std::move(clientMetadata.getValue()));
+
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    session.stashTransactionResources(opCtx());
+
+    // LastClientInfo should have been set.
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->client, "");
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->connectionId, 0);
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->appName, "appName");
+    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo()->clientMetadata,
+                      obj.getField("client").Obj());
+
+    // Create another ClientMetadata object.
+    auto newObj = constructClientMetadata("newAppName");
+    auto newClientMetadata = ClientMetadata::parse(newObj["client"]);
+    clientMetadataIsMasterState.setClientMetadata(opCtx()->getClient(),
+                                                  std::move(newClientMetadata.getValue()));
+
+    session.unstashTransactionResources(opCtx(), "insert");
+    session.stashTransactionResources(opCtx());
+
+    // LastClientInfo's clientMetadata should have been updated to the new ClientMetadata object.
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->appName, "newAppName");
+    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo()->clientMetadata,
+                      newObj.getField("client").Obj());
+}
+
+TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponCommit) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    // Create a ClientMetadata object and set it on ClientMetadataIsMasterState.
+    auto obj = constructClientMetadata("appName");
+    auto clientMetadata = ClientMetadata::parse(obj["client"]);
+    auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx()->getClient());
+    clientMetadataIsMasterState.setClientMetadata(opCtx()->getClient(),
+                                                  std::move(clientMetadata.getValue()));
+
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+    // The transaction machinery cannot store an empty locker.
+    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+    session.commitTransaction(opCtx());
+
+    // LastClientInfo should have been set.
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->client, "");
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->connectionId, 0);
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->appName, "appName");
+    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo()->clientMetadata,
+                      obj.getField("client").Obj());
+}
+
+TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    // Create a ClientMetadata object and set it on ClientMetadataIsMasterState.
+    auto obj = constructClientMetadata("appName");
+    auto clientMetadata = ClientMetadata::parse(obj["client"]);
+
+    auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx()->getClient());
+    clientMetadataIsMasterState.setClientMetadata(opCtx()->getClient(),
+                                                  std::move(clientMetadata.getValue()));
+
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+    session.abortActiveTransaction(opCtx());
+
+    // LastClientInfo should have been set.
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->client, "");
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->connectionId, 0);
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->appName, "appName");
+    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo()->clientMetadata,
+                      obj.getField("client").Obj());
+}
+
 }  // namespace
 }  // namespace mongo

@@ -29,6 +29,8 @@
 #pragma once
 
 #include "mongo/db/curop.h"
+#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 
 namespace mongo {
 
@@ -37,6 +39,28 @@ namespace mongo {
  */
 class SingleTransactionStats {
 public:
+    /*
+     * Stores information about the last client to run a transaction operation.
+     */
+    struct LastClientInfo {
+        std::string client;
+        long long connectionId;
+        BSONObj clientMetadata;
+        std::string appName;
+
+        void update(Client* opCtxClient) {
+            if (opCtxClient->hasRemote()) {
+                client = opCtxClient->getRemote().toString();
+            }
+            connectionId = opCtxClient->getConnectionId();
+            if (const auto& metadata =
+                    ClientMetadataIsMasterState::get(opCtxClient).getClientMetadata()) {
+                clientMetadata = metadata.get().getDocument();
+                appName = metadata.get().getApplicationName().toString();
+            }
+        }
+    };
+
     /**
      * Returns the start time of the transaction in microseconds.
      *
@@ -111,6 +135,13 @@ public:
         return &_opDebug;
     }
 
+    /*
+     * Returns the LastClientInfo object stored in this SingleTransactionStats instance.
+     */
+    LastClientInfo* getLastClientInfo() {
+        return &_lastClientInfo;
+    }
+
 private:
     // The start time of the transaction in microseconds.
     unsigned long long _startTime{0};
@@ -127,6 +158,9 @@ private:
 
     // Tracks and accumulates stats from all operations that run inside the transaction.
     OpDebug _opDebug;
+
+    // Holds information about the last client to run a transaction operation.
+    LastClientInfo _lastClientInfo;
 };
 
 }  // namespace mongo
