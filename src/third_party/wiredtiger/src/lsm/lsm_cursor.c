@@ -265,6 +265,12 @@ open:		WT_WITH_SCHEMA_LOCK(session,
 	}
 
 	if (!F_ISSET(clsm, WT_CLSM_ACTIVE)) {
+		/*
+		 * Opening this LSM cursor has opened a number of btree
+		 * cursors, ensure other code doesn't think this is the first
+		 * cursor in a session.
+		 */
+		++session->ncursors;
 		WT_RET(__cursor_enter(session));
 		F_SET(clsm, WT_CLSM_ACTIVE);
 	}
@@ -284,6 +290,7 @@ __clsm_leave(WT_CURSOR_LSM *clsm)
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 
 	if (F_ISSET(clsm, WT_CLSM_ACTIVE)) {
+		--session->ncursors;
 		__cursor_leave(session);
 		F_CLR(clsm, WT_CLSM_ACTIVE);
 	}
@@ -365,11 +372,16 @@ __clsm_deleted_decode(WT_CURSOR_LSM *clsm, WT_ITEM *value)
  *	Close any btree cursors that are not needed.
  */
 static int
-__clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int start, u_int end)
+__clsm_close_cursors(
+    WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, u_int start, u_int end)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
 	u_int i;
+
+	__wt_verbose(session, WT_VERB_LSM,
+	    "LSM closing cursor session(%p):clsm(%p), start: %u, end: %u",
+	    (void *)session, (void *)clsm, start, end);
 
 	if (clsm->chunks == NULL || clsm->nchunks == 0)
 		return (0);
@@ -609,7 +621,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 			saved_gen = lsm_tree->dsk_gen;
 			locked = false;
 			__wt_lsm_tree_readunlock(session, lsm_tree);
-			WT_ERR(__clsm_close_cursors(
+			WT_ERR(__clsm_close_cursors(session,
 			    clsm, close_range_start, close_range_end));
 			__wt_lsm_tree_readlock(session, lsm_tree);
 			locked = true;
@@ -626,6 +638,10 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 	clsm->nchunks = nchunks;
 
 	/* Open the cursors for chunks that have changed. */
+	__wt_verbose(session, WT_VERB_LSM,
+	    "LSM opening cursor session(%p):clsm(%p)%s, chunks: %u, good: %u",
+	    (void *)session, (void *)clsm,
+	    update ? ", update" : "", nchunks, ngood);
 	for (i = ngood; i != nchunks; i++) {
 		chunk = lsm_tree->chunk[i + start_chunk];
 		/* Copy the maximum transaction ID. */
@@ -1736,7 +1752,7 @@ __wt_clsm_close(WT_CURSOR *cursor)
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
-	WT_TRET(__clsm_close_cursors(clsm, 0, clsm->nchunks));
+	WT_TRET(__clsm_close_cursors(session, clsm, 0, clsm->nchunks));
 	__clsm_free_chunks(session, clsm);
 
 	/* In case we were somehow left positioned, clear that. */

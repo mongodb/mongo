@@ -406,6 +406,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_maximum_page_size;
 	int64_t cache_eviction_dirty;
 	int64_t cache_eviction_app_dirty;
+	int64_t cache_timed_out_ops;
 	int64_t cache_read_overflow;
 	int64_t cache_eviction_deepen;
 	int64_t cache_write_lookaside;
@@ -663,6 +664,7 @@ struct __wt_connection_stats {
 	int64_t txn_pinned_checkpoint_range;
 	int64_t txn_pinned_snapshot_range;
 	int64_t txn_pinned_timestamp;
+	int64_t txn_pinned_timestamp_checkpoint;
 	int64_t txn_pinned_timestamp_oldest;
 	int64_t txn_sync;
 	int64_t txn_commit;

@@ -42,7 +42,9 @@ __wt_lsm_worker_stop(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 
 /*
  * __lsm_worker_general_op --
- *	Execute a single bloom, drop or flush work unit.
+ *	Execute a single medium importance maintenance operation that should
+ *	not be super long running. That includes bloom creation, drop or flush
+ *	work unit types.
  */
 static int
 __lsm_worker_general_op(
@@ -55,11 +57,7 @@ __lsm_worker_general_op(
 
 	*completed = false;
 
-	/*
-	 * Return if this thread cannot process a bloom, drop or flush.
-	 */
-	if (!FLD_ISSET(cookie->type,
-	    WT_LSM_WORK_BLOOM | WT_LSM_WORK_DROP | WT_LSM_WORK_FLUSH))
+	if (!FLD_ISSET(cookie->type, WT_LSM_WORK_GENERAL_OPS))
 		return (WT_NOTFOUND);
 
 	if ((ret = __wt_lsm_manager_pop_entry(session,
@@ -88,6 +86,8 @@ __lsm_worker_general_op(
 		WT_ERR(__wt_lsm_free_chunks(session, entry->lsm_tree));
 	else if (entry->type == WT_LSM_WORK_BLOOM)
 		WT_ERR(__wt_lsm_work_bloom(session, entry->lsm_tree));
+	else if (entry->type == WT_LSM_WORK_ENABLE_EVICT)
+		WT_ERR(__wt_lsm_work_enable_evict(session, entry->lsm_tree));
 	*completed = true;
 
 err:	__wt_lsm_manager_free_work_unit(session, entry);

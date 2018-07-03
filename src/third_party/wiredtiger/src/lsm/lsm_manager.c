@@ -72,11 +72,7 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 			worker_args->type =
 			    WT_LSM_WORK_DROP | WT_LSM_WORK_SWITCH;
 		else {
-			worker_args->type =
-			    WT_LSM_WORK_BLOOM |
-			    WT_LSM_WORK_DROP |
-			    WT_LSM_WORK_FLUSH |
-			    WT_LSM_WORK_SWITCH;
+			worker_args->type = WT_LSM_WORK_GENERAL_OPS;
 			/*
 			 * Only allow half of the threads to run merges to
 			 * avoid all all workers getting stuck in long-running
@@ -422,9 +418,10 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				fillms = 10000;
 			/*
 			 * If the tree appears to not be triggering enough
-			 * LSM maintenance, help it out. Additional work units
-			 * don't hurt, and can be necessary if some work
-			 * units aren't completed for some reason.
+			 * LSM maintenance, help it out. Some types of
+			 * additional work units don't hurt, and can be
+			 * necessary if some work units aren't completed for
+			 * some reason.
 			 * If the tree hasn't been modified, and there are
 			 * more than 1 chunks - try to get the tree smaller
 			 * so queries run faster.

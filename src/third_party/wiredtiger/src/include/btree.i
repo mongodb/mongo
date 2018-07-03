@@ -1190,10 +1190,10 @@ __wt_page_las_active(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	if ((page_las = ref->page_las) == NULL)
 		return (false);
-	if (page_las->invalid || !ref->page_las->las_skew_newest)
+	if (page_las->invalid || !ref->page_las->skew_newest)
 		return (true);
-	if (__wt_txn_visible_all(session, page_las->las_max_txn,
-	    WT_TIMESTAMP_NULL(&page_las->onpage_timestamp)))
+	if (__wt_txn_visible_all(session, page_las->max_txn,
+	    WT_TIMESTAMP_NULL(&page_las->max_timestamp)))
 		return (false);
 
 	return (true);
@@ -1329,6 +1329,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline bool
 __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_DECL_TIMESTAMP(pinned_ts)
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
 
@@ -1338,7 +1339,8 @@ __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * If the page hasn't been through one round of update/restore, give it
 	 * a try.
 	 */
-	if ((mod = page->modify) == NULL || !mod->update_restored)
+	if ((mod = page->modify) == NULL ||
+	    !FLD_ISSET(mod->restore_state, WT_PAGE_RS_RESTORED))
 		return (true);
 
 	/*
@@ -1356,17 +1358,12 @@ __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (true);
 
 #ifdef HAVE_TIMESTAMPS
-	{
-	bool same_timestamp;
-
-	same_timestamp = false;
-	if (!__wt_timestamp_iszero(&mod->last_eviction_timestamp))
-		WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
-		    same_timestamp = __wt_timestamp_cmp(
+	if (!__wt_timestamp_iszero(&mod->last_eviction_timestamp)) {
+		__wt_txn_pinned_timestamp(session, &pinned_ts);
+		if (__wt_timestamp_cmp(
 		    &mod->last_eviction_timestamp,
-		    &txn_global->pinned_timestamp) == 0);
-	if (!same_timestamp)
-		return (true);
+		    &txn_global->pinned_timestamp) != 0)
+			return (true);
 	}
 #endif
 
@@ -1605,6 +1602,8 @@ __wt_split_descent_race(
 	 * update. A thread can read the parent page's original page index and
 	 * then read the split page's replacement index.
 	 *
+	 * For example, imagine a search descending the tree.
+	 *
 	 * Because internal page splits work by truncating the original page to
 	 * the initial part of the original page, the result of this race is we
 	 * will have a search key that points past the end of the current page.
@@ -1649,73 +1648,17 @@ __wt_split_descent_race(
 	 * work by truncating the split page, so the split page search is for
 	 * content the split page retains after the split, and we ignore this
 	 * race.
+	 *
+	 * This code is a general purpose check for a descent race and we call
+	 * it in other cases, for example, a cursor traversing backwards through
+	 * the tree.
+	 *
+	 * Presumably we acquired a page index on the child page before calling
+	 * this code, don't re-order that acquisition with this check.
 	 */
+	WT_BARRIER();
 	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	return (pindex != saved_pindex);
-}
-
-/*
- * __wt_split_prev_race --
- *	Return if we raced with an internal page split when moving backwards
- * through the tree.
- */
-static inline bool
-__wt_split_prev_race(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	WT_PAGE_INDEX *pindex;
-
-	/*
-	 * There's a split race when a cursor moving backwards through the tree
-	 * descends the tree. If we're splitting an internal page into its
-	 * parent, we move the WT_REF structures and update the parent's page
-	 * index before updating the split page's page index, and it's not an
-	 * atomic update. A thread can read the parent and split page's original
-	 * indexes during a split, or read the parent page's replacement page
-	 * index and then read the split page's original index, either of which
-	 * can lead to skipping pages.
-	 *
-	 * For example, imagine an internal page with 3 child pages, with the
-	 * namespaces a-f, g-h and i-j; the first child page splits. The parent
-	 * starts out with the following page-index:
-	 *
-	 *	| ... | a | g | i | ... |
-	 *
-	 * The split page starts out with the following page-index:
-	 *
-	 *	| a | b | c | d | e | f |
-	 *
-	 * The first step is to move the c-f ranges into a new subtree, so, for
-	 * example we might have two new internal pages 'c' and 'e', where the
-	 * new 'c' page references the c-d namespace and the new 'e' page
-	 * references the e-f namespace. The top of the subtree references the
-	 * parent page, but until the parent's page index is updated, threads in
-	 * the subtree won't be able to ascend out of the subtree. However, once
-	 * the parent page's page index is updated to this:
-	 *
-	 *	| ... | a | c | e | g | i | ... |
-	 *
-	 * threads in the subtree can ascend into the parent. Imagine a cursor
-	 * in the c-d part of the namespace that ascends to the parent's 'c'
-	 * slot. It would then decrement to the slot before the 'c' slot, the
-	 * 'a' slot.
-	 *
-	 * The previous-cursor movement selects the last slot in the 'a' page;
-	 * if the split page's page-index hasn't been updated yet, it selects
-	 * the 'f' slot, which is incorrect. Once the split page's page index is
-	 * updated to this:
-	 *
-	 *	| a | b |
-	 *
-	 * the previous-cursor movement will select the 'b' slot, which is
-	 * correct.
-	 *
-	 * This function takes an argument which is the internal page into which
-	 * we're coupling. If the last slot on the page no longer points to
-	 * the current page as its "home", the page is being split and part of
-	 * its namespace moved, we have to restart.
-	 */
-	WT_INTL_INDEX_GET(session, ref->page, pindex);
-	return (pindex->index[pindex->entries - 1]->home != ref->page);
 }
 
 /*
@@ -1724,8 +1667,8 @@ __wt_split_prev_race(WT_SESSION_IMPL *session, WT_REF *ref)
  * coupling up/down the tree.
  */
 static inline int
-__wt_page_swap_func(WT_SESSION_IMPL *session,
-    WT_REF *held, WT_REF *want, bool prev_race, uint32_t flags
+__wt_page_swap_func(
+    WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -1753,18 +1696,6 @@ __wt_page_swap_func(WT_SESSION_IMPL *session,
 	    , file, line
 #endif
 	    );
-
-	/*
-	 * We can race when descending into an internal page as part of moving
-	 * backwards through the tree, and we have to detect that race before
-	 * releasing the page from which we are coupling, else we can't restart
-	 * the movement.
-	 */
-	if (ret == 0 && prev_race && WT_PAGE_IS_INTERNAL(want->page) &&
-	    __wt_split_prev_race(session, want)) {
-		ret = WT_RESTART;
-		WT_TRET(__wt_page_release(session, want, flags));
-	}
 
 	/*
 	 * Expected failures: page not found or restart. Our callers list the

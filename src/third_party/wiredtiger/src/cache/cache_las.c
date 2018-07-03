@@ -404,43 +404,34 @@ __wt_las_page_skip_locked(WT_SESSION_IMPL *session, WT_REF *ref)
 		return (false);
 
 	/*
-	 * If page image has the newest version of data and includes data newer
-	 * than the reader's snapshot then we should read the history.
+	 * If some of the page's history overlaps with the reader's snapshot
+	 * then we have to read it.  This is only relevant if we chose versions
+	 * that were unstable when the page was written.
 	 */
-	if (ref->page_las->las_skew_newest &&
-	    WT_TXNID_LE(txn->snap_min, ref->page_las->las_max_txn))
+	if (ref->page_las->skew_newest &&
+	    WT_TXNID_LE(txn->snap_min, ref->page_las->unstable_txn))
 		return (false);
 
-	/*
-	 * If page image has the oldest version of data and some of the history
-	 * overlaps with the reader's snapshot then we should read the history.
-	 */
-	if (!ref->page_las->las_skew_newest &&
-	    WT_TXNID_LE(ref->page_las->las_min_txn, txn->snap_max))
-		return (false);
-
-	if (!F_ISSET(txn, WT_TXN_HAS_TS_READ) && ref->page_las->las_skew_newest)
-		return (true);
+	if (!F_ISSET(txn, WT_TXN_HAS_TS_READ))
+		return (ref->page_las->skew_newest);
 
 #ifdef HAVE_TIMESTAMPS
 	/*
 	 * Skip lookaside pages if reading as of a timestamp, we evicted new
 	 * versions of data and all the updates are in the past.
 	 */
-	if (F_ISSET(&session->txn, WT_TXN_HAS_TS_READ) &&
-	    ref->page_las->las_skew_newest &&
+	if (ref->page_las->skew_newest &&
 	    __wt_timestamp_cmp(
-	    &ref->page_las->onpage_timestamp, &session->txn.read_timestamp) < 0)
+	    &txn->read_timestamp, &ref->page_las->unstable_timestamp) > 0)
 		return (true);
 
 	/*
 	 * Skip lookaside pages if reading as of a timestamp, we evicted old
-	 * versions of data and all the updates are in the future.
+	 * versions of data and all the unstable updates are in the future.
 	 */
-	if (F_ISSET(&session->txn, WT_TXN_HAS_TS_READ) &&
-	    !ref->page_las->las_skew_newest &&
+	if (!ref->page_las->skew_newest &&
 	    __wt_timestamp_cmp(
-	    &ref->page_las->min_timestamp, &session->txn.read_timestamp) > 0)
+	    &txn->read_timestamp, &ref->page_las->unstable_timestamp) < 0)
 		return (true);
 #endif
 
@@ -563,8 +554,8 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 		(void)__wt_eviction_dirty_needed(session, &pct_dirty);
 
 #ifdef HAVE_TIMESTAMPS
-		WT_RET(__wt_timestamp_to_hex_string(
-		    session, hex_timestamp, &multi->page_las.min_timestamp));
+		WT_RET(__wt_timestamp_to_hex_string(session, hex_timestamp,
+		    &multi->page_las.unstable_timestamp));
 		ts = hex_timestamp;
 #else
 		ts = "disabled";
@@ -573,14 +564,14 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 		    WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY,
 		    "Page reconciliation triggered lookaside write "
 		    "file ID %" PRIu32 ", page ID %" PRIu64 ". "
-		    "Max txn ID %" PRIu64 ", min timestamp %s, skewed %s. "
+		    "Max txn ID %" PRIu64 ", unstable timestamp %s, %s. "
 		    "Entries now in lookaside file: %" PRId64 ", "
 		    "cache dirty: %2.3f%% , "
 		    "cache use: %2.3f%%",
 		    btree_id, multi->page_las.las_pageid,
-		    multi->page_las.las_max_txn,
+		    multi->page_las.max_txn,
 		    ts,
-		    multi->page_las.las_skew_newest ? "newest" : "oldest",
+		    multi->page_las.skew_newest ? "newest" : "not newest",
 		    WT_STAT_READ(conn->stats, cache_lookaside_entries),
 		    pct_dirty, pct_full);
 	}
@@ -724,8 +715,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 			 * table. (We check the length because row-store doesn't
 			 * write zero-length data items.)
 			 */
-			if (multi->page_las.las_skew_newest &&
-			    upd == list->onpage_upd &&
+			if (upd == list->onpage_upd &&
 			    upd->size > 0 &&
 			    (upd->type == WT_UPDATE_STANDARD ||
 			    upd->type == WT_UPDATE_MODIFY)) {

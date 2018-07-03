@@ -372,12 +372,11 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	double current_dirty, delta, scrub_min;
-	uint64_t bytes_written_last, bytes_written_start, bytes_written_total;
+	double current_dirty, prev_dirty;
+	uint64_t bytes_written_start, bytes_written_total;
 	uint64_t cache_size, max_write;
-	uint64_t current_us, stepdown_us, total_ms, work_us;
-	uint64_t time_last, time_start, time_stop;
-	bool progress;
+	uint64_t time_start, time_stop;
+	uint64_t total_ms;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -388,61 +387,41 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	 * scrubbing cannot help).
 	 */
 	if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP) ||
-	    cache->eviction_checkpoint_target < DBL_EPSILON ||
-	    cache->eviction_checkpoint_target >= cache->eviction_dirty_trigger)
+	    cache->eviction_checkpoint_target < DBL_EPSILON)
 		return;
 
-	time_last = time_start = __wt_clock(session);
-	bytes_written_last = 0;
+	time_start = __wt_clock(session);
 	bytes_written_start = cache->bytes_written;
-	cache_size = conn->cache_size;
+
 	/*
 	 * If the cache size is zero or very small, we're done.  The cache
 	 * size can briefly become zero if we're transitioning to a shared
 	 * cache via reconfigure.  This avoids potential divide by zero.
 	 */
-	if (cache_size < 10 * WT_MEGABYTE)
+	if ((cache_size = conn->cache_size) < 10 * WT_MEGABYTE)
 		return;
 
-	/*
-	 * Skip scrubbing if it won't perform at-least some minimum amount of
-	 * work. Scrubbing is supposed to bring down the dirty data to eviction
-	 * checkpoint target before the actual checkpoint starts. Do not perform
-	 * scrubbing if the dirty data to scrub is less than a pre-configured
-	 * size. This size is to an extent based on the configured cache size
-	 * without being too large or too small for large cache sizes. For the
-	 * values chosen, for instance, 100 GB cache will require at-least
-	 * 200 MB of dirty data above eviction checkpoint target, which should
-	 * equate to a scrub phase a few seconds long. That said, the value of
-	 * 0.2% and 500 MB are still somewhat arbitrary.
-	 */
-	scrub_min = WT_MIN((0.2 * conn->cache_size) / 100, 500 * WT_MEGABYTE);
-	if (__wt_cache_dirty_leaf_inuse(cache) <
-	    ((cache->eviction_checkpoint_target * conn->cache_size) / 100) +
-	    scrub_min)
+	current_dirty =
+	    (100.0 * __wt_cache_dirty_leaf_inuse(cache)) / cache_size;
+	if (current_dirty <= cache->eviction_checkpoint_target)
 		return;
-
-	stepdown_us = 10000;
-	work_us = 0;
-	progress = false;
-
-	/* Step down the scrub target (as a percentage) in units of 10MB. */
-	delta = WT_MIN(1.0, (100 * 10.0 * WT_MEGABYTE) / cache_size);
-
-	/*
-	 * Start with the scrub target equal to the expected maximum percentage
-	 * of dirty data in cache.
-	 */
-	cache->eviction_scrub_limit = cache->eviction_dirty_trigger;
 
 	/* Stop if we write as much dirty data as is currently in cache. */
 	max_write = __wt_cache_dirty_leaf_inuse(cache);
 
-	/* Step down the dirty target to the eviction trigger */
+	/* Set the dirty trigger to the target value. */
+	cache->eviction_scrub_target = cache->eviction_checkpoint_target;
+	WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target, 0);
+
+	/* Wait while the dirty level is going down. */
 	for (;;) {
+		__wt_sleep(0, 100 * WT_THOUSAND);
+
+		prev_dirty = current_dirty;
 		current_dirty =
 		    (100.0 * __wt_cache_dirty_leaf_inuse(cache)) / cache_size;
-		if (current_dirty <= cache->eviction_checkpoint_target)
+		if (current_dirty <= cache->eviction_checkpoint_target ||
+		    current_dirty >= prev_dirty)
 			break;
 
 		/*
@@ -452,63 +431,17 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		if (F_ISSET(cache, WT_CACHE_EVICT_LOOKASIDE))
 			break;
 
-		__wt_sleep(0, stepdown_us / 10);
-		time_stop = __wt_clock(session);
-		current_us = WT_CLOCKDIFF_US(time_stop, time_last);
+		/*
+		 * We haven't reached the current target.
+		 *
+		 * Don't wait indefinitely: there might be dirty pages
+		 * that can't be evicted.  If we can't meet the target,
+		 * give up and start the checkpoint for real.
+		 */
 		bytes_written_total =
 		    cache->bytes_written - bytes_written_start;
-
-		if (current_dirty > cache->eviction_scrub_limit) {
-			/*
-			 * We haven't reached the current target.
-			 *
-			 * Don't wait indefinitely: there might be dirty pages
-			 * that can't be evicted.  If we can't meet the target,
-			 * give up and start the checkpoint for real.
-			 */
-			if (current_us > WT_MAX(WT_MILLION, 10 * stepdown_us) ||
-			    bytes_written_total > max_write)
-				break;
-			continue;
-		}
-
-		/*
-		 * Estimate how long the next step down of dirty data should
-		 * take.
-		 *
-		 * The calculation here assumes that the system is writing from
-		 * cache as fast as it can, and determines the write throughput
-		 * based on the change in the bytes written from cache since
-		 * the start of the call.  We use that to estimate how long it
-		 * will take to step the dirty target down by delta.
-		 *
-		 * Take care to avoid dividing by zero.
-		 */
-		if (bytes_written_total - bytes_written_last > WT_MEGABYTE &&
-		    work_us > 0) {
-			stepdown_us = (uint64_t)((delta * cache_size / 100) /
-			    ((double)bytes_written_total / work_us));
-			stepdown_us = WT_MAX(1, stepdown_us);
-			if (!progress)
-				stepdown_us = WT_MIN(stepdown_us, 200000);
-			progress = true;
-
-			bytes_written_last = bytes_written_total;
-		}
-
-		work_us += current_us;
-
-		/*
-		 * Smooth out step down: try to limit the impact on
-		 * performance to 10% by waiting once we reach the last
-		 * level.
-		 */
-		__wt_sleep(0, 10 * stepdown_us);
-		cache->eviction_scrub_limit =
-		    WT_MAX(cache->eviction_dirty_target, current_dirty - delta);
-		WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target,
-		    cache->eviction_scrub_limit);
-		time_last = __wt_clock(session);
+		if (bytes_written_total > max_write)
+			break;
 	}
 
 	time_stop = __wt_clock(session);
@@ -681,8 +614,7 @@ __checkpoint_prepare(
 	 */
 	__wt_writelock(session, &txn_global->rwlock);
 	txn_global->checkpoint_state = *txn_state;
-	txn_global->checkpoint_txn = txn;
-	txn_global->checkpoint_state.pinned_id = WT_MIN(txn->id, txn->snap_min);
+	txn_global->checkpoint_state.pinned_id = txn->snap_min;
 
 	/*
 	 * Sanity check that the oldest ID hasn't moved on before we have
@@ -724,6 +656,8 @@ __checkpoint_prepare(
 		if (txn_global->has_stable_timestamp) {
 			__wt_timestamp_set(&txn->read_timestamp,
 			    &txn_global->stable_timestamp);
+			__wt_timestamp_set(&txn_global->checkpoint_timestamp,
+			    &txn->read_timestamp);
 			F_SET(txn, WT_TXN_HAS_TS_READ);
 			if (!F_ISSET(conn, WT_CONN_RECOVERING))
 				__wt_timestamp_set(
@@ -975,7 +909,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Unblock updates -- we can figure out that any updates to clean pages
 	 * after this point are too new to be written in the checkpoint.
 	 */
-	cache->eviction_scrub_limit = 0.0;
+	cache->eviction_scrub_target = 0.0;
 	WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target, 0);
 
 	/* Tell logging that we have started a database checkpoint. */
@@ -1125,7 +1059,7 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, false, failed));
 
-	cache->eviction_scrub_limit = 0.0;
+	cache->eviction_scrub_target = 0.0;
 	WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target, 0);
 
 	if (F_ISSET(txn, WT_TXN_RUNNING)) {

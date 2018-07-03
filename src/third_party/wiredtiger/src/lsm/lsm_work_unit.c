@@ -313,6 +313,37 @@ __wt_lsm_chunk_visible_all(
 }
 
 /*
+ * __lsm_set_chunk_evictable --
+ *	Enable eviction in an LSM chunk.
+ */
+static int
+__lsm_set_chunk_evictable(
+    WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk, bool need_handle)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+
+	if (chunk->evict_enabled != 0)
+		return (0);
+
+	/* See if we win the race to enable eviction. */
+	if (__wt_atomic_cas32(&chunk->evict_enabled, 0, 1)) {
+		if (need_handle)
+			WT_RET(__wt_session_get_dhandle(
+			    session, chunk->uri, NULL, NULL, 0));
+		btree = session->dhandle->handle;
+		if (btree->evict_disabled_open) {
+			btree->evict_disabled_open = false;
+			__wt_evict_file_exclusive_off(session);
+		}
+
+		if (need_handle)
+			WT_TRET(__wt_session_release_dhandle(session));
+	}
+	return (ret);
+}
+
+/*
  * __lsm_checkpoint_chunk --
  *	Checkpoint an LSM chunk, separated out to make locking easier.
  */
@@ -340,7 +371,6 @@ int
 __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_TXN_ISOLATION saved_isolation;
 	bool flush_set, release_dhandle;
@@ -375,6 +405,14 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	WT_RET(__wt_txn_update_oldest(
 	    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 	if (!__wt_lsm_chunk_visible_all(session, chunk)) {
+		/*
+		 * If there is cache pressure consider making a chunk evictable
+		 * to avoid the cache getting stuck when history is required.
+		 */
+		if (__wt_eviction_needed(session, false, false, NULL))
+			WT_ERR(__wt_lsm_manager_push_entry(
+			    session, WT_LSM_WORK_ENABLE_EVICT, 0, lsm_tree));
+
 		__wt_verbose(session, WT_VERB_LSM,
 		    "LSM worker %s: running transaction, return",
 		    chunk->uri);
@@ -446,11 +484,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * Enable eviction on the live chunk so it doesn't block the cache.
 	 * Future reads should direct to the on-disk chunk anyway.
 	 */
-	btree = session->dhandle->handle;
-	if (btree->evict_disabled_open) {
-		btree->evict_disabled_open = false;
-		__wt_evict_file_exclusive_off(session);
-	}
+	WT_ERR(__lsm_set_chunk_evictable(session, chunk, false));
 
 	release_dhandle = false;
 	WT_ERR(__wt_session_release_dhandle(session));
@@ -477,6 +511,54 @@ err:	if (flush_set)
 	if (release_dhandle)
 		WT_TRET(__wt_session_release_dhandle(session));
 
+	return (ret);
+}
+
+/*
+ * __wt_lsm_work_enable_evict --
+ *	LSM usually pins live chunks in memory - preferring to force them
+ *	out via a checkpoint when they are no longer required. For applications
+ *	that keep data pinned for a long time this can lead to the cache
+ *	being pinned full. This work unit detects that case, and enables
+ *	regular eviction in chunks that can be correctly evicted.
+ */
+int
+__wt_lsm_work_enable_evict(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
+	WT_LSM_WORKER_COOKIE cookie;
+	u_int i;
+
+	WT_CLEAR(cookie);
+
+	/* Only do this if there is cache pressure */
+	if (!__wt_eviction_needed(session, false, false, NULL))
+		return (0);
+
+	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, false));
+
+	/*
+	 * Turn on eviction in chunks that have had some chance to
+	 * checkpoint if there is cache pressure.
+	 */
+	for (i = 0; cookie.nchunks > 2 && i < cookie.nchunks - 2; i++) {
+		chunk = cookie.chunk_array[i];
+
+		/*
+		 * Skip if the chunk isn't on disk yet, or if it's still in
+		 * cache for a reason other than transaction visibility.
+		 */
+		if (!F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
+		    chunk->evict_enabled != 0 ||
+		    __wt_lsm_chunk_visible_all(session, chunk))
+			continue;
+
+		WT_ERR(__lsm_set_chunk_evictable(session, chunk, true));
+	}
+
+err:	__lsm_unpin_chunks(session, &cookie);
+	__wt_free(session, cookie.chunk_array);
 	return (ret);
 }
 

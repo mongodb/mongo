@@ -302,7 +302,16 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 err:	if (c != NULL)
 		WT_TRET(c->reset(c));
 
-	/* Don't return WT_NOTFOUND from a failed cursor open or search. */
+	/*
+	 * Error handling from this function is complex. A search in the
+	 * backing bit field should never return WT_NOTFOUND - so translate
+	 * that into a different error code and report an error. If we got a
+	 * WT_ROLLBACK it may be because there is a lot of cache pressure and
+	 * the transaction is being killed - don't report an error message in
+	 * that case.
+	 */
+	if (ret == WT_ROLLBACK || ret == WT_CACHE_FULL)
+		return (ret);
 	WT_RET_MSG(bloom->session,
 	    ret == WT_NOTFOUND ? WT_ERROR : ret,
 	    "Failed lookup in bloom filter");

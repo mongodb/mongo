@@ -262,7 +262,7 @@ restart:	/*
 		 * holding nothing on failure.
 		 */
 descend:	if ((ret = __wt_page_swap(
-		    session, current, descent, false, flags)) == 0) {
+		    session, current, descent, flags)) == 0) {
 			current = descent;
 			continue;
 		}

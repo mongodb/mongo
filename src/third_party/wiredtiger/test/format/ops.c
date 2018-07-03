@@ -498,6 +498,7 @@ static void
 begin_transaction(TINFO *tinfo, WT_SESSION *session, u_int *iso_configp)
 {
 	u_int v;
+	int ret;
 	const char *config;
 	char config_buf[64];
 	bool locked;
@@ -523,7 +524,15 @@ begin_transaction(TINFO *tinfo, WT_SESSION *session, u_int *iso_configp)
 	}
 	*iso_configp = v;
 
-	testutil_check(session->begin_transaction(session, config));
+	/*
+	 * Keep trying to start a new transaction if it's timing out - we
+	 * know there aren't any resources pinned so it should succeed
+	 * eventually.
+	 */
+	while ((ret =
+	    session->begin_transaction(session, config)) == WT_CACHE_FULL)
+		;
+	testutil_check(ret);
 
 	if (v == ISOLATION_SNAPSHOT && g.c_txn_timestamps) {
 		/* Avoid starting a new reader when a prepare is in progress. */

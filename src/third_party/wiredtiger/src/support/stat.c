@@ -840,6 +840,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: maximum page size at eviction",
 	"cache: modified pages evicted",
 	"cache: modified pages evicted by application threads",
+	"cache: operations timed out waiting for space in cache",
 	"cache: overflow pages read into cache",
 	"cache: page split during eviction deepened the tree",
 	"cache: page written requiring lookaside records",
@@ -1097,6 +1098,7 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: transaction range of IDs currently pinned by a checkpoint",
 	"transaction: transaction range of IDs currently pinned by named snapshots",
 	"transaction: transaction range of timestamps currently pinned",
+	"transaction: transaction range of timestamps pinned by a checkpoint",
 	"transaction: transaction range of timestamps pinned by the oldest timestamp",
 	"transaction: transaction sync calls",
 	"transaction: transactions committed",
@@ -1237,6 +1239,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing cache_eviction_maximum_page_size */
 	stats->cache_eviction_dirty = 0;
 	stats->cache_eviction_app_dirty = 0;
+	stats->cache_timed_out_ops = 0;
 	stats->cache_read_overflow = 0;
 	stats->cache_eviction_deepen = 0;
 	stats->cache_write_lookaside = 0;
@@ -1494,6 +1497,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing txn_pinned_checkpoint_range */
 		/* not clearing txn_pinned_snapshot_range */
 		/* not clearing txn_pinned_timestamp */
+		/* not clearing txn_pinned_timestamp_checkpoint */
 		/* not clearing txn_pinned_timestamp_oldest */
 	stats->txn_sync = 0;
 	stats->txn_commit = 0;
@@ -1662,6 +1666,7 @@ __wt_stat_connection_aggregate(
 	to->cache_eviction_dirty += WT_STAT_READ(from, cache_eviction_dirty);
 	to->cache_eviction_app_dirty +=
 	    WT_STAT_READ(from, cache_eviction_app_dirty);
+	to->cache_timed_out_ops += WT_STAT_READ(from, cache_timed_out_ops);
 	to->cache_read_overflow += WT_STAT_READ(from, cache_read_overflow);
 	to->cache_eviction_deepen +=
 	    WT_STAT_READ(from, cache_eviction_deepen);
@@ -2047,6 +2052,8 @@ __wt_stat_connection_aggregate(
 	to->txn_pinned_snapshot_range +=
 	    WT_STAT_READ(from, txn_pinned_snapshot_range);
 	to->txn_pinned_timestamp += WT_STAT_READ(from, txn_pinned_timestamp);
+	to->txn_pinned_timestamp_checkpoint +=
+	    WT_STAT_READ(from, txn_pinned_timestamp_checkpoint);
 	to->txn_pinned_timestamp_oldest +=
 	    WT_STAT_READ(from, txn_pinned_timestamp_oldest);
 	to->txn_sync += WT_STAT_READ(from, txn_sync);

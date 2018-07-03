@@ -805,11 +805,13 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	WT_PAGE_INDEX *pindex;
 	WT_PAGE_MODIFY *mod;
 	WT_SESSION_IMPL *session;
+	uint64_t split_gen;
 	uint32_t entries;
 
 	session = ds->session;
 	page = ref->page;
 	mod = page->modify;
+	split_gen = 0;
 
 	WT_RET(ds->f(ds, "%p", (void *)ref));
 
@@ -818,6 +820,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 		WT_RET(ds->f(ds, " recno %" PRIu64, ref->ref_recno));
 		WT_INTL_INDEX_GET(session, page, pindex);
 		entries = pindex->entries;
+		split_gen = page->pg_intl_split_gen;
 		break;
 	case WT_PAGE_COL_FIX:
 		WT_RET(ds->f(ds, " recno %" PRIu64, ref->ref_recno));
@@ -830,6 +833,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	case WT_PAGE_ROW_INT:
 		WT_INTL_INDEX_GET(session, page, pindex);
 		entries = pindex->entries;
+		split_gen = page->pg_intl_split_gen;
 		break;
 	case WT_PAGE_ROW_LEAF:
 		entries = page->entries;
@@ -845,8 +849,6 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	WT_RET(ds->f(ds, ", entries %" PRIu32, entries));
 	WT_RET(ds->f(ds,
 	    ", %s", __wt_page_is_modified(page) ? "dirty" : "clean"));
-	WT_RET(ds->f(ds,
-	    ", memory_size %" WT_SIZET_FMT, page->memory_footprint));
 
 	if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
 		WT_RET(ds->f(ds, ", keys-built"));
@@ -878,9 +880,12 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
+	if (split_gen != 0)
+		WT_RET(ds->f(ds, ", split-gen=%" PRIu64, split_gen));
 	if (mod != NULL)
-		WT_RET(
-		    ds->f(ds, ", write generation=%" PRIu32, mod->write_gen));
+		WT_RET(ds->f(ds, ", write-gen=%" PRIu32, mod->write_gen));
+	WT_RET(ds->f(ds,
+	    ", memory-size %" WT_SIZET_FMT, page->memory_footprint));
 	WT_RET(ds->f(ds, "\n"));
 
 	return (0);

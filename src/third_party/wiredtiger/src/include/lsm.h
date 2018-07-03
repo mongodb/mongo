@@ -107,7 +107,8 @@ struct __wt_lsm_chunk {
 	uint32_t id;			/* ID used to generate URIs */
 	uint32_t generation;		/* Merge generation */
 	uint32_t refcnt;		/* Number of worker thread references */
-	uint32_t bloom_busy;		/* Number of worker thread references */
+	uint32_t bloom_busy;		/* Currently creating bloom filter */
+	uint32_t evict_enabled;		/* Eviction allowed on the chunk */
 
 	int8_t empty;			/* 1/0: checkpoint missing */
 	int8_t evicted;			/* 1/0: in-memory chunk was evicted */
@@ -129,12 +130,18 @@ struct __wt_lsm_chunk {
  * is required.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define	WT_LSM_WORK_BLOOM	0x01u	/* Create a bloom filter */
-#define	WT_LSM_WORK_DROP	0x02u	/* Drop unused chunks */
-#define	WT_LSM_WORK_FLUSH	0x04u	/* Flush a chunk to disk */
-#define	WT_LSM_WORK_MERGE	0x08u	/* Look for a tree merge */
-#define	WT_LSM_WORK_SWITCH	0x10u	/* Switch to new in-memory chunk */
+#define	WT_LSM_WORK_BLOOM		0x01u	/* Create a bloom filter */
+#define	WT_LSM_WORK_DROP		0x02u	/* Drop unused chunks */
+#define	WT_LSM_WORK_ENABLE_EVICT	0x04u	/* Create a bloom filter */
+#define	WT_LSM_WORK_FLUSH		0x08u	/* Flush a chunk to disk */
+#define	WT_LSM_WORK_MERGE		0x10u	/* Look for a tree merge */
+#define	WT_LSM_WORK_SWITCH		0x20u	/* Switch the in-memory chunk */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+
+/* Work units that are serviced by general worker threads. */
+#define	WT_LSM_WORK_GENERAL_OPS	 					\
+	(WT_LSM_WORK_BLOOM | WT_LSM_WORK_DROP | WT_LSM_WORK_ENABLE_EVICT |\
+	WT_LSM_WORK_FLUSH | WT_LSM_WORK_SWITCH)
 
 /*
  * WT_LSM_WORK_UNIT --

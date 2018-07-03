@@ -276,6 +276,22 @@ __wt_eviction_clean_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 }
 
 /*
+ * __wt_eviction_dirty_target --
+ *	Return the effective dirty target (including checkpoint scrubbing).
+ */
+static inline double
+__wt_eviction_dirty_target(WT_CACHE *cache)
+{
+	double dirty_target, scrub_target;
+
+	dirty_target = cache->eviction_dirty_target;
+	scrub_target = cache->eviction_scrub_target;
+
+	return (scrub_target > 0 && scrub_target < dirty_target ?
+	    scrub_target : dirty_target);
+}
+
+/*
  * __wt_eviction_dirty_needed --
  *	Return if an application thread should do eviction due to the total
  *	volume of dirty data in cache.
@@ -284,7 +300,6 @@ static inline bool
 __wt_eviction_dirty_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 {
 	WT_CACHE *cache;
-	double dirty_trigger;
 	uint64_t dirty_inuse, bytes_max;
 
 	cache = S2C(session)->cache;
@@ -299,10 +314,8 @@ __wt_eviction_dirty_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 	if (pct_fullp != NULL)
 		*pct_fullp = ((100.0 * dirty_inuse) / bytes_max);
 
-	if ((dirty_trigger = cache->eviction_scrub_limit) < 1.0)
-		dirty_trigger = cache->eviction_dirty_trigger;
-
-	return (dirty_inuse > (uint64_t)(dirty_trigger * bytes_max) / 100);
+	return (dirty_inuse > (uint64_t)(
+	    cache->eviction_dirty_trigger * bytes_max) / 100);
 }
 
 /*

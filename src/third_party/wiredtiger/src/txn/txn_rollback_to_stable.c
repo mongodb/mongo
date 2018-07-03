@@ -275,8 +275,9 @@ __txn_rollback_to_stable_btree_walk(
 	    WT_READ_CACHE | WT_READ_LOOKASIDE | WT_READ_NO_EVICT)) == 0 &&
 	    ref != NULL) {
 		if (ref->page_las != NULL &&
+		    ref->page_las->skew_newest &&
 		    __wt_timestamp_cmp(rollback_timestamp,
-		    &ref->page_las->onpage_timestamp) < 0)
+		    &ref->page_las->unstable_timestamp) < 0)
 			ref->page_las->invalid = true;
 
 		/* Review deleted page saved to the ref */

@@ -563,7 +563,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	dirty_target = cache->eviction_dirty_target;
+	dirty_target = __wt_eviction_dirty_target(cache);
 	dirty_trigger = cache->eviction_dirty_trigger;
 	target = cache->eviction_target;
 	trigger = cache->eviction_trigger;
@@ -2345,7 +2345,8 @@ __wt_cache_eviction_worker(
 	WT_TRACK_OP_DECL;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	uint64_t initial_progress, max_progress, time_start, time_stop;
+	uint64_t elapsed, time_start, time_stop;
+	uint64_t initial_progress, max_progress;
 	bool timer;
 
 	WT_TRACK_OP_INIT(session);
@@ -2367,8 +2368,7 @@ __wt_cache_eviction_worker(
 	__wt_evict_server_wake(session);
 
 	/* Track how long application threads spend doing eviction. */
-	timer =
-	    WT_STAT_ENABLED(session) && !F_ISSET(session, WT_SESSION_INTERNAL);
+	timer = !F_ISSET(session, WT_SESSION_INTERNAL);
 	if (timer)
 		time_start = __wt_clock(session);
 
@@ -2405,21 +2405,9 @@ __wt_cache_eviction_worker(
 
 		/* See if eviction is still needed. */
 		if (!__wt_eviction_needed(session, busy, readonly, &pct_full) ||
-		    ((pct_full < 100.0 || cache->eviction_scrub_limit > 0.0) &&
-		    (cache->eviction_progress >
+		    (pct_full < 100.0 && (cache->eviction_progress >
 		    initial_progress + max_progress)))
 			break;
-
-		/*
-		 * Don't make application threads participate in scrubbing for
-		 * checkpoints.  Just throttle updates instead.
-		 */
-		if (WT_EVICT_HAS_WORKERS(session) &&
-		    cache->eviction_scrub_limit > 0.0 &&
-		    !F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD)) {
-			__wt_yield();
-			continue;
-		}
 
 		/* Evict a page. */
 		switch (ret = __evict_page(session, false)) {
@@ -2438,13 +2426,26 @@ __wt_cache_eviction_worker(
 		default:
 			goto err;
 		}
+		/* Stop if we've exceeded the time out. */
+		if (timer && cache->cache_max_wait_us != 0) {
+			time_stop = __wt_clock(session);
+			if (session->cache_wait_us +
+			    WT_CLOCKDIFF_US(time_stop, time_start) >
+			    cache->cache_max_wait_us)
+				goto err;
+		}
 	}
 
 err:	if (timer) {
 		time_stop = __wt_clock(session);
-		WT_STAT_CONN_INCRV(session,
-		    application_cache_time,
-		    WT_CLOCKDIFF_US(time_stop, time_start));
+		elapsed = WT_CLOCKDIFF_US(time_stop, time_start);
+		WT_STAT_CONN_INCRV(session, application_cache_time, elapsed);
+		session->cache_wait_us += elapsed;
+		if (cache->cache_max_wait_us != 0 &&
+		    session->cache_wait_us > cache->cache_max_wait_us) {
+			WT_TRET(WT_CACHE_FULL);
+			WT_STAT_CONN_INCR(session, cache_timed_out_ops);
+		}
 	}
 
 done:	WT_TRACK_OP_END(session);

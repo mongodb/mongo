@@ -2024,6 +2024,8 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "split_5",		WT_TIMING_STRESS_SPLIT_5 },
 		{ "split_6",		WT_TIMING_STRESS_SPLIT_6 },
 		{ "split_7",		WT_TIMING_STRESS_SPLIT_7 },
+		{ "split_8",		WT_TIMING_STRESS_SPLIT_8 },
+		{ "split_9",		WT_TIMING_STRESS_SPLIT_9 },
 		{ NULL, 0 }
 	};
 	WT_CONFIG_ITEM cval, sval;

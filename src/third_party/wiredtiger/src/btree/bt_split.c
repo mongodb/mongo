@@ -1414,6 +1414,7 @@ __split_multi_inmem(
 	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
 	WT_SAVE_UPD *supd;
 	WT_UPDATE *upd;
 	uint64_t recno;
@@ -1520,17 +1521,26 @@ __split_multi_inmem(
 	 * might be older than that. Set the first dirty transaction to an
 	 * impossibly old value so this page is never skipped in a checkpoint.
 	 */
-	page->modify->first_dirty_txn = WT_TXN_FIRST;
+	mod = page->modify;
+	mod->first_dirty_txn = WT_TXN_FIRST;
 
 	/*
 	 * If the new page is modified, save the eviction generation to avoid
 	 * repeatedly attempting eviction on the same page.
 	 */
-	page->modify->last_evict_pass_gen = orig->modify->last_evict_pass_gen;
-	page->modify->last_eviction_id = orig->modify->last_eviction_id;
-	__wt_timestamp_set(&page->modify->last_eviction_timestamp,
+	mod->last_evict_pass_gen = orig->modify->last_evict_pass_gen;
+	mod->last_eviction_id = orig->modify->last_eviction_id;
+	__wt_timestamp_set(&mod->last_eviction_timestamp,
 	    &orig->modify->last_eviction_timestamp);
-	page->modify->update_restored = 1;
+
+	/* Add the update/restore flag to any previous state. */
+	__wt_timestamp_set(&mod->last_stable_timestamp,
+	    &orig->modify->last_stable_timestamp);
+	mod->rec_max_txn = orig->modify->rec_max_txn;
+	__wt_timestamp_set(&mod->rec_max_timestamp,
+	    &orig->modify->rec_max_timestamp);
+	mod->restore_state = orig->modify->restore_state;
+	FLD_SET(mod->restore_state, WT_PAGE_RS_RESTORED);
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt, true));
@@ -1684,7 +1694,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 
 		WT_RET(__wt_calloc_one(session, &ref->page_las));
 		*ref->page_las = multi->page_las;
-		WT_ASSERT(session, ref->page_las->las_max_txn != WT_TXN_NONE);
+		WT_ASSERT(session, ref->page_las->max_txn != WT_TXN_NONE);
 		ref->state = WT_REF_LOOKASIDE;
 	}
 
