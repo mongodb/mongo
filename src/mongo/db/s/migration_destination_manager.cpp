@@ -51,6 +51,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
+#include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
@@ -319,12 +320,7 @@ BSONObj MigrationDestinationManager::getMigrationStatusReport() {
 Status MigrationDestinationManager::start(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           ScopedReceiveChunk scopedReceiveChunk,
-                                          const MigrationSessionId& sessionId,
-                                          const ShardId& fromShard,
-                                          const ShardId& toShard,
-                                          const BSONObj& min,
-                                          const BSONObj& max,
-                                          const BSONObj& shardKeyPattern,
+                                          const StartChunkCloneRequest cloneRequest,
                                           const OID& epoch,
                                           const WriteConcernOptions& writeConcern) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -336,14 +332,14 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     _errmsg = "";
 
     _nss = nss;
-    _fromShard = fromShard;
+    _fromShard = cloneRequest.getFromShardId();
     _fromShardConnString =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, _fromShard))
             ->getConnString();
-    _toShard = toShard;
-    _min = min;
-    _max = max;
-    _shardKeyPattern = shardKeyPattern;
+    _toShard = cloneRequest.getToShardId();
+    _min = cloneRequest.getMinKey();
+    _max = cloneRequest.getMaxKey();
+    _shardKeyPattern = cloneRequest.getShardKeyPattern();
 
     _epoch = epoch;
 
@@ -356,7 +352,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     _numCatchup = 0;
     _numSteady = 0;
 
-    _sessionId = sessionId;
+    _sessionId = cloneRequest.getSessionId();
     _scopedReceiveChunk = std::move(scopedReceiveChunk);
 
     // TODO: If we are here, the migrate thread must have completed, otherwise _active above
@@ -367,7 +363,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     }
 
     _sessionMigration =
-        stdx::make_unique<SessionCatalogMigrationDestination>(fromShard, *_sessionId);
+        stdx::make_unique<SessionCatalogMigrationDestination>(_fromShard, *_sessionId);
 
     _migrateThreadHandle = stdx::thread([this]() { _migrateThread(); });
 

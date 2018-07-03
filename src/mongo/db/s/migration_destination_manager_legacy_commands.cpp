@@ -42,6 +42,7 @@
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/util/assert_util.h"
@@ -71,6 +72,10 @@ public:
         return true;
     }
 
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
+    }
+
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const override {
@@ -87,50 +92,28 @@ public:
         auto shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
-        const ShardId toShard(cmdObj["toShardName"].String());
-        const ShardId fromShard(cmdObj["fromShardName"].String());
+        auto nss = NamespaceString(parseNs(dbname, cmdObj));
 
-        const NamespaceString nss(cmdObj.firstElement().String());
+        auto cloneRequest = uassertStatusOK(StartChunkCloneRequest::createFromCommand(nss, cmdObj));
 
         const auto chunkRange = uassertStatusOK(ChunkRange::fromBSON(cmdObj));
 
         const auto shardVersion = forceShardFilteringMetadataRefresh(opCtx, nss);
 
-        // Process secondary throttle settings and assign defaults if necessary.
-        const auto secondaryThrottle =
-            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
-        const auto writeConcern = uassertStatusOK(
-            ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(opCtx, secondaryThrottle));
-
-        BSONObj shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
-
-        auto statusWithFromShardConnectionString = ConnectionString::parse(cmdObj["from"].String());
-        if (!statusWithFromShardConnectionString.isOK()) {
-            errmsg = str::stream()
-                << "cannot start receiving chunk " << redact(chunkRange.toString())
-                << causedBy(redact(statusWithFromShardConnectionString.getStatus()));
-
-            warning() << errmsg;
-            return false;
-        }
-
-        const MigrationSessionId migrationSessionId(
-            uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
+        const auto writeConcern =
+            uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
+                opCtx, cloneRequest.getSecondaryThrottle()));
 
         // Ensure this shard is not currently receiving or donating any chunks.
-        auto scopedReceiveChunk(uassertStatusOK(
-            ActiveMigrationsRegistry::get(opCtx).registerReceiveChunk(nss, chunkRange, fromShard)));
+        auto scopedReceiveChunk(
+            uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerReceiveChunk(
+                nss, chunkRange, cloneRequest.getFromShardId())));
 
         uassertStatusOK(
             MigrationDestinationManager::get(opCtx)->start(opCtx,
                                                            nss,
                                                            std::move(scopedReceiveChunk),
-                                                           migrationSessionId,
-                                                           fromShard,
-                                                           toShard,
-                                                           chunkRange.getMin(),
-                                                           chunkRange.getMax(),
-                                                           shardKeyPattern,
+                                                           cloneRequest,
                                                            shardVersion.epoch(),
                                                            writeConcern));
 
