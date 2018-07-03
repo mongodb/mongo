@@ -66,7 +66,7 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
         opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
 
         LogicalSessionCache* lsc = LogicalSessionCache::get(opCtx->getServiceContext());
-        lsc->vivify(opCtx, opCtx->getLogicalSessionId().get());
+        uassertStatusOK(lsc->vivify(opCtx, opCtx->getLogicalSessionId().get()));
     }
 
     if (osi.getTxnNumber()) {

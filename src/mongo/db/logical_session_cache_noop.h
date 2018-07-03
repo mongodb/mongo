@@ -45,7 +45,9 @@ public:
         return Status::OK();
     }
 
-    void startSession(OperationContext* opCtx, LogicalSessionRecord record) override {}
+    Status startSession(OperationContext* opCtx, LogicalSessionRecord record) override {
+        return Status::OK();
+    }
 
     Status refreshSessions(OperationContext* opCtx,
                            const RefreshSessionsCmdFromClient& cmd) override {
@@ -56,7 +58,9 @@ public:
         return Status::OK();
     }
 
-    void vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override {}
+    Status vivify(OperationContext* opCtx, const LogicalSessionId& lsid) override {
+        return Status::OK();
+    }
 
     Status refreshNow(Client* client) override {
         return Status::OK();

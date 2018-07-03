@@ -77,6 +77,7 @@ public:
         ServiceContext* serviceContext = client->getServiceContext();
 
         auto lsCache = LogicalSessionCache::get(serviceContext);
+
         boost::optional<LogicalSessionRecord> record;
 
         try {
@@ -87,7 +88,7 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        lsCache->startSession(opCtx, record.get());
+        uassertStatusOK(lsCache->startSession(opCtx, record.get()));
 
         makeLogicalSessionToClient(record->getId()).serialize(&result);
 
