@@ -68,12 +68,12 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     }
 
     // Need to mark the UUIDCatalog as open if we our closeAll fails, dismissed if successful.
-    auto reopenOnFailure = MakeGuard([opCtx] { UUIDCatalog::get(opCtx).onOpenCatalog(); });
+    auto reopenOnFailure = MakeGuard([opCtx] { UUIDCatalog::get(opCtx).onOpenCatalog(opCtx); });
     // Closing UUID Catalog: only lookupNSSByUUID will fall back to using pre-closing state to
     // allow authorization for currently unknown UUIDs. This is needed because authorization needs
     // to work before acquiring locks, and might otherwise spuriously regard a UUID as unknown
     // while reloading the catalog.
-    UUIDCatalog::get(opCtx).onCloseCatalog();
+    UUIDCatalog::get(opCtx).onCloseCatalog(opCtx);
     LOG(1) << "closeCatalog: closing UUID catalog";
 
     // Close all databases.
@@ -205,7 +205,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     }
     // Opening UUID Catalog: The UUID catalog is now in sync with the storage engine catalog. Clear
     // the pre-closing state.
-    UUIDCatalog::get(opCtx).onOpenCatalog();
+    UUIDCatalog::get(opCtx).onOpenCatalog(opCtx);
     LOG(1) << "openCatalog: finished reloading UUID catalog";
 }
 }  // namespace catalog

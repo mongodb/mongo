@@ -187,4 +187,30 @@ private:
     bool _justCreated{false};
 };
 
+/**
+ * RAII-style class. Hides changes to the UUIDCatalog For the life of the object so that calls to
+ * UUIDCatalog::lookupNSSByUUID will return results as before the RAII object was instantiated.
+ *
+ * The caller must hold the global exclusive lock for the life of the instance.
+ */
+class ConcealUUIDCatalogChangesBlock {
+    MONGO_DISALLOW_COPYING(ConcealUUIDCatalogChangesBlock);
+
+public:
+    /**
+     * Conceals future UUIDCatalog changes and stashes a pointer to the opCtx for the destructor to
+     * use.
+     */
+    ConcealUUIDCatalogChangesBlock(OperationContext* opCtx);
+
+    /**
+     * Reveals UUIDCatalog changes.
+     */
+    ~ConcealUUIDCatalogChangesBlock();
+
+private:
+    // Needed for the destructor to access the UUIDCatalog in order to call onOpenCatalog.
+    OperationContext* _opCtx;
+};
+
 }  // namespace mongo

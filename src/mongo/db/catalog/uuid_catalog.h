@@ -181,15 +181,20 @@ public:
 
     /**
      * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back
-     * to the pre-close state to resolve queries for currently unknown UUIDs. This allows
-     * authorization, which needs to do lookups outside of database locks, to proceed.
+     * to the pre-close state to resolve queries for currently unknown UUIDs. This allows processes,
+     * like authorization and replication, which need to do lookups outside of database locks, to
+     * proceed.
+     *
+     * Must be called with the global lock acquired in exclusive mode.
      */
-    void onCloseCatalog();
+    void onCloseCatalog(OperationContext* opCtx);
 
     /**
      * Puts the catatlog back in open state, removing the pre-close state. See onCloseCatalog.
+     *
+     * Must be called with the global lock acquired in exclusive mode.
      */
-    void onOpenCatalog();
+    void onOpenCatalog(OperationContext* opCtx);
 
     /**
      * Return the UUID lexicographically preceding `uuid` in the database named by `db`.

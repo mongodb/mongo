@@ -247,13 +247,21 @@ public:
                 "backupOriginalFiles not supported",
                 !cmdObj.getField("backupOriginalFiles").trueValue());
 
-        StorageEngine* engine = getGlobalServiceContext()->getStorageEngine();
-        repl::UnreplicatedWritesBlock uwb(opCtx);
-        Status status = repairDatabase(opCtx, engine, dbname);
+        {
+            // Conceal UUIDCatalog changes for the duration of repairDatabase so that calls to
+            // UUIDCatalog::lookupNSSByUUID do not cause spurious NamespaceNotFound errors while
+            // repairDatabase makes updates.
+            ConcealUUIDCatalogChangesBlock cucc(opCtx);
 
-        // Open database before returning
-        DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbname);
-        uassertStatusOK(status);
+            StorageEngine* engine = getGlobalServiceContext()->getStorageEngine();
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            Status status = repairDatabase(opCtx, engine, dbname);
+
+            // Open database before returning
+            DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbname);
+            uassertStatusOK(status);
+        }
+
         return true;
     }
 } cmdRepairDatabase;
