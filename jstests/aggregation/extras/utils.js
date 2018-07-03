@@ -25,10 +25,10 @@ function testExpressionWithCollation(coll, expression, result, collationSpec) {
 /**
  * Returns true if 'al' is the same as 'ar'. If the two are arrays, the arrays can be in any order.
  * Objects (either 'al' and 'ar' themselves, or embedded objects) must have all the same properties,
- * with the exception of '_id'. If 'al' and 'ar' are neither object nor arrays, they must be the
- * same value.
+ * with the exception of '_id'. If 'al' and 'ar' are neither object nor arrays, they must compare
+ * equal using 'valueComparator', or == if not provided.
  */
-function anyEq(al, ar, verbose = false) {
+function anyEq(al, ar, verbose = false, valueComparator) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
 
     if (al instanceof Array) {
@@ -37,7 +37,7 @@ function anyEq(al, ar, verbose = false) {
             return false;
         }
 
-        if (!arrayEq(al, ar, verbose)) {
+        if (!arrayEq(al, ar, verbose, valueComparator)) {
             debug(`anyEq: arrayEq(al, ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
             return false;
         }
@@ -49,11 +49,12 @@ function anyEq(al, ar, verbose = false) {
             return false;
         }
 
-        if (!documentEq(al, ar, verbose)) {
+        if (!documentEq(al, ar, verbose, valueComparator)) {
             debug(`anyEq: documentEq(al, ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
             return false;
         }
-    } else if (al != ar) {
+    } else if ((valueComparator && !valueComparator(al, ar)) || (!valueComparator && al !== ar)) {
+        // Neither an object nor an array, use the custom comparator if provided.
         debug(`anyEq: (al != ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
         return false;
     }
@@ -63,10 +64,19 @@ function anyEq(al, ar, verbose = false) {
 }
 
 /**
+ * Compares two documents for equality using a custom comparator for the values which returns true
+ * or false. Returns true or false. Only equal if they have the exact same set of properties, and
+ * all the properties' values match according to 'valueComparator'.
+ */
+function customDocumentEq({left, right, verbose, valueComparator}) {
+    return documentEq(left, right, verbose, valueComparator);
+}
+
+/**
  * Compare two documents for equality. Returns true or false. Only equal if they have the exact same
  * set of properties, and all the properties' values match.
  */
-function documentEq(dl, dr, verbose = false) {
+function documentEq(dl, dr, verbose = false, valueComparator) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
 
     // Make sure these are both objects.
@@ -95,7 +105,7 @@ function documentEq(dl, dr, verbose = false) {
         if (propertyName == '_id')
             continue;
 
-        if (!anyEq(dl[propertyName], dr[propertyName], verbose)) {
+        if (!anyEq(dl[propertyName], dr[propertyName], verbose, valueComparator)) {
             return false;
         }
     }
@@ -117,7 +127,7 @@ function documentEq(dl, dr, verbose = false) {
     return true;
 }
 
-function arrayEq(al, ar, verbose = false) {
+function arrayEq(al, ar, verbose = false, valueComparator) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
 
     // Check that these are both arrays.
@@ -136,15 +146,19 @@ function arrayEq(al, ar, verbose = false) {
         return false;
     }
 
-    let i = 0;
-    let j = 0;
-    while (i < al.length) {
-        if (anyEq(al[i], ar[j], verbose)) {
-            j = 0;
-            i++;
-        } else if (j < ar.length) {
-            j++;
-        } else {
+    // Keep a set of which indexes we've already used to avoid considering [1,1] as equal to [1,2].
+    const matchedElementsInRight = new Set();
+    for (let leftElem of al) {
+        let foundMatch = false;
+        for (let i = 0; i < ar.length; ++i) {
+            if (!matchedElementsInRight.has(i) &&
+                anyEq(leftElem, ar[i], verbose, valueComparator)) {
+                matchedElementsInRight.add(i);  // Don't use the same value each time.
+                foundMatch = true;
+                break;
+            }
+        }
+        if (!foundMatch) {
             return false;
         }
     }

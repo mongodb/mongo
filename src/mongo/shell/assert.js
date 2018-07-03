@@ -831,11 +831,7 @@ assert = (function() {
         assert.between(a, b, c, msg, false);
     };
 
-    assert.close = function(a, b, msg, places) {
-        if (places === undefined) {
-            places = 4;
-        }
-
+    assert.close = function(a, b, msg, places = 4) {
         // This treats 'places' as digits past the decimal point.
         var absoluteError = Math.abs(a - b);
         if (Math.round(absoluteError * Math.pow(10, places)) === 0) {
@@ -848,8 +844,8 @@ assert = (function() {
             return;
         }
 
-        const msgPrefix = "" + a + " is not equal to " + b + " within " + places + " places, " +
-            "absolute error: " + absoluteError + ", relative error: " + relativeError;
+        const msgPrefix = `${a} is not equal to ${b} within ${places} places, absolute error: ` +
+            `${absoluteError}, relative error: ${relativeError}`;
         doassert(_buildAssertionMessage(msg, msgPrefix));
     };
 
