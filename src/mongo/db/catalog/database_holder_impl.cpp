@@ -233,6 +233,7 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx, const std::string& re
 
     set<string> dbs;
     for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
+        BackgroundOperation::assertNoBgOpInProgForDb(i->first);
         dbs.insert(i->first);
     }
 
@@ -240,8 +241,6 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx, const std::string& re
         string name = *i;
 
         LOG(2) << "DatabaseHolder::closeAll name:" << name;
-
-        BackgroundOperation::assertNoBgOpInProgForDb(name);
 
         Database* db = _dbs[name];
         repl::oplogCheckCloseDatabase(opCtx, db);
