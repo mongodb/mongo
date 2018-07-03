@@ -346,13 +346,24 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         _stats.setLastSessionsCollectionJobEntriesEnded(explicitlyEndingSessions.size());
     }
 
-
     // Find which running, but not recently active sessions, are expired, and add them
     // to the list of sessions to kill cursors for
 
     KillAllSessionsByPatternSet patterns;
 
     auto openCursorSessions = _service->getOpenCursorSessions();
+    // Exclude sessions added to _activeSessions from the openCursorSession to avoid race between
+    // killing cursors on the removed sessions and creating sessions.
+    {
+        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+
+        for (const auto& it : _activeSessions) {
+            auto newSessionIt = openCursorSessions.find(it.first);
+            if (newSessionIt != openCursorSessions.end()) {
+                openCursorSessions.erase(newSessionIt);
+            }
+        }
+    }
 
     // think about pruning ending and active out of openCursorSessions
     auto statusAndRemovedSessions = _sessionsColl->findRemovedSessions(opCtx, openCursorSessions);
