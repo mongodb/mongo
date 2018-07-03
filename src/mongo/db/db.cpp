@@ -518,6 +518,11 @@ ExitCode _initAndListen(int listenPort) {
               << startupWarningsLog;
     }
 
+    // Set up the periodic runner for background job execution
+    auto runner = makePeriodicRunner(serviceContext);
+    runner->startup();
+    serviceContext->setPeriodicRunner(std::move(runner));
+
     // This function may take the global lock.
     auto shardingInitialized =
         uassertStatusOK(ShardingState::get(startupOpCtx.get())
@@ -603,11 +608,6 @@ ExitCode _initAndListen(int listenPort) {
     startClientCursorMonitor();
 
     PeriodicTask::startRunningPeriodicTasks();
-
-    // Set up the periodic runner for background job execution
-    auto runner = makePeriodicRunner(serviceContext);
-    runner->startup();
-    serviceContext->setPeriodicRunner(std::move(runner));
 
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsLocal));

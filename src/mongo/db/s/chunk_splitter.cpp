@@ -232,7 +232,7 @@ ChunkSplitter& ChunkSplitter::get(ServiceContext* serviceContext) {
     return getChunkSplitter(serviceContext);
 }
 
-void ChunkSplitter::setReplicaSetMode(bool isPrimary) {
+void ChunkSplitter::onShardingInitialization(bool isPrimary) {
     stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
     _isPrimary = isPrimary;
 }

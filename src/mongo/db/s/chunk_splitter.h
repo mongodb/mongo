@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/periodic_runner.h"
 
 namespace mongo {
 
@@ -57,7 +58,7 @@ public:
      * Sets the mode of the ChunkSplitter to either primary or secondary.
      * The ChunkSplitter is only active when primary.
      */
-    void setReplicaSetMode(bool isPrimary);
+    void onShardingInitialization(bool isPrimary);
 
     /**
      * Invoked when the shard server primary enters the 'PRIMARY' state to set up the ChunkSplitter

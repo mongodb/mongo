@@ -72,6 +72,7 @@
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/server_options.h"
@@ -705,6 +706,7 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
         invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
         ChunkSplitter::get(_service).onStepDown();
         CatalogCacheLoader::get(_service).onStepDown();
+        PeriodicBalancerConfigRefresher::get(_service).onStepDown();
     }
 
     if (auto validator = LogicalTimeValidator::get(_service)) {
@@ -788,6 +790,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         CatalogCacheLoader::get(_service).onStepUp();
         ChunkSplitter::get(_service).onStepUp();
+        PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
     } else {  // unsharded
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);

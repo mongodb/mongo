@@ -43,6 +43,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mock_periodic_runner_impl.h"
 
 #include "mongo/db/catalog/database_holder.h"
 
@@ -61,6 +62,11 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine) {
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
     auto logicalClock = std::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
+
+    // Set up a fake no-op PeriodicRunner. No jobs will ever get run, which is
+    // desired behavior for unit tests unrelated to background jobs.
+    auto runner = std::make_unique<MockPeriodicRunnerImpl>();
+    serviceContext->setPeriodicRunner(std::move(runner));
 
     unittest::TempDir tempDir("service_context_d_test_fixture");
     storageGlobalParams.dbpath = tempDir.path();

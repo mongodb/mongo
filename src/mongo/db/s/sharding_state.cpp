@@ -47,6 +47,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -232,7 +233,9 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
                                repl::MemberState::RS_PRIMARY);
 
             CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
-            ChunkSplitter::get(opCtx).setReplicaSetMode(isStandaloneOrPrimary);
+            ChunkSplitter::get(opCtx).onShardingInitialization(isStandaloneOrPrimary);
+            PeriodicBalancerConfigRefresher::get(opCtx).onShardingInitialization(
+                opCtx->getServiceContext(), isStandaloneOrPrimary);
 
             log() << "initialized sharding components for "
                   << (isStandaloneOrPrimary ? "primary" : "secondary") << " node.";

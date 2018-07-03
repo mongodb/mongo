@@ -30,6 +30,7 @@ env.Library(
         'active_migrations_registry.cpp',
         'active_move_primaries_registry.cpp',
         'chunk_move_write_concern_options.cpp',
+        'periodic_balancer_config_refresher.cpp',
         'chunk_splitter.cpp',
         'config_server_op_observer.cpp',
         'implicit_create_collection.cpp',
