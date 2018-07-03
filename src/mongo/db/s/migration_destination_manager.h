@@ -51,6 +51,7 @@
 namespace mongo {
 
 class OperationContext;
+class StartChunkCloneRequest;
 class Status;
 struct WriteConcernOptions;
 
@@ -102,12 +103,7 @@ public:
     Status start(OperationContext* opCtx,
                  const NamespaceString& nss,
                  ScopedReceiveChunk scopedReceiveChunk,
-                 const MigrationSessionId& sessionId,
-                 const ShardId& fromShard,
-                 const ShardId& toShard,
-                 const BSONObj& min,
-                 const BSONObj& max,
-                 const BSONObj& shardKeyPattern,
+                 StartChunkCloneRequest cloneRequest,
                  const OID& epoch,
                  const WriteConcernOptions& writeConcern);
 
