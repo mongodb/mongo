@@ -959,7 +959,7 @@ functions:
       remote_file: ${mongo_debugsymbols}
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
 
   "fetch debugsymbols archive" : &fetch_debugsymbols_archive
     command: s3.get
@@ -1710,7 +1710,7 @@ functions:
         remote_file: ${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         display_name: Generated Tests - Execution ${execution}
 
   "run idl tests" :
@@ -2540,7 +2540,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_artifacts-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: Remote EC2 Artifacts - Execution ${execution}
       optional: true
 
@@ -2553,7 +2553,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_monitor-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: Remote EC2 Monitor - Execution ${execution}
       optional: true
 
@@ -2613,7 +2613,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/client_logs/mongo-client-logs-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: Client logs - Execution ${execution}
       optional: true
 
@@ -2811,7 +2811,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/gcov/gcov-intermediate-files-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: gcov intermediate files - Execution ${execution}
       optional: true
 
@@ -2837,7 +2837,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: Jepsen mongod Logs - ${execution}
       optional: true
 
@@ -2858,7 +2858,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: Jepsen Test Results - ${execution}
       optional: true
 
@@ -2903,7 +2903,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/coredumps/mongo-coredumps-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: Core Dumps - Execution ${execution}
       optional: true
 
@@ -2973,7 +2973,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/unittests/mongo-unittests-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: Unit tests - Execution ${execution}
       optional: true
 
@@ -3070,7 +3070,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: Hang Analyzer Output - Execution ${execution}
       optional: true
 
@@ -3097,7 +3097,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: Disk Stats - Execution ${execution}
       optional: true
 
@@ -3123,7 +3123,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/systemresourceinfo/mongo-system-resource-info-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/x-gzip}
+      content_type: ${content_type|application/gzip}
       display_name: System Resource Info - Execution ${execution}
       optional: true
 
@@ -3337,7 +3337,7 @@ tasks:
         remote_file: ${mongo_binaries}
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         display_name: Binaries
     - command: s3.put
       params:
@@ -3348,7 +3348,7 @@ tasks:
         remote_file: ${mongo_shell}
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         display_name: Shell
     - command: s3.put
       params:
@@ -3368,7 +3368,7 @@ tasks:
         remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         display_name: Source tarball
         # We only need to upload the source tarball from one of the build variants
         # because it should be the same everywhere, so just use linux-64/windows-64-2k8-ssl.
@@ -6565,7 +6565,7 @@ tasks:
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
     # Put the shell tarball/zipfile
     - command: s3.put
@@ -6575,7 +6575,7 @@ tasks:
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
     # Put the source tarball
     - command: s3.put
@@ -6585,7 +6585,7 @@ tasks:
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}
         build_variants: [ linux-64, windows-64-2k8-ssl ]
 
@@ -6597,7 +6597,7 @@ tasks:
         permissions: public-read
         local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
         bucket: build-push-testing
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}
         optional: true
 
@@ -6609,7 +6609,7 @@ tasks:
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
 
     # Put the shell tarball signature
@@ -6620,7 +6620,7 @@ tasks:
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
 
     # Put the source tarball signature
@@ -6631,7 +6631,7 @@ tasks:
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig
         build_variants: [ linux-64, windows-64-2k8-ssl ]
 
@@ -6643,7 +6643,7 @@ tasks:
         permissions: public-read
         local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
         bucket: build-push-testing
-        content_type: ${content_type|application/x-gzip}
+        content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sig
         optional: true
 
