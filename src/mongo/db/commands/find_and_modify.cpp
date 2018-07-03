@@ -417,7 +417,7 @@ public:
                 opDebug->setPlanSummaryMetrics(summaryStats);
 
                 // Fill out OpDebug with the number of deleted docs.
-                opDebug->ndeleted = getDeleteStats(exec.get())->docsDeleted;
+                opDebug->additiveMetrics.ndeleted = getDeleteStats(exec.get())->docsDeleted;
 
                 if (curOp->shouldDBProfile()) {
                     BSONObjBuilder execStatsBob;

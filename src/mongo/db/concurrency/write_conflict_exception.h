@@ -90,7 +90,7 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
         try {
             return f();
         } catch (WriteConflictException const&) {
-            ++CurOp::get(opCtx)->debug().writeConflicts;
+            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             WriteConflictException::logAndBackoff(attempts, opStr, ns);
             ++attempts;
             opCtx->recoveryUnit()->abandonSnapshot();
