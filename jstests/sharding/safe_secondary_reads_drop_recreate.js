@@ -152,6 +152,7 @@
         emptycapped: {skip: "primary only"},
         enableSharding: {skip: "primary only"},
         endSessions: {skip: "does not return user data"},
+        eval: {skip: "must define test coverage for 4.0 backwards compatibility"},
         explain: {skip: "TODO SERVER-30068"},
         features: {skip: "does not return user data"},
         filemd5: {skip: "does not return user data"},

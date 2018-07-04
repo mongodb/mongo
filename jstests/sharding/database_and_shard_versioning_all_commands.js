@@ -17,7 +17,8 @@
     // on mongos. In an all-4.2 environment, these commands won't exist. To increase test coverage,
     // and allow us to run on same- and mixed-version suites, we will allow these commands to have
     // a test defined without always existing on the mongos being used.
-    const fcv40OnlyCommands = ['geoNear', 'group'];
+    const fcv40OnlyCommands =
+        ['abortTransaction', 'commitTransaction', 'eval', 'geoNear', 'group', 'reIndex'];
 
     function validateTestCase(testCase) {
         assert(testCase.skip || testCase.command,
@@ -206,6 +207,7 @@
         echo: {skip: "does not forward command to primary shard"},
         enableSharding: {skip: "does not forward command to primary shard"},
         endSessions: {skip: "goes through the cluster write path"},
+        eval: {skip: "must define test coverage for 4.0 backwards compatibility"},
         explain: {skip: "TODO SERVER-31226"},
         features: {skip: "executes locally on mongos (not sent to any remote node)"},
         filemd5: {
@@ -359,6 +361,7 @@
         refreshLogicalSessionCacheNow: {skip: "goes through the cluster write path"},
         refreshSessions: {skip: "executes locally on mongos (not sent to any remote node)"},
         refreshSessionsInternal: {skip: "executes locally on mongos (not sent to any remote node)"},
+        reIndex: {skip: "must define test coverage for 4.0 backwards compatibility"},
         removeShard: {skip: "not on a user database"},
         removeShardFromZone: {skip: "not on a user database"},
         renameCollection: {
