@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -71,6 +72,11 @@ const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
 
 // Allow the command to be executed on a secondary (see ServerSelectionMetadata).
 const BSONObj kSecondaryOkMetadata{rpc::ServerSelectionMetadata(true, boost::none).toBSON()};
+
+constexpr bool internalProhibitShardOperationRetryByDefault = false;
+MONGO_EXPORT_SERVER_PARAMETER(internalProhibitShardOperationRetry,
+                              bool,
+                              internalProhibitShardOperationRetryByDefault);
 
 /**
  * Returns a new BSONObj describing the same command and arguments as 'cmdObj', but with maxTimeMS
@@ -104,6 +110,10 @@ ShardRemote::ShardRemote(const ShardId& id,
 ShardRemote::~ShardRemote() = default;
 
 bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
+    if (internalProhibitShardOperationRetry.loadRelaxed()) {
+        return false;
+    }
+
     if (options == RetryPolicy::kNoRetry) {
         return false;
     }
