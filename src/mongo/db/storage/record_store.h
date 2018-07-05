@@ -266,9 +266,10 @@ public:
 };
 
 /**
- * A RecordStore provides an abstraction used for storing documents in a collection,
- * or entries in an index. In storage engines implementing the KVEngine, record stores
- * are also used for implementing catalogs.
+ * An abstraction used for storing documents in a collection or entries in an index.
+ *
+ * In storage engines implementing the KVEngine, record stores are also used for implementing
+ * catalogs.
  *
  * Many methods take an OperationContext parameter. This contains the RecoveryUnit, with
  * all RecordStore specific transaction information, as well as the LockState. Methods that take

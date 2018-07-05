@@ -45,26 +45,35 @@ struct LockHead;
 struct PartitionedLockHead;
 
 /**
- * Lock modes.
+ * LockMode compatibility matrix.
  *
- * Compatibility Matrix
- *                                          Granted mode
- *   ---------------.--------------------------------------------------------.
- *   Requested Mode | MODE_NONE  MODE_IS   MODE_IX  MODE_S   MODE_X  |
- *     MODE_IS      |      +        +         +        +        -    |
- *     MODE_IX      |      +        +         +        -        -    |
- *     MODE_S       |      +        +         -        +        -    |
- *     MODE_X       |      +        -         -        -        -    |
+ * This matrix answers the question, "Is a lock request with mode 'Requested Mode' compatible with
+ * an existing lock held in mode 'Granted Mode'?"
+ *
+ * | Requested Mode | Granted Mode |         |          |        |          |
+ * |----------------|:------------:|:-------:|:--------:|:------:|:--------:|
+ * |                |  MODE_NONE   | MODE_IS |  MODE_IX | MODE_S |  MODE_X  |
+ * | MODE_IS        |      +       |    +    |     +    |    +   |          |
+ * | MODE_IX        |      +       |    +    |     +    |        |          |
+ * | MODE_S         |      +       |    +    |          |    +   |          |
+ * | MODE_X         |      +       |         |          |        |          |
  */
 enum LockMode {
+    /** None */
     MODE_NONE = 0,
+    /** Intent shared */
     MODE_IS = 1,
+    /** Intent exclusive */
     MODE_IX = 2,
+    /** Shared */
     MODE_S = 3,
+    /** Exclusive */
     MODE_X = 4,
 
-    // Counts the lock modes. Used for array size allocations, etc. Always insert new lock
-    // modes above this entry.
+    /**
+     * Counts the lock modes. Used for array size allocations, etc. Always insert new lock modes
+     * above this entry.
+     */
     LockModesCount
 };
 
@@ -148,20 +157,24 @@ enum LockResult {
  * ordering is consistent so deadlock cannot occur.
  */
 enum ResourceType {
-    // Types used for special resources, use with a hash id from ResourceId::SingletonHashIds.
+    /** Types used for special resources, use with a hash id from ResourceId::SingletonHashIds. */
     RESOURCE_INVALID = 0,
-    RESOURCE_GLOBAL,        // Used for mode changes or global exclusive operations
-    RESOURCE_MMAPV1_FLUSH,  // Necessary only for the MMAPv1 engine
 
-    // Generic resources, used for multi-granularity locking, together with RESOURCE_GLOBAL
+    /**  Used for mode changes or global exclusive operations */
+    RESOURCE_GLOBAL,
+
+    /** Necessary only for the MMAPv1 engine */
+    RESOURCE_MMAPV1_FLUSH,
+
+    /** Generic resources, used for multi-granularity locking, together with RESOURCE_GLOBAL */
     RESOURCE_DATABASE,
     RESOURCE_COLLECTION,
     RESOURCE_METADATA,
 
-    // Resource type used for locking general resources not related to the storage hierarchy.
+    /** Resource type used for locking general resources not related to the storage hierarchy. */
     RESOURCE_MUTEX,
 
-    // Counts the rest. Always insert new resource types above this entry.
+    /** Counts the rest. Always insert new resource types above this entry. */
     ResourceTypesCount
 };
 
