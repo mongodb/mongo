@@ -89,7 +89,7 @@ StatusWith<ReadPreference> parseReadPreferenceMode(StringData prefStr) {
                                 << kPrimaryOnly
                                 << "', '"
                                 << kPrimaryPreferred
-                                << "', "
+                                << "', '"
                                 << kSecondaryOnly
                                 << "', '"
                                 << kSecondaryPreferred
