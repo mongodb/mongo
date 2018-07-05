@@ -548,11 +548,15 @@ functions:
           set -o verbose
 
           python_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})
+          python3_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python3})
           if [ "Windows_NT" = "$OS" ]; then
             python_loc=$(cygpath -w $python_loc)
+            python3_loc=$(cygpath -w c:/python/Python36/python.exe)
           fi
           # Set up virtualenv in ${workdir}
           virtualenv --python "$python_loc" --system-site-packages "${workdir}/venv"
+          # Add virtualenv for python3 in ${workdir}
+          virtualenv --python "$python3_loc" --system-site-packages "${workdir}/venv_3"
 
   "run tests" :
     - command: expansions.update
@@ -1811,6 +1815,28 @@ pre:
             python=${python|/opt/mongodbtoolchain/v2/bin/python2}
           fi
           echo "python set to $(which $python)"
+       - key: activate_virtualenv_3
+         value: |
+          # check if virtualenv for python3 is set up
+          if [ -d "${workdir}/venv_3" ]; then
+            if [ "Windows_NT" = "$OS" ]; then
+              # Need to quote the path on Windows to preserve the separator.
+              . "${workdir}/venv_3/Scripts/activate" 2> /tmp/activate_error.log
+            else
+              . ${workdir}/venv_3/bin/activate 2> /tmp/activate_error.log
+            fi
+            if [ $? -ne 0 ]; then
+              echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
+            fi
+            python=python
+          else
+            if [ "Windows_NT" = "$OS" ]; then
+              python=/cygdrive/c/python/Python36/python
+            else
+              python=${python3|/opt/mongodbtoolchain/v2/bin/python3}
+            fi
+          fi
+          echo "python set to $(which $python)"
        - key: posix_workdir
          value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
        # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
@@ -2502,8 +2528,15 @@ tasks:
           set -o errexit
           set -o verbose
 
+          # Since mypy requires python3, we need to activate the venv_3
+          ${activate_virtualenv_3}
+          pip install -r buildscripts/requirements.txt
+          updated_mypy=$(PATH=$PATH:/opt/mongodbtoolchain/v2/bin which mypy)
+          deactivate
+          ###
           ${activate_virtualenv}
-          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
+          pip install -r buildscripts/requirements.txt
+          MYPY=$updated_mypy ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
 
 - <<: *task_template
   name: burn_in_tests

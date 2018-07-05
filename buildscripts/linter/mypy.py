@@ -2,6 +2,8 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import os
+
 from typing import List
 
 from . import base
@@ -13,7 +15,7 @@ class MypyLinter(base.LinterBase):
     def __init__(self):
         # type: () -> None
         """Create a mypy linter."""
-        super(MypyLinter, self).__init__("mypy", "mypy 0.501")
+        super(MypyLinter, self).__init__("mypy", "mypy 0.501", os.getenv("MYPY"))
 
     def get_lint_version_cmd_args(self):
         # type: () -> List[str]

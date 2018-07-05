@@ -88,7 +88,11 @@ def _find_linter(linter, config_dict):
 
         if linter.ignore_interpreter():
             # Some linters use a different interpreter then the current interpreter.
-            cmd_str = os.path.join('/opt/mongodbtoolchain/v2/bin', linter.cmd_name)
+            # If the linter cmd_location is specified then use that location.
+            if linter.cmd_location:
+                cmd_str = linter.cmd_location
+            else:
+                cmd_str = os.path.join('/opt/mongodbtoolchain/v2/bin', linter.cmd_name)
             cmd = [cmd_str]
         else:
             cmd = [sys.executable, cmd_str]
