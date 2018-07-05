@@ -57,17 +57,17 @@ const char kTermField[] = "term";
 /**
  * Implements the find command on mongos.
  */
-class ClusterFindCmd : public BasicCommand {
-    MONGO_DISALLOW_COPYING(ClusterFindCmd);
-
+class ClusterFindCmd final : public Command {
 public:
-    ClusterFindCmd() : BasicCommand("find") {}
+    ClusterFindCmd() : Command("find") {}
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
+                                             const OpMsgRequest& opMsgRequest) override {
+        // TODO: Parse into a QueryRequest here.
+        return std::make_unique<Invocation>(this, opMsgRequest, opMsgRequest.getDatabase());
     }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
         return AllowedOnSecondary::kOptIn;
     }
 
@@ -79,12 +79,6 @@ public:
         return false;
     }
 
-    bool supportsReadConcern(const std::string& dbName,
-                             const BSONObj& cmdObj,
-                             repl::ReadConcernLevel level) const final {
-        return true;
-    }
-
     bool shouldAffectCommandCounter() const final {
         return false;
     }
@@ -93,152 +87,153 @@ public:
         return "query for documents";
     }
 
-    /**
-     * In order to run the find command, you must be authorized for the "find" action
-     * type on the collection.
-     */
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-        auto hasTerm = cmdObj.hasField(kTermField);
-        return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
-    }
+    class Invocation final : public CommandInvocation {
+    public:
+        Invocation(const ClusterFindCmd* definition, const OpMsgRequest& request, StringData dbName)
+            : CommandInvocation(definition), _request(request), _dbName(dbName) {}
 
-    Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& request,
-                   ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const final {
-        std::string dbname = request.getDatabase().toString();
-        const BSONObj& cmdObj = request.body;
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
-        // Parse the command BSON to a QueryRequest.
-        bool isExplain = true;
-        auto swQr = QueryRequest::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
-        if (!swQr.isOK()) {
-            return swQr.getStatus();
+    private:
+        bool supportsWriteConcern() const override {
+            return false;
         }
-        auto& qr = *swQr.getValue();
 
-        try {
-            const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
-
-            long long millisElapsed;
-            std::vector<AsyncRequestsSender::Response> shardResponses;
-
-            // We will time how long it takes to run the commands on the shards.
-            Timer timer;
-            const auto routingInfo = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, qr.nss()));
-            shardResponses =
-                scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           qr.nss().db(),
-                                                           qr.nss(),
-                                                           routingInfo,
-                                                           explainCmd,
-                                                           ReadPreferenceSetting::get(opCtx),
-                                                           Shard::RetryPolicy::kIdempotent,
-                                                           qr.getFilter(),
-                                                           qr.getCollation());
-            millisElapsed = timer.millis();
-
-            const char* mongosStageName =
-                ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
-
-            uassertStatusOK(ClusterExplain::buildExplainResult(
-                opCtx,
-                ClusterExplain::downconvert(opCtx, shardResponses),
-                mongosStageName,
-                millisElapsed,
-                out));
-
-            return Status::OK();
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-            out->resetToEmpty();
-
-            auto aggCmdOnView = qr.asAggregationCommand();
-            if (!aggCmdOnView.isOK()) {
-                return aggCmdOnView.getStatus();
-            }
-
-            auto aggRequestOnView =
-                AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue(), verbosity);
-            if (!aggRequestOnView.isOK()) {
-                return aggRequestOnView.getStatus();
-            }
-
-            auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
-            auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
-
-            ClusterAggregate::Namespaces nsStruct;
-            nsStruct.requestedNss = std::move(nss);
-            nsStruct.executionNss = std::move(ex->getNamespace());
-
-            auto status = ClusterAggregate::runAggregate(
-                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
-            uassertStatusOK(status);
-            return status;
-        }
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) final {
-        // We count find command as a query op.
-        globalOpCounters.gotQuery();
-
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
-
-        const bool isExplain = false;
-        auto qr = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-        uassertStatusOK(qr.getStatus());
-
-        const boost::intrusive_ptr<ExpressionContext> expCtx;
-        auto cq = CanonicalQuery::canonicalize(opCtx,
-                                               std::move(qr.getValue()),
-                                               expCtx,
-                                               ExtensionsCallbackNoop(),
-                                               MatchExpressionParser::kAllowAllSpecialFeatures);
-        uassertStatusOK(cq.getStatus());
-
-        try {
-            // Do the work to generate the first batch of results. This blocks waiting to get
-            // responses from the shard(s).
-            std::vector<BSONObj> batch;
-            auto cursorId = ClusterFind::runQuery(
-                opCtx, *cq.getValue(), ReadPreferenceSetting::get(opCtx), &batch);
-            // Build the response document.
-            CursorResponseBuilder firstBatch(/*firstBatch*/ true, &result);
-            for (const auto& obj : batch) {
-                firstBatch.append(obj);
-            }
-            firstBatch.done(cursorId, nss.ns());
-            return true;
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-            auto aggCmdOnView = cq.getValue()->getQueryRequest().asAggregationCommand();
-            uassertStatusOK(aggCmdOnView.getStatus());
-
-            auto aggRequestOnView = AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
-            uassertStatusOK(aggRequestOnView.getStatus());
-
-            auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
-            auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
-
-            // We pass both the underlying collection namespace and the view namespace here. The
-            // underlying collection namespace is used to execute the aggregation on mongoD. Any
-            // cursor returned will be registered under the view namespace so that subsequent
-            // getMore and killCursors calls against the view have access.
-            ClusterAggregate::Namespaces nsStruct;
-            nsStruct.requestedNss = std::move(nss);
-            nsStruct.executionNss = std::move(ex->getNamespace());
-
-            auto status = ClusterAggregate::runAggregate(
-                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, &result);
-            uassertStatusOK(status);
+        bool supportsReadConcern(repl::ReadConcernLevel level) const final {
             return true;
         }
-    }
+
+        NamespaceString ns() const override {
+            // TODO get the ns from the parsed QueryRequest.
+            return NamespaceString(CommandHelpers::parseNsFromCommand(_dbName, _request.body));
+        }
+
+        /**
+         * In order to run the find command, you must be authorized for the "find" action
+         * type on the collection.
+         */
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            auto hasTerm = _request.body.hasField(kTermField);
+            uassertStatusOK(
+                AuthorizationSession::get(opCtx->getClient())->checkAuthForFind(ns(), hasTerm));
+        }
+
+        void explain(OperationContext* opCtx,
+                     ExplainOptions::Verbosity verbosity,
+                     BSONObjBuilder* result) override {
+            // Parse the command BSON to a QueryRequest.
+            bool isExplain = true;
+            auto qr =
+                uassertStatusOK(QueryRequest::makeFromFindCommand(ns(), _request.body, isExplain));
+
+            try {
+                const auto explainCmd = ClusterExplain::wrapAsExplain(_request.body, verbosity);
+
+                long long millisElapsed;
+                std::vector<AsyncRequestsSender::Response> shardResponses;
+
+                // We will time how long it takes to run the commands on the shards.
+                Timer timer;
+                const auto routingInfo = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, qr->nss()));
+                shardResponses =
+                    scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                               qr->nss().db(),
+                                                               qr->nss(),
+                                                               routingInfo,
+                                                               explainCmd,
+                                                               ReadPreferenceSetting::get(opCtx),
+                                                               Shard::RetryPolicy::kIdempotent,
+                                                               qr->getFilter(),
+                                                               qr->getCollation());
+                millisElapsed = timer.millis();
+
+                const char* mongosStageName =
+                    ClusterExplain::getStageNameForReadOp(shardResponses.size(), _request.body);
+
+                uassertStatusOK(ClusterExplain::buildExplainResult(
+                    opCtx,
+                    ClusterExplain::downconvert(opCtx, shardResponses),
+                    mongosStageName,
+                    millisElapsed,
+                    result));
+
+            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+                result->resetToEmpty();
+
+                auto aggCmdOnView = uassertStatusOK(qr->asAggregationCommand());
+
+                auto aggRequestOnView = uassertStatusOK(
+                    AggregationRequest::parseFromBSON(ns(), aggCmdOnView, verbosity));
+
+                auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
+                auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
+
+                ClusterAggregate::Namespaces nsStruct;
+                nsStruct.requestedNss = ns();
+                nsStruct.executionNss = std::move(ex->getNamespace());
+
+                uassertStatusOK(ClusterAggregate::runAggregate(
+                    opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, result));
+            }
+        }
+
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
+            // We count find command as a query op.
+            globalOpCounters.gotQuery();
+
+            const bool isExplain = false;
+            auto qr =
+                uassertStatusOK(QueryRequest::makeFromFindCommand(ns(), _request.body, isExplain));
+
+            const boost::intrusive_ptr<ExpressionContext> expCtx;
+            auto cq = uassertStatusOK(
+                CanonicalQuery::canonicalize(opCtx,
+                                             std::move(qr),
+                                             expCtx,
+                                             ExtensionsCallbackNoop(),
+                                             MatchExpressionParser::kAllowAllSpecialFeatures));
+
+            try {
+                // Do the work to generate the first batch of results. This blocks waiting to get
+                // responses from the shard(s).
+                std::vector<BSONObj> batch;
+                auto cursorId =
+                    ClusterFind::runQuery(opCtx, *cq, ReadPreferenceSetting::get(opCtx), &batch);
+                auto bodyBuilder = result->getBodyBuilder();
+                // Build the response document.
+                CursorResponseBuilder firstBatch(/*firstBatch*/ true, &bodyBuilder);
+                for (const auto& obj : batch) {
+                    firstBatch.append(obj);
+                }
+                firstBatch.done(cursorId, cq->ns());
+            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+                result->reset();
+
+                auto aggCmdOnView = uassertStatusOK(cq->getQueryRequest().asAggregationCommand());
+
+                auto aggRequestOnView =
+                    uassertStatusOK(AggregationRequest::parseFromBSON(ns(), aggCmdOnView));
+
+                auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
+                auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
+
+                // We pass both the underlying collection namespace and the view namespace here. The
+                // underlying collection namespace is used to execute the aggregation on mongoD. Any
+                // cursor returned will be registered under the view namespace so that subsequent
+                // getMore and killCursors calls against the view have access.
+                ClusterAggregate::Namespaces nsStruct;
+                nsStruct.requestedNss = ns();
+                nsStruct.executionNss = std::move(ex->getNamespace());
+
+                auto bodyBuilder = result->getBodyBuilder();
+                uassertStatusOK(ClusterAggregate::runAggregate(
+                    opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, &bodyBuilder));
+            }
+        }
+
+    private:
+        const OpMsgRequest& _request;
+        const StringData _dbName;
+    };
 
 } cmdFindCluster;
 
