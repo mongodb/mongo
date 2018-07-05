@@ -4771,6 +4771,22 @@ tasks:
       resmoke_args: --suites=concurrency_replication_causal_consistency --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: concurrency_replication_ubsan
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_replication_ubsan --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: concurrency_replication_causal_consistency_ubsan
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_replication_causal_consistency_ubsan --storageEngine=wiredTiger
+
+- <<: *task_template
   name: concurrency_sharded_replication
   commands:
   - func: "do setup"
@@ -12851,8 +12867,9 @@ buildvariants:
   - name: change_streams_whole_cluster_secondary_reads_passthrough
   - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
-  - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
+  # TODO: SERVER-35964 revert the addition of UBSAN concurrency_replication suites.
+  - name: concurrency_replication_ubsan
+  - name: concurrency_replication_causal_consistency_ubsan
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
