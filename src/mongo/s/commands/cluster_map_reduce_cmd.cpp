@@ -476,7 +476,7 @@ public:
             // can skip this check in that case. If using merge or reduce, we only want to do this
             // if the output collection does not exist or if it exists and is an empty sharded
             // collection.
-            int count;
+            bool shouldDropAndShard = replaceOutput;
             if (!replaceOutput && outputCollNss.isValid()) {
                 const auto primaryShard =
                     uassertStatusOK(shardRegistry->getShard(opCtx, outputDbInfo.primaryId()));
@@ -499,12 +499,15 @@ public:
                             "Cannot output to a sharded collection because "
                             "non-sharded collection exists already",
                             collections.isEmpty());
+
+                    // If we reach here, the collection does not exist at all.
+                    shouldDropAndShard = true;
                 } else {
                     // The output collection exists and is sharded. We need to determine whether the
                     // collection is empty in order to decide whether we should drop and re-shard
                     // it.
                     // We don't want to do this if the collection is not empty.
-                    count = conn->count(outputCollNss.ns());
+                    shouldDropAndShard = (conn->count(outputCollNss.ns()) == 0);
                 }
 
                 conn.done();
@@ -515,8 +518,7 @@ public:
             // UUID generated during shardCollection to the shards to be used to create the temp
             // collections.
             boost::optional<UUID> shardedOutputCollUUID;
-            if (replaceOutput ||
-                (outputCollNss.isValid() && (count == 0 || !outputRoutingInfo.cm()))) {
+            if (shouldDropAndShard) {
                 auto dropCmdResponse = uassertStatusOK(
                     Grid::get(opCtx)
                         ->shardRegistry()
