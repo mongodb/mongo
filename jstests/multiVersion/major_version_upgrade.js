@@ -35,7 +35,7 @@
         {binVersion: '3.4', featureCompatibilityVersion: '3.4', testCollection: 'three_four'},
         {binVersion: '3.6', featureCompatibilityVersion: '3.6', testCollection: 'three_six'},
         {binVersion: 'last-stable', testCollection: 'last_stable'},
-        {binVersion: 'latest', testCollection: 'latest'},
+        {binVersion: 'latest', featureCompatibilityVersion: '4.0', testCollection: 'latest'},
     ];
 
     // These key patterns are considered valid for existing v:0 and v:1 indexes, but are considered
