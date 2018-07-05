@@ -148,7 +148,7 @@ void MultiIteratorStage::doInvalidate(OperationContext* opCtx,
 
 unique_ptr<PlanStageStats> MultiIteratorStage::getStats() {
     unique_ptr<PlanStageStats> ret =
-        make_unique<PlanStageStats>(CommonStats(kStageType), STAGE_MULTI_ITERATOR);
+        make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_ITERATOR);
     ret->specific = make_unique<CollectionScanStats>();
     return ret;
 }

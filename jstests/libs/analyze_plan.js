@@ -130,8 +130,17 @@ function getAggPlanStages(root, stage) {
         assert(root.stages[0].hasOwnProperty("$cursor"));
         assert(root.stages[0].$cursor.hasOwnProperty("queryPlanner"));
         assert(root.stages[0].$cursor.queryPlanner.hasOwnProperty("winningPlan"));
-        results =
-            results.concat(getPlanStages(root.stages[0].$cursor.queryPlanner.winningPlan, stage));
+
+        // If execution stats are available, then use the execution stats tree. Otherwise use the
+        // plan info from the "queryPlanner" section.
+        if (root.stages[0].$cursor.hasOwnProperty("executionStats")) {
+            assert(root.stages[0].$cursor.executionStats.hasOwnProperty("executionStages"));
+            results = results.concat(
+                getPlanStages(root.stages[0].$cursor.executionStats.executionStages, stage));
+        } else {
+            results = results.concat(
+                getPlanStages(root.stages[0].$cursor.queryPlanner.winningPlan, stage));
+        }
     }
 
     if (root.hasOwnProperty("shards")) {
@@ -140,11 +149,21 @@ function getAggPlanStages(root, stage) {
 
             results = results.concat(getDocumentSources(root.shards[elem].stages));
 
-            assert(root.shards[elem].stages[0].hasOwnProperty("$cursor"));
-            assert(root.shards[elem].stages[0].$cursor.hasOwnProperty("queryPlanner"));
-            assert(root.shards[elem].stages[0].$cursor.queryPlanner.hasOwnProperty("winningPlan"));
-            results = results.concat(
-                getPlanStages(root.shards[elem].stages[0].$cursor.queryPlanner.winningPlan, stage));
+            const firstStage = root.shards[elem].stages[0];
+            assert(firstStage.hasOwnProperty("$cursor"));
+            assert(firstStage.$cursor.hasOwnProperty("queryPlanner"));
+            assert(firstStage.$cursor.queryPlanner.hasOwnProperty("winningPlan"));
+
+            // If execution stats are available, then use the execution stats tree. Otherwise use
+            // the plan info from the "queryPlanner" section.
+            if (firstStage.$cursor.hasOwnProperty("executionStats")) {
+                assert(firstStage.$cursor.executionStats.hasOwnProperty("executionStages"));
+                results = results.concat(
+                    getPlanStages(firstStage.$cursor.executionStats.executionStages, stage));
+            } else {
+                results = results.concat(
+                    getPlanStages(firstStage.$cursor.queryPlanner.winningPlan, stage));
+            }
         }
     }
 
