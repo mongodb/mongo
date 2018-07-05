@@ -1,30 +1,30 @@
 /**
-*    Copyright (C) 2014 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *   Copyright (C) 2014 MongoDB Inc.
+ *
+ *   This program is free software: you can redistribute it and/or  modify
+ *   it under the terms of the GNU Affero General Public License, version 3,
+ *   as published by the Free Software Foundation.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *   As a special exception, the copyright holders give permission to link the
+ *   code of portions of this program with the OpenSSL library under certain
+ *   conditions as described in each individual source file and distribute
+ *   linked combinations including the program with the OpenSSL library. You
+ *   must comply with the GNU Affero General Public License in all respects for
+ *   all of the code used other than as permitted herein. If you modify file(s)
+ *   with this exception, you may extend this exception to your version of the
+ *   file(s), but you are not obligated to do so. If you do not wish to do so,
+ *   delete this exception statement from your version. If you delete this
+ *   exception statement from all source files in the program, then also delete
+ *   it in the license file.
+ */
 
 #include "mongo/platform/basic.h"
 
@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index/all_paths_key_generator.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
@@ -82,6 +83,7 @@ static const std::set<StringData> allowedFieldNames = {
     IndexDescriptor::kLanguageOverrideFieldName,
     IndexDescriptor::kNamespaceFieldName,
     IndexDescriptor::kPartialFilterExprFieldName,
+    IndexDescriptor::kPathProjectionFieldName,
     IndexDescriptor::kSparseFieldName,
     IndexDescriptor::kStorageEngineFieldName,
     IndexDescriptor::kTextVersionFieldName,
@@ -163,6 +165,10 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
 
         if (keyElement.type() == String && pluginName != keyElement.str()) {
             return Status(code, "Can't use more than one index plugin for a single index.");
+        } else if (keyElement.type() == String && keyElement.str() == IndexNames::ALLPATHS) {
+            return Status(code,
+                          str::stream() << "The key pattern value for an '" << IndexNames::ALLPATHS
+                                        << "' index must be a non-zero number, not a string.");
         }
 
         // Check if the all paths index is compounded. If it is the key is invalid because
@@ -272,6 +278,15 @@ StatusWith<BSONObj> validateIndexSpec(
                 return keyPatternValidateStatus;
             }
 
+            if ((featureCompatibility.getVersion() <
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) &&
+                (IndexNames::findPluginName(indexSpec.getObjectField(
+                     IndexDescriptor::kKeyPatternFieldName)) == IndexNames::ALLPATHS)) {
+                return {ErrorCodes::CannotCreateIndex,
+                        mongoutils::str::stream() << "Unknown index plugin '"
+                                                  << IndexNames::ALLPATHS
+                                                  << "'"};
+            }
             hasKeyPatternField = true;
         } else if (IndexDescriptor::kIndexNameFieldName == indexSpecElemFieldName) {
             if (indexSpecElem.type() != BSONType::String) {
@@ -377,6 +392,42 @@ StatusWith<BSONObj> validateIndexSpec(
                                              MatchExpressionParser::kBanAllSpecialFeatures);
             if (!statusWithMatcher.isOK()) {
                 return statusWithMatcher.getStatus();
+            }
+        } else if (IndexDescriptor::kPathProjectionFieldName == indexSpecElemFieldName) {
+            const auto key = indexSpec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
+            if (IndexNames::findPluginName(key) != IndexNames::ALLPATHS) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "The field '" << IndexDescriptor::kPathProjectionFieldName
+                                      << "' is only allowed in an '"
+                                      << IndexNames::ALLPATHS
+                                      << "' index"};
+            }
+            if (indexSpecElem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "The field '" << IndexDescriptor::kPathProjectionFieldName
+                                      << "' must be a non-empty object, but got "
+                                      << typeName(indexSpecElem.type())};
+            }
+            if (!key.hasField("$**")) {
+                return {ErrorCodes::FailedToParse,
+                        str::stream() << "The field '" << IndexDescriptor::kPathProjectionFieldName
+                                      << "' is only allowed when '"
+                                      << IndexDescriptor::kKeyPatternFieldName
+                                      << "' is {\"$**\": ±1}"};
+            }
+
+            if (indexSpecElem.embeddedObject().isEmpty()) {
+                return {ErrorCodes::FailedToParse,
+                        str::stream() << "The '" << IndexDescriptor::kPathProjectionFieldName
+                                      << "' field can't be an empty object"};
+            }
+            try {
+                // We use AllPathsKeyGenerator::createProjectionExec to parse and validate the path
+                // projection spec.
+                AllPathsKeyGenerator::createProjectionExec(key, indexSpecElem.embeddedObject());
+            } catch (const DBException& ex) {
+                return ex.toStatus(str::stream() << "Failed to parse: "
+                                                 << IndexDescriptor::kPathProjectionFieldName);
             }
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled

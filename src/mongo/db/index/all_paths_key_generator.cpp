@@ -61,16 +61,14 @@ void popPathComponent(BSONElement elem, bool enclosingObjIsArray, FieldRef* path
 
 constexpr StringData AllPathsKeyGenerator::kSubtreeSuffix;
 
-AllPathsKeyGenerator::AllPathsKeyGenerator(BSONObj keyPattern,
-                                           BSONObj pathProjection,
-                                           const CollatorInterface* collator)
-    : _collator(collator), _keyPattern(keyPattern) {
+std::unique_ptr<ProjectionExecAgg> AllPathsKeyGenerator::createProjectionExec(
+    const BSONObj& keyPattern, const BSONObj& pathProjection) {
     // We should never have a key pattern that contains more than a single element.
-    invariant(_keyPattern.nFields() == 1);
+    invariant(keyPattern.nFields() == 1);
 
     // The _keyPattern is either { "$**": ±1 } for all paths or { "path.$**": ±1 } for a single
     // subtree. If we are indexing a single subtree, then we will project just that path.
-    auto indexRoot = _keyPattern.firstElement().fieldNameStringData();
+    auto indexRoot = keyPattern.firstElement().fieldNameStringData();
     auto suffixPos = indexRoot.find(kSubtreeSuffix);
 
     // If we're indexing a single subtree, we can't also specify a path projection.
@@ -86,10 +84,17 @@ AllPathsKeyGenerator::AllPathsKeyGenerator(BSONObj keyPattern,
     // If the projection spec does not explicitly specify _id, we exclude it by default. We also
     // prevent the projection from recursing through nested arrays, in order to ensure that the
     // output document aligns with the match system's expectations.
-    _projExec = ProjectionExecAgg::create(
+    return ProjectionExecAgg::create(
         projSpec,
         ProjectionExecAgg::DefaultIdPolicy::kExcludeId,
         ProjectionExecAgg::ArrayRecursionPolicy::kDoNotRecurseNestedArrays);
+}
+
+AllPathsKeyGenerator::AllPathsKeyGenerator(BSONObj keyPattern,
+                                           BSONObj pathProjection,
+                                           const CollatorInterface* collator)
+    : _collator(collator), _keyPattern(keyPattern) {
+    _projExec = createProjectionExec(keyPattern, pathProjection);
 }
 
 void AllPathsKeyGenerator::generateKeys(BSONObj inputDoc,

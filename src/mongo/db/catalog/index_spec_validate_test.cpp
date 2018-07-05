@@ -37,6 +37,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -52,6 +53,32 @@ using index_key_validate::validateIndexSpecCollation;
 
 const NamespaceString kTestNamespace("test", "index_spec_validate");
 constexpr OperationContext* kDefaultOpCtx = nullptr;
+
+/**
+ * Helper class to ensure proper FCV & test commands enabled.
+ */
+class TestCommandFcvGuard {
+
+public:
+    TestCommandFcvGuard() {
+        _prevVersion = serverGlobalParams.featureCompatibility.getVersion();
+        serverGlobalParams.featureCompatibility.setVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
+        // TODO: Remove test command enabling/disabling in SERVER-36198
+        _prevEnabled = getTestCommandsEnabled();
+        setTestCommandsEnabled(true);
+    }
+
+    ~TestCommandFcvGuard() {
+        serverGlobalParams.featureCompatibility.setVersion(_prevVersion);
+        setTestCommandsEnabled(_prevEnabled);
+    }
+
+private:
+    bool _prevEnabled;
+    ServerGlobalParams::FeatureCompatibility::Version _prevVersion;
+};
+
 
 /**
  * Helper function used to return the fields of a BSONObj in a consistent order.
@@ -802,6 +829,175 @@ TEST(IndexSpecPartialFilterTest, AcceptsValidPartialFilterExpression) {
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
     ASSERT_OK(result.getStatus());
+}
+
+TEST(IndexSpecAllPaths, SucceedsWithInclusion) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("a" << 1 << "b" << 1)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(IndexSpecAllPaths, SucceedsWithExclusion) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("a" << 0 << "b" << 0)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(IndexSpecAllPaths, SucceedsWithExclusionIncludingId) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("_id" << 1 << "a" << 0 << "b" << 0)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(IndexSpecAllPaths, SucceedsWithInclusionExcludingId) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("_id" << 0 << "a" << 1 << "b" << 1)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(IndexSpecAllPaths, FailsWithInclusionExcludingIdSubfield) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("_id.field" << 0 << "a" << 1 << "b" << 1)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), 40179);
+}
+
+TEST(IndexSpecAllPaths, FailsWithExclusionIncludingIdSubfield) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("_id.field" << 1 << "a" << 0 << "b" << 0)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), 40178);
+}
+
+TEST(IndexSpecAllPaths, FailsWithImproperFeatureCompatabilityVersion) {
+    TestCommandFcvGuard guard;
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42);
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::CannotCreateIndex);
+}
+
+TEST(IndexSpecAllPaths, FailsWithMixedProjection) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("a" << 1 << "b" << 0)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), 40178);
+}
+
+TEST(IndexSpecAllPaths, FailsWithComputedFieldsInProjection) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("a" << 1 << "b"
+                                                           << "string")),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+}
+
+TEST(IndexSpecAllPaths, FailsWhenProjectionPluginNotAllPaths) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("a" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("a" << 1)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+}
+
+TEST(IndexSpecAllPaths, FailsWhenProjectionIsNotAnObject) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << 4),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
+}
+
+TEST(IndexSpecAllPaths, FailsWithEmptyProjection) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSONObj()),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+}
+
+TEST(IndexSpecAllPaths, FailsWhenInclusionWithSubpath) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("a.$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("a" << 1)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+}
+
+TEST(IndexSpecAllPaths, FailsWhenExclusionWithSubpath) {
+    TestCommandFcvGuard guard;
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("a.$**" << 1) << "name"
+                                               << "indexName"
+                                               << "starPathsTempName"
+                                               << BSON("b" << 0)),
+                                    kTestNamespace,
+                                    serverGlobalParams.featureCompatibility);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
 }  // namespace

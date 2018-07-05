@@ -7,13 +7,19 @@
  */
 (function() {
     "use strict";
-    const coll = db.getCollection("all_paths_validindex");
+    const kCollectionName = "all_paths_validindex";
+    const coll = db.getCollection(kCollectionName);
 
     const kIndexName = "all_paths_validindex";
 
-    const createIndexAndVerifyWithDrop = (key, parameters) => {
+    const createIndexHelper = function(key, parameters) {
+        return db.runCommand(
+            {createIndexes: kCollectionName, indexes: [Object.assign({key: key}, parameters)]});
+    };
+
+    const createIndexAndVerifyWithDrop = function(key, parameters) {
         coll.dropIndexes();
-        assert.commandWorked(coll.createIndex(key, parameters));
+        createIndexHelper(key, parameters);
         assert.eq(coll.getIndexes()
                       .filter((index) => {
                           return index.name == parameters.name;
@@ -38,6 +44,19 @@
 
     // Can create an allPaths index with index level collation.
     createIndexAndVerifyWithDrop({"$**": 1}, {collation: {locale: "fr"}, name: kIndexName});
+
+    // Can create an allPaths index with an inclusion projection.
+    createIndexAndVerifyWithDrop({"$**": 1},
+                                 {starPathsTempName: {a: 1, b: 1, c: 1}, name: kIndexName});
+    // Can create an allPaths index with an exclusion projection.
+    createIndexAndVerifyWithDrop({"$**": 1},
+                                 {starPathsTempName: {a: 0, b: 0, c: 0}, name: kIndexName});
+    // Can include _id in an exclusion.
+    createIndexAndVerifyWithDrop({"$**": 1},
+                                 {starPathsTempName: {_id: 1, a: 0, b: 0, c: 0}, name: kIndexName});
+    // Can exclude _id in an exclusion.
+    createIndexAndVerifyWithDrop({"$**": 1},
+                                 {starPathsTempName: {_id: 0, a: 1, b: 1, c: 1}, name: kIndexName});
 
     // Cannot create an allPaths index with sparse option.
     coll.dropIndexes();
@@ -69,6 +88,11 @@
     // Cannot create a text all paths index using single sub-path syntax.
     assert.commandFailedWithCode(coll.createIndex({"a.$**": "text"}), ErrorCodes.CannotCreateIndex);
 
+    // Cannot specify plugin by string.
+    assert.commandFailedWithCode(coll.createIndex({"a": "allPaths"}), ErrorCodes.CannotCreateIndex);
+    assert.commandFailedWithCode(coll.createIndex({"$**": "allPaths"}),
+                                 ErrorCodes.CannotCreateIndex);
+
     // Cannot create a compound all paths index.
     assert.commandFailedWithCode(coll.createIndex({"$**": 1, "a": 1}),
                                  ErrorCodes.CannotCreateIndex);
@@ -79,4 +103,42 @@
     assert.commandFailedWithCode(coll.createIndex({"a.$**.$**": 1}), ErrorCodes.CannotCreateIndex);
     assert.commandFailedWithCode(coll.createIndex({"$**.$**": 1}), ErrorCodes.CannotCreateIndex);
     assert.commandFailedWithCode(coll.createIndex({"$**": "hello"}), ErrorCodes.CannotCreateIndex);
+
+    // Cannot create an all paths index with mixed inclusion exclusion.
+    assert.commandFailedWithCode(
+        createIndexHelper({"$**": 1}, {name: kIndexName, starPathsTempName: {a: 1, b: 0}}), 40178);
+    // Cannot create an all paths index with computed fields.
+    assert.commandFailedWithCode(
+        createIndexHelper({"$**": 1}, {name: kIndexName, starPathsTempName: {a: 1, b: "string"}}),
+        ErrorCodes.FailedToParse);
+    // Cannot create an all paths index with an empty projection.
+    assert.commandFailedWithCode(
+        createIndexHelper({"$**": 1}, {name: kIndexName, starPathsTempName: {}}),
+        ErrorCodes.FailedToParse);
+    // Cannot create another index type with "starPathsTempName" projection.
+    assert.commandFailedWithCode(
+        createIndexHelper({"a": 1}, {name: kIndexName, starPathsTempName: {a: 1, b: 1}}),
+        ErrorCodes.BadValue);
+    // Cannot create a text index with a "starPathsTempName" projection.
+    assert.commandFailedWithCode(
+        createIndexHelper({"$**": "text"}, {name: kIndexName, starPathsTempName: {a: 1, b: 1}}),
+        ErrorCodes.BadValue);
+    // Cannot create an all paths index with a non-object "starPathsTempName" projection.
+    assert.commandFailedWithCode(
+        createIndexHelper({"a.$**": 1}, {name: kIndexName, starPathsTempName: "string"}),
+        ErrorCodes.TypeMismatch);
+    // Cannot exclude an subfield of _id in an inclusion.
+    assert.commandFailedWithCode(createIndexHelper({"_id.id": 0, a: 1, b: 1, c: 1}),
+                                 ErrorCodes.CannotCreateIndex);
+    // Cannot include an subfield of _id in an exclusion.
+    assert.commandFailedWithCode(createIndexHelper({"_id.id": 1, a: 0, b: 0, c: 0}),
+                                 ErrorCodes.CannotCreateIndex);
+
+    // Cannot specify both a subpath and a projection.
+    assert.commandFailedWithCode(
+        createIndexHelper({"a.$**": 1}, {name: kIndexName, starPathsTempName: {a: 1}}),
+        ErrorCodes.FailedToParse);
+    assert.commandFailedWithCode(
+        createIndexHelper({"a.$**": 1}, {name: kIndexName, starPathsTempName: {b: 0}}),
+        ErrorCodes.FailedToParse);
 })();

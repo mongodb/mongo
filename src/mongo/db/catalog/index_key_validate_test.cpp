@@ -286,6 +286,30 @@ TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnIncorrectValue) {
     setTestCommandsEnabled(temp);
 }
 
+TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsWhenValueIsPluginNameWithInvalidKeyName) {
+    // TODO: Remove test command enabling/disabling in SERVER-36198
+    const bool temp = getTestCommandsEnabled();
+    setTestCommandsEnabled(true);
+    auto status = validateKeyPattern(BSON("a"
+                                          << "allPaths"),
+                                     IndexVersion::kV2);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    setTestCommandsEnabled(temp);
+}
+
+TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsWhenValueIsPluginNameWithValidKeyName) {
+    // TODO: Remove test command enabling/disabling in SERVER-36198
+    const bool temp = getTestCommandsEnabled();
+    setTestCommandsEnabled(true);
+    auto status = validateKeyPattern(BSON("$**"
+                                          << "allPaths"),
+                                     IndexVersion::kV2);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    setTestCommandsEnabled(temp);
+}
+
 }  // namespace
 
 }  // namespace mongo

@@ -43,6 +43,9 @@ class AllPathsKeyGenerator {
 public:
     static constexpr StringData kSubtreeSuffix = ".$**"_sd;
 
+    static std::unique_ptr<ProjectionExecAgg> createProjectionExec(const BSONObj& keyPattern,
+                                                                   const BSONObj& pathProjection);
+
     /**
      * TODO SERVER-35748: Currently, the MultikeyPaths structure used by IndexAccessMethod is not
      * suitable for tracking multikey paths in AllPaths indexes. In order to keep multikey paths
