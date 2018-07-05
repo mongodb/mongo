@@ -405,13 +405,6 @@ ExitCode _initAndListen(int listenPort) {
         uassert(10296, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
     }
 
-    // Disallow running Mobile with --repair
-    if (storageGlobalParams.engine == "mobile" && storageGlobalParams.repair) {
-        log() << "Running mobile with repair is not supported. Make sure you are not "
-              << "using --repair.";
-        exitCleanly(EXIT_BADOPTIONS);
-    }
-
     {
         std::stringstream ss;
         ss << "repairpath (" << storageGlobalParams.repairpath << ") does not exist";
