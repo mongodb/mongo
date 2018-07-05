@@ -152,8 +152,7 @@ bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, Recor
 
 void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
-    std::string key =
-        createKey(_ident, dl.repr());  // std::string(_prefix).append(fixedLengthInt(dl.repr()));
+    std::string key = createKey(_ident, dl.repr());
     auto numElementsRemoved = workingCopy->erase(key);
     invariant(numElementsRemoved == 1);
 }
@@ -196,9 +195,7 @@ Status RecordStore::updateRecord(OperationContext* opCtx,
                                  int len,
                                  UpdateNotifier* notifier) {
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
-    std::string key = createKey(
-        _ident,
-        oldLocation.repr());  // std::string(_prefix).append(fixedLengthInt(oldLocation.repr()));
+    std::string key = createKey(_ident, oldLocation.repr());
     StringStore::iterator it = workingCopy->find(key);
     invariant(it != workingCopy->end());
     it->second = std::string(data, len);
@@ -206,8 +203,7 @@ Status RecordStore::updateRecord(OperationContext* opCtx,
 }
 
 bool RecordStore::updateWithDamagesSupported() const {
-    // TODO : Implement.
-    return false;
+    return true;
 }
 
 StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
@@ -215,8 +211,17 @@ StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
                                                       const RecordData& oldRec,
                                                       const char* damageSource,
                                                       const mutablebson::DamageVector& damages) {
-    // TODO: Implement.
-    return StatusWith<RecordData>(oldRec);
+    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
+    std::string key = createKey(_ident, loc.repr());
+    StringStore::iterator doc = workingCopy->find(key);
+    invariant(doc != workingCopy->end());  // Only update existing records.
+    for (const auto& d : damages) {
+        const char* source = damageSource + d.sourceOffset;
+        char* target = (&doc->second[0]) + d.targetOffset;
+        std::memcpy(target, source, d.size);
+    }
+    RecordData updatedRecord(doc->second.c_str(), doc->second.length());
+    return updatedRecord;  // Data is un-owned.
 }
 
 std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* opCtx,
@@ -330,8 +335,7 @@ boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
     _needFirstSeek = false;
     _savedPosition = boost::none;
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
-    std::string key =
-        createKey(_ident, id.repr());  // std::string(_prefix).append(fixedLengthInt(id.repr()));
+    std::string key = createKey(_ident, id.repr());
     it = workingCopy->find(key);
     if (it == workingCopy->end() || !inPrefix(it->first)) {
         return boost::none;
@@ -399,8 +403,7 @@ boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id
     _needFirstSeek = false;
     _savedPosition = boost::none;
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
-    std::string key =
-        createKey(_ident, id.repr());  // std::string(_prefix).append(fixedLengthInt(id.repr()));
+    std::string key = createKey(_ident, id.repr());
     StringStore::iterator canFind = workingCopy->find(key);
     if (canFind == workingCopy->end() || !inPrefix(canFind->first)) {
         it = workingCopy->rend();
