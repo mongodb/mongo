@@ -728,6 +728,7 @@ TEST_F(SessionTest, StashAndUnstashResources) {
 TEST_F(SessionTest, ReportStashedResources) {
     const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
+    const bool autocommit = false;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
 
@@ -737,7 +738,7 @@ TEST_F(SessionTest, ReportStashedResources) {
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
 
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "find");
+    session.beginOrContinueTxn(opCtx(), txnNum, autocommit, true, "testDB", "find");
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -757,18 +758,20 @@ TEST_F(SessionTest, ReportStashedResources) {
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
 
-    auto txnDoc = BSON("parameters" << BSON("txnNumber" << txnNum));
-    auto reportBuilder =
-        std::move(BSONObjBuilder() << "host" << getHostNameCachedAndPort() << "desc"
-                                   << "inactive transaction"
-                                   << "lsid"
-                                   << sessionId.toBSON()
-                                   << "transaction"
-                                   << txnDoc
-                                   << "waitingForLock"
-                                   << false
-                                   << "active"
-                                   << false);
+    BSONObjBuilder reportBuilder;
+    reportBuilder.append("host", getHostNameCachedAndPort());
+    reportBuilder.append("desc", "inactive transaction");
+    reportBuilder.append("lsid", sessionId.toBSON());
+    // Build the transaction parameters sub-document.
+    BSONObjBuilder transactionBuilder(reportBuilder.subobjStart("transaction"));
+    BSONObjBuilder parametersBuilder(transactionBuilder.subobjStart("parameters"));
+    parametersBuilder.append("txnNumber", txnNum);
+    parametersBuilder.append("autocommit", autocommit);
+    parametersBuilder.done();
+    transactionBuilder.done();
+
+    reportBuilder.append("waitingForLock", false);
+    reportBuilder.append("active", false);
     fillLockerInfo(*lockerInfo, reportBuilder);
 
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
@@ -791,6 +794,89 @@ TEST_F(SessionTest, ReportStashedResources) {
 
     // Commit the transaction. This allows us to release locks.
     session.commitTransaction(opCtx());
+}
+
+TEST_F(SessionTest, ReportUnstashedResources) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 20;
+    const bool autocommit = false;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    ASSERT(opCtx()->lockState());
+    ASSERT(opCtx()->recoveryUnit());
+
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    session.beginOrContinueTxn(opCtx(), txnNum, autocommit, true, "testDB", "find");
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+    // Perform initial unstash which sets up a WriteUnitOfWork.
+    session.unstashTransactionResources(opCtx(), "find");
+    ASSERT(opCtx()->getWriteUnitOfWork());
+    ASSERT(opCtx()->lockState()->isLocked());
+
+    // Build a BSONObj containing the details which we expect to see reported when we call
+    // Session::reportUnstashedState.
+    BSONObjBuilder reportBuilder;
+    BSONObjBuilder transactionBuilder(reportBuilder.subobjStart("transaction"));
+    BSONObjBuilder parametersBuilder(transactionBuilder.subobjStart("parameters"));
+    parametersBuilder.append("txnNumber", txnNum);
+    parametersBuilder.append("autocommit", autocommit);
+    parametersBuilder.done();
+    transactionBuilder.done();
+
+    // Verify that the Session's report of its own unstashed state aligns with our expectations.
+    BSONObjBuilder unstashedStateBuilder;
+    session.reportUnstashedState(&unstashedStateBuilder);
+    ASSERT_BSONOBJ_EQ(unstashedStateBuilder.obj(), reportBuilder.obj());
+
+    // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
+    session.stashTransactionResources(opCtx());
+    ASSERT(!opCtx()->getWriteUnitOfWork());
+
+    // With the resources stashed, verify that the Session reports an empty unstashed state.
+    BSONObjBuilder builder;
+    session.reportUnstashedState(&builder);
+    ASSERT(builder.obj().isEmpty());
+}
+
+TEST_F(SessionTest, ReportUnstashedResourcesForARetryableWrite) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 20;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    ASSERT(opCtx()->lockState());
+    ASSERT(opCtx()->recoveryUnit());
+
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "find");
+    session.unstashTransactionResources(opCtx(), "find");
+
+    // Build a BSONObj containing the details which we expect to see reported when we call
+    // Session::reportUnstashedState. For a retryable write, we should only include the txnNumber.
+    BSONObjBuilder reportBuilder;
+    BSONObjBuilder transactionBuilder(reportBuilder.subobjStart("transaction"));
+    BSONObjBuilder parametersBuilder(transactionBuilder.subobjStart("parameters"));
+    parametersBuilder.append("txnNumber", txnNum);
+    parametersBuilder.done();
+    transactionBuilder.done();
+
+    // Verify that the Session's report of its own unstashed state aligns with our expectations.
+    BSONObjBuilder unstashedStateBuilder;
+    session.reportUnstashedState(&unstashedStateBuilder);
+    ASSERT_BSONOBJ_EQ(unstashedStateBuilder.obj(), reportBuilder.obj());
 }
 
 TEST_F(SessionTest, CannotSpecifyStartTransactionOnInProgressTxn) {

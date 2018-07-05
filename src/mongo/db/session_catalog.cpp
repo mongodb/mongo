@@ -254,6 +254,9 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx,
     auto& checkedOutSession = operationSessionDecoration(opCtx);
     if (!checkedOutSession) {
         auto sessionTransactionTable = SessionCatalog::get(opCtx);
+        // We acquire a Client lock here to guard the construction of this session so that
+        // references to this session are safe to use while the lock is held.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
         checkedOutSession.emplace(sessionTransactionTable->checkOutSession(opCtx));
     } else {
         // The only reason to be trying to check out a session when you already have a session
@@ -281,6 +284,9 @@ OperationContextSession::~OperationContextSession() {
     }
 
     auto& checkedOutSession = operationSessionDecoration(_opCtx);
+    // We acquire a Client lock here to guard the destruction of this session so that references to
+    // this session are safe to use while the lock is held.
+    stdx::lock_guard<Client> lk(*_opCtx->getClient());
     checkedOutSession.reset();
 }
 

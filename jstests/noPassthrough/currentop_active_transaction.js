@@ -36,8 +36,12 @@
 
     // Keep running currentOp() until we see the transaction subdocument.
     assert.soon(function() {
-        const transactionFilter =
-            {active: true, 'lsid': {$exists: true}, 'transaction.parameters.txnNumber': {$eq: 0}};
+        const transactionFilter = {
+            active: true,
+            'lsid': {$exists: true},
+            'transaction.parameters.txnNumber': {$eq: 0},
+            'transaction.parameters.autocommit': {$eq: false}
+        };
         return 1 === adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).itcount();
     });
 

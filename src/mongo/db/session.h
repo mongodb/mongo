@@ -362,6 +362,13 @@ public:
     void reportStashedState(BSONObjBuilder* builder) const;
 
     /**
+     * If this session is not holding stashed locks in _txnResourceStash (transaction is active),
+     * reports the current state of the session using the provided builder. Locks the session
+     * object's mutex while running.
+     */
+    void reportUnstashedState(BSONObjBuilder* builder) const;
+
+    /**
      * Convenience method which creates and populates a BSONObj containing the stashed state.
      * Returns an empty BSONObj if this session has no stashed resources.
      */
@@ -540,6 +547,10 @@ private:
     // Set to true if incomplete history is detected. For example, when the oplog to a write was
     // truncated because it was too old.
     bool _hasIncompleteHistory{false};
+
+    // Reports transaction stats for both active and inactive transactions using the provided
+    // builder.
+    void _reportTransactionStats(WithLock wl, BSONObjBuilder* builder) const;
 
     // Caches what is known to be the last written transaction record for the session
     boost::optional<SessionTxnRecord> _lastWrittenSessionRecord;

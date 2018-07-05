@@ -1104,13 +1104,38 @@ void Session::reportStashedState(BSONObjBuilder* builder) const {
                 BSONObjBuilder lsid(builder->subobjStart("lsid"));
                 getSessionId().serialize(&lsid);
             }
-            builder->append("transaction",
-                            BSON("parameters" << BSON("txnNumber" << _activeTxnNumber)));
+            BSONObjBuilder transactionBuilder;
+            _reportTransactionStats(ls, &transactionBuilder);
+            builder->append("transaction", transactionBuilder.obj());
             builder->append("waitingForLock", false);
             builder->append("active", false);
             fillLockerInfo(*lockerInfo, *builder);
         }
     }
+}
+
+void Session::reportUnstashedState(BSONObjBuilder* builder) const {
+    stdx::lock_guard<stdx::mutex> ls(_mutex);
+
+    if (!_txnResourceStash) {
+        BSONObjBuilder transactionBuilder;
+        _reportTransactionStats(ls, &transactionBuilder);
+        builder->append("transaction", transactionBuilder.obj());
+    }
+}
+
+void Session::_reportTransactionStats(WithLock wl, BSONObjBuilder* builder) const {
+    BSONObjBuilder parametersBuilder(builder->subobjStart("parameters"));
+    parametersBuilder.append("txnNumber", _activeTxnNumber);
+
+    if (!_txnState.inMultiDocumentTransaction(wl)) {
+        // For retryable writes, we only include the txnNumber.
+        parametersBuilder.done();
+        return;
+    }
+    parametersBuilder.append("autocommit", _autocommit);
+
+    parametersBuilder.done();
 }
 
 void Session::_checkValid(WithLock) const {

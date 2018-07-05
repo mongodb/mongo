@@ -257,11 +257,6 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
             lsid->serialize(&lsidBuilder);
         }
 
-        if (auto txnNumber = clientOpCtx->getTxnNumber()) {
-            infoBuilder->append("transaction",
-                                BSON("parameters" << BSON("txnNumber" << *txnNumber)));
-        }
-
         CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);
     }
 }
