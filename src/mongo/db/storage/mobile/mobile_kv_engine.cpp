@@ -182,6 +182,12 @@ Status MobileKVEngine::createRecordStore(OperationContext* opCtx,
                                          const CollectionOptions& options) {
     // TODO: eventually will support file renaming but otherwise do not use collection options.
 
+    // Mobile SE doesn't support creating an oplog
+    if (NamespaceString::oplog(ns)) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "Replication is not supported by the mobile storage engine");
+    }
+
     // Mobile doesn't support capped collections
     if (options.capped) {
         return Status(ErrorCodes::InvalidOptions,

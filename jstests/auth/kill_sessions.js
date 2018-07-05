@@ -7,7 +7,7 @@ load("jstests/libs/kill_sessions.js");
     // if the kill command is sent with an implicit session.
     TestData.disableImplicitSessions = true;
 
-    var forExec = MongoRunner.runMongod({nojournal: "", auth: ""});
+    var forExec = MongoRunner.runMongod({auth: ""});
     var forKill = new Mongo(forExec.host);
     var forVerify = new Mongo(forExec.host);
     KillSessionsTestHelper.initializeAuth(forExec);

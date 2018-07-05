@@ -11,7 +11,7 @@
     var result;
     const request = {startSession: 1};
 
-    conn = MongoRunner.runMongod({nojournal: ""});
+    conn = MongoRunner.runMongod();
     admin = conn.getDB("admin");
 
     // ensure that the cache is empty

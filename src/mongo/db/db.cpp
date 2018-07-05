@@ -363,6 +363,14 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
+    // Disallow running a storage engine that doesn't support capped collections with --profile
+    if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections() &&
+        serverGlobalParams.defaultProfile != 0) {
+        log() << "Running " << storageGlobalParams.engine << " with profiling is not supported. "
+              << "Make sure you are not using --profile.";
+        exitCleanly(EXIT_BADOPTIONS);
+    }
+
     // Disallow running WiredTiger with --nojournal in a replica set
     if (storageGlobalParams.engine == "wiredTiger" && !storageGlobalParams.dur &&
         replSettings.usingReplSets()) {
@@ -395,6 +403,13 @@ ExitCode _initAndListen(int listenPort) {
         ss << " See http://dochub.mongodb.org/core/startingandstoppingmongo" << endl;
         ss << "*********************************************************************" << endl;
         uassert(10296, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
+    }
+
+    // Disallow running Mobile with --repair
+    if (storageGlobalParams.engine == "mobile" && storageGlobalParams.repair) {
+        log() << "Running mobile with repair is not supported. Make sure you are not "
+              << "using --repair.";
+        exitCleanly(EXIT_BADOPTIONS);
     }
 
     {

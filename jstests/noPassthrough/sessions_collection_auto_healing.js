@@ -8,7 +8,7 @@ load('jstests/libs/sessions_collection.js');
     TestData.disableImplicitSessions = true;
 
     var startSession = {startSession: 1};
-    var conn = MongoRunner.runMongod({nojournal: ""});
+    var conn = MongoRunner.runMongod();
 
     var admin = conn.getDB("admin");
     var config = conn.getDB("config");

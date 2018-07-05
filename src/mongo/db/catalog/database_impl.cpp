@@ -334,6 +334,12 @@ Status DatabaseImpl::setProfilingLevel(OperationContext* opCtx, int newLevel) {
         return Status(ErrorCodes::BadValue, "profiling level has to be >=0 and <= 2");
     }
 
+    // Can't support profiling without supporting capped collections.
+    if (!opCtx->getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "the storage engine doesn't support profiling.");
+    }
+
     Status status = createProfileCollection(opCtx, this->_this);
 
     if (!status.isOK()) {

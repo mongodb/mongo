@@ -11,7 +11,7 @@
     var startSession = {startSession: 1};
 
     // Run initial tests without auth.
-    conn = MongoRunner.runMongod({nojournal: ""});
+    conn = MongoRunner.runMongod();
     admin = conn.getDB("admin");
 
     result = admin.runCommand(startSession);

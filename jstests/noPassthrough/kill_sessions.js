@@ -7,7 +7,7 @@ load("jstests/libs/kill_sessions.js");
     // if the kill command is sent with an implicit session.
     TestData.disableImplicitSessions = true;
 
-    var conn = MongoRunner.runMongod({nojournal: ""});
+    var conn = MongoRunner.runMongod();
     KillSessionsTestHelper.runNoAuth(conn, conn, [conn]);
     MongoRunner.stopMongod(conn);
 })();

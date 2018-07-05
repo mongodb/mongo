@@ -1,6 +1,6 @@
 // test read/write permissions
 
-m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1", nojournal: "", smallfiles: ""});
+m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1", smallfiles: ""});
 db = m.getDB("admin");
 
 // These statements throw because the localhost exception does not allow
