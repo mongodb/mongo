@@ -40,7 +40,6 @@ selector:
   - jstests/sharding/bulk_insert.js
   - jstests/sharding/mrShardedOutput.js
   - jstests/sharding/authConnectionHook.js
-  - jstests/sharding/change_stream_update_lookup_collation.js
   - jstests/sharding/oplog_document_key.js
   - jstests/sharding/top_chunk_split.js
   - jstests/sharding/split_large_key.js

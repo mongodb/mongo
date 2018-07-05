@@ -15,7 +15,6 @@ selector:
   - jstests/sharding/secondary_shard_versioning.js
   - jstests/sharding/coll_epoch_test1.js
   - jstests/sharding/change_streams_shards_start_in_sync.js
-  - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
   - jstests/sharding/migration_ignore_interrupts_1.js
   - jstests/sharding/migration_ignore_interrupts_3.js
   - jstests/sharding/change_streams_establishment_finds_new_shards.js

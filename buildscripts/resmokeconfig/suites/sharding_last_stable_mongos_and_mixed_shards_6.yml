@@ -15,7 +15,6 @@ selector:
   - jstests/sharding/change_stream_enforce_max_time_ms_on_mongos.js
   - jstests/sharding/shard_collection_basic.js
   - jstests/sharding/autosplit_with_balancer.js
-  - jstests/sharding/change_stream_read_preference.js
   - jstests/sharding/migrateBig.js
   - jstests/sharding/migrateBig_balancer.js
   - jstests/sharding/mapReduce_inSharded.js
@@ -34,7 +33,6 @@ selector:
   - jstests/sharding/large_chunk.js
   - jstests/sharding/migration_move_chunk_after_receive.js
   - jstests/sharding/linearizable_read_concern.js
-  - jstests/sharding/resume_change_stream_from_stale_mongos.js
   - jstests/sharding/migration_id_index.js
   - jstests/sharding/explain_agg_read_pref.js
   - jstests/sharding/session_info_in_oplog.js
@@ -42,7 +40,6 @@ selector:
   - jstests/sharding/retryable_writes.js
   - jstests/sharding/view_rewrite.js
   - jstests/sharding/hash_shard1.js
-  - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
   - jstests/sharding/split_with_force.js
 
 executor:

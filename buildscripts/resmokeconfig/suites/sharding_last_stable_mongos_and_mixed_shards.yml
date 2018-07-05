@@ -34,6 +34,17 @@ selector:
   - jstests/sharding/geo_near_random1.js
   - jstests/sharding/geo_near_random2.js
   - jstests/sharding/shard7.js
+  # SERVER-35977
+  - jstests/sharding/change_stream_read_preference.js
+  - jstests/sharding/change_stream_resume_from_different_mongos.js
+  - jstests/sharding/change_stream_shard_failover.js
+  - jstests/sharding/change_streams_whole_db.js
+  - jstests/sharding/change_stream_update_lookup_collation.js
+  - jstests/sharding/change_stream_update_lookup_read_concern.js
+  - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
+  - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
+  - jstests/sharding/resume_change_stream.js
+  - jstests/sharding/resume_change_stream_from_stale_mongos.js
 executor:
   config:
     shell_options:
