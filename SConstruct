@@ -1760,7 +1760,8 @@ if env.TargetOSIs('posix'):
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
     # startup.
     if env.TargetOSIs('darwin'):
-        env.Append( LINKFLAGS=["-Wl,-bind_at_load"] )
+        if env.TargetOSIs('macOS'):
+            env.Append( LINKFLAGS=["-Wl,-bind_at_load"] )
     else:
         env.Append( LINKFLAGS=["-Wl,-z,now"] )
         env.Append( LINKFLAGS=["-rdynamic"] )
