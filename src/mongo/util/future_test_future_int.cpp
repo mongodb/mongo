@@ -165,6 +165,36 @@ TEST(Future, Fail_isReady) {
     });
 }
 
+TEST(Future, Success_wait) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](Future<int>&& fut) {
+                            fut.wait();
+                            ASSERT_EQ(fut.get(), 1);
+                        });
+}
+
+TEST(Future, Success_waitNoThrow) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](Future<int>&& fut) {
+                            ASSERT_OK(fut.waitNoThrow());
+                            ASSERT_EQ(fut.get(), 1);
+                        });
+}
+
+TEST(Future, Fail_wait) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        fut.wait();
+        ASSERT_THROWS_failStatus(fut.get());
+    });
+}
+
+TEST(Future, Fail_waitNoThrow) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        ASSERT_OK(fut.waitNoThrow());
+        ASSERT_THROWS_failStatus(fut.get());
+    });
+}
+
 TEST(Future, isReady_TSAN_OK) {
     bool done = false;
     auto fut = async([&] {

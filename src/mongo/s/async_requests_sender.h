@@ -39,6 +39,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/time_support.h"
@@ -281,17 +282,14 @@ private:
     /**
      * Waits for forward progress in gathering responses from a remote.
      *
-     * If the opCtx is non-null, use it while waiting on completion.
-     *
      * Stores the response or error in the remote.
      */
-    void _makeProgress(OperationContext* opCtx);
+    void _makeProgress();
 
     OperationContext* _opCtx;
 
     executor::TaskExecutor* _executor;
     BatonDetacher _baton;
-    size_t _batonRequests = 0;
 
     // The metadata obj to pass along with the command remote. Used to indicate that the command is
     // ok to run on secondaries.

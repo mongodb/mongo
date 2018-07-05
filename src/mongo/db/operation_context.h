@@ -44,6 +44,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -70,7 +71,7 @@ class UnreplicatedWritesBlock;
  * (RecoveryUnitState) to reduce complexity and duplication in the storage-engine specific
  * RecoveryUnit and to allow better invariant checking.
  */
-class OperationContext : public Decorable<OperationContext> {
+class OperationContext : public Interruptible, public Decorable<OperationContext> {
     MONGO_DISALLOW_COPYING(OperationContext);
 
 public:
@@ -127,107 +128,9 @@ public:
     std::unique_ptr<Locker> swapLockState(std::unique_ptr<Locker> locker);
 
     /**
-     * Raises a AssertionException if this operation is in a killed state.
-     */
-    void checkForInterrupt();
-
-    /**
      * Returns Status::OK() unless this operation is in a killed state.
      */
-    Status checkForInterruptNoAssert();
-
-    /**
-     * Sleeps until "deadline"; throws an exception if the operation is interrupted before then.
-     */
-    void sleepUntil(Date_t deadline);
-
-    /**
-     * Sleeps for "duration" ms; throws an exception if the operation is interrupted before then.
-     */
-    void sleepFor(Milliseconds duration);
-
-    /**
-     * Waits for either the condition "cv" to be signaled, this operation to be interrupted, or the
-     * deadline on this operation to expire.  In the event of interruption or operation deadline
-     * expiration, raises a AssertionException with an error code indicating the interruption type.
-     */
-    void waitForConditionOrInterrupt(stdx::condition_variable& cv,
-                                     stdx::unique_lock<stdx::mutex>& m);
-
-    /**
-     * Waits on condition "cv" for "pred" until "pred" returns true, or this operation
-     * is interrupted or its deadline expires. Throws a DBException for interruption and
-     * deadline expiration.
-     */
-    template <typename Pred>
-    void waitForConditionOrInterrupt(stdx::condition_variable& cv,
-                                     stdx::unique_lock<stdx::mutex>& m,
-                                     Pred pred) {
-        while (!pred()) {
-            waitForConditionOrInterrupt(cv, m);
-        }
-    }
-
-    /**
-     * Same as waitForConditionOrInterrupt, except returns a Status instead of throwing
-     * a DBException to report interruption.
-     */
-    Status waitForConditionOrInterruptNoAssert(stdx::condition_variable& cv,
-                                               stdx::unique_lock<stdx::mutex>& m) noexcept;
-
-    /**
-     * Waits for condition "cv" to be signaled, or for the given "deadline" to expire, or
-     * for the operation to be interrupted, or for the operation's own deadline to expire.
-     *
-     * If the operation deadline expires or the operation is interrupted, throws a DBException.  If
-     * the given "deadline" expires, returns cv_status::timeout. Otherwise, returns
-     * cv_status::no_timeout.
-     */
-    stdx::cv_status waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
-                                                     stdx::unique_lock<stdx::mutex>& m,
-                                                     Date_t deadline);
-
-    /**
-     * Waits on condition "cv" for "pred" until "pred" returns true, or the given "deadline"
-     * expires, or this operation is interrupted, or this operation's own deadline expires.
-     *
-     *
-     * If the operation deadline expires or the operation is interrupted, throws a DBException.  If
-     * the given "deadline" expires, returns cv_status::timeout. Otherwise, returns
-     * cv_status::no_timeout indicating that "pred" finally returned true.
-     */
-    template <typename Pred>
-    bool waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
-                                          stdx::unique_lock<stdx::mutex>& m,
-                                          Date_t deadline,
-                                          Pred pred) {
-        while (!pred()) {
-            if (stdx::cv_status::timeout == waitForConditionOrInterruptUntil(cv, m, deadline)) {
-                return pred();
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Same as the predicate form of waitForConditionOrInterruptUntil, but takes a relative
-     * amount of time to wait instead of an absolute time point.
-     */
-    template <typename Pred>
-    bool waitForConditionOrInterruptFor(stdx::condition_variable& cv,
-                                        stdx::unique_lock<stdx::mutex>& m,
-                                        Milliseconds duration,
-                                        Pred pred) {
-        return waitForConditionOrInterruptUntil(
-            cv, m, getExpirationDateForWaitForValue(duration), pred);
-    }
-
-    /**
-     * Same as waitForConditionOrInterruptUntil, except returns StatusWith<stdx::cv_status> and
-     * non-ok status indicates the error instead of a DBException.
-     */
-    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
-        stdx::condition_variable& cv, stdx::unique_lock<stdx::mutex>& m, Date_t deadline) noexcept;
+    Status checkForInterruptNoAssert() noexcept override;
 
     /**
      * Returns the service context under which this operation context runs, or nullptr if there is
@@ -353,6 +256,9 @@ public:
      * without lock by the thread executing on behalf of this operation context.
      */
     ErrorCodes::Error getKillStatus() const {
+        if (_ignoreInterrupts) {
+            return ErrorCodes::OK;
+        }
         return _killCode.loadRelaxed();
     }
 
@@ -397,16 +303,9 @@ public:
     }
 
     /**
-     * Returns true if this operation has a deadline.
-     */
-    bool hasDeadline() const {
-        return getDeadline() < Date_t::max();
-    }
-
-    /**
      * Returns the deadline for this operation, or Date_t::max() if there is no deadline.
      */
-    Date_t getDeadline() const {
+    Date_t getDeadline() const override {
         return _deadline;
     }
 
@@ -425,7 +324,54 @@ public:
      */
     Microseconds getRemainingMaxTimeMicros() const;
 
+    StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
+        stdx::condition_variable& cv,
+        stdx::unique_lock<stdx::mutex>& m,
+        Date_t deadline) noexcept override;
+
 private:
+    IgnoreInterruptsState pushIgnoreInterrupts() override {
+        IgnoreInterruptsState iis{_ignoreInterrupts,
+                                  {_deadline, _timeoutError, _hasArtificialDeadline}};
+        _hasArtificialDeadline = true;
+        setDeadlineByDate(Date_t::max(), ErrorCodes::ExceededTimeLimit);
+        _ignoreInterrupts = true;
+
+        return iis;
+    }
+
+    void popIgnoreInterrupts(IgnoreInterruptsState iis) override {
+        _ignoreInterrupts = iis.ignoreInterrupts;
+
+        setDeadlineByDate(iis.deadline.deadline, iis.deadline.error);
+        _hasArtificialDeadline = iis.deadline.hasArtificialDeadline;
+
+        _markKilledIfDeadlineRequires();
+    }
+
+    DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
+        DeadlineState ds{_deadline, _timeoutError, _hasArtificialDeadline};
+
+        _hasArtificialDeadline = true;
+        setDeadlineByDate(std::min(_deadline, deadline), error);
+
+        return ds;
+    }
+
+    void popArtificialDeadline(DeadlineState ds) override {
+        setDeadlineByDate(ds.deadline, ds.error);
+        _hasArtificialDeadline = ds.hasArtificialDeadline;
+
+        _markKilledIfDeadlineRequires();
+    }
+
+    void _markKilledIfDeadlineRequires() {
+        if (!_ignoreInterrupts && !_hasArtificialDeadline && hasDeadlineExpired() &&
+            !isKillPending()) {
+            markKilled(_timeoutError);
+        }
+    }
+
     /**
      * Returns true if this operation has a deadline and it has passed according to the fast clock
      * on ServiceContext.
@@ -447,7 +393,7 @@ private:
      * Returns the timepoint that is "waitFor" ms after now according to the
      * ServiceContext's precise clock.
      */
-    Date_t getExpirationDateForWaitForValue(Milliseconds waitFor);
+    Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) override;
 
     /**
      * Set whether or not operations should generate oplog entries.
@@ -502,6 +448,8 @@ private:
         Date_t::max();  // The timepoint at which this operation exceeds its time limit.
 
     ErrorCodes::Error _timeoutError = ErrorCodes::ExceededTimeLimit;
+    bool _ignoreInterrupts = false;
+    bool _hasArtificialDeadline = false;
 
     // Max operation time requested by the user or by the cursor in the case of a getMore with no
     // user-specified maxTime. This is tracked with microsecond granularity for the purpose of

@@ -76,7 +76,8 @@ public:
             auto client = _serviceCtx->makeClient(name.toString());
             auto opCtx = client->makeOperationContext();
 
-            cb(opCtx.get(), _timeout);
+            opCtx->runWithDeadline(
+                _timeout, ErrorCodes::ExceededTimeLimit, [&] { cb(opCtx.get()); });
         });
     }
 
@@ -96,20 +97,6 @@ public:
     }
 };
 
-template <typename Timeout>
-class ProducerConsumerQueueTestHelper<Timeout> {
-public:
-    ProducerConsumerQueueTestHelper(Timeout timeout) : _timeout(timeout) {}
-
-    template <typename Callback>
-    stdx::thread runThread(StringData name, Callback&& cb) {
-        return stdx::thread([this, name, cb] { cb(_timeout); });
-    }
-
-private:
-    Timeout _timeout;
-};
-
 class ProducerConsumerQueueTest : public unittest::Test {
 public:
     template <typename Callback>
@@ -127,27 +114,17 @@ public:
         const Minutes duration(30);
 
         callback(ProducerConsumerQueueTestHelper<OperationContext>(_serviceCtx.get()));
-        callback(ProducerConsumerQueueTestHelper<OperationContext, Milliseconds>(_serviceCtx.get(),
-                                                                                 duration));
         callback(ProducerConsumerQueueTestHelper<OperationContext, Date_t>(
             _serviceCtx.get(), _serviceCtx->getPreciseClockSource()->now() + duration));
         callback(ProducerConsumerQueueTestHelper<>());
-        callback(ProducerConsumerQueueTestHelper<Milliseconds>(duration));
-        callback(ProducerConsumerQueueTestHelper<Date_t>(
-            _serviceCtx->getPreciseClockSource()->now() + duration));
     }
 
     template <typename Callback>
     void runTimeoutPermutations(Callback&& callback) {
         const Milliseconds duration(10);
 
-        callback(ProducerConsumerQueueTestHelper<OperationContext, Milliseconds>(_serviceCtx.get(),
-                                                                                 duration));
         callback(ProducerConsumerQueueTestHelper<OperationContext, Date_t>(
             _serviceCtx.get(), _serviceCtx->getPreciseClockSource()->now() + duration));
-        callback(ProducerConsumerQueueTestHelper<Milliseconds>(duration));
-        callback(ProducerConsumerQueueTestHelper<Date_t>(
-            _serviceCtx->getPreciseClockSource()->now() + duration));
     }
 
 private:

@@ -96,7 +96,7 @@ void TLTimer::setTimeout(Milliseconds timeoutVal, TimeoutCallback cb) {
         return;
     }
 
-    _timer->waitFor(timeoutVal).getAsync([cb = std::move(cb)](Status status) {
+    _timer->waitUntil(_reactor->now() + timeoutVal).getAsync([cb = std::move(cb)](Status status) {
         // If we get canceled, then we don't worry about the timeout anymore
         if (status == ErrorCodes::CallbackCanceled) {
             return;

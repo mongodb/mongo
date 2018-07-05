@@ -30,13 +30,20 @@
 
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/waitable.h"
 
 namespace mongo {
 stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
                                                    stdx::unique_lock<stdx::mutex>& m,
-                                                   Date_t deadline) {
+                                                   Date_t deadline,
+                                                   Waitable* waitable) {
     if (_tracksSystemClock) {
-        return cv.wait_until(m, deadline.toSystemTimePoint());
+        if (deadline == Date_t::max()) {
+            Waitable::wait(waitable, this, cv, m);
+            return stdx::cv_status::no_timeout;
+        }
+
+        return Waitable::wait_until(waitable, this, cv, m, deadline.toSystemTimePoint());
     }
 
     // The rest of this function only runs during testing, when the clock source is virtualized and
@@ -75,7 +82,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
         alarmInfo->waitCV->notify_all();
     }));
     if (!invokedAlarmInline) {
-        cv.wait(m);
+        Waitable::wait(waitable, this, cv, m);
     }
     m.unlock();
     stdx::lock_guard<stdx::mutex> controlLk(alarmInfo->controlMutex);

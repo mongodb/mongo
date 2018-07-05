@@ -44,6 +44,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 
@@ -315,7 +316,7 @@ public:
     virtual ~SharedStateBase() = default;
 
     // Only called by future side.
-    void wait() noexcept {
+    void wait(Interruptible* interruptible) {
         if (state.load(std::memory_order_acquire) == SSBState::kFinished)
             return;
 
@@ -330,7 +331,7 @@ public:
         }
 
         stdx::unique_lock<stdx::mutex> lk(mx);
-        cv->wait(lk, [&] {
+        interruptible->waitForConditionOrInterrupt(*cv, lk, [&] {
             // The mx locking above is insufficient to establish an acquire if state transitions to
             // kFinished before we get here, but we aquire mx before the producer does.
             return state.load(std::memory_order_acquire) == SSBState::kFinished;
@@ -753,37 +754,86 @@ public:
     }
 
     /**
+     * Returns when the future isReady().
+     *
+     * Throws if the interruptible passed is interrupted (explicitly or via deadline).
+     */
+    void wait(Interruptible* interruptible = Interruptible::notInterruptible()) const {
+        if (_immediate) {
+            return;
+        }
+
+        _shared->wait(interruptible);
+    }
+
+    /**
+     * Returns Status::OK() when the future isReady().
+     *
+     * Returns a non-okay status if the interruptible is interrupted.
+     */
+    Status waitNoThrow(Interruptible* interruptible = Interruptible::notInterruptible()) const
+        noexcept {
+        if (_immediate) {
+            return Status::OK();
+        }
+
+        try {
+            _shared->wait(interruptible);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+        return Status::OK();
+    }
+
+    /**
      * Gets the value out of this Future, blocking until it is ready.
      *
      * get() methods throw on error, while getNoThrow() returns a !OK status.
      *
      * These methods can be called multiple times, except for the rvalue overloads.
+     *
+     * Note: It is impossible to differentiate interruptible interruption from an error propagating
+     * down the future chain with these methods.  If you need to distinguish the two cases, call
+     * wait() first.
      */
-    T get() && {
-        return std::move(getImpl());
+    T get(Interruptible* interruptible = Interruptible::notInterruptible()) && {
+        return std::move(getImpl(interruptible));
     }
-    T& get() & {
-        return getImpl();
+    T& get(Interruptible* interruptible = Interruptible::notInterruptible()) & {
+        return getImpl(interruptible);
     }
-    const T& get() const& {
-        return const_cast<Future*>(this)->getImpl();
+    const T& get(Interruptible* interruptible = Interruptible::notInterruptible()) const& {
+        return const_cast<Future*>(this)->getImpl(interruptible);
     }
-    StatusWith<T> getNoThrow() && noexcept {
+    StatusWith<T> getNoThrow(Interruptible* interruptible = Interruptible::notInterruptible()) &&
+        noexcept {
         if (_immediate) {
             return std::move(*_immediate);
         }
 
-        _shared->wait();
+        try {
+            _shared->wait(interruptible);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
         if (!_shared->status.isOK())
             return std::move(_shared->status);
         return std::move(*_shared->data);
     }
-    StatusWith<T> getNoThrow() const& noexcept {
+    StatusWith<T> getNoThrow(
+        Interruptible* interruptible = Interruptible::notInterruptible()) const& noexcept {
         if (_immediate) {
             return *_immediate;
         }
 
-        _shared->wait();
+        try {
+            _shared->wait(interruptible);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
         if (!_shared->status.isOK())
             return _shared->status;
         return *_shared->data;
@@ -1092,12 +1142,12 @@ private:
     friend class Future;
     friend class Promise<T>;
 
-    T& getImpl() {
+    T& getImpl(Interruptible* interruptible) {
         if (_immediate) {
             return *_immediate;
         }
 
-        _shared->wait();
+        _shared->wait(interruptible);
         uassertStatusOK(_shared->status);
         return *(_shared->data);
     }
@@ -1244,12 +1294,22 @@ public:
         return _inner.isReady();
     }
 
-    void get() const {
-        _inner.get();
+    void wait(Interruptible* interruptible = Interruptible::notInterruptible()) const {
+        _inner.wait(interruptible);
     }
 
-    Status getNoThrow() const noexcept {
-        return _inner.getNoThrow().getStatus();
+    Status waitNoThrow(Interruptible* interruptible = Interruptible::notInterruptible()) const
+        noexcept {
+        return _inner.waitNoThrow(interruptible);
+    }
+
+    void get(Interruptible* interruptible = Interruptible::notInterruptible()) const {
+        _inner.get(interruptible);
+    }
+
+    Status getNoThrow(Interruptible* interruptible = Interruptible::notInterruptible()) const
+        noexcept {
+        return _inner.getNoThrow(interruptible).getStatus();
     }
 
     template <typename Func>  // Status -> void

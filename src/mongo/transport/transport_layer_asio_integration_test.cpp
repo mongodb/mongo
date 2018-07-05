@@ -33,6 +33,7 @@
 #include "mongo/client/async_client.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
@@ -128,11 +129,7 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
         auto future = handle->runCommandRequest(ecr, baton);
         const auto batonGuard = MakeGuard([&] { baton->detach(); });
 
-        while (!future.isReady()) {
-            baton->run(nullptr, boost::none);
-        }
-
-        assertOK(future.get());
+        future.get(opCtx.get());
     }
 }
 

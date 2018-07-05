@@ -88,7 +88,9 @@ void OperationContext::setDeadlineAndMaxTime(Date_t when,
                                              ErrorCodes::Error timeoutError) {
     invariant(!getClient()->isInDirectClient());
     invariant(ErrorCodes::isExceededTimeLimitError(timeoutError));
-    uassert(40120, "Illegal attempt to change operation deadline", !hasDeadline());
+    uassert(40120,
+            "Illegal attempt to change operation deadline",
+            _hasArtificialDeadline || !hasDeadline());
     _deadline = when;
     _maxTime = maxTime;
     _timeoutError = timeoutError;
@@ -165,10 +167,6 @@ Microseconds OperationContext::getRemainingMaxTimeMicros() const {
     return _maxTime - getElapsedTime();
 }
 
-void OperationContext::checkForInterrupt() {
-    uassertStatusOK(checkForInterruptNoAssert());
-}
-
 namespace {
 
 // Helper function for checkForInterrupt fail point.  Decides whether the operation currently
@@ -190,7 +188,7 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 
 }  // namespace
 
-Status OperationContext::checkForInterruptNoAssert() {
+Status OperationContext::checkForInterruptNoAssert() noexcept {
     // TODO: Remove the MONGO_likely(getClient()) once all operation contexts are constructed with
     // clients.
     if (MONGO_likely(getClient() && getServiceContext()) &&
@@ -199,8 +197,14 @@ Status OperationContext::checkForInterruptNoAssert() {
     }
 
     if (hasDeadlineExpired()) {
-        markKilled(_timeoutError);
+        if (!_hasArtificialDeadline) {
+            markKilled(_timeoutError);
+        }
         return Status(_timeoutError, "operation exceeded time limit");
+    }
+
+    if (_ignoreInterrupts) {
+        return Status::OK();
     }
 
     MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
@@ -216,41 +220,6 @@ Status OperationContext::checkForInterruptNoAssert() {
     }
 
     return Status::OK();
-}
-
-void OperationContext::sleepUntil(Date_t deadline) {
-    stdx::mutex m;
-    stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(m);
-    invariant(!waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }));
-}
-
-void OperationContext::sleepFor(Milliseconds duration) {
-    stdx::mutex m;
-    stdx::condition_variable cv;
-    stdx::unique_lock<stdx::mutex> lk(m);
-    invariant(!waitForConditionOrInterruptFor(cv, lk, duration, [] { return false; }));
-}
-
-void OperationContext::waitForConditionOrInterrupt(stdx::condition_variable& cv,
-                                                   stdx::unique_lock<stdx::mutex>& m) {
-    uassertStatusOK(waitForConditionOrInterruptNoAssert(cv, m));
-}
-
-Status OperationContext::waitForConditionOrInterruptNoAssert(
-    stdx::condition_variable& cv, stdx::unique_lock<stdx::mutex>& m) noexcept {
-    auto status = waitForConditionOrInterruptNoAssertUntil(cv, m, Date_t::max());
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-    invariant(status.getValue() == stdx::cv_status::no_timeout);
-    return status.getStatus();
-}
-
-stdx::cv_status OperationContext::waitForConditionOrInterruptUntil(
-    stdx::condition_variable& cv, stdx::unique_lock<stdx::mutex>& m, Date_t deadline) {
-
-    return uassertStatusOK(waitForConditionOrInterruptNoAssertUntil(cv, m, deadline));
 }
 
 // Theory of operation for waitForConditionOrInterruptNoAssertUntil and markKilled:
@@ -312,14 +281,15 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
 
     const auto waitStatus = [&] {
         if (Date_t::max() == deadline) {
-            cv.wait(m);
+            Waitable::wait(_baton.get(), getServiceContext()->getPreciseClockSource(), cv, m);
             return stdx::cv_status::no_timeout;
         }
-        return getServiceContext()->getPreciseClockSource()->waitForConditionUntil(cv, m, deadline);
+        return getServiceContext()->getPreciseClockSource()->waitForConditionUntil(
+            cv, m, deadline, _baton.get());
     }();
 
     // Continue waiting on cv until no other thread is attempting to kill this one.
-    cv.wait(m, [this] {
+    Waitable::wait(_baton.get(), getServiceContext()->getPreciseClockSource(), cv, m, [this] {
         stdx::lock_guard<Client> clientLock(*getClient());
         if (0 == _numKillers) {
             _waitMutex = nullptr;
@@ -338,9 +308,12 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
         // is slightly ahead of the FastClock used in checkForInterrupt. In this case,
         // we treat the operation as though it has exceeded its time limit, just as if the
         // FastClock and system clock had agreed.
-        markKilled(_timeoutError);
+        if (!_hasArtificialDeadline) {
+            markKilled(_timeoutError);
+        }
         return Status(_timeoutError, "operation exceeded time limit");
     }
+
     return waitStatus;
 }
 
@@ -360,11 +333,6 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
     if (lkWaitMutex && _numKillers == 0) {
         invariant(_waitCV);
         _waitCV->notify_all();
-    }
-
-    // If we have a baton, we need to wake it up.  The baton itself will check for interruption
-    if (_baton) {
-        _baton->schedule([] {});
     }
 }
 

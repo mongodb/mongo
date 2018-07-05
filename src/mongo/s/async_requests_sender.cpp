@@ -99,7 +99,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
         // Otherwise, wait for some response to be received.
         if (_interruptStatus.isOK()) {
             try {
-                _makeProgress(_opCtx);
+                _makeProgress();
             } catch (const AssertionException& ex) {
                 // If the operation is interrupted, we cancel outstanding requests and switch to
                 // waiting for the (canceled) callbacks to finish without checking for interrupts.
@@ -108,7 +108,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
                 continue;
             }
         } else {
-            _makeProgress(nullptr);
+            _opCtx->runWithoutInterruption([&] { _makeProgress(); });
         }
     }
     return *readyResponse;
@@ -137,11 +137,6 @@ void AsyncRequestsSender::_cancelPendingRequests() {
 boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
     if (!_stopRetrying) {
         _scheduleRequests();
-    }
-
-    // If we have baton requests, we want to process those before proceeding
-    if (_batonRequests) {
-        return boost::none;
     }
 
     // Check if any remote is ready.
@@ -215,11 +210,6 @@ void AsyncRequestsSender::_scheduleRequests() {
             if (!scheduleStatus.isOK()) {
                 remote.swResponse = std::move(scheduleStatus);
 
-                if (_baton) {
-                    _batonRequests++;
-                    _baton->schedule([this] { _batonRequests--; });
-                }
-
                 // Push a noop response to the queue to indicate that a remote is ready for
                 // re-processing due to failure.
                 _responseQueue.push(boost::none);
@@ -245,11 +235,6 @@ Status AsyncRequestsSender::_scheduleRequest(size_t remoteIndex) {
     auto callbackStatus = _executor->scheduleRemoteCommand(
         request,
         [remoteIndex, this](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-            if (_baton) {
-                _batonRequests++;
-                _baton->schedule([this] { _batonRequests--; });
-            }
-
             _responseQueue.push(Job{cbData, remoteIndex});
         },
         _baton);
@@ -262,22 +247,8 @@ Status AsyncRequestsSender::_scheduleRequest(size_t remoteIndex) {
 }
 
 // Passing opCtx means you'd like to opt into opCtx interruption.  During cleanup we actually don't.
-void AsyncRequestsSender::_makeProgress(OperationContext* opCtx) {
-    invariant(!opCtx || opCtx == _opCtx);
-
-    boost::optional<Job> job;
-
-    if (_baton) {
-        // If we're using a baton, we peek the queue, and block on the baton if it's empty
-        if (boost::optional<boost::optional<Job>> tryJob = _responseQueue.tryPop()) {
-            job = std::move(*tryJob);
-        } else {
-            _baton->run(opCtx, boost::none);
-        }
-    } else {
-        // Otherwise we block on the queue
-        job = opCtx ? _responseQueue.pop(opCtx) : _responseQueue.pop();
-    }
+void AsyncRequestsSender::_makeProgress() {
+    auto job = _responseQueue.pop(_opCtx);
 
     if (!job) {
         return;
@@ -350,22 +321,22 @@ Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
         // progress on previous requests.
         auto pf = makePromiseFuture<HostAndPort>();
 
-        ars->_batonRequests++;
         stdx::thread bgChecker([&] {
             pf.promise.setWith(
                 [&] { return targeter->findHostWithMaxWait(readPref, deadline - clock->now()); });
-
-            ars->_baton->schedule([ars] { ars->_batonRequests--; });
         });
-        const auto guard = MakeGuard([&] { bgChecker.join(); });
+        const auto threadGuard = MakeGuard([&] { bgChecker.join(); });
 
-        while (!pf.future.isReady()) {
-            if (!ars->_baton->run(nullptr, deadline)) {
-                break;
-            }
-        }
-
-        return pf.future.getNoThrow();
+        // We ignore interrupts here because we want to spin the baton for the full duration of the
+        // findHostWithMaxWait.  We set the time limit (although the bg checker should fulfill our
+        // promise) to sync up with the findHostWithMaxWait.
+        //
+        // TODO clean this up after SERVER-35689 when we can do async targeting.
+        return ars->_opCtx->runWithoutInterruption([&] {
+            return ars->_opCtx->runWithDeadline(deadline, ErrorCodes::ExceededTimeLimit, [&] {
+                return pf.future.getNoThrow(ars->_opCtx);
+            });
+        });
     }();
 
     if (!findHostStatus.isOK()) {

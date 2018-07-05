@@ -200,6 +200,25 @@ TEST(OperationContextTest, OpCtxGroup) {
     }
 }
 
+TEST(OperationContextTest, IgnoreInterruptsWorks) {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->markKilled(ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(opCtx->checkForInterrupt(), DBException, ErrorCodes::BadValue);
+    ASSERT_EQUALS(opCtx->getKillStatus(), ErrorCodes::BadValue);
+
+    opCtx->runWithoutInterruption([&] {
+        ASSERT_OK(opCtx->checkForInterruptNoAssert());
+        ASSERT_OK(opCtx->getKillStatus());
+    });
+
+    ASSERT_THROWS_CODE(opCtx->checkForInterrupt(), DBException, ErrorCodes::BadValue);
+
+    ASSERT_EQUALS(opCtx->getKillStatus(), ErrorCodes::BadValue);
+}
+
 class OperationDeadlineTests : public unittest::Test {
 public:
     void setUp() {
@@ -208,6 +227,13 @@ public:
         service->setPreciseClockSource(stdx::make_unique<SharedClockSourceAdapter>(mockClock));
         service->setTickSource(stdx::make_unique<TickSourceMock>());
         client = service->makeClient("OperationDeadlineTest");
+    }
+
+    void checkForInterruptForTimeout(OperationContext* opCtx) {
+        stdx::mutex m;
+        stdx::condition_variable cv;
+        stdx::unique_lock<stdx::mutex> lk(m);
+        opCtx->waitForConditionOrInterrupt(cv, lk);
     }
 
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
@@ -300,6 +326,209 @@ TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCVWithWaitUntilSet) {
         ErrorCodes::ExceededTimeLimit,
         opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now() + Seconds{10})
             .getStatus());
+}
+
+TEST_F(OperationDeadlineTests, NestedTimeoutsTimeoutInOrder) {
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setDeadlineByDate(mockClock->now() + Milliseconds(500), ErrorCodes::MaxTimeMSExpired);
+
+    bool reachedA = false;
+    bool reachedB = false;
+    bool reachedC = false;
+
+    try {
+        opCtx->runWithDeadline(
+            mockClock->now() + Milliseconds(100), ErrorCodes::ExceededTimeLimit, [&] {
+                ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+                try {
+                    opCtx->runWithDeadline(
+                        mockClock->now() + Milliseconds(50), ErrorCodes::ExceededTimeLimit, [&] {
+                            ASSERT_OK(opCtx->checkForInterruptNoAssert());
+                            try {
+                                opCtx->runWithDeadline(mockClock->now() + Milliseconds(10),
+                                                       ErrorCodes::ExceededTimeLimit,
+                                                       [&] {
+                                                           ASSERT_OK(
+                                                               opCtx->checkForInterruptNoAssert());
+                                                           ASSERT_OK(opCtx->getKillStatus());
+                                                           mockClock->advance(Milliseconds(20));
+                                                           checkForInterruptForTimeout(opCtx.get());
+                                                           ASSERT(false);
+                                                       });
+                            } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+                                opCtx->checkForInterrupt();
+                                ASSERT_OK(opCtx->getKillStatus());
+                                mockClock->advance(Milliseconds(50));
+                                reachedA = true;
+                            }
+
+                            opCtx->checkForInterrupt();
+                        });
+                } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+                    opCtx->checkForInterrupt();
+                    ASSERT_OK(opCtx->getKillStatus());
+                    mockClock->advance(Milliseconds(50));
+                    reachedB = true;
+                }
+
+                opCtx->checkForInterrupt();
+            });
+    } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+        reachedC = true;
+        ASSERT_OK(opCtx->getKillStatus());
+        ASSERT_OK(opCtx->checkForInterruptNoAssert());
+    }
+
+    ASSERT(reachedA);
+    ASSERT(reachedB);
+    ASSERT(reachedC);
+
+    ASSERT_OK(opCtx->getKillStatus());
+
+    mockClock->advance(Seconds(1));
+
+    ASSERT_THROWS_CODE(opCtx->checkForInterrupt(), DBException, ErrorCodes::MaxTimeMSExpired);
+}
+
+TEST_F(OperationDeadlineTests, NestedTimeoutsThatViolateMaxTime) {
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setDeadlineByDate(mockClock->now() + Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+
+    bool reachedA = false;
+    bool reachedB = false;
+
+    try {
+        opCtx->runWithDeadline(
+            mockClock->now() + Milliseconds(100), ErrorCodes::ExceededTimeLimit, [&] {
+                ASSERT_OK(opCtx->checkForInterruptNoAssert());
+                try {
+                    opCtx->runWithDeadline(
+                        mockClock->now() + Milliseconds(100), ErrorCodes::ExceededTimeLimit, [&] {
+                            ASSERT_OK(opCtx->checkForInterruptNoAssert());
+                            ASSERT_OK(opCtx->getKillStatus());
+                            mockClock->advance(Milliseconds(50));
+                            opCtx->checkForInterrupt();
+                        });
+                } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+                    reachedA = true;
+                }
+
+                opCtx->checkForInterrupt();
+            });
+    } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>&) {
+        reachedB = true;
+    }
+
+    ASSERT(reachedA);
+    ASSERT(reachedB);
+}
+
+TEST_F(OperationDeadlineTests, NestedNonMaxTimeMSTimeoutsThatAreLargerAreIgnored) {
+    auto opCtx = client->makeOperationContext();
+
+    bool reachedA = false;
+    bool reachedB = false;
+
+    try {
+        opCtx->runWithDeadline(
+            mockClock->now() + Milliseconds(10), ErrorCodes::ExceededTimeLimit, [&] {
+                ASSERT_OK(opCtx->checkForInterruptNoAssert());
+                try {
+                    opCtx->runWithDeadline(
+                        mockClock->now() + Milliseconds(100), ErrorCodes::ExceededTimeLimit, [&] {
+                            ASSERT_OK(opCtx->checkForInterruptNoAssert());
+                            ASSERT_OK(opCtx->getKillStatus());
+                            mockClock->advance(Milliseconds(50));
+                            opCtx->checkForInterrupt();
+                        });
+                } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+                    reachedA = true;
+                }
+
+                opCtx->checkForInterrupt();
+            });
+    } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+        reachedB = true;
+    }
+
+    ASSERT(reachedA);
+    ASSERT(reachedB);
+}
+
+TEST_F(OperationDeadlineTests, DeadlineAfterIgnoreInterruptsReopens) {
+    auto opCtx = client->makeOperationContext();
+
+    bool reachedA = false;
+    bool reachedB = false;
+    bool reachedC = false;
+
+    try {
+        opCtx->runWithDeadline(
+            mockClock->now() + Milliseconds(500), ErrorCodes::ExceededTimeLimit, [&] {
+                ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+                opCtx->runWithoutInterruption([&] {
+                    try {
+                        opCtx->runWithDeadline(
+                            mockClock->now() + Seconds(1), ErrorCodes::ExceededTimeLimit, [&] {
+                                ASSERT_OK(opCtx->checkForInterruptNoAssert());
+                                ASSERT_OK(opCtx->getKillStatus());
+                                mockClock->advance(Milliseconds(750));
+                                ASSERT_OK(opCtx->checkForInterruptNoAssert());
+                                mockClock->advance(Milliseconds(500));
+                                reachedA = true;
+                                opCtx->checkForInterrupt();
+                            });
+                    } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+                        opCtx->checkForInterrupt();
+                        reachedB = true;
+                    }
+                });
+
+                opCtx->checkForInterrupt();
+            });
+    } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>& ex) {
+        reachedC = true;
+    }
+
+    ASSERT(reachedA);
+    ASSERT(reachedB);
+    ASSERT(reachedC);
+}
+
+TEST_F(OperationDeadlineTests, DeadlineAfterRunWithoutInterruptSeesViolatedMaxMS) {
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setDeadlineByDate(mockClock->now() + Milliseconds(100), ErrorCodes::MaxTimeMSExpired);
+
+    ASSERT_THROWS_CODE(opCtx->runWithoutInterruption([&] {
+        opCtx->runWithDeadline(
+            mockClock->now() + Milliseconds(200), ErrorCodes::ExceededTimeLimit, [&] {
+                mockClock->advance(Milliseconds(300));
+                opCtx->checkForInterrupt();
+            });
+    }),
+                       DBException,
+                       ErrorCodes::MaxTimeMSExpired);
+}
+
+TEST_F(OperationDeadlineTests, DeadlineAfterRunWithoutInterruptDoesntSeeUnviolatedMaxMS) {
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setDeadlineByDate(mockClock->now() + Milliseconds(200), ErrorCodes::MaxTimeMSExpired);
+
+    ASSERT_THROWS_CODE(opCtx->runWithoutInterruption([&] {
+        opCtx->runWithDeadline(
+            mockClock->now() + Milliseconds(100), ErrorCodes::ExceededTimeLimit, [&] {
+                mockClock->advance(Milliseconds(150));
+                opCtx->checkForInterrupt();
+            });
+    }),
+                       DBException,
+                       ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(OperationDeadlineTests, WaitForKilledOpCV) {
