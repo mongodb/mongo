@@ -2,6 +2,7 @@
  * Tests that hidden nodes with buildIndexes: false behave correctly when system tables with
  * default indexes are created.
  *
+ * @tags: [requires_persistence]
  */
 (function() {
     'use strict';
