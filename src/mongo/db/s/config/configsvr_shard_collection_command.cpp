@@ -859,31 +859,6 @@ public:
 
             auto shardCollResponse = ShardsvrShardCollectionResponse::parse(
                 IDLParserErrorContext("ShardsvrShardCollectionResponse"), cmdResponse.response);
-            uuid = std::move(shardCollResponse.getCollectionUUID());
-
-            LOG(0) << "CMD: shardcollection: " << cmdObj;
-
-            audit::logShardCollection(
-                Client::getCurrent(), nss.ns(), proposedKey, request.getUnique());
-
-            // The initial chunks are distributed evenly across shards only if the initial split
-            // points were specified in the request, i.e., by mapReduce. Otherwise, all the initial
-            // chunks are placed on the primary shard, and may be distributed across shards through
-            // migrations (below) if using a hashed shard key.
-            const bool distributeInitialChunks = request.getInitialSplitPoints().is_initialized();
-
-            // SERVER-36031 TODO: Move initial splitting (below) to shard
-
-            // Step 6. Actually shard the collection.
-            catalogManager->shardCollection(opCtx,
-                                            nss,
-                                            uuid,
-                                            shardKeyPattern,
-                                            *request.getCollation(),
-                                            request.getUnique(),
-                                            std::move(shardCollResponse.getInitSplits()),
-                                            distributeInitialChunks,
-                                            primaryShardId);
 
             // Make sure the cached metadata for the collection knows that we are now sharded
             catalogCache->invalidateShardedCollection(nss);

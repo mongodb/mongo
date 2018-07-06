@@ -148,10 +148,6 @@ structs:
                 type: uuid
                 description: "The UUID of the collection that just got sharded."
                 optional: true
-            initSplits:
-                type: array<object>
-                description: "The initial split points."
-                optional: false
             allSplits:
                 type: array<object>
                 description: "All split points."
