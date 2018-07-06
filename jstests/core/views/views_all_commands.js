@@ -103,6 +103,7 @@
         _recvChunkCommit: {skip: isAnInternalCommand},
         _recvChunkStart: {skip: isAnInternalCommand},
         _recvChunkStatus: {skip: isAnInternalCommand},
+        _shardsvrShardCollection: {skip: isAnInternalCommand},
         _transferMods: {skip: isAnInternalCommand},
         abortTransaction: {skip: isUnrelated},
         addShard: {skip: isUnrelated},

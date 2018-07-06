@@ -286,6 +286,7 @@ env.Library(
         'split_chunk_command.cpp',
         'split_vector_command.cpp',
         'unset_sharding_command.cpp',
+        'shardsvr_shard_collection.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',

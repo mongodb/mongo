@@ -69,6 +69,7 @@ enum ShardDrainingStatus {
  */
 class ShardingCatalogManager {
     MONGO_DISALLOW_COPYING(ShardingCatalogManager);
+    friend class ConfigSvrShardCollectionCommand;
 
 public:
     ShardingCatalogManager(ServiceContext* serviceContext,
@@ -360,6 +361,8 @@ public:
      * service context, so that 'create' can be called again.
      */
     static void clearForTests(ServiceContext* serviceContext);
+
+    Lock::ExclusiveLock lockZoneMutex(OperationContext* opCtx);
 
 private:
     /**
