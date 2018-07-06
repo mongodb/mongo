@@ -204,6 +204,11 @@ BSONObj OplogFetcherTest::makeOplogQueryMetadataObject(OpTime lastAppliedOpTime,
 HostAndPort source("localhost:12345");
 NamespaceString nss("local.oplog.rs");
 
+// For testing, set these network timeouts to match the defaults in the OplogFetcher.
+const Milliseconds kNetworkTimeoutBufferMS{5000};
+const Milliseconds initialFindMaxTime = Milliseconds(60000);
+const Milliseconds retriedFindMaxTime = Milliseconds(2000);
+
 ReplSetConfig _createConfig(bool isV1ElectionProtocol) {
     BSONObjBuilder bob;
     bob.append("_id", "myset");
@@ -1477,6 +1482,99 @@ TEST_F(OplogFetcherTest, OplogFetcherAbortsWithOriginalResponseErrorOnFailureToS
     ASSERT_EQUALS(ErrorCodes::CappedPositionLost, shutdownState->getStatus());
     ASSERT_EQUALS(_getOpTimeWithHash(ops[2]), shutdownState->getLastFetched());
 }
+
+TEST_F(OplogFetcherTest, OplogFetcherTimesOutCorrectlyOnInitialFindRequests) {
+    auto ops = _generateOplogEntries(2U);
+    std::size_t maxFetcherRestarts = 0U;
+    auto shutdownState = stdx::make_unique<ShutdownState>();
+    OplogFetcher oplogFetcher(&getExecutor(),
+                              _getOpTimeWithHash(ops[0]),
+                              source,
+                              nss,
+                              _createConfig(true),
+                              maxFetcherRestarts,
+                              rbid,
+                              true,
+                              dataReplicatorExternalState.get(),
+                              enqueueDocumentsFn,
+                              stdx::ref(*shutdownState));
+
+    ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
+
+    ASSERT_OK(oplogFetcher.startup());
+    ASSERT_TRUE(oplogFetcher.isActive());
+
+    auto net = getNet();
+
+    // Schedule a response at a time that would exceed the initial find request network timeout.
+    net->enterNetwork();
+    auto when = net->now() + initialFindMaxTime + kNetworkTimeoutBufferMS + Milliseconds(10);
+    auto noi = getNet()->getNextReadyRequest();
+    RemoteCommandResponse response = {
+        {makeCursorResponse(1, {ops[0], ops[1]})}, rpc::makeEmptyMetadata(), Milliseconds(0)};
+    auto request = net->scheduleSuccessfulResponse(noi, when, response);
+    net->runUntil(when);
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    oplogFetcher.join();
+
+    // The fetcher should have shut down after its last request timed out.
+    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, shutdownState->getStatus());
+}
+
+TEST_F(OplogFetcherTest, OplogFetcherTimesOutCorrectlyOnRetriedFindRequests) {
+    auto ops = _generateOplogEntries(2U);
+    std::size_t maxFetcherRestarts = 1U;
+    auto shutdownState = stdx::make_unique<ShutdownState>();
+    OplogFetcher oplogFetcher(&getExecutor(),
+                              _getOpTimeWithHash(ops[0]),
+                              source,
+                              nss,
+                              _createConfig(true),
+                              maxFetcherRestarts,
+                              rbid,
+                              true,
+                              dataReplicatorExternalState.get(),
+                              enqueueDocumentsFn,
+                              stdx::ref(*shutdownState));
+
+
+    ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
+
+    ASSERT_OK(oplogFetcher.startup());
+    ASSERT_TRUE(oplogFetcher.isActive());
+
+    auto net = getNet();
+
+    // Schedule a response at a time that would exceed the initial find request network timeout.
+    net->enterNetwork();
+    auto when = net->now() + initialFindMaxTime + kNetworkTimeoutBufferMS + Milliseconds(10);
+    auto noi = getNet()->getNextReadyRequest();
+    RemoteCommandResponse response = {
+        {makeCursorResponse(1, {ops[0], ops[1]})}, rpc::makeEmptyMetadata(), Milliseconds(0)};
+    auto request = net->scheduleSuccessfulResponse(noi, when, response);
+    net->runUntil(when);
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    // Schedule a response at a time that would exceed the retried find request network timeout.
+    net->enterNetwork();
+    when = net->now() + retriedFindMaxTime + kNetworkTimeoutBufferMS + Milliseconds(10);
+    noi = getNet()->getNextReadyRequest();
+    response = {
+        {makeCursorResponse(1, {ops[0], ops[1]})}, rpc::makeEmptyMetadata(), Milliseconds(0)};
+    request = net->scheduleSuccessfulResponse(noi, when, response);
+    net->runUntil(when);
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    oplogFetcher.join();
+
+    // The fetcher should have shut down after its last request timed out.
+    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, shutdownState->getStatus());
+}
+
 
 bool sharedCallbackStateDestroyed = false;
 class SharedCallbackState {

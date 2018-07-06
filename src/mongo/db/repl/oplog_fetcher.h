@@ -237,7 +237,16 @@ private:
     /**
      * Returns how long the `find` command should wait before timing out.
      */
-    virtual Milliseconds _getFindMaxTime() const;
+    virtual Milliseconds _getInitialFindMaxTime() const;
+
+    /**
+     * Returns how long the `find` command should wait before timing out, if we are retrying the
+     * 'find' due to an error. This timeout should be considerably smaller than our initial oplog
+     * find time, since a communication failure with an upstream node may indicate it is
+     * unreachable.
+     */
+    virtual Milliseconds _getRetriedFindMaxTime() const;
+
 
     /**
      * Returns how long the `getMore` command should wait before timing out.
@@ -247,7 +256,9 @@ private:
     /**
      * Creates a new instance of the fetcher to tail the remote oplog starting at the given optime.
      */
-    std::unique_ptr<Fetcher> _makeFetcher(long long currentTerm, OpTime lastFetchedOpTime);
+    std::unique_ptr<Fetcher> _makeFetcher(long long currentTerm,
+                                          OpTime lastFetchedOpTime,
+                                          Milliseconds findMaxTime);
 
     /**
      * Returns whether the oplog fetcher is in shutdown.

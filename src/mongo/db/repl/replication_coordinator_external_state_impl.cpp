@@ -131,29 +131,59 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBuffer,
 // Set this to specify size of read ahead buffer in the OplogBufferCollection.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBufferPeekCacheSize, int, 10000);
 
-// Set this to specify maximum number of times the oplog fetcher will consecutively restart the
-// oplog tailing query on non-cancellation errors.
+// Set this to specify the maximum number of times the oplog fetcher will consecutively restart the
+// oplog tailing query on non-cancellation errors during steady state replication.
 server_parameter_storage_type<int, ServerParameterType::kStartupAndRuntime>::value_type
-    oplogFetcherMaxFetcherRestarts(3);
-class ExportedOplogFetcherMaxFetcherRestartsServerParameter
+    oplogFetcherSteadyStateMaxFetcherRestarts(1);
+class ExportedOplogFetcherSteadyStateMaxFetcherRestartsServerParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
 public:
-    ExportedOplogFetcherMaxFetcherRestartsServerParameter();
+    ExportedOplogFetcherSteadyStateMaxFetcherRestartsServerParameter();
     Status validate(const int& potentialNewValue) override;
-} _exportedOplogFetcherMaxFetcherRestartsServerParameter;
+} _exportedOplogFetcherSteadyStateMaxFetcherRestartsServerParameter;
 
-ExportedOplogFetcherMaxFetcherRestartsServerParameter::
-    ExportedOplogFetcherMaxFetcherRestartsServerParameter()
+ExportedOplogFetcherSteadyStateMaxFetcherRestartsServerParameter::
+    ExportedOplogFetcherSteadyStateMaxFetcherRestartsServerParameter()
     : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
           ServerParameterSet::getGlobal(),
-          "oplogFetcherMaxFetcherRestarts",
-          &oplogFetcherMaxFetcherRestarts) {}
+          "oplogFetcherSteadyStateMaxFetcherRestarts",
+          &oplogFetcherSteadyStateMaxFetcherRestarts) {}
 
-Status ExportedOplogFetcherMaxFetcherRestartsServerParameter::validate(
+Status ExportedOplogFetcherSteadyStateMaxFetcherRestartsServerParameter::validate(
     const int& potentialNewValue) {
     if (potentialNewValue < 0) {
-        return Status(ErrorCodes::BadValue,
-                      "oplogFetcherMaxFetcherRestarts must be greater than or equal to 0");
+        return Status(
+            ErrorCodes::BadValue,
+            "oplogFetcherSteadyStateMaxFetcherRestarts must be greater than or equal to 0");
+    }
+    return Status::OK();
+}
+
+// Set this to specify the maximum number of times the oplog fetcher will consecutively restart the
+// oplog tailing query on non-cancellation errors during initial sync. By default we provide a
+// generous amount of restarts to avoid potentially restarting an entire initial sync from scratch.
+server_parameter_storage_type<int, ServerParameterType::kStartupAndRuntime>::value_type
+    oplogFetcherInitialSyncMaxFetcherRestarts(10);
+class ExportedOplogFetcherInitialSyncMaxFetcherRestartsServerParameter
+    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
+public:
+    ExportedOplogFetcherInitialSyncMaxFetcherRestartsServerParameter();
+    Status validate(const int& potentialNewValue) override;
+} _exportedOplogFetcherInitialSyncMaxFetcherRestartsServerParameter;
+
+ExportedOplogFetcherInitialSyncMaxFetcherRestartsServerParameter::
+    ExportedOplogFetcherInitialSyncMaxFetcherRestartsServerParameter()
+    : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
+          ServerParameterSet::getGlobal(),
+          "oplogFetcherInitialSyncMaxFetcherRestarts",
+          &oplogFetcherInitialSyncMaxFetcherRestarts) {}
+
+Status ExportedOplogFetcherInitialSyncMaxFetcherRestartsServerParameter::validate(
+    const int& potentialNewValue) {
+    if (potentialNewValue < 0) {
+        return Status(
+            ErrorCodes::BadValue,
+            "oplogFetcherInitialSyncMaxFetcherRestarts must be greater than or equal to 0");
     }
     return Status::OK();
 }
@@ -957,8 +987,14 @@ bool ReplicationCoordinatorExternalStateImpl::shouldUseDataReplicatorInitialSync
     return !use3dot2InitialSync;
 }
 
-std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRestarts() const {
-    return oplogFetcherMaxFetcherRestarts;
+std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherSteadyStateMaxFetcherRestarts()
+    const {
+    return oplogFetcherSteadyStateMaxFetcherRestarts.load();
+}
+
+std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncMaxFetcherRestarts()
+    const {
+    return oplogFetcherInitialSyncMaxFetcherRestarts.load();
 }
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {

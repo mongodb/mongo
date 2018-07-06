@@ -58,7 +58,14 @@ MONGO_FP_DECLARE(stopReplProducer);
 namespace {
 
 // Number of seconds for the `maxTimeMS` on the initial `find` command.
+//
+// For the initial 'find' request, we provide a generous timeout, to account for the potentially
+// slow process of a sync source finding the lastApplied optime provided in a node's query in its
+// oplog.
 MONGO_EXPORT_SERVER_PARAMETER(oplogInitialFindMaxSeconds, int, 60);
+
+// Number of seconds for the `maxTimeMS` on any retried `find` commands.
+MONGO_EXPORT_SERVER_PARAMETER(oplogRetriedFindMaxSeconds, int, 2);
 
 // Number of milliseconds to add to the `find` and `getMore` timeouts to calculate the network
 // timeout for the requests.
@@ -373,7 +380,7 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
     uassert(ErrorCodes::BadValue, "null onShutdownCallback function", onShutdownCallbackFn);
 
     auto currentTerm = dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime().value;
-    _fetcher = _makeFetcher(currentTerm, _lastFetched.opTime);
+    _fetcher = _makeFetcher(currentTerm, _lastFetched.opTime, _getInitialFindMaxTime());
 }
 
 OplogFetcher::~OplogFetcher() {
@@ -463,8 +470,12 @@ Milliseconds OplogFetcher::getAwaitDataTimeout_forTest() const {
     return _getGetMoreMaxTime();
 }
 
-Milliseconds OplogFetcher::_getFindMaxTime() const {
+Milliseconds OplogFetcher::_getInitialFindMaxTime() const {
     return Milliseconds(oplogInitialFindMaxSeconds.load() * 1000);
+}
+
+Milliseconds OplogFetcher::_getRetriedFindMaxTime() const {
+    return Milliseconds(oplogRetriedFindMaxSeconds.load() * 1000);
 }
 
 Milliseconds OplogFetcher::_getGetMoreMaxTime() const {
@@ -511,7 +522,7 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
                 // Move the old fetcher into the shutting down instance.
                 _shuttingDownFetcher.swap(_fetcher);
                 // Create and start fetcher with current term and new starting optime.
-                _fetcher = _makeFetcher(currentTerm, _lastFetched.opTime);
+                _fetcher = _makeFetcher(currentTerm, _lastFetched.opTime, _getRetriedFindMaxTime());
                 auto scheduleStatus = _scheduleFetcher_inlock();
                 if (scheduleStatus.isOK()) {
                     log() << "Scheduled new oplog query " << _fetcher->toString();
@@ -704,15 +715,16 @@ void OplogFetcher::_finishCallback(Status status, OpTimeWithHash opTimeWithHash)
 }
 
 std::unique_ptr<Fetcher> OplogFetcher::_makeFetcher(long long currentTerm,
-                                                    OpTime lastFetchedOpTime) {
+                                                    OpTime lastFetchedOpTime,
+                                                    Milliseconds findMaxTime) {
     return stdx::make_unique<Fetcher>(
         _executor,
         _source,
         _nss.db().toString(),
-        makeFindCommandObject(_nss, currentTerm, lastFetchedOpTime, _getFindMaxTime()),
+        makeFindCommandObject(_nss, currentTerm, lastFetchedOpTime, findMaxTime),
         stdx::bind(&OplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
         _metadataObject,
-        _getFindMaxTime() + kNetworkTimeoutBufferMS,
+        findMaxTime + kNetworkTimeoutBufferMS,
         _getGetMoreMaxTime() + kNetworkTimeoutBufferMS);
 }
 
