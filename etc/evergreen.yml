@@ -12744,9 +12744,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   stepback: false
   tasks:
-  # TODO SERVER-35165: Re-enable the update_test_lifecycle task once Evergreen has 28 days worth of
-  # task history.
-  # - name: update_test_lifecycle
+  - name: update_test_lifecycle
   - name: fetch_test_lifecycle
     distros:
     - rhel62-small
