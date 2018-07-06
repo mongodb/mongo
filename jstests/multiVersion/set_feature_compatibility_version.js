@@ -190,8 +190,10 @@ TestData.skipCheckDBHashes = true;
 
     // Test that a 'lastStable' secondary can successfully perform initial sync from a 'latest'
     // primary with 'lastStableFCV'.
-    rst = new ReplSetTest(
-        {nodes: [{binVersion: latest}, {binVersion: latest, rsConfig: {priority: 0}}]});
+    rst = new ReplSetTest({
+        nodes: [{binVersion: latest}, {binVersion: latest, rsConfig: {priority: 0}}],
+        settings: {chainingAllowed: false}
+    });
     rst.startSet();
     rst.initiate();
 
