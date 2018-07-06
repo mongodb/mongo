@@ -102,10 +102,6 @@ public:
 
     ReadSource getTimestampReadSource() const override;
 
-    void* writingPtr(void* data, size_t len) override;
-
-    void setRollbackWritesDisabled() override {}
-
     virtual void setOrderedCommit(bool orderedCommit) override {
         _orderedCommit = orderedCommit;
     }

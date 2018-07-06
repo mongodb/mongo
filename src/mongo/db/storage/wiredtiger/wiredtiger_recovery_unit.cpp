@@ -236,11 +236,6 @@ void WiredTigerRecoveryUnit::preallocateSnapshot() {
     getSession();
 }
 
-void* WiredTigerRecoveryUnit::writingPtr(void* data, size_t len) {
-    // This API should not be used for anything other than the MMAP V1 storage engine
-    MONGO_UNREACHABLE;
-}
-
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_active);
     WT_SESSION* s = _session->getSession();

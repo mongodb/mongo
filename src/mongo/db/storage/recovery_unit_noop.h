@@ -71,11 +71,6 @@ public:
         _changes.push_back(std::unique_ptr<Change>(change));
     }
 
-    virtual void* writingPtr(void* data, size_t len) {
-        return data;
-    }
-    virtual void setRollbackWritesDisabled() {}
-
     virtual SnapshotId getSnapshotId() const {
         return SnapshotId();
     }

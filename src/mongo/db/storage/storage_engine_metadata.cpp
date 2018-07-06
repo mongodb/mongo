@@ -40,9 +40,15 @@
 #include <ostream>
 #include <vector>
 
+#ifdef __linux__  // Only needed by flushDirectory for Linux
+#include <boost/filesystem/path.hpp>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
+
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -55,15 +61,6 @@ namespace dps = ::mongo::dotted_path_support;
 namespace {
 
 const std::string kMetadataBasename = "storage.bson";
-
-/**
- * Returns true if local.ns is found in 'directory' or 'directory'/local/.
- */
-bool containsMMapV1LocalNsFile(const std::string& directory) {
-    boost::filesystem::path directoryPath(directory);
-    return boost::filesystem::exists(directoryPath / "local.ns") ||
-        boost::filesystem::exists((directoryPath / "local") / "local.ns");
-}
 
 bool fsyncFile(boost::filesystem::path path) {
     invariant(path.has_filename());
@@ -99,11 +96,6 @@ boost::optional<std::string> StorageEngineMetadata::getStorageEngineForPath(
         return {metadata->getStorageEngine()};
     }
 
-    // Fallback to checking for MMAPv1-specific files to handle upgrades from before the
-    // storage.bson metadata file was introduced in 3.0.
-    if (containsMMapV1LocalNsFile(dbpath)) {
-        return {std::string("mmapv1")};
-    }
     return {};
 }
 
@@ -219,6 +211,51 @@ Status StorageEngineMetadata::read() {
     }
 
     return Status::OK();
+}
+
+void flushMyDirectory(const boost::filesystem::path& file) {
+#ifdef __linux__  // this isn't needed elsewhere
+    static bool _warnedAboutFilesystem = false;
+    // if called without a fully qualified path it asserts; that makes mongoperf fail.
+    // so make a warning. need a better solution longer term.
+    // massert(13652, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
+    if (!file.has_branch_path()) {
+        log() << "warning flushMyDirectory couldn't find parent dir for file: " << file.string();
+        return;
+    }
+
+
+    boost::filesystem::path dir = file.branch_path();  // parent_path in new boosts
+
+    LOG(1) << "flushing directory " << dir.string();
+
+    int fd = ::open(dir.string().c_str(), O_RDONLY);  // DO NOT THROW OR ASSERT BEFORE CLOSING
+    massert(13650,
+            str::stream() << "Couldn't open directory '" << dir.string() << "' for flushing: "
+                          << errnoWithDescription(),
+            fd >= 0);
+    if (fsync(fd) != 0) {
+        int e = errno;
+        if (e == EINVAL) {  // indicates filesystem does not support synchronization
+            if (!_warnedAboutFilesystem) {
+                log() << "\tWARNING: This file system is not supported. For further information"
+                      << " see:" << startupWarningsLog;
+                log() << "\t\t\thttp://dochub.mongodb.org/core/unsupported-filesystems"
+                      << startupWarningsLog;
+                log() << "\t\tPlease notify MongoDB, Inc. if an unlisted filesystem generated "
+                      << "this warning." << startupWarningsLog;
+                _warnedAboutFilesystem = true;
+            }
+        } else {
+            close(fd);
+            massert(13651,
+                    str::stream() << "Couldn't fsync directory '" << dir.string() << "': "
+                                  << errnoWithDescription(e),
+                    false);
+        }
+    }
+    close(fd);
+#endif
 }
 
 Status StorageEngineMetadata::write() const {

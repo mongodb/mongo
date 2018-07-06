@@ -471,7 +471,6 @@ env.Library(
         "mongod_options.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/mmap_v1/mmap_v1_options',
         'repl/repl_settings',
         'repl/replica_set_messages',
         'server_options_servers',
@@ -695,6 +694,9 @@ env.Library(
         'index/index_access_method',
         'write_ops',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+    ],
 )
 
 env.Library(
@@ -858,19 +860,6 @@ env.Library(
 )
 
 env.Library(
-    target='prefetch',
-    source=[
-        'prefetch.cpp',
-    ],
-    LIBDEPS=[
-        'dbhelpers',
-        'index/index_access_method',
-        '$BUILD_DIR/mongo/db/stats/timer_stats',
-        '$BUILD_DIR/mongo/db/storage/mmap_v1/mmap',
-    ],
-)
-
-env.Library(
     target="rw_concern_d",
     source=[
         "read_concern.cpp",
@@ -886,6 +875,9 @@ env.Library(
         "storage/storage_options",
         "s/sharding",
     ],
+    LIBDEPS_PRIVATE=[
+        "commands/server_status_core",
+    ],
 )
 
 env.Library(
@@ -896,7 +888,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/database',
-        '$BUILD_DIR/mongo/db/storage/mmap_v1/repair_database_interface',
         'background',
         'logical_clock',
     ],
@@ -920,6 +911,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/fsync_locked',
+        'commands/server_status_core',
         'write_ops',
     ]
 )
@@ -1035,6 +1027,9 @@ env.Library(
         'storage/storage_options',
         'update/update_driver',
     ],
+    LIBDEPS_PRIVATE=[
+        "commands/server_status_core",
+    ],
 )
 
 env.Library(
@@ -1047,7 +1042,6 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
-        "$BUILD_DIR/mongo/db/storage/mmap_v1/file_allocator",
         "$BUILD_DIR/mongo/db/ttl_collection_cache",
         "$BUILD_DIR/mongo/executor/network_interface_factory",
         "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl",
@@ -1085,7 +1079,6 @@ env.Library(
         "op_observer_d",
         "ops/write_ops_parsers",
         "pipeline/aggregation",
-        "prefetch",
         "query_exec",
         "repair_database",
         "repl/bgsync",
@@ -1111,8 +1104,6 @@ env.Library(
         "stats/top",
         "storage/devnull/storage_devnull",
         "storage/ephemeral_for_test/storage_ephemeral_for_test",
-        "storage/mmap_v1/mmap",
-        "storage/mmap_v1/storage_mmapv1",
         "storage/storage_engine_lock_file",
         "storage/storage_engine_metadata",
         "storage/storage_init_d",

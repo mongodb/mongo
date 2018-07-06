@@ -34,8 +34,6 @@
 #include <iostream>
 
 #include "mongo/db/client.h"
-#include "mongo/db/storage/mmap_v1/compress.h"
-#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/queue.h"
@@ -382,36 +380,6 @@ public:
     }
 };
 
-class RelativePathTest {
-public:
-    void run() {
-        RelativePath a = RelativePath::fromRelativePath("a");
-        RelativePath b = RelativePath::fromRelativePath("a");
-        RelativePath c = RelativePath::fromRelativePath("b");
-        RelativePath d = RelativePath::fromRelativePath("a/b");
-
-
-        ASSERT(a == b);
-        ASSERT(a != c);
-        ASSERT(a != d);
-        ASSERT(c != d);
-    }
-};
-
-struct CompressionTest1 {
-    void run() {
-        const char* c = "this is a test";
-        std::string s;
-        size_t len = compress(c, strlen(c) + 1, &s);
-        verify(len > 0);
-
-        std::string out;
-        bool ok = uncompress(s.c_str(), s.size(), &out);
-        verify(ok);
-        verify(strcmp(out.c_str(), c) == 0);
-    }
-} ctest1;
-
 class All : public Suite {
 public:
     All() : Suite("basic") {}
@@ -436,9 +404,6 @@ public:
         add<StrTests>();
 
         add<HostAndPortTests>();
-        add<RelativePathTest>();
-
-        add<CompressionTest1>();
     }
 };
 

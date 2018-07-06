@@ -77,11 +77,6 @@ Status addOptions(optionenvironment::OptionSection* options) {
 
 #endif
 
-    storage_options.addOptionChaining("storage.repairPath",
-                                      "repairpath",
-                                      optionenvironment::String,
-                                      "root directory for repair files - defaults to dbpath");
-
     options->addSection(general_options).transitional_ignore();
     options->addSection(storage_options).transitional_ignore();
 
@@ -130,23 +125,6 @@ Status storeOptions(const moe::Environment& params) {
         storageGlobalParams.dbpath = currentPath.root_name().string() + storageGlobalParams.dbpath;
     }
 #endif
-
-    // needs to be after things like --configsvr parsing, thus here.
-    if (params.count("storage.repairPath")) {
-        storageGlobalParams.repairpath = params["storage.repairPath"].as<string>();
-        if (!storageGlobalParams.repairpath.size()) {
-            return Status(ErrorCodes::BadValue, "repairpath is empty");
-        }
-
-        if (storageGlobalParams.dur &&
-            !str::startsWith(storageGlobalParams.repairpath, storageGlobalParams.dbpath)) {
-            return Status(ErrorCodes::BadValue,
-                          "You must use a --repairpath that is a subdirectory of --dbpath when "
-                          "using journaling");
-        }
-    } else {
-        storageGlobalParams.repairpath = storageGlobalParams.dbpath;
-    }
 
     return Status::OK();
 }

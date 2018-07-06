@@ -126,7 +126,6 @@
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/encryption_hooks.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
@@ -405,20 +404,11 @@ ExitCode _initAndListen(int listenPort) {
         uassert(10296, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
     }
 
-    {
-        std::stringstream ss;
-        ss << "repairpath (" << storageGlobalParams.repairpath << ") does not exist";
-        uassert(12590, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.repairpath));
-    }
-
     initializeSNMP();
 
     if (!storageGlobalParams.readOnly) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
     }
-
-    if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalRecoverOnly)
-        return EXIT_NET_ERROR;
 
     if (mongodGlobalParams.scriptingEnabled) {
         ScriptEngine::setup();

@@ -407,26 +407,6 @@ ThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() const
     return _writerPool.get();
 }
 
-Status ReplicationCoordinatorExternalStateImpl::runRepairOnLocalDB(OperationContext* opCtx) {
-    try {
-        Lock::GlobalWrite globalWrite(opCtx);
-        StorageEngine* engine = getGlobalServiceContext()->getStorageEngine();
-
-        if (!engine->isMmapV1()) {
-            return Status::OK();
-        }
-
-        UnreplicatedWritesBlock uwb(opCtx);
-        Status status = repairDatabase(opCtx, engine, localDbName, false, false);
-
-        // Open database before returning
-        DatabaseHolder::getDatabaseHolder().openDb(opCtx, localDbName);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-    return Status::OK();
-}
-
 Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(OperationContext* opCtx,
                                                                          const BSONObj& config) {
     try {

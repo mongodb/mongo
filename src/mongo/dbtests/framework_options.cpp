@@ -39,7 +39,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/query/find.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -152,18 +151,6 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
         frameworkGlobalParams.perfHist = params["perfHist"].as<unsigned>();
     }
 
-    bool nodur = false;
-    if (params.count("nodur")) {
-        nodur = true;
-        storageGlobalParams.dur = false;
-    }
-    if (params.count("dur") || storageGlobalParams.dur) {
-        storageGlobalParams.dur = true;
-    }
-
-    if (params.count("nopreallocj")) {
-        mmapv1GlobalOptions.preallocj = false;
-    }
 
     if (params.count("debug") || params.count("verbose")) {
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
@@ -194,31 +181,10 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
+    DEV log() << "DEBUG build" << endl;
+
     string dbpathString = p.string();
     storageGlobalParams.dbpath = dbpathString.c_str();
-
-    mmapv1GlobalOptions.prealloc = false;
-
-    // dbtest defaults to smallfiles
-    mmapv1GlobalOptions.smallfiles = true;
-    if (params.count("bigfiles")) {
-        storageGlobalParams.dur = true;
-    }
-
-    DEV log() << "DEBUG build" << endl;
-    if (sizeof(void*) == 4)
-        log() << "32bit" << endl;
-    log() << "random seed: " << frameworkGlobalParams.seed << endl;
-
-    if (time(0) % 3 == 0 && !nodur) {
-        if (!storageGlobalParams.dur) {
-            storageGlobalParams.dur = true;
-            log() << "****************" << endl;
-            log() << "running with journaling enabled to test that. dbtests will do this "
-                  << "occasionally even if --dur is not specified." << endl;
-            log() << "****************" << endl;
-        }
-    }
 
     storageGlobalParams.engine = params["storage.engine"].as<string>();
 
@@ -229,13 +195,6 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     frameworkGlobalParams.filter = "";
     if (params.count("filter")) {
         frameworkGlobalParams.filter = params["filter"].as<string>();
-    }
-
-    if (kDebugBuild && storageGlobalParams.dur) {
-        log() << "Debug Build: automatically enabling mmapv1GlobalOptions.journalOptions=8 "
-              << "(JournalParanoid)" << endl;
-        // this was commented out.  why too slow or something?
-        mmapv1GlobalOptions.journalOptions |= MMAPV1Options::JournalParanoid;
     }
 
     return Status::OK();

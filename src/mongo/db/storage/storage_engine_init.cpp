@@ -126,12 +126,6 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
         log() << startupWarningsLog;
     }
 
-    const std::string repairpath = storageGlobalParams.repairpath;
-    uassert(40311,
-            str::stream() << "Cannot start server. The command line option '--repairpath'"
-                          << " is only supported by the mmapv1 storage engine",
-            repairpath.empty() || repairpath == dbpath || storageGlobalParams.engine == "mmapv1");
-
     const StorageEngine::Factory* factory =
         getFactoryForStorageEngine(service, storageGlobalParams.engine);
 

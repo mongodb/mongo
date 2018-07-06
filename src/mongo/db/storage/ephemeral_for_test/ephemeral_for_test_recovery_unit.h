@@ -64,12 +64,6 @@ public:
         _changes.push_back(ChangePtr(change));
     }
 
-    virtual void* writingPtr(void* data, size_t len) {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual void setRollbackWritesDisabled() {}
-
     virtual SnapshotId getSnapshotId() const {
         return SnapshotId();
     }

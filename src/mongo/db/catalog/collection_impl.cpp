@@ -64,7 +64,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/update/update_driver.h"
@@ -797,9 +796,6 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
 
 bool CollectionImpl::_enforceQuota(bool userEnforeQuota) const {
     if (!userEnforeQuota)
-        return false;
-
-    if (!mmapv1GlobalOptions.quota)
         return false;
 
     if (_ns.db() == "local")

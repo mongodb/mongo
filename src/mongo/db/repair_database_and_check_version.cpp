@@ -50,7 +50,6 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
@@ -501,7 +500,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         if (replSettings.usingReplSets()) {
             // We only care about _id indexes and drop-pending collections if we are in a replset.
             checkForIdIndexesAndDropPendingCollections(opCtx, db);
-            // Ensure oplog is capped (mmap does not guarantee order of inserts on noncapped
+            // Ensure oplog is capped (mongodb does not guarantee order of inserts on noncapped
             // collections)
             if (db->name() == "local") {
                 checkForCappedOplog(opCtx, db);
@@ -519,13 +518,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     if (!fcvDocumentExists && nonLocalDatabases) {
         severe()
             << "Unable to start up mongod due to missing featureCompatibilityVersion document.";
-        if (opCtx->getServiceContext()->getStorageEngine()->isMmapV1()) {
-            severe() << "Please run with --journalOptions "
-                     << static_cast<int>(MMAPV1Options::JournalRecoverOnly)
-                     << " to recover the journal. Then run with --repair to restore the document.";
-        } else {
-            severe() << "Please run with --repair to restore the document.";
-        }
+        severe() << "Please run with --repair to restore the document.";
         fassertFailedNoTrace(40652);
     }
 

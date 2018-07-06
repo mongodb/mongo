@@ -72,10 +72,6 @@ void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication(Operat
 
 void ReplicationCoordinatorExternalStateMock::stopDataReplication(OperationContext*) {}
 
-Status ReplicationCoordinatorExternalStateMock::runRepairOnLocalDB(OperationContext* opCtx) {
-    return Status::OK();
-}
-
 Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(OperationContext* opCtx,
                                                                          const BSONObj& config) {
     return storeLocalConfigDocument(opCtx, config);

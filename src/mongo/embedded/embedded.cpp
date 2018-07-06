@@ -231,12 +231,6 @@ ServiceContext* initialize(const char* yaml_config) {
         uassert(50677, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
     }
 
-    {
-        std::stringstream ss;
-        ss << "repairpath (" << storageGlobalParams.repairpath << ") does not exist";
-        uassert(50678, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.repairpath));
-    }
-
     if (!storageGlobalParams.readOnly) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
     }

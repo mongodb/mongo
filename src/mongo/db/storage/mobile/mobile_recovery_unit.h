@@ -62,12 +62,6 @@ public:
 
     void registerChange(Change* change) override;
 
-    void* writingPtr(void* data, size_t len) override {
-        MONGO_UNREACHABLE;
-    }
-
-    void setRollbackWritesDisabled() override {}
-
     SnapshotId getSnapshotId() const override {
         return SnapshotId();
     }

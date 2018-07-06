@@ -55,7 +55,6 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/prefetch.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/applier_helpers.h"
 #include "mongo/db/repl/apply_ops.h"
@@ -348,38 +347,6 @@ const OplogApplier::Options& SyncTail::getOptions() const {
 }
 
 namespace {
-
-// The pool threads call this to prefetch each op
-void prefetchOp(const OplogEntry& oplogEntry) {
-    const auto& nss = oplogEntry.getNamespace();
-    if (!nss.isEmpty()) {
-        try {
-            // one possible tweak here would be to stay in the read lock for this database
-            // for multiple prefetches if they are for the same database.
-            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-            OperationContext& opCtx = *opCtxPtr;
-            AutoGetCollectionForReadCommand ctx(&opCtx, nss);
-            Database* db = ctx.getDb();
-            if (db) {
-                prefetchPagesForReplicatedOp(&opCtx, db, oplogEntry);
-            }
-        } catch (const DBException& e) {
-            LOG(2) << "ignoring exception in prefetchOp(): " << redact(e) << endl;
-        } catch (const std::exception& e) {
-            log() << "Unhandled std::exception in prefetchOp(): " << redact(e.what()) << endl;
-            fassertFailed(16397);
-        }
-    }
-}
-
-// Doles out all the work to the reader pool threads and waits for them to complete
-void prefetchOps(const MultiApplier::Operations& ops, ThreadPool* prefetcherPool) {
-    invariant(prefetcherPool);
-    for (auto&& op : ops) {
-        invariant(prefetcherPool->schedule([&] { prefetchOp(op); }));
-    }
-    prefetcherPool->waitForIdle();
-}
 
 // Doles out all the work to the writer pool threads.
 // Does not modify writerVectors, but passes non-const pointers to inner vectors into func.
@@ -1254,11 +1221,6 @@ Status multiSyncApply(OperationContext* opCtx,
 
 StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
     invariant(!ops.empty());
-
-    if (isMMAPV1()) {
-        // Use a ThreadPool to prefetch all the operations in a batch.
-        prefetchOps(ops, _writerPool);
-    }
 
     LOG(2) << "replication batch size is " << ops.size();
     // Stop all readers until we're done. This also prevents doc-locking engines from deleting old

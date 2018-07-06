@@ -74,12 +74,6 @@ struct StorageGlobalParams {
     // running the repairDatabase database command on all databases.
     bool repair;
 
-    // --repairpath
-    // Specifies the root directory containing MongoDB data files to use for the --repair
-    // operation.
-    // Default: A _tmp directory within the path specified by the dbPath option.
-    std::string repairpath;
-
     bool dur;  // --dur durability (now --journal)
 
     // --journalCommitInterval

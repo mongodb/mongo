@@ -8,7 +8,6 @@ env.SConscript(
         'devnull',
         'ephemeral_for_test',
         'kv',
-        'mmap_v1',
         'wiredtiger',
         'mobile',
     ],
@@ -245,9 +244,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/storage/mmap_v1/paths',
     ],
 )
 

@@ -51,7 +51,6 @@
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/storage/mmap_v1/repair_database_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -230,11 +229,7 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status repairDatabase(OperationContext* opCtx,
-                      StorageEngine* engine,
-                      const std::string& dbName,
-                      bool preserveClonedFilesOnFailure,
-                      bool backupOriginalFiles) {
+Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std::string& dbName) {
     DisableDocumentValidation validationDisabler(opCtx);
 
     // We must hold some form of lock here
@@ -246,24 +241,6 @@ Status repairDatabase(OperationContext* opCtx,
     BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
     opCtx->checkForInterrupt();
-
-    if (engine->isMmapV1()) {
-        // MMAPv1 is a layering violation so it implements its own repairDatabase. Call through a
-        // shimmed interface, so the symbol can exist independent of mmapv1.
-        auto status = repairDatabaseMmapv1(
-            engine, opCtx, dbName, preserveClonedFilesOnFailure, backupOriginalFiles);
-        // Restore oplog Collection pointer cache.
-        repl::acquireOplogCollectionForLogging(opCtx);
-        return status;
-    }
-
-    // These are MMAPv1 specific
-    if (preserveClonedFilesOnFailure) {
-        return Status(ErrorCodes::BadValue, "preserveClonedFilesOnFailure not supported");
-    }
-    if (backupOriginalFiles) {
-        return Status(ErrorCodes::BadValue, "backupOriginalFiles not supported");
-    }
 
     // Close the db and invalidate all current users and caches.
     DatabaseHolder::getDatabaseHolder().close(opCtx, dbName, "database closed for repair");

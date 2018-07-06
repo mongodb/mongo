@@ -698,13 +698,11 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         if (startCompleted) {
             startCompleted();
         }
-        // Repair local db (to compact it).
-        auto opCtxHolder = cc().makeOperationContext();
-        uassertStatusOK(_externalState->runRepairOnLocalDB(opCtxHolder.get()));
         // Because initial sync completed, we can only be in STARTUP2, not REMOVED.
         // Transition from STARTUP2 to RECOVERING and start the producer and the applier.
         invariant(getMemberState().startup2());
         invariant(setFollowerMode(MemberState::RS_RECOVERING));
+        auto opCtxHolder = cc().makeOperationContext();
         _externalState->startSteadyStateReplication(opCtxHolder.get(), this);
     };
 

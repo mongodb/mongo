@@ -167,10 +167,10 @@ env.Library(
         "fsync.cpp",
     ],
     LIBDEPS_PRIVATE=[
+	'$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
         'fsync_locked',
     ]
 )

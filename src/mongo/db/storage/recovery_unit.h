@@ -355,50 +355,6 @@ public:
         registerChange(new OnCommitChange(std::move(callback)));
     }
 
-    //
-    // The remaining methods probably belong on DurRecoveryUnit rather than on the interface.
-    //
-
-    /**
-     * Declare that the data at [x, x + len) is being written.
-     */
-    virtual void* writingPtr(void* data, size_t len) = 0;
-
-    //
-    // Syntactic sugar
-    //
-
-    /**
-     * Declare write intent for an int
-     */
-    inline int& writingInt(int& d) {
-        return *writing(&d);
-    }
-
-    /**
-     * A templated helper for writingPtr.
-     */
-    template <typename T>
-    inline T* writing(T* x) {
-        writingPtr(x, sizeof(T));
-        return x;
-    }
-
-    /**
-     * Sets a flag that declares this RecoveryUnit will skip rolling back writes, for the
-     * duration of the current outermost WriteUnitOfWork.  This function can only be called
-     * between a pair of unnested beginUnitOfWork() / endUnitOfWork() calls.
-     * The flag is cleared when endUnitOfWork() is called.
-     * While the flag is set, rollback will skip rolling back writes, but custom rollback
-     * change functions are still called.  Clearly, this functionality should only be used when
-     * writing to temporary collections that can be cleaned up externally.  For example,
-     * foreground index builds write to a temporary collection; if something goes wrong that
-     * normally requires a rollback, we can instead clean up the index by dropping the entire
-     * index.
-     * Setting the flag may permit increased performance.
-     */
-    virtual void setRollbackWritesDisabled() = 0;
-
     virtual void setOrderedCommit(bool orderedCommit) = 0;
 
 protected:

@@ -80,14 +80,6 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
 }  // namespace
 MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
 
-//
-// Comparison for external sorter interface
-//
-
-// Defined in db/structure/btree/key.cpp
-// XXX TODO: rename to something more descriptive, etc. etc.
-int oldCompare(const BSONObj& l, const BSONObj& r, const Ordering& o);
-
 class BtreeExternalSortComparison {
 public:
     BtreeExternalSortComparison(const BSONObj& ordering, IndexVersion version)
@@ -98,12 +90,8 @@ public:
     typedef std::pair<BSONObj, RecordId> Data;
 
     int operator()(const Data& l, const Data& r) const {
-        int x = (_version == IndexVersion::kV0
-                     ? oldCompare(l.first, r.first, _ordering)
-                     : l.first.woCompare(r.first, _ordering, /*considerfieldname*/ false));
-        if (x) {
+        if (int x = l.first.woCompare(r.first, _ordering, /*considerfieldname*/ false))
             return x;
-        }
         return l.second.compare(r.second);
     }
 
@@ -497,11 +485,6 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wunit(opCtx);
-        // Improve performance in the btree-building phase by disabling rollback tracking.
-        // This avoids copying all the written bytes to a buffer that is only used to roll back.
-        // Note that this is safe to do, as this entire index-build-in-progress will be cleaned
-        // up by the index system.
-        opCtx->recoveryUnit()->setRollbackWritesDisabled();
 
         // Get the next datum and add it to the builder.
         BulkBuilder::Sorter::Data data = it->next();

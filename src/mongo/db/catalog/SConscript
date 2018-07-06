@@ -294,9 +294,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views_mongod',
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/commands/server_status_core",
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/repl/repl_settings',
-        '$BUILD_DIR/mongo/db/storage/mmap_v1/mmap_v1_options',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
     ],
 )

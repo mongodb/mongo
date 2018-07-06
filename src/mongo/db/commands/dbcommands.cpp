@@ -240,15 +240,16 @@ public:
         log() << "repairDatabase " << dbname;
         BackgroundOperation::assertNoBgOpInProgForDb(dbname);
 
-        e = cmdObj.getField("preserveClonedFilesOnFailure");
-        bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
-        e = cmdObj.getField("backupOriginalFiles");
-        bool backupOriginalFiles = e.isBoolean() && e.boolean();
+        uassert(ErrorCodes::BadValue,
+                "preserveClonedFilesOnFailure not supported",
+                !cmdObj.getField("preserveClonedFilesOnFailure").trueValue());
+        uassert(ErrorCodes::BadValue,
+                "backupOriginalFiles not supported",
+                !cmdObj.getField("backupOriginalFiles").trueValue());
 
         StorageEngine* engine = getGlobalServiceContext()->getStorageEngine();
         repl::UnreplicatedWritesBlock uwb(opCtx);
-        Status status = repairDatabase(
-            opCtx, engine, dbname, preserveClonedFilesOnFailure, backupOriginalFiles);
+        Status status = repairDatabase(opCtx, engine, dbname);
 
         // Open database before returning
         DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbname);
