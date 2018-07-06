@@ -290,6 +290,7 @@ env.Library(
         "eval.cpp",
         "group_cmd.cpp",
         "haystack.cpp",
+        "invalidate_view_catalog_command.cpp",
         "mr.cpp",
         "oplog_application_checks.cpp",
         "oplog_note.cpp",
