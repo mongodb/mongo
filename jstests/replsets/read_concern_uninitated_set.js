@@ -1,6 +1,8 @@
 /**
  * Test to ensure that specifying non-local read concern with an uninitiated set does not crash
  * node.
+ *
+ * @tags: [requires_persistence]
  */
 (function() {
     "use strict";
