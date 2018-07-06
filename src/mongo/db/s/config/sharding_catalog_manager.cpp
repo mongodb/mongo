@@ -324,4 +324,9 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     return Status::OK();
 }
 
+Lock::ExclusiveLock ShardingCatalogManager::lockZoneMutex(OperationContext* opCtx) {
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
+    return lk;
+}
+
 }  // namespace mongo

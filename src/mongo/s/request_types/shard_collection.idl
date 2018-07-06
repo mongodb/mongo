@@ -104,3 +104,67 @@ structs:
                 type: uuid
                 description: "The UUID of the collection that just got sharded."
                 optional: true
+                
+    ShardsvrShardCollection:
+        description: "The internal shardCollection command on a primary shard"
+        strict: false
+        fields:
+            _shardsvrShardCollection:
+                type: namespacestring
+                description: "The namespace of the collection to shard in the form <database>.<collection>."
+                optional: true
+            key:
+                type: object
+                description: "The index specification document to use as the shard key."
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint"
+                default: false
+            numInitialChunks:
+                type: safeInt64
+                description: "The number of chunks to create initially when sharding an empty collection with a hashed shard key."
+                default: 0
+            initialSplitPoints:
+                type: array<object>
+                description: "A specific set of points to create initial splits at, currently used only by mapReduce"
+                optional: true
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true
+            getUUIDfromPrimaryShard:
+                type: bool
+                description: "Whether the collection should be created on the primary shard. This should only be false when used in mapReduce."
+                default: true
+
+    ShardsvrShardCollectionResponse:
+        description: "The response format of the internal shardCollection command on the primary shard"
+        strict: false
+        fields:
+            collectionsharded:
+                type: string
+                description: "The name of the collection that just got sharded."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection that just got sharded."
+                optional: true
+            initSplits:
+                type: array<object>
+                description: "The initial split points."
+                optional: false
+            allSplits:
+                type: array<object>
+                description: "All split points."
+                optional: false
+                
+    ConfigsvrCommitShardCollection:
+        description: "The internal commitShardCollection command on the config server"
+        strict: false
+        fields:
+            _configsvrCommitShardCollection:
+                type: string
+                description: "The name of the collection that just got sharded."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection that just got sharded."
+                optional: true
