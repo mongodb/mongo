@@ -1073,9 +1073,6 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         // baseProgramName is the program name without any version information, e.g., mongod.
         let programName = argArray[0];
 
-        // Object containing log component levels for the "logComponentVerbosity" parameter
-        let logComponentVerbosity = {};
-
         let [baseProgramName, programVersion] = programName.split("-");
         let programMajorMinorVersion = 0;
         if (programVersion) {
@@ -1086,11 +1083,6 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         if (baseProgramName === 'mongod' || baseProgramName === 'mongos') {
             if (jsTest.options().enableTestCommands) {
                 argArray.push(...['--setParameter', "enableTestCommands=1"]);
-                if (!programVersion || programMajorMinorVersion >= 303) {
-                    if (!argArrayContains("logComponentVerbosity")) {
-                        logComponentVerbosity["tracking"] = 0;
-                    }
-                }
             }
             if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-1") {
                 if (!argArrayContainsSetParameterValue('authenticationMechanisms=')) {
@@ -1166,11 +1158,6 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 // Since options may not be backward compatible, mongod options are not
                 // set on older versions, e.g., mongod-3.0.
                 if (programName.endsWith('mongod')) {
-                    // Enable heartbeat logging for replica set nodes.
-                    if (!argArrayContains("logComponentVerbosity")) {
-                        logComponentVerbosity["replication"] = {"heartbeats": 2, "rollback": 2};
-                    }
-
                     if (jsTest.options().storageEngine === "wiredTiger" ||
                         !jsTest.options().storageEngine) {
                         if (jsTest.options().storageEngineCacheSizeGB) {
@@ -1195,24 +1182,27 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                                               jsTest.options().storageEngineCacheSizeGB]);
                         }
                     }
-                    // apply setParameters for mongod
+                    // apply setParameters for mongod. The 'setParameters' field should be given as
+                    // a plain JavaScript object, where each key is a parameter name and the value
+                    // is the value to set for that parameter.
                     if (jsTest.options().setParameters) {
-                        var params = jsTest.options().setParameters.split(",");
-                        if (params && params.length > 0) {
-                            params.forEach(function(p) {
-                                if (p)
-                                    argArray.push(...['--setParameter', p]);
-                            });
+                        let params = jsTest.options().setParameters;
+                        for (let paramName of Object.keys(params)) {
+                            // Only set the 'logComponentVerbosity' parameter if it has not already
+                            // been specified in the given argument array. This means that any
+                            // 'logComponentVerbosity' settings passed through via TestData will
+                            // always be overridden by settings passed directly to MongoRunner from
+                            // within the shell.
+                            if (paramName === "logComponentVerbosity" &&
+                                argArrayContains("logComponentVerbosity")) {
+                                continue;
+                            }
+                            const paramVal = params[paramName];
+                            const setParamStr = paramName + "=" + JSON.stringify(paramVal);
+                            argArray.push(...['--setParameter', setParamStr]);
                         }
                     }
                 }
-            }
-
-            // Add any enabled log components.
-            if (Object.keys(logComponentVerbosity).length > 0) {
-                argArray.push(
-                    ...['--setParameter',
-                        "logComponentVerbosity=" + JSON.stringify(logComponentVerbosity)]);
             }
         }
 
