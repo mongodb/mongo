@@ -4,7 +4,7 @@
     "use strict";
     const baseName = "jstests_repair2";
 
-    const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
+    const conn = MongoRunner.runMongod({smallfiles: ""});
     assert.neq(null, conn, "mongod failed to start.");
 
     const t = conn.getDB(baseName)[baseName];

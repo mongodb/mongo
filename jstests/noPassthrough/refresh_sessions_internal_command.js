@@ -4,7 +4,7 @@
     var conn;
     var admin;
 
-    conn = MongoRunner.runMongod({auth: "", nojournal: ""});
+    conn = MongoRunner.runMongod({auth: ""});
     admin = conn.getDB("admin");
 
     admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});

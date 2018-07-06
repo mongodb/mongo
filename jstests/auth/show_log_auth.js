@@ -2,7 +2,7 @@
 
 var baseName = "jstests_show_log_auth";
 
-var m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1", nojournal: "", smallfiles: ""});
+var m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1", smallfiles: ""});
 var db = m.getDB("admin");
 
 db.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});

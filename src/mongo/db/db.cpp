@@ -366,6 +366,14 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
+    // Disallow running a storage engine that doesn't support capped collections with --profile
+    if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections() &&
+        serverGlobalParams.defaultProfile != 0) {
+        log() << "Running " << storageGlobalParams.engine << " with profiling is not supported. "
+              << "Make sure you are not using --profile.";
+        exitCleanly(EXIT_BADOPTIONS);
+    }
+
     // Disallow running WiredTiger with --nojournal in a replica set
     if (storageGlobalParams.engine == "wiredTiger" && !storageGlobalParams.dur &&
         replSettings.usingReplSets()) {

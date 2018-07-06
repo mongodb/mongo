@@ -4,7 +4,7 @@ var db;
     "use strict";
     load("jstests/libs/geo_near_random.js");
 
-    const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
+    const conn = MongoRunner.runMongod({smallfiles: ""});
     assert.neq(null, conn, "mongod failed to start.");
     db = conn.getDB("test");
 

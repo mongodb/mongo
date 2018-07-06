@@ -1,6 +1,6 @@
 (function() {
     "use strict";
-    const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
+    const conn = MongoRunner.runMongod({smallfiles: ""});
     assert.neq(null, conn, "mongod failed to start.");
     let mydb = conn.getDB("test_ns1");
 

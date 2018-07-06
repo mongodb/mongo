@@ -6,7 +6,7 @@
     var startSession = {startSession: 1};
 
     // Start up a standalone server.
-    var conn = MongoRunner.runMongod({nojournal: ""});
+    var conn = MongoRunner.runMongod();
     var admin = conn.getDB("admin");
     var config = conn.getDB("config");
 

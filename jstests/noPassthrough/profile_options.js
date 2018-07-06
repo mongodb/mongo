@@ -1,3 +1,5 @@
+// @tags: [requires_profiling]
+
 var baseName = "jstests_core_profile_options";
 
 load('jstests/libs/command_line/test_parsed_options.js');
