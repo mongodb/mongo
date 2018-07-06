@@ -105,7 +105,8 @@ public:
     virtual double getElectionTimeoutOffsetLimitFraction() const;
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const;
     virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
-    virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
+    virtual std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;
+    virtual std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
 
     // Methods from JournalListener.
     virtual JournalListener::Token getToken();
