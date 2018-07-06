@@ -268,7 +268,13 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeSteady
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
-std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherMaxFetcherRestarts() const {
+std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherSteadyStateMaxFetcherRestarts()
+    const {
+    return 0;
+}
+
+std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherInitialSyncMaxFetcherRestarts()
+    const {
     return 0;
 }
 

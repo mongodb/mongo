@@ -133,13 +133,25 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBuffer,
 // Set this to specify size of read ahead buffer in the OplogBufferCollection.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBufferPeekCacheSize, int, 10000);
 
-// Set this to specify maximum number of times the oplog fetcher will consecutively restart the
-// oplog tailing query on non-cancellation errors.
-MONGO_EXPORT_SERVER_PARAMETER(oplogFetcherMaxFetcherRestarts, int, 3)
+// Set this to specify the maximum number of times the oplog fetcher will consecutively restart the
+// oplog tailing query on non-cancellation errors during steady state replication.
+MONGO_EXPORT_SERVER_PARAMETER(oplogFetcherSteadyStateMaxFetcherRestarts, int, 1)
     ->withValidator([](const int& potentialNewValue) {
         if (potentialNewValue < 0) {
             return Status(ErrorCodes::BadValue,
-                          "oplogFetcherMaxFetcherRestarts must be nonnegative");
+                          "oplogFetcherSteadyStateMaxFetcherRestarts must be nonnegative");
+        }
+        return Status::OK();
+    });
+
+// Set this to specify the maximum number of times the oplog fetcher will consecutively restart the
+// oplog tailing query on non-cancellation errors during initial sync. By default we provide a
+// generous amount of restarts to avoid potentially restarting an entire initial sync from scratch.
+MONGO_EXPORT_SERVER_PARAMETER(oplogFetcherInitialSyncMaxFetcherRestarts, int, 10)
+    ->withValidator([](const int& potentialNewValue) {
+        if (potentialNewValue < 0) {
+            return Status(ErrorCodes::BadValue,
+                          "oplogFetcherInitialSyncMaxFetcherRestarts must be nonnegative");
         }
         return Status::OK();
     });
@@ -900,8 +912,14 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteady
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
-std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRestarts() const {
-    return oplogFetcherMaxFetcherRestarts.load();
+std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherSteadyStateMaxFetcherRestarts()
+    const {
+    return oplogFetcherSteadyStateMaxFetcherRestarts.load();
+}
+
+std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncMaxFetcherRestarts()
+    const {
+    return oplogFetcherInitialSyncMaxFetcherRestarts.load();
 }
 
 SyncTail::BatchLimits ReplicationCoordinatorExternalStateImpl::getInitialSyncBatchLimits() const {

@@ -146,7 +146,8 @@ public:
 
 private:
     BSONObj _makeFindCommandObject(const NamespaceString& nss,
-                                   OpTime lastOpTimeFetched) const override;
+                                   OpTime lastOpTimeFetched,
+                                   Milliseconds findMaxTime) const override;
 
     BSONObj _makeMetadataObject() const override;
 
