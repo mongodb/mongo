@@ -371,16 +371,19 @@ Status OptionSection::getBoostOptions(po::options_description* boostOptions,
                                         boostType.release(),
                                         oditerator->_description.c_str());
 
-            for (const std::string& depreatedSingleName : oditerator->_deprecatedSingleNames) {
-                std::unique_ptr<po::value_semantic> boostTypeDep;
-                Status retDep = typeToBoostType(&boostTypeDep,
-                                                oditerator->_type,
-                                                includeDefaults ? oditerator->_default : Value(),
-                                                oditerator->_implicit,
-                                                !(sources & SourceCommandLine));
-                boostOptions->add_options()(depreatedSingleName.c_str(),
-                                            boostTypeDep.release(),
-                                            oditerator->_description.c_str());
+            if (!visibleOnly) {
+                for (const std::string& depreatedSingleName : oditerator->_deprecatedSingleNames) {
+                    std::unique_ptr<po::value_semantic> boostTypeDep;
+                    Status retDep =
+                        typeToBoostType(&boostTypeDep,
+                                        oditerator->_type,
+                                        includeDefaults ? oditerator->_default : Value(),
+                                        oditerator->_implicit,
+                                        !(sources & SourceCommandLine));
+                    boostOptions->add_options()(depreatedSingleName.c_str(),
+                                                boostTypeDep.release(),
+                                                oditerator->_description.c_str());
+                }
             }
         }
     }
