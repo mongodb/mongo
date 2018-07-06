@@ -85,6 +85,20 @@ BSONObj createRequestWithSessionId(StringData commandName,
     return builder.obj();
 }
 
+bool shouldApplyOplogToSession(const repl::OplogEntry& oplog,
+                               const ChunkRange& range,
+                               const ShardKeyPattern& keyPattern) {
+    // Skip appending CRUD operations that don't pertain to the ChunkRange being migrated.
+    if (oplog.isCrudOpType()) {
+        auto shardKey = keyPattern.extractShardKeyFromDoc(oplog.getOperationToApply());
+        if (!range.containsKey(shardKey)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 }  // namespace
 
 /**
@@ -669,17 +683,18 @@ void MigrationChunkClonerSourceLegacy::_xfer(OperationContext* opCtx,
 
 boost::optional<repl::OpTime> MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
     OperationContext* opCtx, BSONArrayBuilder* arrBuilder) {
-    repl::OpTime opTimeToWait;
-
     if (!_sessionCatalogSource) {
         return boost::none;
     }
 
+    repl::OpTime opTimeToWaitIfWaitingForMajority;
+    const ChunkRange range(_args.getMinKey(), _args.getMaxKey());
+
     while (_sessionCatalogSource->hasMoreOplog()) {
         auto result = _sessionCatalogSource->getLastFetchedOplog();
 
-        if (!result.oplog) {
-            // Last fetched turned out empty, try to see if there are more
+        if (!result.oplog ||
+            !shouldApplyOplogToSession(result.oplog.get(), range, _shardKeyPattern)) {
             _sessionCatalogSource->fetchNextOplog(opCtx);
             continue;
         }
@@ -695,16 +710,17 @@ boost::optional<repl::OpTime> MigrationChunkClonerSourceLegacy::nextSessionMigra
         }
 
         arrBuilder->append(oplogDoc);
+
         _sessionCatalogSource->fetchNextOplog(opCtx);
 
         if (result.shouldWaitForMajority) {
-            if (opTimeToWait < newOpTime) {
-                opTimeToWait = newOpTime;
+            if (opTimeToWaitIfWaitingForMajority < newOpTime) {
+                opTimeToWaitIfWaitingForMajority = newOpTime;
             }
         }
     }
 
-    return boost::make_optional(opTimeToWait);
+    return boost::make_optional(opTimeToWaitIfWaitingForMajority);
 }
 
 }  // namespace mongo
