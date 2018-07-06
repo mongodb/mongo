@@ -376,6 +376,12 @@
         assert.commandWorked(freshMongos.adminCommand({enableSharding: db}));
         st.ensurePrimaryShard(db, st.shard0.shardName);
         assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
+
+        // We do this because we expect staleMongos to see that the collection is sharded, which
+        // it may not if the "nearest" config server it contacts has not replicated the
+        // shardCollection writes (or has not heard that they have reached a majority).
+        st.configRS.awaitReplication();
+
         assert.commandWorked(freshMongos.adminCommand({split: nss, middle: {x: 0}}));
 
         // Do dummy read from the stale mongos so it loads the routing table into memory once.

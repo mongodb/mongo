@@ -384,6 +384,11 @@
             assert.commandWorked(freshMongos.getDB(db).runCommand({create: coll}));
             assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
 
+            // We do this because we expect staleMongos to see that the collection is sharded, which
+            // it may not if the "nearest" config server it contacts has not replicated the
+            // shardCollection writes (or has not heard that they have reached a majority).
+            st.configRS.awaitReplication();
+
             // Ensure the latest version changes have been persisted and propagate to the secondary
             // before we target it with versioned commands.
             assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand(
@@ -456,6 +461,12 @@
             assert.commandWorked(freshMongos.getDB(db).runCommand({drop: coll}));
             assert.commandWorked(freshMongos.getDB(db).runCommand({create: coll}));
             assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
+
+            // We do this because we expect staleMongos to see that the collection is sharded, which
+            // it may not if the "nearest" config server it contacts has not replicated the
+            // shardCollection writes (or has not heard that they have reached a majority).
+            st.configRS.awaitReplication();
+
             // Use {w:2} (all) write concern in the moveChunk operation so the metadata change gets
             // persisted to the secondary before versioned commands are sent against the secondary.
             assert.commandWorked(freshMongos.adminCommand({
@@ -552,6 +563,11 @@
             assert.commandWorked(staleMongos.adminCommand({enableSharding: db}));
             st.ensurePrimaryShard(db, st.shard0.shardName);
             assert.commandWorked(staleMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
+
+            // We do this because we expect staleMongos to see that the collection is sharded, which
+            // it may not if the "nearest" config server it contacts has not replicated the
+            // shardCollection writes (or has not heard that they have reached a majority).
+            st.configRS.awaitReplication();
 
             // Do any test-specific setup.
             test.setUp(staleMongos);
