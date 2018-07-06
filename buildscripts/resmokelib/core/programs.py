@@ -15,6 +15,10 @@ from . import process as _process
 from .. import config
 from .. import utils
 
+# The default 'logComponentVerbosity' object for mongod processes started either directly via
+# resmoke or those that will get started by the mongo shell.
+DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {"replication": {"heartbeats": 2, "rollback": 2}}
+
 
 def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     """
@@ -32,11 +36,9 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     if config.MONGOD_SET_PARAMETERS is not None:
         suite_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
 
-    # Turn on replication heartbeat logging.
-    if "replSet" in kwargs and "logComponentVerbosity" not in suite_set_parameters:
-        suite_set_parameters["logComponentVerbosity"] = {
-            "replication": {"heartbeats": 2, "rollback": 2}
-        }
+    # Set default log verbosity levels if none were specified.
+    if "logComponentVerbosity" not in suite_set_parameters:
+        suite_set_parameters["logComponentVerbosity"] = DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY
 
     # orphanCleanupDelaySecs controls an artificial delay before cleaning up an orphaned chunk
     # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
@@ -181,22 +183,29 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
 
     global_vars["TestData"] = test_data
 
-    # Pass setParameters for mongos and mongod through TestData. The setParameter parsing in
-    # servers.js is very primitive (just splits on commas), so this may break for non-scalar
-    # setParameter values.
+    # Initialize setParameters for mongod and mongos, to be passed to the shell via TestData. Since
+    # they are dictionaries, they will be converted to JavaScript objects when passed to the shell
+    # by the _format_shell_vars() function.
+    mongod_set_parameters = {}
     if config.MONGOD_SET_PARAMETERS is not None:
         if "setParameters" in test_data:
             raise ValueError("setParameters passed via TestData can only be set from either the"
                              " command line or the suite YAML, not both")
         mongod_set_parameters = utils.load_yaml(config.MONGOD_SET_PARAMETERS)
-        test_data["setParameters"] = _format_test_data_set_parameters(mongod_set_parameters)
+
+    # If the 'logComponentVerbosity' setParameter for mongod was not already specified, we set its
+    # value to a default.
+    mongod_set_parameters.setdefault("logComponentVerbosity",
+                                     DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY)
+
+    test_data["setParameters"] = mongod_set_parameters
 
     if config.MONGOS_SET_PARAMETERS is not None:
         if "setParametersMongos" in test_data:
             raise ValueError("setParametersMongos passed via TestData can only be set from either"
                              " the command line or the suite YAML, not both")
         mongos_set_parameters = utils.load_yaml(config.MONGOS_SET_PARAMETERS)
-        test_data["setParametersMongos"] = _format_test_data_set_parameters(mongos_set_parameters)
+        test_data["setParametersMongos"] = mongos_set_parameters
 
     if "eval_prepend" in kwargs:
         eval_sb.append(str(kwargs.pop("eval_prepend")))
