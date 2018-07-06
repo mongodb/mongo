@@ -72,15 +72,6 @@ Status addMongodOptions(moe::OptionSection* options) {
     }
 #endif
 
-#ifdef MONGO_CONFIG_SSL
-    moe::OptionSection ssl_options("SSL options");
-
-    ret = addSSLServerOptions(&ssl_options);
-    if (!ret.isOK()) {
-        return ret;
-    }
-#endif
-
     moe::OptionSection rs_options("Replica set options");
     moe::OptionSection replication_options("Replication options");
     moe::OptionSection sharding_options("Sharding options");
@@ -406,9 +397,6 @@ Status addMongodOptions(moe::OptionSection* options) {
     options->addSection(replication_options).transitional_ignore();
     options->addSection(rs_options).transitional_ignore();
     options->addSection(sharding_options).transitional_ignore();
-#ifdef MONGO_CONFIG_SSL
-    options->addSection(ssl_options).transitional_ignore();
-#endif
     options->addSection(storage_options).transitional_ignore();
 
     // The following are legacy options that are disallowed in the JSON config file
@@ -543,13 +531,6 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
     if (!ret.isOK()) {
         return ret;
     }
-
-#ifdef MONGO_CONFIG_SSL
-    ret = canonicalizeSSLServerOptions(params);
-    if (!ret.isOK()) {
-        return ret;
-    }
-#endif
 
     // "storage.journal.enabled" comes from the config file, so override it if any of "journal",
     // "nojournal", "dur", and "nodur" are set, since those come from the command line.

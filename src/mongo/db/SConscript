@@ -426,8 +426,9 @@ env.CppUnitTest(
     source=[
         'server_options_test.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         'server_options_servers',
+        '$BUILD_DIR/mongo/util/net/ssl_options_server',
     ],
 )
 

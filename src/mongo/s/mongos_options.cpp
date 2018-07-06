@@ -46,7 +46,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
@@ -67,15 +66,6 @@ Status addMongosOptions(moe::OptionSection* options) {
     moe::OptionSection windows_scm_options("Windows Service Control Manager options");
 
     ret = addWindowsServerOptions(&windows_scm_options);
-    if (!ret.isOK()) {
-        return ret;
-    }
-#endif
-
-#ifdef MONGO_CONFIG_SSL
-    moe::OptionSection ssl_options("SSL options");
-
-    ret = addSSLServerOptions(&ssl_options);
     if (!ret.isOK()) {
         return ret;
     }
@@ -127,10 +117,6 @@ Status addMongosOptions(moe::OptionSection* options) {
 
     options->addSection(sharding_options).transitional_ignore();
 
-#ifdef MONGO_CONFIG_SSL
-    options->addSection(ssl_options).transitional_ignore();
-#endif
-
     return Status::OK();
 }
 
@@ -172,13 +158,6 @@ Status canonicalizeMongosOptions(moe::Environment* params) {
     if (!ret.isOK()) {
         return ret;
     }
-
-#ifdef MONGO_CONFIG_SSL
-    ret = canonicalizeSSLServerOptions(params);
-    if (!ret.isOK()) {
-        return ret;
-    }
-#endif
 
     return Status::OK();
 }

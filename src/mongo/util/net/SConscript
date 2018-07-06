@@ -42,6 +42,35 @@ env.Library(
 )
 
 env.Library(
+    target='ssl_options_client',
+    source=[
+        'ssl_options_client.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'ssl_options',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ]
+)
+
+env.Library(
+    target='ssl_options_server',
+    source=[
+        'ssl_options_server.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'ssl_options',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ]
+)
+
+env.Library(
     target='socket',
     source=[
         "private/socket_poll.cpp",
@@ -131,17 +160,20 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target='ssl_manager_test',
-    source=[
-        'ssl_manager_test.cpp',
-        'ssl_options_test.cpp',
-        'sock_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/fail_point',
-        'network',
-        'socket',
-        'ssl_manager',
-    ],
-)
+if has_option('ssl'):
+    env.CppUnitTest(
+        target='ssl_manager_test',
+        source=[
+            'ssl_manager_test.cpp',
+            'ssl_options_test.cpp',
+            'sock_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/util/fail_point',
+            'network',
+            '$BUILD_DIR/mongo/db/server_options_servers',
+            'socket',
+            'ssl_manager',
+            'ssl_options_server',
+        ],
+    )

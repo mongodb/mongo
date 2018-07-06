@@ -390,13 +390,6 @@ Status validateServerOptions(const moe::Environment& params) {
     }
 #endif
 
-#ifdef MONGO_CONFIG_SSL
-    ret = validateSSLServerOptions(params);
-    if (!ret.isOK()) {
-        return ret;
-    }
-#endif
-
     bool haveAuthenticationMechanisms = true;
     bool hasAuthorizationEnabled = false;
     if (params.count("security.authenticationMechanisms") &&
@@ -663,13 +656,6 @@ Status storeServerOptions(const moe::Environment& params) {
         return Status(ErrorCodes::BadValue,
                       "--transitionToAuth must be used with keyFile or x509 authentication");
     }
-
-#ifdef MONGO_CONFIG_SSL
-    ret = storeSSLServerOptions(params);
-    if (!ret.isOK()) {
-        return ret;
-    }
-#endif
 
     ret = storeMessageCompressionOptions(params);
     if (!ret.isOK()) {

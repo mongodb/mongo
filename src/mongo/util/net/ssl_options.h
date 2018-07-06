@@ -111,28 +111,29 @@ struct SSLParams {
 extern SSLParams sslGlobalParams;
 
 /**
+ * Older versions of mongod/mongos accepted --sslDisabledProtocols values
+ * in the form 'noTLS1_0,noTLS1_1'.  kAcceptNegativePrefix allows us to
+ * continue accepting this format on mongod/mongos while only supporting
+ * the "standard" TLS1_X format in the shell.
+ */
+enum class SSLDisabledProtocolsMode {
+    kStandardFormat,
+    kAcceptNegativePrefix,
+};
+
+Status storeSSLDisabledProtocols(
+    const std::string& disabledProtocols,
+    SSLDisabledProtocolsMode mode = SSLDisabledProtocolsMode::kStandardFormat);
+
+/**
 * The global SSL configuration. This should be accessed only after global initialization has
 * completed. If it must be accessed in an initializer, the initializer should have
 * "EndStartupOptionStorage" as a prerequisite.
 */
 const SSLParams& getSSLGlobalParams();
 
-Status addSSLServerOptions(mongo::optionenvironment::OptionSection* options);
-
-Status addSSLClientOptions(mongo::optionenvironment::OptionSection* options);
-
-Status storeSSLServerOptions(const mongo::optionenvironment::Environment& params);
-
 Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
                                 StringData name,
                                 StringData value);
-/**
- * Canonicalize SSL options for the given environment that have different representations with
- * the same logical meaning.
- */
-Status canonicalizeSSLServerOptions(mongo::optionenvironment::Environment* params);
 
-Status validateSSLServerOptions(const mongo::optionenvironment::Environment& params);
-
-Status storeSSLClientOptions(const mongo::optionenvironment::Environment& params);
 }  // namespace mongo

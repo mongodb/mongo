@@ -48,8 +48,6 @@ Status addGeneralServerOptions(moe::OptionSection* options);
 
 Status addWindowsServerOptions(moe::OptionSection* options);
 
-Status addSSLServerOptions(moe::OptionSection* options);
-
 /**
  * Handle custom validation of server options that can not currently be done by using
  * Constraints in the Environment.  See the "validate" function in the Environment class for
