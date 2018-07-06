@@ -241,32 +241,6 @@ TEST(StorageEngineMetadataTest, StorageEngineForPath_EmptyDirectory) {
     ASSERT_FALSE(storageEngine);
 }
 
-// Override the active storage engine with "mmapv1" when the data directory contains local.ns.
-TEST(StorageEngineMetadataTest, StorageEngineForPath_DataFilesExist) {
-    TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_DataFilesExist");
-    {
-        std::string filename(tempDir.path() + "/local.ns");
-        std::ofstream ofs(filename.c_str());
-        ofs << "unused data" << std::endl;
-    }
-    ASSERT_EQUALS(std::string("mmapv1"),
-                  StorageEngineMetadata::getStorageEngineForPath(tempDir.path()));
-}
-
-// Override the active storage engine with "mmapv1" when the data directory contains
-// local/local.ns.
-TEST(StorageEngineMetadataTest, StorageEngineForPath_DataFilesExist_DirPerDB) {
-    TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_DataFilesExist_DirPerDB");
-    {
-        boost::filesystem::create_directory(tempDir.path() + "/local");
-        std::string filename(tempDir.path() + "/local/local.ns");
-        std::ofstream ofs(filename.c_str());
-        ofs << "unused data" << std::endl;
-    }
-    ASSERT_EQUALS(std::string("mmapv1"),
-                  StorageEngineMetadata::getStorageEngineForPath(tempDir.path()));
-}
-
 // Do not override the active storage engine when the data directory is nonempty, but does not
 // contain either local.ns or local/local.ns.
 TEST(StorageEngineMetadataTest, StorageEngineForPath_NoDataFilesExist) {

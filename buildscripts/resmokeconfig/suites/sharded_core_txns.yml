@@ -27,7 +27,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
     mongod_options:
-      nopreallocj: ''
       enableMajorityReadConcern: ''
       set_parameters:
         enableTestCommands: 1

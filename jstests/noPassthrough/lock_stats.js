@@ -11,7 +11,9 @@
         var startStats = db.serverStatus().locks.Global;
         var startTime = new Date();
         var minBlockedMillis = blockTimeMillis;
-        var s = startParallelShell('assert.commandWorked(db.adminCommand({fsync:1}));', conn.port);
+        // This is just some command that requires a MODE_X global lock that conflicts.
+        var s = startParallelShell(
+            'assert.commandWorked(db.getSiblingDB(\'nonexisting\').dropDatabase());', conn.port);
 
         // Wait until we see somebody waiting to acquire the lock, defend against unset stats.
         assert.soon((function() {
