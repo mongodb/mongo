@@ -1,4 +1,5 @@
 // Test background index creation w/ constraints
+// @tags: [requires_document_locking]
 
 load("jstests/libs/slow_weekly_util.js");
 
