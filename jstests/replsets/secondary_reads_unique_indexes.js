@@ -75,12 +75,10 @@
 
     // Write the initial documents. Ensure they have been replicated.
     for (let i = 0; i < nOps; i++) {
-        assert.commandWorked(primaryDB.runCommand({
-            insert: collName,
-            documents: [{_id: i, x: i, iter: 0}],
-            writeConcern: {w: "majority"}
-        }));
+        assert.commandWorked(
+            primaryDB.runCommand({insert: collName, documents: [{_id: i, x: i, iter: 0}]}));
     }
+    replSet.awaitReplication();
 
     // Cycle the value of x in the document {_id: i, x: i} between i and i+1 each iteration.
     for (let iteration = 0; iteration < nIterations; iteration++) {
