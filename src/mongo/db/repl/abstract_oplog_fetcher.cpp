@@ -52,14 +52,7 @@ ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCr
                                                          &readersCreatedStats);
 
 // Number of seconds for the `maxTimeMS` on the initial `find` command.
-//
-// For the initial 'find' request, we provide a generous timeout, to account for the potentially
-// slow process of a sync source finding the lastApplied optime provided in a node's query in its
-// oplog.
 MONGO_EXPORT_SERVER_PARAMETER(oplogInitialFindMaxSeconds, int, 60);
-
-// Number of seconds for the `maxTimeMS` on any retried `find` commands.
-MONGO_EXPORT_SERVER_PARAMETER(oplogRetriedFindMaxSeconds, int, 2);
 
 // Number of milliseconds to add to the `find` and `getMore` timeouts to calculate the network
 // timeout for the requests.
@@ -104,12 +97,8 @@ AbstractOplogFetcher::AbstractOplogFetcher(executor::TaskExecutor* executor,
     invariant(onShutdownCallbackFn);
 }
 
-Milliseconds AbstractOplogFetcher::_getInitialFindMaxTime() const {
+Milliseconds AbstractOplogFetcher::_getFindMaxTime() const {
     return Milliseconds(oplogInitialFindMaxSeconds.load() * 1000);
-}
-
-Milliseconds AbstractOplogFetcher::_getRetriedFindMaxTime() const {
-    return Milliseconds(oplogRetriedFindMaxSeconds.load() * 1000);
 }
 
 Milliseconds AbstractOplogFetcher::_getGetMoreMaxTime() const {
@@ -137,14 +126,13 @@ void AbstractOplogFetcher::_makeAndScheduleFetcherCallback(
         return;
     }
 
-    BSONObj findCommandObj = _makeFindCommandObject(
-        _nss, _getLastOpTimeWithHashFetched().opTime, _getInitialFindMaxTime());
+    BSONObj findCommandObj = _makeFindCommandObject(_nss, _getLastOpTimeWithHashFetched().opTime);
     BSONObj metadataObj = _makeMetadataObject();
 
     Status scheduleStatus = Status::OK();
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _fetcher = _makeFetcher(findCommandObj, metadataObj, _getInitialFindMaxTime());
+        _fetcher = _makeFetcher(findCommandObj, metadataObj);
         scheduleStatus = _scheduleFetcher_inlock();
     }
     if (!scheduleStatus.isOK()) {
@@ -193,8 +181,7 @@ BSONObj AbstractOplogFetcher::getCommandObject_forTest() const {
 }
 
 BSONObj AbstractOplogFetcher::getFindQuery_forTest() const {
-    return _makeFindCommandObject(
-        _nss, _getLastOpTimeWithHashFetched().opTime, _getInitialFindMaxTime());
+    return _makeFindCommandObject(_nss, _getLastOpTimeWithHashFetched().opTime);
 }
 
 HostAndPort AbstractOplogFetcher::_getSource() const {
@@ -219,9 +206,8 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     // If target cut connections between connecting and querying (for
     // example, because it stepped down) we might not have a cursor.
     if (!responseStatus.isOK()) {
-
-        BSONObj findCommandObj = _makeFindCommandObject(
-            _nss, _getLastOpTimeWithHashFetched().opTime, _getRetriedFindMaxTime());
+        BSONObj findCommandObj =
+            _makeFindCommandObject(_nss, _getLastOpTimeWithHashFetched().opTime);
         BSONObj metadataObj = _makeMetadataObject();
         {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -237,10 +223,8 @@ void AbstractOplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
                 _shuttingDownFetcher.reset();
                 // Move the old fetcher into the shutting down instance.
                 _shuttingDownFetcher.swap(_fetcher);
-                // Create and start fetcher with current term and new starting optime, and use the
-                // retry 'find' timeout.
-                _fetcher = _makeFetcher(findCommandObj, metadataObj, _getRetriedFindMaxTime());
-
+                // Create and start fetcher with current term and new starting optime.
+                _fetcher = _makeFetcher(findCommandObj, metadataObj);
                 auto scheduleStatus = _scheduleFetcher_inlock();
                 if (scheduleStatus.isOK()) {
                     log() << "Scheduled new oplog query " << _fetcher->toString();
@@ -334,8 +318,7 @@ void AbstractOplogFetcher::_finishCallback(Status status) {
 }
 
 std::unique_ptr<Fetcher> AbstractOplogFetcher::_makeFetcher(const BSONObj& findCommandObj,
-                                                            const BSONObj& metadataObj,
-                                                            Milliseconds findMaxTime) {
+                                                            const BSONObj& metadataObj) {
     return stdx::make_unique<Fetcher>(
         _getExecutor(),
         _source,
@@ -345,7 +328,7 @@ std::unique_ptr<Fetcher> AbstractOplogFetcher::_makeFetcher(const BSONObj& findC
                Fetcher::NextAction*,
                BSONObjBuilder* builder) { return _callback(resp, builder); },
         metadataObj,
-        findMaxTime + kNetworkTimeoutBufferMS,
+        _getFindMaxTime() + kNetworkTimeoutBufferMS,
         _getGetMoreMaxTime() + kNetworkTimeoutBufferMS);
 }
 

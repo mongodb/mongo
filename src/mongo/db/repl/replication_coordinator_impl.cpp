@@ -317,8 +317,7 @@ InitialSyncerOptions createInitialSyncerOptions(
     };
     options.resetOptimes = [replCoord]() { replCoord->resetMyLastOpTimes(); };
     options.syncSourceSelector = replCoord;
-    options.oplogFetcherMaxFetcherRestarts =
-        externalState->getOplogFetcherInitialSyncMaxFetcherRestarts();
+    options.oplogFetcherMaxFetcherRestarts = externalState->getOplogFetcherMaxFetcherRestarts();
     return options;
 }
 }  // namespace

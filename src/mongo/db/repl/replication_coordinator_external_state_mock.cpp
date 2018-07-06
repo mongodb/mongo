@@ -250,13 +250,7 @@ bool ReplicationCoordinatorExternalStateMock::isReadConcernSnapshotSupportedBySt
     return true;
 }
 
-std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherSteadyStateMaxFetcherRestarts()
-    const {
-    return 0;
-}
-
-std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherInitialSyncMaxFetcherRestarts()
-    const {
+std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherMaxFetcherRestarts() const {
     return 0;
 }
 

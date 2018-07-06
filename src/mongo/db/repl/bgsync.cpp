@@ -455,7 +455,7 @@ void BackgroundSync::_produce() {
             source,
             NamespaceString::kRsOplogNamespace,
             _replCoord->getConfig(),
-            _replicationCoordinatorExternalState->getOplogFetcherSteadyStateMaxFetcherRestarts(),
+            _replicationCoordinatorExternalState->getOplogFetcherMaxFetcherRestarts(),
             syncSourceResp.rbid,
             true /* requireFresherSyncSource */,
             &dataReplicatorExternalState,

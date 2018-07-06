@@ -350,8 +350,7 @@ OplogFetcher::~OplogFetcher() {
 }
 
 BSONObj OplogFetcher::_makeFindCommandObject(const NamespaceString& nss,
-                                             OpTime lastOpTimeFetched,
-                                             Milliseconds findMaxTime) const {
+                                             OpTime lastOpTimeFetched) const {
     auto lastCommittedWithCurrentTerm =
         _dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
     auto term = lastCommittedWithCurrentTerm.value;
@@ -361,7 +360,7 @@ BSONObj OplogFetcher::_makeFindCommandObject(const NamespaceString& nss,
     cmdBob.append("tailable", true);
     cmdBob.append("oplogReplay", true);
     cmdBob.append("awaitData", true);
-    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(findMaxTime));
+    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(_getFindMaxTime()));
     cmdBob.append("batchSize", _batchSize);
 
     if (term != OpTime::kUninitializedTerm) {

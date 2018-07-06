@@ -123,59 +123,29 @@ assert.commandFailed(
 assert.commandWorked(
     db.adminCommand({"setParameter": 1, logComponentVerbosity: old.logComponentVerbosity}));
 
+//
+// oplogFetcherMaxFetcherRestarts
+//
+
 var isMongos = (db.isMaster().msg === 'isdbgrid');
 if (!isMongos) {
-    //
-    // oplogFetcherSteadyStateMaxFetcherRestarts
-    //
-    var origRestarts = assert
-                           .commandWorked(db.adminCommand(
-                               {getParameter: 1, oplogFetcherSteadyStateMaxFetcherRestarts: 1}))
-                           .oplogFetcherSteadyStateMaxFetcherRestarts;
-    assert.gte(origRestarts,
-               0,
-               'default value of oplogFetcherSteadyStateMaxFetcherRestarts cannot be negative');
+    var origRestarts =
+        assert.commandWorked(db.adminCommand({getParameter: 1, oplogFetcherMaxFetcherRestarts: 1}))
+            .oplogFetcherMaxFetcherRestarts;
+    assert.gte(
+        origRestarts, 0, 'default value of oplogFetcherMaxFetcherRestarts cannot be negative');
     assert.commandFailedWithCode(
-        db.adminCommand({setParameter: 1, oplogFetcherSteadyStateMaxFetcherRestarts: -1}),
+        db.adminCommand({setParameter: 1, oplogFetcherMaxFetcherRestarts: -1}),
         ErrorCodes.BadValue,
-        'server should reject negative values for oplogFetcherSteadyStateMaxFetcherRestarts');
+        'server should reject negative values for oplogFetcherMaxFetcherRestarts');
+    assert.commandWorked(db.adminCommand({setParameter: 1, oplogFetcherMaxFetcherRestarts: 0}));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, oplogFetcherSteadyStateMaxFetcherRestarts: 0}));
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, oplogFetcherSteadyStateMaxFetcherRestarts: origRestarts + 20}));
-    assert.eq(origRestarts + 20,
-              assert
-                  .commandWorked(db.adminCommand(
-                      {getParameter: 1, oplogFetcherSteadyStateMaxFetcherRestarts: 1}))
-                  .oplogFetcherSteadyStateMaxFetcherRestarts);
+        db.adminCommand({setParameter: 1, oplogFetcherMaxFetcherRestarts: origRestarts + 20}));
+    assert.eq(
+        origRestarts + 20,
+        assert.commandWorked(db.adminCommand({getParameter: 1, oplogFetcherMaxFetcherRestarts: 1}))
+            .oplogFetcherMaxFetcherRestarts);
     // Restore original value.
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, oplogFetcherSteadyStateMaxFetcherRestarts: origRestarts}));
-
-    //
-    // oplogFetcherInitialSyncStateMaxFetcherRestarts
-    //
-    origRestarts = assert
-                       .commandWorked(db.adminCommand(
-                           {getParameter: 1, oplogFetcherInitialSyncMaxFetcherRestarts: 1}))
-                       .oplogFetcherInitialSyncMaxFetcherRestarts;
-    assert.gte(origRestarts,
-               0,
-               'default value of oplogFetcherSteadyStateMaxFetcherRestarts cannot be negative');
-    assert.commandFailedWithCode(
-        db.adminCommand({setParameter: 1, oplogFetcherInitialSyncMaxFetcherRestarts: -1}),
-        ErrorCodes.BadValue,
-        'server should reject negative values for oplogFetcherSteadyStateMaxFetcherRestarts');
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, oplogFetcherInitialSyncMaxFetcherRestarts: 0}));
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, oplogFetcherInitialSyncMaxFetcherRestarts: origRestarts + 20}));
-    assert.eq(origRestarts + 20,
-              assert
-                  .commandWorked(db.adminCommand(
-                      {getParameter: 1, oplogFetcherInitialSyncMaxFetcherRestarts: 1}))
-                  .oplogFetcherInitialSyncMaxFetcherRestarts);
-    // Restore original value.
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, oplogFetcherInitialSyncMaxFetcherRestarts: origRestarts}));
+        db.adminCommand({setParameter: 1, oplogFetcherMaxFetcherRestarts: origRestarts}));
 }
