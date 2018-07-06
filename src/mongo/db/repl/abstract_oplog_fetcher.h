@@ -113,7 +113,15 @@ protected:
     /**
      * Returns how long the `find` command should wait before timing out.
      */
-    virtual Milliseconds _getFindMaxTime() const;
+    virtual Milliseconds _getInitialFindMaxTime() const;
+
+    /**
+     * Returns how long the `find` command should wait before timing out, if we are retrying the
+     * 'find' due to an error. This timeout should be considerably smaller than our initial oplog
+     * find time, since a communication failure with an upstream node may indicate it is
+     * unreachable.
+     */
+    virtual Milliseconds _getRetriedFindMaxTime() const;
 
     /**
      * Returns how long the `getMore` command should wait before timing out.
@@ -156,7 +164,8 @@ private:
      * it can begin its Fetcher from the middle of the oplog.
      */
     virtual BSONObj _makeFindCommandObject(const NamespaceString& nss,
-                                           OpTime lastOpTimeFetched) const = 0;
+                                           OpTime lastOpTimeFetched,
+                                           Milliseconds findMaxTime) const = 0;
 
     /**
      * This function must be overriden by subclass oplog fetchers to specify what metadata object
@@ -177,7 +186,8 @@ private:
      * This function creates a Fetcher with the given `find` command and metadata.
      */
     std::unique_ptr<Fetcher> _makeFetcher(const BSONObj& findCommandObj,
-                                          const BSONObj& metadataObj);
+                                          const BSONObj& metadataObj,
+                                          Milliseconds findTimeout);
     /**
      * Callback used to make a Fetcher, and then save and schedule it in a lock.
      */

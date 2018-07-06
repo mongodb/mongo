@@ -287,9 +287,15 @@ public:
 
     /**
      * Returns maximum number of times that the oplog fetcher will consecutively restart the oplog
-     * tailing query on non-cancellation errors.
+     * tailing query on non-cancellation errors during steady state replication.
      */
-    virtual std::size_t getOplogFetcherMaxFetcherRestarts() const = 0;
+    virtual std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const = 0;
+
+    /**
+     * Returns maximum number of times that the oplog fetcher will consecutively restart the oplog
+     * tailing query on non-cancellation errors during initial sync.
+     */
+    virtual std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const = 0;
 
     /*
      * Creates noop writer instance. Setting the _noopWriter member is not protected by a guard,
