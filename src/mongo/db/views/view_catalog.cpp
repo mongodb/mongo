@@ -53,10 +53,13 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_graph.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
+MONGO_FAIL_POINT_DEFINE(hangDuringViewResolution);
+
 StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* opCtx,
                                                              BSONObj collationSpec) {
     // If 'collationSpec' is empty, return the null collator, which represents the "simple"
@@ -428,45 +431,79 @@ std::shared_ptr<ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx, Str
 
 StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
                                                   const NamespaceString& nss) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    const NamespaceString* resolvedNss = &nss;
-    std::vector<BSONObj> resolvedPipeline;
-    BSONObj collation;
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
 
-    for (int i = 0; i < ViewGraph::kMaxViewDepth; i++) {
-        auto view = _lookup_inlock(opCtx, resolvedNss->ns());
-        if (!view) {
-            // Return error status if pipeline is too large.
-            int pipelineSize = 0;
-            for (auto obj : resolvedPipeline) {
-                pipelineSize += obj.objsize();
+    // Keep looping until the resolution completes. If the catalog is invalidated during the
+    // resolution, we start over from the beginning.
+    while (true) {
+        // Points to the name of the most resolved namespace.
+        const NamespaceString* resolvedNss = &nss;
+
+        // Holds the combination of all the resolved views.
+        std::vector<BSONObj> resolvedPipeline;
+
+        // If the catalog has not been tampered with, all views seen during the resolution will have
+        // the same collation. As an optimization, we fill out the collation spec only once.
+        boost::optional<BSONObj> collation;
+
+        // The last seen view definition, which owns the NamespaceString pointed to by
+        // 'resolvedNss'.
+        std::shared_ptr<ViewDefinition> lastViewDefinition;
+
+        int depth = 0;
+        for (; depth < ViewGraph::kMaxViewDepth; depth++) {
+            while (MONGO_FAIL_POINT(hangDuringViewResolution)) {
+                log() << "Yielding mutex and hanging due to 'hangDuringViewResolution' failpoint";
+                lock.unlock();
+                sleepmillis(1000);
+                lock.lock();
             }
-            if (pipelineSize > ViewGraph::kMaxViewPipelineSizeBytes) {
-                return {ErrorCodes::ViewPipelineMaxSizeExceeded,
-                        str::stream() << "View pipeline exceeds maximum size; maximum size is "
-                                      << ViewGraph::kMaxViewPipelineSizeBytes};
+
+            // If the catalog has been invalidated, bail and restart.
+            if (!_valid.load()) {
+                uassertStatusOK(_reloadIfNeeded_inlock(opCtx));
+                break;
             }
-            return StatusWith<ResolvedView>(
-                {*resolvedNss, std::move(resolvedPipeline), std::move(collation)});
+
+            auto view = _lookup_inlock(opCtx, resolvedNss->ns());
+            if (!view) {
+                // Return error status if pipeline is too large.
+                int pipelineSize = 0;
+                for (auto obj : resolvedPipeline) {
+                    pipelineSize += obj.objsize();
+                }
+                if (pipelineSize > ViewGraph::kMaxViewPipelineSizeBytes) {
+                    return {ErrorCodes::ViewPipelineMaxSizeExceeded,
+                            str::stream() << "View pipeline exceeds maximum size; maximum size is "
+                                          << ViewGraph::kMaxViewPipelineSizeBytes};
+                }
+                return StatusWith<ResolvedView>(
+                    {*resolvedNss, std::move(resolvedPipeline), std::move(collation.get())});
+            }
+
+            resolvedNss = &view->viewOn();
+            if (!collation) {
+                collation = view->defaultCollator() ? view->defaultCollator()->getSpec().toBSON()
+                                                    : CollationSpec::kSimpleSpec;
+            }
+
+            // Prepend the underlying view's pipeline to the current working pipeline.
+            const std::vector<BSONObj>& toPrepend = view->pipeline();
+            resolvedPipeline.insert(resolvedPipeline.begin(), toPrepend.begin(), toPrepend.end());
+
+            // If the first stage is a $collStats, then we return early with the viewOn namespace.
+            if (toPrepend.size() > 0 && !toPrepend[0]["$collStats"].eoo()) {
+                return StatusWith<ResolvedView>(
+                    {*resolvedNss, std::move(resolvedPipeline), std::move(collation.get())});
+            }
         }
 
-        resolvedNss = &(view->viewOn());
-        collation = view->defaultCollator() ? view->defaultCollator()->getSpec().toBSON()
-                                            : CollationSpec::kSimpleSpec;
-
-        // Prepend the underlying view's pipeline to the current working pipeline.
-        const std::vector<BSONObj>& toPrepend = view->pipeline();
-        resolvedPipeline.insert(resolvedPipeline.begin(), toPrepend.begin(), toPrepend.end());
-
-        // If the first stage is a $collStats, then we return early with the viewOn namespace.
-        if (toPrepend.size() > 0 && !toPrepend[0]["$collStats"].eoo()) {
-            return StatusWith<ResolvedView>(
-                {*resolvedNss, std::move(resolvedPipeline), std::move(collation)});
+        if (depth >= ViewGraph::kMaxViewDepth) {
+            return {ErrorCodes::ViewDepthLimitExceeded,
+                    str::stream() << "View depth too deep or view cycle detected; maximum depth is "
+                                  << ViewGraph::kMaxViewDepth};
         }
-    }
-
-    return {ErrorCodes::ViewDepthLimitExceeded,
-            str::stream() << "View depth too deep or view cycle detected; maximum depth is "
-                          << ViewGraph::kMaxViewDepth};
+    };
+    MONGO_UNREACHABLE;
 }
 }  // namespace mongo
