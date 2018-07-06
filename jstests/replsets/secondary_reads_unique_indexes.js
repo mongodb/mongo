@@ -67,6 +67,8 @@
                 projection: {x: 1},
                 readConcern: {level: "local"},
             }));
+            // Sleep a bit to make these reader threads less CPU intensive.
+            sleep(60);
         }
     };
     TestData.nOps = nOps;
