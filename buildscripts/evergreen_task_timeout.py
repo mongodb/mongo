@@ -17,8 +17,8 @@ SPECIFIC_TASK_OVERRIDES = {
 
 REQUIRED_BUILD_VARIANTS = {
     "linux-64-debug", "enterprise-windows-64-2k8", "enterprise-rhel-62-64-bit",
-    "enterprise-ubuntu1604-clang-3.8-libcxx", "rhel-62-64-bit-required-mobile",
-    "ubuntu1604-debug-aubsan-lite"
+    "enterprise-ubuntu1604-clang-3.8-libcxx", "enterprise-rhel-62-64-bit-required-inmem",
+    "rhel-62-64-bit-required-mobile", "ubuntu1604-debug-aubsan-lite"
 }
 
 

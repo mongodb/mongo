@@ -12030,7 +12030,7 @@ buildvariants:
   run_on:
   - rhel62-small
   batchtime: 1440 # 1 day
-  expansions:
+  expansions: &enterprise-rhel-62-64-bit-inmem-expansions
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
@@ -12157,6 +12157,30 @@ buildvariants:
   - name: update_fuzzer_replication
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough
+
+- name: enterprise-rhel-62-64-bit-required-inmem
+  display_name: "! Enterprise RHEL 6.2 (inMemory)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions:
+    <<: *enterprise-rhel-62-64-bit-inmem-expansions
+    burn_in_tests_build_variant: enterprise-rhel-62-64-bit-inmem
+  tasks:
+  # This build variant exists specifically to test that newly added or modified JavaScript tests
+  # properly tag non-persistent storage tests using "requires_persistence", "requires_journaling" or
+  # "uses_transactions".
+  # It uses the task list from the enterprise-rhel-62-64-bit-inmem build variant to
+  # determine the resmoke.py YAML suite configurations to run the tests under. Do not add more tasks
+  # to this list.
+  - name: compile_TG
+    requires:
+    - name: burn_in_tests
+    distros:
+    - rhel62-large
+  - name: burn_in_tests
+  - name: jsCore
 
 - name: rhel-62-64-bit-mobile
   display_name: RHEL 6.2 (mobile)
