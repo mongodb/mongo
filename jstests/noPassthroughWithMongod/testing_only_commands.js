@@ -7,6 +7,7 @@ var testOnlyCommands = [
     'configureFailPoint',
     '_hashBSONElement',
     'replSetTest',
+    'journalLatencyTest',
     'godinsert',
     'sleep',
     'cpuload',

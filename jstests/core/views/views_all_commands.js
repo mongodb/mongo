@@ -318,6 +318,7 @@
         invalidateUserCache: {skip: isUnrelated},
         isdbgrid: {skip: isUnrelated},
         isMaster: {skip: isUnrelated},
+        journalLatencyTest: {skip: isUnrelated},
         killCursors: {
             setup: function(conn) {
                 assert.writeOK(conn.collection.remove({}));
