@@ -39,6 +39,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -120,6 +121,7 @@ TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
     ocs.emplace(opCtx(), true, boost::none, false, "testDB", "insert");
 
     stdx::async(stdx::launch::async, [&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto sideOpCtx = Client::getCurrent()->makeOperationContext();
         auto scopedSession =
@@ -132,6 +134,7 @@ TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
     ocs.reset();
 
     stdx::async(stdx::launch::async, [&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready();
         auto sideOpCtx = Client::getCurrent()->makeOperationContext();
         auto scopedSession =
