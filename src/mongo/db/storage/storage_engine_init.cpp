@@ -329,11 +329,7 @@ public:
         if (!storageEngine) {
             return;
         }
-        if (storageEngine->isMmapV1()) {
-            opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
-        } else {
-            opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());
-        }
+        opCtx->setLockState(stdx::make_unique<LockerImpl>());
         opCtx->setRecoveryUnit(storageEngine->newRecoveryUnit(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }

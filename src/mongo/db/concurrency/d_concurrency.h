@@ -182,8 +182,6 @@ public:
      * in any mode, see LockMode. An outermost GlobalLock, when not in a WriteUnitOfWork, calls
      * abandonSnapshot() on destruction. This allows the storage engine to release resources, such
      * as snapshots or locks, that it may have acquired during the transaction.
-     *
-     * NOTE: Does not acquire flush lock.
      */
     class GlobalLock {
     public:
@@ -266,11 +264,7 @@ public:
         explicit GlobalWrite(OperationContext* opCtx)
             : GlobalWrite(opCtx, Date_t::max(), InterruptBehavior::kThrow) {}
         explicit GlobalWrite(OperationContext* opCtx, Date_t deadline, InterruptBehavior behavior)
-            : GlobalLock(opCtx, MODE_X, deadline, behavior) {
-            if (isLocked()) {
-                opCtx->lockState()->lockMMAPV1Flush();
-            }
-        }
+            : GlobalLock(opCtx, MODE_X, deadline, behavior) {}
     };
 
     /**
@@ -285,11 +279,7 @@ public:
         explicit GlobalRead(OperationContext* opCtx)
             : GlobalRead(opCtx, Date_t::max(), InterruptBehavior::kThrow) {}
         explicit GlobalRead(OperationContext* opCtx, Date_t deadline, InterruptBehavior behavior)
-            : GlobalLock(opCtx, MODE_S, deadline, behavior) {
-            if (isLocked()) {
-                opCtx->lockState()->lockMMAPV1Flush();
-            }
-        }
+            : GlobalLock(opCtx, MODE_S, deadline, behavior) {}
     };
 
     /**

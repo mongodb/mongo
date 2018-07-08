@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-class LockerForTests : public LockerImpl<false> {
+class LockerForTests : public LockerImpl {
 public:
     explicit LockerForTests(LockMode globalLockMode) {
         lockGlobal(globalLockMode);

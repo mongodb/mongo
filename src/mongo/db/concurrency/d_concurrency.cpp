@@ -219,9 +219,6 @@ Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode, Date
     if (!_globalLock.isLocked())
         return;
 
-    // Need to acquire the flush lock
-    _opCtx->lockState()->lockMMAPV1Flush();
-
     // The check for the admin db is to ensure direct writes to auth collections
     // are serialized (see SERVER-16092).
     if ((_id == resourceIdAdminDB) && !isSharedLockMode(_mode)) {

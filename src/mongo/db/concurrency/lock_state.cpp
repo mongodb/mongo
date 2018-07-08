@@ -111,12 +111,6 @@ LockManager globalLockManager;
 // once. See comments in the header file (begin/endTransaction) for more information.
 const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
 
-// Flush lock. This is only used for the MMAP V1 storage engine and synchronizes journal writes
-// to the shared view and remaps. See the comments in the header for information on how MMAP V1
-// concurrency control works.
-const ResourceId resourceIdMMAPV1Flush =
-    ResourceId(RESOURCE_MMAPV1_FLUSH, ResourceId::SINGLETON_MMAPV1_FLUSH);
-
 // How often (in millis) to check for deadlock if a lock has not been granted for some time
 const Milliseconds DeadlockTimeout = Milliseconds(500);
 
@@ -128,12 +122,8 @@ PartitionedInstanceWideLockStats globalStats;
 
 }  // namespace
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
+bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
     switch (resId.getType()) {
-        // The flush lock must not participate in two-phase locking because we need to temporarily
-        // yield it while blocked waiting to acquire other locks.
-        case RESOURCE_MMAPV1_FLUSH:
         case RESOURCE_MUTEX:
             return false;
 
@@ -161,33 +151,27 @@ bool LockerImpl<IsForMMAPV1>::_shouldDelayUnlock(ResourceId resId, LockMode mode
     }
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::isW() const {
+bool LockerImpl::isW() const {
     return getLockMode(resourceIdGlobal) == MODE_X;
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::isR() const {
+bool LockerImpl::isR() const {
     return getLockMode(resourceIdGlobal) == MODE_S;
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::isLocked() const {
+bool LockerImpl::isLocked() const {
     return getLockMode(resourceIdGlobal) != MODE_NONE;
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::isWriteLocked() const {
+bool LockerImpl::isWriteLocked() const {
     return isLockHeldForMode(resourceIdGlobal, MODE_IX);
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::isReadLocked() const {
+bool LockerImpl::isReadLocked() const {
     return isLockHeldForMode(resourceIdGlobal, MODE_IS);
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::dump() const {
+void LockerImpl::dump() const {
     StringBuilder ss;
     ss << "Locker id " << _id << " status: ";
 
@@ -257,27 +241,22 @@ void Locker::setGlobalThrottling(class TicketHolder* reading, class TicketHolder
     ticketHolders[MODE_IX] = writing;
 }
 
-template <bool IsForMMAPV1>
-LockerImpl<IsForMMAPV1>::LockerImpl()
+LockerImpl::LockerImpl()
     : _id(idCounter.addAndFetch(1)), _wuowNestingLevel(0), _threadId(stdx::this_thread::get_id()) {}
 
-template <bool IsForMMAPV1>
-stdx::thread::id LockerImpl<IsForMMAPV1>::getThreadId() const {
+stdx::thread::id LockerImpl::getThreadId() const {
     return _threadId;
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::updateThreadIdToCurrentThread() {
+void LockerImpl::updateThreadIdToCurrentThread() {
     _threadId = stdx::this_thread::get_id();
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::unsetThreadId() {
+void LockerImpl::unsetThreadId() {
     _threadId = stdx::thread::id();  // Reset to represent a non-executing thread.
 }
 
-template <bool IsForMMAPV1>
-LockerImpl<IsForMMAPV1>::~LockerImpl() {
+LockerImpl::~LockerImpl() {
     // Cannot delete the Locker while there are still outstanding requests, because the
     // LockManager may attempt to access deleted memory. Besides it is probably incorrect
     // to delete with unaccounted locks anyways.
@@ -290,8 +269,7 @@ LockerImpl<IsForMMAPV1>::~LockerImpl() {
     _stats.reset();
 }
 
-template <bool IsForMMAPV1>
-Locker::ClientState LockerImpl<IsForMMAPV1>::getClientState() const {
+Locker::ClientState LockerImpl::getClientState() const {
     auto state = _clientState.load();
     if (state == kActiveReader && hasLockPending())
         state = kQueuedReader;
@@ -301,32 +279,23 @@ Locker::ClientState LockerImpl<IsForMMAPV1>::getClientState() const {
     return state;
 }
 
-template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lockGlobal(OperationContext* opCtx, LockMode mode) {
+LockResult LockerImpl::lockGlobal(OperationContext* opCtx, LockMode mode) {
     LockResult result = _lockGlobalBegin(opCtx, mode, Date_t::max());
 
     if (result == LOCK_WAITING) {
         result = lockGlobalComplete(opCtx, Date_t::max());
     }
 
-    if (result == LOCK_OK) {
-        lockMMAPV1Flush();
-    }
-
     return result;
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::reacquireTicket(OperationContext* opCtx) {
+void LockerImpl::reacquireTicket(OperationContext* opCtx) {
     invariant(_modeForTicket != MODE_NONE);
     auto acquireTicketResult = _acquireTicket(opCtx, _modeForTicket, Date_t::max());
     invariant(acquireTicketResult == LOCK_OK);
 }
 
-template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::_acquireTicket(OperationContext* opCtx,
-                                                   LockMode mode,
-                                                   Date_t deadline) {
+LockResult LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline) {
     const bool reader = isSharedLockMode(mode);
     auto holder = shouldAcquireTicket() ? ticketHolders[mode] : nullptr;
     if (holder) {
@@ -345,10 +314,7 @@ LockResult LockerImpl<IsForMMAPV1>::_acquireTicket(OperationContext* opCtx,
     return LOCK_OK;
 }
 
-template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(OperationContext* opCtx,
-                                                     LockMode mode,
-                                                     Date_t deadline) {
+LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) {
     dassert(isLocked() == (_modeForTicket != MODE_NONE));
     if (_modeForTicket == MODE_NONE) {
         auto acquireTicketResult = _acquireTicket(opCtx, mode, deadline);
@@ -376,52 +342,11 @@ LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(OperationContext* opCtx,
     return result;
 }
 
-template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lockGlobalComplete(OperationContext* opCtx, Date_t deadline) {
+LockResult LockerImpl::lockGlobalComplete(OperationContext* opCtx, Date_t deadline) {
     return lockComplete(opCtx, resourceIdGlobal, getLockMode(resourceIdGlobal), deadline, false);
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::lockMMAPV1Flush() {
-    if (!IsForMMAPV1)
-        return;
-
-    // The flush lock always has a reference count of 1, because it is dropped at the end of
-    // each write unit of work in order to allow the flush thread to run. See the comments in
-    // the header for information on how the MMAP V1 journaling system works.
-    LockRequest* globalLockRequest = _requests.find(resourceIdGlobal).objAddr();
-    if (globalLockRequest->recursiveCount == 1) {
-        invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
-    }
-
-    dassert(getLockMode(resourceIdMMAPV1Flush) == _getModeForMMAPV1FlushLock());
-}
-
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::downgradeGlobalXtoSForMMAPV1() {
-    invariant(!inAWriteUnitOfWork());
-
-    LockRequest* globalLockRequest = _requests.find(resourceIdGlobal).objAddr();
-    invariant(globalLockRequest->mode == MODE_X);
-    invariant(globalLockRequest->recursiveCount == 1);
-    invariant(_modeForTicket == MODE_X);
-    // Note that this locker will not actually have a ticket (as MODE_X has no TicketHolder) or
-    // acquire one now, but at most a single thread can be in this downgraded MODE_S situation,
-    // so it's OK.
-
-    // Making this call here will record lock downgrades as acquisitions, which is acceptable
-    globalStats.recordAcquisition(_id, resourceIdGlobal, MODE_S);
-    _stats.recordAcquisition(resourceIdGlobal, MODE_S);
-
-    globalLockManager.downgrade(globalLockRequest, MODE_S);
-
-    if (IsForMMAPV1) {
-        invariant(unlock(resourceIdMMAPV1Flush));
-    }
-}
-
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::unlockGlobal() {
+bool LockerImpl::unlockGlobal() {
     if (!unlock(resourceIdGlobal)) {
         return false;
     }
@@ -443,17 +368,11 @@ bool LockerImpl<IsForMMAPV1>::unlockGlobal() {
     return true;
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::beginWriteUnitOfWork() {
-    // Sanity check that write transactions under MMAP V1 have acquired the flush lock, so we
-    // don't allow partial changes to be written.
-    dassert(!IsForMMAPV1 || isLockHeldForMode(resourceIdMMAPV1Flush, MODE_IX));
-
+void LockerImpl::beginWriteUnitOfWork() {
     _wuowNestingLevel++;
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::endWriteUnitOfWork() {
+void LockerImpl::endWriteUnitOfWork() {
     invariant(_wuowNestingLevel > 0);
 
     if (--_wuowNestingLevel > 0) {
@@ -475,16 +394,9 @@ void LockerImpl<IsForMMAPV1>::endWriteUnitOfWork() {
         }
         it.next();
     }
-
-    // For MMAP V1, we need to yield the flush lock so that the flush thread can run
-    if (IsForMMAPV1) {
-        invariant(unlock(resourceIdMMAPV1Flush));
-        invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
-    }
 }
 
-template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lock(
+LockResult LockerImpl::lock(
     OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock) {
 
     const LockResult result = lockBegin(opCtx, resId, mode);
@@ -500,14 +412,12 @@ LockResult LockerImpl<IsForMMAPV1>::lock(
     return lockComplete(opCtx, resId, mode, deadline, checkDeadlock);
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::downgrade(ResourceId resId, LockMode newMode) {
+void LockerImpl::downgrade(ResourceId resId, LockMode newMode) {
     LockRequestsMap::Iterator it = _requests.find(resId);
     globalLockManager.downgrade(it.objAddr(), newMode);
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::unlock(ResourceId resId) {
+bool LockerImpl::unlock(ResourceId resId) {
     LockRequestsMap::Iterator it = _requests.find(resId);
     if (inAWriteUnitOfWork() && _shouldDelayUnlock(it.key(), (it->mode))) {
         if (!it->unlockPending) {
@@ -527,8 +437,7 @@ bool LockerImpl<IsForMMAPV1>::unlock(ResourceId resId) {
     return _unlockImpl(&it);
 }
 
-template <bool IsForMMAPV1>
-LockMode LockerImpl<IsForMMAPV1>::getLockMode(ResourceId resId) const {
+LockMode LockerImpl::getLockMode(ResourceId resId) const {
     scoped_spinlock scopedLock(_lock);
 
     const LockRequestsMap::ConstIterator it = _requests.find(resId);
@@ -538,13 +447,11 @@ LockMode LockerImpl<IsForMMAPV1>::getLockMode(ResourceId resId) const {
     return it->mode;
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::isLockHeldForMode(ResourceId resId, LockMode mode) const {
+bool LockerImpl::isLockHeldForMode(ResourceId resId, LockMode mode) const {
     return isModeCovered(mode, getLockMode(resId));
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(StringData dbName, LockMode mode) const {
+bool LockerImpl::isDbLockedForMode(StringData dbName, LockMode mode) const {
     invariant(nsIsDbOnly(dbName));
 
     if (isW())
@@ -556,8 +463,7 @@ bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(StringData dbName, LockMode mode
     return isLockHeldForMode(resIdDb, mode);
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(StringData ns, LockMode mode) const {
+bool LockerImpl::isCollectionLockedForMode(StringData ns, LockMode mode) const {
     invariant(nsIsFull(ns));
 
     if (isW())
@@ -592,8 +498,7 @@ bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(StringData ns, LockMode 
     return false;
 }
 
-template <bool IsForMMAPV1>
-ResourceId LockerImpl<IsForMMAPV1>::getWaitingResource() const {
+ResourceId LockerImpl::getWaitingResource() const {
     scoped_spinlock scopedLock(_lock);
 
     LockRequestsMap::ConstIterator it = _requests.begin();
@@ -609,8 +514,7 @@ ResourceId LockerImpl<IsForMMAPV1>::getWaitingResource() const {
     return ResourceId();
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::getLockerInfo(LockerInfo* lockerInfo) const {
+void LockerImpl::getLockerInfo(LockerInfo* lockerInfo) const {
     invariant(lockerInfo);
 
     // Zero-out the contents
@@ -636,15 +540,13 @@ void LockerImpl<IsForMMAPV1>::getLockerInfo(LockerInfo* lockerInfo) const {
     lockerInfo->stats.append(_stats);
 }
 
-template <bool IsForMMAPV1>
-boost::optional<Locker::LockerInfo> LockerImpl<IsForMMAPV1>::getLockerInfo() const {
+boost::optional<Locker::LockerInfo> LockerImpl::getLockerInfo() const {
     Locker::LockerInfo lockerInfo;
     getLockerInfo(&lockerInfo);
     return std::move(lockerInfo);
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
+bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
     // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
     invariant(!inAWriteUnitOfWork());
 
@@ -682,8 +584,7 @@ bool LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock(Locker::LockSnapshot* state
             continue;
 
         // We should never have to save and restore metadata locks.
-        invariant((IsForMMAPV1 && (resourceIdMMAPV1Flush == resId)) ||
-                  RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() ||
+        invariant(RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() ||
                   (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(it->mode)));
 
         // And, stuff the info into the out parameter.
@@ -703,9 +604,7 @@ bool LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock(Locker::LockSnapshot* state
     return true;
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::restoreLockState(OperationContext* opCtx,
-                                               const Locker::LockSnapshot& state) {
+void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSnapshot& state) {
     // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
     invariant(!inAWriteUnitOfWork());
     invariant(_modeForTicket == MODE_NONE);
@@ -719,21 +618,12 @@ void LockerImpl<IsForMMAPV1>::restoreLockState(OperationContext* opCtx,
 
     invariant(LOCK_OK == lockGlobal(opCtx, state.globalMode));
     for (; it != state.locks.end(); it++) {
-        // This is a sanity check that lockGlobal restored the MMAP V1 flush lock in the
-        // expected mode.
-        if (IsForMMAPV1 && (it->resourceId == resourceIdMMAPV1Flush)) {
-            invariant(it->mode == _getModeForMMAPV1FlushLock());
-        } else {
-            invariant(LOCK_OK == lock(it->resourceId, it->mode));
-        }
+        invariant(LOCK_OK == lock(it->resourceId, it->mode));
     }
     invariant(_modeForTicket != MODE_NONE);
 }
 
-template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lockBegin(OperationContext* opCtx,
-                                              ResourceId resId,
-                                              LockMode mode) {
+LockResult LockerImpl::lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode) {
     dassert(!getWaitingResource().isValid());
 
     LockRequest* request;
@@ -769,7 +659,7 @@ LockResult LockerImpl<IsForMMAPV1>::lockBegin(OperationContext* opCtx,
     // Give priority to the full modes for global, parallel batch writer mode,
     // and flush lock so we don't stall global operations such as shutdown or flush.
     const ResourceType resType = resId.getType();
-    if (resType == RESOURCE_GLOBAL || (IsForMMAPV1 && resId == resourceIdMMAPV1Flush)) {
+    if (resType == RESOURCE_GLOBAL) {
         if (mode == MODE_S || mode == MODE_X) {
             request->enqueueAtFront = true;
             request->compatibleFirst = true;
@@ -781,10 +671,6 @@ LockResult LockerImpl<IsForMMAPV1>::lockBegin(OperationContext* opCtx,
             const LockRequestsMap::Iterator itGlobal = _requests.find(resourceIdGlobal);
             invariant(itGlobal->recursiveCount > 0);
             invariant(itGlobal->mode != MODE_NONE);
-
-            // Check the MMAP V1 flush lock is held in the appropriate mode
-            invariant(!IsForMMAPV1 ||
-                      isLockHeldForMode(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
         };
     }
 
@@ -813,25 +699,8 @@ LockResult LockerImpl<IsForMMAPV1>::lockBegin(OperationContext* opCtx,
     return result;
 }
 
-template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lockComplete(
+LockResult LockerImpl::lockComplete(
     OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock) {
-    // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on
-    // DB lock, while holding the flush lock, so it has to be released. This is only
-    // correct to do if not in a write unit of work.
-    const bool yieldFlushLock = IsForMMAPV1 && !inAWriteUnitOfWork() &&
-        resId.getType() != RESOURCE_GLOBAL && resId.getType() != RESOURCE_MUTEX &&
-        resId != resourceIdMMAPV1Flush;
-    if (yieldFlushLock) {
-        invariant(unlock(resourceIdMMAPV1Flush));
-    }
-    auto relockFlushLockGuard = MakeGuard([&] {
-        if (yieldFlushLock) {
-            // We cannot obey the timeout here, because it is not correct to return from the lock
-            // request with the flush lock released.
-            invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
-        }
-    });
 
     LockResult result;
     Milliseconds timeout;
@@ -932,14 +801,12 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(
     return result;
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::releaseTicket() {
+void LockerImpl::releaseTicket() {
     invariant(_modeForTicket != MODE_NONE);
     _releaseTicket();
 }
 
-template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::_releaseTicket() {
+void LockerImpl::_releaseTicket() {
     auto holder = shouldAcquireTicket() ? ticketHolders[_modeForTicket] : nullptr;
     if (holder) {
         holder->release();
@@ -947,8 +814,7 @@ void LockerImpl<IsForMMAPV1>::_releaseTicket() {
     _clientState.store(kInactive);
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::_unlockImpl(LockRequestsMap::Iterator* it) {
+bool LockerImpl::_unlockImpl(LockRequestsMap::Iterator* it) {
     if (globalLockManager.unlock(it->objAddr())) {
         if (it->key() == resourceIdGlobal) {
             invariant(_modeForTicket != MODE_NONE);
@@ -970,26 +836,7 @@ bool LockerImpl<IsForMMAPV1>::_unlockImpl(LockRequestsMap::Iterator* it) {
     return false;
 }
 
-template <bool IsForMMAPV1>
-LockMode LockerImpl<IsForMMAPV1>::_getModeForMMAPV1FlushLock() const {
-    invariant(IsForMMAPV1);
-
-    LockMode mode = getLockMode(resourceIdGlobal);
-    switch (mode) {
-        case MODE_X:
-        case MODE_IX:
-            return MODE_IX;
-        case MODE_S:
-        case MODE_IS:
-            return MODE_IS;
-        default:
-            MONGO_UNREACHABLE;
-            return MODE_NONE;
-    }
-}
-
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::isGlobalLockedRecursively() {
+bool LockerImpl::isGlobalLockedRecursively() {
     auto globalLockRequest = _requests.find(resourceIdGlobal);
     return !globalLockRequest.finished() && globalLockRequest->recursiveCount > 1;
 }
@@ -997,77 +844,6 @@ bool LockerImpl<IsForMMAPV1>::isGlobalLockedRecursively() {
 //
 // Auto classes
 //
-
-AutoYieldFlushLockForMMAPV1Commit::AutoYieldFlushLockForMMAPV1Commit(Locker* locker)
-    : _locker(static_cast<MMAPV1LockerImpl*>(locker)) {
-    // Explicit yielding of the flush lock should happen only at global synchronization points
-    // such as database drop. There should not be any active writes at these points.
-    invariant(!_locker->inAWriteUnitOfWork());
-
-    if (isMMAPV1()) {
-        invariant(_locker->unlock(resourceIdMMAPV1Flush));
-    }
-}
-
-AutoYieldFlushLockForMMAPV1Commit::~AutoYieldFlushLockForMMAPV1Commit() {
-    if (isMMAPV1()) {
-        invariant(LOCK_OK ==
-                  _locker->lock(resourceIdMMAPV1Flush, _locker->_getModeForMMAPV1FlushLock()));
-    }
-}
-
-
-AutoAcquireFlushLockForMMAPV1Commit::AutoAcquireFlushLockForMMAPV1Commit(Locker* locker)
-    : _locker(locker), _released(false) {
-    // The journal thread acquiring the journal lock in S-mode opens opportunity for deadlock
-    // involving operations which do not acquire and release the Oplog collection's X lock
-    // inside a WUOW (see SERVER-17416 for the sequence of events), therefore acquire it with
-    // check for deadlock and back-off if one is encountered.
-    //
-    // This exposes theoretical chance that we might starve the journaling system, but given
-    // that these deadlocks happen extremely rarely and are usually due to incorrect locking
-    // policy, and we have the deadlock counters as part of the locking statistics, this is a
-    // reasonable handling.
-    //
-    // In the worst case, if we are to starve the journaling system, the server will shut down
-    // due to too much uncommitted in-memory journal, but won't have corruption.
-
-    while (true) {
-        LockResult result = _locker->lock(resourceIdMMAPV1Flush, MODE_S, Date_t::max(), true);
-        if (result == LOCK_OK) {
-            break;
-        }
-
-        invariant(result == LOCK_DEADLOCK);
-
-        warning() << "Delayed journaling in order to avoid deadlock during MMAP V1 journal "
-                  << "lock acquisition. See the previous messages for information on the "
-                  << "involved threads.";
-    }
-}
-
-void AutoAcquireFlushLockForMMAPV1Commit::upgradeFlushLockToExclusive() {
-    // This should not be able to deadlock, since we already hold the S journal lock, which
-    // means all writers are kicked out. Readers always yield the journal lock if they block
-    // waiting on any other lock.
-    invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, Date_t::max(), false));
-
-    // Lock bumps the recursive count. Drop it back down so that the destructor doesn't
-    // complain.
-    invariant(!_locker->unlock(resourceIdMMAPV1Flush));
-}
-
-void AutoAcquireFlushLockForMMAPV1Commit::release() {
-    if (!_released) {
-        invariant(_locker->unlock(resourceIdMMAPV1Flush));
-        _released = true;
-    }
-}
-
-AutoAcquireFlushLockForMMAPV1Commit::~AutoAcquireFlushLockForMMAPV1Commit() {
-    release();
-}
-
 
 namespace {
 /**
@@ -1104,12 +880,6 @@ void reportGlobalLockingStats(SingleThreadedLockStats* outStats) {
 void resetGlobalLockStats() {
     globalStats.reset();
 }
-
-
-// Ensures that there are two instances compiled for LockerImpl for the two values of the
-// template argument.
-template class LockerImpl<true>;
-template class LockerImpl<false>;
 
 // Definition for the hardcoded localdb and oplog collection info
 const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, StringData("local"));

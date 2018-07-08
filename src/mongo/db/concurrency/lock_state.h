@@ -89,10 +89,7 @@ private:
  *
  * All instances reference a single global lock manager.
  *
- * @param IsForMMAPV1 Whether to compile-in the flush lock functionality, which is specific to
- *          the way the MMAP V1 (legacy) storag engine does commit concurrency control.
  */
-template <bool IsForMMAPV1>
 class LockerImpl : public Locker {
 public:
     /**
@@ -144,9 +141,7 @@ public:
     virtual LockResult lockGlobalComplete(Date_t deadline) {
         return lockGlobalComplete(nullptr, deadline);
     }
-    virtual void lockMMAPV1Flush();
 
-    virtual void downgradeGlobalXtoSForMMAPV1();
     virtual bool unlockGlobal();
 
     virtual void beginWriteUnitOfWork();
@@ -257,8 +252,6 @@ public:
     }
 
 private:
-    friend class AutoYieldFlushLockForMMAPV1Commit;
-
     typedef FastMapNoAlloc<ResourceId, LockRequest> LockRequestsMap;
 
     /**
@@ -272,13 +265,6 @@ private:
      * inside a WUOW.
      */
     bool _unlockImpl(LockRequestsMap::Iterator* it);
-
-    /**
-     * MMAP V1 locking code yields and re-acquires the flush lock occasionally in order to
-     * allow the flush thread proceed. This call returns in what mode the flush lock should be
-     * acquired. It is based on the type of the operation (IS for readers, IX for writers).
-     */
-    LockMode _getModeForMMAPV1FlushLock() const;
 
     /**
      * Whether we should use two phase locking. Returns true if the particular lock's release should
@@ -370,72 +356,6 @@ public:
         return getWaitingResource().isValid();
     }
 };
-
-typedef LockerImpl<false> DefaultLockerImpl;
-typedef LockerImpl<true> MMAPV1LockerImpl;
-
-
-/**
- * At global synchronization points, such as drop database we are running under a global
- * exclusive lock and without an active write unit of work, doing changes which require global
- * commit. This utility allows the flush lock to be temporarily dropped so the flush thread
- * could run in such circumstances. Should not be used where write units of work are used,
- * because these have different mechanism of yielding the flush lock.
- */
-class AutoYieldFlushLockForMMAPV1Commit {
-public:
-    AutoYieldFlushLockForMMAPV1Commit(Locker* locker);
-    ~AutoYieldFlushLockForMMAPV1Commit();
-
-private:
-    MMAPV1LockerImpl* const _locker;
-};
-
-
-/**
- * This explains how the MMAP V1 durability system is implemented.
- *
- * Every server operation (OperationContext), must call Locker::lockGlobal as the first lock
- * action (it is illegal to acquire any other locks without calling this first). This action
- * acquires the global and flush locks in the appropriate modes (IS for read operations, IX
- * for write operations). Having the flush lock in one of these modes indicates to the flush
- * thread that there is an active reader or writer.
- *
- * Whenever the flush thread(dur.cpp) activates, it goes through the following steps :
- *
- * Acquire the flush lock in S mode using AutoAcquireFlushLockForMMAPV1Commit. This waits until
- * all current write activity on the system completes and does not allow any new operations to
- * start.
- *
- * Once the S lock is granted, the flush thread writes the journal entries to disk (it is
- * guaranteed that there will not be any modifications) and applies them to the shared view.
- *
- * After that, it upgrades the S lock to X and remaps the private view.
- *
- * NOTE: There should be only one usage of this class and this should be in dur.cpp
- */
-class AutoAcquireFlushLockForMMAPV1Commit {
-public:
-    AutoAcquireFlushLockForMMAPV1Commit(Locker* locker);
-    ~AutoAcquireFlushLockForMMAPV1Commit();
-
-    /**
-     * We need the exclusive lock in order to do the shared view remap.
-     */
-    void upgradeFlushLockToExclusive();
-
-    /**
-     * Allows the acquired flush lock to be prematurely released. This is helpful for the case
-     * where we know that we won't be doing a remap after gathering the write intents, so the
-     * rest can be done outside of flush lock.
-     */
-    void release();
-
-private:
-    Locker* const _locker;
-    bool _released;
-};
-
 
 /**
  * Retrieves the global lock manager instance.

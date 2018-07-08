@@ -105,15 +105,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual void lockMMAPV1Flush() {
-        MONGO_UNREACHABLE;
-    }
-
     virtual bool unlockGlobal() {
-        MONGO_UNREACHABLE;
-    }
-
-    virtual void downgradeGlobalXtoSForMMAPV1() {
         MONGO_UNREACHABLE;
     }
 

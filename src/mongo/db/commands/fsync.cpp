@@ -331,9 +331,8 @@ void FSyncLockThread::run() {
     try {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::GlobalWrite global(&opCtx);  // No WriteUnitOfWork needed
+        Lock::GlobalRead global(&opCtx);  // Block any writes in order to flush the files.
 
-        opCtx.lockState()->downgradeGlobalXtoSForMMAPV1();
         StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
 
         try {

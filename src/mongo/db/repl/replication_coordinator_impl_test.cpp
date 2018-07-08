@@ -1816,7 +1816,7 @@ TEST_F(StepDownTest,
     // locker to test this, or otherwise stepDown will be granted the lock automatically.
     Lock::GlobalWrite lk(opCtx.get());
     ASSERT_TRUE(opCtx->lockState()->isW());
-    auto locker = opCtx.get()->swapLockState(stdx::make_unique<DefaultLockerImpl>());
+    auto locker = opCtx.get()->swapLockState(stdx::make_unique<LockerImpl>());
 
     Status status =
         getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000));

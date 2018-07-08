@@ -949,7 +949,7 @@ void shutdownTask() {
     // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
     // of this function to prevent any operations from running that need a lock.
     //
-    DefaultLockerImpl* globalLocker = new DefaultLockerImpl();
+    LockerImpl* globalLocker = new LockerImpl();
     LockResult result = globalLocker->lockGlobalBegin(MODE_X, Date_t::max());
     if (result == LOCK_WAITING) {
         result = globalLocker->lockGlobalComplete(Date_t::max());

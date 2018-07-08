@@ -151,9 +151,8 @@ public:
      * @param mode Mode in which the global lock should be acquired. Also indicates the intent
      *              of the operation.
      *
-     * @return LOCK_OK, if the global lock (and the flush lock, for the MMAP V1 engine) were
-     *          acquired within the specified time bound. Otherwise, the respective failure
-     *          code and neither lock will be acquired.
+     * @return LOCK_OK, if the global lock was acquired within the specified time bound. Otherwise,
+     *              the failure code and no lock will be acquired.
      */
     virtual LockResult lockGlobal(OperationContext* opCtx, LockMode mode) = 0;
     virtual LockResult lockGlobal(LockMode mode) = 0;
@@ -161,10 +160,10 @@ public:
     /**
      * Requests the global lock to be acquired in the specified mode.
      *
-     * See the comments for lockBegin/Complete for more information on the semantics.
-     * The deadline indicates the absolute time point when this lock acquisition will time out, if
-     * not yet granted. The lockGlobalBegin
-     * method has a deadline for use with the TicketHolder, if there is one.
+     * See the comments for lockBegin/Complete for more information on the semantics. The deadline
+     * indicates the absolute time point when this lock acquisition will time out, if not yet
+     * granted. The lockGlobalBegin method has a deadline for use with the TicketHolder, if there
+     *  is one.
      */
     virtual LockResult lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) = 0;
     virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) = 0;
@@ -175,12 +174,6 @@ public:
      */
     virtual LockResult lockGlobalComplete(OperationContext* opCtx, Date_t deadline) = 0;
     virtual LockResult lockGlobalComplete(Date_t deadline) = 0;
-
-    /**
-     * This method is used only in the MMAP V1 storage engine, otherwise it is a no-op. See the
-     * comments in the implementation for more details on how MMAP V1 journaling works.
-     */
-    virtual void lockMMAPV1Flush() = 0;
 
     /**
      * Decrements the reference count on the global lock.  If the reference count on the
@@ -194,16 +187,6 @@ public:
      * @return false if the global lock is still held.
      */
     virtual bool unlockGlobal() = 0;
-
-    /**
-     * This is only necessary for the MMAP V1 engine and in particular, the fsyncLock command
-     * which needs to first acquire the global lock in X-mode for truncating the journal and
-     * then downgrade to S before it blocks.
-     *
-     * The downgrade is necessary in order to be nice and not block readers while under
-     * fsyncLock.
-     */
-    virtual void downgradeGlobalXtoSForMMAPV1() = 0;
 
     /**
      * beginWriteUnitOfWork/endWriteUnitOfWork are called at the start and end of WriteUnitOfWorks.

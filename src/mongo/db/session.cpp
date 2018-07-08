@@ -629,7 +629,7 @@ Session::TxnResources::TxnResources(OperationContext* opCtx) {
     _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
 
-    _locker = opCtx->swapLockState(stdx::make_unique<DefaultLockerImpl>());
+    _locker = opCtx->swapLockState(stdx::make_unique<LockerImpl>());
     _locker->releaseTicket();
     _locker->unsetThreadId();
 

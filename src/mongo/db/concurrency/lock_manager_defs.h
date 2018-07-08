@@ -163,9 +163,6 @@ enum ResourceType {
     /**  Used for mode changes or global exclusive operations */
     RESOURCE_GLOBAL,
 
-    /** Necessary only for the MMAPv1 engine */
-    RESOURCE_MMAPV1_FLUSH,
-
     /** Generic resources, used for multi-granularity locking, together with RESOURCE_GLOBAL */
     RESOURCE_DATABASE,
     RESOURCE_COLLECTION,
@@ -200,7 +197,6 @@ public:
         SINGLETON_INVALID = 0,
         SINGLETON_PARALLEL_BATCH_WRITER_MODE,
         SINGLETON_GLOBAL,
-        SINGLETON_MMAPV1_FLUSH,
     };
 
     ResourceId() : _fullHash(0) {}

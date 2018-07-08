@@ -53,9 +53,8 @@ namespace mongo {
 namespace {
 Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData note) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    // Use GlobalLock + lockMMAPV1Flush instead of DBLock to allow return when the lock is not
-    // available. It may happen when the primary steps down and a shared global lock is
-    // acquired.
+    // Use GlobalLock instead of DBLock to allow return when the lock is not available. It may
+    // happen when the primary steps down and a shared global lock is acquired.
     Lock::GlobalLock lock(
         opCtx, MODE_IX, Date_t::now() + Milliseconds(1), Lock::InterruptBehavior::kThrow);
 
@@ -63,7 +62,6 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
         LOG(1) << "Global lock is not available skipping noopWrite";
         return {ErrorCodes::LockFailed, "Global lock is not available"};
     }
-    opCtx->lockState()->lockMMAPV1Flush();
 
     // Its a proxy for being a primary passing "local" will cause it to return true on secondary
     if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {

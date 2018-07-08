@@ -108,7 +108,7 @@ uint64_t hashStringData(StringData str) {
  * Maps the resource id to a human-readable string.
  */
 static const char* ResourceTypeNames[] = {
-    "Invalid", "Global", "MMAPV1Journal", "Database", "Collection", "Metadata", "Mutex"};
+    "Invalid", "Global", "Database", "Collection", "Metadata", "Mutex"};
 
 // Ensure we do not add new types without updating the names array
 MONGO_STATIC_ASSERT((sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) ==

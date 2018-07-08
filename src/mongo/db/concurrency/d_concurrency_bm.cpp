@@ -46,16 +46,15 @@ class DConcurrencyTest : public benchmark::Fixture {
 public:
     /**
      * Returns a vector of Clients of length 'k', each of which has an OperationContext with its
-     * lockState set to a DefaultLockerImpl.
+     * lockState set to a LockerImpl.
      */
-    template <typename LockerType>
     void makeKClientsWithLockers(int k) {
         clients.reserve(k);
         for (int i = 0; i < k; ++i) {
             auto client = getGlobalServiceContext()->makeClient(
                 str::stream() << "test client for thread " << i);
             auto opCtx = client->makeOperationContext();
-            opCtx->swapLockState(std::make_unique<LockerType>());
+            opCtx->swapLockState(std::make_unique<LockerImpl>());
             clients.emplace_back(std::move(client), std::move(opCtx));
         }
     }
@@ -63,7 +62,7 @@ public:
 protected:
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients;
-    std::array<DefaultLockerImpl, kMaxPerfThreads> locker;
+    std::array<LockerImpl, kMaxPerfThreads> locker;
 };
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_StdMutex)(benchmark::State& state) {
@@ -94,7 +93,7 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentSharedLock)(benchmark::S
     std::unique_ptr<ForceSupportsDocLocking> supportDocLocking;
 
     if (state.thread_index == 0) {
-        makeKClientsWithLockers<DefaultLockerImpl>(state.threads);
+        makeKClientsWithLockers(state.threads);
         supportDocLocking = std::make_unique<ForceSupportsDocLocking>(true);
     }
 
@@ -113,7 +112,7 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)(benchmark
     std::unique_ptr<ForceSupportsDocLocking> supportDocLocking;
 
     if (state.thread_index == 0) {
-        makeKClientsWithLockers<DefaultLockerImpl>(state.threads);
+        makeKClientsWithLockers(state.threads);
         supportDocLocking = std::make_unique<ForceSupportsDocLocking>(true);
     }
 
@@ -132,7 +131,7 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_MMAPv1CollectionSharedLock)(benchmark::S
     std::unique_ptr<ForceSupportsDocLocking> supportDocLocking;
 
     if (state.thread_index == 0) {
-        makeKClientsWithLockers<DefaultLockerImpl>(state.threads);
+        makeKClientsWithLockers(state.threads);
         supportDocLocking = std::make_unique<ForceSupportsDocLocking>(false);
     }
 
@@ -151,7 +150,7 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_MMAPv1CollectionExclusiveLock)(benchmark
     std::unique_ptr<ForceSupportsDocLocking> supportDocLocking;
 
     if (state.thread_index == 0) {
-        makeKClientsWithLockers<DefaultLockerImpl>(state.threads);
+        makeKClientsWithLockers(state.threads);
         supportDocLocking = std::make_unique<ForceSupportsDocLocking>(false);
     }
 
