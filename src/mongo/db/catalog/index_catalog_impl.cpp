@@ -571,14 +571,6 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
         }
     }
 
-    // SERVER-16893 Forbid use of v0 indexes with non-mmapv1 engines
-    if (indexVersion == IndexVersion::kV0 &&
-        !opCtx->getServiceContext()->getStorageEngine()->isMmapV1()) {
-        return Status(ErrorCodes::CannotCreateIndex,
-                      str::stream() << "use of v0 indexes is only allowed with the "
-                                    << "mmapv1 storage engine");
-    }
-
     if (!IndexDescriptor::isIndexVersionSupported(indexVersion)) {
         return Status(ErrorCodes::CannotCreateIndex,
                       str::stream() << "this version of mongod cannot build new indexes "

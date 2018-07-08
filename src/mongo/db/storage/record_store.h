@@ -426,13 +426,6 @@ public:
      * @param notifier - Only used by record stores which do not support doc-locking. Called only
      *                   in the case of an in-place update. Called just before the in-place write
      *                   occurs.
-     * @return Status  - If a document move is required (MMAPv1 only) then a status of
-     *                   ErrorCodes::NeedsDocumentMove will be returned. On receipt of this status
-     *                   no update will be performed. It is the caller's responsibility to:
-     *                     1. Remove the existing document and associated index keys.
-     *                     2. Insert a new document and index keys.
-     *
-     * For capped record stores, the record size will never change.
      */
     virtual Status updateRecord(OperationContext* opCtx,
                                 const RecordId& oldLocation,

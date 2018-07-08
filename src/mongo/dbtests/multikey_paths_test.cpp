@@ -92,18 +92,14 @@ public:
         const IndexCatalogEntry* ice = indexCatalog->getEntry(desc);
 
         auto actualMultikeyPaths = ice->getMultikeyPaths(_opCtx.get());
-        if (storageEngineSupportsPathLevelMultikeyTracking()) {
-            ASSERT_FALSE(actualMultikeyPaths.empty());
-            const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
-            if (!match) {
-                FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
-                                   << ", Actual: "
-                                   << dumpMultikeyPaths(actualMultikeyPaths));
-            }
-            ASSERT_TRUE(match);
-        } else {
-            ASSERT_TRUE(actualMultikeyPaths.empty());
+        ASSERT_FALSE(actualMultikeyPaths.empty());
+        const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
+        if (!match) {
+            FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
+                               << ", Actual: "
+                               << dumpMultikeyPaths(actualMultikeyPaths));
         }
+        ASSERT_TRUE(match);
     }
 
 protected:
@@ -111,14 +107,6 @@ protected:
     const NamespaceString _nss;
 
 private:
-    bool storageEngineSupportsPathLevelMultikeyTracking() {
-        // Path-level multikey tracking is supported for all storage engines that use the KVCatalog.
-        // MMAPv1 is the only storage engine that does not.
-        //
-        // TODO SERVER-22727: Store path-level multikey information in MMAPv1 index catalog.
-        return !getGlobalServiceContext()->getStorageEngine()->isMmapV1();
-    }
-
     std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
         std::stringstream ss;
 

@@ -82,16 +82,7 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
             WriteUnitOfWork uow(opCtx.get());
             Status res =
                 rs->updateRecord(opCtx.get(), loc, data.c_str(), data.size() + 1, false, NULL);
-
-            if (ErrorCodes::NeedsDocumentMove == res) {
-                StatusWith<RecordId> newLocation = rs->insertRecord(
-                    opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
-                ASSERT_OK(newLocation.getStatus());
-                rs->deleteRecord(opCtx.get(), loc);
-                loc = newLocation.getValue();
-            } else {
-                ASSERT_OK(res);
-            }
+            ASSERT_OK(res);
 
             uow.commit();
         }
@@ -150,16 +141,7 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
             WriteUnitOfWork uow(opCtx.get());
             Status res =
                 rs->updateRecord(opCtx.get(), locs[i], data.c_str(), data.size() + 1, false, NULL);
-
-            if (ErrorCodes::NeedsDocumentMove == res) {
-                StatusWith<RecordId> newLocation = rs->insertRecord(
-                    opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
-                ASSERT_OK(newLocation.getStatus());
-                rs->deleteRecord(opCtx.get(), locs[i]);
-                locs[i] = newLocation.getValue();
-            } else {
-                ASSERT_OK(res);
-            }
+            ASSERT_OK(res);
 
             uow.commit();
         }
@@ -217,18 +199,8 @@ TEST(RecordStoreTestHarness, UpdateRecordWithMoveNotifier) {
             WriteUnitOfWork uow(opCtx.get());
             Status res = rs->updateRecord(
                 opCtx.get(), loc, newData.c_str(), newData.size() + 1, false, &umn);
-
-            if (ErrorCodes::NeedsDocumentMove == res) {
-                StatusWith<RecordId> newLocation = rs->insertRecord(
-                    opCtx.get(), newData.c_str(), newData.size() + 1, Timestamp(), false);
-                ASSERT_OK(newLocation.getStatus());
-                rs->deleteRecord(opCtx.get(), loc);
-                loc = newLocation.getValue();
-                ASSERT_EQUALS(0, umn.numInPlaceCallbacks());
-            } else {
-                ASSERT_OK(res);
-                ASSERT_GTE(1, umn.numInPlaceCallbacks());
-            }
+            ASSERT_OK(res);
+            ASSERT_GTE(1, umn.numInPlaceCallbacks());
 
             uow.commit();
         }

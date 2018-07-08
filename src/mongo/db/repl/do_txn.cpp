@@ -183,15 +183,6 @@ Status _doTxn(OperationContext* opCtx,
         (*numApplied)++;
 
         if (MONGO_FAIL_POINT(doTxnPauseBetweenOperations)) {
-            // While holding a database lock under MMAPv1, we would be implicitly holding the
-            // flush lock here. This would prevent other threads from acquiring the global
-            // lock or any database locks. We release all locks temporarily while the fail
-            // point is enabled to allow other threads to make progress.
-            boost::optional<Lock::TempRelease> release;
-            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            if (storageEngine->isMmapV1() && !opCtx->lockState()->isW()) {
-                release.emplace(opCtx->lockState());
-            }
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(doTxnPauseBetweenOperations);
         }
     }

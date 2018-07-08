@@ -266,20 +266,7 @@ TEST(RecordStoreTestHarness, Update1) {
             WriteUnitOfWork uow(opCtx.get());
             Status status =
                 rs->updateRecord(opCtx.get(), loc, s2.c_str(), s2.size() + 1, false, NULL);
-
-            if (ErrorCodes::NeedsDocumentMove == status) {
-                // NeedsDocumentMove should only be possible under MMAPv1. We don't have the means
-                // to check storageEngine here but asserting 'supportsDocLocking()' is false
-                // provides an equivalent check as only MMAPv1 will/should return false.
-                ASSERT_FALSE(harnessHelper->supportsDocLocking());
-                StatusWith<RecordId> newLocation =
-                    rs->insertRecord(opCtx.get(), s2.c_str(), s2.size() + 1, Timestamp(), false);
-                ASSERT_OK(newLocation.getStatus());
-                rs->deleteRecord(opCtx.get(), loc);
-                loc = newLocation.getValue();
-            } else {
-                ASSERT_OK(status);
-            }
+            ASSERT_OK(status);
 
             uow.commit();
         }

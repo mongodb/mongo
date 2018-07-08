@@ -667,13 +667,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     Status updateStatus = _recordStore->updateRecord(
         opCtx, oldLocation, newDoc.objdata(), newDoc.objsize(), _enforceQuota(enforceQuota), this);
 
-    if (updateStatus == ErrorCodes::NeedsDocumentMove) {
-        return uassertStatusOK(_updateDocumentWithMove(
-            opCtx, oldLocation, oldDoc, newDoc, enforceQuota, opDebug, args, sid));
-    }
-    uassertStatusOK(updateStatus);
-
-    // Object did not move.  We update each index with each respective UpdateTicket.
+    // Update each index with each respective UpdateTicket.
     if (indexesAffected) {
         IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator(opCtx, true);
         while (ii.more()) {
@@ -697,61 +691,6 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, *args);
 
     return {oldLocation};
-}
-
-StatusWith<RecordId> CollectionImpl::_updateDocumentWithMove(OperationContext* opCtx,
-                                                             const RecordId& oldLocation,
-                                                             const Snapshotted<BSONObj>& oldDoc,
-                                                             const BSONObj& newDoc,
-                                                             bool enforceQuota,
-                                                             OpDebug* opDebug,
-                                                             OplogUpdateEntryArgs* args,
-                                                             const SnapshotId& sid) {
-    invariant(isMMAPV1());
-    // Insert new record.
-    StatusWith<RecordId> newLocation = _recordStore->insertRecord(
-        opCtx, newDoc.objdata(), newDoc.objsize(), Timestamp(), _enforceQuota(enforceQuota));
-    if (!newLocation.isOK()) {
-        return newLocation;
-    }
-
-    invariant(newLocation.getValue() != oldLocation);
-
-    _cursorManager.invalidateDocument(opCtx, oldLocation, INVALIDATION_DELETION);
-
-    args->preImageDoc = oldDoc.value().getOwned();
-
-    // Remove indexes for old record.
-    int64_t keysDeleted;
-    _indexCatalog.unindexRecord(opCtx, oldDoc.value(), oldLocation, true, &keysDeleted);
-
-    // Remove old record.
-    _recordStore->deleteRecord(opCtx, oldLocation);
-
-    std::vector<BsonRecord> bsonRecords;
-    BsonRecord bsonRecord = {newLocation.getValue(), Timestamp(), &newDoc};
-    bsonRecords.push_back(bsonRecord);
-
-    // Add indexes for new record.
-    int64_t keysInserted;
-    Status status = _indexCatalog.indexRecords(opCtx, bsonRecords, &keysInserted);
-    if (!status.isOK()) {
-        return StatusWith<RecordId>(status);
-    }
-
-    invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
-    args->updatedDoc = newDoc;
-
-    getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, *args);
-
-    moveCounter.increment();
-    if (opDebug) {
-        opDebug->additiveMetrics.incrementNmoved(1);
-        opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
-        opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
-    }
-
-    return newLocation;
 }
 
 Status CollectionImpl::recordStoreGoingToUpdateInPlace(OperationContext* opCtx,

@@ -176,8 +176,7 @@ private:
 
 /**
  * Get the given collection in MODE_S, except that if the collection is missing it will report that
- * to the health log, and it takes an IX lock on "local" as a workaround to SERVER-28544 and to
- * ensure correct flush lock acquisition for MMAPV1.
+ * to the health log, and it takes an IX lock on "local" as a workaround to SERVER-28544.
  */
 class AutoGetCollectionForDbCheck {
 public:

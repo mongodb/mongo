@@ -208,13 +208,6 @@ public:
     virtual bool isEphemeral() const = 0;
 
     /**
-     * Only MMAPv1 should override this and return true to trigger MMAPv1-specific behavior.
-     */
-    virtual bool isMmapV1() const {
-        return false;
-    }
-
-    /**
      * Populates and tears down in-memory data structures, respectively. Only required for storage
      * engines that support recoverToStableTimestamp().
      *

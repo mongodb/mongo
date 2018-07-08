@@ -85,13 +85,6 @@ bool supportsDocLocking() {
     return _supportsDocLocking;
 }
 
-bool isMMAPV1() {
-    StorageEngine* globalStorageEngine = getGlobalServiceContext()->getStorageEngine();
-
-    invariant(globalStorageEngine);
-    return globalStorageEngine->isMmapV1();
-}
-
 ServiceContext::ServiceContext()
     : _tickSource(stdx::make_unique<SystemTickSource>()),
       _fastClockSource(stdx::make_unique<SystemClockSource>()),

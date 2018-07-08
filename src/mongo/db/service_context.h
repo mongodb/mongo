@@ -616,9 +616,4 @@ void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceConte
  */
 bool supportsDocLocking();
 
-/**
- * Returns true if the storage engine in use is MMAPV1.
- */
-bool isMMAPV1();
-
 }  // namespace mongo

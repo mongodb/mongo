@@ -401,18 +401,6 @@ private:
                             OpDebug* opDebug);
 
 
-    /**
-     * Perform update when document move will be required.
-     */
-    StatusWith<RecordId> _updateDocumentWithMove(OperationContext* opCtx,
-                                                 const RecordId& oldLocation,
-                                                 const Snapshotted<BSONObj>& oldDoc,
-                                                 const BSONObj& newDoc,
-                                                 bool enforceQuota,
-                                                 OpDebug* opDebug,
-                                                 OplogUpdateEntryArgs* args,
-                                                 const SnapshotId& sid);
-
     bool _enforceQuota(bool userEnforeQuota) const;
 
     int _magic;
