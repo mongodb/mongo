@@ -65,6 +65,16 @@ env.CppUnitTest(
     ],
 )
 
+env.Benchmark(
+    target='bsonobjbuilder_bm',
+    source=[
+        'bsonobjbuilder_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.CppUnitTest(
     target='bsonelement_test',
     source=[
