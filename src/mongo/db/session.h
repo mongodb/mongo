@@ -358,6 +358,11 @@ public:
         return _singleTransactionStats;
     }
 
+    repl::OpTime getSpeculativeTransactionReadOpTimeForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _speculativeTransactionReadOpTime;
+    }
+
     /**
      * If this session is holding stashed locks in _txnResourceStash, reports the current state of
      * the session using the provided builder. Locks the session object's mutex while running.
@@ -376,6 +381,14 @@ public:
      * Returns an empty BSONObj if this session has no stashed resources.
      */
     BSONObj reportStashedState() const;
+
+    /**
+     * This method returns a string with information about a slow transaction. The format of the
+     * logging string produced should match the format used for slow operation logging. A
+     * transaction must be completed (committed or aborted) and a valid LockStats reference must be
+     * passed in order for this method to be called.
+     */
+    std::string transactionInfoForLog(const SingleThreadedLockStats* lockStats);
 
     void addMultikeyPathInfo(MultikeyPathInfo info) {
         _multikeyPathInfo.push_back(std::move(info));

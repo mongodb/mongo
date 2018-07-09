@@ -44,6 +44,7 @@
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/socket_utils.h"
 
@@ -2709,6 +2710,208 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponAbort) {
     ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->appName, "appName");
     ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo()->clientMetadata,
                       obj.getField("client").Obj());
+}
+
+namespace {
+
+/*
+ * Sets up the additive metrics for Transactions Metrics test.
+ */
+void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
+    CurOp::get(opCtx)->debug().additiveMetrics.keysExamined = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.docsExamined = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.nMatched = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.nModified = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.ninserted = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.ndeleted = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.nmoved = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.keysInserted = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.keysDeleted = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.prepareReadConflicts = metricValue;
+    CurOp::get(opCtx)->debug().additiveMetrics.writeConflicts = metricValue;
+}
+
+/*
+ * Builds expected parameters info string.
+ */
+void buildParametersInfoString(StringBuilder* sb,
+                               LogicalSessionId sessionId,
+                               const TxnNumber txnNum) {
+    BSONObjBuilder lsidBuilder;
+    sessionId.serialize(&lsidBuilder);
+    (*sb) << "parameters:{ lsid: " << lsidBuilder.done().toString() << ", txnNumber: " << txnNum
+          << ", autocommit: false },";
+}
+
+/*
+ * Builds expected single transaction stats info string.
+ */
+void buildSingleTransactionStatsString(StringBuilder* sb, const int metricValue) {
+    (*sb) << " keysExamined:" << metricValue << " docsExamined:" << metricValue
+          << " nMatched:" << metricValue << " nModified:" << metricValue
+          << " ninserted:" << metricValue << " ndeleted:" << metricValue
+          << " nmoved:" << metricValue << " keysInserted:" << metricValue
+          << " keysDeleted:" << metricValue << " prepareReadConflicts:" << metricValue
+          << " writeConflicts:" << metricValue;
+}
+
+/*
+ * Builds the time active and time inactive info string.
+ */
+void buildTimeActiveInactiveString(StringBuilder* sb,
+                                   Session* session,
+                                   unsigned long long curTime) {
+    // Add time active micros to string.
+    (*sb) << " timeActiveMicros:"
+          << durationCount<Microseconds>(
+                 session->getSingleTransactionStats()->getTimeActiveMicros(curTime));
+
+    // Add time inactive micros to string.
+    (*sb) << " timeInactiveMicros:"
+          << session->getSingleTransactionStats()->getDuration(curTime) -
+            durationCount<Microseconds>(
+                 session->getSingleTransactionStats()->getTimeActiveMicros(curTime));
+}
+
+
+/*
+ * Builds the entire expected transaction info string and returns it.
+ */
+std::string buildTransactionInfoString(OperationContext* opCtx,
+                                       Session* session,
+                                       std::string terminationCause,
+                                       const LogicalSessionId sessionId,
+                                       const TxnNumber txnNum,
+                                       const int metricValue) {
+    // Calling transactionInfoForLog to get the actual transaction info string.
+    const auto lockerInfo = opCtx->lockState()->getLockerInfo();
+
+    // Building expected transaction info string.
+    StringBuilder parametersInfo;
+    buildParametersInfoString(&parametersInfo, sessionId, txnNum);
+
+    StringBuilder readTimestampInfo;
+    readTimestampInfo
+        << " readTimestamp:"
+        << session->getSpeculativeTransactionReadOpTimeForTest().getTimestamp().toString() << ",";
+
+    StringBuilder singleTransactionStatsInfo;
+    buildSingleTransactionStatsString(&singleTransactionStatsInfo, metricValue);
+
+    auto curTime = curTimeMicros64();
+    StringBuilder timeActiveAndInactiveInfo;
+    buildTimeActiveInactiveString(&timeActiveAndInactiveInfo, session, curTime);
+
+    BSONObjBuilder locks;
+    if (lockerInfo) {
+        lockerInfo->stats.report(&locks);
+    }
+
+    // Puts all the substrings together into one expected info string. The expected info string will
+    // look something like this:
+    // parameters:{ lsid: { id: UUID("f825288c-100e-49a1-9fd7-b95c108049e6"), uid: BinData(0,
+    // E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855) }, txnNumber: 1,
+    // autocommit: false }, readTimestamp:Timestamp(0, 0), keysExamined:1 docsExamined:1 nMatched:1
+    // nModified:1 ninserted:1 ndeleted:1 nmoved:1 keysInserted:1 keysDeleted:1
+    // prepareReadConflicts:1 writeConflicts:1 terminationCause:committed timeActiveMicros:3
+    // timeInactiveMicros:2 numYields:0 locks:{ Global: { acquireCount: { r: 6, w: 4 } }, Database:
+    // { acquireCount: { r: 1, w: 1, W: 2 } }, Collection: { acquireCount: { R: 1 } }, oplog: {
+    // acquireCount: { W: 1 } } } 0ms
+    StringBuilder expectedTransactionInfo;
+    expectedTransactionInfo << parametersInfo.str() << readTimestampInfo.str()
+                            << singleTransactionStatsInfo.str()
+                            << " terminationCause:" << terminationCause
+                            << timeActiveAndInactiveInfo.str() << " numYields:" << 0
+                            << " locks:" << locks.done().toString() << " "
+                            << Milliseconds{
+                                   static_cast<long long>(
+                                       session->getSingleTransactionStats()->getDuration(curTime)) /
+                                   1000};
+    return expectedTransactionInfo.str();
+}
+}  // namespace
+
+TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterCommit) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
+
+    // Initialize SingleTransactionStats AdditiveMetrics objects.
+    const int metricValue = 1;
+    setupAdditiveMetrics(metricValue, opCtx());
+
+    session.unstashTransactionResources(opCtx(), "commitTransaction");
+    session.commitTransaction(opCtx(), boost::none);
+
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    ASSERT(lockerInfo);
+    std::string testTransactionInfo = session.transactionInfoForLog(&lockerInfo->stats);
+
+    std::string expectedTransactionInfo =
+        buildTransactionInfoString(opCtx(), &session, "committed", sessionId, txnNum, metricValue);
+    ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
+}
+
+TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "abortTransaction");
+
+    // Initialize SingleTransactionStats AdditiveMetrics objects.
+    const int metricValue = 1;
+    setupAdditiveMetrics(metricValue, opCtx());
+
+    session.unstashTransactionResources(opCtx(), "abortTransaction");
+    session.abortActiveTransaction(opCtx());
+
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    ASSERT(lockerInfo);
+    std::string testTransactionInfo = session.transactionInfoForLog(&lockerInfo->stats);
+
+    std::string expectedTransactionInfo =
+        buildTransactionInfoString(opCtx(), &session, "aborted", sessionId, txnNum, metricValue);
+    ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
+}
+
+DEATH_TEST_F(TransactionsMetricsTest, UnterminatedLogTransactionInfoFails, "invariant") {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    ASSERT(lockerInfo);
+    session.transactionInfoForLog(&lockerInfo->stats);
+}
+
+DEATH_TEST_F(TransactionsMetricsTest, noLockerInfoStatsFails, "invariant") {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    session.unstashTransactionResources(opCtx(), "commitTransaction");
+    session.commitTransaction(opCtx(), boost::none);
+
+    session.transactionInfoForLog(nullptr);
 }
 
 }  // namespace

@@ -774,4 +774,22 @@ void OpDebug::AdditiveMetrics::incrementPrepareReadConflicts(long long n) {
     *prepareReadConflicts += n;
 }
 
+string OpDebug::AdditiveMetrics::report() {
+    StringBuilder s;
+
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("keysExamined", keysExamined);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("docsExamined", docsExamined);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nMatched", nMatched);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nModified", nModified);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("ninserted", ninserted);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("ndeleted", ndeleted);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nmoved", nmoved);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("keysInserted", keysInserted);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("keysDeleted", keysDeleted);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("prepareReadConflicts", prepareReadConflicts);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("writeConflicts", writeConflicts);
+
+    return s.str();
+}
+
 }  // namespace mongo
