@@ -58,12 +58,4 @@ intrusive_ptr<const RCString> RCString::create(StringData s) {
     return ptr;
 }
 
-void IntrusiveCounterUnsigned::addRef() const {
-    ++counter;
-}
-
-void IntrusiveCounterUnsigned::release() const {
-    if (!--counter)
-        delete this;
-}
-}
+}  // namespace mongo
