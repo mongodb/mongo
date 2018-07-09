@@ -38,21 +38,22 @@ TestData.skipCheckDBHashes = true;
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
 
-    // featureCompatibilityVersion cannot be set to invalid value.
+    jsTestLog("EXPECTED TO FAIL: featureCompatibilityVersion cannot be set to an invalid value");
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: 5}));
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "4.4"}));
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
 
-    // setFeatureCompatibilityVersion rejects unknown fields.
+    jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion rejects unknown fields.");
     assert.commandFailed(
         adminDB.runCommand({setFeatureCompatibilityVersion: lastStable, unknown: 1}));
 
-    // setFeatureCompatibilityVersion can only be run on the admin database.
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion can only be run on the admin database");
     assert.commandFailed(
         conn.getDB("test").runCommand({setFeatureCompatibilityVersion: lastStable}));
 
-    // featureCompatibilityVersion cannot be set via setParameter.
+    jsTestLog("EXPECTED TO FAIL: featureCompatibilityVersion cannot be set via setParameter");
     assert.commandFailed(
         adminDB.runCommand({setParameter: 1, featureCompatibilityVersion: lastStable}));
 
@@ -62,6 +63,8 @@ TestData.skipCheckDBHashes = true;
         data: {collectionNS: "admin.system.version"},
         mode: "alwaysOn"
     }));
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion fails to downgrade FCV if the write fails");
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     checkFCV(adminDB, latestFCV);
     assert.commandWorked(adminDB.runCommand({
@@ -80,6 +83,8 @@ TestData.skipCheckDBHashes = true;
         data: {collectionNS: "admin.system.version"},
         mode: "alwaysOn"
     }));
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion fails to upgrade to 'latestFCV' if the write fails");
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(adminDB, lastStableFCV);
     assert.commandWorked(adminDB.runCommand({
@@ -171,7 +176,7 @@ TestData.skipCheckDBHashes = true;
     rst.awaitReplication();
     checkFCV(secondaryAdminDB, lastStableFCV);
 
-    // setFeatureCompatibilityVersion cannot be run on secondary.
+    jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion cannot be run on secondary");
     assert.commandFailed(secondaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
 
     rst.stopSet();
@@ -277,26 +282,31 @@ TestData.skipCheckDBHashes = true;
     checkFCV(configPrimaryAdminDB, latestFCV);
     checkFCV(shardPrimaryAdminDB, latestFCV);
 
-    // featureCompatibilityVersion cannot be set to invalid value on mongos.
+    jsTestLog(
+        "EXPECTED TO FAIL: featureCompatibilityVersion cannot be set to invalid value on mongos");
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: 5}));
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "4.4"}));
 
-    // setFeatureCompatibilityVersion rejects unknown fields on mongos.
+    jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion rejects unknown fields on mongos");
     assert.commandFailed(
         mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV, unknown: 1}));
 
-    // setFeatureCompatibilityVersion can only be run on the admin database on mongos.
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion can only be run on the admin database on mongos");
     assert.commandFailed(
         st.s.getDB("test").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 
-    // featureCompatibilityVersion cannot be set via setParameter on mongos.
+    jsTestLog(
+        "EXPECTED TO FAIL: featureCompatibilityVersion cannot be set via setParameter on mongos");
     assert.commandFailed(
         mongosAdminDB.runCommand({setParameter: 1, featureCompatibilityVersion: lastStableFCV}));
 
     // Prevent the shard primary from receiving messages from the config server primary. When we try
     // to set FCV to 'lastStableFCV', the command should fail because the shard cannot be contacted.
     st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 1.0);
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion cannot be set because the shard primary is not reachable");
     assert.commandFailed(
         mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV, maxTimeMS: 1000}));
     checkFCV(
