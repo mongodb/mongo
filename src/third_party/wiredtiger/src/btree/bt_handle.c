@@ -893,11 +893,11 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 * reset it to the default.
 	 */
 	if (btree->maxintlkey == 0 || btree->maxintlkey > intl_split_size / 10)
-		    btree->maxintlkey = intl_split_size / 10;
+		btree->maxintlkey = intl_split_size / 10;
 	if (btree->maxleafkey == 0)
-		    btree->maxleafkey = leaf_split_size / 10;
+		btree->maxleafkey = leaf_split_size / 10;
 	if (btree->maxleafvalue == 0)
-		    btree->maxleafvalue = leaf_split_size / 2;
+		btree->maxleafvalue = leaf_split_size / 2;
 
 	return (0);
 }

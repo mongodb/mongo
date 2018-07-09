@@ -625,7 +625,7 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	 * We'll need some extra cursors to pull out column group information
 	 * and chase "source" entries.
 	 */
-	if (WT_STREQ(uri, "metadata:create")) {
+	if (strcmp(uri, "metadata:create") == 0) {
 		F_SET(mdc, WT_MDC_CREATEONLY);
 		WT_ERR(__wt_metadata_cursor_open(session, cfg[1],
 		    &mdc->create_cursor));

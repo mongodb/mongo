@@ -456,10 +456,10 @@ snap_check(WT_CURSOR *cursor,
 				print_item_data(
 				    "expected", start->vdata, start->vsize);
 			if (ret == WT_NOTFOUND)
-				fprintf(stderr, "\t   found {deleted}\n");
+				fprintf(stderr, "found {deleted}\n");
 			else
 				print_item_data(
-				    "   found", value->data, value->size);
+				    "found", value->data, value->size);
 
 			testutil_die(ret,
 			    "snapshot-isolation: %.*s search mismatch",
@@ -476,10 +476,10 @@ snap_check(WT_CURSOR *cursor,
 				print_item_data(
 				    "expected", start->vdata, start->vsize);
 			if (ret == WT_NOTFOUND)
-				fprintf(stderr, "\t   found {deleted}\n");
+				fprintf(stderr, "found {deleted}\n");
 			else
 				print_item_data(
-				    "   found", value->data, value->size);
+				    "found", value->data, value->size);
 
 			testutil_die(ret,
 			    "snapshot-isolation: %" PRIu64 " search mismatch",

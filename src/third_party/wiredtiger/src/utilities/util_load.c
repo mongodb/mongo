@@ -138,7 +138,7 @@ load_dump(WT_SESSION *session)
 	 * Check the append flag (it only applies to objects where the primary
 	 * key is a record number).
 	 */
-	if (append && strcmp(cursor->key_format, "r") != 0) {
+	if (append && !WT_STREQ(cursor->key_format, "r")) {
 		fprintf(stderr,
 		    "%s: %s: -a option illegal unless the primary key is a "
 		    "record number\n",

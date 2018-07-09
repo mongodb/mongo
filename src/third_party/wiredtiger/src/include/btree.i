@@ -1158,8 +1158,7 @@ __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Return if a truncate operation is active.
  */
 static inline bool
-__wt_page_del_active(
-    WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
+__wt_page_del_active(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 {
 	WT_PAGE_DELETED *page_del;
 	uint8_t prepare_state;

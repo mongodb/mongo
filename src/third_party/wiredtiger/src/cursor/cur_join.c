@@ -188,7 +188,7 @@ __curjoin_iter_set_entry(WT_CURSOR_JOIN_ITER *iter, u_int entry_pos)
 		size = strlen(to_dup->internal_uri) + 3;
 		WT_ERR(__wt_calloc(session, size, 1, &uri));
 		WT_ERR(__wt_snprintf(uri, size, "%s()", to_dup->internal_uri));
-		if ((c = iter->cursor) == NULL || !WT_STREQ(c->uri, uri)) {
+		if ((c = iter->cursor) == NULL || strcmp(c->uri, uri) != 0) {
 			iter->cursor = NULL;
 			if (c != NULL)
 				WT_ERR(c->close(c));

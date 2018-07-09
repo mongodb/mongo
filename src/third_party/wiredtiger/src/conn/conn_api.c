@@ -137,7 +137,7 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (WT_STREQ(name, "none"))
+	if (strcmp(name, "none") == 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "invalid name for a collator: %s", name);
 
@@ -243,7 +243,7 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_compressor, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (WT_STREQ(name, "none"))
+	if (strcmp(name, "none") == 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "invalid name for a compressor: %s", name);
 
@@ -482,7 +482,7 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_encryptor, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (WT_STREQ(name, "none"))
+	if (strcmp(name, "none") == 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "invalid name for an encryptor: %s", name);
 
@@ -578,7 +578,7 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_extractor, config, cfg);
 	WT_UNUSED(cfg);
 
-	if (WT_STREQ(name, "none"))
+	if (strcmp(name, "none") == 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "invalid name for an extractor: %s", name);
 
@@ -1692,11 +1692,11 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	    is_create || exist ? WT_FS_OPEN_CREATE : 0, &conn->lock_fh);
 
 	/*
-	 * If this is a read-only connection and we cannot grab the lock
-	 * file, check if it is because there is not write permission or
-	 * if the file does not exist.  If so, then ignore the error.
-	 * XXX Ignoring the error does allow multiple read-only
-	 * connections to exist at the same time on a read-only directory.
+	 * If this is a read-only connection and we cannot grab the lock file,
+	 * check if it is because there's no write permission or if the file
+	 * does not exist. If so, then ignore the error.
+	 * XXX Ignoring the error does allow multiple read-only connections to
+	 * exist at the same time on a read-only directory.
 	 *
 	 * If we got an expected permission or non-existence error then skip
 	 * the byte lock.
@@ -1776,7 +1776,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * and there's never a database home after that point without a turtle
 	 * file. If the turtle file doesn't exist, it's a create.
 	 */
-	WT_ERR(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist));
+	WT_ERR(__wt_turtle_exists(session, &exist));
 	conn->is_new = exist ? 0 : 1;
 
 	if (conn->is_new) {

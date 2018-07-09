@@ -1408,7 +1408,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 		/*
 		 * Lookaside without stable timestamp was taken care of above
-		 * (set to the first uncommitted transaction.  Lookaside with
+		 * (set to the first uncommitted transaction). Lookaside with
 		 * stable timestamp always takes the first stable update.
 		 */
 		if (*updp == NULL)

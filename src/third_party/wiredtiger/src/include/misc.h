@@ -227,9 +227,12 @@
 } while (0)
 
 /*
- * Check if a variable string equals a constant string.  Inline the common
- * case for WiredTiger of a single byte string.  This is required because not
- * all compilers optimize this case in strcmp (e.g., clang).
+ * Check if a variable string equals a constant string. Inline the common case
+ * for WiredTiger of a single byte string. This is required because not all
+ * compilers optimize this case in strcmp (e.g., clang). While this macro works
+ * in the case of comparing two pointers (a sizeof operator on a pointer won't
+ * equal 2 and the extra code will be discarded at compile time), that's not its
+ * purpose.
  */
 #define	WT_STREQ(s, cs)							\
 	(sizeof(cs) == 2 ? (s)[0] == (cs)[0] && (s)[1] == '\0' :	\
