@@ -256,6 +256,9 @@ public:
      */
     Command(StringData name, StringData oldName = StringData());
 
+    Command(const Command&) = delete;
+    Command& operator=(const Command&) = delete;
+
     // Do not remove or relocate the definition of this "key function".
     // See https://gcc.gnu.org/wiki/VerboseDiagnostics#missing_vtable
     virtual ~Command();
@@ -420,6 +423,10 @@ private:
 class CommandInvocation {
 public:
     CommandInvocation(const Command* definition) : _definition(definition) {}
+
+    CommandInvocation(const CommandInvocation&) = delete;
+    CommandInvocation& operator=(const CommandInvocation&) = delete;
+
     virtual ~CommandInvocation();
 
     /**
