@@ -1067,6 +1067,8 @@ void Session::_reportTransactionStats(WithLock wl, BSONObjBuilder* builder) cons
         return;
     }
     parametersBuilder.append("autocommit", _autocommit);
+    parametersBuilder.append("timeOpenMicros",
+                             static_cast<long long>(_singleTransactionStats->getDuration()));
 
     parametersBuilder.done();
 }

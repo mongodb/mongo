@@ -626,7 +626,8 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
             desc: "inactive transaction",
             "lsid.id": {$in: sessions.map((session) => session.getSessionId().id)},
             "transaction.parameters.txnNumber": {$gte: 0, $lt: sessions.length},
-            "transaction.parameters.autocommit": false
+            "transaction.parameters.autocommit": false,
+            'transaction.parameters.timeOpenMicros': {$gt: 0}
         };
     }
 

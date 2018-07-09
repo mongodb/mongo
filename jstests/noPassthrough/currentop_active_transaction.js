@@ -40,7 +40,8 @@
             active: true,
             'lsid': {$exists: true},
             'transaction.parameters.txnNumber': {$eq: 0},
-            'transaction.parameters.autocommit': {$eq: false}
+            'transaction.parameters.autocommit': {$eq: false},
+            'transaction.parameters.timeOpenMicros': {$gt: 0}
         };
         return 1 === adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).itcount();
     });
