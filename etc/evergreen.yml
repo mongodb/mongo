@@ -6510,7 +6510,9 @@ tasks:
 - name: push
   patchable: false
   depends_on:
-  - name: "*"
+  - name: jsCore
+  - name: dbtest
+  - name: replica_sets_jscore_passthrough
   stepback: false
   commands:
     - func: "fetch artifacts"
@@ -7713,6 +7715,7 @@ buildvariants:
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -8051,6 +8054,7 @@ buildvariants:
   - name: dbtest
   - name: free_monitoring
   - name: jsCore
+  - name: replica_sets_jscore_passthrough
   - name: push
     distros:
     - ubuntu1604-test
@@ -8304,6 +8308,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: replica_sets_auth
   - name: replica_sets_ese
+  - name: replica_sets_jscore_passthrough
   - name: powercycle
   - name: sasl
   - name: sharding_auth
@@ -8479,6 +8484,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: replica_sets_auth
   - name: replica_sets_ese
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: sharding_auth_audit
@@ -8832,6 +8838,7 @@ buildvariants:
   - name: replica_sets_ese_5
   - name: replica_sets_ese_6
   - name: replica_sets_ese_misc
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharded_core_txns
   - name: sharding_auth_0
@@ -9499,6 +9506,7 @@ buildvariants:
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: ssl
   - name: sslSpecial
@@ -10681,6 +10689,7 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: external_auth
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: sharding_auth_audit
@@ -11279,7 +11288,9 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel67-zseries-build
+  - name: dbtest
   - name: jsCore
+  - name: replica_sets_jscore_passthrough
   - name: ssl
   - name: push
     distros:
@@ -11333,6 +11344,7 @@ buildvariants:
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -11404,6 +11416,7 @@ buildvariants:
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -11504,6 +11517,7 @@ buildvariants:
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -11764,6 +11778,7 @@ buildvariants:
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -11913,6 +11928,7 @@ buildvariants:
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
   - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth
   - name: snmp
