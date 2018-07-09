@@ -1632,9 +1632,14 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         return {ErrorCodes::NotMaster, "not primary so can't step down"};
     }
 
+    // Using 'force' sets the default for the wait time to zero, which means the stepdown will
+    // fail if it does not acquire the lock immediately. In such a scenario, we use the
+    // stepDownUntil deadline instead.
+    auto lockDeadline = force ? stepDownUntil : waitUntil;
+
     auto globalLock = stdx::make_unique<Lock::GlobalLock>(opCtx,
                                                           MODE_X,
-                                                          stepDownUntil,
+                                                          lockDeadline,
                                                           Lock::InterruptBehavior::kThrow,
                                                           Lock::GlobalLock::EnqueueOnly());
 
@@ -1643,11 +1648,10 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // to help us get the global lock faster.
     _externalState->killAllUserOperations(opCtx);
 
-    globalLock->waitForLockUntil(stepDownUntil);
+    globalLock->waitForLockUntil(lockDeadline);
     if (!globalLock->isLocked()) {
         return {ErrorCodes::ExceededTimeLimit,
-                "Could not acquire the global shared lock within the amount of time "
-                "specified that we should step down for"};
+                "Could not acquire the global shared lock before the deadline for stepdown"};
     }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
