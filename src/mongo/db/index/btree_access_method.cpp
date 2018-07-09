@@ -54,12 +54,8 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataIn
         fixed.push_back(BSONElement());
     }
 
-    _keyGenerator = BtreeKeyGenerator::make(_descriptor->version(),
-                                            fieldNames,
-                                            fixed,
-                                            _descriptor->isSparse(),
-                                            btreeState->getCollator());
-    massert(16745, "Invalid index version for key generation.", _keyGenerator);
+    _keyGenerator = std::make_unique<BtreeKeyGenerator>(
+        fieldNames, fixed, _descriptor->isSparse(), btreeState->getCollator());
 }
 
 void BtreeAccessMethod::doGetKeys(const BSONObj& obj,

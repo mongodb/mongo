@@ -99,8 +99,6 @@ constexpr StringData IndexDescriptor::kWeightsFieldName;
 
 bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
     switch (indexVersion) {
-        case IndexVersion::kV0:
-            return false;
         case IndexVersion::kV1:
         case IndexVersion::kV2:
             return true;
@@ -117,8 +115,6 @@ Status IndexDescriptor::isIndexVersionAllowedForCreation(
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility,
     const BSONObj& indexSpec) {
     switch (indexVersion) {
-        case IndexVersion::kV0:
-            break;
         case IndexVersion::kV1:
         case IndexVersion::kV2:
             return Status::OK();

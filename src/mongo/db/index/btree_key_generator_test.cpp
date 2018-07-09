@@ -117,8 +117,7 @@ bool testKeygen(const BSONObj& kp,
         fixed.push_back(BSONElement());
     }
 
-    unique_ptr<BtreeKeyGenerator> keyGen(
-        new BtreeKeyGeneratorV1(fieldNames, fixed, sparse, collator));
+    auto keyGen = std::make_unique<BtreeKeyGenerator>(fieldNames, fixed, sparse, collator);
 
     //
     // Step 2: ask 'keyGen' to generate index keys for the object 'obj' and report any prefixes of

@@ -93,12 +93,10 @@ TEST(IndexKeyValidateTest, KeyElementValueOfZeroFailsForV2Indexes) {
               validateKeyPattern(BSON("x" << -0.0), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementValueOfZeroSucceedsForV0AndV1Indexes) {
-    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
-        ASSERT_OK(validateKeyPattern(BSON("x" << 0), indexVersion));
-        ASSERT_OK(validateKeyPattern(BSON("x" << 0.0), indexVersion));
-        ASSERT_OK(validateKeyPattern(BSON("x" << -0.0), indexVersion));
-    }
+TEST(IndexKeyValidateTest, KeyElementValueOfZeroSucceedsForV1Indexes) {
+    ASSERT_OK(validateKeyPattern(BSON("x" << 0), IndexVersion::kV1));
+    ASSERT_OK(validateKeyPattern(BSON("x" << 0.0), IndexVersion::kV1));
+    ASSERT_OK(validateKeyPattern(BSON("x" << -0.0), IndexVersion::kV1));
 }
 
 TEST(IndexKeyValidateTest, KeyElementValueOfNaNFailsForV2Indexes) {
@@ -113,15 +111,13 @@ TEST(IndexKeyValidateTest, KeyElementValueOfNaNFailsForV2Indexes) {
     }
 }
 
-TEST(IndexKeyValidateTest, KeyElementValueOfNaNSucceedsForV0AndV1Indexes) {
+TEST(IndexKeyValidateTest, KeyElementValueOfNaNSucceedsForV1Indexes) {
     if (std::numeric_limits<double>::has_quiet_NaN) {
-        for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
-            double nan = std::numeric_limits<double>::quiet_NaN();
-            ASSERT_OK(validateKeyPattern(BSON("x" << nan), indexVersion));
-            ASSERT_OK(validateKeyPattern(BSON("a" << nan << "b"
-                                                  << "2d"),
-                                         indexVersion));
-        }
+        double nan = std::numeric_limits<double>::quiet_NaN();
+        ASSERT_OK(validateKeyPattern(BSON("x" << nan), IndexVersion::kV1));
+        ASSERT_OK(validateKeyPattern(BSON("a" << nan << "b"
+                                              << "2d"),
+                                     IndexVersion::kV1));
     }
 }
 
@@ -160,16 +156,14 @@ TEST(IndexKeyValidateTest, KeyElementBooleanValueFailsForV2Indexes) {
                                  IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementBooleanValueSucceedsForV0AndV1Indexes) {
-    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
-        ASSERT_OK(validateKeyPattern(BSON("x" << true), indexVersion));
-        ASSERT_OK(validateKeyPattern(BSON("x" << false), indexVersion));
-        ASSERT_OK(validateKeyPattern(BSON("a"
-                                          << "2dsphere"
-                                          << "b"
-                                          << true),
-                                     indexVersion));
-    }
+TEST(IndexKeyValidateTest, KeyElementBooleanValueSucceedsForV1Indexes) {
+    ASSERT_OK(validateKeyPattern(BSON("x" << true), IndexVersion::kV1));
+    ASSERT_OK(validateKeyPattern(BSON("x" << false), IndexVersion::kV1));
+    ASSERT_OK(validateKeyPattern(BSON("a"
+                                      << "2dsphere"
+                                      << "b"
+                                      << true),
+                                 IndexVersion::kV1));
 }
 
 TEST(IndexKeyValidateTest, KeyElementNullValueFailsForV2Indexes) {
@@ -177,10 +171,8 @@ TEST(IndexKeyValidateTest, KeyElementNullValueFailsForV2Indexes) {
               validateKeyPattern(BSON("x" << BSONNULL), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementNullValueSucceedsForV0AndV1Indexes) {
-    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
-        ASSERT_OK(validateKeyPattern(BSON("x" << BSONNULL), indexVersion));
-    }
+TEST(IndexKeyValidateTest, KeyElementNullValueSucceedsForV1Indexes) {
+    ASSERT_OK(validateKeyPattern(BSON("x" << BSONNULL), IndexVersion::kV1));
 }
 
 TEST(IndexKeyValidateTest, KeyElementUndefinedValueFailsForV2Indexes) {
@@ -188,10 +180,8 @@ TEST(IndexKeyValidateTest, KeyElementUndefinedValueFailsForV2Indexes) {
               validateKeyPattern(BSON("x" << BSONUndefined), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementUndefinedValueSucceedsForV0AndV1Indexes) {
-    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
-        ASSERT_OK(validateKeyPattern(BSON("x" << BSONUndefined), indexVersion));
-    }
+TEST(IndexKeyValidateTest, KeyElementUndefinedValueSucceedsForV1Indexes) {
+    ASSERT_OK(validateKeyPattern(BSON("x" << BSONUndefined), IndexVersion::kV1));
 }
 
 TEST(IndexKeyValidateTest, KeyElementMinKeyValueFailsForV2Indexes) {
@@ -199,10 +189,8 @@ TEST(IndexKeyValidateTest, KeyElementMinKeyValueFailsForV2Indexes) {
               validateKeyPattern(BSON("x" << MINKEY), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementMinKeyValueSucceedsForV0AndV1Indexes) {
-    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
-        ASSERT_OK(validateKeyPattern(BSON("x" << MINKEY), indexVersion));
-    }
+TEST(IndexKeyValidateTest, KeyElementMinKeyValueSucceedsForV1Indexes) {
+    ASSERT_OK(validateKeyPattern(BSON("x" << MINKEY), IndexVersion::kV1));
 }
 
 TEST(IndexKeyValidateTest, KeyElementMaxKeyValueFailsForV2Indexes) {
@@ -210,10 +198,8 @@ TEST(IndexKeyValidateTest, KeyElementMaxKeyValueFailsForV2Indexes) {
               validateKeyPattern(BSON("x" << MAXKEY), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementMaxKeyValueSucceedsForV0AndV1Indexes) {
-    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
-        ASSERT_OK(validateKeyPattern(BSON("x" << MAXKEY), indexVersion));
-    }
+TEST(IndexKeyValidateTest, KeyElementMaxKeyValueSucceedsForV1Indexes) {
+    ASSERT_OK(validateKeyPattern(BSON("x" << MAXKEY), IndexVersion::kV1));
 }
 
 TEST(IndexKeyValidateTest, KeyElementObjectValueFails) {

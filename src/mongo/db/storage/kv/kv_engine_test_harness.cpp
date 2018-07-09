@@ -35,6 +35,7 @@
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -144,7 +145,10 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     ASSERT(engine);
 
     string ident = "abc";
-    IndexDescriptor desc(NULL, "", BSON("key" << BSON("a" << 1)));
+    IndexDescriptor desc(nullptr,
+                         "",
+                         BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "key"
+                                  << BSON("a" << 1)));
     unique_ptr<SortedDataInterface> sorted;
     {
         MyOperationContext opCtx(engine);
@@ -487,6 +491,27 @@ TEST(KVCatalogTest, RestartForPrefixes) {
         ASSERT_EQ("a.b", md.ns);
         ASSERT_EQ(abCollPrefix, md.prefix);
         ASSERT_EQ(fooIndexPrefix, md.indexes[md.findIndexOffset("foo")].prefix);
+    }
+}
+
+DEATH_TEST(KVCatalogTest, TerminateOnNonNumericIndexVersion, "Fatal Assertion 50942") {
+    unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
+    KVEngine* engine = helper->getEngine();
+    ASSERT(engine);
+
+    string ident = "abc";
+    IndexDescriptor desc(nullptr,
+                         "",
+                         BSON("v"
+                              << "1"
+                              << "key"
+                              << BSON("a" << 1)));
+    unique_ptr<SortedDataInterface> sorted;
+    {
+        MyOperationContext opCtx(engine);
+        ASSERT_OK(engine->createSortedDataInterface(&opCtx, ident, &desc));
+        sorted.reset(engine->getSortedDataInterface(&opCtx, ident, &desc));
+        ASSERT(sorted);
     }
 }
 

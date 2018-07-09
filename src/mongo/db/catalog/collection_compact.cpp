@@ -46,37 +46,7 @@
 
 namespace mongo {
 
-using std::endl;
-using std::vector;
-
-using IndexVersion = IndexDescriptor::IndexVersion;
-
 namespace {
-BSONObj _compactAdjustIndexSpec(const BSONObj& oldSpec) {
-    BSONObjBuilder bob;
-
-    for (auto&& indexSpecElem : oldSpec) {
-        auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
-        if (IndexDescriptor::kIndexVersionFieldName == indexSpecElemFieldName) {
-            IndexVersion indexVersion = static_cast<IndexVersion>(indexSpecElem.numberInt());
-            if (IndexVersion::kV0 == indexVersion) {
-                // We automatically upgrade v=0 indexes to v=1 indexes.
-                bob.append(IndexDescriptor::kIndexVersionFieldName,
-                           static_cast<int>(IndexVersion::kV1));
-            } else {
-                bob.append(IndexDescriptor::kIndexVersionFieldName, static_cast<int>(indexVersion));
-            }
-        } else if (IndexDescriptor::kBackgroundFieldName == indexSpecElemFieldName) {
-            // Create the new index in the foreground.
-            continue;
-        } else {
-            bob.append(indexSpecElem);
-        }
-    }
-
-    return bob.obj();
-}
-
 class MyCompactAdaptor : public RecordStoreCompactAdaptor {
 public:
     MyCompactAdaptor(Collection* collection, MultiIndexBlock* indexBlock)
@@ -144,13 +114,15 @@ StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
         return StatusWith<CompactStats>(ErrorCodes::BadValue,
                                         "cannot compact when indexes in progress");
 
-    vector<BSONObj> indexSpecs;
+    std::vector<BSONObj> indexSpecs;
     {
         IndexCatalog::IndexIterator ii(_indexCatalog.getIndexIterator(opCtx, false));
         while (ii.more()) {
             IndexDescriptor* descriptor = ii.next();
 
-            const BSONObj spec = _compactAdjustIndexSpec(descriptor->infoObj());
+            // Compact always creates the new index in the foreground.
+            const BSONObj spec =
+                descriptor->infoObj().removeField(IndexDescriptor::kBackgroundFieldName);
             const BSONObj key = spec.getObjectField("key");
             const Status keyStatus =
                 index_key_validate::validateKeyPattern(key, descriptor->version());

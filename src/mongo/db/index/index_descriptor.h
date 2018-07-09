@@ -57,7 +57,7 @@ class OperationContext;
  */
 class IndexDescriptor {
 public:
-    enum class IndexVersion { kV0 = 0, kV1 = 1, kV2 = 2 };
+    enum class IndexVersion { kV1 = 1, kV2 = 2 };
     static constexpr IndexVersion kLatestIndexVersion = IndexVersion::kV2;
 
     static constexpr StringData k2dIndexBitsFieldName = "bits"_sd;
@@ -106,11 +106,9 @@ public:
           _cachedEntry(NULL) {
         _indexNamespace = makeIndexNamespace(_parentNS, _indexName);
 
-        _version = IndexVersion::kV0;
         BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];
-        if (e.isNumber()) {
-            _version = static_cast<IndexVersion>(e.numberInt());
-        }
+        fassert(50942, e.isNumber());
+        _version = static_cast<IndexVersion>(e.numberInt());
     }
 
 

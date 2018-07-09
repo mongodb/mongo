@@ -133,7 +133,6 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
         BSONElement keyElement = it.next();
 
         switch (indexVersion) {
-            case IndexVersion::kV0:
             case IndexVersion::kV1: {
                 if (keyElement.type() == BSONType::Object || keyElement.type() == BSONType::Array) {
                     return {code,

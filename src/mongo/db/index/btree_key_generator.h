@@ -47,71 +47,35 @@ class CollatorInterface;
  */
 class BtreeKeyGenerator {
 public:
+    /**
+     * Provides a context to generate keys based on names in 'fieldNames'. The 'fixed' argument
+     * specifies values that have already been identified for their corresponding fields.
+     */
     BtreeKeyGenerator(std::vector<const char*> fieldNames,
                       std::vector<BSONElement> fixed,
-                      bool isSparse);
+                      bool isSparse,
+                      const CollatorInterface* collator);
 
-    virtual ~BtreeKeyGenerator() {}
-
-    static std::unique_ptr<BtreeKeyGenerator> make(IndexDescriptor::IndexVersion indexVersion,
-                                                   std::vector<const char*> fieldNames,
-                                                   std::vector<BSONElement> fixed,
-                                                   bool isSparse,
-                                                   const CollatorInterface* collator);
-
+    /**
+     * Generates the index keys for the document 'obj', and stores them in the set 'keys'.
+     *
+     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
+     * index type supports tracking path-level multikey information, then this function resizes
+     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
+     * element with the prefixes of the indexed field that would cause this index to be multikey as
+     * a result of inserting 'keys'.
+     */
     void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const;
 
-protected:
-    // These are used by the getKeysImpl(s) below.
+private:
+    // These are used by getKeys below.
     std::vector<const char*> _fieldNames;
     bool _isIdIndex;
     bool _isSparse;
-    BSONObj _nullKey;  // a full key with all fields null
+    BSONObj _nullKey;  // A full key with all fields null.
     BSONSizeTracker _sizeTracker;
 
-private:
-    virtual void getKeysImpl(std::vector<const char*> fieldNames,
-                             std::vector<BSONElement> fixed,
-                             const BSONObj& obj,
-                             BSONObjSet* keys,
-                             MultikeyPaths* multikeyPaths) const = 0;
-
     std::vector<BSONElement> _fixed;
-};
-
-class BtreeKeyGeneratorV0 : public BtreeKeyGenerator {
-public:
-    BtreeKeyGeneratorV0(std::vector<const char*> fieldNames,
-                        std::vector<BSONElement> fixed,
-                        bool isSparse);
-
-    virtual ~BtreeKeyGeneratorV0() {}
-
-private:
-    /**
-     * Generates the index keys for the document 'obj' and stores them in the set 'keys'.
-     *
-     * It isn't possible to create a v0 index, so it's unnecessary to track the prefixes of the
-     * indexed fields that cause the index to be mulitkey. This function therefore ignores its
-     * 'multikeyPaths' parameter.
-     */
-    void getKeysImpl(std::vector<const char*> fieldNames,
-                     std::vector<BSONElement> fixed,
-                     const BSONObj& obj,
-                     BSONObjSet* keys,
-                     MultikeyPaths* multikeyPaths) const final;
-};
-
-class BtreeKeyGeneratorV1 : public BtreeKeyGenerator {
-public:
-    BtreeKeyGeneratorV1(std::vector<const char*> fieldNames,
-                        std::vector<BSONElement> fixed,
-                        bool isSparse,
-                        const CollatorInterface* collator);
-
-    virtual ~BtreeKeyGeneratorV1() {}
-
-private:
     /**
      * Stores info regarding traversal of a positional path. A path through a document is
      * considered positional if this path element names an array element. Generally this means
@@ -166,37 +130,18 @@ private:
     };
 
     /**
-     * Generates the index keys for the document 'obj' and stores them in the set 'keys'.
-     *
-     * @param fieldNames - fields to index, may be postfixes in recursive calls
-     * @param fixed - values that have already been identified for their index fields
-     * @param obj - object from which keys should be extracted, based on names in fieldNames
-     * @param keys - set where index keys are written
-     *
-     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
-     * index type supports tracking path-level multikey information, then this function resizes
-     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
-     * element with the prefixes of the indexed field that would cause this index to be multikey as
-     * a result of inserting 'keys'.
+     * This recursive method does the heavy-lifting for getKeys().
      */
-    void getKeysImpl(std::vector<const char*> fieldNames,
-                     std::vector<BSONElement> fixed,
-                     const BSONObj& obj,
-                     BSONObjSet* keys,
-                     MultikeyPaths* multikeyPaths) const final;
+    void _getKeysWithArray(std::vector<const char*> fieldNames,
+                           std::vector<BSONElement> fixed,
+                           const BSONObj& obj,
+                           BSONObjSet* keys,
+                           unsigned numNotFound,
+                           const std::vector<PositionalPathInfo>& positionalInfo,
+                           MultikeyPaths* multikeyPaths) const;
 
     /**
-     * This recursive method does the heavy-lifting for getKeysImpl().
-     */
-    void getKeysImplWithArray(std::vector<const char*> fieldNames,
-                              std::vector<BSONElement> fixed,
-                              const BSONObj& obj,
-                              BSONObjSet* keys,
-                              unsigned numNotFound,
-                              const std::vector<PositionalPathInfo>& positionalInfo,
-                              MultikeyPaths* multikeyPaths) const;
-    /**
-     * A call to getKeysImplWithArray() begins by calling this for each field in the key pattern. It
+     * A call to _getKeysWithArray() begins by calling this for each field in the key pattern. It
      * traverses the path '*field' in 'obj' until either reaching the end of the path or an array
      * element.
      *
@@ -223,20 +168,20 @@ private:
      *   to "b.c".
      *
      *   extractNextElement() will then be called from a recursive call to
-     *   getKeysImplWithArray() for each array element. For instance, it will get called with
+     *   _getKeysWithArray() for each array element. For instance, it will get called with
      *   'obj' {b: {c: 98}} and '*field' pointing to "b.c". It will return element 98 and
      *   set '*field' to "". Similarly, it will return elemtn 99 and set '*field' to "" for
      *   the second array element.
      */
-    BSONElement extractNextElement(const BSONObj& obj,
-                                   const PositionalPathInfo& positionalInfo,
-                                   const char** field,
-                                   bool* arrayNestedArray) const;
+    BSONElement _extractNextElement(const BSONObj& obj,
+                                    const PositionalPathInfo& positionalInfo,
+                                    const char** field,
+                                    bool* arrayNestedArray) const;
 
     /**
      * Sets extracted elements in 'fixed' for field paths that we have traversed to the end.
      *
-     * Then calls getKeysImplWithArray() recursively.
+     * Then calls _getKeysWithArray() recursively.
      */
     void _getKeysArrEltFixed(std::vector<const char*>* fieldNames,
                              std::vector<BSONElement>* fixed,
