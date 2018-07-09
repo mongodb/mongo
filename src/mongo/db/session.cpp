@@ -716,6 +716,11 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
         _singleTransactionStats->setInactive(curTimeMicros64());
     }
 
+    // Add the latest operation stats to the aggregate OpDebug object stored in the
+    // SingleTransactionStats instance on the Session.
+    _singleTransactionStats->getOpDebug()->additiveMetrics.add(
+        CurOp::get(opCtx)->debug().additiveMetrics);
+
     invariant(!_txnResourceStash);
     _txnResourceStash = TxnResources(opCtx);
 }
@@ -850,6 +855,11 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
     opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     opCtx->lockState()->unsetMaxLockTimeout();
+
+    // Add the latest operation stats to the aggregate OpDebug object stored in the
+    // SingleTransactionStats instance on the Session.
+    _singleTransactionStats->getOpDebug()->additiveMetrics.add(
+        CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
 void Session::_abortTransaction(WithLock wl) {
@@ -986,6 +996,10 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
                 if (_singleTransactionStats->isActive()) {
                     _singleTransactionStats->setInactive(curTime);
                 }
+                // Add the latest operation stats to the aggregate OpDebug object stored in the
+                // SingleTransactionStats instance on the Session.
+                _singleTransactionStats->getOpDebug()->additiveMetrics.add(
+                    CurOp::get(opCtx)->debug().additiveMetrics);
             }
         }
         // We must clear the recovery unit and locker so any post-transaction writes can run without
@@ -1017,6 +1031,10 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     if (_singleTransactionStats->isActive()) {
         _singleTransactionStats->setInactive(curTime);
     }
+    // Add the latest operation stats to the aggregate OpDebug object stored in the
+    // SingleTransactionStats instance on the Session.
+    _singleTransactionStats->getOpDebug()->additiveMetrics.add(
+        CurOp::get(opCtx)->debug().additiveMetrics);
 }
 
 BSONObj Session::reportStashedState() const {
