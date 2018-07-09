@@ -722,6 +722,16 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     writeConflicts = addOptionalLongs(writeConflicts, otherMetrics.writeConflicts);
 }
 
+bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) {
+    return keysExamined == otherMetrics.keysExamined && docsExamined == otherMetrics.docsExamined &&
+        nMatched == otherMetrics.nMatched && nModified == otherMetrics.nModified &&
+        ninserted == otherMetrics.ninserted && ndeleted == otherMetrics.ndeleted &&
+        nmoved == otherMetrics.nmoved && keysInserted == otherMetrics.keysInserted &&
+        keysDeleted == otherMetrics.keysDeleted &&
+        prepareReadConflicts == otherMetrics.prepareReadConflicts &&
+        writeConflicts == otherMetrics.writeConflicts;
+}
+
 void OpDebug::AdditiveMetrics::incrementWriteConflicts(long long n) {
     if (!writeConflicts) {
         writeConflicts = 0;

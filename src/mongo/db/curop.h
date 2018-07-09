@@ -63,6 +63,12 @@ public:
         void add(const AdditiveMetrics& otherMetrics);
 
         /**
+         * Returns true if the AdditiveMetrics object we are comparing has the same field values as
+         * this AdditiveMetrics instance.
+         */
+        bool equals(const AdditiveMetrics& otherMetrics);
+
+        /**
          * Increments writeConflicts by n.
          */
         void incrementWriteConflicts(long long n);

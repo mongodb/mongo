@@ -626,6 +626,7 @@ env.Library(
         'server_transactions_metrics.cpp',
         'session.cpp',
         'session_catalog.cpp',
+        'single_transaction_stats.cpp',
         'transaction_coordinator.cpp',
         'transaction_participant.cpp',
         'transaction_history_iterator.cpp',
