@@ -64,8 +64,6 @@ namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceCandidate);
 
-const Seconds TopologyCoordinator::VoteLease::leaseTime = Seconds(30);
-
 // Controls how caught up in replication a secondary with higher priority than the current primary
 // must be before it will call for a priority takeover election.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(priorityTakeoverFreshnessWindowSeconds, int, 2);
@@ -1142,41 +1140,6 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
     return HeartbeatResponseAction::makeNoAction();
 }
 
-Status TopologyCoordinator::checkShouldStandForElection(Date_t now) const {
-    if (_currentPrimaryIndex != -1) {
-        return {ErrorCodes::NodeNotElectable, "Not standing for election since there is a Primary"};
-    }
-    invariant(_role != Role::kLeader);
-
-    if (_role == Role::kCandidate) {
-        return {ErrorCodes::NodeNotElectable, "Not standing for election again; already candidate"};
-    }
-
-    const UnelectableReasonMask unelectableReason =
-        _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout);
-    if (unelectableReason) {
-        return {ErrorCodes::NodeNotElectable,
-                str::stream() << "Not standing for election because "
-                              << _getUnelectableReasonString(unelectableReason)};
-    }
-    if (_electionSleepUntil > now) {
-        if (_rsConfig.getProtocolVersion() == 1) {
-            return {
-                ErrorCodes::NodeNotElectable,
-                str::stream() << "Not standing for election before "
-                              << dateToISOStringLocal(_electionSleepUntil)
-                              << " because I stood up or learned about a new term too recently"};
-        } else {
-            return {ErrorCodes::NodeNotElectable,
-                    str::stream() << "Not standing for election before "
-                                  << dateToISOStringLocal(_electionSleepUntil)
-                                  << " because I stood too recently"};
-        }
-    }
-    // All checks passed. Start election proceedings.
-    return Status::OK();
-}
-
 bool TopologyCoordinator::_aMajoritySeemsToBeUp() const {
     int vUp = 0;
     for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();
@@ -1304,31 +1267,6 @@ OpTime TopologyCoordinator::_latestKnownOpTime() const {
     }
 
     return latest;
-}
-
-bool TopologyCoordinator::_isMemberHigherPriority(int memberOneIndex, int memberTwoIndex) const {
-    if (memberOneIndex == -1)
-        return false;
-
-    if (memberTwoIndex == -1)
-        return true;
-
-    return _rsConfig.getMemberAt(memberOneIndex).getPriority() >
-        _rsConfig.getMemberAt(memberTwoIndex).getPriority();
-}
-
-int TopologyCoordinator::_getHighestPriorityElectableIndex(Date_t now) const {
-    int maxIndex = -1;
-    for (int currentIndex = 0; currentIndex < _rsConfig.getNumMembers(); currentIndex++) {
-        UnelectableReasonMask reason = currentIndex == _selfIndex
-            ? _getMyUnelectableReason(now, StartElectionReason::kElectionTimeout)
-            : _getUnelectableReason(currentIndex);
-        if (None == reason && _isMemberHigherPriority(currentIndex, maxIndex)) {
-            maxIndex = currentIndex;
-        }
-    }
-
-    return maxIndex;
 }
 
 bool TopologyCoordinator::prepareForUnconditionalStepDown() {
@@ -1797,27 +1735,6 @@ TopologyCoordinator::prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder*
     return PrepareFreezeResponseResult::kNoAction;
 }
 
-bool TopologyCoordinator::becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now) {
-    if (_stepDownUntil > now) {
-        return false;
-    }
-
-    if (_isElectableNodeInSingleNodeReplicaSet()) {
-        // If the new config describes a one-node replica set, we're the one member,
-        // we're electable, we're not in maintenance mode, and we are currently in followerMode
-        // SECONDARY, we must transition to candidate, in leiu of heartbeats.
-        _role = Role::kCandidate;
-        return true;
-    }
-    return false;
-}
-
-void TopologyCoordinator::setElectionSleepUntil(Date_t newTime) {
-    if (_electionSleepUntil < newTime) {
-        _electionSleepUntil = newTime;
-    }
-}
-
 Timestamp TopologyCoordinator::getElectionTime() const {
     return _electionTime;
 }
@@ -2116,23 +2033,6 @@ int TopologyCoordinator::_getTotalPings() {
     return totalPings;
 }
 
-std::vector<HostAndPort> TopologyCoordinator::getMaybeUpHostAndPorts() const {
-    std::vector<HostAndPort> upHosts;
-    for (std::vector<MemberData>::const_iterator it = _memberData.begin(); it != _memberData.end();
-         ++it) {
-        const int itIndex = indexOfIterator(_memberData, it);
-        if (itIndex == _selfIndex) {
-            continue;  // skip ourselves
-        }
-        if (!it->maybeUp()) {
-            continue;  // skip DOWN nodes
-        }
-
-        upHosts.push_back(_rsConfig.getMemberAt(itIndex).getHostAndPort());
-    }
-    return upHosts;
-}
-
 bool TopologyCoordinator::isSteppingDown() const {
     return _leaderMode == LeaderMode::kAttemptingStepDown ||
         _leaderMode == LeaderMode::kSteppingDown;
@@ -2236,12 +2136,6 @@ void TopologyCoordinator::processLoseElection() {
     _electionTime = Timestamp(0, 0);
     _electionId = OID();
     _role = Role::kFollower;
-
-    // Clear voteLease time, if we voted for ourselves in this election.
-    // This will allow us to vote for others.
-    if (_voteLease.whoId == _selfConfig().getId()) {
-        _voteLease.when = Date_t();
-    }
 }
 
 bool TopologyCoordinator::attemptStepDown(
