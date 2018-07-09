@@ -3432,6 +3432,7 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
+
           tar cfvz ./embedded-sdk.tgz ./mongo-embedded-sdk-${version}
 
     # Upload it so we can download from EVG.
@@ -3462,6 +3463,7 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
+
           if [ ${enable_embedded_tests|false} = "ios_tvos_simulator" -a $(command -v xcrun) ]; then
             find ./lib -type f -name "*.dylib" -print0 | xargs -0 -L 1 xcrun codesign -s -
           fi
@@ -3495,6 +3497,9 @@ tasks:
       params:
         working_dir: "src/build"
         script: |
+          set -o errexit
+          set -o verbose
+
           if [ "${is_patch}" = "true" ]; then
             rm -f src/build/embedded-sdk.tgz
           fi
@@ -3515,6 +3520,89 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
 
+- name: embedded_sdk_multiarch_android_package
+  depends_on:
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-android-arm32
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-android-arm64
+    - name: embedded_sdk_s3_put
+      variant: embedded-sdk-android-x86_64
+  commands:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
+    - func: "generate compile expansions"
+    - func: "apply compile expansions"
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-android-arm32/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "embedded-sdk-android-armeabi-v7a.tgz"
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-android-arm64/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "embedded-sdk-android-arm64-v8a.tgz"
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/embedded-sdk/embedded-sdk-android-x86_64/${revision}/${version}.tgz
+        bucket: mciuploads
+        local_file: "embedded-sdk-android-x86_64.tgz"
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ "${setup_android_toolchain|}" = "true" ]; then
+            export ANDROID_HOME=$(pwd)/android_sdk
+
+            cd src/src/mongo/embedded/android
+
+            chmod +x gradlew
+
+            for arch in arm64-v8a armeabi-v7a x86_64 ; do
+                tar zxvf ../../../../../embedded-sdk-android-$arch.tgz
+                mkdir -p mongodb-embedded-capi/src/main/jniLibs/$arch
+                cp ./mongo-embedded-sdk-${version}/lib/*.so mongodb-embedded-capi/src/main/jniLibs/$arch
+                rm -rf ./mongo-embedded-sdk-${version}
+            done
+
+            ./gradlew build
+
+            mkdir -p ../../../../build/mongo-embedded-sdk-${version}/aar
+            cp mongodb-embedded-capi/build/outputs/aar/*.aar ../../../../build/mongo-embedded-sdk-${version}/aar
+          fi
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ "${setup_android_toolchain|}" = "true" ]; then
+            cd src/build
+            tar zcvf mongo-embedded-sdk-${version}.tgz mongo-embedded-sdk-${version}
+          fi
+    - command: s3.put
+      params:
+        #optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/mongo-embedded-sdk-${version}.tgz"
+        remote_file: "${project}/embedded-sdk/embedded-sdk-android-multiarch/${revision}/${version}.tgz"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "Embedded SDK Tar Archive"
 
 - name: compile_benchmarks
   depends_on: []
@@ -9895,6 +9983,21 @@ buildvariants:
     dump_scons_config_on_failure: true
   tasks:
   - name: embedded_sdk_build_and_test
+
+- name: embedded-sdk-android-multiarch
+  display_name: "Embedded SDK - Android Multiarch Package"
+  run_on:
+  - ubuntu1604-build
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_env: JAVA_HOME=/opt/java/jdk8/
+    setup_android_toolchain: true
+    android_toolchain_system_image_arch: "x86_64"
+    android_system_image_version: 21
+    android_toolchain_target_arch: "x86_64"
+    android_toolchain_api_version: "21"
+  tasks:
+  - name: embedded_sdk_multiarch_android_package
 
 ###########################################
 #          Redhat buildvariants           #
