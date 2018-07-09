@@ -62,7 +62,7 @@ public:
 
     public:
         using iterator_category = std::bidirectional_iterator_tag;
-        using value_type = Store::value_type;
+        using value_type = typename Store::value_type;
         using difference_type = std::ptrdiff_t;
         using pointer = pointer_type;
         using reference = reference_type;
