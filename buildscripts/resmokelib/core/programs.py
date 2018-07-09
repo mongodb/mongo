@@ -14,9 +14,26 @@ from . import process as _process
 from .. import config
 from .. import utils
 
-# The default 'logComponentVerbosity' object for mongod processes started either directly via
-# resmoke or those that will get started by the mongo shell.
-DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {"replication": {"heartbeats": 2, "rollback": 2}}
+# The below parameters define the default 'logComponentVerbosity' object passed to mongod processes
+# started either directly via resmoke or those that will get started by the mongo shell. We allow
+# this default to be different for tests run locally and tests run in Evergreen. This allows us, for
+# example, to keep log verbosity high in Evergreen test runs without polluting the logs for
+# developers running local tests.
+
+# The default verbosity setting for any tests that are not started with an Evergreen task id. This
+# will apply to any tests run locally.
+DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {"replication": {"rollback": 2}}
+
+# The default verbosity setting for any tests running in Evergreen i.e. started with an Evergreen
+# task id.
+DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {"replication": {"heartbeats": 2, "rollback": 2}}
+
+
+def default_mongod_log_component_verbosity():
+    """Return the default 'logComponentVerbosity' value to use for mongod processes."""
+    if config.EVERGREEN_TASK_ID:
+        return DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY
+    return DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY
 
 
 def mongod_program(  # pylint: disable=too-many-branches
@@ -35,7 +52,7 @@ def mongod_program(  # pylint: disable=too-many-branches
 
     # Set default log verbosity levels if none were specified.
     if "logComponentVerbosity" not in suite_set_parameters:
-        suite_set_parameters["logComponentVerbosity"] = DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY
+        suite_set_parameters["logComponentVerbosity"] = default_mongod_log_component_verbosity()
 
     # orphanCleanupDelaySecs controls an artificial delay before cleaning up an orphaned chunk
     # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
@@ -197,7 +214,7 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     # If the 'logComponentVerbosity' setParameter for mongod was not already specified, we set its
     # value to a default.
     mongod_set_parameters.setdefault("logComponentVerbosity",
-                                     DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY)
+                                     default_mongod_log_component_verbosity())
 
     test_data["setParameters"] = mongod_set_parameters
 
