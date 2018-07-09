@@ -753,33 +753,24 @@ TEST_F(SessionTest, ReportStashedResources) {
     ASSERT(opCtx()->getWriteUnitOfWork());
     ASSERT(opCtx()->lockState()->isLocked());
 
-    // Build a BSONObj containing the details which we expect to see reported when we call
-    // Session::reportStashedState.
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
-    ASSERT(lockerInfo);
-
-    BSONObjBuilder reportBuilder;
-    reportBuilder.append("host", getHostNameCachedAndPort());
-    reportBuilder.append("desc", "inactive transaction");
-    reportBuilder.append("lsid", sessionId.toBSON());
-    // Build the transaction parameters sub-document.
-    BSONObjBuilder transactionBuilder(reportBuilder.subobjStart("transaction"));
-    BSONObjBuilder parametersBuilder(transactionBuilder.subobjStart("parameters"));
-    parametersBuilder.append("txnNumber", txnNum);
-    parametersBuilder.append("autocommit", autocommit);
-    parametersBuilder.done();
-    transactionBuilder.done();
-
-    reportBuilder.append("waitingForLock", false);
-    reportBuilder.append("active", false);
-    fillLockerInfo(*lockerInfo, reportBuilder);
-
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
     session.stashTransactionResources(opCtx());
     ASSERT(!opCtx()->getWriteUnitOfWork());
 
     // Verify that the Session's report of its own stashed state aligns with our expectations.
-    ASSERT_BSONOBJ_EQ(session.reportStashedState(), reportBuilder.obj());
+    auto stashedState = session.reportStashedState();
+    auto transactionDocument =
+        stashedState.getObjectField("transaction").getObjectField("parameters");
+
+    ASSERT_EQ(stashedState.getField("host").valueStringData().toString(),
+              getHostNameCachedAndPort());
+    ASSERT_EQ(stashedState.getField("desc").valueStringData().toString(), "inactive transaction");
+    ASSERT_BSONOBJ_EQ(stashedState.getField("lsid").Obj(), sessionId.toBSON());
+    ASSERT_EQ(transactionDocument.getField("txnNumber").numberLong(), txnNum);
+    ASSERT_EQ(transactionDocument.getField("autocommit").boolean(), autocommit);
+    ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
+    ASSERT_EQ(stashedState.getField("waitingForLock").boolean(), false);
+    ASSERT_EQ(stashedState.getField("active").boolean(), false);
 
     // Unset the read concern on the OperationContext. This is needed to unstash.
     repl::ReadConcernArgs::get(opCtx()) = repl::ReadConcernArgs();
@@ -824,20 +815,16 @@ TEST_F(SessionTest, ReportUnstashedResources) {
     ASSERT(opCtx()->getWriteUnitOfWork());
     ASSERT(opCtx()->lockState()->isLocked());
 
-    // Build a BSONObj containing the details which we expect to see reported when we call
-    // Session::reportUnstashedState.
-    BSONObjBuilder reportBuilder;
-    BSONObjBuilder transactionBuilder(reportBuilder.subobjStart("transaction"));
-    BSONObjBuilder parametersBuilder(transactionBuilder.subobjStart("parameters"));
-    parametersBuilder.append("txnNumber", txnNum);
-    parametersBuilder.append("autocommit", autocommit);
-    parametersBuilder.done();
-    transactionBuilder.done();
-
     // Verify that the Session's report of its own unstashed state aligns with our expectations.
     BSONObjBuilder unstashedStateBuilder;
     session.reportUnstashedState(&unstashedStateBuilder);
-    ASSERT_BSONOBJ_EQ(unstashedStateBuilder.obj(), reportBuilder.obj());
+    auto unstashedState = unstashedStateBuilder.obj();
+    auto transactionDocument =
+        unstashedState.getObjectField("transaction").getObjectField("parameters");
+
+    ASSERT_EQ(transactionDocument.getField("txnNumber").numberLong(), txnNum);
+    ASSERT_EQ(transactionDocument.getField("autocommit").boolean(), autocommit);
+    ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
 
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
     session.stashTransactionResources(opCtx());
