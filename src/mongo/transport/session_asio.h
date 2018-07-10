@@ -138,19 +138,19 @@ public:
                         read(sync, buffers, handler);
                     } else {
                         std::error_code ec;
-                        handler(ec, asio::buffer_size(buffers));
+                        handler(std::move(status), asio::buffer_size(buffers));
                     }
                 } else {
-                    handler(std::error_code(status.code(), mongoErrorCategory()), 0);
+                    handler(std::move(status), 0);
                 }
             };
 
             auto handshakeRecvCb =
                 [ this, postHandshakeCb = std::move(postHandshakeCb), sync, buffers ](
-                    const std::error_code& ec, size_t size) {
+                    const Status& status, size_t size) {
                 _ranHandshake = true;
-                if (ec) {
-                    postHandshakeCb(errorCodeToStatus(ec), size);
+                if (!status.isOK()) {
+                    postHandshakeCb(status, size);
                     return;
                 }
 
@@ -204,14 +204,11 @@ public:
 
         write(sync,
               asio::buffer(httpResp.data(), httpResp.size()),
-              [ cb = std::move(postHandshakeCb), this ](const std::error_code& ec,
-                                                        size_t size) mutable {
-                  if (ec) {
-                      cb({ErrorCodes::ProtocolError,
-                          str::stream()
-                              << "Client sent an HTTP request over a native MongoDB connection, "
-                                 "but there was an error sending a response: "
-                              << ec.message()});
+              [ cb = std::move(postHandshakeCb), this ](const Status& status, size_t size) mutable {
+                  if (!status.isOK()) {
+                      cb(status.withContext(
+                          "Client sent an HTTP request over a native MongoDB connection, "
+                          "but there was an error sending a response: "));
                       return;
                   }
                   cb({ErrorCodes::ProtocolError,
@@ -235,9 +232,14 @@ private:
             if (size > 0) {
                 asyncBuffers += size;
             }
-            asio::async_read(stream, asyncBuffers, std::forward<CompleteHandler>(handler));
+            asio::async_read(stream,
+                             asyncBuffers,
+                             [handler = std::forward<CompleteHandler>(handler)](
+                                 const std::error_code& ec, size_t size) mutable {
+                                 handler(errorCodeToStatus(ec), size);
+                             });
         } else {
-            handler(ec, size);
+            handler(errorCodeToStatus(ec), size);
         }
     }
 
@@ -256,9 +258,14 @@ private:
             if (size > 0) {
                 asyncBuffers += size;
             }
-            asio::async_write(stream, asyncBuffers, std::forward<CompleteHandler>(handler));
+            asio::async_write(stream,
+                              asyncBuffers,
+                              [handler = std::forward<CompleteHandler>(handler)](
+                                  const std::error_code& ec, size_t size) mutable {
+                                  handler(errorCodeToStatus(ec), size);
+                              });
         } else {
-            handler(ec, size);
+            handler(errorCodeToStatus(ec), size);
         }
     }
 
@@ -295,7 +302,7 @@ private:
                     sync,
                     _socket,
                     asio::buffer(tlsAlert->data(), tlsAlert->size()),
-                    [ this, onComplete = std::move(onComplete) ](const std::error_code& ec,
+                    [ this, onComplete = std::move(onComplete) ](const Status& status,
                                                                  size_t size) {
                         return onComplete(
                             {ErrorCodes::SSLHandshakeFailed,

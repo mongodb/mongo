@@ -80,8 +80,8 @@ protected:
     void fillImpl() final;
 
 private:
-    void _headerCallback(const std::error_code& ec, size_t size);
-    void _bodyCallback(const std::error_code& ec, size_t size);
+    void _headerCallback(const Status& ec, size_t size);
+    void _bodyCallback(const Status& ec, size_t size);
 
     SharedBuffer _buffer;
     Message* _target;
@@ -95,7 +95,7 @@ protected:
     void fillImpl() final;
 
 private:
-    void _sinkCallback(const std::error_code& ec, size_t size);
+    void _sinkCallback(const Status& ec, size_t size);
     Message _msgToSend;
 };
 

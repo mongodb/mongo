@@ -72,9 +72,9 @@ TransportLayerASIO::ASIOSinkTicket::ASIOSinkTicket(const ASIOSessionHandle& sess
                                                    const Message& msg)
     : ASIOTicket(session, expiration), _msgToSend(msg) {}
 
-void TransportLayerASIO::ASIOSourceTicket::_bodyCallback(const std::error_code& ec, size_t size) {
-    if (ec) {
-        finishFill(errorCodeToStatus(ec));
+void TransportLayerASIO::ASIOSourceTicket::_bodyCallback(const Status& status, size_t size) {
+    if (!status.isOK()) {
+        finishFill(status);
         return;
     }
 
@@ -83,9 +83,9 @@ void TransportLayerASIO::ASIOSourceTicket::_bodyCallback(const std::error_code& 
     finishFill(Status::OK());
 }
 
-void TransportLayerASIO::ASIOSourceTicket::_headerCallback(const std::error_code& ec, size_t size) {
-    if (ec) {
-        finishFill(errorCodeToStatus(ec));
+void TransportLayerASIO::ASIOSourceTicket::_headerCallback(const Status& status, size_t size) {
+    if (!status.isOK()) {
+        finishFill(status);
         return;
     }
 
@@ -119,7 +119,7 @@ void TransportLayerASIO::ASIOSourceTicket::_headerCallback(const std::error_code
 
     session->read(isSync(),
                   asio::buffer(msgView.data(), msgView.dataLen()),
-                  [this](const std::error_code& ec, size_t size) { _bodyCallback(ec, size); });
+                  [this](const Status& status, size_t size) { _bodyCallback(status, size); });
 }
 
 void TransportLayerASIO::ASIOSourceTicket::fillImpl() {
@@ -132,12 +132,12 @@ void TransportLayerASIO::ASIOSourceTicket::fillImpl() {
 
     session->read(isSync(),
                   asio::buffer(_buffer.get(), initBufSize),
-                  [this](const std::error_code& ec, size_t size) { _headerCallback(ec, size); });
+                  [this](const Status& status, size_t size) { _headerCallback(status, size); });
 }
 
-void TransportLayerASIO::ASIOSinkTicket::_sinkCallback(const std::error_code& ec, size_t size) {
+void TransportLayerASIO::ASIOSinkTicket::_sinkCallback(const Status& status, size_t size) {
     networkCounter.hitPhysicalOut(_msgToSend.size());
-    finishFill(ec ? errorCodeToStatus(ec) : Status::OK());
+    finishFill(status);
 }
 
 void TransportLayerASIO::ASIOSinkTicket::fillImpl() {
@@ -147,7 +147,7 @@ void TransportLayerASIO::ASIOSinkTicket::fillImpl() {
 
     session->write(isSync(),
                    asio::buffer(_msgToSend.buf(), _msgToSend.size()),
-                   [this](const std::error_code& ec, size_t size) { _sinkCallback(ec, size); });
+                   [this](const Status& status, size_t size) { _sinkCallback(status, size); });
 }
 
 void TransportLayerASIO::ASIOTicket::finishFill(Status status) {
