@@ -87,7 +87,7 @@ TEST(RecordStoreTestHarness, GetRandomIteratorNonEmpty) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             uow.commit();
@@ -141,8 +141,7 @@ TEST(RecordStoreTestHarness, GetRandomIteratorSingleton) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         WriteUnitOfWork uow(opCtx.get());
-        StatusWith<RecordId> res =
-            rs->insertRecord(opCtx.get(), "some data", 10, Timestamp(), false);
+        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "some data", 10, Timestamp());
         ASSERT_OK(res.getStatus());
         idToRetrieve = res.getValue();
         uow.commit();

@@ -96,8 +96,8 @@ public:
                 ASSERT(_remain.insert(data).second);
 
                 WriteUnitOfWork uow(opCtx.get());
-                StatusWith<RecordId> res = _rs->insertRecord(
-                    opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                StatusWith<RecordId> res =
+                    _rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
                 ASSERT_OK(res.getStatus());
                 uow.commit();
             }

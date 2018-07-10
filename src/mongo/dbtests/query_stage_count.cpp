@@ -108,8 +108,7 @@ public:
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        _coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, false)
-            .transitional_ignore();
+        _coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug).transitional_ignore();
         wunit.commit();
     }
 
@@ -129,7 +128,6 @@ public:
                               oldrecordId,
                               Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
                               newDoc,
-                              false,
                               true,
                               NULL,
                               &args);

@@ -184,8 +184,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CreateAndCheckForCachePressure) {
     WriteUnitOfWork wu(opCtx);
     ASSERT_OK(ru1->setTimestamp(Timestamp(time++)));
     std::string str = str::stream() << "foobarbaz";
-    StatusWith<RecordId> ress =
-        rs->insertRecord(opCtx, str.c_str(), str.size() + 1, Timestamp(), false);
+    StatusWith<RecordId> ress = rs->insertRecord(opCtx, str.c_str(), str.size() + 1, Timestamp());
     ASSERT_OK(ress.getStatus());
     auto recordId = ress.getValue();
     wu.commit();
@@ -203,7 +202,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CreateAndCheckForCachePressure) {
             ASSERT_OK(ru1->setTimestamp(Timestamp(time++)));
             std::string s = str::stream()
                 << "abcbcdcdedefefgfghghihijijkjklklmlmnmnomopopqpqrqrsrststutuv" << j;
-            ASSERT_OK(rs->updateRecord(opCtx, recordId, s.c_str(), s.size() + 1, false, nullptr));
+            ASSERT_OK(rs->updateRecord(opCtx, recordId, s.c_str(), s.size() + 1, nullptr));
             wuow.commit();
         } catch (const DBException& ex) {
             invariant(ex.toStatus().code() == ErrorCodes::WriteConflict);

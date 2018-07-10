@@ -113,11 +113,11 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
         {
             WriteUnitOfWork uow(opCtx.get());
 
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
             ASSERT_OK(res.getStatus());
             id1 = res.getValue();
 
-            res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
+            res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
             ASSERT_OK(res.getStatus());
             id2 = res.getValue();
 
@@ -136,12 +136,12 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
         rs->dataFor(t1.get(), id1);
         rs->dataFor(t2.get(), id1);
 
-        ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, false, NULL));
-        ASSERT_OK(rs->updateRecord(t1.get(), id2, "B", 2, false, NULL));
+        ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, NULL));
+        ASSERT_OK(rs->updateRecord(t1.get(), id2, "B", 2, NULL));
 
         try {
             // this should fail
-            rs->updateRecord(t2.get(), id1, "c", 2, false, NULL).transitional_ignore();
+            rs->updateRecord(t2.get(), id1, "c", 2, NULL).transitional_ignore();
             ASSERT(0);
         } catch (WriteConflictException&) {
             w2.reset(NULL);
@@ -164,11 +164,11 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
         {
             WriteUnitOfWork uow(opCtx.get());
 
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
             ASSERT_OK(res.getStatus());
             id1 = res.getValue();
 
-            res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
+            res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
             ASSERT_OK(res.getStatus());
             id2 = res.getValue();
 
@@ -187,7 +187,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 
         {
             WriteUnitOfWork w(t1.get());
-            ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, false, NULL));
+            ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, NULL));
             w.commit();
         }
 
@@ -196,7 +196,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
             ASSERT_EQUALS(string("a"), rs->dataFor(t2.get(), id1).data());
             try {
                 // this should fail as our version of id1 is too old
-                rs->updateRecord(t2.get(), id1, "c", 2, false, NULL).transitional_ignore();
+                rs->updateRecord(t2.get(), id1, "c", 2, NULL).transitional_ignore();
                 ASSERT(0);
             } catch (WriteConflictException&) {
             }
@@ -215,8 +215,7 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
     Status status = wrs->oplogDiskLocRegister(opCtx.get(), opTime, false);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
-    StatusWith<RecordId> res =
-        rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), opTime, false);
+    StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), opTime);
     if (res.isOK())
         wuow.commit();
     return res;
@@ -230,7 +229,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         for (int i = 0; i < 3; ++i) {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
             ASSERT_OK(res.getStatus());
             uow.commit();
         }
@@ -250,7 +249,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
         auto opCtx = harnessHelper->newOperationContext(client3.get());
         for (int i = 0; i < 100; i++) {
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
             ASSERT_OK(res.getStatus());
             uow.commit();
         }
@@ -268,7 +267,7 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
     Status status = rs->oplogDiskLocRegister(opCtx, opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime, false);
+    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime);
     ASSERT_OK(res.getStatus());
     return res.getValue();
 }
@@ -384,7 +383,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorYieldFirst) {
     {  // first insert a document
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         WriteUnitOfWork uow(opCtx.get());
-        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp(), false);
+        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
         ASSERT_OK(res.getStatus());
         id1 = res.getValue();
         uow.commit();
@@ -428,7 +427,7 @@ StatusWith<RecordId> insertBSONWithSize(OperationContext* opCtx,
     if (!status.isOK()) {
         return StatusWith<RecordId>(status);
     }
-    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime, false);
+    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime);
     if (res.isOK()) {
         wuow.commit();
     }
@@ -526,9 +525,9 @@ TEST(WiredTigerRecordStoreTest, OplogStones_UpdateRecord) {
 
         WriteUnitOfWork wuow(opCtx.get());
         ASSERT_NOT_OK(rs->updateRecord(
-            opCtx.get(), RecordId(1, 1), changed1.objdata(), changed1.objsize(), false, nullptr));
+            opCtx.get(), RecordId(1, 1), changed1.objdata(), changed1.objsize(), nullptr));
         ASSERT_NOT_OK(rs->updateRecord(
-            opCtx.get(), RecordId(1, 2), changed2.objdata(), changed2.objsize(), false, nullptr));
+            opCtx.get(), RecordId(1, 2), changed2.objdata(), changed2.objsize(), nullptr));
     }
 
     // Attempts to shrink the records should also fail.
@@ -540,9 +539,9 @@ TEST(WiredTigerRecordStoreTest, OplogStones_UpdateRecord) {
 
         WriteUnitOfWork wuow(opCtx.get());
         ASSERT_NOT_OK(rs->updateRecord(
-            opCtx.get(), RecordId(1, 1), changed1.objdata(), changed1.objsize(), false, nullptr));
+            opCtx.get(), RecordId(1, 1), changed1.objdata(), changed1.objsize(), nullptr));
         ASSERT_NOT_OK(rs->updateRecord(
-            opCtx.get(), RecordId(1, 2), changed2.objdata(), changed2.objsize(), false, nullptr));
+            opCtx.get(), RecordId(1, 2), changed2.objdata(), changed2.objsize(), nullptr));
     }
 
     // Changing the contents of the records without changing their size should succeed.
@@ -554,9 +553,9 @@ TEST(WiredTigerRecordStoreTest, OplogStones_UpdateRecord) {
 
         WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(rs->updateRecord(
-            opCtx.get(), RecordId(1, 1), changed1.objdata(), changed1.objsize(), false, nullptr));
+            opCtx.get(), RecordId(1, 1), changed1.objdata(), changed1.objsize(), nullptr));
         ASSERT_OK(rs->updateRecord(
-            opCtx.get(), RecordId(1, 2), changed2.objdata(), changed2.objsize(), false, nullptr));
+            opCtx.get(), RecordId(1, 2), changed2.objdata(), changed2.objsize(), nullptr));
         wuow.commit();
 
         ASSERT_EQ(1U, oplogStones->numStones());

@@ -95,7 +95,7 @@ TEST_F(CollectionShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
 
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(autoColl.getCollection()->insertDocument(
-            operationContext(), shardIdentity.toShardIdentityDocument(), {}, false));
+            operationContext(), shardIdentity.toShardIdentityDocument(), {}));
         ASSERT_EQ(0, getInitCallCount());
     }
 

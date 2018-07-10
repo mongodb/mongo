@@ -63,8 +63,7 @@ public:
     StatusWith<RecordId> insertRecord(OperationContext* opCtx,
                                       const char* data,
                                       int len,
-                                      Timestamp timestamp,
-                                      bool enforceQuota) override;
+                                      Timestamp timestamp) override;
 
     Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                       const DocWriter* const* docs,
@@ -76,7 +75,6 @@ public:
                         const RecordId& oldLocation,
                         const char* data,
                         int len,
-                        bool enforceQuota,
                         UpdateNotifier* notifier) override;
 
     bool updateWithDamagesSupported() const override;

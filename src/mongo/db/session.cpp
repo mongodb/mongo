@@ -231,7 +231,7 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     if (recordId.isNull()) {
         // Upsert case.
         auto status = collection->insertDocument(
-            opCtx, InsertStatement(updateRequest.getUpdates()), nullptr, true, false);
+            opCtx, InsertStatement(updateRequest.getUpdates()), nullptr, false);
 
         if (status == ErrorCodes::DuplicateKey) {
             throw WriteConflictException();
@@ -266,7 +266,6 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
                                recordId,
                                Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
                                updateRequest.getUpdates(),
-                               true,   // enforceQuota
                                false,  // indexesAffected = false because _id is the only index
                                nullptr,
                                &args);

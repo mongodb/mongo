@@ -44,8 +44,7 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
     Status status = rs->oplogDiskLocRegister(opCtx.get(), opTime, false);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
-    StatusWith<RecordId> res =
-        rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), opTime, false);
+    StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), opTime);
     if (res.isOK())
         wuow.commit();
     return res;
@@ -58,7 +57,7 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
     Status status = rs->oplogDiskLocRegister(opCtx, opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
-    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime, false);
+    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime);
     ASSERT_OK(res.getStatus());
     return res.getValue();
 }
@@ -79,19 +78,17 @@ TEST(RecordStore_Oplog, OplogHack) {
         {
             WriteUnitOfWork wuow(opCtx.get());
             BSONObj obj = BSON("not_ts" << Timestamp(2, 1));
-            ASSERT_EQ(
-                rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp(2, 1), false)
-                    .getStatus(),
-                ErrorCodes::BadValue);
+            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp(2, 1))
+                          .getStatus(),
+                      ErrorCodes::BadValue);
         }
         {
             WriteUnitOfWork wuow(opCtx.get());
             BSONObj obj = BSON("ts"
                                << "not a Timestamp");
-            ASSERT_EQ(
-                rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp(), false)
-                    .getStatus(),
-                ErrorCodes::BadValue);
+            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp())
+                          .getStatus(),
+                      ErrorCodes::BadValue);
         }
 
         ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(-2, 1)).getStatus(), ErrorCodes::BadValue);
@@ -167,9 +164,8 @@ TEST(RecordStore_Oplog, OplogHackOnNonOplog) {
     BSONObj obj = BSON("ts" << Timestamp(2, -1));
     {
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(
-            rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp(2, -1), false)
-                .getStatus());
+        ASSERT_OK(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp(2, -1))
+                      .getStatus());
         wuow.commit();
     }
     ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0, 1)), boost::none);

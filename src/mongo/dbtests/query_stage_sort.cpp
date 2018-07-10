@@ -362,7 +362,7 @@ public:
         args.nss = coll->ns();
         {
             WriteUnitOfWork wuow(&_opCtx);
-            coll->updateDocument(&_opCtx, *it, oldDoc, newDoc(oldDoc), false, false, NULL, &args);
+            coll->updateDocument(&_opCtx, *it, oldDoc, newDoc(oldDoc), false, NULL, &args);
             wuow.commit();
         }
         ASSERT_OK(exec->restoreState());
@@ -380,8 +380,7 @@ public:
             oldDoc = coll->docFor(&_opCtx, *it);
             {
                 WriteUnitOfWork wuow(&_opCtx);
-                coll->updateDocument(
-                    &_opCtx, *it++, oldDoc, newDoc(oldDoc), false, false, NULL, &args);
+                coll->updateDocument(&_opCtx, *it++, oldDoc, newDoc(oldDoc), false, NULL, &args);
                 wuow.commit();
             }
         }

@@ -143,12 +143,11 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     const bool requireIndex = false;
     RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()), requireIndex);
 
-    const bool enforceQuota = true;
     Snapshotted<BSONObj> oldView;
     if (!id.isNormal() || !systemViews->findDoc(opCtx, id, &oldView)) {
         LOG(2) << "insert view " << view << " into " << _db->getSystemViewsName();
-        uassertStatusOK(systemViews->insertDocument(
-            opCtx, InsertStatement(view), &CurOp::get(opCtx)->debug(), enforceQuota));
+        uassertStatusOK(
+            systemViews->insertDocument(opCtx, InsertStatement(view), &CurOp::get(opCtx)->debug()));
     } else {
         OplogUpdateEntryArgs args;
         args.nss = systemViewsNs;
@@ -157,14 +156,8 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
         args.fromMigrate = false;
 
         const bool assumeIndexesAreAffected = true;
-        systemViews->updateDocument(opCtx,
-                                    id,
-                                    oldView,
-                                    view,
-                                    enforceQuota,
-                                    assumeIndexesAreAffected,
-                                    &CurOp::get(opCtx)->debug(),
-                                    &args);
+        systemViews->updateDocument(
+            opCtx, id, oldView, view, assumeIndexesAreAffected, &CurOp::get(opCtx)->debug(), &args);
     }
 }
 

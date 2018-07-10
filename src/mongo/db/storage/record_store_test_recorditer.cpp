@@ -71,7 +71,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -122,7 +122,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -173,7 +173,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -225,7 +225,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -278,7 +278,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -315,7 +315,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
 
         WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
-            rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+            rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         uow.commit();
 
@@ -349,7 +349,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             datas[i] = data;
@@ -406,7 +406,7 @@ TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
 
         WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
-            rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp(), false);
+            rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
         ASSERT_OK(res.getStatus());
         locs[i] = res.getValue();
         datas[i] = data;

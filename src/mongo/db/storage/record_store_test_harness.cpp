@@ -60,7 +60,7 @@ TEST(RecordStoreTestHarness, Simple1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc1 = res.getValue();
             uow.commit();
@@ -87,7 +87,7 @@ TEST(RecordStoreTestHarness, Simple1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             uow.commit();
         }
@@ -160,7 +160,7 @@ TEST(RecordStoreTestHarness, Delete1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -205,9 +205,9 @@ TEST(RecordStoreTestHarness, Delete2) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
-            res = rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp(), false);
+            res = rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -248,7 +248,7 @@ TEST(RecordStoreTestHarness, Update1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s1.c_str(), s1.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), s1.c_str(), s1.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -264,8 +264,7 @@ TEST(RecordStoreTestHarness, Update1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            Status status =
-                rs->updateRecord(opCtx.get(), loc, s2.c_str(), s2.size() + 1, false, NULL);
+            Status status = rs->updateRecord(opCtx.get(), loc, s2.c_str(), s2.size() + 1, NULL);
             ASSERT_OK(status);
 
             uow.commit();
@@ -296,7 +295,7 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s1Rec.data(), s1Rec.size(), Timestamp(), false);
+                rs->insertRecord(opCtx.get(), s1Rec.data(), s1Rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -350,7 +349,7 @@ TEST(RecordStoreTestHarness, Truncate1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp(), false);
+                rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -400,7 +399,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
             WriteUnitOfWork uow(opCtx.get());
             for (int i = 0; i < N; i++) {
                 string s = str::stream() << "eliot" << i;
-                ASSERT_OK(rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp(), false)
+                ASSERT_OK(rs->insertRecord(opCtx.get(), s.c_str(), s.size() + 1, Timestamp())
                               .getStatus());
             }
             uow.commit();

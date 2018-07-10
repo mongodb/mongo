@@ -426,8 +426,7 @@ void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const 
 
         WriteUnitOfWork wuow(opCtx);
         OpDebug* const opDebug = nullptr;
-        bool enforceQuota = true;
-        ASSERT_OK(collection->insertDocument(opCtx, InsertStatement(doc), opDebug, enforceQuota));
+        ASSERT_OK(collection->insertDocument(opCtx, InsertStatement(doc), opDebug));
         wuow.commit();
     });
 }

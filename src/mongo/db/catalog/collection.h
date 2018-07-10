@@ -228,13 +228,11 @@ public:
                                        std::vector<InsertStatement>::const_iterator begin,
                                        std::vector<InsertStatement>::const_iterator end,
                                        OpDebug* opDebug,
-                                       bool enforceQuota,
                                        bool fromMigrate) = 0;
 
         virtual Status insertDocument(OperationContext* opCtx,
                                       const InsertStatement& doc,
                                       OpDebug* opDebug,
-                                      bool enforceQuota,
                                       bool fromMigrate) = 0;
 
         virtual Status insertDocumentsForOplog(OperationContext* opCtx,
@@ -244,14 +242,12 @@ public:
 
         virtual Status insertDocument(OperationContext* opCtx,
                                       const BSONObj& doc,
-                                      const std::vector<MultiIndexBlock*>& indexBlocks,
-                                      bool enforceQuota) = 0;
+                                      const std::vector<MultiIndexBlock*>& indexBlocks) = 0;
 
         virtual RecordId updateDocument(OperationContext* opCtx,
                                         const RecordId& oldLocation,
                                         const Snapshotted<BSONObj>& oldDoc,
                                         const BSONObj& newDoc,
-                                        bool enforceQuota,
                                         bool indexesAffected,
                                         OpDebug* opDebug,
                                         OplogUpdateEntryArgs* args) = 0;
@@ -468,9 +464,8 @@ public:
                                   const std::vector<InsertStatement>::const_iterator begin,
                                   const std::vector<InsertStatement>::const_iterator end,
                                   OpDebug* const opDebug,
-                                  const bool enforceQuota,
                                   const bool fromMigrate = false) {
-        return this->_impl().insertDocuments(opCtx, begin, end, opDebug, enforceQuota, fromMigrate);
+        return this->_impl().insertDocuments(opCtx, begin, end, opDebug, fromMigrate);
     }
 
     /**
@@ -478,14 +473,12 @@ public:
      * i.e. will not add an _id field for documents that are missing it
      *
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     * 'enforceQuota' If false, quotas will be ignored.
      */
     inline Status insertDocument(OperationContext* const opCtx,
                                  const InsertStatement& doc,
                                  OpDebug* const opDebug,
-                                 const bool enforceQuota,
                                  const bool fromMigrate = false) {
-        return this->_impl().insertDocument(opCtx, doc, opDebug, enforceQuota, fromMigrate);
+        return this->_impl().insertDocument(opCtx, doc, opDebug, fromMigrate);
     }
 
     /**
@@ -506,9 +499,8 @@ public:
      */
     inline Status insertDocument(OperationContext* const opCtx,
                                  const BSONObj& doc,
-                                 const std::vector<MultiIndexBlock*>& indexBlocks,
-                                 const bool enforceQuota) {
-        return this->_impl().insertDocument(opCtx, doc, indexBlocks, enforceQuota);
+                                 const std::vector<MultiIndexBlock*>& indexBlocks) {
+        return this->_impl().insertDocument(opCtx, doc, indexBlocks);
     }
 
     /**
@@ -524,12 +516,11 @@ public:
                                    const RecordId& oldLocation,
                                    const Snapshotted<BSONObj>& oldDoc,
                                    const BSONObj& newDoc,
-                                   const bool enforceQuota,
                                    const bool indexesAffected,
                                    OpDebug* const opDebug,
                                    OplogUpdateEntryArgs* const args) {
         return this->_impl().updateDocument(
-            opCtx, oldLocation, oldDoc, newDoc, enforceQuota, indexesAffected, opDebug, args);
+            opCtx, oldLocation, oldDoc, newDoc, indexesAffected, opDebug, args);
     }
 
     inline bool updateWithDamagesSupported() const {

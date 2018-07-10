@@ -334,7 +334,6 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                                                           recordId,
                                                           oldObj,
                                                           newObj,
-                                                          true,
                                                           driver->modsAffectIndices(),
                                                           _params.opDebug,
                                                           &args);
@@ -469,11 +468,9 @@ void UpdateStage::doInsert() {
     writeConflictRetry(getOpCtx(), "upsert", _collection->ns().ns(), [&] {
         WriteUnitOfWork wunit(getOpCtx());
         invariant(_collection);
-        const bool enforceQuota = !request->isGod();
         uassertStatusOK(_collection->insertDocument(getOpCtx(),
                                                     InsertStatement(request->getStmtId(), newObj),
                                                     _params.opDebug,
-                                                    enforceQuota,
                                                     request->isFromMigration()));
 
         // Technically, we should save/restore state here, but since we are going to return

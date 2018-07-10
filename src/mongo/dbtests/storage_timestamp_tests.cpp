@@ -216,9 +216,8 @@ public:
     void insertDocument(Collection* coll, const InsertStatement& stmt) {
         // Insert some documents.
         OpDebug* const nullOpDebug = nullptr;
-        const bool enforceQuota = false;
         const bool fromMigrate = false;
-        ASSERT_OK(coll->insertDocument(_opCtx, stmt, nullOpDebug, enforceQuota, fromMigrate));
+        ASSERT_OK(coll->insertDocument(_opCtx, stmt, nullOpDebug, fromMigrate));
     }
 
     void createIndex(Collection* coll, std::string indexName, const BSONObj& indexKey) {

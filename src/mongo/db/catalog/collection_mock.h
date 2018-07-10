@@ -137,7 +137,6 @@ public:
                            std::vector<InsertStatement>::const_iterator begin,
                            std::vector<InsertStatement>::const_iterator end,
                            OpDebug* opDebug,
-                           bool enforceQuota,
                            bool fromMigrate) {
         std::abort();
     }
@@ -145,7 +144,6 @@ public:
     Status insertDocument(OperationContext* opCtx,
                           const InsertStatement& doc,
                           OpDebug* opDebug,
-                          bool enforceQuota,
                           bool fromMigrate) {
         std::abort();
     }
@@ -159,8 +157,7 @@ public:
 
     Status insertDocument(OperationContext* opCtx,
                           const BSONObj& doc,
-                          const std::vector<MultiIndexBlock*>& indexBlocks,
-                          bool enforceQuota) {
+                          const std::vector<MultiIndexBlock*>& indexBlocks) {
         std::abort();
     }
 
@@ -168,7 +165,6 @@ public:
                             const RecordId& oldLocation,
                             const Snapshotted<BSONObj>& oldDoc,
                             const BSONObj& newDoc,
-                            bool enforceQuota,
                             bool indexesAffected,
                             OpDebug* opDebug,
                             OplogUpdateEntryArgs* args) {

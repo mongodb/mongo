@@ -65,7 +65,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp(), false);
+                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -131,7 +131,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp(), false);
+                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -195,7 +195,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp(), false);
+                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -257,7 +257,7 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
         {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp(), false);
+                rs->insertRecord(opCtx.get(), rec.data(), rec.size(), Timestamp());
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();

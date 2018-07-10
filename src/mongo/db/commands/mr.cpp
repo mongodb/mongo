@@ -843,7 +843,7 @@ void State::_insertToInc(BSONObj& o) {
         // TODO: Consider whether to pass OpDebug for stats tracking under SERVER-23261.
         OpDebug* const nullOpDebug = nullptr;
         uassertStatusOK(autoColl.getCollection()->insertDocument(
-            _opCtx, InsertStatement(o), nullOpDebug, true, false));
+            _opCtx, InsertStatement(o), nullOpDebug, false));
         wuow.commit();
     });
 }

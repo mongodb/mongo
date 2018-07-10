@@ -354,8 +354,7 @@ void insertDocuments(OperationContext* opCtx,
         }
     }
 
-    uassertStatusOK(collection->insertDocuments(
-        opCtx, begin, end, &CurOp::get(opCtx)->debug(), /*enforceQuota*/ true));
+    uassertStatusOK(collection->insertDocuments(opCtx, begin, end, &CurOp::get(opCtx)->debug()));
     wuow.commit();
 }
 

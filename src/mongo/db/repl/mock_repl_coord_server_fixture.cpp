@@ -102,7 +102,6 @@ void MockReplCoordServerFixture::insertOplogEntry(const repl::OplogEntry& entry)
     auto status = coll->insertDocument(opCtx(),
                                        InsertStatement(entry.toBSON()),
                                        &CurOp::get(opCtx())->debug(),
-                                       /* enforceQuota */ false,
                                        /* fromMigrate */ false);
     ASSERT_OK(status);
 }

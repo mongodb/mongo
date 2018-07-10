@@ -42,7 +42,7 @@ namespace {
 
 RecordId doInsert(unowned_ptr<OperationContext> opCtx, unowned_ptr<RecordStore> rs) {
     static char zeros[16];
-    return uassertStatusOK(rs->insertRecord(opCtx, zeros, sizeof(zeros), Timestamp(), false));
+    return uassertStatusOK(rs->insertRecord(opCtx, zeros, sizeof(zeros), Timestamp()));
 }
 
 // macro to keep assert line numbers correct.

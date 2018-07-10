@@ -126,7 +126,7 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                         // This flavor of insertDocument will not update any pre-existing indexes,
                         // only the indexers passed in.
                         const auto status = _autoColl->getCollection()->insertDocument(
-                            _opCtx.get(), *iter, indexers, false);
+                            _opCtx.get(), *iter, indexers);
                         if (!status.isOK()) {
                             return status;
                         }
@@ -134,7 +134,7 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                         // For capped collections, we use regular insertDocument, which will update
                         // pre-existing indexes.
                         const auto status = _autoColl->getCollection()->insertDocument(
-                            _opCtx.get(), InsertStatement(*iter), nullptr, false);
+                            _opCtx.get(), InsertStatement(*iter), nullptr);
                         if (!status.isOK()) {
                             return status;
                         }
