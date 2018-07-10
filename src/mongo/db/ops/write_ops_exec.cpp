@@ -36,6 +36,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
@@ -63,8 +64,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/implicit_create_collection.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
@@ -233,24 +233,19 @@ bool handleError(OperationContext* opCtx,
         throw;
     }
 
-    if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
+    if (ex.extraInfo<StaleConfigInfo>()) {
         if (!opCtx->getClient()->isInDirectClient()) {
-            // We already have the StaleConfig exception, so just swallow any errors due to refresh
-            onShardVersionMismatch(opCtx, nss, staleInfo->getVersionReceived()).ignore();
+            auto& oss = OperationShardingState::get(opCtx);
+            oss.setShardingOperationFailedStatus(ex.toStatus());
         }
 
         // Don't try doing more ops since they will fail with the same error.
         // Command reply serializer will handle repeating this error if needed.
         out->results.emplace_back(ex.toStatus());
         return false;
-    } else if (auto cannotImplicitCreateCollInfo =
-                   ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-        if (ShardingState::get(opCtx)->enabled()) {
-            // Ignore status since we already put the cannot implicitly create error as the
-            // result of the write.
-            onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss())
-                .ignore();
-        }
+    } else if (ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
+        auto& oss = OperationShardingState::get(opCtx);
+        oss.setShardingOperationFailedStatus(ex.toStatus());
 
         // Don't try doing more ops since they will fail with the same error.
         // Command reply serializer will handle repeating this error if needed.
