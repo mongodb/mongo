@@ -391,7 +391,7 @@ env.Library(
     ],
 )
 
-env.Clone().InjectModule("enterprise").Library(
+env.Library(
     target="server_options",
     source=[
         "server_options_helpers.cpp",
@@ -406,7 +406,7 @@ env.Clone().InjectModule("enterprise").Library(
     ],
 )
 
-env.Library(
+env.Clone().InjectModule("enterprise").Library(
     target="server_options_servers",
     source=[
         "server_options_server_helpers.cpp",
