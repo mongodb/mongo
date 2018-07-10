@@ -1160,19 +1160,23 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 if (programName.endsWith('mongod')) {
                     if (jsTest.options().storageEngine === "wiredTiger" ||
                         !jsTest.options().storageEngine) {
-                        if (jsTest.options().storageEngineCacheSizeGB) {
+                        if (jsTest.options().storageEngineCacheSizeGB &&
+                            !argArrayContains('--wiredTigerCacheSizeGB')) {
                             argArray.push(...['--wiredTigerCacheSizeGB',
                                               jsTest.options().storageEngineCacheSizeGB]);
                         }
-                        if (jsTest.options().wiredTigerEngineConfigString) {
+                        if (jsTest.options().wiredTigerEngineConfigString &&
+                            !argArrayContains('--wiredTigerEngineConfigString')) {
                             argArray.push(...['--wiredTigerEngineConfigString',
                                               jsTest.options().wiredTigerEngineConfigString]);
                         }
-                        if (jsTest.options().wiredTigerCollectionConfigString) {
+                        if (jsTest.options().wiredTigerCollectionConfigString &&
+                            !argArrayContains('--wiredTigerCollectionConfigString')) {
                             argArray.push(...['--wiredTigerCollectionConfigString',
                                               jsTest.options().wiredTigerCollectionConfigString]);
                         }
-                        if (jsTest.options().wiredTigerIndexConfigString) {
+                        if (jsTest.options().wiredTigerIndexConfigString &&
+                            !argArrayContains('--wiredTigerIndexConfigString')) {
                             argArray.push(...['--wiredTigerIndexConfigString',
                                               jsTest.options().wiredTigerIndexConfigString]);
                         }
