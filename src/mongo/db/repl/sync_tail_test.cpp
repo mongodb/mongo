@@ -1056,7 +1056,6 @@ TEST_F(SyncTailTest, MultiSyncApplySkipsIndexCreationOnNamespaceNotFoundDuringIn
         makeCreateIndexOplogEntry({Timestamp(Seconds(3), 0), 1LL}, badNss, "a_1", keyPattern);
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
-    AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
     ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
     ASSERT_EQUALS(syncTail.numFetched, 0U);

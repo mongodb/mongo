@@ -70,7 +70,6 @@ void ClockSourceMock::_processAlarms(stdx::unique_lock<stdx::mutex> lk) {
     using std::swap;
     invariant(lk.owns_lock());
     std::vector<Alarm> readyAlarms;
-    std::vector<Alarm>::iterator iter;
     auto alarmIsNotExpired = [&](const Alarm& alarm) { return alarm.first > _now; };
     auto expiredAlarmsBegin = std::partition(_alarms.begin(), _alarms.end(), alarmIsNotExpired);
     std::move(expiredAlarmsBegin, _alarms.end(), std::back_inserter(readyAlarms));
