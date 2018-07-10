@@ -90,6 +90,11 @@ public:
      */
     explicit ShardKeyPattern(const KeyPattern& keyPattern);
 
+    /**
+     * Returns whether the provided element is hashed.
+     */
+    static bool isHashedPatternEl(const BSONElement& el);
+
     bool isHashedPattern() const;
 
     const KeyPattern& getKeyPattern() const;

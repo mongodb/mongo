@@ -53,10 +53,6 @@ constexpr size_t kMaxFlattenedInCombinations = 4000000;
 
 constexpr auto kIdField = "_id"_sd;
 
-bool isHashedPatternEl(const BSONElement& el) {
-    return el.type() == String && el.String() == IndexNames::HASHED;
-}
-
 /**
  * Currently the allowable shard keys are either:
  * i) a hashed single field, e.g. { a : "hashed" }, or
@@ -94,7 +90,7 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
                 str::stream() << "Field " << patternEl.fieldNameStringData()
                               << " can only be 1 or 'hashed'",
                 (patternEl.isNumber() && patternEl.numberInt() == 1) ||
-                    (keyPattern.nFields() == 1 && isHashedPatternEl(patternEl)));
+                    (keyPattern.nFields() == 1 && ShardKeyPattern::isHashedPatternEl(patternEl)));
 
         parsedPaths.emplace_back(std::move(newFieldRef));
     }
@@ -187,6 +183,10 @@ ShardKeyPattern::ShardKeyPattern(const BSONObj& keyPattern)
 
 ShardKeyPattern::ShardKeyPattern(const KeyPattern& keyPattern)
     : ShardKeyPattern(keyPattern.toBSON()) {}
+
+bool ShardKeyPattern::isHashedPatternEl(const BSONElement& el) {
+    return el.type() == String && el.String() == IndexNames::HASHED;
+}
 
 bool ShardKeyPattern::isHashedPattern() const {
     return isHashedPatternEl(_keyPattern.toBSON().firstElement());

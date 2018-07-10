@@ -352,6 +352,7 @@ selector:
   - jstests/sharding/geo_near_random1.js
   - jstests/sharding/geo_near_random2.js
   - jstests/sharding/shard7.js
+  - jstests/sharding/shard_collection_existing_zones.js
   # SERVER-35977
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/change_stream_metadata_notifications.js
