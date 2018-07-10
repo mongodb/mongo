@@ -739,12 +739,12 @@ ShardId pickMergingShard(OperationContext* opCtx,
               .toString();
 }
 
-// "Resolve" involved namespaces and verify that none of them are sharded. We won't try to execute
-// anything on a mongos, but we still have to populate this map so that any $lookups, etc. will be
-// able to have a resolved view definition. It's okay that this is incorrect, we will repopulate the
-// real namespace map on the mongod. Note that this function must be called before forwarding an
-// aggregation command on an unsharded collection, in order to validate that none of the involved
-// collections are sharded.
+// "Resolve" involved namespaces and verify that none of them are sharded unless allowed by the
+// pipeline. We won't try to execute anything on a mongos, but we still have to populate this map so
+// that any $lookups, etc. will be able to have a resolved view definition. It's okay that this is
+// incorrect, we will repopulate the real namespace map on the mongod. Note that this function must
+// be called before forwarding an aggregation command on an unsharded collection, in order to verify
+// that the involved namespaces are allowed to be sharded.
 StringMap<ExpressionContext::ResolvedNamespace> resolveInvolvedNamespaces(
     OperationContext* opCtx, const LiteParsedPipeline& litePipe) {
 
@@ -752,8 +752,9 @@ StringMap<ExpressionContext::ResolvedNamespace> resolveInvolvedNamespaces(
     for (auto&& nss : litePipe.getInvolvedNamespaces()) {
         const auto resolvedNsRoutingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        uassert(
-            28769, str::stream() << nss.ns() << " cannot be sharded", !resolvedNsRoutingInfo.cm());
+        uassert(28769,
+                str::stream() << nss.ns() << " cannot be sharded",
+                !resolvedNsRoutingInfo.cm() || litePipe.allowShardedForeignCollections());
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
     return resolvedNamespaces;

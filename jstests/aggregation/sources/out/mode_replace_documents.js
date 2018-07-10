@@ -68,7 +68,7 @@
     assertErrorCode(
         coll,
         [{$addFields: {a: 0}}, {$out: {to: outColl.getName(), mode: "replaceDocuments"}}],
-        50904);
+        ErrorCodes.DuplicateKey);
 
     // Test that $out fails if the unique key contains an array.
     coll.drop();

@@ -41,14 +41,12 @@
     // Test that both batched updates and inserts will successfully write the first document but
     // fail on the second. We don't guarantee any particular behavior in this case, but this test is
     // meant to characterize the current behavior.
-    assertErrorCode(coll, [{$out: {to: outColl.getName(), mode: "insertDocuments"}}], 16996);
-    assert.soon(() => {
-        return outColl.find().itcount() == 2;
-    });
-
-    assertErrorCode(coll, [{$out: {to: outColl.getName(), mode: "replaceDocuments"}}], 50904);
-    assert.soon(() => {
-        return outColl.find().itcount() == 2;
+    ["insertDocuments", "replaceDocuments"].forEach(mode => {
+        assertErrorCode(
+            coll, [{$out: {to: outColl.getName(), mode: mode}}], ErrorCodes.DuplicateKey);
+        assert.soon(() => {
+            return outColl.find().itcount() == 2;
+        });
     });
 
     // Mode "replaceCollection" will drop the contents of the output collection, so there is no

@@ -74,8 +74,9 @@ std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::l
 
     PrivilegeVector privileges{Privilege(ResourcePattern::forExactNamespace(targetNss), actions)};
 
-    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(targetNss),
-                                                                         std::move(privileges));
+    constexpr bool allowSharded = true;
+    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(
+        std::move(targetNss), std::move(privileges), allowSharded);
 }
 
 REGISTER_DOCUMENT_SOURCE(out, DocumentSourceOut::liteParse, DocumentSourceOut::createFromBson);
@@ -96,7 +97,6 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
         _initialized = true;
     }
 
-    // Insert all documents into temp collection, batching to perform vectored inserts.
     BatchedObjects batch;
     int bufferedBytes = 0;
 

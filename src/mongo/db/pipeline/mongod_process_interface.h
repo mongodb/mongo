@@ -38,23 +38,26 @@ namespace mongo {
  * Class to provide access to mongod-specific implementations of methods required by some
  * document sources.
  */
-class MongoDInterface final : public MongoProcessCommon {
+class MongoDInterface : public MongoProcessCommon {
 public:
+    static std::shared_ptr<MongoProcessInterface> create(OperationContext* opCtx);
+
     MongoDInterface(OperationContext* opCtx);
+
+    virtual ~MongoDInterface() = default;
 
     void setOperationContext(OperationContext* opCtx) final;
     DBClientBase* directClient() final;
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
-    void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                const NamespaceString& ns,
-                const std::vector<BSONObj>& objs) final;
-    void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                const NamespaceString& ns,
-                const std::vector<BSONObj>& queries,
-                const std::vector<BSONObj>& updates,
-                bool upsert,
-                bool multi) final;
-
+    virtual void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        const NamespaceString& ns,
+                        const std::vector<BSONObj>& objs);
+    virtual void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        const NamespaceString& ns,
+                        const std::vector<BSONObj>& queries,
+                        const std::vector<BSONObj>& updates,
+                        bool upsert,
+                        bool multi);
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx, const NamespaceString& ns) final;
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -114,6 +117,33 @@ private:
 
     DBDirectClient _client;
     std::map<UUID, std::unique_ptr<const CollatorInterface>> _collatorCache;
+};
+
+/**
+ * Specialized version of the MongoDInterface when this node is a shard server.
+ */
+class MongoDInterfaceShardServer final : public MongoDInterface {
+public:
+    using MongoDInterface::MongoDInterface;
+
+    /**
+     * Inserts the documents 'objs' into the namespace 'ns' using the ClusterWriter for locking,
+     * routing, stale config handling, etc.
+     */
+    void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                const NamespaceString& ns,
+                const std::vector<BSONObj>& objs) final;
+
+    /**
+     * Replaces the documents matching 'queries' with 'updates' using the ClusterWriter for locking,
+     * routing, stale config handling, etc.
+     */
+    void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                const NamespaceString& ns,
+                const std::vector<BSONObj>& queries,
+                const std::vector<BSONObj>& updates,
+                bool upsert,
+                bool multi) final;
 };
 
 }  // namespace mongo

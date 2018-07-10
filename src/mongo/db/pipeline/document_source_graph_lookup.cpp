@@ -74,8 +74,9 @@ std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceGraphL
     PrivilegeVector privileges{
         Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)};
 
-    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(std::move(nss),
-                                                                         std::move(privileges));
+    constexpr bool allowedSharded = false;
+    return std::make_unique<LiteParsedDocumentSourceForeignCollections>(
+        std::move(nss), std::move(privileges), allowedSharded);
 }
 
 REGISTER_DOCUMENT_SOURCE(graphLookup,

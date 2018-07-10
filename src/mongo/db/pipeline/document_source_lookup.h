@@ -79,6 +79,13 @@ public:
             return requiredPrivileges;
         }
 
+        /**
+         * Lookup from a sharded collection is not allowed.
+         */
+        bool allowShardedForeignCollections() const final {
+            return false;
+        }
+
     private:
         const NamespaceString _fromNss;
         const stdx::unordered_set<NamespaceString> _foreignNssSet;

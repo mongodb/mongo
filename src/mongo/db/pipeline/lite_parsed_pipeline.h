@@ -119,6 +119,16 @@ public:
     }
 
     /**
+     * Returns false if at least one of the stages does not allow an involved namespace to be
+     * sharded.
+     */
+    bool allowShardedForeignCollections() const {
+        return std::all_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return spec->allowShardedForeignCollections();
+        });
+    }
+
+    /**
      * Verifies that this pipeline is allowed to run with the specified read concern. This ensures
      * that each stage is compatible, and throws a UserException if not.
      */

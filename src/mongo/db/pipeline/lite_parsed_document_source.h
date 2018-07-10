@@ -128,6 +128,13 @@ public:
     }
 
     /**
+     * Returns true if the involved namespaces for this aggregation are allowed to be sharded.
+     */
+    virtual bool allowShardedForeignCollections() const {
+        return false;
+    }
+
+    /**
      * Verifies that this stage is allowed to run with the specified read concern. Throws a
      * UserException if not compatible.
      */
@@ -158,17 +165,23 @@ public:
 };
 
 /**
- * Helper class for DocumentSources which which reference one or more foreign collections.
+ * Helper class for DocumentSources which reference one or more foreign collections.
  */
 class LiteParsedDocumentSourceForeignCollections : public LiteParsedDocumentSource {
 public:
     LiteParsedDocumentSourceForeignCollections(NamespaceString foreignNss,
-                                               PrivilegeVector privileges)
-        : _foreignNssSet{std::move(foreignNss)}, _requiredPrivileges(std::move(privileges)) {}
+                                               PrivilegeVector privileges,
+                                               bool allowSharded)
+        : _foreignNssSet{std::move(foreignNss)},
+          _requiredPrivileges(std::move(privileges)),
+          _allowSharded(allowSharded) {}
 
     LiteParsedDocumentSourceForeignCollections(stdx::unordered_set<NamespaceString> foreignNssSet,
-                                               PrivilegeVector privileges)
-        : _foreignNssSet(std::move(foreignNssSet)), _requiredPrivileges(std::move(privileges)) {}
+                                               PrivilegeVector privileges,
+                                               bool allowSharded)
+        : _foreignNssSet(std::move(foreignNssSet)),
+          _requiredPrivileges(std::move(privileges)),
+          _allowSharded(allowSharded) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return {_foreignNssSet};
@@ -178,8 +191,13 @@ public:
         return _requiredPrivileges;
     }
 
+    bool allowShardedForeignCollections() const final {
+        return _allowSharded;
+    }
+
 private:
     stdx::unordered_set<NamespaceString> _foreignNssSet;
     PrivilegeVector _requiredPrivileges;
+    bool _allowSharded;
 };
 }  // namespace mongo

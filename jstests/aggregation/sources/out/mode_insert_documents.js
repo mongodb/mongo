@@ -32,7 +32,7 @@
     //
     // Test that $out fails if there's a duplicate key error.
     //
-    assertErrorCode(coll, pipeline, 16996);
+    assertErrorCode(coll, pipeline, ErrorCodes.DuplicateKey);
 
     //
     // Test that $out will preserve the indexes and options of the output collection.
@@ -61,6 +61,6 @@
     targetColl.drop();
     assert.commandWorked(targetColl.createIndex({a: 1}, {unique: true}));
 
-    assertErrorCode(coll, pipeline, 16996);
+    assertErrorCode(coll, pipeline, ErrorCodes.DuplicateKey);
 
 }());

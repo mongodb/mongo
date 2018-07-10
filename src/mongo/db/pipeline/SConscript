@@ -280,6 +280,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/mongo/s/sharding_api',
         'mongo_process_common',
     ]
 )

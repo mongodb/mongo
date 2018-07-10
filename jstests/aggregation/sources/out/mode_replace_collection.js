@@ -52,7 +52,7 @@
     targetColl.drop();
     assert.commandWorked(targetColl.createIndex({a: 1}, {unique: true}));
 
-    assertErrorCode(coll, pipeline, 16996);
+    assertErrorCode(coll, pipeline, ErrorCodes.DuplicateKey);
 
     // Rerun a similar test, except populate the target collection with a document that conflics
     // with one out of the pipeline. In this case, there is no unique key violation since the target

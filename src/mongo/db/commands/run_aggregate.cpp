@@ -491,7 +491,7 @@ Status runAggregate(OperationContext* opCtx,
             new ExpressionContext(opCtx,
                                   request,
                                   std::move(*collatorToUse),
-                                  std::make_shared<MongoDInterface>(opCtx),
+                                  MongoDInterface::create(opCtx),
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
                                   uuid));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";

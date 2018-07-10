@@ -49,14 +49,13 @@ struct PlanSummaryStats;
 class BSONObj;
 struct DepsTracker;
 
-/*
-  PipelineD is an extension of the Pipeline class, but with additional
-  material that references symbols that are not available in mongos,
-  where the remainder of the Pipeline class also functions.  PipelineD
-  is a friend of Pipeline so that it can have equal access to Pipeline's
-  members.
-
-  See the friend declaration in Pipeline.
+/**
+ * PipelineD is an extension of the Pipeline class, but with additional material that references
+ * symbols that are not available in mongos, where the remainder of the Pipeline class also
+ * functions.  PipelineD is a friend of Pipeline so that it can have equal access to Pipeline's
+ * members.
+ *
+ * See the friend declaration in Pipeline.
  */
 class PipelineD {
 public:
@@ -96,11 +95,6 @@ public:
                                            const NamespaceString& nss,
                                            const AggregationRequest* aggRequest,
                                            Pipeline* pipeline);
-
-    /**
-     * Injects a MongodInterface into stages which require access to mongod-specific functionality.
-     */
-    static void injectMongodInterface(Pipeline* pipeline);
 
     static std::string getPlanSummaryStr(const Pipeline* pipeline);
 
