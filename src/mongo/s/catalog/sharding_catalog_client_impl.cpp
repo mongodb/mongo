@@ -94,10 +94,10 @@ const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
 
 const std::string kActionLogCollectionName("actionlog");
-const int kActionLogCollectionSizeMB = 2 * 1024 * 1024;
+const int kActionLogCollectionSizeMB = 20 * 1024 * 1024;
 
 const std::string kChangeLogCollectionName("changelog");
-const int kChangeLogCollectionSizeMB = 10 * 1024 * 1024;
+const int kChangeLogCollectionSizeMB = 200 * 1024 * 1024;
 
 const NamespaceString kSettingsNamespace("config", "settings");
 
