@@ -54,6 +54,7 @@ class OperationShardingState {
 
 public:
     OperationShardingState();
+    ~OperationShardingState();
 
     /**
      * Retrieves a reference to the shard version decorating the OperationContext, 'opCtx'.
@@ -154,6 +155,22 @@ public:
      */
     void setMovePrimaryCriticalSectionSignal(std::shared_ptr<Notification<void>> critSecSignal);
 
+    /**
+     * Stores the failed status in _shardingOperationFailedStatus.
+     *
+     * This method may only be called once when a rerouting exception occurs. The caller
+     * must process the status at exit.
+     */
+    void setShardingOperationFailedStatus(const Status& status);
+
+    /**
+     * Returns the failed status stored in _shardingOperationFailedStatus if any, and reset the
+     * status to none.
+     *
+     * This method may only be called when the caller wants to process the status.
+     */
+    boost::optional<Status> resetShardingOperationFailedStatus();
+
 private:
     // Specifies whether the request is allowed to create database/collection implicitly
     bool _allowImplicitCollectionCreation{true};
@@ -175,6 +192,10 @@ private:
     // to stale version and there was a movePrimary for that namespace, which was in critical
     // section.
     std::shared_ptr<Notification<void>> _movePrimaryCriticalSectionSignal;
+
+    // This value can only be set when a rerouting exception occurs during a write operation, and
+    // must be handled before this object gets destructed.
+    boost::optional<Status> _shardingOperationFailedStatus;
 };
 
 }  // namespace mongo
