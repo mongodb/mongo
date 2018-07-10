@@ -59,6 +59,17 @@ env.Library(
 )
 
 env.Library(
+    target='embedded_integration_helpers',
+    source=[
+        'embedded_options_helpers.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ],
+)
+
+env.Library(
     target='mongo_embedded_capi',
     source=[
         'capi.cpp',
@@ -119,6 +130,7 @@ mongoed = yamlEnv.Program(
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
         '$BUILD_DIR/mongo/util/signal_handlers',
         'embedded',
+        'embedded_integration_helpers',
     ],
     INSTALL_ALIAS=[
         'mobile-test',

@@ -34,6 +34,8 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/embedded/embedded.h"
+#include "mongo/embedded/embedded_options.h"
+#include "mongo/embedded/embedded_options_helpers.h"
 #include "mongo/embedded/service_entry_point_embedded.h"
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/transport_layer.h"
@@ -102,22 +104,12 @@ int mongoedMain(int argc, char* argv[], char** envp) {
 
     try {
         optionenvironment::OptionSection startupOptions("Options");
+        // Adding all options mongod we don't have to maintain a separate set for this executable,
+        // some will be unused but that's fine as this is just an executable for testing purposes
+        // anyway.
         uassertStatusOK(addMongodOptions(&startupOptions));
-
-        // Manually run the code that's equivalent to the MONGO_INITIALIZERs for mongod. We can't do
-        // this in initializers because embedded uses a different options format. However as long as
-        // we store the options in the same place it will be valid for embedded too. Adding all
-        // options mongod we don't have to maintain a separate set for this executable, some will be
-        // unused but that's fine as this is just an executable for testing purposes anyway.
-        std::vector<std::string> args;
-        std::map<std::string, std::string> env;
-
-        args.reserve(argc);
-        std::copy(argv, argv + argc, std::back_inserter(args));
-
-        optionenvironment::OptionsParser parser;
         uassertStatusOK(
-            parser.run(startupOptions, args, env, &optionenvironment::startupOptionsParsed));
+            embedded_integration_helpers::parseCommandLineOptions(argc, argv, startupOptions));
         uassertStatusOK(storeMongodOptions(optionenvironment::startupOptionsParsed));
 
         // Add embedded specific options that's not available in mongod here.

@@ -62,6 +62,17 @@ extern const JSFile replsettest;
 extern const JSFile bridge;
 }
 
+MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
+(const BenchRunConfig& config)->std::unique_ptr<DBClientBase> {
+    const ConnectionString connectionString = uassertStatusOK(ConnectionString::parse(config.host));
+
+    std::string errorMessage;
+    std::unique_ptr<DBClientBase> connection(connectionString.connect("BenchRun", errorMessage));
+    uassert(16158, errorMessage, connection);
+
+    return connection;
+}
+
 namespace shell_utils {
 
 std::string _dbConnect;
