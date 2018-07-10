@@ -36,7 +36,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context.h"
 
 namespace mongo {
 
@@ -117,10 +116,12 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
             // There's no need to compute the prefixes of the indexed fields that cause the index to
             // be multikey when ensuring the keyData is still valid.
+            BSONObjSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
             member->keyData[i].index->getKeys(member->obj.value(),
                                               IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                                               &keys,
+                                              multikeyMetadataKeys,
                                               multikeyPaths);
             if (!keys.count(member->keyData[i].keyData)) {
                 // document would no longer be at this position in the index.

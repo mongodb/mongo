@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -46,12 +47,18 @@ BSONObj wrapInLiteral(const T& arg) {
     return BSON("$literal" << arg);
 }
 
-// Helper to simplify the creation of a ProjectionExecAgg which includes _id and recurses nested
-// arrays by default.
+// Helper to simplify the creation of a ProjectionExecAgg which includes _id and recurses arrays.
 std::unique_ptr<ProjectionExecAgg> makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
     BSONObj projSpec) {
     return ProjectionExecAgg::create(
         projSpec, DefaultIdPolicy::kIncludeId, ArrayRecursionPolicy::kRecurseNestedArrays);
+}
+
+// Helper to simplify the creation of a ProjectionExecAgg which excludes _id and recurses arrays.
+std::unique_ptr<ProjectionExecAgg> makeProjectionWithDefaultIdExclusionAndNestedArrayRecursion(
+    BSONObj projSpec) {
+    return ProjectionExecAgg::create(
+        projSpec, DefaultIdPolicy::kExcludeId, ArrayRecursionPolicy::kRecurseNestedArrays);
 }
 
 //
@@ -172,6 +179,133 @@ TEST(ProjectionExecAggType, ShouldAcceptExclusionProjection) {
     parsedProject =
         makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(BSON("_id" << false));
     ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
+}
+
+// Misc tests.
+
+TEST(ProjectionExecAggTests, InclusionFieldPathsWithImplicitIdInclusion) {
+    auto parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        fromjson("{a: {b: {c: 1}}, d: 1}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+    std::set<std::string> expectedPaths{"_id", "a.b.c", "d"};
+
+    // Verify that the exhaustive set of paths is as expected.
+    ASSERT(exhaustivePaths == expectedPaths);
+}
+
+TEST(ProjectionExecAggTests, InclusionFieldPathsWithExplicitIdInclusion) {
+    auto parsedProject = makeProjectionWithDefaultIdExclusionAndNestedArrayRecursion(
+        fromjson("{_id: 1, a: {b: {c: 1}}, d: 1}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+    std::set<std::string> expectedPaths{"_id", "a.b.c", "d"};
+
+    // Verify that the exhaustive set of paths is as expected.
+    ASSERT(exhaustivePaths == expectedPaths);
+}
+
+TEST(ProjectionExecAggTests, InclusionFieldPathsWithExplicitIdInclusionIdOnly) {
+    auto parsedProject =
+        makeProjectionWithDefaultIdExclusionAndNestedArrayRecursion(fromjson("{_id: 1}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+    std::set<std::string> expectedPaths{"_id"};
+
+    // Verify that the exhaustive set of paths is as expected.
+    ASSERT(exhaustivePaths == expectedPaths);
+}
+
+TEST(ProjectionExecAggTests, InclusionFieldPathsWithImplicitIdExclusion) {
+    auto parsedProject = makeProjectionWithDefaultIdExclusionAndNestedArrayRecursion(
+        fromjson("{a: {b: {c: 1}}, d: 1}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+    std::set<std::string> expectedPaths{"a.b.c", "d"};
+
+    // Verify that the exhaustive set of paths is as expected.
+    ASSERT(exhaustivePaths == expectedPaths);
+}
+
+TEST(ProjectionExecAggTests, InclusionFieldPathsWithExplicitIdExclusion) {
+    auto parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        fromjson("{_id: 0, a: {b: {c: 1}}, d: 1}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kInclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+    std::set<std::string> expectedPaths{"a.b.c", "d"};
+
+    // Verify that the exhaustive set of paths is as expected.
+    ASSERT(exhaustivePaths == expectedPaths);
+}
+
+TEST(ProjectionExecAggTests, ExclusionFieldPathsWithImplicitIdInclusion) {
+    auto parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        fromjson("{a: {b: {c: 0}}, d: 0}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+
+    // Verify that the exhaustive set is empty, despite the implicit inclusion of _id.
+    ASSERT(exhaustivePaths.empty());
+}
+
+TEST(ProjectionExecAggTests, ExclusionFieldPathsWithExplicitIdInclusion) {
+    auto parsedProject = makeProjectionWithDefaultIdExclusionAndNestedArrayRecursion(
+        fromjson("{_id: 1, a: {b: {c: 0}}, d: 0}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+
+    // Verify that the exhaustive set is empty, despite the explicit inclusion of _id.
+    ASSERT(exhaustivePaths.empty());
+}
+
+TEST(ProjectionExecAggTests, ExclusionFieldPathsWithImplicitIdExclusion) {
+    auto parsedProject = makeProjectionWithDefaultIdExclusionAndNestedArrayRecursion(
+        fromjson("{a: {b: {c: 0}}, d: 0}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+
+    // Verify that the exhaustive set is empty.
+    ASSERT(exhaustivePaths.empty());
+}
+
+TEST(ProjectionExecAggTests, ExclusionFieldPathsWithExplicitIdExclusion) {
+    auto parsedProject = makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(
+        fromjson("{_id: 1, a: {b: {c: 0}}, d: 0}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+
+    // Verify that the exhaustive set is empty.
+    ASSERT(exhaustivePaths.empty());
+}
+
+TEST(ProjectionExecAggTests, ExclusionFieldPathsWithExplicitIdExclusionIdOnly) {
+    auto parsedProject =
+        makeProjectionWithDefaultIdInclusionAndNestedArrayRecursion(fromjson("{_id: 0}"));
+    ASSERT(parsedProject->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection);
+
+    // Extract the exhaustive set of paths that will be preserved by the projection.
+    auto exhaustivePaths = parsedProject->getExhaustivePaths();
+
+    // Verify that the exhaustive set is empty.
+    ASSERT(exhaustivePaths.empty());
 }
 
 }  // namespace

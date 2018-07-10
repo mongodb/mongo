@@ -298,7 +298,7 @@ ValidationStage IndexConsistency::getStage() const {
 void IndexConsistency::setLastProcessedRecordId(RecordId recordId) {
 
     stdx::lock_guard<stdx::mutex> lock(_classMutex);
-    if (!recordId.isNormal()) {
+    if (!recordId.isValid()) {
         _lastProcessedRecordId = boost::none;
     } else {
         _lastProcessedRecordId = recordId;

@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/index/all_paths_key_generator.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/query/plan_cache.h"
@@ -88,18 +89,22 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
     while (i.more()) {
         IndexDescriptor* descriptor = i.next();
 
-        if (descriptor->getAccessMethodName() != IndexNames::TEXT) {
-            BSONObj key = descriptor->keyPattern();
-            const BSONObj& infoObj = descriptor->infoObj();
-            if (infoObj.hasField("expireAfterSeconds")) {
-                _hasTTLIndex = true;
+        if (descriptor->getAccessMethodName() == IndexNames::ALLPATHS) {
+            // Obtain the projection used by the $** index's key generator.
+            auto pathProj = AllPathsKeyGenerator::createProjectionExec(
+                descriptor->keyPattern(), descriptor->pathProjection());
+            // If the projection is an exclusion, then we must check the new document's keys on all
+            // updates, since we do not exhaustively know the set of paths to be indexed.
+            if (pathProj->getType() == ProjectionExecAgg::ProjectionType::kExclusionProjection) {
+                _indexedPaths.allPathsIndexed();
+            } else {
+                // If a subtree was specified in the keyPattern, or if an inclusion projection is
+                // present, then we need only index the path(s) preserved by the projection.
+                for (const auto& path : pathProj->getExhaustivePaths()) {
+                    _indexedPaths.addPath(path);
+                }
             }
-            BSONObjIterator j(key);
-            while (j.more()) {
-                BSONElement e = j.next();
-                _indexedPaths.addPath(e.fieldName());
-            }
-        } else {
+        } else if (descriptor->getAccessMethodName() == IndexNames::TEXT) {
             fts::FTSSpec ftsSpec(descriptor->infoObj());
 
             if (ftsSpec.wildcard()) {
@@ -119,6 +124,17 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
                 // Any update to a path containing "language" as a component could change the
                 // language of a subdocument.  Add the override field as a path component.
                 _indexedPaths.addPathComponent(ftsSpec.languageOverrideField());
+            }
+        } else {
+            BSONObj key = descriptor->keyPattern();
+            const BSONObj& infoObj = descriptor->infoObj();
+            if (infoObj.hasField("expireAfterSeconds")) {
+                _hasTTLIndex = true;
+            }
+            BSONObjIterator j(key);
+            while (j.more()) {
+                BSONElement e = j.next();
+                _indexedPaths.addPath(e.fieldName());
             }
         }
 

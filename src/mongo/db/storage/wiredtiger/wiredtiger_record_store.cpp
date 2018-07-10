@@ -119,7 +119,7 @@ public:
 
     void commit(boost::optional<Timestamp>) final {
         invariant(_bytesInserted >= 0);
-        invariant(_highestInserted.isNormal());
+        invariant(_highestInserted.isValid());
 
         _oplogStones->_currentRecords.addAndFetch(_countInserted);
         int64_t newCurrentBytes = _oplogStones->_currentBytes.addAndFetch(_bytesInserted);
@@ -225,7 +225,7 @@ void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
                     : Timestamp::min();
 
                 auto stone = _stones.front();
-                invariant(stone.lastRecord.isNormal());
+                invariant(stone.lastRecord.isValid());
                 if (static_cast<std::uint64_t>(stone.lastRecord.repr()) <
                     lastStableRecoveryTimestamp.asULL()) {
                     break;
@@ -1210,7 +1210,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp recoveryTimestamp) {
     Timer timer;
     while (auto stone = _oplogStones->peekOldestStoneIfNeeded()) {
-        invariant(stone->lastRecord.isNormal());
+        invariant(stone->lastRecord.isValid());
 
         if (static_cast<std::uint64_t>(stone->lastRecord.repr()) >= recoveryTimestamp.asULL()) {
             // Do not truncate oplogs needed for replication recovery.
@@ -1934,7 +1934,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     }
 
     _skipNextAdvance = false;
-    if (!id.isNormal()) {
+    if (!id.isValid()) {
         id = getKey(c);
     }
 

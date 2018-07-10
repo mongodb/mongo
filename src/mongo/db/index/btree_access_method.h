@@ -32,7 +32,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -48,7 +47,10 @@ public:
     BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 
 private:
-    void doGetKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
+    void doGetKeys(const BSONObj& obj,
+                   BSONObjSet* keys,
+                   BSONObjSet* multikeyMetadataKeys,
+                   MultikeyPaths* multikeyPaths) const final;
 
     // Our keys differ for V0 and V1.
     std::unique_ptr<BtreeKeyGenerator> _keyGenerator;

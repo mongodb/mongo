@@ -52,6 +52,7 @@ env.Library(
 dbtest = env.Program(
     target="dbtest",
     source=[
+        'all_paths_multikey_persistence_test.cpp',
         'basictests.cpp',
         'clienttests.cpp',
         'commandtests.cpp',

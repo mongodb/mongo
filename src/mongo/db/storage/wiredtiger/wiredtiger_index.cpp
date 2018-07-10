@@ -318,7 +318,7 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
                                const RecordId& id,
                                bool dupsAllowed) {
     dassert(opCtx->lockState()->isWriteLocked());
-    invariant(id.isNormal());
+    invariant(id.isValid());
     dassert(!hasFieldNames(key));
 
     Status s = checkKeySize(key);
@@ -337,7 +337,7 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
                               const RecordId& id,
                               bool dupsAllowed) {
     dassert(opCtx->lockState()->isWriteLocked());
-    invariant(id.isNormal());
+    invariant(id.isValid());
     dassert(!hasFieldNames(key));
 
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);

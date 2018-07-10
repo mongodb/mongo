@@ -45,12 +45,25 @@ namespace mongo {
  */
 class RecordId {
 public:
+    // This set of constants define the boundaries of the 'normal' and 'reserved' id ranges.
+    static constexpr int64_t kNullRepr = 0;
+    static constexpr int64_t kMinRepr = LLONG_MIN;
+    static constexpr int64_t kMaxRepr = LLONG_MAX;
+    static constexpr int64_t kMinReservedRepr = kMaxRepr - (1024 * 1024);
+
+    /**
+     * Enumerates all ids in the reserved range that have been allocated for a specific purpose.
+     */
+    enum class ReservedId : int64_t { kAllPathsMultikeyMetadataId = kMinReservedRepr };
+
     /**
      * Constructs a Null RecordId.
      */
     RecordId() : _repr(kNullRepr) {}
 
     explicit RecordId(int64_t repr) : _repr(repr) {}
+
+    explicit RecordId(ReservedId repr) : RecordId(static_cast<int64_t>(repr)) {}
 
     /**
      * Construct a RecordId from two halves.
@@ -72,6 +85,13 @@ public:
         return RecordId(kMaxRepr);
     }
 
+    /**
+     * Returns the first record in the reserved id range at the top of the RecordId space.
+     */
+    static RecordId minReserved() {
+        return RecordId(kMinReservedRepr);
+    }
+
     bool isNull() const {
         return _repr == 0;
     }
@@ -81,11 +101,27 @@ public:
     }
 
     /**
-     * Normal RecordIds are the only ones valid for representing Records. All RecordIds outside
-     * of this range are sentinel values.
+     * Valid RecordIds are the only ones which may be used to represent Records. The range of valid
+     * RecordIds includes both "normal" ids that refer to user data, and "reserved" ids that are
+     * used internally. All RecordIds outside of the valid range are sentinel values.
+     */
+    bool isValid() const {
+        return isNormal() || isReserved();
+    }
+
+    /**
+     * Normal RecordIds are those which fall within the range used to represent normal user data,
+     * excluding the reserved range at the top of the RecordId space.
      */
     bool isNormal() const {
-        return _repr > 0 && _repr < kMaxRepr;
+        return _repr > 0 && _repr < kMinReservedRepr;
+    }
+
+    /**
+     * Returns true if this RecordId falls within the reserved range at the top of the record space.
+     */
+    bool isReserved() const {
+        return _repr >= kMinReservedRepr && _repr < kMaxRepr;
     }
 
     int compare(RecordId rhs) const {
@@ -121,10 +157,6 @@ public:
     }
 
 private:
-    static const int64_t kMaxRepr = LLONG_MAX;
-    static const int64_t kNullRepr = 0;
-    static const int64_t kMinRepr = LLONG_MIN;
-
     int64_t _repr;
 };
 

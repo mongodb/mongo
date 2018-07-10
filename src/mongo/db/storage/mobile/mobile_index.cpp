@@ -80,7 +80,7 @@ Status MobileIndex::insert(OperationContext* opCtx,
                            const BSONObj& key,
                            const RecordId& recId,
                            bool dupsAllowed) {
-    invariant(recId.isNormal());
+    invariant(recId.isValid());
     invariant(!hasFieldNames(key));
 
     Status status = _checkKeySize(key);
@@ -133,7 +133,7 @@ void MobileIndex::unindex(OperationContext* opCtx,
                           const BSONObj& key,
                           const RecordId& recId,
                           bool dupsAllowed) {
-    invariant(recId.isNormal());
+    invariant(recId.isValid());
     invariant(!hasFieldNames(key));
 
     return _unindex(opCtx, key, recId, dupsAllowed);
@@ -299,7 +299,7 @@ public:
     virtual ~BulkBuilderBase() {}
 
     Status addKey(const BSONObj& key, const RecordId& recId) override {
-        invariant(recId.isNormal());
+        invariant(recId.isValid());
         invariant(!hasFieldNames(key));
 
         Status status = _checkKeySize(key);

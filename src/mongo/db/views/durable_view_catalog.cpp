@@ -144,7 +144,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()), requireIndex);
 
     Snapshotted<BSONObj> oldView;
-    if (!id.isNormal() || !systemViews->findDoc(opCtx, id, &oldView)) {
+    if (!id.isValid() || !systemViews->findDoc(opCtx, id, &oldView)) {
         LOG(2) << "insert view " << view << " into " << _db->getSystemViewsName();
         uassertStatusOK(
             systemViews->insertDocument(opCtx, InsertStatement(view), &CurOp::get(opCtx)->debug()));
@@ -168,7 +168,7 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
         return;
     const bool requireIndex = false;
     RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()), requireIndex);
-    if (!id.isNormal())
+    if (!id.isValid())
         return;
 
     LOG(2) << "remove view " << name << " from " << _db->getSystemViewsName();

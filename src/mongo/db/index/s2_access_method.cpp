@@ -142,6 +142,7 @@ StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
 
 void S2AccessMethod::doGetKeys(const BSONObj& obj,
                                BSONObjSet* keys,
+                               BSONObjSet* multikeyMetadataKeys,
                                MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::getS2Keys(obj, _descriptor->keyPattern(), _params, keys, multikeyPaths);
 }

@@ -631,7 +631,7 @@ int64_t EphemeralForTestRecordStore::storageSize(OperationContext* opCtx,
 
 RecordId EphemeralForTestRecordStore::allocateLoc() {
     RecordId out = RecordId(_data->nextId++);
-    invariant(out < RecordId::max());
+    invariant(out.isNormal());
     return out;
 }
 

@@ -42,8 +42,22 @@ class AllPathsAccessMethod : public IndexAccessMethod {
 public:
     AllPathsAccessMethod(IndexCatalogEntry* allPathsState, SortedDataInterface* btree);
 
+    /**
+     * Returns 'true' if the index should become multikey on the basis of the passed arguments.
+     * Because it is possible for a $** index to generate multiple keys per document without any of
+     * them lying along a multikey (i.e. array) path, this method will only return 'true' if one or
+     * more multikey metadata keys have been generated; that is, if the 'multikeyMetadataKeys'
+     * BSONObjSet is non-empty.
+     */
+    bool shouldMarkIndexAsMultikey(const BSONObjSet& keys,
+                                   const BSONObjSet& multikeyMetadataKeys,
+                                   const MultikeyPaths& multikeyPaths) const final;
+
 private:
-    void doGetKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
+    void doGetKeys(const BSONObj& obj,
+                   BSONObjSet* keys,
+                   BSONObjSet* multikeyMetadataKeys,
+                   MultikeyPaths* multikeyPaths) const final;
 
     const AllPathsKeyGenerator _keyGen;
 };

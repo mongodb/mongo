@@ -73,6 +73,12 @@ public:
             expCtx, projSpec, idPolicy, recursionPolicy, ProjectionParseMode::kBanComputedFields);
     }
 
+    std::set<std::string> getExhaustivePaths() const {
+        DepsTracker depsTracker;
+        _projection->addDependencies(&depsTracker);
+        return depsTracker.fields;
+    }
+
     ProjectionType getType() const {
         return (_projection->getType() == TransformerType::kInclusionProjection
                     ? ProjectionType::kInclusionProjection
@@ -136,4 +142,7 @@ stdx::unordered_set<std::string> ProjectionExecAgg::applyProjectionToFields(
     return _exec->applyProjectionToFields(fields);
 }
 
+std::set<std::string> ProjectionExecAgg::getExhaustivePaths() const {
+    return _exec->getExhaustivePaths();
+}
 }  // namespace mongo

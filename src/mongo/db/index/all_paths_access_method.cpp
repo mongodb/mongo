@@ -40,12 +40,16 @@ AllPathsAccessMethod::AllPathsAccessMethod(IndexCatalogEntry* allPathsState,
       _keyGen(
           _descriptor->keyPattern(), _descriptor->pathProjection(), _btreeState->getCollator()) {}
 
+bool AllPathsAccessMethod::shouldMarkIndexAsMultikey(const BSONObjSet& keys,
+                                                     const BSONObjSet& multikeyMetadataKeys,
+                                                     const MultikeyPaths& multikeyPaths) const {
+    return !multikeyMetadataKeys.empty();
+}
+
 void AllPathsAccessMethod::doGetKeys(const BSONObj& obj,
                                      BSONObjSet* keys,
+                                     BSONObjSet* multikeyMetadataKeys,
                                      MultikeyPaths* multikeyPaths) const {
-    // TODO SERVER-35748: Until MultikeyPaths has been updated to facilitate 'allPaths' indexes, we
-    // use AllPathsKeyGenerator::MultikeyPathsMock to separate multikey paths from RecordId keys.
-    auto multikeyPathsMock = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    _keyGen.generateKeys(obj, keys, &multikeyPathsMock);
+    _keyGen.generateKeys(obj, keys, multikeyMetadataKeys);
 }
 }  // namespace mongo

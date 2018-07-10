@@ -44,20 +44,12 @@ public:
     static constexpr StringData kSubtreeSuffix = ".$**"_sd;
 
     /**
-     * Returns an owned ProjectionExecAgg as defined by the 'keyPattern' and 'pathProjection' and
-     * created with the parameter necessary for allPaths key generation.
-    */
-    static std::unique_ptr<ProjectionExecAgg> createProjectionExec(const BSONObj& keyPattern,
-                                                                   const BSONObj& pathProjection);
-
-    /**
-     * TODO SERVER-35748: Currently, the MultikeyPaths structure used by IndexAccessMethod is not
-     * suitable for tracking multikey paths in AllPaths indexes. In order to keep multikey paths
-     * separate from RecordId keys, and to ensure that both this key generator and the
-     * AllPathsIndexAccessMethod can be trivially switched over to using the new MultikeyPaths
-     * tracker once it is implemented, we use a mock MultikeyPaths here.
+     * Returns an owned ProjectionExecAgg identical to the one that AllPathsKeyGenerator will use
+     * internally when generating the keys for the $** index, as defined by the 'keyPattern' and
+     * 'pathProjection' arguments.
      */
-    using MultikeyPathsMock = BSONObjSet;
+    static std::unique_ptr<ProjectionExecAgg> createProjectionExec(BSONObj keyPattern,
+                                                                   BSONObj pathProjection);
 
     AllPathsKeyGenerator(BSONObj keyPattern,
                          BSONObj pathProjection,
@@ -71,7 +63,7 @@ public:
      * document, in the following format:
      *      { '': 1, '': 'path.to.array' }
      */
-    void generateKeys(BSONObj inputDoc, BSONObjSet* keys, MultikeyPathsMock* multikeyPaths) const;
+    void generateKeys(BSONObj inputDoc, BSONObjSet* keys, BSONObjSet* multikeyPaths) const;
 
 private:
     // Traverses every path of the post-projection document, adding keys to the set as it goes.
@@ -79,10 +71,10 @@ private:
                            bool objIsArray,
                            FieldRef* path,
                            BSONObjSet* keys,
-                           MultikeyPathsMock* multikeyPaths) const;
+                           BSONObjSet* multikeyPaths) const;
 
     // Helper functions to format the entry appropriately before adding it to the key/path tracker.
-    void _addMultiKey(const FieldRef& fullPath, MultikeyPathsMock* multikeyPaths) const;
+    void _addMultiKey(const FieldRef& fullPath, BSONObjSet* multikeyPaths) const;
     void _addKey(BSONElement elem, const FieldRef& fullPath, BSONObjSet* keys) const;
 
     // Helper to check whether the element is a nested array, and conditionally add it to 'keys'.

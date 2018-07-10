@@ -1123,7 +1123,7 @@ TEST_F(KeyStringTest, RecordIds) {
                 ASSERT(reader.atEof());
             }
 
-            if (rid.isNormal()) {
+            if (rid.isValid()) {
                 ASSERT_GT(ks, KeyString(version, RecordId()));
                 ASSERT_GT(ks, KeyString(version, RecordId::min()));
                 ASSERT_LT(ks, KeyString(version, RecordId::max()));

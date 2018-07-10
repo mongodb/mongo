@@ -66,6 +66,10 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
 
+// Reserved RecordId against which multikey metadata keys are indexed.
+static const RecordId kMultikeyMetadataKeyId =
+    RecordId{RecordId::ReservedId::kAllPathsMultikeyMetadataId};
+
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be
  * multikey, and returns false otherwise. This function returns false if the 'multikeyPaths'
@@ -75,6 +79,10 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
     return std::any_of(multikeyPaths.cbegin(),
                        multikeyPaths.cend(),
                        [](const std::set<std::size_t>& components) { return !components.empty(); });
+}
+
+std::vector<BSONObj> asVector(const BSONObjSet& objSet) {
+    return {objSet.begin(), objSet.end()};
 }
 
 }  // namespace
@@ -125,7 +133,23 @@ bool IndexAccessMethod::ignoreKeyTooLong(OperationContext* opCtx) {
     return shouldRelaxConstraints || !failIndexKeyTooLongParam();
 }
 
-// Find the keys for obj, put them in the tree pointing to loc
+bool IndexAccessMethod::isFatalError(OperationContext* opCtx, Status status, BSONObj key) {
+    // If the status is Status::OK(), or if it is ErrorCodes::KeyTooLong and the user has chosen to
+    // ignore this error, return false immediately.
+    if (status.isOK() || (status == ErrorCodes::KeyTooLong && ignoreKeyTooLong(opCtx))) {
+        return false;
+    }
+
+    // A document might be indexed multiple times during a background index build if it moves ahead
+    // of the cursor (e.g. via an update). We test this scenario and swallow the error accordingly.
+    if (status == ErrorCodes::DuplicateKeyValue && !_btreeState->isReady(opCtx)) {
+        LOG(3) << "key " << key << " already in index during background indexing (ok)";
+        return false;
+    }
+    return true;
+}
+
+// Find the keys for obj, put them in the tree pointing to loc.
 Status IndexAccessMethod::insert(OperationContext* opCtx,
                                  const BSONObj& obj,
                                  const RecordId& loc,
@@ -133,52 +157,32 @@ Status IndexAccessMethod::insert(OperationContext* opCtx,
                                  int64_t* numInserted) {
     invariant(numInserted);
     *numInserted = 0;
+    BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
     // Delegate to the subclass.
-    getKeys(obj, options.getKeysMode, &keys, &multikeyPaths);
+    getKeys(obj, options.getKeysMode, &keys, &multikeyMetadataKeys, &multikeyPaths);
 
-    Status ret = Status::OK();
-    for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-        Status status = _newInterface->insert(opCtx, *i, loc, options.dupsAllowed);
-
-        // Everything's OK, carry on.
-        if (status.isOK()) {
-            ++*numInserted;
-            IndexKeyEntry indexEntry = IndexKeyEntry(*i, loc);
-            continue;
-        }
-
-        // Error cases.
-
-        if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(opCtx)) {
-            IndexKeyEntry indexEntry = IndexKeyEntry(*i, loc);
-            continue;
-        }
-
-        if (status.code() == ErrorCodes::DuplicateKeyValue) {
-            // A document might be indexed multiple times during a background index build
-            // if it moves ahead of the collection scan cursor (e.g. via an update).
-            if (!_btreeState->isReady(opCtx)) {
-                LOG(3) << "key " << *i << " already in index during background indexing (ok)";
-                continue;
+    // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
+    // over the data keys, each of them should point to the doc's RecordId. When iterating over
+    // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
+    for (const auto keySet : {&keys, &multikeyMetadataKeys}) {
+        const auto& recordId = (keySet == &keys ? loc : kMultikeyMetadataKeyId);
+        for (const auto& key : *keySet) {
+            Status status = _newInterface->insert(opCtx, key, recordId, options.dupsAllowed);
+            if (isFatalError(opCtx, status, key)) {
+                return status;
             }
         }
-
-        // Clean up after ourselves.
-        for (BSONObjSet::const_iterator j = keys.begin(); j != i; ++j) {
-            removeOneKey(opCtx, *j, loc, options.dupsAllowed);
-            *numInserted = 0;
-        }
-
-        return status;
     }
 
-    if (*numInserted > 1 || isMultikeyFromPaths(multikeyPaths)) {
+    *numInserted = keys.size() + multikeyMetadataKeys.size();
+
+    if (shouldMarkIndexAsMultikey(keys, multikeyMetadataKeys, multikeyPaths)) {
         _btreeState->setMultikey(opCtx, multikeyPaths);
     }
 
-    return ret;
+    return Status::OK();
 }
 
 void IndexAccessMethod::removeOneKey(OperationContext* opCtx,
@@ -188,7 +192,6 @@ void IndexAccessMethod::removeOneKey(OperationContext* opCtx,
 
     try {
         _newInterface->unindex(opCtx, key, loc, dupsAllowed);
-        IndexKeyEntry indexEntry = IndexKeyEntry(key, loc);
     } catch (AssertionException& e) {
         log() << "Assertion failure: _unindex failed " << _descriptor->indexNamespace();
         log() << "Assertion failure: _unindex failed: " << redact(e) << "  key:" << key.toString()
@@ -214,16 +217,19 @@ Status IndexAccessMethod::remove(OperationContext* opCtx,
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when removing a document since the index metadata isn't updated when keys are
     // deleted.
+    BSONObjSet* multikeyMetadataKeys = nullptr;
     MultikeyPaths* multikeyPaths = nullptr;
 
     // Relax key constraints on removal when deleting documents with invalid formats, but only
     // those that don't apply to the partialIndex filter.
-    getKeys(obj, GetKeysMode::kRelaxConstraintsUnfiltered, &keys, multikeyPaths);
+    getKeys(
+        obj, GetKeysMode::kRelaxConstraintsUnfiltered, &keys, multikeyMetadataKeys, multikeyPaths);
 
-    for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-        removeOneKey(opCtx, *i, loc, options.dupsAllowed);
-        ++*numDeleted;
+    for (const auto& key : keys) {
+        removeOneKey(opCtx, key, loc, options.dupsAllowed);
     }
+
+    *numDeleted = keys.size();
 
     return Status::OK();
 }
@@ -236,12 +242,13 @@ Status IndexAccessMethod::touch(OperationContext* opCtx, const BSONObj& obj) {
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when paging a document's index entries into memory.
+    BSONObjSet* multikeyMetadataKeys = nullptr;
     MultikeyPaths* multikeyPaths = nullptr;
-    getKeys(obj, GetKeysMode::kEnforceConstraints, &keys, multikeyPaths);
+    getKeys(obj, GetKeysMode::kEnforceConstraints, &keys, multikeyMetadataKeys, multikeyPaths);
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(opCtx));
-    for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-        cursor->seekExact(*i);
+    for (const auto& key : keys) {
+        cursor->seekExact(key);
     }
 
     return Status::OK();
@@ -258,8 +265,13 @@ RecordId IndexAccessMethod::findSingle(OperationContext* opCtx, const BSONObj& r
     if (_btreeState->getCollator()) {
         // For performance, call get keys only if there is a non-simple collation.
         BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+        BSONObjSet* multikeyMetadataKeys = nullptr;
         MultikeyPaths* multikeyPaths = nullptr;
-        getKeys(requestedKey, GetKeysMode::kEnforceConstraints, &keys, multikeyPaths);
+        getKeys(requestedKey,
+                GetKeysMode::kEnforceConstraints,
+                &keys,
+                multikeyMetadataKeys,
+                multikeyPaths);
         invariant(keys.size() == 1);
         actualKey = *keys.begin();
     } else {
@@ -346,12 +358,17 @@ Status IndexAccessMethod::validateUpdate(OperationContext* opCtx,
         // There's no need to compute the prefixes of the indexed fields that possibly caused the
         // index to be multikey when the old version of the document was written since the index
         // metadata isn't updated when keys are deleted.
+        BSONObjSet* multikeyMetadataKeys = nullptr;
         MultikeyPaths* multikeyPaths = nullptr;
-        getKeys(from, options.getKeysMode, &ticket->oldKeys, multikeyPaths);
+        getKeys(from, options.getKeysMode, &ticket->oldKeys, multikeyMetadataKeys, multikeyPaths);
     }
 
     if (!indexFilter || indexFilter->matchesBSON(to)) {
-        getKeys(to, options.getKeysMode, &ticket->newKeys, &ticket->newMultikeyPaths);
+        getKeys(to,
+                options.getKeysMode,
+                &ticket->newKeys,
+                &ticket->newMultikeyMetadataKeys,
+                &ticket->newMultikeyPaths);
     }
 
     ticket->loc = record;
@@ -368,6 +385,8 @@ Status IndexAccessMethod::update(OperationContext* opCtx,
                                  const UpdateTicket& ticket,
                                  int64_t* numInserted,
                                  int64_t* numDeleted) {
+    invariant(ticket.newKeys.size() ==
+              ticket.oldKeys.size() + ticket.added.size() - ticket.removed.size());
     invariant(numInserted);
     invariant(numDeleted);
 
@@ -378,34 +397,31 @@ Status IndexAccessMethod::update(OperationContext* opCtx,
         return Status(ErrorCodes::InternalError, "Invalid UpdateTicket in update");
     }
 
-    if (ticket.oldKeys.size() + ticket.added.size() - ticket.removed.size() > 1 ||
-        isMultikeyFromPaths(ticket.newMultikeyPaths)) {
+    for (const auto& remKey : ticket.removed) {
+        _newInterface->unindex(opCtx, remKey, ticket.loc, ticket.dupsAllowed);
+    }
+
+    // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
+    // over the data keys, each of them should point to the doc's RecordId. When iterating over
+    // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
+    const auto newMultikeyMetadataKeys = asVector(ticket.newMultikeyMetadataKeys);
+    for (const auto keySet : {&ticket.added, &newMultikeyMetadataKeys}) {
+        const auto& recordId = (keySet == &ticket.added ? ticket.loc : kMultikeyMetadataKeyId);
+        for (const auto& key : *keySet) {
+            Status status = _newInterface->insert(opCtx, key, recordId, ticket.dupsAllowed);
+            if (isFatalError(opCtx, status, key)) {
+                return status;
+            }
+        }
+    }
+
+    if (shouldMarkIndexAsMultikey(
+            ticket.newKeys, ticket.newMultikeyMetadataKeys, ticket.newMultikeyPaths)) {
         _btreeState->setMultikey(opCtx, ticket.newMultikeyPaths);
     }
 
-    for (size_t i = 0; i < ticket.removed.size(); ++i) {
-        _newInterface->unindex(opCtx, ticket.removed[i], ticket.loc, ticket.dupsAllowed);
-        IndexKeyEntry indexEntry = IndexKeyEntry(ticket.removed[i], ticket.loc);
-    }
-
-    for (size_t i = 0; i < ticket.added.size(); ++i) {
-        Status status =
-            _newInterface->insert(opCtx, ticket.added[i], ticket.loc, ticket.dupsAllowed);
-        if (!status.isOK()) {
-            if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(opCtx)) {
-                // Ignore.
-                IndexKeyEntry indexEntry = IndexKeyEntry(ticket.added[i], ticket.loc);
-                continue;
-            }
-
-            return status;
-        }
-
-        IndexKeyEntry indexEntry = IndexKeyEntry(ticket.added[i], ticket.loc);
-    }
-
-    *numInserted = ticket.added.size();
     *numDeleted = ticket.removed.size();
+    *numInserted = ticket.added.size();
 
     return Status::OK();
 }
@@ -433,14 +449,11 @@ IndexAccessMethod::BulkBuilder::BulkBuilder(const IndexAccessMethod* index,
 Status IndexAccessMethod::BulkBuilder::insert(OperationContext* opCtx,
                                               const BSONObj& obj,
                                               const RecordId& loc,
-                                              const InsertDeleteOptions& options,
-                                              int64_t* numInserted) {
+                                              const InsertDeleteOptions& options) {
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
 
-    _real->getKeys(obj, options.getKeysMode, &keys, &multikeyPaths);
-
-    _everGeneratedMultipleKeys = _everGeneratedMultipleKeys || (keys.size() > 1);
+    _real->getKeys(obj, options.getKeysMode, &keys, &_multikeyMetadataKeys, &multikeyPaths);
 
     if (!multikeyPaths.empty()) {
         if (_indexMultikeyPaths.empty()) {
@@ -453,18 +466,24 @@ Status IndexAccessMethod::BulkBuilder::insert(OperationContext* opCtx,
         }
     }
 
-    for (BSONObjSet::iterator it = keys.begin(); it != keys.end(); ++it) {
-        _sorter->add(*it, loc);
-        _keysInserted++;
+    for (const auto& key : keys) {
+        _sorter->add(key, loc);
+        ++_keysInserted;
     }
 
-    if (NULL != numInserted) {
-        *numInserted += keys.size();
-    }
+    _isMultiKey =
+        _isMultiKey || _real->shouldMarkIndexAsMultikey(keys, _multikeyMetadataKeys, multikeyPaths);
 
     return Status::OK();
 }
 
+IndexAccessMethod::BulkBuilder::Sorter::Iterator* IndexAccessMethod::BulkBuilder::done() {
+    for (const auto& key : _multikeyMetadataKeys) {
+        _sorter->add(key, kMultikeyMetadataKeyId);
+        ++_keysInserted;
+    }
+    return _sorter->done();
+}
 
 Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
                                      BulkBuilder* bulk,
@@ -473,7 +492,7 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
                                      set<RecordId>* dupsToDrop) {
     Timer timer;
 
-    std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->_sorter->done());
+    std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->done());
 
     stdx::unique_lock<Client> lk(*opCtx->getClient());
     ProgressMeterHolder pm(
@@ -516,8 +535,7 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
             return status;
         }
 
-        // If we're here either it's a dup and we're cool with it or the addKey went just
-        // fine.
+        // If we're here either it's a dup and we're cool with it or the addKey went just fine.
         pm.hit();
         wunit.commit();
     }
@@ -543,6 +561,7 @@ void IndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx, MultikeyPath
 void IndexAccessMethod::getKeys(const BSONObj& obj,
                                 GetKeysMode mode,
                                 BSONObjSet* keys,
+                                BSONObjSet* multikeyMetadataKeys,
                                 MultikeyPaths* multikeyPaths) const {
     static stdx::unordered_set<int> whiteList{ErrorCodes::CannotBuildIndexKeys,
                                               // Btree
@@ -569,7 +588,7 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
                                               13026,
                                               13027};
     try {
-        doGetKeys(obj, keys, multikeyPaths);
+        doGetKeys(obj, keys, multikeyMetadataKeys, multikeyPaths);
     } catch (const AssertionException& ex) {
         // Suppress all indexing errors when mode is kRelaxConstraints.
         if (mode == GetKeysMode::kEnforceConstraints) {
@@ -598,8 +617,10 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
     }
 }
 
-bool IndexAccessMethod::BulkBuilder::isMultikey() const {
-    return _everGeneratedMultipleKeys || isMultikeyFromPaths(_indexMultikeyPaths);
+bool IndexAccessMethod::shouldMarkIndexAsMultikey(const BSONObjSet& keys,
+                                                  const BSONObjSet& multikeyMetadataKeys,
+                                                  const MultikeyPaths& multikeyPaths) const {
+    return (keys.size() > 1 || isMultikeyFromPaths(multikeyPaths));
 }
 
 }  // namespace mongo

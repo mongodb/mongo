@@ -486,7 +486,7 @@ Status MultiIndexBlockImpl::insert(const BSONObj& doc, const RecordId& loc) {
         int64_t unused;
         Status idxStatus(ErrorCodes::InternalError, "");
         if (_indexes[i].bulk) {
-            idxStatus = _indexes[i].bulk->insert(_opCtx, doc, loc, _indexes[i].options, &unused);
+            idxStatus = _indexes[i].bulk->insert(_opCtx, doc, loc, _indexes[i].options);
         } else {
             idxStatus = _indexes[i].real->insert(_opCtx, doc, loc, _indexes[i].options, &unused);
         }
