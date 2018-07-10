@@ -136,6 +136,7 @@ sh.moveChunk = function(fullName, find, to) {
 };
 
 sh.setBalancerState = function(isOn) {
+    assert(typeof(isOn) == "boolean", "Must pass boolean to setBalancerState");
     if (isOn) {
         return sh.startBalancer();
     } else {
