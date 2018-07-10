@@ -91,18 +91,8 @@ Status GetMoreRequest::isValid() const {
 }
 
 // static
-NamespaceString GetMoreRequest::parseNs(const std::string& dbname, const BSONObj& cmdObj) {
-    BSONElement collElt = cmdObj["collection"];
-    const std::string coll = (collElt.type() == BSONType::String) ? collElt.String() : "";
-
-    return NamespaceString(dbname, coll);
-}
-
-// static
 StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbname,
                                                          const BSONObj& cmdObj) {
-    invariant(!dbname.empty());
-
     // Required fields.
     boost::optional<CursorId> cursorid;
     boost::optional<NamespaceString> nss;
@@ -129,7 +119,9 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                                       << cmdObj};
             }
 
-            nss = parseNs(dbname, cmdObj);
+            BSONElement collElt = cmdObj["collection"];
+            const std::string coll = (collElt.type() == BSONType::String) ? collElt.String() : "";
+            nss = NamespaceString(dbname, coll);
         } else if (fieldName == kBatchSizeField) {
             if (!el.isNumber()) {
                 return {ErrorCodes::TypeMismatch,
