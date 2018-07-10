@@ -2788,9 +2788,6 @@ TEST(ChainingInterface, PositionalHoleInRange) {
     argv.push_back("binaryname");
     std::map<std::string, std::string> env_map;
 
-    moe::Value value;
-    std::vector<std::string>::iterator positionalit;
-
     ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
 }
 
@@ -2808,9 +2805,6 @@ TEST(ChainingInterface, PositionalOverlappingRange) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     std::map<std::string, std::string> env_map;
-
-    moe::Value value;
-    std::vector<std::string>::iterator positionalit;
 
     ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
 }
@@ -2830,9 +2824,6 @@ TEST(ChainingInterface, PositionalOverlappingRangeInfinite) {
     argv.push_back("binaryname");
     std::map<std::string, std::string> env_map;
 
-    moe::Value value;
-    std::vector<std::string>::iterator positionalit;
-
     ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
 }
 
@@ -2850,9 +2841,6 @@ TEST(ChainingInterface, PositionalMultipleInfinite) {
     std::vector<std::string> argv;
     argv.push_back("binaryname");
     std::map<std::string, std::string> env_map;
-
-    moe::Value value;
-    std::vector<std::string>::iterator positionalit;
 
     ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
 }

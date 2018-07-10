@@ -1392,7 +1392,6 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfOwnerJustChanged) {
     currentLockDoc.setWho("me");
     currentLockDoc.setWhy("why");
 
-    Date_t currentPing;
     LockpingsType pingDoc;
     pingDoc.setProcess("otherProcess");
     pingDoc.setPing(Date_t());
@@ -1490,7 +1489,6 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfElectionIdChanged) {
     currentLockDoc.setWho("me");
     currentLockDoc.setWhy("why");
 
-    Date_t currentPing;
     LockpingsType pingDoc;
     pingDoc.setProcess("otherProcess");
     pingDoc.setPing(Date_t());
@@ -1590,7 +1588,6 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfNoMaster) {
     currentLockDoc.setWho("me");
     currentLockDoc.setWhy("why");
 
-    Date_t currentPing;
     LockpingsType pingDoc;
     pingDoc.setProcess("otherProcess");
     pingDoc.setPing(Date_t());
