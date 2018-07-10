@@ -429,7 +429,7 @@ void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& config
 
 void ShardingTestFixture::expectChangeLogCreate(const HostAndPort& configHost,
                                                 const BSONObj& response) {
-    expectConfigCollectionCreate(configHost, "changelog", 10 * 1024 * 1024, response);
+    expectConfigCollectionCreate(configHost, "changelog", 200 * 1024 * 1024, response);
 }
 
 void ShardingTestFixture::expectChangeLogInsert(const HostAndPort& configHost,

@@ -191,12 +191,12 @@ protected:
 
 class ActionLogTest : public InfoLoggingTest {
 public:
-    ActionLogTest() : InfoLoggingTest(ActionLog, 2 * 1024 * 1024) {}
+    ActionLogTest() : InfoLoggingTest(ActionLog, 20 * 1024 * 1024) {}
 };
 
 class ChangeLogTest : public InfoLoggingTest {
 public:
-    ChangeLogTest() : InfoLoggingTest(ChangeLog, 10 * 1024 * 1024) {}
+    ChangeLogTest() : InfoLoggingTest(ChangeLog, 200 * 1024 * 1024) {}
 };
 
 TEST_F(ActionLogTest, NoRetryAfterSuccessfulCreate) {
