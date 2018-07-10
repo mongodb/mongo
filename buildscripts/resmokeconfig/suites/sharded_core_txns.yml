@@ -5,8 +5,58 @@
 test_kind: js_test
 selector:
   roots:
-  - jstests/core/txns/multi_statement_transaction.js
+  - jstests/core/txns/**/*.js
+  exclude_files:
+  # Profile can only be run against the admin database on mongos.
+  - jstests/core/txns/transactions_profiling.js
+  - jstests/core/txns/transactions_profiling_with_drops.js
 
+  # No featureCompatibilityVersion parameter on mongos.
+  - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
+
+  # Prepare is not a command on mongos.
+  - jstests/core/txns/empty_prepare.js
+  - jstests/core/txns/prepare_conflict.js
+  - jstests/core/txns/prepare_transaction.js
+
+  # Implicitly creates a database through a collection rename, which does not work in a sharded
+  # cluster.
+  - jstests/core/txns/transactions_block_ddl.js
+
+  # TODO SERVER-36124: maxTimeMS doesn't work for insert on mongos.
+  - jstests/core/txns/write_conflicts_with_non_txns.js
+
+  # TODO SERVER-36120: No doTxn command on mongos.
+  - jstests/core/txns/do_txn_atomicity.js
+  - jstests/core/txns/do_txn_basic.js
+
+  # TODO SERVER-36121: Set the transactionLifetimeLimitSeconds parameter, which is not on mongos.
+  - jstests/core/txns/abort_expired_transaction.js
+  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+
+  # TODO SERVER-35829: Mongos loses txnNumber when forwarding to shards.
+  - jstests/core/txns/banned_txn_dbs.js
+  - jstests/core/txns/kill_cursors_in_transaction.js
+
+  # TODO SERVER-35829: Mongos loses txnNumber when forwarding to shards.
+  # TODO SERVER-33709: Support readConcern snapshot in cluster count command.
+  - jstests/core/txns/commands_not_allowed_in_txn.js
+
+  # TODO SERVER-35708 Mongos does not attach errorLabels on command response.
+  - jstests/core/txns/multi_statement_transaction_abort.js
+
+  # TODO SERVER-36057: Mongos doesn't validate autocommit / startTransaction fields.
+  - jstests/core/txns/multi_statement_transaction_command_args.js
+  - jstests/core/txns/upconvert_read_concern.js
+
+  # TODO SERVER-35825: Mongos should only allow readConcern on writes that start transactions.
+  - jstests/core/txns/no_read_or_write_concern_inside_txn.js
+  - jstests/core/txns/no_read_concern_snapshot_outside_txn.js
+
+  # TODO SERVER-35707: Figure out transaction abort state on re-targeting exceptions.
+  - jstests/core/txns/view_reads_in_transaction.js
+  - jstests/core/txns/list_collections_not_blocked_by_txn.js
+  - jstests/core/txns/statement_ids_accepted.js
 executor:
   archive:
     hooks:
