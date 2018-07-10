@@ -748,13 +748,12 @@ void MigrationChunkClonerSourceLegacy::_xfer(OperationContext* opCtx,
 
 repl::OpTime MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
     OperationContext* opCtx, BSONArrayBuilder* arrBuilder) {
+    repl::OpTime opTimeToWait;
+    auto seenOpTimeTerm = repl::OpTime::kUninitializedTerm;
+
     if (!_sessionCatalogSource) {
         return {};
     }
-
-    repl::OpTime opTimeToWait;
-    auto seenOpTimeTerm = repl::OpTime::kUninitializedTerm;
-    const ChunkRange range(_args.getMinKey(), _args.getMaxKey());
 
     while (_sessionCatalogSource->hasMoreOplog()) {
         auto result = _sessionCatalogSource->getLastFetchedOplog();
@@ -773,15 +772,6 @@ repl::OpTime MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
                     str::stream() << "detected change of term from " << seenOpTimeTerm << " to "
                                   << newOpTime.getTerm(),
                     seenOpTimeTerm == newOpTime.getTerm());
-        }
-
-        // Skip appending CRUD operations that don't pertain to the ChunkRange being migrated.
-        if (result.oplog->isCrudOpType()) {
-            auto shardKey =
-                _shardKeyPattern.extractShardKeyFromDoc(result.oplog->getOperationToApply());
-            if (!range.containsKey(shardKey)) {
-                continue;
-            }
         }
 
         auto oplogDoc = result.oplog->toBSON();
