@@ -61,6 +61,9 @@ selector:
   - jstests/sharding/max_time_ms_sharded.js
   # Requires killOp to work for local operations on mongos, introduced in v4.0.
   - jstests/sharding/killop.js
+  # Requires shardCollection command to validate shard key against existing
+  # zones, introduced in v4.0.
+  - jstests/sharding/shard_collection_existing_zones.js
   # New 4.0 feature
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/change_stream_metadata_notifications.js

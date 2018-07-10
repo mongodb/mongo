@@ -421,6 +421,9 @@ selector:
   - jstests/sharding/movechunk_include.js
   # Enable when SERVER-33538 is backported.
   - jstests/sharding/mapReduce_outSharded_checkUUID.js
+  # Requires shardCollection command to validate shard key against existing
+  # zones, introduced in v4.0.
+  - jstests/sharding/shard_collection_existing_zones.js
   # TODO SERVER-34204: Change streams established in a session can send getMores without logical
   # session ids. Enable when SERVER-34204 is backported to v3.6.
   - jstests/sharding/change_stream_chunk_migration.js
