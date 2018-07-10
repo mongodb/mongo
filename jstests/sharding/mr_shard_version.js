@@ -31,13 +31,6 @@
 
     jsTest.log("Starting migrations...");
 
-    var migrateOp = {op: "command", ns: "admin", command: {moveChunk: "" + coll}};
-
-    var checkMigrate = function() {
-        print("Result of migrate : ");
-        printjson(this);
-    };
-
     var ops = {};
     for (var i = 0; i < st._connections.length; i++) {
         for (var j = 0; j < 2; j++) {
@@ -49,7 +42,6 @@
                     find: {_id: (j == 0 ? 0 : halfId)},
                     to: st._connections[i].shardName
                 },
-                check: checkMigrate
             };
         }
     }
