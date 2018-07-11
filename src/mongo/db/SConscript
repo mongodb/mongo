@@ -1328,7 +1328,7 @@ env.Library(
         'sessions_collection_sharded',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
+        '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
     ]
 )
 

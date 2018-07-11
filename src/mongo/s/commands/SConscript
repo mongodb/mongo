@@ -5,16 +5,26 @@ Import("get_option")
 
 env = env.Clone()
 
-# These commands are linked both in MongoS and MongoD
 env.Library(
-    target='shared_cluster_commands',
+    target='cluster_commands_helpers',
     source=[
         'cluster_commands_helpers.cpp',
-        'cluster_get_shard_map_cmd.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/s/async_requests_sender',
+    ],
+)
+
+# These commands are linked both in MongoS and MongoD
+env.Library(
+    target='shared_cluster_commands',
+    source=[
+        'cluster_get_shard_map_cmd.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/s/grid',
     ]
 )
 
@@ -128,7 +138,7 @@ env.CppUnitTest(
         'append_at_cluster_time_test.cpp',
     ],
     LIBDEPS=[
-        'shared_cluster_commands',
+        'cluster_commands_helpers',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/logical_time',
         '$BUILD_DIR/mongo/unittest/unittest',
@@ -141,7 +151,7 @@ env.CppUnitTest(
         'compute_at_cluster_time_test.cpp',
     ],
     LIBDEPS=[
-        'shared_cluster_commands',
+        'cluster_commands_helpers',
         '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/logical_clock',
