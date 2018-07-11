@@ -66,8 +66,6 @@ public:
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
     static CollectionShardingState* get(OperationContext* opCtx, const std::string& ns);
 
-    static void resetAll(OperationContext* opCtx);
-
     /**
      * Reports all collections which have filtering information associated.
      */
