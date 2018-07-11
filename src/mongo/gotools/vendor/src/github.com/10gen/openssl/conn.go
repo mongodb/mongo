@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Space Monkey, Inc.
+// Copyright (C) 2017. See AUTHORS.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,30 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build cgo
-
 package openssl
 
-/*
-#include <stdlib.h>
-#include <openssl/ssl.h>
-#include <openssl/conf.h>
-#include <openssl/err.h>
-
-int sk_X509_num_not_a_macro(STACK_OF(X509) *sk) { return sk_X509_num(sk); }
-X509 *sk_X509_value_not_a_macro(STACK_OF(X509)* sk, int i) {
-   return sk_X509_value(sk, i);
-}
-long SSL_set_tlsext_host_name_not_a_macro(SSL *ssl, const char *name) {
-   return SSL_set_tlsext_host_name(ssl, name);
-}
-const char * SSL_get_cipher_name_not_a_macro(const SSL *ssl) {
-   return SSL_get_cipher_name(ssl);
-}
-static int SSL_session_reused_not_a_macro(SSL *ssl) {
-    return SSL_session_reused(ssl);
-}
-*/
+// #include "shim.h"
 import "C"
 
 import (
@@ -59,8 +38,9 @@ var (
 )
 
 type Conn struct {
+	*SSL
+
 	conn             net.Conn
-	ssl              *C.SSL
 	ctx              *Ctx // for gc
 	into_ssl         *readBio
 	from_ssl         *writeBio
@@ -156,9 +136,13 @@ func newConn(conn net.Conn, ctx *Ctx) (*Conn, error) {
 	// the ssl object takes ownership of these objects now
 	C.SSL_set_bio(ssl, into_ssl_cbio, from_ssl_cbio)
 
+	s := &SSL{ssl: ssl}
+	C.SSL_set_ex_data(s.ssl, get_ssl_idx(), unsafe.Pointer(s))
+
 	c := &Conn{
+		SSL: s,
+
 		conn:     conn,
-		ssl:      ssl,
 		ctx:      ctx,
 		into_ssl: into_ssl,
 		from_ssl: from_ssl}
@@ -203,8 +187,10 @@ func Server(conn net.Conn, ctx *Ctx) (*Conn, error) {
 	return c, nil
 }
 
+func (c *Conn) GetCtx() *Ctx { return c.ctx }
+
 func (c *Conn) CurrentCipher() (string, error) {
-	p := C.SSL_get_cipher_name_not_a_macro(c.ssl)
+	p := C.X_SSL_get_cipher_name(c.ssl)
 	if p == nil {
 		return "", errors.New("Session not established")
 	}
@@ -358,10 +344,10 @@ func (c *Conn) PeerCertificateChain() (rv []*Certificate, err error) {
 	if sk == nil {
 		return nil, errors.New("no peer certificates found")
 	}
-	sk_num := int(C.sk_X509_num_not_a_macro(sk))
+	sk_num := int(C.X_sk_X509_num(sk))
 	rv = make([]*Certificate, 0, sk_num)
 	for i := 0; i < sk_num; i++ {
-		x := C.sk_X509_value_not_a_macro(sk, C.int(i))
+		x := C.X_sk_X509_value(sk, C.int(i))
 		// ref holds on to the underlying connection memory so we don't need to
 		// worry about incrementing refcounts manually or freeing the X509
 		rv = append(rv, &Certificate{x: x, ref: c})
@@ -578,7 +564,7 @@ func (c *Conn) SetTlsExtHostName(name string) error {
 	defer C.free(unsafe.Pointer(cname))
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	if C.SSL_set_tlsext_host_name_not_a_macro(c.ssl, cname) == 0 {
+	if C.X_SSL_set_tlsext_host_name(c.ssl, cname) == 0 {
 		return errorFromErrorQueue()
 	}
 	return nil
@@ -589,7 +575,7 @@ func (c *Conn) VerifyResult() VerifyResult {
 }
 
 func (c *Conn) SessionReused() bool {
-	return C.SSL_session_reused_not_a_macro(c.ssl) == 1
+	return C.X_SSL_session_reused(c.ssl) == 1
 }
 
 func (c *Conn) GetSession() ([]byte, error) {

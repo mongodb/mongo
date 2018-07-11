@@ -1,4 +1,4 @@
-// Copyright (C) 2015 Space Monkey, Inc.
+// Copyright (C) 2017. See AUTHORS.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <openssl/ssl.h>
-#include <openssl/evp.h>
-#include "_cgo_export.h"
+// +build openssl_static
 
-int ticket_key_cb(SSL *s, unsigned char key_name[16],
-		unsigned char iv[EVP_MAX_IV_LENGTH],
-		EVP_CIPHER_CTX *cctx, HMAC_CTX *hctx, int enc) {
+package openssl
 
-	SSL_CTX* ssl_ctx = SSL_get_SSL_CTX(s);
-	void* p = SSL_CTX_get_ex_data(ssl_ctx, get_ssl_ctx_idx());
-	// get the pointer to the go Ctx object and pass it back into the thunk
-	return ticket_key_cb_thunk(p, s, key_name, iv, cctx, hctx, enc);
-}
+// #cgo linux windows darwin pkg-config: --static libssl libcrypto
+// #cgo CFLAGS: -Wno-deprecated-declarations
+// #cgo windows CFLAGS: -DWIN32_LEAN_AND_MEAN -I"c:/openssl/include"
+// #cgo windows LDFLAGS: -lssleay32 -llibeay32 -lcrypt32 -L "c:/openssl/bin"
+// #cgo darwin LDFLAGS: -framework CoreFoundation -framework Foundation -framework Security
+import "C"

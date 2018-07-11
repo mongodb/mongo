@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Space Monkey, Inc.
+// Copyright (C) 2017. See AUTHORS.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,8 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-// +build cgo
 
 package openssl
 
@@ -37,7 +35,7 @@ func TestSHA1(t *testing.T) {
 		}
 
 		if expected != got {
-			t.Fatal("exp:%x got:%x", expected, got)
+			t.Fatalf("exp:%x got:%x", expected, got)
 		}
 	}
 }
@@ -75,7 +73,7 @@ func TestSHA1Writer(t *testing.T) {
 		}
 
 		if got != exp {
-			t.Fatal("exp:%x got:%x", exp, got)
+			t.Fatalf("exp:%x got:%x", exp, got)
 		}
 	}
 }

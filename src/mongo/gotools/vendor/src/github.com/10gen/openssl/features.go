@@ -14,10 +14,9 @@
 
 package openssl
 
-import "fmt"
+// #include "shim.h"
+import "C"
 
-// We can implemant SNI rfc6066 (http://tools.ietf.org/html/rfc6066) on the server side using foolowing callback.
-// You should implement context storage (tlsCtxStorage) by your self.
-func ExampleSetTLSExtServernameCallback() {
-	fmt.Println("Hello")
+func HasECDH() bool {
+	return C.X_OPENSSL_NO_ECDH() == 0
 }

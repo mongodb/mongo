@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Space Monkey, Inc.
+// Copyright (C) 2017. See AUTHORS.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build cgo
-
 package openssl
 
 /*
@@ -25,11 +23,11 @@ package openssl
 #define X509_CHECK_FLAG_ALWAYS_CHECK_SUBJECT	0x1
 #define X509_CHECK_FLAG_NO_WILDCARDS	0x2
 
-extern int _X509_check_host(X509 *x, const unsigned char *chk, size_t chklen,
+extern int X509_check_host(X509 *x, const unsigned char *chk, size_t chklen,
+    unsigned int flags, char **peername);
+extern int X509_check_email(X509 *x, const unsigned char *chk, size_t chklen,
     unsigned int flags);
-extern int _X509_check_email(X509 *x, const unsigned char *chk, size_t chklen,
-    unsigned int flags);
-extern int _X509_check_ip(X509 *x, const unsigned char *chk, size_t chklen,
+extern int X509_check_ip(X509 *x, const unsigned char *chk, size_t chklen,
 		unsigned int flags);
 #endif
 */
@@ -60,8 +58,9 @@ const (
 func (c *Certificate) CheckHost(host string, flags CheckFlags) error {
 	chost := unsafe.Pointer(C.CString(host))
 	defer C.free(chost)
-	rv := C._X509_check_host(c.x, (*C.uchar)(chost), C.size_t(len(host)),
-		C.uint(flags))
+
+	rv := C.X509_check_host(c.x, (*C.uchar)(chost), C.size_t(len(host)),
+		C.uint(flags), nil)
 	if rv > 0 {
 		return nil
 	}
@@ -79,7 +78,7 @@ func (c *Certificate) CheckHost(host string, flags CheckFlags) error {
 func (c *Certificate) CheckEmail(email string, flags CheckFlags) error {
 	cemail := unsafe.Pointer(C.CString(email))
 	defer C.free(cemail)
-	rv := C._X509_check_email(c.x, (*C.uchar)(cemail), C.size_t(len(email)),
+	rv := C.X509_check_email(c.x, (*C.uchar)(cemail), C.size_t(len(email)),
 		C.uint(flags))
 	if rv > 0 {
 		return nil
@@ -97,7 +96,7 @@ func (c *Certificate) CheckEmail(email string, flags CheckFlags) error {
 // there was no internal error.
 func (c *Certificate) CheckIP(ip net.IP, flags CheckFlags) error {
 	cip := unsafe.Pointer(&ip[0])
-	rv := C._X509_check_ip(c.x, (*C.uchar)(cip), C.size_t(len(ip)),
+	rv := C.X509_check_ip(c.x, (*C.uchar)(cip), C.size_t(len(ip)),
 		C.uint(flags))
 	if rv > 0 {
 		return nil

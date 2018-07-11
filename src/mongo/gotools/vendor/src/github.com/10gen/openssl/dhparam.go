@@ -1,21 +1,20 @@
-// +build cgo
+// Copyright (C) 2017. See AUTHORS.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package openssl
 
-/*
-#include <openssl/crypto.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#include <openssl/conf.h>
-#include <openssl/dh.h>
-
-static long SSL_CTX_set_tmp_dh_not_a_macro(SSL_CTX* ctx, DH *dh) {
-    return SSL_CTX_set_tmp_dh(ctx, dh);
-}
-static long PEM_read_DHparams_not_a_macro(SSL_CTX* ctx, DH *dh) {
-    return SSL_CTX_set_tmp_dh(ctx, dh);
-}
-*/
+// #include "shim.h"
 import "C"
 
 import (
@@ -58,7 +57,7 @@ func (c *Ctx) SetDHParameters(dh *DH) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	if int(C.SSL_CTX_set_tmp_dh_not_a_macro(c.ctx, dh.dh)) != 1 {
+	if int(C.X_SSL_CTX_set_tmp_dh(c.ctx, dh.dh)) != 1 {
 		return errorFromErrorQueue()
 	}
 	return nil

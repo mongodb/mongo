@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Space Monkey, Inc.
+// Copyright (C) 2017. See AUTHORS.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !darwin
 // +build !openssl_pre_1.0
 
 package openssl
@@ -91,6 +90,10 @@ func doDecryption(key, iv, aad, ciphertext, tag []byte, blocksize,
 	if err != nil {
 		return nil, fmt.Errorf("Failed making GCM decryption ctx: %s", err)
 	}
+	err = dctx.SetTag(tag)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to set expected GCM tag: %s", err)
+	}
 	aadbuf := bytes.NewBuffer(aad)
 	for aadbuf.Len() > 0 {
 		err = dctx.ExtraData(aadbuf.Next(bufsize))
@@ -106,10 +109,6 @@ func doDecryption(key, iv, aad, ciphertext, tag []byte, blocksize,
 			return nil, fmt.Errorf("Failed to perform a decryption: %s", err)
 		}
 		plainb.Write(moar)
-	}
-	err = dctx.SetTag(tag)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to set expected GCM tag: %s", err)
 	}
 	moar, err := dctx.DecryptFinal()
 	if err != nil {
