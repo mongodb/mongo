@@ -9,6 +9,8 @@
 
     load('jstests/libs/write_concern_util.js');
 
+    // This ShardingTest is only started to set up a config server replica set and include its
+    // connection string in the shardIdentity doc.
     var st = new ShardingTest({shards: 1});
 
     var replTest = new ReplSetTest({nodes: 3});
@@ -19,8 +21,21 @@
     var secondaries = replTest.getSecondaries();
     var configConnStr = st.configRS.getURL();
 
-    // Shards start in FCV 3.6 until a config server reaches out to them. This causes storage to
-    // shutdown with 3.6 compatible files, requiring rollback via refetch.
+    // In general, shardsvrs default to the lower FCV on fresh start up (their FCV is set to the
+    // cluster's FCV on addShard). However, this test starts a shardsvr that it never adds to the
+    // cluster, but expects behavior that only a FCV>4.0 shardsvr would execute:
+    //
+    // In FCV 3.6, clean shutdown writes uncommitted data to disk in the v3.6-compatible format.
+    // When the node is restarted and sees uncommitted data in the v3.6-compatible format, it fails
+    // to start up. A user can recover from this by restarting the node in v3.6 so that it uses the
+    // rollback via refetch algorithm (rather than recoverable rollback), or by re-initial syncing
+    // the node (by clearing its data directory).
+    //
+    // In FCV 4.0, clean shutdown does not write uncommitted data in the v3.6-compatible format, so
+    // the node is able to be restarted.
+    //
+    // To avoid re-writing this test to take one of these user actions, we simply set the FCV on the
+    // --shardsvr explicitly to 4.0.
     priConn.adminCommand({setFeatureCompatibilityVersion: "4.0"});
 
     // Wait for the secondaries to have the latest oplog entries before stopping the fetcher to
