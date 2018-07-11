@@ -199,13 +199,6 @@ TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
         auto scm3 = _manager->getActiveMetadata(_manager, boost::none);  // and increment refcount
         ASSERT_EQ(1ULL, scm3->getChunks().size());
 
-        auto overlaps = _manager->overlappingMetadata(
-            _manager, ChunkRange(BSON("key" << 0), BSON("key" << 10)));
-        ASSERT_EQ(2ULL, overlaps.size());
-
-        ASSERT_EQ(scm2->getShardVersion(), overlaps[1]->getShardVersion());
-        ASSERT_EQ(scm3->getShardVersion(), overlaps[0]->getShardVersion());
-
         ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 3UL);
         ASSERT_EQ(_manager->numberOfRangesToClean(), 0UL);  // not yet...
 

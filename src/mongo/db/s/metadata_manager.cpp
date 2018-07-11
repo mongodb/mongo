@@ -438,35 +438,6 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
     return orphans.back().notification;
 }
 
-std::vector<ScopedCollectionMetadata> MetadataManager::overlappingMetadata(
-    std::shared_ptr<MetadataManager> const& self, ChunkRange const& range) {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
-    invariant(!_metadata.empty());
-
-    std::vector<ScopedCollectionMetadata> result;
-    result.reserve(_metadata.size());
-
-    // Start with the active metadata
-    auto it = _metadata.rbegin();
-    if ((*it)->metadata.rangeOverlapsChunk(range)) {
-        // We ignore the refcount of the active mapping; effectively, we assume it is in use.
-        result.push_back(ScopedCollectionMetadata(lg, self, (*it)));
-    }
-
-    // Continue to snapshots
-    ++it;
-    for (; it != _metadata.rend(); ++it) {
-        auto& tracker = *it;
-
-        // We want all the overlapping snapshot mappings still possibly in use by a query.
-        if (tracker->usageCounter > 0 && tracker->metadata.rangeOverlapsChunk(range)) {
-            result.push_back(ScopedCollectionMetadata(lg, self, tracker));
-        }
-    }
-
-    return result;
-}
-
 size_t MetadataManager::numberOfRangesToCleanStillInUse() const {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
     size_t count = 0;

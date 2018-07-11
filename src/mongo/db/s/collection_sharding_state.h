@@ -54,11 +54,6 @@ class CollectionShardingState : public Decorable<CollectionShardingState> {
     MONGO_DISALLOW_COPYING(CollectionShardingState);
 
 public:
-    using CleanupNotification = CollectionRangeDeleter::DeleteNotification;
-
-    /**
-     * Instantiates a new per-collection sharding state as unsharded.
-     */
     CollectionShardingState(ServiceContext* sc, NamespaceString nss);
 
     /**
@@ -72,6 +67,10 @@ public:
     static CollectionShardingState* get(OperationContext* opCtx, const std::string& ns);
 
     static void resetAll(OperationContext* opCtx);
+
+    /**
+     * Reports all collections which have filtering information associated.
+     */
     static void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
@@ -85,11 +84,22 @@ public:
     ScopedCollectionMetadata getMetadata(OperationContext* opCtx);
 
     /**
+     * Checks whether the shard version in the operation context is compatible with the shard
+     * version of the collection and if not, throws StaleConfigException populated with the received
+     * and wanted versions.
+     */
+    void checkShardVersionOrThrow(OperationContext* opCtx);
+
+    /**
      * BSON output of the pending metadata into a BSONArray
      */
     void toBSONPending(BSONArrayBuilder& bb) const {
         _metadataManager->toBSONPending(bb);
     }
+
+    //
+    // Methods used by the sharding runtime only (all runtime)
+    //
 
     /**
      * Updates the metadata based on changes received from the config server and also resolves the
@@ -106,6 +116,30 @@ public:
      */
     void markNotShardedAtStepdown();
 
+    //
+    // Methods used by the sharding runtime only (donor shard)
+    //
+
+    /**
+     * Methods to control the collection's critical section. Must be called with the collection X
+     * lock held.
+     */
+    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx);
+    void enterCriticalSectionCommitPhase(OperationContext* opCtx);
+    void exitCriticalSection(OperationContext* opCtx);
+
+    /**
+     * If the collection is currently in a critical section, returns the critical section signal to
+     * be waited on. Otherwise, returns nullptr.
+     */
+    auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const {
+        return _critSec.getSignal(op);
+    }
+
+    //
+    // Methods used by the sharding runtime only (recipient shard)
+    //
+
     /**
      * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
      * on them, and adds the range to the list of pending ranges. Otherwise, returns a notification
@@ -113,11 +147,12 @@ public:
      * to wait for the deletion to complete or fail.  After that, call waitForClean to ensure no
      * other deletions are pending for the range.
      */
-    auto beginReceive(ChunkRange const& range) -> CleanupNotification;
+    using CleanupNotification = CollectionRangeDeleter::DeleteNotification;
+    CleanupNotification beginReceive(ChunkRange const& range);
 
     /*
      * Removes `range` from the list of pending ranges, and schedules any documents in the range for
-     * immediate cleanup.  Does not block.
+     * immediate cleanup. Does not block.
      */
     void forgetReceive(const ChunkRange& range);
 
@@ -132,33 +167,7 @@ public:
      * result.abandon(), instead of waitStatus, to ignore the outcome.
      */
     enum CleanWhen { kNow, kDelayed };
-    auto cleanUpRange(ChunkRange const& range, CleanWhen) -> CleanupNotification;
-
-    /**
-     * Returns a vector of ScopedCollectionMetadata objects representing metadata instances in use
-     * by running queries that overlap the argument range, suitable for identifying and invalidating
-     * those queries.
-     */
-    std::vector<ScopedCollectionMetadata> overlappingMetadata(ChunkRange const& range) const;
-
-    /**
-     * Methods to control the collection's critical section. Must be called with the collection X
-     * lock held.
-     */
-    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx);
-    void enterCriticalSectionCommitPhase(OperationContext* opCtx);
-    void exitCriticalSection(OperationContext* opCtx);
-
-    auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const {
-        return _critSec.getSignal(op);
-    }
-
-    /**
-     * Checks whether the shard version in the operation context is compatible with the shard
-     * version of the collection and if not throws StaleConfigException populated with the received
-     * and wanted versions.
-     */
-    void checkShardVersionOrThrow(OperationContext* opCtx);
+    CleanupNotification cleanUpRange(ChunkRange const& range, CleanWhen when);
 
     /**
      * Tracks deletion of any documents within the range, returning when deletion is complete.
@@ -191,6 +200,7 @@ private:
     // Contains all the metadata associated with this collection.
     std::shared_ptr<MetadataManager> _metadataManager;
 
+    // Tracks the migration critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;
 
     // for access to _metadataManager

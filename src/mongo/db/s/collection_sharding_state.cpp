@@ -145,8 +145,6 @@ public:
                 ScopedCollectionMetadata metadata = coll.second->getMetadata(opCtx);
                 if (metadata->isSharded()) {
                     versionB.appendTimestamp(coll.first, metadata->getShardVersion().toLong());
-                } else {
-                    versionB.appendTimestamp(coll.first, ChunkVersion::UNSHARDED().toLong());
                 }
             }
         }
@@ -224,11 +222,6 @@ auto CollectionShardingState::cleanUpRange(ChunkRange const& range, CleanWhen wh
     Date_t time = (when == kNow) ? Date_t{} : Date_t::now() +
             stdx::chrono::seconds{orphanCleanupDelaySecs.load()};
     return _metadataManager->cleanUpRange(range, time);
-}
-
-std::vector<ScopedCollectionMetadata> CollectionShardingState::overlappingMetadata(
-    ChunkRange const& range) const {
-    return _metadataManager->overlappingMetadata(_metadataManager, range);
 }
 
 void CollectionShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {

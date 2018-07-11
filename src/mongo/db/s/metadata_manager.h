@@ -113,14 +113,6 @@ public:
     CleanupNotification cleanUpRange(ChunkRange const& range, Date_t whenToDelete);
 
     /**
-     * Returns a vector of ScopedCollectionMetadata objects representing metadata instances in use
-     * by running queries that overlap the argument range, suitable for identifying and invalidating
-     * those queries.
-     */
-    std::vector<ScopedCollectionMetadata> overlappingMetadata(
-        std::shared_ptr<MetadataManager> const& itself, ChunkRange const& range);
-
-    /**
      * Returns the number of ranges scheduled to be cleaned, exclusive of such ranges that might
      * still be in use by running queries.  Outside of test drivers, the actual number may vary
      * after it returns, so this is really only useful for unit tests.
@@ -281,9 +273,6 @@ public:
 private:
     friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(
         std::shared_ptr<MetadataManager>, const boost::optional<LogicalTime>&);
-
-    friend std::vector<ScopedCollectionMetadata> MetadataManager::overlappingMetadata(
-        std::shared_ptr<MetadataManager> const&, ChunkRange const&);
 
     /**
      * Increments the usageCounter in the specified CollectionMetadata.
