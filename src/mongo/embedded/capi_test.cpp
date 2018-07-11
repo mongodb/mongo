@@ -547,7 +547,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "getMore",
                                           "getParameter",
                                           "getPrevError",
-                                          "getShardMap",
                                           "insert",
                                           "isMaster",
                                           "killCursors",

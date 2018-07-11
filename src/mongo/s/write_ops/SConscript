@@ -33,11 +33,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/async_requests_sender',
+        '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
         'batch_write_types',
     ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
-    ]
 )
 
 env.Library(
