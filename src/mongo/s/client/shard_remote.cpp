@@ -110,7 +110,7 @@ ShardRemote::ShardRemote(const ShardId& id,
 ShardRemote::~ShardRemote() = default;
 
 bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
-    if (internalProhibitShardOperationRetry.loadRelaxed()) {
+    if (internalProhibitShardOperationRetry.load()) {
         return false;
     }
 
