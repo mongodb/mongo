@@ -139,6 +139,7 @@ env.Library(
     source=[
         'metadata.cpp',
         'metadata/audit_metadata.cpp',
+        'metadata/client_metadata_naive.cpp',
         'metadata/config_server_metadata.cpp',
         'metadata/server_selection_metadata.cpp',
         'metadata/sharding_metadata.cpp',
@@ -150,6 +151,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/util/decorable',
+        '$BUILD_DIR/mongo/util/net/hostandport',
     ],
 )
 

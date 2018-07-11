@@ -29,7 +29,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/rpc/metadata/client_metadata_naive.h"
 #include "mongo/s/catalog/forwarding_catalog_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -65,6 +67,8 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
+        logClientMetadata(txn->getClient(), cmdObj);
+
         result.appendBool("ismaster", true);
         result.append("msg", "isdbgrid");
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
