@@ -141,6 +141,46 @@ err:	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 }
 
 /*
+ * __wt_turtle_exists --
+ *	Return if the turtle file exists on startup.
+ */
+int
+__wt_turtle_exists(WT_SESSION_IMPL *session, bool *existp)
+{
+	/*
+	 * The last thing we do in database initialization is rename a turtle
+	 * file into place, and there's never a database home after that point
+	 * without a turtle file. On startup we check if the turtle file exists
+	 * to decide if we're creating the database or re-opening an existing
+	 * database.
+	 *	Unfortunately, we re-write the turtle file at checkpoint end,
+	 * first creating the "set" file and then renaming it into place.
+	 * Renames on Windows aren't guaranteed to be atomic, a power failure
+	 * could leave us with only the set file. The turtle file is the file
+	 * we regularly rename when WiredTiger is running, so if we're going to
+	 * get caught, the turtle file is where it will happen. If we have a set
+	 * file and no turtle file, rename the set file into place. We don't
+	 * know what went wrong for sure, so this can theoretically make it
+	 * worse, but there aren't alternatives other than human intervention.
+	 */
+	WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE, existp));
+	if (*existp)
+		return (0);
+
+	WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE_SET, existp));
+	if (!*existp)
+		return (0);
+
+	WT_RET(__wt_fs_rename(session,
+	    WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE, true));
+	WT_RET(__wt_msg(session,
+	    "%s not found, %s renamed to %s",
+	    WT_METADATA_TURTLE, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE));
+	*existp = true;
+	return  (0);
+}
+
+/*
  * __wt_turtle_init --
  *	Check the turtle file and create if necessary.
  */

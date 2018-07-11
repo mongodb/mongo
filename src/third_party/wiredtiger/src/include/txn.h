@@ -147,7 +147,7 @@ struct __wt_txn_global {
 	volatile bool	  checkpoint_running;	/* Checkpoint running */
 	volatile uint32_t checkpoint_id;	/* Checkpoint's session ID */
 	WT_TXN_STATE	  checkpoint_state;	/* Checkpoint's txn state */
-	WT_TXN           *checkpoint_txn;	/* Checkpoint's txn structure */
+	WT_DECL_TIMESTAMP(checkpoint_timestamp)	/* Checkpoint's timestamp */
 
 	volatile uint64_t metadata_pinned;	/* Oldest ID for metadata */
 

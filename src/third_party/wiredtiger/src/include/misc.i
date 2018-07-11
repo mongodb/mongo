@@ -248,3 +248,26 @@ __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs)
 	(*sleep_usecs) = WT_MIN((*sleep_usecs) + 100, WT_THOUSAND);
 	__wt_sleep(0, (*sleep_usecs));
 }
+
+				/* Maximum stress delay is 1/10 of a second. */
+#define	WT_TIMING_STRESS_MAX_DELAY	(100000)
+
+/*
+ * __wt_timing_stress --
+ *	Optionally add delay to stress code paths.
+ */
+static inline void
+__wt_timing_stress(WT_SESSION_IMPL *session, u_int flag)
+{
+	WT_CONNECTION_IMPL *conn;
+	uint64_t sleep_usecs;
+
+	conn = S2C(session);
+
+	/* Only sleep when the specified configuration flag is set. */
+	if (!FLD_ISSET(conn->timing_stress_flags, flag))
+		return;
+
+	sleep_usecs = __wt_random(&session->rnd) % WT_TIMING_STRESS_MAX_DELAY;
+	__wt_sleep(0, sleep_usecs);
+}

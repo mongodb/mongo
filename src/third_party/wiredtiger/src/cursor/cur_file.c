@@ -710,7 +710,7 @@ __curfile_create(WT_SESSION_IMPL *session,
 	 * WiredTiger.wt should not be cached, doing so interferes
 	 * with named checkpoints.
 	 */
-	if (cacheable && !WT_STREQ(WT_METAFILE_URI, cursor->internal_uri))
+	if (cacheable && strcmp(WT_METAFILE_URI, cursor->internal_uri) != 0)
 		F_SET(cursor, WT_CURSTD_CACHEABLE);
 
 	WT_ERR(__wt_cursor_init(

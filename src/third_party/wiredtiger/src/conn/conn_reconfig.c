@@ -232,8 +232,7 @@ done:	conn->req_max_major = max_major;
 	conn->req_min_major = min_major;
 	conn->req_min_minor = min_minor;
 
-err:	if (value != NULL)
-		__wt_free(session, value);
+err:	__wt_free(session, value);
 
 	return (ret);
 }

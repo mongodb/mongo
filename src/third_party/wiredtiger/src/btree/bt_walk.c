@@ -176,44 +176,96 @@ __ref_ascend(WT_SESSION_IMPL *session,
 }
 
 /*
- * __ref_initial_descent_prev --
- *	Descend the tree one level, when setting up the initial cursor position
- * for a previous-cursor walk.
+ * __split_prev_race --
+ *	Check for races when descending the tree during a previous-cursor walk.
  */
 static inline bool
-__ref_initial_descent_prev(
+__split_prev_race(
     WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp)
 {
 	WT_PAGE_INDEX *pindex;
 
 	/*
-	 * When splitting an internal page into its parent, we move the WT_REF
-	 * structures and update the parent's page index before updating the
-	 * split page's page index, and it's not an atomic update. A thread can
-	 * read the parent page's replacement page index, then read the split
-	 * page's original index, or the parent page's original and the split
-	 * page's replacement.
+	 * Handle a cursor moving backwards through the tree or setting up at
+	 * the end of the tree. We're passed the child page into which we're
+	 * descending, and the parent page's page-index we used to find that
+	 * child page.
+	 *
+	 * When splitting an internal page into its parent, we move the split
+	 * pages WT_REF structures, then update the parent's page index, then
+	 * update the split page's page index, and nothing is atomic. A thread
+	 * can read the parent page's replacement page index and then the split
+	 * page's original index, or vice-versa, and either change can cause a
+	 * cursor moving backwards through the tree to skip pages.
 	 *
 	 * This isn't a problem for a cursor setting up at the start of the tree
-	 * because we do right-hand splits on internal pages and the initial
-	 * part of the split page's namespace won't change as part of a split.
-	 * A thread reading the parent page's and split page's indexes will move
-	 * to the same slot no matter what order of indexes are read.
+	 * or moving forward through the tree because we do right-hand splits on
+	 * internal pages and the initial part of the split page's namespace
+	 * won't change as part of a split (in other words, a thread reading the
+	 * parent page's and split page's indexes will move to the same slot no
+	 * matter what order of indexes are read.
 	 *
-	 * Handle a cursor setting up at the end of the tree.
-	 *
-	 * We're passed a child page into which we're descending, and on which
-	 * we have a hazard pointer.
-	 *
-	 * Acquire a page index for the child page and then confirm we haven't
-	 * raced with a parent split.
+	 * Acquire the child's page index, then confirm the parent's page index
+	 * hasn't changed, to check for reading an old version of the parent's
+	 * page index and then reading a new version of the child's page index.
 	 */
 	WT_INTL_INDEX_GET(session, ref->page, pindex);
 	if (__wt_split_descent_race(session, ref, *pindexp))
-		return (false);
+		return (true);
+
+	/*
+	 * That doesn't check if we read a new version of parent's page index
+	 * and then an old version of the child's page index. For example, if
+	 * a thread were in a newly created split page subtree, the split
+	 * completes into the parent before the thread reads it and descends
+	 * into the child (where the split hasn't yet completed).
+	 *
+	 * Imagine an internal page with 3 child pages, with the namespaces a-f,
+	 * g-h and i-j; the first child page splits. The parent starts out with
+	 * the following page-index:
+	 *
+	 *	| ... | a | g | i | ... |
+	 *
+	 * The split page starts out with the following page-index:
+	 *
+	 *	| a | b | c | d | e | f |
+	 *
+	 * The first step is to move the c-f ranges into a new subtree, so, for
+	 * example we might have two new internal pages 'c' and 'e', where the
+	 * new 'c' page references the c-d namespace and the new 'e' page
+	 * references the e-f namespace. The top of the subtree references the
+	 * parent page, but until the parent's page index is updated, threads in
+	 * the subtree won't be able to ascend out of the subtree. However, once
+	 * the parent page's page index is updated to this:
+	 *
+	 *	| ... | a | c | e | g | i | ... |
+	 *
+	 * threads in the subtree can ascend into the parent. Imagine a cursor
+	 * in the c-d part of the namespace that ascends to the parent's 'c'
+	 * slot. It would then decrement to the slot before the 'c' slot, the
+	 * 'a' slot.
+	 *
+	 * The previous-cursor movement selects the last slot in the 'a' page;
+	 * if the split page's page-index hasn't been updated yet, it selects
+	 * the 'f' slot, which is incorrect. Once the split page's page index is
+	 * updated to this:
+	 *
+	 *	| a | b |
+	 *
+	 * the previous-cursor movement will select the 'b' slot, which is
+	 * correct.
+	 *
+	 * If the last slot on the page no longer points to the current page as
+	 * its "home", the page is being split and part of its namespace moved,
+	 * restart. (We probably don't have to restart, I think we could spin
+	 * until the page-index is updated, but I'm not willing to debug that
+	 * one if I'm wrong.)
+	 */
+	if (pindex->index[pindex->entries - 1]->home != ref->page)
+		return (true);
 
 	*pindexp = pindex;
-	return (true);
+	return (false);
 }
 
 /*
@@ -229,22 +281,21 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE_INDEX *pindex;
-	WT_REF *couple, *couple_orig, *ref;
+	WT_REF *couple, *ref, *ref_orig;
 	uint64_t sleep_usecs, yield_count;
 	uint32_t current_state, slot;
-	bool empty_internal, initial_descent, prev, skip;
+	bool empty_internal, prev, skip;
 
 	btree = S2BT(session);
 	pindex = NULL;
 	sleep_usecs = yield_count = 0;
-	empty_internal = initial_descent = false;
+	empty_internal = false;
 
 	/*
-	 * Tree walks are special: they look inside page structures that splits
-	 * may want to free.  Publish that the tree is active during this
-	 * window.
+	 * We're not supposed to walk trees without root pages. As this has not
+	 * always been the case, assert to debug that change.
 	 */
-	WT_ENTER_PAGE_INDEX(session);
+	WT_ASSERT(session, btree->root.page != NULL);
 
 	/* Check whether deleted pages can be skipped. */
 	if (!LF_ISSET(WT_READ_DELETED_SKIP))
@@ -284,36 +335,41 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	 * new leaf, couple to the next page to which we're descending, it
 	 * saves a hazard-pointer swap for each cursor page movement.
 	 *
-	 * !!!
-	 * NOTE: we depend on the fact it's OK to release a page we don't hold,
-	 * that is, it's OK to release couple when couple is set to NULL.
-	 *
-	 * Take a copy of any held page and clear the return value.  Remember
-	 * the hazard pointer we're currently holding.
-	 *
-	 * Clear the returned value, it makes future error handling easier.
+	 * The hazard pointer on the original location is held until the end of
+	 * the movement, in case we have to restart the movement. Take a copy
+	 * of any held page and clear the return value (it makes future error
+	 * handling easier).
 	 */
-	couple = couple_orig = ref = *refp;
+	couple = NULL;
+	ref_orig = *refp;
 	*refp = NULL;
 
+	/*
+	 * Tree walks are special: they look inside page structures that splits
+	 * may want to free. Publish the tree is active during this window.
+	 */
+	WT_ENTER_PAGE_INDEX(session);
+
 	/* If no page is active, begin a walk from the start/end of the tree. */
-	if (ref == NULL) {
-restart:	/*
-		 * We can be here with a NULL or root WT_REF; the page release
-		 * function handles them internally, don't complicate this code
-		 * by calling them out.
-		 */
-		WT_ERR(__wt_page_release(session, couple, flags));
+	if ((ref = ref_orig) == NULL) {
+		if (0) {
+restart:		/*
+			 * Yield before retrying, and if we've yielded enough
+			 * times, start sleeping so we don't burn CPU to no
+			 * purpose.
+			 */
+			__wt_spin_backoff(&yield_count, &sleep_usecs);
 
-		/*
-		 * We're not supposed to walk trees without root pages. As this
-		 * has not always been the case, assert to debug that change.
-		 */
-		WT_ASSERT(session, btree->root.page != NULL);
+			WT_ERR(__wt_page_release(session, couple, flags));
+			couple = NULL;
+		}
 
-		couple = couple_orig = ref = &btree->root;
-		initial_descent = true;
-		goto descend;
+		if ((ref = ref_orig) == NULL) {
+			ref = &btree->root;
+			WT_INTL_INDEX_GET(session, ref->page, pindex);
+			slot = prev ? pindex->entries - 1 : 0;
+			goto descend;
+		}
 	}
 
 	/*
@@ -340,12 +396,9 @@ restart:	/*
 
 			/*
 			 * If at the root and returning internal pages, return
-			 * the root page, otherwise we're done. Regardless, no
-			 * hazard pointer is required, release the one we hold.
+			 * the root page, otherwise we're done.
 			 */
 			if (__wt_ref_is_root(ref)) {
-				WT_ERR(__wt_page_release(
-				    session, couple, flags));
 				if (!LF_ISSET(WT_READ_SKIP_INTL))
 					*refp = ref;
 				goto done;
@@ -356,7 +409,7 @@ restart:	/*
 			 * all of the child pages were deleted, mark it for
 			 * eviction.
 			 */
-			if (empty_internal && pindex->entries > 1) {
+			if (empty_internal) {
 				__wt_page_evict_soon(session, ref);
 				empty_internal = false;
 			}
@@ -367,17 +420,18 @@ restart:	/*
 			 * handle restart or not-found returns, it would require
 			 * additional complexity and is not a possible return:
 			 * we're moving to the parent of the current child page,
-			 * the parent can't have been evicted. (This is why we
-			 * don't pass "prev" to the page-swap function, we can't
-			 * handle the restart error returned if the parent page
-			 * is currently splitting.)
+			 * the parent can't have been evicted.
 			 */
 			if (!LF_ISSET(WT_READ_SKIP_INTL)) {
 				WT_ERR(__wt_page_swap(
-				    session, couple, ref, false, flags));
+				    session, couple, ref, flags));
+				couple = NULL;
 				*refp = ref;
 				goto done;
 			}
+
+			/* Encourage races. */
+			__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_8);
 		}
 
 		if (prev)
@@ -389,9 +443,9 @@ restart:	/*
 			++*walkcntp;
 
 		for (;;) {
-			/*
-			 * Move to the next slot, and set the reference hint if
-			 * it's wrong (used when we continue the walk). We don't
+descend:		/*
+			 * Get a reference, setting the reference hint if it's
+			 * wrong (used when we continue the walk). We don't
 			 * always update the hints when splitting, it's expected
 			 * for them to be incorrect in some workloads.
 			 */
@@ -452,12 +506,41 @@ restart:	/*
 					break;
 			}
 
-			ret = __wt_page_swap(session, couple, ref, prev,
+			ret = __wt_page_swap(session, couple, ref,
 			    WT_READ_NOTFOUND_OK | WT_READ_RESTART_OK | flags);
+			if (ret == 0) {
+				/* Success, so "couple" has been released. */
+				couple = NULL;
+
+				/* Return leaf pages to our caller. */
+				if (!WT_PAGE_IS_INTERNAL(ref->page)) {
+					*refp = ref;
+					goto done;
+				}
+
+				/* Set the new "couple" value. */
+				couple = ref;
+
+				/* Configure traversal of any internal page. */
+				empty_internal = true;
+				if (prev) {
+					if (__split_prev_race(
+					    session, ref, &pindex))
+						goto restart;
+					slot = pindex->entries - 1;
+				} else {
+					WT_INTL_INDEX_GET(
+					    session, ref->page, pindex);
+					slot = 0;
+				}
+				continue;
+			}
 
 			/*
-			 * Not-found is an expected return when only walking
+			 * Not-found is an expected return when walking only
 			 * in-cache pages, or if we see a deleted page.
+			 *
+			 * An expected error, so "couple" is unchanged.
 			 */
 			if (ret == WT_NOTFOUND) {
 				WT_NOT_READ(ret, 0);
@@ -466,94 +549,24 @@ restart:	/*
 
 			/*
 			 * The page we're moving to might have split, in which
-			 * case move to the last position we held.
+			 * case restart the movement.
+			 *
+			 * An expected error, so "couple" is unchanged.
 			 */
-			if (ret == WT_RESTART) {
-				ret = 0;
+			if (ret == WT_RESTART)
+				goto restart;
 
-				/*
-				 * Yield before retrying, and if we've yielded
-				 * enough times, start sleeping so we don't burn
-				 * CPU to no purpose.
-				 */
-				__wt_spin_backoff(
-				    &yield_count, &sleep_usecs);
-
-				/*
-				 * If a cursor is setting up at the end of the
-				 * tree, we can't use our parent page's index,
-				 * because it may have already split; restart
-				 * the walk.
-				 */
-				if (prev && initial_descent)
-					goto restart;
-
-				/*
-				 * If a new walk that never coupled from the
-				 * root to a new saved position in the tree,
-				 * restart the walk.
-				 */
-				if (couple == &btree->root)
-					goto restart;
-
-				/*
-				 * If restarting from some original position,
-				 * repeat the increment or decrement we made at
-				 * that time. Otherwise, couple is an internal
-				 * page we've acquired after moving from that
-				 * starting position and we can treat it as a
-				 * new page. This works because we never acquire
-				 * a hazard pointer on a leaf page we're not
-				 * going to return to our caller, this will quit
-				 * working if that ever changes.
-				 */
-				WT_ASSERT(session,
-				    couple == couple_orig ||
-				    WT_PAGE_IS_INTERNAL(couple->page));
-				ref = couple;
-				__ref_index_slot(session, ref, &pindex, &slot);
-				if (couple == couple_orig)
-					break;
-			}
-			WT_ERR(ret);
-			couple = ref;
-
-			/*
-			 * A new page: configure for traversal of any internal
-			 * page's children, else return the leaf page.
-			 */
-			if (WT_PAGE_IS_INTERNAL(ref->page)) {
-descend:			empty_internal = true;
-
-				/*
-				 * There's a split race when a cursor is setting
-				 * up at the end of the tree.
-				 */
-				if (prev && initial_descent) {
-					if (!__ref_initial_descent_prev(
-					    session, ref, &pindex))
-						goto restart;
-				} else
-					WT_INTL_INDEX_GET(
-					    session, ref->page, pindex);
-				slot = prev ? pindex->entries - 1 : 0;
-				continue;
-			}
-
-			/*
-			 * The tree-walk restart code knows we return any leaf
-			 * page we acquire (never hazard-pointer coupling on
-			 * after acquiring a leaf page), and asserts no restart
-			 * happens while holding a leaf page. This page must be
-			 * returned to our caller.
-			 */
-			*refp = ref;
-			goto done;
+			/* Unexpected error, so "couple" was released. */
+			couple = NULL;
+			goto err;
 		}
 	}
 
 done:
-err:	WT_LEAVE_PAGE_INDEX(session);
+err:
+	WT_TRET(__wt_page_release(session, couple, flags));
+	WT_TRET(__wt_page_release(session, ref_orig, flags));
+	WT_LEAVE_PAGE_INDEX(session);
 	return (ret);
 }
 

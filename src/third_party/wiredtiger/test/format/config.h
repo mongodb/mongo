@@ -331,40 +331,48 @@ static CONFIG c[] = {
 	  C_IGNORE, 0, 0, UINT_MAX, &g.c_timer, NULL },
 
 	{ "timing_stress_checkpoint",
-	  "configure slow checkpoints",				/* 2% */
+	  "stress checkpoints",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_checkpoint, NULL },
 
 	{ "timing_stress_lookaside_sweep",
-	  "configure slow lookaside sweep",			/* 2% */
+	  "stress lookaside sweep",				/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_lookaside_sweep, NULL },
 
 	{ "timing_stress_split_1",
-	  "configure slow splits (#1)",				/* 2% */
+	  "stress splits (#1)",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_1, NULL },
 
 	{ "timing_stress_split_2",
-	  "configure slow splits (#2)",				/* 2% */
+	  "stress splits (#2)",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_2, NULL },
 
 	{ "timing_stress_split_3",
-	  "configure slow splits (#3)",				/* 2% */
+	  "stress splits (#3)",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_3, NULL },
 
 	{ "timing_stress_split_4",
-	  "configure slow splits (#4)",				/* 2% */
+	  "stress splits (#4)",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_4, NULL },
 
 	{ "timing_stress_split_5",
-	  "configure slow splits (#5)",				/* 2% */
+	  "stress splits (#5)",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_5, NULL },
 
 	{ "timing_stress_split_6",
-	  "configure slow splits (#6)",				/* 2% */
+	  "stress splits (#6)",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_6, NULL },
 
 	{ "timing_stress_split_7",
-	  "configure slow splits (#7)",				/* 2% */
+	  "stress splits (#7)",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_7, NULL },
+
+	{ "timing_stress_split_8",
+	  "stress splits (#8)",					/* 2% */
+	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_8, NULL },
+
+	{ "timing_stress_split_9",
+	  "stress splits (#9)",					/* 2% */
+	  C_BOOL, 2, 0, 0, &g.c_timing_stress_split_9, NULL },
 
 	{ "transaction_timestamps",				/* 10% */
 	  "enable transaction timestamp support",

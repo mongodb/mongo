@@ -234,14 +234,13 @@ struct __wt_ovfl_reuse {
  */
 struct __wt_page_lookaside {
 	uint64_t las_pageid;		/* Page ID in lookaside */
-	uint64_t las_max_txn;		/* Max transaction ID in lookaside */
-	uint64_t las_min_txn;		/* Min transaction ID in lookaside */
-	WT_DECL_TIMESTAMP(min_timestamp)/* Min timestamp in lookaside */
-					/* Max timestamp on page */
-	WT_DECL_TIMESTAMP(onpage_timestamp)
+	uint64_t max_txn;		/* Maximum transaction ID */
+	uint64_t unstable_txn;		/* First transaction ID not on page */
+	WT_DECL_TIMESTAMP(max_timestamp)/* Maximum timestamp */
+	WT_DECL_TIMESTAMP(unstable_timestamp)/* First timestamp not on page */
 	bool eviction_to_lookaside;	/* Revert to lookaside on eviction */
-	bool las_skew_newest;		/* On-page skewed to newest */
 	bool invalid;			/* History is required correct reads */
+	bool skew_newest;		/* Page image has newest versions */
 };
 
 /*
@@ -269,6 +268,9 @@ struct __wt_page_modify {
 	/* The largest transaction seen on the page by reconciliation. */
 	uint64_t rec_max_txn;
 	WT_DECL_TIMESTAMP(rec_max_timestamp)
+
+	/* Stable timestamp at last reconciliation. */
+	WT_DECL_TIMESTAMP(last_stable_timestamp)
 
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
@@ -481,7 +483,9 @@ struct __wt_page_modify {
 #define	WT_PM_REC_REPLACE	3	/* Reconciliation: single block */
 	uint8_t rec_result;		/* Reconciliation state */
 
-	uint8_t update_restored;	/* Page created by restoring updates */
+#define	WT_PAGE_RS_LOOKASIDE	0x1
+#define	WT_PAGE_RS_RESTORED	0x2
+	uint8_t restore_state;		/* Created by restoring updates */
 };
 
 /*

@@ -227,9 +227,12 @@
 } while (0)
 
 /*
- * Check if a variable string equals a constant string.  Inline the common
- * case for WiredTiger of a single byte string.  This is required because not
- * all compilers optimize this case in strcmp (e.g., clang).
+ * Check if a variable string equals a constant string. Inline the common case
+ * for WiredTiger of a single byte string. This is required because not all
+ * compilers optimize this case in strcmp (e.g., clang). While this macro works
+ * in the case of comparing two pointers (a sizeof operator on a pointer won't
+ * equal 2 and the extra code will be discarded at compile time), that's not its
+ * purpose.
  */
 #define	WT_STREQ(s, cs)							\
 	(sizeof(cs) == 2 ? (s)[0] == (cs)[0] && (s)[1] == '\0' :	\
@@ -294,16 +297,15 @@ typedef void wt_timestamp_t;
 	__wt_scr_alloc_func(session, size, scratchp, __func__, __LINE__)
 #define	__wt_page_in(session, ref, flags)				\
 	__wt_page_in_func(session, ref, flags, __func__, __LINE__)
-#define	__wt_page_swap(session, held, want, prev_race, flags)		\
-	__wt_page_swap_func(						\
-	    session, held, want, prev_race, flags, __func__, __LINE__)
+#define	__wt_page_swap(session, held, want, flags)			\
+	__wt_page_swap_func(session, held, want, flags, __func__, __LINE__)
 #else
 #define	__wt_scr_alloc(session, size, scratchp)				\
 	__wt_scr_alloc_func(session, size, scratchp)
 #define	__wt_page_in(session, ref, flags)				\
 	__wt_page_in_func(session, ref, flags)
-#define	__wt_page_swap(session, held, want, prev_race, flags)		\
-	__wt_page_swap_func(session, held, want, prev_race, flags)
+#define	__wt_page_swap(session, held, want, flags)			\
+	__wt_page_swap_func(session, held, want, flags)
 #endif
 
 /* Called on unexpected code path: locate the failure. */
@@ -336,6 +338,3 @@ union __wt_rand_state {
 			continue;					\
 		}
 #define	WT_TAILQ_SAFE_REMOVE_END }
-
-/* Sleep time to uncover race conditions during timing stress test. */
-#define	TIMING_STRESS_TEST_SLEEP	(100 * WT_THOUSAND)

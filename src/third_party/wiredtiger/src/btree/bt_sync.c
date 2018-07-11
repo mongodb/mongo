@@ -118,6 +118,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
 	WT_REF *prev, *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
@@ -256,9 +257,24 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			if (walk == NULL)
 				break;
 
-			/* Skip clean pages. */
-			if (!__wt_page_is_modified(walk->page))
+			/*
+			 * Skip clean pages, but need to make sure maximum
+			 * transaction ID is always updated.
+			 */
+			if (!__wt_page_is_modified(walk->page)) {
+				if (((mod = walk->page->modify) != NULL) &&
+				    mod->rec_max_txn > btree->rec_max_txn)
+					btree->rec_max_txn = mod->rec_max_txn;
+#ifdef HAVE_TIMESTAMPS
+				if (mod != NULL && __wt_timestamp_cmp(
+				    &btree->rec_max_timestamp,
+				    &mod->rec_max_timestamp) < 0)
+					__wt_timestamp_set(
+					    &btree->rec_max_timestamp,
+					    &mod->rec_max_timestamp);
+#endif
 				continue;
+			}
 
 			/*
 			 * Take a local reference to the page modify structure

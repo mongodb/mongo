@@ -722,7 +722,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 
 	/* Fast path overwrite configuration */
 	if (have_config && cfg[2] == NULL &&
-	    WT_STREQ(cfg[1], "overwrite=false")) {
+	    strcmp(cfg[1], "overwrite=false") == 0) {
 		have_config = false;
 		overwrite_flag = 0;
 	} else
@@ -780,7 +780,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 	bucket = hash_value % WT_HASH_ARRAY_SIZE;
 	TAILQ_FOREACH(cursor, &session->cursor_cache[bucket], q) {
 		if (cursor->uri_hash == hash_value &&
-		    WT_STREQ(cursor->uri, uri)) {
+		    strcmp(cursor->uri, uri) == 0) {
 			if ((ret = cursor->reopen(cursor, false)) != 0) {
 				F_CLR(cursor, WT_CURSTD_CACHEABLE);
 				session->dhandle = NULL;

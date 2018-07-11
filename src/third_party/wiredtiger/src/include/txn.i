@@ -396,6 +396,60 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	return (checkpoint_pinned);
 }
 
+#ifdef HAVE_TIMESTAMPS
+/*
+ * __wt_txn_pinned_timestamp --
+ *	Get the first timestamp that has to be kept for the current tree.
+ */
+static inline void
+__wt_txn_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinned_tsp)
+{
+	WT_BTREE *btree;
+	WT_TXN_GLOBAL *txn_global;
+	wt_timestamp_t checkpoint_ts, pinned_ts;
+	bool include_checkpoint_txn;
+
+	btree = S2BT_SAFE(session);
+	txn_global = &S2C(session)->txn_global;
+
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    __wt_timestamp_set(&pinned_ts, &txn_global->pinned_timestamp));
+	__wt_timestamp_set(pinned_tsp, &pinned_ts);
+
+	/*
+	 * Checkpoint transactions often fall behind ordinary application
+	 * threads.  Take special effort to not keep changes pinned in cache if
+	 * they are only required for the checkpoint and it has already seen
+	 * them.
+	 *
+	 * If there is no active checkpoint or this handle is up to date with
+	 * the active checkpoint then it's safe to ignore the checkpoint ID in
+	 * the visibility check.
+	 */
+	include_checkpoint_txn = btree == NULL ||
+	    (!F_ISSET(btree, WT_BTREE_LOOKASIDE) &&
+	    btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT));
+	if (!include_checkpoint_txn)
+		return;
+
+	/*
+	 * The read of the timestamp pinned by a checkpoint needs to be
+	 * carefully ordered: if a checkpoint is starting and we have to use
+	 * the checkpoint timestamp, we take the minimum of it with the oldest
+	 * timestamp, which is what we want.
+	 */
+	WT_READ_BARRIER();
+
+	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+	    __wt_timestamp_set(&checkpoint_ts,
+	    &txn_global->checkpoint_timestamp));
+
+	if (!__wt_timestamp_iszero(&checkpoint_ts) &&
+	    __wt_timestamp_cmp(&checkpoint_ts, &pinned_ts) < 0)
+		__wt_timestamp_set(pinned_tsp, &checkpoint_ts);
+}
+#endif
+
 /*
  * __txn_visible_all_id --
  *	Check if a given transaction ID is "globally visible".	This is, if
@@ -427,8 +481,7 @@ __wt_txn_visible_all(
 
 #ifdef HAVE_TIMESTAMPS
 	{
-	WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
-	int cmp;
+	wt_timestamp_t pinned_ts;
 
 	/* Timestamp check. */
 	if (timestamp == NULL || __wt_timestamp_iszero(timestamp))
@@ -438,20 +491,11 @@ __wt_txn_visible_all(
 	 * If no oldest timestamp has been supplied, updates have to stay in
 	 * cache until we are shutting down.
 	 */
-	if (!txn_global->has_pinned_timestamp)
+	if (!S2C(session)->txn_global.has_pinned_timestamp)
 		return (F_ISSET(S2C(session), WT_CONN_CLOSING));
 
-	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
-	    cmp = __wt_timestamp_cmp(timestamp, &txn_global->pinned_timestamp));
-
-	/*
-	 * We can discard updates with timestamps less than or equal to the
-	 * pinned timestamp.  This is different to the situation for
-	 * transaction IDs, because we know that updates with timestamps are
-	 * definitely committed (and in this case, that the transaction ID is
-	 * globally visible).
-	 */
-	return (cmp <= 0);
+	__wt_txn_pinned_timestamp(session, &pinned_ts);
+	return (__wt_timestamp_cmp(timestamp, &pinned_ts) <= 0);
 	}
 #else
 	WT_UNUSED(timestamp);

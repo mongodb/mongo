@@ -529,7 +529,7 @@ __wt_curstat_init(WT_SESSION_IMPL *session,
 
 	dsrc_uri = uri + strlen("statistics:");
 
-	if (WT_STREQ(dsrc_uri, "join"))
+	if (strcmp(dsrc_uri, "join") == 0)
 		WT_RET(__curstat_join_init(session, curjoin, cfg, cst));
 
 	else if (WT_PREFIX_MATCH(dsrc_uri, "colgroup:"))

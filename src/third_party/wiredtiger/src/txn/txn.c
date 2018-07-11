@@ -119,9 +119,11 @@ void
 __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
+	txn_global = &S2C(session)->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
 
 	WT_ASSERT(session,
@@ -131,6 +133,14 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 
 	txn_state->metadata_pinned = txn_state->pinned_id = WT_TXN_NONE;
 	F_CLR(txn, WT_TXN_HAS_SNAPSHOT);
+
+	/* Clear a checkpoint's pinned ID. */
+	if (WT_SESSION_IS_CHECKPOINT(session)) {
+		txn_global->checkpoint_state.pinned_id = WT_TXN_NONE;
+		__wt_timestamp_set_zero(&txn_global->checkpoint_timestamp);
+	}
+
+	__wt_txn_clear_read_timestamp(session);
 }
 
 /*
@@ -528,8 +538,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (WT_SESSION_IS_CHECKPOINT(session)) {
 		WT_ASSERT(session,
 		    WT_SESSION_TXN_STATE(session)->id == WT_TXN_NONE);
-		txn->id = txn_global->checkpoint_state.id =
-		    txn_global->checkpoint_state.pinned_id = WT_TXN_NONE;
+		txn->id = txn_global->checkpoint_state.id = WT_TXN_NONE;
 
 		/*
 		 * Be extra careful to cleanup everything for checkpoints: once
@@ -548,7 +557,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	}
 
 	__wt_txn_clear_commit_timestamp(session);
-	__wt_txn_clear_read_timestamp(session);
 
 	/* Free the scratch buffer allocated for logging. */
 	__wt_logrec_free(session, &txn->logrec);
@@ -1283,12 +1291,24 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	    txn_global->current - txn_global->oldest_id);
 
 #if WT_TIMESTAMP_SIZE == 8
+	{
+	WT_DECL_TIMESTAMP(checkpoint_timestamp)
+	WT_DECL_TIMESTAMP(commit_timestamp)
+	WT_DECL_TIMESTAMP(pinned_timestamp)
+
+	checkpoint_timestamp = txn_global->checkpoint_timestamp;
+	commit_timestamp = txn_global->commit_timestamp;
+	pinned_timestamp = txn_global->pinned_timestamp;
+	if (checkpoint_timestamp.val != 0 &&
+	    checkpoint_timestamp.val < pinned_timestamp.val)
+		pinned_timestamp = checkpoint_timestamp;
 	WT_STAT_SET(session, stats, txn_pinned_timestamp,
-	    txn_global->commit_timestamp.val -
-	    txn_global->pinned_timestamp.val);
+	    commit_timestamp.val - pinned_timestamp.val);
+	WT_STAT_SET(session, stats, txn_pinned_timestamp_checkpoint,
+	    commit_timestamp.val - checkpoint_timestamp.val);
 	WT_STAT_SET(session, stats, txn_pinned_timestamp_oldest,
-	    txn_global->commit_timestamp.val -
-	    txn_global->oldest_timestamp.val);
+	    commit_timestamp.val - txn_global->oldest_timestamp.val);
+	}
 #endif
 
 	WT_STAT_SET(session, stats, txn_pinned_snapshot_range,

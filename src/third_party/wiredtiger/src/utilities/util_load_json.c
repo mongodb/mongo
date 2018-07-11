@@ -254,7 +254,7 @@ json_data(WT_SESSION *session,
 		goto err;
 	}
 	keyformat = cursor->key_format;
-	isrec = strcmp(keyformat, "r") == 0;
+	isrec = WT_STREQ(keyformat, "r");
 	for (nkeys = 0; *keyformat; keyformat++)
 		if (!__wt_isdigit((u_char)*keyformat))
 			nkeys++;

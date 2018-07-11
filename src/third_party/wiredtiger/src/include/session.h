@@ -141,6 +141,8 @@ struct __wt_session_impl {
 	u_int   ckpt_handle_next;	/* Next empty slot */
 	size_t  ckpt_handle_allocated;	/* Bytes allocated */
 
+	uint64_t cache_wait_us; /* Wait time for cache for current operation */
+
 	/*
 	 * Operations acting on handles.
 	 *

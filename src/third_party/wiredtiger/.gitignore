@@ -126,6 +126,8 @@ _wiredtiger.pyd
 **/test/csuite/test_wt3338_partial_update
 **/test/csuite/test_wt3363_checkpoint_op_races
 **/test/csuite/test_wt3874_pad_byte_collator
+**/test/csuite/test_wt4105_large_doc_small_upd
+**/test/csuite/test_wt4117_checksum
 **/test/cursor_order/cursor_order
 **/test/fops/t
 **/test/format/s_dumpcmp
