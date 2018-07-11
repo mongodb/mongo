@@ -855,10 +855,17 @@ public:
                     cmdObj, shardsvrShardCollectionRequest.toBSON())),
                 Shard::RetryPolicy::kIdempotent));
 
-            CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+            // SERVER-14394 Remove status check below and replace with
+            // filterCommandReplyForPassthrough
+            uassertStatusOK(cmdResponse.commandStatus);
 
             auto shardCollResponse = ShardsvrShardCollectionResponse::parse(
                 IDLParserErrorContext("ShardsvrShardCollectionResponse"), cmdResponse.response);
+
+            result << "collectionsharded" << nss.ns();
+            if (uuid) {
+                result << "collectionUUID" << *uuid;
+            }
 
             // Make sure the cached metadata for the collection knows that we are now sharded
             catalogCache->invalidateShardedCollection(nss);
