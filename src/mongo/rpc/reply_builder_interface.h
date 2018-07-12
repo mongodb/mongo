@@ -72,7 +72,7 @@ public:
      * before the body as the body will have status types appended at the end.
      */
     virtual OpMsgBuilder::DocSequenceBuilder getDocSequenceBuilder(StringData name) {
-        uasserted(99980, "Only OpMsg may use document sequences");
+        uasserted(50875, "Only OpMsg may use document sequences");
     }
 
     virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;

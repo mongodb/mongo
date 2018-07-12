@@ -57,7 +57,7 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(99981,
+            uassert(50876,
                     "Cannot run addShard on a node started without --shardsvr",
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 

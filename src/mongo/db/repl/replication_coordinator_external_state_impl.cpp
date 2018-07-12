@@ -518,7 +518,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     std::call_once(verifySystemIndexesOnce, [opCtx] {
         const auto globalAuthzManager = AuthorizationManager::get(opCtx->getServiceContext());
         if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
-            fassert(65536, verifySystemIndexes(opCtx));
+            fassert(50877, verifySystemIndexes(opCtx));
         }
     });
 
