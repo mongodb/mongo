@@ -502,12 +502,16 @@ assert = (function() {
             res instanceof BulkWriteResult || res instanceof BulkWriteError;
     }
 
+    function _validateCommandResponse(res, assertionName) {
+        if (typeof res !== "object") {
+            doassert("unknown response type '" + typeof res + "' given to " + assertionName +
+                     ", res='" + res + "'");
+        }
+    }
+
     function _assertCommandWorked(res, msg, {ignoreWriteErrors, ignoreWriteConcernErrors}) {
         _validateAssertionMessage(msg);
-
-        if (typeof res !== "object") {
-            doassert("unknown response given to commandWorked");
-        }
+        _validateCommandResponse(res, "commandWorked");
 
         // Keep this as a function so we don't call tojson if not necessary.
         const makeFailMsg = () => {
@@ -547,10 +551,7 @@ assert = (function() {
     const kAnyErrorCode = Object.create(null);
     function _assertCommandFailed(res, expectedCode, msg) {
         _validateAssertionMessage(msg);
-
-        if (typeof res !== "object") {
-            doassert("unknown response given to commandFailed");
-        }
+        _validateCommandResponse(res, "commandFailed");
 
         if (expectedCode !== kAnyErrorCode && !Array.isArray(expectedCode)) {
             expectedCode = [expectedCode];

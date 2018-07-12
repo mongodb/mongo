@@ -302,6 +302,32 @@
         });
     });
 
+    tests.push(function invalidResponsesAttemptToProvideInformationToCommandWorks() {
+        const invalidResponses = [undefined, 'not a valid response', 42];
+
+        invalidResponses.forEach((invalidRes) => {
+            const error = assert.throws(() => {
+                assert.commandWorked(invalidRes);
+            });
+
+            assert.gte(error.message.indexOf(invalidRes), 0);
+            assert.gte(error.message.indexOf(typeof invalidRes), 0);
+        });
+    });
+
+    tests.push(function invalidResponsesAttemptToProvideInformationCommandFailed() {
+        const invalidResponses = [undefined, 'not a valid response', 42];
+
+        invalidResponses.forEach((invalidRes) => {
+            const error = assert.throws(() => {
+                assert.commandFailed(invalidRes);
+            });
+
+            assert.gte(error.message.indexOf(invalidRes), 0);
+            assert.gte(error.message.indexOf(typeof invalidRes), 0);
+        });
+    });
+
     tests.forEach((test) => {
         jsTest.log(`Starting test '${test.name}'`);
         setup();
