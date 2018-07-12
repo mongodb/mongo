@@ -441,7 +441,7 @@ public:
 
     virtual void explain(OperationContext* opCtx,
                          ExplainOptions::Verbosity verbosity,
-                         BSONObjBuilder* result) {
+                         rpc::ReplyBuilderInterface* result) {
         uasserted(ErrorCodes::IllegalOperation,
                   str::stream() << "Cannot explain cmd: " << definition()->getName());
     }
@@ -561,7 +561,7 @@ public:
     virtual Status explain(OperationContext* opCtx,
                            const OpMsgRequest& request,
                            ExplainOptions::Verbosity verbosity,
-                           BSONObjBuilder* out) const;
+                           rpc::ReplyBuilderInterface* result) const;
 
     /**
      * Checks if the client associated with the given OperationContext is authorized to run this

@@ -142,7 +142,7 @@ public:
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     BSONObjBuilder* result) override {
+                     rpc::ReplyBuilderInterface* result) override {
             // Acquire locks and resolve possible UUID. The RAII object is optional, because in the
             // case of a view, the locks need to be released.
             boost::optional<AutoGetCollectionForReadCommand> ctx;
@@ -182,7 +182,7 @@ public:
 
                 try {
                     uassertStatusOK(
-                        runAggregate(opCtx, nss, aggRequest, viewAggregationCommand, *result));
+                        runAggregate(opCtx, nss, aggRequest, viewAggregationCommand, result));
                 } catch (DBException& error) {
                     if (error.code() == ErrorCodes::InvalidPipelineOperator) {
                         uasserted(ErrorCodes::InvalidPipelineOperator,
@@ -201,8 +201,9 @@ public:
             // We have a parsed query. Time to get the execution plan for it.
             auto exec = uassertStatusOK(getExecutorFind(opCtx, collection, nss, std::move(cq)));
 
+            auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
-            Explain::explainStages(exec.get(), collection, verbosity, result);
+            Explain::explainStages(exec.get(), collection, verbosity, &bodyBuilder);
         }
 
         /**
@@ -320,8 +321,9 @@ public:
             const QueryRequest& originalQR = exec->getCanonicalQuery()->getQueryRequest();
 
             // Stream query results, adding them to a BSONArray as we go.
-            auto bodyBuilder = result->getBodyBuilder();
-            CursorResponseBuilder firstBatch(/*isInitialResponse*/ true, &bodyBuilder);
+            CursorResponseBuilder::Options options;
+            options.isInitialResponse = true;
+            CursorResponseBuilder firstBatch(result, options);
             BSONObj obj;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             long long numResults = 0;

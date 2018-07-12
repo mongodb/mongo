@@ -97,13 +97,12 @@ public:
                 "Explain's child command cannot run on this node. "
                 "Are you explaining a write command on a secondary?",
                 commandCanRunHere(opCtx, _dbName, _innerInvocation->definition()));
-        BSONObjBuilder bob = result->getBodyBuilder();
-        _innerInvocation->explain(opCtx, _verbosity, &bob);
+        _innerInvocation->explain(opCtx, _verbosity, result);
     }
 
     void explain(OperationContext* opCtx,
                  ExplainOptions::Verbosity verbosity,
-                 BSONObjBuilder* result) override {
+                 rpc::ReplyBuilderInterface* result) override {
         uasserted(ErrorCodes::IllegalOperation, "Explain cannot explain itself.");
     }
 

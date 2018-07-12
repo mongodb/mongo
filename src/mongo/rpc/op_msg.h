@@ -319,6 +319,10 @@ public:
         return BSONObjBuilder(*_buf);
     }
 
+    int len() const {
+        return _buf->len();
+    }
+
 private:
     friend OpMsgBuilder;
 

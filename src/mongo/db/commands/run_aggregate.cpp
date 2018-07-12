@@ -91,7 +91,7 @@ bool handleCursorCommand(OperationContext* opCtx,
                          const NamespaceString& nsForCursor,
                          std::vector<ClientCursor*> cursors,
                          const AggregationRequest& request,
-                         BSONObjBuilder& result) {
+                         rpc::ReplyBuilderInterface* result) {
     invariant(!cursors.empty());
     long long batchSize = request.getBatchSize();
 
@@ -121,12 +121,15 @@ bool handleCursorCommand(OperationContext* opCtx,
             cursors[idx]->getExecutor()->detachFromOperationContext();
         }
 
-        result.appendArray("cursors", cursorsBuilder.obj());
+        auto bodyBuilder = result->getBodyBuilder();
+        bodyBuilder.appendArray("cursors", cursorsBuilder.obj());
 
         return true;
     }
 
-    CursorResponseBuilder responseBuilder(true, &result);
+    CursorResponseBuilder::Options options;
+    options.isInitialResponse = true;
+    CursorResponseBuilder responseBuilder(result, options);
 
     ClientCursor* cursor = cursors[0];
     invariant(cursor);
@@ -345,7 +348,7 @@ Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& origNss,
                     const AggregationRequest& request,
                     const BSONObj& cmdObj,
-                    BSONObjBuilder& result) {
+                    rpc::ReplyBuilderInterface* result) {
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespaceString();
 
@@ -611,8 +614,9 @@ Status runAggregate(OperationContext* opCtx,
 
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {
+        auto bodyBuilder = result->getBodyBuilder();
         Explain::explainPipelineExecutor(
-            pins[0].getCursor()->getExecutor(), *(expCtx->explain), &result);
+            pins[0].getCursor()->getExecutor(), *(expCtx->explain), &bodyBuilder);
     } else {
         // Cursor must be specified, if explain is not.
         const bool keepCursor =

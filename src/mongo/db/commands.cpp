@@ -440,7 +440,7 @@ private:
 
     void explain(OperationContext* opCtx,
                  ExplainOptions::Verbosity verbosity,
-                 BSONObjBuilder* result) override {
+                 rpc::ReplyBuilderInterface* result) override {
         uassertStatusOK(_command->explain(opCtx, *_request, verbosity, result));
     }
 
@@ -492,7 +492,7 @@ Command::Command(StringData name, StringData oldName)
 Status BasicCommand::explain(OperationContext* opCtx,
                              const OpMsgRequest& request,
                              ExplainOptions::Verbosity verbosity,
-                             BSONObjBuilder* out) const {
+                             rpc::ReplyBuilderInterface* result) const {
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
 }
 

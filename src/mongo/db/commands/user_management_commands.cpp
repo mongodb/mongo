@@ -1371,16 +1371,18 @@ public:
 
             DBDirectClient client(opCtx);
 
-            BSONObjBuilder responseBuilder;
+            rpc::OpMsgReplyBuilder replyBuilder;
             AggregationRequest aggRequest(AuthorizationManager::usersCollectionNamespace,
                                           std::move(pipeline));
             uassertStatusOK(runAggregate(opCtx,
                                          AuthorizationManager::usersCollectionNamespace,
                                          aggRequest,
                                          aggRequest.serializeToCommandObj().toBson(),
-                                         responseBuilder));
-            CommandHelpers::appendSimpleCommandStatus(responseBuilder, true);
-            auto response = CursorResponse::parseFromBSONThrowing(responseBuilder.obj());
+                                         &replyBuilder));
+            auto bodyBuilder = replyBuilder.getBodyBuilder();
+            CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
+            bodyBuilder.doneFast();
+            auto response = CursorResponse::parseFromBSONThrowing(replyBuilder.releaseBody());
             DBClientCursor cursor(&client,
                                   response.getNSS().toString(),
                                   response.getCursorId(),

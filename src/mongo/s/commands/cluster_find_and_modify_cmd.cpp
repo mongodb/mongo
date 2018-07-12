@@ -105,7 +105,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const override {
+                   rpc::ReplyBuilderInterface* result) const override {
         std::string dbName = request.getDatabase().toString();
         const BSONObj& cmdObj = request.body;
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
@@ -134,25 +134,26 @@ public:
 
         // Time how long it takes to run the explain command on the shard.
         Timer timer;
-        BSONObjBuilder result;
+        BSONObjBuilder bob;
         _runCommand(opCtx,
                     shard->getId(),
                     (chunkMgr ? chunkMgr->getVersion(shard->getId()) : ChunkVersion::UNSHARDED()),
                     nss,
                     explainCmd,
-                    &result);
+                    &bob);
         const auto millisElapsed = timer.millis();
 
         Strategy::CommandResult cmdResult;
         cmdResult.shardTargetId = shard->getId();
         cmdResult.target = shard->getConnString();
-        cmdResult.result = result.obj();
+        cmdResult.result = bob.obj();
 
         std::vector<Strategy::CommandResult> shardResults;
         shardResults.push_back(cmdResult);
 
+        auto bodyBuilder = result->getBodyBuilder();
         return ClusterExplain::buildExplainResult(
-            opCtx, shardResults, ClusterExplain::kSingleShard, millisElapsed, out);
+            opCtx, shardResults, ClusterExplain::kSingleShard, millisElapsed, &bodyBuilder);
     }
 
     bool run(OperationContext* opCtx,

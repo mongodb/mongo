@@ -112,7 +112,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const override {
+                   rpc::ReplyBuilderInterface* result) const override {
         std::string dbname = request.getDatabase().toString();
         const BSONObj& cmdObj = request.body;
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
@@ -143,7 +143,7 @@ public:
             }
 
             return runAggregate(
-                opCtx, nss, viewAggRequest.getValue(), viewAggregation.getValue(), *out);
+                opCtx, nss, viewAggRequest.getValue(), viewAggregation.getValue(), result);
         }
 
         Collection* const collection = ctx->getCollection();
@@ -151,7 +151,8 @@ public:
         auto executor =
             uassertStatusOK(getExecutorDistinct(opCtx, collection, nss.ns(), &parsedDistinct));
 
-        Explain::explainStages(executor.get(), collection, verbosity, out);
+        auto bodyBuilder = result->getBodyBuilder();
+        Explain::explainStages(executor.get(), collection, verbosity, &bodyBuilder);
         return Status::OK();
     }
 

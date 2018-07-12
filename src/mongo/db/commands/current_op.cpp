@@ -66,18 +66,20 @@ public:
         OperationContext* opCtx, const AggregationRequest& request) const final {
         auto aggCmdObj = request.serializeToCommandObj().toBson();
 
-        BSONObjBuilder responseBuilder;
+        rpc::OpMsgReplyBuilder replyBuilder;
 
         auto status = runAggregate(
-            opCtx, request.getNamespaceString(), request, std::move(aggCmdObj), responseBuilder);
+            opCtx, request.getNamespaceString(), request, std::move(aggCmdObj), &replyBuilder);
 
         if (!status.isOK()) {
             return status;
         }
 
-        CommandHelpers::appendSimpleCommandStatus(responseBuilder, true);
+        auto bodyBuilder = replyBuilder.getBodyBuilder();
+        CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
+        bodyBuilder.doneFast();
 
-        return CursorResponse::parseFromBSON(responseBuilder.obj());
+        return CursorResponse::parseFromBSON(replyBuilder.releaseBody());
     }
 
     virtual void appendToResponse(BSONObjBuilder* result) const final {

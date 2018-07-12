@@ -214,7 +214,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const override {
+                   rpc::ReplyBuilderInterface* result) const override {
         std::string dbname = request.getDatabase().toString();
         const BSONObj& cmdObj = request.body;
         const NamespaceString nss(parseNs(dbname, cmdObj));
@@ -282,8 +282,9 @@ public:
             nsStruct.requestedNss = nss;
             nsStruct.executionNss = resolvedAggRequest.getNamespaceString();
 
+            auto bodyBuilder = result->getBodyBuilder();
             return ClusterAggregate::runAggregate(
-                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
+                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, &bodyBuilder);
         }
 
         long long millisElapsed = timer.millis();
@@ -291,12 +292,13 @@ public:
         const char* mongosStageName =
             ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
 
+        auto bodyBuilder = result->getBodyBuilder();
         return ClusterExplain::buildExplainResult(
             opCtx,
             ClusterExplain::downconvert(opCtx, shardResponses),
             mongosStageName,
             millisElapsed,
-            out);
+            &bodyBuilder);
     }
 
 private:

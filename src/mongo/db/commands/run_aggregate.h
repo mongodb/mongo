@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 
 namespace mongo {
 
@@ -48,6 +49,6 @@ Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& nss,
                     const AggregationRequest& request,
                     const BSONObj& cmdObj,
-                    BSONObjBuilder& result);
+                    rpc::ReplyBuilderInterface* result);
 
 }  // namespace mongo

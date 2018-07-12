@@ -218,7 +218,7 @@ public:
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     BSONObjBuilder* result) override {}
+                     rpc::ReplyBuilderInterface* result) override {}
 
         void doCheckAuthorization(OperationContext*) const override {}
 
@@ -263,7 +263,7 @@ public:
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     BSONObjBuilder* result) override {}
+                     rpc::ReplyBuilderInterface* result) override {}
 
         void doCheckAuthorization(OperationContext*) const override {}
 

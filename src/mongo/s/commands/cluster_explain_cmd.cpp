@@ -96,13 +96,12 @@ public:
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-        auto bob = result->getBodyBuilder();
-        _innerInvocation->explain(opCtx, _verbosity, &bob);
+        _innerInvocation->explain(opCtx, _verbosity, result);
     }
 
     void explain(OperationContext* opCtx,
                  ExplainOptions::Verbosity verbosity,
-                 BSONObjBuilder* result) override {
+                 rpc::ReplyBuilderInterface* result) override {
         uasserted(ErrorCodes::IllegalOperation, "Explain cannot explain itself.");
     }
 

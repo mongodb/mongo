@@ -33,6 +33,7 @@
 #include "mongo/s/commands/cluster_aggregate.h"
 
 #include <boost/intrusive_ptr.hpp>
+#include <mongo/rpc/op_msg_rpc_impls.h>
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -543,9 +544,12 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
-    BSONObjBuilder cursorResponse;
 
-    CursorResponseBuilder responseBuilder(true, &cursorResponse);
+    rpc::OpMsgReplyBuilder replyBuilder;
+    CursorResponseBuilder::Options options;
+    options.isInitialResponse = true;
+
+    CursorResponseBuilder responseBuilder(&replyBuilder, options);
 
     for (long long objCount = 0; objCount < request.getBatchSize(); ++objCount) {
         ClusterQueryResult next;
@@ -609,9 +613,11 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
     responseBuilder.done(clusterCursorId, requestedNss.ns());
 
-    CommandHelpers::appendSimpleCommandStatus(cursorResponse, true);
+    auto bodyBuilder = replyBuilder.getBodyBuilder();
+    CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
+    bodyBuilder.doneFast();
 
-    return cursorResponse.obj();
+    return replyBuilder.releaseBody();
 }
 
 /**

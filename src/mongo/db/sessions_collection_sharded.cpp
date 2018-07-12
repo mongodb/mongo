@@ -37,6 +37,7 @@
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_find.h"
@@ -145,14 +146,16 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
             return ex.toStatus();
         }
 
-        BSONObjBuilder result;
-        CursorResponseBuilder firstBatch(/*firstBatch*/ true, &result);
+        rpc::OpMsgReplyBuilder replyBuilder;
+        CursorResponseBuilder::Options options;
+        options.isInitialResponse = true;
+        CursorResponseBuilder firstBatch(&replyBuilder, options);
         for (const auto& obj : batch) {
             firstBatch.append(obj);
         }
         firstBatch.done(cursorId, NamespaceString::kLogicalSessionsNamespace.ns());
 
-        return result.obj();
+        return replyBuilder.releaseBody();
     };
 
     return doFetch(NamespaceString::kLogicalSessionsNamespace, sessions, send);

@@ -107,7 +107,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const OpMsgRequest& opMsgRequest,
                    ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const override {
+                   rpc::ReplyBuilderInterface* result) const override {
         std::string dbname = opMsgRequest.getDatabase().toString();
         const BSONObj& cmdObj = opMsgRequest.body;
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
@@ -143,7 +143,7 @@ public:
                                 viewAggRequest.getValue().getNamespaceString(),
                                 viewAggRequest.getValue(),
                                 viewAggregation.getValue(),
-                                *out);
+                                result);
         }
 
         Collection* const collection = ctx->getCollection();
@@ -160,7 +160,8 @@ public:
 
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
-        Explain::explainStages(exec.get(), collection, verbosity, out);
+        auto bodyBuilder = result->getBodyBuilder();
+        Explain::explainStages(exec.get(), collection, verbosity, &bodyBuilder);
         return Status::OK();
     }
 

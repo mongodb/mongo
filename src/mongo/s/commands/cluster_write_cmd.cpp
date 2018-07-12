@@ -311,7 +311,7 @@ private:
 
     void explain(OperationContext* opCtx,
                  ExplainOptions::Verbosity verbosity,
-                 BSONObjBuilder* result) override {
+                 rpc::ReplyBuilderInterface* result) override {
         uassert(ErrorCodes::InvalidLength,
                 "explained write batches must be of size 1",
                 _batchedRequest.sizeWriteOps() == 1U);
@@ -329,8 +329,9 @@ private:
                                         explainCmd,
                                         targetingBatchItem,
                                         &shardResults));
+        auto bodyBuilder = result->getBodyBuilder();
         uassertStatusOK(ClusterExplain::buildExplainResult(
-            opCtx, shardResults, ClusterExplain::kWriteOnShards, timer.millis(), result));
+            opCtx, shardResults, ClusterExplain::kWriteOnShards, timer.millis(), &bodyBuilder));
     }
 
     NamespaceString ns() const override {

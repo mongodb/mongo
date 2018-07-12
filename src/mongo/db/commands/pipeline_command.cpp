@@ -79,7 +79,6 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
-            auto bob = reply->getBodyBuilder();
             const auto aggregationRequest = uassertStatusOK(
                 AggregationRequest::parseFromBSON(_dbName, _request.body, boost::none));
 
@@ -87,7 +86,7 @@ public:
                                          aggregationRequest.getNamespaceString(),
                                          aggregationRequest,
                                          _request.body,
-                                         bob));
+                                         reply));
         }
 
         NamespaceString ns() const override {
@@ -96,7 +95,7 @@ public:
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     BSONObjBuilder* out) override {
+                     rpc::ReplyBuilderInterface* result) override {
             const auto aggregationRequest = uassertStatusOK(
                 AggregationRequest::parseFromBSON(_dbName, _request.body, verbosity));
 
@@ -104,7 +103,7 @@ public:
                                          aggregationRequest.getNamespaceString(),
                                          aggregationRequest,
                                          _request.body,
-                                         *out));
+                                         result));
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

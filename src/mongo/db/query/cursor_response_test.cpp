@@ -30,6 +30,8 @@
 
 #include "mongo/db/query/cursor_response.h"
 
+#include "mongo/rpc/op_msg_rpc_impls.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -328,6 +330,32 @@ TEST(CursorResponseTest, serializeLatestOplogEntry) {
     ASSERT_EQ(reparsedResponse.getNSS().ns(), "db.coll");
     ASSERT_EQ(reparsedResponse.getBatch().size(), 2U);
     ASSERT_EQ(*reparsedResponse.getLastOplogTimestamp(), Timestamp(1, 2));
+}
+
+TEST(CursorResponseTest, cursorReturnDocumentSequences) {
+    CursorResponseBuilder::Options options;
+    options.isInitialResponse = true;
+    options.useDocumentSequences = true;
+    rpc::OpMsgReplyBuilder builder;
+    BSONObj expectedDoc = BSON("_id" << 1 << "test"
+                                     << "123");
+    BSONObj expectedBody = BSON("cursor" << BSON("id" << CursorId(123) << "ns"
+                                                      << "db.coll"));
+
+    CursorResponseBuilder crb(&builder, options);
+    crb.append(expectedDoc);
+    ASSERT_EQ(crb.numDocs(), 1U);
+    crb.done(CursorId(123), "db.coll");
+
+    auto msg = builder.done();
+    auto opMsg = OpMsg::parse(msg);
+    const auto& docSeqs = opMsg.sequences;
+    ASSERT_EQ(docSeqs.size(), 1U);
+    const auto& documentSequence = docSeqs[0];
+    ASSERT_EQ(documentSequence.name, "cursor.firstBatch");
+    ASSERT_EQ(documentSequence.objs.size(), 1U);
+    ASSERT_BSONOBJ_EQ(documentSequence.objs[0], expectedDoc);
+    ASSERT_BSONOBJ_EQ(opMsg.body, expectedBody);
 }
 
 }  // namespace

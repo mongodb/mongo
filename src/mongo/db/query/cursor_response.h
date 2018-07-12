@@ -35,6 +35,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
 
 namespace mongo {
 
@@ -47,14 +49,23 @@ class CursorResponseBuilder {
 
 public:
     /**
-     * Once constructed, you may not use the passed-in BSONObjBuilder until you call either done()
+     * Structure used to confiugre the CursorResponseBuilder.
+     */
+    struct Options {
+        bool isInitialResponse = false;
+        bool useDocumentSequences = false;
+    };
+
+    /**
+     * Once constructed, you may not use the passed-in ReplyBuilderInterface until you call either
+     * done()
      * or abandon(), or this object goes out of scope. This is the same as the rule when using a
      * BSONObjBuilder to build a sub-object with subobjStart().
      *
-     * If the builder goes out of scope without a call to done(), any data appended to the
-     * builder will be removed.
+     * If the builder goes out of scope without a call to done(), the ReplyBuilderInterface will be
+     * reset.
      */
-    CursorResponseBuilder(bool isInitialResponse, BSONObjBuilder* commandResponse);
+    CursorResponseBuilder(rpc::ReplyBuilderInterface* replyBuilder, Options options);
 
     ~CursorResponseBuilder() {
         if (_active)
@@ -63,12 +74,16 @@ public:
 
     size_t bytesUsed() const {
         invariant(_active);
-        return _batch.len();
+        return _options.useDocumentSequences ? _docSeqBuilder->len() : _batch->len();
     }
 
     void append(const BSONObj& obj) {
         invariant(_active);
-        _batch.append(obj);
+        if (_options.useDocumentSequences) {
+            _docSeqBuilder->append(obj);
+        } else {
+            _batch->append(obj);
+        }
         _numDocs++;
     }
 
@@ -94,11 +109,15 @@ public:
     void abandon();
 
 private:
-    const int _responseInitialLen;  // Must be the first member so its initializer runs first.
+    const Options _options;
+    rpc::ReplyBuilderInterface* const _replyBuilder;
+    // Order here is important to ensure destruction in the correct order.
+    boost::optional<BSONObjBuilder> _bodyBuilder;
+    boost::optional<BSONObjBuilder> _cursorObject;
+    boost::optional<BSONArrayBuilder> _batch;
+    boost::optional<OpMsgBuilder::DocSequenceBuilder> _docSeqBuilder;
+
     bool _active = true;
-    BSONObjBuilder* const _commandResponse;
-    BSONObjBuilder _cursorObject;
-    BSONArrayBuilder _batch;
     long long _numDocs = 0;
     Timestamp _latestOplogTimestamp;
 };

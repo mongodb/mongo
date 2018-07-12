@@ -244,7 +244,6 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             // Counted as a getMore, not as a command.
             globalOpCounters.gotGetMore();
-            auto result = reply->getBodyBuilder();
             auto curOp = CurOp::get(opCtx);
             curOp->debug().cursorid = _request.cursorid;
 
@@ -428,7 +427,8 @@ public:
             }
 
             CursorId respondWithId = 0;
-            CursorResponseBuilder nextBatch(/*isInitialResponse*/ false, &result);
+
+            CursorResponseBuilder nextBatch(reply, CursorResponseBuilder::Options());
             BSONObj obj;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             long long numResults = 0;

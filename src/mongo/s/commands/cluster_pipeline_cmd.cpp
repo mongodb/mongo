@@ -85,8 +85,9 @@ public:
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     BSONObjBuilder* out) override {
-            _runAggCommand(opCtx, _dbName, _request.body, verbosity, out);
+                     rpc::ReplyBuilderInterface* result) override {
+            auto bodyBuilder = result->getBodyBuilder();
+            _runAggCommand(opCtx, _dbName, _request.body, verbosity, &bodyBuilder);
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

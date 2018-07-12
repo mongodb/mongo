@@ -350,7 +350,7 @@ private:
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     BSONObjBuilder* out) override {
+                     rpc::ReplyBuilderInterface* result) override {
             uassert(ErrorCodes::InvalidLength,
                     "explained write batches must be of size 1",
                     _batch.getUpdates().size() == 1);
@@ -376,7 +376,8 @@ private:
 
             auto exec = uassertStatusOK(getExecutorUpdate(
                 opCtx, &CurOp::get(opCtx)->debug(), collection.getCollection(), &parsedUpdate));
-            Explain::explainStages(exec.get(), collection.getCollection(), verbosity, out);
+            auto bodyBuilder = result->getBodyBuilder();
+            Explain::explainStages(exec.get(), collection.getCollection(), verbosity, &bodyBuilder);
         }
 
         write_ops::Update _batch;
@@ -426,7 +427,7 @@ private:
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     BSONObjBuilder* out) override {
+                     rpc::ReplyBuilderInterface* result) override {
             uassert(ErrorCodes::InvalidLength,
                     "explained write batches must be of size 1",
                     _batch.getDeletes().size() == 1);
@@ -448,7 +449,8 @@ private:
             // Explain the plan tree.
             auto exec = uassertStatusOK(getExecutorDelete(
                 opCtx, &CurOp::get(opCtx)->debug(), collection.getCollection(), &parsedDelete));
-            Explain::explainStages(exec.get(), collection.getCollection(), verbosity, out);
+            auto bodyBuilder = result->getBodyBuilder();
+            Explain::explainStages(exec.get(), collection.getCollection(), verbosity, &bodyBuilder);
         }
 
         write_ops::Delete _batch;

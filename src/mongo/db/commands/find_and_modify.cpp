@@ -256,7 +256,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const override {
+                   rpc::ReplyBuilderInterface* result) const override {
         std::string dbName = request.getDatabase().toString();
         const BSONObj& cmdObj = request.body;
         const auto args(uassertStatusOK(FindAndModifyRequest::parseFromBSON(
@@ -288,7 +288,8 @@ public:
             const auto exec =
                 uassertStatusOK(getExecutorDelete(opCtx, opDebug, collection, &parsedDelete));
 
-            Explain::explainStages(exec.get(), collection, verbosity, out);
+            auto bodyBuilder = result->getBodyBuilder();
+            Explain::explainStages(exec.get(), collection, verbosity, &bodyBuilder);
         } else {
             UpdateRequest request(nsString);
             UpdateLifecycleImpl updateLifecycle(nsString);
@@ -312,7 +313,8 @@ public:
             const auto exec =
                 uassertStatusOK(getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate));
 
-            Explain::explainStages(exec.get(), collection, verbosity, out);
+            auto bodyBuilder = result->getBodyBuilder();
+            Explain::explainStages(exec.get(), collection, verbosity, &bodyBuilder);
         }
 
         return Status::OK();
