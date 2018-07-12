@@ -133,6 +133,13 @@ public:
 
     Status startCommit(const MigrationSessionId& sessionId);
 
+    /**
+     * Creates the collection nss on the shard and clones the indexes and options from fromShardId.
+     */
+    static void cloneCollectionIndexesAndOptions(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 ShardId fromShardId);
+
 private:
     /**
      * These log the argument msg; then, under lock, move msg to _errmsg and set the state to FAIL.

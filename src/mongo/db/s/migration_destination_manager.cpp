@@ -497,6 +497,175 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     return Status::OK();
 }
 
+void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationContext* opCtx,
+                                                                   const NamespaceString& nss,
+                                                                   ShardId fromShardId) {
+    auto fromShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromShardId));
+
+    auto const serviceContext = opCtx->getServiceContext();
+    DisableDocumentValidation validationDisabler(opCtx);
+
+    std::vector<BSONObj> donorIndexSpecs;
+    BSONObj donorIdIndexSpec;
+    BSONObj donorOptions;
+    {
+        // 0. Get the collection indexes and options from the donor shard.
+
+        // Do not hold any locks while issuing remote calls.
+        invariant(!opCtx->lockState()->isLocked());
+
+        // Get indexes by calling listIndexes against the donor.
+        auto indexes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            nss.db().toString(),
+            BSON("listIndexes" << nss.coll().toString()),
+            Milliseconds(-1)));
+
+        for (auto&& spec : indexes.docs) {
+            donorIndexSpecs.push_back(spec);
+            if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
+                if (indexNameElem.type() == BSONType::String &&
+                    indexNameElem.valueStringData() == "_id_"_sd) {
+                    donorIdIndexSpec = spec;
+                }
+            }
+        }
+
+        // Get collection options by calling listCollections against the donor.
+        auto infosRes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            nss.db().toString(),
+            BSON("listCollections" << 1 << "filter" << BSON("name" << nss.coll())),
+            Milliseconds(-1)));
+
+        auto infos = infosRes.docs;
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "expected listCollections against the primary shard for "
+                              << nss.toString()
+                              << " to return 1 entry, but got "
+                              << infos.size()
+                              << " entries",
+                infos.size() == 1);
+
+
+        BSONObj entry = infos.front();
+
+        // The entire options include both the settable options under the 'options' field in the
+        // listCollections response, and the UUID under the 'info' field.
+        BSONObjBuilder donorOptionsBob;
+
+        if (entry["options"].isABSONObj()) {
+            donorOptionsBob.appendElements(entry["options"].Obj());
+        }
+
+        BSONObj info;
+        if (entry["info"].isABSONObj()) {
+            info = entry["info"].Obj();
+        }
+
+        uassert(ErrorCodes::InvalidUUID,
+                str::stream() << "The donor shard did not return a UUID for collection " << nss.ns()
+                              << " as part of its listCollections response: "
+                              << entry
+                              << ", but this node expects to see a UUID.",
+                !info["uuid"].eoo());
+
+        donorOptionsBob.append(info["uuid"]);
+
+        donorOptions = donorOptionsBob.obj();
+    }
+
+    {
+        // 1. Create the collection (if it doesn't already exist) and create any indexes we are
+        // missing (auto-heal indexes).
+
+        // Hold the DBLock in X mode across creating the collection and indexes, so that a
+        // concurrent dropIndex cannot run between creating the collection and indexes and fail with
+        // IndexNotFound, though the index will get created.
+        // We could take the DBLock in IX mode while checking if the collection already exists and
+        // then upgrade it to X mode while creating the collection and indexes, but there is no way
+        // to upgrade a DBLock once it's taken without releasing it, so we pre-emptively take it in
+        // mode X.
+        AutoGetOrCreateDb autoCreateDb(opCtx, nss.db(), MODE_X);
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Unable to create collection " << nss.ns()
+                              << " because the node is not primary",
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
+
+        Database* const db = autoCreateDb.getDb();
+
+        Collection* collection = db->getCollection(opCtx, nss);
+        if (collection) {
+            // We have an entry for a collection by this name. Check that our collection's UUID
+            // matches the donor's.
+            boost::optional<UUID> donorUUID;
+            if (!donorOptions["uuid"].eoo()) {
+                donorUUID.emplace(UUID::parse(donorOptions));
+            }
+
+            uassert(ErrorCodes::InvalidUUID,
+                    str::stream()
+                        << "Cannot create collection "
+                        << nss.ns()
+                        << " because we already have an identically named collection with UUID "
+                        << (collection->uuid() ? collection->uuid()->toString() : "(none)")
+                        << ", which differs from the donor's UUID "
+                        << (donorUUID ? donorUUID->toString() : "(none)")
+                        << ". Manually drop the collection on this shard if it contains data from "
+                           "a previous incarnation of "
+                        << nss.ns(),
+                    collection->uuid() == donorUUID);
+        } else {
+            // We do not have a collection by this name. Create the collection with the donor's
+            // options.
+            WriteUnitOfWork wuow(opCtx);
+            CollectionOptions collectionOptions;
+            uassertStatusOK(collectionOptions.parse(donorOptions,
+                                                    CollectionOptions::ParseKind::parseForStorage));
+            const bool createDefaultIndexes = true;
+            uassertStatusOK(Database::userCreateNS(
+                opCtx, db, nss.ns(), collectionOptions, createDefaultIndexes, donorIdIndexSpec));
+            wuow.commit();
+
+            collection = db->getCollection(opCtx, nss);
+        }
+
+        MultiIndexBlock indexer(opCtx, collection);
+        indexer.removeExistingIndexes(&donorIndexSpecs);
+
+        if (!donorIndexSpecs.empty()) {
+            // Only copy indexes if the collection does not have any documents.
+            uassert(ErrorCodes::CannotCreateCollection,
+                    str::stream() << "aborting, shard is missing " << donorIndexSpecs.size()
+                                  << " indexes and "
+                                  << "collection is not empty. Non-trivial "
+                                  << "index creation should be scheduled manually",
+                    collection->numRecords(opCtx) == 0);
+
+            auto indexInfoObjs = indexer.init(donorIndexSpecs);
+            uassert(ErrorCodes::CannotCreateIndex,
+                    str::stream() << "failed to create index before migrating data. "
+                                  << " error: "
+                                  << redact(indexInfoObjs.getStatus()),
+                    indexInfoObjs.isOK());
+
+            WriteUnitOfWork wunit(opCtx);
+            indexer.commit();
+
+            for (auto&& infoObj : indexInfoObjs.getValue()) {
+                // make sure to create index on secondaries as well
+                serviceContext->getOpObserver()->onCreateIndex(
+                    opCtx, collection->ns(), collection->uuid(), infoObj, true /* fromMigrate */);
+            }
+
+            wunit.commit();
+        }
+    }
+}
+
 void MigrationDestinationManager::_migrateThread() {
     Client::initThread("migrateThread");
     auto opCtx = Client::getCurrent()->makeOperationContext();
@@ -529,8 +698,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
     invariant(!_min.isEmpty());
     invariant(!_max.isEmpty());
 
-    auto const serviceContext = opCtx->getServiceContext();
-
     log() << "Starting receiving end of migration of chunk " << redact(_min) << " -> "
           << redact(_max) << " for collection " << _nss.ns() << " from " << _fromShard
           << " at epoch " << _epoch.toString() << " with session id " << *_sessionId;
@@ -547,179 +714,15 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
 
     invariant(initialState == READY);
 
-    auto fromShard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, _fromShard));
-
-    DisableDocumentValidation validationDisabler(opCtx);
-
-    std::vector<BSONObj> donorIndexSpecs;
-    BSONObj donorIdIndexSpec;
-    BSONObj donorOptions;
     {
-        // 0. Get the collection indexes and options from the donor shard.
-
-        // Do not hold any locks while issuing remote calls.
-        invariant(!opCtx->lockState()->isLocked());
-
-        // Get indexes by calling listIndexes against the donor.
-        auto indexes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            _nss.db().toString(),
-            BSON("listIndexes" << _nss.coll().toString()),
-            Milliseconds(-1)));
-
-        for (auto&& spec : indexes.docs) {
-            donorIndexSpecs.push_back(spec);
-            if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
-                if (indexNameElem.type() == BSONType::String &&
-                    indexNameElem.valueStringData() == "_id_"_sd) {
-                    donorIdIndexSpec = spec;
-                }
-            }
-        }
-
-        // Get collection options by calling listCollections against the donor.
-        auto infosRes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            _nss.db().toString(),
-            BSON("listCollections" << 1 << "filter" << BSON("name" << _nss.coll())),
-            Milliseconds(-1)));
-
-        auto infos = infosRes.docs;
-        if (infos.size() != 1) {
-            _setStateFailWarn(str::stream()
-                              << "expected listCollections against the donor shard for "
-                              << _nss.ns()
-                              << " to return 1 entry, but got "
-                              << infos.size()
-                              << " entries");
-            return;
-        }
-
-        BSONObj entry = infos.front();
-
-        // The entire options include both the settable options under the 'options' field in the
-        // listCollections response, and the UUID under the 'info' field.
-        BSONObjBuilder donorOptionsBob;
-
-        if (entry["options"].isABSONObj()) {
-            donorOptionsBob.appendElements(entry["options"].Obj());
-        }
-
-        BSONObj info;
-        if (entry["info"].isABSONObj()) {
-            info = entry["info"].Obj();
-        }
-        if (info["uuid"].eoo()) {
-            _setStateFailWarn(str::stream()
-                              << "The donor shard did not return a UUID for collection "
-                              << _nss.ns()
-                              << " as part of its listCollections response: "
-                              << entry
-                              << ", but this node expects to see a UUID.");
-            return;
-        }
-        donorOptionsBob.append(info["uuid"]);
-
-        donorOptions = donorOptionsBob.obj();
-    }
-
-    {
-        // 1. Create the collection (if it doesn't already exist) and create any indexes we are
-        // missing (auto-heal indexes).
-
-        // Hold the DBLock in X mode across creating the collection and indexes, so that a
-        // concurrent dropIndex cannot run between creating the collection and indexes and fail with
-        // IndexNotFound, though the index will get created.
-        // We could take the DBLock in IX mode while checking if the collection already exists and
-        // then upgrade it to X mode while creating the collection and indexes, but there is no way
-        // to upgrade a DBLock once it's taken without releasing it, so we pre-emptively take it in
-        // mode X.
-        AutoGetOrCreateDb autoCreateDb(opCtx, _nss.db(), MODE_X);
-        uassert(ErrorCodes::NotMaster,
-                str::stream() << "Unable to start migration for " << _nss.ns()
-                              << " because the node is not primary",
-                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, _nss));
-
-        Database* const db = autoCreateDb.getDb();
-
-        Collection* collection = db->getCollection(opCtx, _nss);
-        if (collection) {
-            // We have an entry for a collection by this name. Check that our collection's UUID
-            // matches the donor's.
-            boost::optional<UUID> donorUUID;
-            if (!donorOptions["uuid"].eoo()) {
-                donorUUID.emplace(UUID::parse(donorOptions));
-            }
-
-            uassert(ErrorCodes::InvalidUUID,
-                    str::stream()
-                        << "Cannot receive chunk "
-                        << ChunkRange(_min, _max).toString()
-                        << " for collection "
-                        << _nss.ns()
-                        << " because we already have an identically named collection with UUID "
-                        << (collection->uuid() ? collection->uuid()->toString() : "(none)")
-                        << ", which differs from the donor's UUID "
-                        << (donorUUID ? donorUUID->toString() : "(none)")
-                        << ". Manually drop the collection on this shard if it contains data from "
-                           "a previous incarnation of "
-                        << _nss.ns(),
-                    collection->uuid() == donorUUID);
-        } else {
-            // We do not have a collection by this name. Create the collection with the donor's
-            // options.
-            WriteUnitOfWork wuow(opCtx);
-            CollectionOptions collectionOptions;
-            uassertStatusOK(collectionOptions.parse(donorOptions,
-                                                    CollectionOptions::ParseKind::parseForStorage));
-            const bool createDefaultIndexes = true;
-            uassertStatusOK(Database::userCreateNS(
-                opCtx, db, _nss.ns(), collectionOptions, createDefaultIndexes, donorIdIndexSpec));
-            wuow.commit();
-
-            collection = db->getCollection(opCtx, _nss);
-        }
-
-        MultiIndexBlock indexer(opCtx, collection);
-        indexer.removeExistingIndexes(&donorIndexSpecs);
-
-        if (!donorIndexSpecs.empty()) {
-            // Only copy indexes if the collection does not have any documents.
-            if (collection->numRecords(opCtx) > 0) {
-                _setStateFailWarn(str::stream() << "aborting migration, shard is missing "
-                                                << donorIndexSpecs.size()
-                                                << " indexes and "
-                                                << "collection is not empty. Non-trivial "
-                                                << "index creation should be scheduled manually");
-                return;
-            }
-
-            auto indexInfoObjs = indexer.init(donorIndexSpecs);
-            if (!indexInfoObjs.isOK()) {
-                _setStateFailWarn(str::stream() << "failed to create index before migrating data. "
-                                                << " error: "
-                                                << redact(indexInfoObjs.getStatus()));
-                return;
-            }
-
-            WriteUnitOfWork wunit(opCtx);
-            indexer.commit();
-
-            for (auto&& infoObj : indexInfoObjs.getValue()) {
-                // make sure to create index on secondaries as well
-                serviceContext->getOpObserver()->onCreateIndex(
-                    opCtx, collection->ns(), collection->uuid(), infoObj, true /* fromMigrate */);
-            }
-
-            wunit.commit();
-        }
+        cloneCollectionIndexesAndOptions(opCtx, _nss, _fromShard);
 
         timing.done(1);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep1);
     }
+
+    auto fromShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, _fromShard));
 
     {
         // 2. Synchronously delete any data which might have been left orphaned in the range

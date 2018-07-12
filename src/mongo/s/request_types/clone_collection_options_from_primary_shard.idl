@@ -1,0 +1,31 @@
+# Copyright (C) 2018 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+commands:
+    _cloneCollectionOptionsFromPrimaryShard:
+        cpp_name: cloneCollectionOptionsFromPrimaryShard
+        description: "Internal command to create a collection on a non-primary shard with the collection options from the primary shard."
+        strict: true
+        namespace: type
+        type: namespacestring
+        fields:
+            primaryShard:
+                description: "The primary shard to get the options from."
+                type: string
