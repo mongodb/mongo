@@ -28,6 +28,8 @@ except ImportError:
 
 ASSERT_NAMES = ["uassert", "massert", "fassert", "fassertFailed"]
 MINIMUM_CODE = 10000
+# This limit is intended to be increased by 1000 when we get close.
+MAXIMUM_CODE = 51999
 
 # pylint: disable=invalid-name
 codes = []  # type: ignore
@@ -125,6 +127,7 @@ def read_error_codes():
     seen = {}
     errors = []
     dups = defaultdict(list)
+    skips = []
 
     # define callback
     def check_dups(assert_loc):
@@ -134,6 +137,13 @@ def read_error_codes():
 
         if not code in seen:
             seen[code] = assert_loc
+            # on first occurrence of a specific excessively large code, add to skips, errors
+            if int(code) > MAXIMUM_CODE:
+                skips.append(assert_loc)
+                errors.append(assert_loc)
+            elif int(code) > MAXIMUM_CODE - 20:
+                print("Approaching maximum error code.  Consider raising the limit soon.")
+
         else:
             if not code in dups:
                 # on first duplicate, add original to dups, errors
@@ -152,6 +162,11 @@ def read_error_codes():
         line, col = get_line_and_column_for_position(bad)
         print("ZERO_CODE:")
         print("  %s:%d:%d:%s" % (bad.sourceFile, line, col, bad.lines))
+
+    for loc in skips:
+        line, col = get_line_and_column_for_position(loc)
+        print("EXCESSIVE SKIPPING OF ERROR CODES:")
+        print("  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines))
 
     for code, locations in dups.items():
         print("DUPLICATE IDS: %s" % code)
