@@ -37,7 +37,6 @@ if free_monitoring == "on":
             'free_mon_mongod.cpp',
             'free_mon_options.cpp',
             'free_mon_status.cpp',
-            'http_client_curl.cpp' if not env.TargetOSIs('windows') else 'http_client_winhttp.cpp',
         ],
         LIBDEPS=[
             'free_mon',
@@ -46,10 +45,7 @@ if free_monitoring == "on":
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
         ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        ],
-        SYSLIBDEPS=[
-            'winhttp' if env.TargetOSIs('windows') else 'curl',
+            '$BUILD_DIR/mongo/util/net/http_client',
         ],
     )
 else:

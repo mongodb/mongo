@@ -46,11 +46,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/free_mon/free_mon_http.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/http_client.h"
 #include "mongo/util/text.h"
 #include "mongo/util/winutil.h"
 
@@ -126,20 +126,22 @@ StatusWith<ProcessedUrl> parseUrl(const std::wstring& url) {
     return ret;
 }
 
-class FreeMonWinHttpClient : public FreeMonHttpClientInterface {
+class WinHttpClient : public HttpClient {
 public:
-    explicit FreeMonWinHttpClient(std::unique_ptr<executor::ThreadPoolTaskExecutor> executor)
+    explicit WinHttpClient(std::unique_ptr<executor::ThreadPoolTaskExecutor> executor)
         : _executor(std::move(executor)) {}
-    ~FreeMonWinHttpClient() final = default;
+    ~WinHttpClient() final = default;
 
-    Future<std::vector<uint8_t>> postAsync(StringData url, const BSONObj obj) final {
+    Future<std::vector<uint8_t>> postAsync(StringData url,
+                                           std::shared_ptr<std::vector<std::uint8_t>> data) final {
         auto urlString = url.toString();
 
         auto pf = makePromiseFuture<std::vector<uint8_t>>();
         uassertStatusOK(
-            _executor->scheduleWork([ shared_promise = pf.promise.share(), urlString, obj ](
+            _executor->scheduleWork([ shared_promise = pf.promise.share(), urlString, data ](
                 const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-                doPost(shared_promise, urlString, obj);
+                ConstDataRange cdr(reinterpret_cast<char*>(data->data()), data->size());
+                doPost(shared_promise, urlString, cdr);
             }));
 
         return std::move(pf.future);
@@ -148,7 +150,7 @@ public:
 private:
     static void doPost(SharedPromise<std::vector<uint8_t>> shared_promise,
                        const std::string& urlString,
-                       const BSONObj& obj) try {
+                       ConstDataRange cdr) try {
         const auto setError = [&shared_promise](StringData reason) {
             const auto msg = errnoWithDescription(GetLastError());
             shared_promise.setError(
@@ -249,9 +251,9 @@ private:
         if (!WinHttpSendRequest(request,
                                 L"Content-type: application/octet-stream\r\n",
                                 -1L,
-                                const_cast<void*>(static_cast<const void*>(obj.objdata())),
-                                obj.objsize(),
-                                obj.objsize(),
+                                const_cast<void*>(static_cast<const void*>(cdr.data())),
+                                cdr.length(),
+                                cdr.length(),
                                 0)) {
             setError("Failed sending HTTP request");
             return;
@@ -313,9 +315,10 @@ private:
 };
 
 }  // namespace
-}  // namespace mongo
 
-std::unique_ptr<mongo::FreeMonHttpClientInterface> mongo::createFreeMonHttpClient(
+std::unique_ptr<HttpClient> HttpClient::create(
     std::unique_ptr<executor::ThreadPoolTaskExecutor> executor) {
-    return std::make_unique<FreeMonWinHttpClient>(std::move(executor));
+    return std::make_unique<WinHttpClient>(std::move(executor));
 }
+
+}  // namespace mongo

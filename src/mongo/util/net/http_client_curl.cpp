@@ -38,13 +38,14 @@
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/free_mon/free_mon_http.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/http_client.h"
 
 namespace mongo {
 
@@ -53,27 +54,43 @@ namespace {
 class CurlLibraryManager {
 public:
     ~CurlLibraryManager() {
-        curl_global_cleanup();
+        if (_initialized) {
+            curl_global_cleanup();
+        }
     }
 
-    bool initialize() {
+    Status initialize() {
+        if (_initialized) {
+            return Status::OK();
+        }
+
         CURLcode ret = curl_global_init(CURL_GLOBAL_ALL);
         if (ret != CURLE_OK) {
-            error() << "Failed to initialize CURL: " << static_cast<int64_t>(ret);
-            return false;
+            return {ErrorCodes::InternalError,
+                    str::stream() << "Failed to initialize CURL: " << static_cast<int64_t>(ret)};
         }
 
         curl_version_info_data* version_data = curl_version_info(CURLVERSION_NOW);
         if (!(version_data->features & CURL_VERSION_SSL)) {
-            error() << "Curl lacks SSL support, cannot continue";
-            return false;
+            return {ErrorCodes::InternalError, "Curl lacks SSL support, cannot continue"};
         }
 
-        return true;
+        _initialized = true;
+        return Status::OK();
     }
-};
 
-CurlLibraryManager curlLibraryManager;
+private:
+    bool _initialized = false;
+} curlLibraryManager;
+
+// curl_global_init() needs to run earlier than services like FreeMonitoring,
+// but may not run during global initialization.
+MONGO_INITIALIZER_GENERAL(HttpClientCurl,
+                          MONGO_NO_PREREQUISITES,
+                          ("BeginGeneralStartupOptionRegistration"))
+(InitializerContext* context) {
+    return curlLibraryManager.initialize();
+}
 
 /**
  * Receives data from the remote side.
@@ -112,21 +129,23 @@ size_t ReadMemoryCallback(char* buffer, size_t size, size_t nitems, void* instre
     return ret;
 }
 
-class FreeMonCurlHttpClient : public FreeMonHttpClientInterface {
+class CurlHttpClient : public HttpClient {
 public:
-    explicit FreeMonCurlHttpClient(std::unique_ptr<executor::ThreadPoolTaskExecutor> executor)
+    explicit CurlHttpClient(std::unique_ptr<executor::ThreadPoolTaskExecutor> executor)
         : _executor(std::move(executor)) {}
 
-    ~FreeMonCurlHttpClient() final = default;
+    ~CurlHttpClient() final = default;
 
-    Future<std::vector<uint8_t>> postAsync(StringData url, const BSONObj obj) final {
+    Future<std::vector<uint8_t>> postAsync(StringData url,
+                                           std::shared_ptr<std::vector<std::uint8_t>> data) final {
         auto pf = makePromiseFuture<std::vector<uint8_t>>();
         std::string urlString(url.toString());
 
         auto status =
-            _executor->scheduleWork([ shared_promise = pf.promise.share(), urlString, obj ](
+            _executor->scheduleWork([ shared_promise = pf.promise.share(), urlString, data ](
                 const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-                doPost(shared_promise, urlString, obj);
+                ConstDataRange cdr(reinterpret_cast<char*>(data->data()), data->size());
+                doPost(shared_promise, urlString, cdr);
             });
 
         uassertStatusOK(status);
@@ -136,11 +155,9 @@ public:
 private:
     static void doPost(SharedPromise<std::vector<uint8_t>> shared_promise,
                        const std::string& urlString,
-                       const BSONObj& obj) {
+                       ConstDataRange cdr) {
         try {
-            ConstDataRange data(obj.objdata(), obj.objdata() + obj.objsize());
-
-            ConstDataRangeCursor cdrc(data);
+            ConstDataRangeCursor cdrc(cdr);
 
             std::unique_ptr<CURL, void (*)(CURL*)> myHandle(curl_easy_init(), curl_easy_cleanup);
 
@@ -160,7 +177,6 @@ private:
                 curl_easy_setopt(myHandle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
             }
 
-            curl_easy_setopt(myHandle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS | CURLPROTO_HTTP);
             curl_easy_setopt(myHandle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 
             DataBuilder dataBuilder(4096);
@@ -236,14 +252,9 @@ private:
 
 }  // namespace
 
-std::unique_ptr<FreeMonHttpClientInterface> createFreeMonHttpClient(
+std::unique_ptr<HttpClient> HttpClient::create(
     std::unique_ptr<executor::ThreadPoolTaskExecutor> executor) {
-
-    if (!curlLibraryManager.initialize()) {
-        return nullptr;
-    }
-
-    return std::make_unique<FreeMonCurlHttpClient>(std::move(executor));
+    return std::make_unique<CurlHttpClient>(std::move(executor));
 }
 
 }  // namespace mongo

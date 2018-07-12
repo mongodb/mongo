@@ -282,6 +282,13 @@ add_option('enable-free-mon',
     type='choice',
 )
 
+add_option('enable-http-client',
+    choices=["auto", "on", "off"],
+    default="auto",
+    help='Enable support for HTTP client requests (required WinHTTP or cURL)',
+    type='choice',
+)
+
 add_option('use-sasl-client',
     help='Support SASL authentication in the client library',
     nargs=0,
@@ -1836,11 +1843,13 @@ env['MONGO_MODULES'] = [m.name for m in mongo_modules]
 # --- check system ---
 ssl_provider = None
 free_monitoring = get_option("enable-free-mon")
+http_client = get_option("enable-http-client")
 
 def doConfigure(myenv):
     global wiredtiger
     global ssl_provider
     global free_monitoring
+    global http_client
 
     # Check that the compilers work.
     #
@@ -3034,22 +3043,49 @@ def doConfigure(myenv):
             if not addOpenSslLibraryToDistArchive(extra_file):
                 print("WARNING: Cannot find SSL library '%s'" % extra_file)
 
+    def checkHTTPLib(required=False):
+        # WinHTTP available on Windows
+        if env.TargetOSIs("windows"):
+            return True
 
+        # libcurl on all other platforms
+        if conf.CheckLibWithHeader(
+            "curl",
+            ["curl/curl.h"], "C",
+            "curl_global_init(0);",
+            autoadd=False):
+            return True
 
+        if required:
+            env.ConfError("Could not find <curl/curl.h> and curl lib")
+
+        return False
+
+    # Resolve --enable-free-mon
     if free_monitoring == "auto":
         if "enterprise" not in env['MONGO_MODULES']:
             free_monitoring = "on"
         else:
             free_monitoring = "off"
 
-    if not env.TargetOSIs("windows") \
-        and free_monitoring == "on" \
-        and not conf.CheckLibWithHeader(
-        "curl",
-        ["curl/curl.h"], "C",
-        "curl_global_init(0);",
-        autoadd=False):
-        env.ConfError("Could not find <curl/curl.h> and curl lib")
+    if free_monitoring == "on":
+        checkHTTPLib(required=True)
+
+    # Resolve --enable-http-client
+    if http_client == "auto":
+        if checkHTTPLib():
+            http_client = "on"
+        else:
+            print("Disabling http-client as libcurl was not found")
+            http_client = "off"
+    elif http_client == "on":
+        checkLibCurl(required=True)
+
+    # Sanity check.
+    # We know that http_client was explicitly disabled here,
+    # because the free_monitoring check would have failed if no http lib were available.
+    if (free_monitoring == "on") and (http_client == "off"):
+        env.ConfError("FreeMonitoring requires an HTTP client which has been explicitly disabled")
 
     if use_system_version_of_library("pcre"):
         conf.FindSysLibDep("pcre", ["pcre"])
@@ -3522,6 +3558,7 @@ Export("mobile_se")
 Export("endian")
 Export("ssl_provider")
 Export("free_monitoring")
+Export("http_client")
 
 def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])

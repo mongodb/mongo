@@ -26,35 +26,13 @@
  * then also delete it in the license file.
  */
 
-#pragma once
-
-#include <cstdint>
-#include <vector>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
+#include "mongo/util/net/http_client.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
 
-constexpr uint64_t kConnectionTimeoutSeconds = 60L;
-constexpr uint64_t kTotalRequestTimeoutSeconds = 120L;
+std::unique_ptr<HttpClient> HttpClient::create(std::unique_ptr<executor::ThreadPoolTaskExecutor>) {
+    return nullptr;
+}
 
-/**
- * Interface used to upload and receive binary payloads to HTTP servers.
- */
-class FreeMonHttpClientInterface {
-public:
-    virtual ~FreeMonHttpClientInterface();
-
-    /**
-     * Url is a full URL with hostname and protocol specification.
-     */
-    virtual Future<std::vector<uint8_t>> postAsync(StringData url, BSONObj data) = 0;
-};
-
-std::unique_ptr<FreeMonHttpClientInterface> createFreeMonHttpClient(
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> executor);
 }  // namespace mongo

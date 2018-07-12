@@ -2,6 +2,7 @@
 
 Import('env')
 Import("has_option")
+Import('http_client')
 Import('ssl_provider')
 
 env = env.Clone()
@@ -150,6 +151,35 @@ env.Library(
         'ssl_manager_impl' if has_option('ssl') else 'ssl_manager_none',
     ],
 )
+
+if http_client == "off":
+    env.Library(
+        target='http_client',
+        source=[
+            'http_client_none.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+        ],
+    )
+else:
+    env.Library(
+        target='http_client',
+        source=[
+            'http_client_winhttp.cpp' if env.TargetOSIs('windows') else 'http_client_curl.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+            '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+            '$BUILD_DIR/mongo/executor/network_interface',
+        ],
+        SYSLIBDEPS=[
+            'winhttp' if env.TargetOSIs('windows') else 'curl',
+        ],
+    )
 
 env.CppUnitTest(
     target='network_test',
