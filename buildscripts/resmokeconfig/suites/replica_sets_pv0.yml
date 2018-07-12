@@ -36,6 +36,9 @@ selector:
   - jstests/replsets/catchup_takeover_two_nodes_ahead.js
   # electionTimeoutMillis is not available in PV0.
   - jstests/replsets/noop_writes_wait_for_write_concern_fcv.js
+  # Election handoff is not supported in PV0, since it requires replSetStepUp.
+  - jstests/replsets/election_handoff*.js
+
 
 executor:
   config:
