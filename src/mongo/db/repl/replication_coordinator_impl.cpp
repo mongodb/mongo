@@ -105,7 +105,7 @@ const OperationContext::Decoration<bool> alwaysAllowNonLocalWrites =
 
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncAttempts, int, 10);
 
-MONGO_EXPORT_SERVER_PARAMETER(handOffElectionOnStepdown, bool, false);
+MONGO_EXPORT_SERVER_PARAMETER(enableElectionHandoff, bool, true);
 
 // Number of seconds between noop writer writes.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(periodicNoopIntervalSecs, int, 10);
@@ -1773,7 +1773,7 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     // If election handoff is enabled, schedule a step-up immediately instead of waiting for the
     // election timeout to expire.
-    if (!force && handOffElectionOnStepdown.load()) {
+    if (!force && enableElectionHandoff.load()) {
         _performElectionHandoff();
     }
     return Status::OK();

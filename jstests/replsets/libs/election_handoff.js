@@ -36,8 +36,9 @@ var ElectionHandoffTest = (function() {
 
         jsTestLog("Enabling election handoff...");
 
-        // Enable election handoff.
-        assert.commandWorked(primary.adminCommand({setParameter: 1, handOffElectionOnStepdown: 1}));
+        // Election handoff is enabled by default. This test explicitly configures it for safety
+        // purposes.
+        assert.commandWorked(primary.adminCommand({setParameter: 1, enableElectionHandoff: 1}));
 
         jsTestLog("Stepping down primary...");
 
