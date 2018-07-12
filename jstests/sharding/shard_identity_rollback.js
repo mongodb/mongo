@@ -23,7 +23,7 @@
 
     // In general, shardsvrs default to the lower FCV on fresh start up (their FCV is set to the
     // cluster's FCV on addShard). However, this test starts a shardsvr that it never adds to the
-    // cluster, but expects behavior that only a FCV>4.0 shardsvr would execute:
+    // cluster, but expects behavior that only a FCV>=4.0 shardsvr would execute:
     //
     // In FCV 3.6, clean shutdown writes uncommitted data to disk in the v3.6-compatible format.
     // When the node is restarted and sees uncommitted data in the v3.6-compatible format, it fails
