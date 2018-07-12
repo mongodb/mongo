@@ -311,6 +311,9 @@ void BackgroundSync::_produce() {
         }
         const auto requiredOpTime = (minValidSaved > _lastOpTimeFetched) ? minValidSaved : OpTime();
         lastOpTimeFetched = _lastOpTimeFetched;
+        if (!_syncSourceHost.empty()) {
+            log() << "Clearing sync source " << _syncSourceHost << " to choose a new one.";
+        }
         _syncSourceHost = HostAndPort();
         _syncSourceResolver = stdx::make_unique<SyncSourceResolver>(
             _replicationCoordinatorExternalState->getTaskExecutor(),
@@ -389,6 +392,10 @@ void BackgroundSync::_produce() {
                   << ". Sleeping for 1 second to avoid immediately choosing a new sync source for "
                      "the same reason as last time.";
             sleepsecs(1);
+        } else {
+            log() << "Changed sync source from "
+                  << (oldSource.empty() ? std::string("empty") : oldSource.toString()) << " to "
+                  << source;
         }
     } else {
         if (!syncSourceResp.isOK()) {
@@ -406,7 +413,7 @@ void BackgroundSync::_produce() {
 
         _tooStale = false;
 
-        log() << "No longer too stale. Able to sync from " << _syncSourceHost;
+        log() << "No longer too stale. Able to sync from " << source;
 
         auto status = _replCoord->setMaintenanceMode(false);
         if (!status.isOK()) {
@@ -478,8 +485,8 @@ void BackgroundSync::_produce() {
     }
 
     const auto logLevel = Command::testCommandsEnabled ? 0 : 1;
-    LOG(logLevel) << "scheduling fetcher to read remote oplog on " << _syncSourceHost
-                  << " starting at " << oplogFetcher->getFindQuery_forTest()["filter"];
+    LOG(logLevel) << "scheduling fetcher to read remote oplog on " << source << " starting at "
+                  << oplogFetcher->getFindQuery_forTest()["filter"];
     auto scheduleStatus = oplogFetcher->startup();
     if (!scheduleStatus.isOK()) {
         warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "
@@ -747,6 +754,7 @@ HostAndPort BackgroundSync::getSyncTarget() const {
 
 void BackgroundSync::clearSyncTarget() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+    log() << "Resetting sync source to empty, which was " << _syncSourceHost;
     _syncSourceHost = HostAndPort();
 }
 
