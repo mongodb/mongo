@@ -268,6 +268,7 @@ Status convertToCapped(OperationContext* txn, const NamespaceString& collectionN
         Status status = db->dropCollection(txn, longTmpName);
         if (!status.isOK())
             return status;
+        wunit.commit();
     }
 
 
