@@ -325,7 +325,8 @@ ssl_want SSLHandshakeManager::doServerHandshake(asio::error_code& ec,
     // ASC_RET_MUTUAL_AUTH is not set since we do our own certificate validation later.
     invariant(attribs == (retAttribs | ASC_RET_EXTENDED_ERROR | ASC_RET_MUTUAL_AUTH));
 
-    if (inputBuffers[1].BufferType == SECBUFFER_EXTRA) {
+    if (inputBuffers[1].BufferType == SECBUFFER_EXTRA && inputBuffers[1].pvBuffer != nullptr &&
+        inputBuffers[1].cbBuffer > 0) {
         _pExtraEncryptedBuffer->reset();
         _pExtraEncryptedBuffer->append(inputBuffers[1].pvBuffer, inputBuffers[1].cbBuffer);
     }
@@ -464,7 +465,8 @@ ssl_want SSLHandshakeManager::doClientHandshake(asio::error_code& ec) {
 
     if (_pInBuffer->size()) {
         // Locate (optional) extra buffer
-        if (inputBuffers[1].BufferType == SECBUFFER_EXTRA) {
+        if (inputBuffers[1].BufferType == SECBUFFER_EXTRA && inputBuffers[1].pvBuffer != nullptr &&
+            inputBuffers[1].cbBuffer > 0) {
             _pExtraEncryptedBuffer->reset();
             _pExtraEncryptedBuffer->append(inputBuffers[1].pvBuffer, inputBuffers[1].cbBuffer);
         }
@@ -609,7 +611,8 @@ ssl_want SSLReadManager::decryptBuffer(asio::error_code& ec, DecryptState* pDecr
         }
 
         // The network layer may have read more then 1 SSL packet so remember the extra data.
-        if (securityBuffers[3].BufferType == SECBUFFER_EXTRA && securityBuffers[3].cbBuffer > 0) {
+        if (securityBuffers[3].BufferType == SECBUFFER_EXTRA &&
+            securityBuffers[3].pvBuffer != nullptr && securityBuffers[3].cbBuffer > 0) {
             ASIO_ASSERT(_pExtraEncryptedBuffer->empty());
             _pExtraEncryptedBuffer->append(securityBuffers[3].pvBuffer,
                                            securityBuffers[3].cbBuffer);
