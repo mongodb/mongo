@@ -157,17 +157,21 @@ condition_map = {
     'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x',
 }
 
-def filtered_filelist(f):
+def filtered_filelist(f, checksum):
     for line in f:
         file_cond = line.split()
         if line.startswith("#") or len(file_cond) == 0:
             continue
         if len(file_cond) == 1 or condition_map.get(file_cond[1], False):
-            yield file_cond[0]
+            if line.startswith('src/checksum/') == checksum:
+                yield file_cond[0]
 
 filelistfile = 'dist/filelist'
 with open(File(filelistfile).srcnode().abspath) as filelist:
-    wtsources = list(filtered_filelist(filelist))
+    wtsources = list(filtered_filelist(filelist, False))
+
+with open(File(filelistfile).srcnode().abspath) as filelist:
+    cssources = list(filtered_filelist(filelist, True))
 
 if useZlib:
     env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_ZLIB'])
@@ -184,10 +188,16 @@ if useSnappy:
 if not (env['TARGET_ARCH'] == 's390x' and get_option("use-s390x-crc32") == "off"):
     env.Append(CPPDEFINES=["HAVE_CRC32_HARDWARE"])
 
+cslib = env.Library(
+    target="wiredtiger_checksum",
+    source=cssources,
+)
+
 wtlib = env.Library(
     target="wiredtiger",
     source=wtsources,
     LIBDEPS=[
+        'wiredtiger_checksum',
         '$BUILD_DIR/third_party/shim_snappy',
         '$BUILD_DIR/third_party/shim_zlib',
     ],
@@ -196,4 +206,4 @@ wtlib = env.Library(
     ],
 )
 
-env.Depends(wtlib, [filelistfile, version_file])
+env.Depends([cslib, wtlib], [filelistfile, version_file])
