@@ -2082,6 +2082,15 @@ RecordId KeyString::decodeRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
     return decodeRecordId(&reader);
 }
 
+size_t KeyString::sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
+    invariant(bufSize >= 2);  // smallest possible encoding of a RecordId.
+    const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
+    const unsigned char lastByte = *(buffer + bufSize - 1);
+    const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
+    invariant(bufSize >= ridSize);
+    return bufSize - ridSize;
+}
+
 RecordId KeyString::decodeRecordId(BufReader* reader) {
     const uint8_t firstByte = readType<uint8_t>(reader, false);
     const uint8_t numExtraBytes = firstByte >> 5;  // high 3 bits in firstByte

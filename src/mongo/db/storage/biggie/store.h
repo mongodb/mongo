@@ -166,6 +166,10 @@ public:
         return map.erase(key);
     }
 
+    void erase(iterator first, iterator last) {
+        map.erase(first.iter, last.iter);
+    }
+
     /**
      * Returns a Store that has all changes from both 'this' and 'other' compared to base.
      * Throws merge_conflict_exception if there are merge conflicts.

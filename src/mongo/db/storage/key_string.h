@@ -324,6 +324,11 @@ public:
     static RecordId decodeRecordIdAtEnd(const void* buf, size_t size);
 
     /**
+     * Given a KeyString with a RecordId, returns the length of the section without the RecordId.
+     */
+    static size_t sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize);
+
+    /**
      * Decodes a RecordId, consuming all bytes needed from reader.
      */
     static RecordId decodeRecordId(BufReader* reader);

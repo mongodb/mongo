@@ -67,15 +67,11 @@ public:
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
-                                             const IndexDescriptor* desc) {
-        return Status::OK();
-    }
+                                             const IndexDescriptor* desc);
 
     virtual mongo::SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
                                                                StringData ident,
-                                                               const IndexDescriptor* desc) {
-        return new SortedDataInterface();  // TODO : implement later.
-    }
+                                                               const IndexDescriptor* desc);
 
     virtual Status dropIdent(OperationContext* opCtx, StringData ident) {
         return Status::OK();

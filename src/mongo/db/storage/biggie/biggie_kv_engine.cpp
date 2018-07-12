@@ -31,8 +31,10 @@
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/platform/basic.h"
@@ -81,6 +83,20 @@ std::shared_ptr<StringStore> KVEngine::getMaster() const {
 std::shared_ptr<StringStore> KVEngine::getMaster_inlock() const {
     return _master;
 }
+
+
+Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
+                                           StringData ident,
+                                           const IndexDescriptor* desc) {
+    return Status::OK();  // I don't think we actually need to do anything here
+}
+
+mongo::SortedDataInterface* KVEngine::getSortedDataInterface(OperationContext* opCtx,
+                                                             StringData ident,
+                                                             const IndexDescriptor* desc) {
+    return new SortedDataInterface(Ordering::make(desc->keyPattern()), desc->unique(), ident);
+}
+
 
 class EmptyRecordCursor final : public SeekableRecordCursor {
 public:

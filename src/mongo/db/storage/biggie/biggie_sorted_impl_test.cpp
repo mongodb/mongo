@@ -26,12 +26,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/biggie/biggie_record_store.h"
+#include "mongo/db/storage/biggie/biggie_sorted_impl.h"
 #include "mongo/base/init.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
 #include "mongo/db/storage/biggie/biggie_recovery_unit.h"
 #include "mongo/db/storage/biggie/store.h"
-#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/platform/basic.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -39,44 +39,24 @@
 namespace mongo {
 namespace biggie {
 namespace {
-
-class RecordStoreHarnessHelper final : public ::mongo::RecordStoreHarnessHelper {
+class SortedDataInterfaceTestHarnessHelper final : public virtual SortedDataInterfaceHarnessHelper {
+private:
     KVEngine _kvEngine{};
+    Ordering _order;
 
 public:
-    RecordStoreHarnessHelper() {}
-
-    virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore() {
-        return newNonCappedRecordStore("a.b");
+    SortedDataInterfaceTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
+    std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique) final {
+        return std::make_unique<SortedDataInterface>(_order, unique, "ident"_sd);
     }
-
-    virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore(const std::string& ns) {
-        return std::make_unique<RecordStore>(ns, "ident"_sd, false, 0, 0, nullptr);
-    }
-
-    virtual std::unique_ptr<mongo::RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
-                                                                     int64_t cappedMaxDocs) {
-        return newCappedRecordStore("a.b", cappedSizeBytes, cappedMaxDocs);
-    }
-
-    virtual std::unique_ptr<mongo::RecordStore> newCappedRecordStore(const std::string& ns,
-                                                                     int64_t cappedSizeBytes,
-                                                                     int64_t cappedMaxDocs) final {
-        return std::make_unique<RecordStore>(
-            ns, "ident"_sd, true, cappedSizeBytes, cappedMaxDocs, nullptr);
-    }
-
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {
+        //! not correct lol
         return std::make_unique<RecoveryUnit>(&_kvEngine);
-    }
-
-    bool supportsDocLocking() final {
-        return false;
     }
 };
 
-std::unique_ptr<mongo::HarnessHelper> makeHarnessHelper() {
-    return std::make_unique<RecordStoreHarnessHelper>();
+std::unique_ptr<HarnessHelper> makeHarnessHelper() {
+    return stdx::make_unique<SortedDataInterfaceTestHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
