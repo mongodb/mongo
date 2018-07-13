@@ -34,10 +34,10 @@ type OpStat struct {
 	Ns string `json:"ns,omitempty"`
 
 	// Data represents the payload of the request operation.
-	RequestData interface{} `json:"request_data, omitempty"`
+	RequestData interface{} `json:"request_data,omitempty"`
 
 	// Data represents the payload of the reply operation.
-	ReplyData interface{} `json:"reply_data, omitempty"`
+	ReplyData interface{} `json:"reply_data,omitempty"`
 
 	// NumReturned is the number of documents that were fetched as a result of this operation.
 	NumReturned int `json:"nreturned,omitempty"`
@@ -77,7 +77,7 @@ type OpStat struct {
 	// RequestID is the ID of the mongodb operation as taken from the header.
 	// The RequestID for a request operation is the same as the ResponseID for
 	// the corresponding reply, so this field will be the same for request/reply pairs.
-	RequestID int32 `json:"request_id, omitempty"`
+	RequestID int32 `json:"request_id,omitempty"`
 }
 
 // jsonGet retrieves serialized json req/res via the channel-like arg;
