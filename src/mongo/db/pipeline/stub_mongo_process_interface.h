@@ -92,7 +92,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status renameIfOptionsAndIndexesHaveNotChanged(
+    void renameIfOptionsAndIndexesHaveNotChanged(
         OperationContext* opCtx,
         const BSONObj& renameCommandObj,
         const NamespaceString& targetNs,

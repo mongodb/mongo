@@ -291,16 +291,6 @@ TEST_F(DocumentSourceOutTest, CorrectlyUsesTargetDbIfSpecified) {
     ASSERT_EQ(outStage->getOutputNs().coll(), targetColl);
 }
 
-TEST_F(DocumentSourceOutTest, DropTargetMustBeTrue) {
-    BSONObj spec = BSON("$out" << BSON("to"
-                                       << "test"
-                                       << "mode"
-                                       << "insert"
-                                       << "dropTarget"
-                                       << false));
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, ErrorCodes::InvalidOptions);
-}
-
 TEST_F(DocumentSourceOutTest, ModeMustBeInsert) {
     BSONObj spec = BSON("$out" << BSON("to"
                                        << "test"

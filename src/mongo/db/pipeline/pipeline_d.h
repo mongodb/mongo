@@ -86,7 +86,7 @@ public:
                                  const NamespaceString& nss,
                                  BSONObjBuilder* builder) const final;
         BSONObj getCollectionOptions(const NamespaceString& nss) final;
-        Status renameIfOptionsAndIndexesHaveNotChanged(
+        void renameIfOptionsAndIndexesHaveNotChanged(
             OperationContext* opCtx,
             const BSONObj& renameCommandObj,
             const NamespaceString& targetNs,

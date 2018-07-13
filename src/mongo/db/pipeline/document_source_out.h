@@ -33,13 +33,22 @@
 
 namespace mongo {
 
-class DocumentSourceOut final : public DocumentSource, public NeedsMergerDocumentSource {
+/**
+ * Abstract class for the $out aggregation stage.
+ */
+class DocumentSourceOut : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     static std::unique_ptr<LiteParsedDocumentSourceForeignCollections> liteParse(
         const AggregationRequest& request, const BSONElement& spec);
 
-    // virtuals from DocumentSource
-    ~DocumentSourceOut() final;
+    DocumentSourceOut(const NamespaceString& outputNs,
+                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                      WriteModeEnum mode,
+                      bool dropTarget,
+                      boost::optional<Document> uniqueKey);
+
+    virtual ~DocumentSourceOut() = default;
+
     GetNextResult getNext() final;
     const char* getSourceName() const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
@@ -67,51 +76,34 @@ public:
     }
 
     /**
-      Create a document source for output and pass-through.
+     * Retrieves the namespace to direct each batch to, which may be a temporary namespace or the
+     * final output namespace.
+     */
+    virtual const NamespaceString& getWriteNs() const = 0;
 
-      This can be put anywhere in a pipeline and will store content as
-      well as pass it on.
+    /**
+     * Prepares the DocumentSource to be able to write incoming batches to the desired collection.
+     */
+    virtual void initializeWriteNs() = 0;
 
-      @param pBsonElement the raw BSON specification for the source
-      @param pExpCtx the expression context for the pipeline
-      @returns the newly created document source
-    */
+    /**
+     * Finalize the output collection, called when there are no more documents to write.
+     */
+    virtual void finalize() = 0;
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    DocumentSourceOut(const NamespaceString& outputNs,
-                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                      WriteModeEnum mode,
-                      bool dropTarget,
-                      boost::optional<Document> uniqueKey);
-
     /**
-     * Sets '_tempNs' to a unique temporary namespace, makes sure the output collection isn't
-     * sharded or capped, and saves the collection options and indexes of the target collection.
-     * Then creates the temporary collection we will insert into by copying the collection options
-     * and indexes from the target collection.
-     *
-     * Sets '_initialized' to true upon completion.
-     */
-    void initialize();
-
-    /**
-     * Inserts all of 'toInsert' into the temporary collection.
+     * Inserts all of 'toInsert' into the collection returned from getWriteNs().
      */
     void spill(const std::vector<BSONObj>& toInsert);
 
     bool _initialized = false;
     bool _done = false;
 
-    // Holds on to the original collection options and index specs so we can check they didn't
-    // change during computation.
-    BSONObj _originalOutOptions;
-    std::list<BSONObj> _originalIndexes;
-
-    NamespaceString _tempNs;          // output goes here as it is being processed.
-    const NamespaceString _outputNs;  // output will go here after all data is processed.
-
+    const NamespaceString _outputNs;
     WriteModeEnum _mode;
     bool _dropTarget;
     boost::optional<Document> _uniqueKey;
