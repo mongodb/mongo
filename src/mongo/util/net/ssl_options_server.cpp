@@ -408,14 +408,18 @@ MONGO_MODULE_STARTUP_OPTIONS_REGISTER(SSLServerOptions)(InitializerContext*) {
     return moe::startupOptions.addSection(options);
 }
 
+// Alias --tlsOnNormalPorts as --tlsMode=requireTLS
 Status canonicalizeSSLServerOptions(moe::Environment* params) {
     if (params->count("net.tls.tlsOnNormalPorts") &&
         (*params)["net.tls.tlsOnNormalPorts"].as<bool>() == true) {
-        Status ret = params->set("net.tls.mode", moe::Value(std::string("requireTLS")));
+        // Must remove the old setting before adding the new one
+        // since as soon as we add it, the incompatibleWith validation will run.
+        auto ret = params->remove("net.tls.tlsOnNormalPorts");
         if (!ret.isOK()) {
             return ret;
         }
-        ret = params->remove("net.tls.tlsOnNormalPorts");
+
+        ret = params->set("net.tls.mode", moe::Value(std::string("requireTLS")));
         if (!ret.isOK()) {
             return ret;
         }
