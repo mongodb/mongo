@@ -251,9 +251,21 @@ function FreeMonGetRegistration(conn) {
  *
  * @param {object} serverStatus.freeMonitoring section
  */
-function FreeMonGetStatus(conn) {
+function FreeMonGetServerStatus(conn) {
     'use strict';
 
     const admin = conn.getDB("admin");
     return assert.commandWorked(admin.runCommand({serverStatus: 1})).freeMonitoring;
+}
+
+/**
+ * Get current Free Monitoring Status via getFreeMonitoringStatus.
+ *
+ * @param {object} getFreeMonitoringStatus document
+ */
+function FreeMonGetStatus(conn) {
+    'use strict';
+
+    const admin = conn.getDB("admin");
+    return assert.commandWorked(admin.runCommand({getFreeMonitoringStatus: 1}));
 }

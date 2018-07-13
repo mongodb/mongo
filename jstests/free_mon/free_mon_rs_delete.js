@@ -24,8 +24,8 @@ load("jstests/free_mon/libs/free_mon.js");
 
     mock_web.waitRegisters(2);
 
-    assert.eq(FreeMonGetStatus(rst.getPrimary()).state, 'enabled');
-    assert.eq(FreeMonGetStatus(rst.getSecondary()).state, 'enabled');
+    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'enabled');
+    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'enabled');
 
     const qs1 = mock_web.queryStats();
 
@@ -42,8 +42,8 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(qs1.registers, qs2.registers);
 
     // Make sure we are back to the initial state.
-    assert.eq(FreeMonGetStatus(rst.getPrimary()).state, 'undecided');
-    assert.eq(FreeMonGetStatus(rst.getSecondary()).state, 'undecided');
+    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'undecided');
+    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'undecided');
 
     // Enable it again to be sure we can resume
     assert.commandWorked(rst.getPrimary().adminCommand({setFreeMonitoring: 1, action: "enable"}));
@@ -52,8 +52,8 @@ load("jstests/free_mon/libs/free_mon.js");
 
     sleep(20 * 1000);
 
-    assert.eq(FreeMonGetStatus(rst.getPrimary()).state, 'enabled');
-    assert.eq(FreeMonGetStatus(rst.getSecondary()).state, 'enabled');
+    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'enabled');
+    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'enabled');
 
     rst.stopSet();
 
