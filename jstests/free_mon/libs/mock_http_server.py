@@ -36,12 +36,20 @@ FAULT_HALT_METRICS_5 = "halt_metrics_5"
 """Fault which causes metrics to return permanentlyDelete = true after 3 uploads."""
 FAULT_PERMANENTLY_DELETE_AFTER_3 = "permanently_delete_after_3"
 
+"""Fault which causes metrics to trigger resentRegistration at 3 uploads."""
+FAULT_RESEND_REGISTRATION_AT_3 = "resend_registration_at_3"
+
+"""Fault which causes metrics to trigger resentRegistration once."""
+FAULT_RESEND_REGISTRATION_ONCE = "resend_registration_once"
+
 # List of supported fault types
 SUPPORTED_FAULT_TYPES = [
     FAULT_FAIL_REGISTER,
     FAULT_INVALID_REGISTER,
     FAULT_HALT_METRICS_5,
     FAULT_PERMANENTLY_DELETE_AFTER_3,
+    FAULT_RESEND_REGISTRATION_AT_3,
+    FAULT_RESEND_REGISTRATION_ONCE,
 ]
 
 # Supported POST URL types
@@ -117,7 +125,7 @@ class FreeMonHandler(http.server.BaseHTTPRequestHandler):
             data = bson.BSON.encode({
                 'version': bson.int64.Int64(42),
                 'haltMetricsUploading': False,
-                'id': 'mock123',
+                'id': '',
                 'informationalURL': 'http://www.example.com/123',
                 'message': 'Welcome to the Mock Free Monitoring Endpoint',
                 'reportingInterval': bson.int64.Int64(1),
@@ -177,12 +185,37 @@ You can disable monitoring at any time by running db.disableFreeMonitoring()."""
                 'reportingInterval': bson.int64.Int64(1),
                 'message': 'Thanks for all the metrics',
             })
+        elif not disable_faults and \
+            stats.metrics_calls > 3 and \
+            stats.fault_calls < 1 and fault_type == FAULT_RESEND_REGISTRATION_ONCE:
+            stats.fault_calls += 1
+            data = bson.BSON.encode({
+                'version': bson.int64.Int64(2),
+                'haltMetricsUploading': False,
+                'permanentlyDelete': False,
+                'id': 'mock123',
+                'reportingInterval': bson.int64.Int64(1),
+                'message': 'Thanks for all the metrics',
+                'resendRegistration' : True,
+            })
+        elif not disable_faults and \
+            stats.metrics_calls == 3 and fault_type == FAULT_RESEND_REGISTRATION_AT_3:
+            stats.fault_calls += 1
+            data = bson.BSON.encode({
+                'version': bson.int64.Int64(2),
+                'haltMetricsUploading': False,
+                'permanentlyDelete': False,
+                'id': 'mock123',
+                'reportingInterval': bson.int64.Int64(1),
+                'message': 'Thanks for all the metrics',
+                'resendRegistration' : True,
+            })
         else:
             data = bson.BSON.encode({
                 'version': bson.int64.Int64(1),
                 'haltMetricsUploading': False,
                 'permanentlyDelete': False,
-                'id': 'mock123',
+                'id': '',
                 'reportingInterval': bson.int64.Int64(1),
                 'message': 'Thanks for all the metrics',
             })

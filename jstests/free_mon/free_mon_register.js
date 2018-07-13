@@ -31,7 +31,7 @@ load("jstests/free_mon/libs/free_mon.js");
     const last_register = mock_web.query("last_register");
     print(tojson(last_register));
 
-    assert.eq(last_register.version, 1);
+    assert.eq(last_register.version, 2);
     assert.gt(new Date().setTime(last_register.localTime["$date"]), localTime);
     assert.eq(last_register.payload.buildInfo.bits, 64);
     assert.eq(last_register.payload.buildInfo.ok, 1);
@@ -44,7 +44,7 @@ load("jstests/free_mon/libs/free_mon.js");
     const last_metrics = mock_web.query("last_metrics");
     print(tojson(last_metrics));
 
-    assert.eq(last_metrics.version, 1);
+    assert.eq(last_metrics.version, 2);
     assert.gt(new Date().setTime(last_metrics.localTime["$date"]), localTime);
 
     MongoRunner.stopMongod(conn);

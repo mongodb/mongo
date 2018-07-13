@@ -95,7 +95,10 @@ structs:
             description: "Metrics Blob"
             type: bindata_generic
 
-            
+    # History
+    # -------
+    # Version 2 - added resendRegistration bool
+    #
     FreeMonMetricsResponse:
         description: "Metrics Response from Cloud Server"
         fields: 
@@ -126,4 +129,8 @@ structs:
           userReminder:
             description: "Message to display to user to remind them about service"
             type: string
+            optional: true
+          resendRegistration:
+            description: "If true, resend registration to server"
+            type: bool
             optional: true

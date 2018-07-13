@@ -272,6 +272,27 @@ private:
     size_t _count;
 };
 
+/**
+ * In-memory registration status
+ *
+ * Ensures primaries and secondaries register separately
+ */
+enum class FreeMonRegistrationStatus {
+    /**
+     * Free monitoring is not enabled - default state.
+     */
+    kDisabled,
+
+    /**
+     * Registration in progress.
+     */
+    kPending,
+
+    /**
+     * Free Monitoring is enabled.
+     */
+    kEnabled,
+};
 
 /**
  * Process in an Agent in a Agent/Message Passing model.
@@ -478,6 +499,9 @@ private:
 
     // Pending update to disk
     boost::synchronized_value<FreeMonStorageState> _state;
+
+    // In-memory registration status
+    FreeMonRegistrationStatus _registrationStatus{FreeMonRegistrationStatus::kDisabled};
 
     // Countdown launch to support manual cranking
     FreeMonCountdownLatch _countdown;

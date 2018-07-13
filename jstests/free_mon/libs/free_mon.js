@@ -9,6 +9,8 @@ const FAULT_FAIL_REGISTER = "fail_register";
 const FAULT_INVALID_REGISTER = "invalid_register";
 const FAULT_HALT_METRICS_5 = "halt_metrics_5";
 const FAULT_PERMANENTLY_DELETE_AFTER_3 = "permanently_delete_after_3";
+const FAULT_RESEND_REGISTRATION_AT_3 = "resend_registration_at_3";
+const FAULT_RESEND_REGISTRATION_ONCE = "resend_registration_once";
 
 const DISABLE_FAULTS = "disable_faults";
 const ENABLE_FAULTS = "enable_faults";
@@ -175,10 +177,11 @@ class FreeMonWebServer {
      */
     waitRegisters(count) {
         const qs = this.queryStats.bind(this);
+        const port = this.port;
         // Wait for registration to occur
         assert.soon(function() {
             const stats = qs();
-            print("QS : " + tojson(stats));
+            print("w" + port + "| waiting for registers >= (" + count + ") QS : " + tojson(stats));
             return stats.registers >= count;
         }, "Failed to web server register", 60 * 1000);
     }
@@ -190,10 +193,11 @@ class FreeMonWebServer {
      */
     waitMetrics(count) {
         const qs = this.queryStats.bind(this);
+        const port = this.port;
         // Wait for metrics uploads to occur
         assert.soon(function() {
             const stats = qs();
-            print("QS : " + tojson(stats));
+            print("w" + port + "| waiting for metrics >= (" + count + ") QS : " + tojson(stats));
             return stats.metrics >= count;
         }, "Failed to web server metrics", 60 * 1000);
     }
@@ -205,10 +209,11 @@ class FreeMonWebServer {
      */
     waitFaults(count) {
         const qs = this.queryStats.bind(this);
+        const port = this.port;
         // Wait for faults to be triggered
         assert.soon(function() {
             const stats = qs();
-            print("QS : " + tojson(stats));
+            print("w" + port + "| waiting for faults >= (" + count + ") QS : " + tojson(stats));
             return stats.faults >= count;
         }, "Failed to web server faults", 60 * 1000);
     }
