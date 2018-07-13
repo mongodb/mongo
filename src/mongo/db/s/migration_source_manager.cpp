@@ -537,6 +537,23 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     }
 
     if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
+        // This condition may only happen if the migration commit has failed for any reason
+        if (migrationCommitStatus.isOK()) {
+            severe() << "The migration commit succeeded, but the new chunk placement was not "
+                        "reflected after metadata refresh, which is an indication of an "
+                        "afterOpTime bug.";
+            severe() << "The current config server opTime is " << Grid::get(opCtx)->configOpTime();
+            severe() << "The commit response came from "
+                     << redact(commitChunkMigrationResponse.getValue().hostAndPort->toString())
+                     << " and contained:";
+            severe() << "  metadata: "
+                     << redact(commitChunkMigrationResponse.getValue().metadata.toString());
+            severe() << "  response: "
+                     << redact(commitChunkMigrationResponse.getValue().response.toString());
+
+            fassertFailed(50878);
+        }
+
         // The chunk modification was not applied, so report the original error
         return migrationCommitStatus.withContext("Chunk move was not successful");
     }
