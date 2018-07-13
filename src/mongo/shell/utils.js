@@ -1033,15 +1033,16 @@ shellHelper.show = function(what) {
                 } else if (freemonStatus.state === 'undecided') {
                     print(
                         "---\n" +
-                        "Enable MongoDB's free cloud-based monitoring service to collect and display\n" +
-                        "metrics about your deployment (disk utilization, CPU, operation statistics,\n" +
-                        "etc).\n" + "\n" +
-                        "The monitoring data will be available on a MongoDB website with a unique\n" +
-                        "URL created for you. Anyone you share the URL with will also be able to\n" +
-                        "view this page. MongoDB may use this information to make product\n" +
+                        "Enable MongoDB's free cloud-based monitoring service, which will then receive and display\n" +
+                        "metrics about your deployment (disk utilization, CPU, operation statistics, etc).\n" +
+                        "\n" +
+                        "The monitoring data will be available on a MongoDB website with a unique URL accessible to you\n" +
+                        "and anyone you share the URL with. MongoDB may use this information to make product\n" +
                         "improvements and to suggest MongoDB products and deployment options to you.\n" +
-                        "\n" + "To enable free monitoring, run the following command:\n" +
-                        "db.enableFreeMonitoring()\n" + "---\n");
+                        "\n" +
+                        "To enable free monitoring, run the following command: db.enableFreeMonitoring()\n" +
+                        "To permanently disable this reminder, run the following command: db.disableFreeMonitoring()\n" +
+                        "---\n");
                 }
             }
 

@@ -686,14 +686,13 @@ void FreeMonProcessor::doAsyncRegisterFail(
 void FreeMonProcessor::doCommandUnregister(
     Client* client, FreeMonWaitableMessageWithPayload<FreeMonMessageType::UnregisterCommand>* msg) {
     // Treat this request as idempotent
-    if (_state->getState() != StorageStateEnum::disabled) {
+    readState(client);
 
-        _state->setState(StorageStateEnum::disabled);
+    _state->setState(StorageStateEnum::disabled);
 
-        writeState(client);
+    writeState(client);
 
-        log() << "Free Monitoring is Disabled";
-    }
+    log() << "Free Monitoring is Disabled";
 
     msg->setStatus(Status::OK());
 }
