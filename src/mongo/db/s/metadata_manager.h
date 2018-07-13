@@ -34,8 +34,8 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_range_deleter.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -45,7 +45,7 @@
 
 namespace mongo {
 
-class ScopedCollectionMetadata;
+class RangePreserver;
 
 class MetadataManager {
     MONGO_DISALLOW_COPYING(MetadataManager);
@@ -136,8 +136,8 @@ public:
     boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& from) const;
 
 private:
-    // Management of the _metadata list is implemented in ScopedCollectionMetadata
-    friend class ScopedCollectionMetadata;
+    // Management of the _metadata list is implemented in RangePreserver
+    friend class RangePreserver;
 
     // For access to _rangesToClean and _managerLock under task callback
     friend boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
@@ -241,63 +241,6 @@ private:
 
     // Ranges being deleted, or scheduled to be deleted, by a background task
     CollectionRangeDeleter _rangesToClean;
-};
-
-class ScopedCollectionMetadata {
-    MONGO_DISALLOW_COPYING(ScopedCollectionMetadata);
-
-public:
-    ~ScopedCollectionMetadata() {
-        _clear();
-    }
-
-    /**
-     * Binds *this to the same CollectionMetadata as other, if any.
-     */
-    ScopedCollectionMetadata(ScopedCollectionMetadata&& other);
-    ScopedCollectionMetadata& operator=(ScopedCollectionMetadata&& other);
-
-    const CollectionMetadata& get() const {
-        invariant(_metadataTracker);
-        return _metadataTracker->metadata;
-    }
-
-    const auto* operator-> () const {
-        return &get();
-    }
-
-    const auto& operator*() const {
-        return get();
-    }
-
-private:
-    friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(
-        std::shared_ptr<MetadataManager>, const boost::optional<LogicalTime>&);
-
-    /**
-     * Increments the usageCounter in the specified CollectionMetadata.
-     *
-     * Must be called with manager->_managerLock held.  Arguments must be non-null.
-     */
-    ScopedCollectionMetadata(
-        WithLock,
-        std::shared_ptr<MetadataManager> metadataManager,
-        std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker);
-
-    /**
-     * Metadata not tracked by the manager - created on demand for a specific point in time.
-     */
-    ScopedCollectionMetadata(
-        std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker);
-
-    /**
-     * Disconnect from the CollectionMetadata, possibly triggering GC of unused CollectionMetadata.
-     */
-    void _clear();
-
-    std::shared_ptr<MetadataManager> _metadataManager;
-
-    std::shared_ptr<MetadataManager::CollectionMetadataTracker> _metadataTracker;
 };
 
 }  // namespace mongo

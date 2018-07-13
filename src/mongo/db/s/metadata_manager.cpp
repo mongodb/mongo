@@ -115,6 +115,20 @@ using CallbackArgs = TaskExecutor::CallbackArgs;
 
 MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
 
+class UnshardedCollection : public ScopedCollectionMetadata::Impl {
+public:
+    UnshardedCollection() = default;
+
+    const CollectionMetadata& get() override {
+        return _metadata;
+    }
+
+private:
+    CollectionMetadata _metadata;
+};
+
+const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
+
 /**
  * Deletes ranges, in background, until done, normally using a task executor attached to the
  * ShardingState.
@@ -151,6 +165,45 @@ void scheduleCleanup(executor::TaskExecutor* executor,
 
 }  // namespace
 
+class RangePreserver : public ScopedCollectionMetadata::Impl {
+public:
+    // Must be called locked with the MetadataManager's _managerLock
+    RangePreserver(WithLock,
+                   std::shared_ptr<MetadataManager> metadataManager,
+                   std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker)
+        : _metadataManager(std::move(metadataManager)),
+          _metadataTracker(std::move(metadataTracker)) {
+        ++_metadataTracker->usageCounter;
+    }
+
+    ~RangePreserver() {
+        stdx::lock_guard<stdx::mutex> managerLock(_metadataManager->_managerLock);
+
+        invariant(_metadataTracker->usageCounter != 0);
+        if (--_metadataTracker->usageCounter == 0) {
+            // MetadataManager doesn't care which usageCounter went to zero. It just retires all
+            // that are older than the oldest metadata still in use by queries (some start out at
+            // zero, some go to zero but can't be expired yet).
+            //
+            // Note that new instances of ScopedCollectionMetadata may get attached to
+            // _metadata.back(), so its usage count can increase from zero, unlike other reference
+            // counts.
+            _metadataManager->_retireExpiredMetadata(managerLock);
+        }
+    }
+
+    const CollectionMetadata& get() override {
+        return _metadataTracker->metadata;
+    }
+
+private:
+    friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(
+        std::shared_ptr<MetadataManager>, const boost::optional<LogicalTime>&);
+
+    std::shared_ptr<MetadataManager> _metadataManager;
+    std::shared_ptr<MetadataManager::CollectionMetadataTracker> _metadataTracker;
+};
+
 MetadataManager::MetadataManager(ServiceContext* serviceContext,
                                  NamespaceString nss,
                                  TaskExecutor* executor)
@@ -183,23 +236,34 @@ void MetadataManager::_clearAllCleanups(WithLock, Status status) {
 ScopedCollectionMetadata MetadataManager::getActiveMetadata(
     std::shared_ptr<MetadataManager> self, const boost::optional<LogicalTime>& atClusterTime) {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
+
     if (_metadata.empty()) {
-        return ScopedCollectionMetadata(
-            std::make_shared<MetadataManager::CollectionMetadataTracker>(CollectionMetadata()));
+        return {kUnshardedCollection};
     }
 
     auto metadataTracker = _metadata.back();
     if (!atClusterTime) {
-        return ScopedCollectionMetadata(lg, std::move(self), _metadata.back());
+        return {std::make_shared<RangePreserver>(lg, std::move(self), std::move(metadataTracker))};
     }
 
     auto chunkManager = metadataTracker->metadata.getChunkManager();
     auto chunkManagerAtClusterTime = std::make_shared<ChunkManager>(
         chunkManager->getRoutingHistory(), atClusterTime->asTimestamp());
 
-    return ScopedCollectionMetadata(
-        std::make_shared<MetadataManager::CollectionMetadataTracker>(CollectionMetadata(
-            std::move(chunkManagerAtClusterTime), metadataTracker->metadata.shardId())));
+    class MetadataAtTimestamp : public ScopedCollectionMetadata::Impl {
+    public:
+        MetadataAtTimestamp(CollectionMetadata metadata) : _metadata(std::move(metadata)) {}
+
+        const CollectionMetadata& get() override {
+            return _metadata;
+        }
+
+    private:
+        CollectionMetadata _metadata;
+    };
+
+    return {std::make_shared<MetadataAtTimestamp>(
+        CollectionMetadata(chunkManagerAtClusterTime, metadataTracker->metadata.shardId()))};
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {
@@ -509,60 +573,6 @@ boost::optional<ChunkRange> MetadataManager::getNextOrphanRange(BSONObj const& f
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
     invariant(!_metadata.empty());
     return _metadata.back()->metadata.getNextOrphanRange(_receivingChunks, from);
-}
-
-ScopedCollectionMetadata::ScopedCollectionMetadata(
-    WithLock,
-    std::shared_ptr<MetadataManager> metadataManager,
-    std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker)
-    : _metadataManager(std::move(metadataManager)), _metadataTracker(std::move(metadataTracker)) {
-    invariant(_metadataManager);
-    invariant(_metadataTracker);
-    ++_metadataTracker->usageCounter;
-}
-
-ScopedCollectionMetadata::ScopedCollectionMetadata(
-    std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker)
-    : _metadataTracker(std::move(metadataTracker)) {
-    invariant(_metadataTracker);
-}
-
-ScopedCollectionMetadata::ScopedCollectionMetadata(ScopedCollectionMetadata&& other) {
-    *this = std::move(other);
-}
-
-ScopedCollectionMetadata& ScopedCollectionMetadata::operator=(ScopedCollectionMetadata&& other) {
-    if (this != &other) {
-        _clear();
-
-        _metadataManager = std::move(other._metadataManager);
-        _metadataTracker = std::move(other._metadataTracker);
-
-        other._metadataManager = nullptr;
-        other._metadataTracker = nullptr;
-    }
-    return *this;
-}
-
-void ScopedCollectionMetadata::_clear() {
-    if (!_metadataManager) {
-        return;
-    }
-
-    stdx::lock_guard<stdx::mutex> managerLock(_metadataManager->_managerLock);
-    invariant(_metadataTracker->usageCounter != 0);
-    if (--_metadataTracker->usageCounter == 0) {
-        // MetadataManager doesn't care which usageCounter went to zero. It just retires all that
-        // are older than the oldest metadata still in use by queries (some start out at zero, some
-        // go to zero but can't be expired yet).
-        //
-        // Note that new instances of ScopedCollectionMetadata may get attached to _metadata.back(),
-        // so its usage count can increase from zero, unlike other reference counts.
-        _metadataManager->_retireExpiredMetadata(managerLock);
-    }
-
-    _metadataManager.reset();
-    _metadataTracker.reset();
 }
 
 }  // namespace mongo
