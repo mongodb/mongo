@@ -1149,10 +1149,13 @@ void Session::_reportTransactionStats(WithLock wl, BSONObjBuilder* builder) cons
         return;
     }
     parametersBuilder.append("autocommit", _autocommit);
-    parametersBuilder.append("timeOpenMicros",
-                             static_cast<long long>(_singleTransactionStats->getDuration()));
-
     parametersBuilder.done();
+
+    builder->append("timeOpenMicros",
+                    static_cast<long long>(_singleTransactionStats->getDuration()));
+    builder->append("startWallClockTime",
+                    dateToISOStringLocal(Date_t::fromMillisSinceEpoch(
+                        _singleTransactionStats->getStartTime() / 1000)));
 }
 
 void Session::_checkValid(WithLock) const {

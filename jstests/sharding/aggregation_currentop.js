@@ -626,8 +626,6 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
             desc: "inactive transaction",
             "lsid.id": {$in: sessions.map((session) => session.getSessionId().id)},
             "transaction.parameters.txnNumber": {$gte: 0, $lt: sessions.length},
-            "transaction.parameters.autocommit": false,
-            'transaction.parameters.timeOpenMicros': {$gt: 0}
         };
     }
 
@@ -722,6 +720,8 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     // disabled, even with 'allUsers:false'.
     const session = shardAdminDB.getMongo().startSession();
 
+    const timeBeforeTransactionStarts = new ISODate();
+
     // Start but do not complete a transaction.
     const sessionDB = session.getDatabase(shardTestDB.getName());
     assert.commandWorked(sessionDB.runCommand({
@@ -735,6 +735,8 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     sessionDBs = [sessionDB];
     sessions = [session];
 
+    const timeAfterTransactionStarts = new ISODate();
+
     // Use $currentOp to confirm that the incomplete transaction has stashed its locks.
     assert.eq(shardAdminDB.aggregate([{$currentOp: {allUsers: false}}, {$match: sessionFilter()}])
                   .itcount(),
@@ -747,6 +749,18 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                 [{$currentOp: {allUsers: false, idleSessions: false}}, {$match: sessionFilter()}])
             .itcount(),
         0);
+
+    const timeBeforeCurrentOp = new ISODate();
+
+    // Check that the currentOp's transaction subdocument's fields align with our expectations.
+    let currentOp =
+        shardAdminDB.aggregate([{$currentOp: {allUsers: false}}, {$match: sessionFilter()}])
+            .toArray();
+    let transactionDocument = currentOp[0].transaction;
+    assert.eq(transactionDocument.parameters.autocommit, false);
+    assert.gt(transactionDocument.timeOpenMicros,
+              (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
+    assert.gte(ISODate(transactionDocument.startWallClockTime), timeBeforeTransactionStarts);
 
     // Allow the transactions to complete and close the session.
     assert.commandWorked(sessionDB.adminCommand({

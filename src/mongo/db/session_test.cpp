@@ -726,6 +726,7 @@ TEST_F(SessionTest, StashAndUnstashResources) {
 }
 
 TEST_F(SessionTest, ReportStashedResources) {
+    Date_t startTime = Date_t::now();
     const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
     const bool autocommit = false;
@@ -759,16 +760,20 @@ TEST_F(SessionTest, ReportStashedResources) {
 
     // Verify that the Session's report of its own stashed state aligns with our expectations.
     auto stashedState = session.reportStashedState();
-    auto transactionDocument =
-        stashedState.getObjectField("transaction").getObjectField("parameters");
+    auto transactionDocument = stashedState.getObjectField("transaction");
+    auto parametersDocument = transactionDocument.getObjectField("parameters");
 
     ASSERT_EQ(stashedState.getField("host").valueStringData().toString(),
               getHostNameCachedAndPort());
     ASSERT_EQ(stashedState.getField("desc").valueStringData().toString(), "inactive transaction");
     ASSERT_BSONOBJ_EQ(stashedState.getField("lsid").Obj(), sessionId.toBSON());
-    ASSERT_EQ(transactionDocument.getField("txnNumber").numberLong(), txnNum);
-    ASSERT_EQ(transactionDocument.getField("autocommit").boolean(), autocommit);
+    ASSERT_EQ(parametersDocument.getField("txnNumber").numberLong(), txnNum);
+    ASSERT_EQ(parametersDocument.getField("autocommit").boolean(), autocommit);
     ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
+    ASSERT_GTE(
+        dateFromISOString(transactionDocument.getField("startWallClockTime").valueStringData())
+            .getValue(),
+        startTime);
     ASSERT_EQ(stashedState.getField("waitingForLock").boolean(), false);
     ASSERT_EQ(stashedState.getField("active").boolean(), false);
 
@@ -788,6 +793,7 @@ TEST_F(SessionTest, ReportStashedResources) {
 }
 
 TEST_F(SessionTest, ReportUnstashedResources) {
+    Date_t startTime = Date_t::now();
     const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 20;
     const bool autocommit = false;
@@ -819,12 +825,16 @@ TEST_F(SessionTest, ReportUnstashedResources) {
     BSONObjBuilder unstashedStateBuilder;
     session.reportUnstashedState(&unstashedStateBuilder);
     auto unstashedState = unstashedStateBuilder.obj();
-    auto transactionDocument =
-        unstashedState.getObjectField("transaction").getObjectField("parameters");
+    auto transactionDocument = unstashedState.getObjectField("transaction");
+    auto parametersDocument = transactionDocument.getObjectField("parameters");
 
-    ASSERT_EQ(transactionDocument.getField("txnNumber").numberLong(), txnNum);
-    ASSERT_EQ(transactionDocument.getField("autocommit").boolean(), autocommit);
+    ASSERT_EQ(parametersDocument.getField("txnNumber").numberLong(), txnNum);
+    ASSERT_EQ(parametersDocument.getField("autocommit").boolean(), autocommit);
     ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
+    ASSERT_GTE(
+        dateFromISOString(transactionDocument.getField("startWallClockTime").valueStringData())
+            .getValue(),
+        startTime);
 
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
     session.stashTransactionResources(opCtx());
