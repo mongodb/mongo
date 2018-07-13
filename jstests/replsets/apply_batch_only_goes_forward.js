@@ -43,11 +43,11 @@ TestData.skipCheckDBHashes = true;
     var stepDownCmd = {replSetStepDown: stepDownSecs, force: true};
 
     // Write op
-    assert.writeOK(
-        mTest.foo.save({}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+    assert.writeOK(mTest.foo.save(
+        {}, {writeConcern: {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
     replTest.waitForState(slave, ReplSetTest.State.SECONDARY);
-    assert.writeOK(
-        mTest.foo.save({}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+    assert.writeOK(mTest.foo.save(
+        {}, {writeConcern: {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     // Set minvalid to something far in the future for the current primary, to simulate recovery.
     // Note: This is so far in the future (5 days) that it will never become secondary.
