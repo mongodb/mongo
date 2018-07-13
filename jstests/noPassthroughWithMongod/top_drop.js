@@ -65,4 +65,15 @@
     // Check that dropping the database removes the remaining collections.
     assert.commandWorked(topDB.dropDatabase());
     checkTopEntries([]);
+
+    // Check that top doesn't keep state about non-existent collections.
+    assert.commandWorked(topDB.dropDatabase());
+    topDB.foo.find().itcount();
+    topDB.baz.update({}, {$set: {a: 1}});
+    topDB.bar.remove({});
+    let res = topDB.adminCommand("top");
+    assert.isnull(res.totals["test.foo"]);
+    assert.isnull(res.totals["test.bar"]);
+    assert.isnull(res.totals["test.baz"]);
+    assert.commandWorked(topDB.dropDatabase());
 }());

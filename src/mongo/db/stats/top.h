@@ -143,7 +143,7 @@ private:
     mutable SimpleMutex _lock;
     OperationLatencyHistogram _globalHistogramStats;
     UsageMap _usage;
-    std::string _lastDropped;
+    std::set<std::string> _collDropNs;
 };
 
 }  // namespace mongo
