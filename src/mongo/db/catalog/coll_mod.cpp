@@ -75,6 +75,8 @@ struct CollModRequest {
     std::string collValidationLevel = {};
     BSONElement usePowerOf2Sizes = {};
     BSONElement noPadding = {};
+    // Indicates whether any of the above fields have been set.
+    bool isEmptyCollModRequest = true;
 };
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
@@ -82,13 +84,13 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                Collection* coll,
                                                const BSONObj& cmdObj,
                                                BSONObjBuilder* oplogEntryBuilder) {
-
     bool isView = !coll;
 
     CollModRequest cmr;
 
     BSONForEach(e, cmdObj) {
         const auto fieldName = e.fieldNameStringData();
+
         if (Command::isGenericArgument(fieldName)) {
             continue;  // Don't add to oplog builder.
         } else if (fieldName == "collMod") {
@@ -173,6 +175,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                               "existing expireAfterSeconds field is not a number");
             }
 
+            cmr.isEmptyCollModRequest = false;
         } else if (fieldName == "validator" && !isView) {
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
                 MatchExpressionParser::kBanAllSpecialFeatures;
@@ -200,18 +203,21 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.collValidator = e;
+            cmr.isEmptyCollModRequest = false;
         } else if (fieldName == "validationLevel" && !isView) {
             auto statusW = coll->parseValidationLevel(e.String());
             if (!statusW.isOK())
                 return statusW.getStatus();
 
             cmr.collValidationLevel = e.String();
+            cmr.isEmptyCollModRequest = false;
         } else if (fieldName == "validationAction" && !isView) {
             auto statusW = coll->parseValidationAction(e.String());
             if (!statusW.isOK())
                 return statusW.getStatus();
 
             cmr.collValidationAction = e.String();
+            cmr.isEmptyCollModRequest = false;
         } else if (fieldName == "pipeline") {
             if (!isView) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -221,6 +227,8 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return Status(ErrorCodes::InvalidOptions, "not a valid aggregation pipeline");
             }
             cmr.viewPipeLine = e;
+            cmr.isEmptyCollModRequest = false;
+
         } else if (fieldName == "viewOn") {
             if (!isView) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -230,6 +238,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return Status(ErrorCodes::InvalidOptions, "'viewOn' option must be a string");
             }
             cmr.viewOn = e.str();
+            cmr.isEmptyCollModRequest = false;
         } else {
             if (isView) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -246,6 +255,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             else
                 return Status(ErrorCodes::InvalidOptions,
                               str::stream() << "unknown option to collMod: " << fieldName);
+            cmr.isEmptyCollModRequest = false;
         }
 
         oplogEntryBuilder->append(e);
@@ -341,8 +351,11 @@ Status _collModInternal(OperationContext* opCtx,
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
-
     CollModRequest cmr = statusW.getValue();
+
+    if (cmr.isEmptyCollModRequest && !upgradeUUID) {
+        return Status::OK();
+    }
 
     WriteUnitOfWork wunit(opCtx);
 
