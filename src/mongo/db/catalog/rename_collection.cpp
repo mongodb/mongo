@@ -51,6 +51,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -176,8 +177,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
     // Ensure that collection name does not exceed maximum length.
     // Index names do not limit the maximum allowable length of the target namespace under
     // FCV 4.2 and above.
-    // TODO(SERVER-35824): Re-enable index namespace check under FCV 4.0.
-    const bool checkIndexNamespace = false;
+    const auto checkIndexNamespace =
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
     std::string::size_type longestIndexNameLength =
         checkIndexNamespace ? sourceColl->getIndexCatalog()->getLongestIndexNameLength(opCtx) : 0;
     auto status = target.checkLengthForRename(longestIndexNameLength);

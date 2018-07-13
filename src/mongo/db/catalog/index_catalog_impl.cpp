@@ -620,8 +620,10 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     // namespace length constraints as the ones in created by users.
     // Index names do not limit the maximum allowable length of the target namespace under FCV 4.2
     // and above.
-    // TODO(SERVER-35824): Re-enable index namespace check under FCV 4.0.
-    const bool checkIndexNamespace = false;
+    const auto checkIndexNamespace =
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
     if (checkIndexNamespace && !nss.isDropPendingNamespace()) {
         auto indexNamespace = IndexDescriptor::makeIndexNamespace(nss.ns(), name);
         if (indexNamespace.length() > NamespaceString::MaxNsLen)
