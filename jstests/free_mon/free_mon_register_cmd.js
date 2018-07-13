@@ -41,7 +41,7 @@ load("jstests/free_mon/libs/free_mon.js");
     const last_register = mock_web.query("last_register");
     print(tojson(last_register));
 
-    assert.eq(last_register.version, 1);
+    assert.eq(last_register.version, 2);
     assert.eq(last_register.payload.buildInfo.bits, 64);
     assert.eq(last_register.payload.buildInfo.ok, 1);
     assert.eq(last_register.payload.storageEngine.readOnly, false);
@@ -52,7 +52,7 @@ load("jstests/free_mon/libs/free_mon.js");
     const last_metrics = mock_web.query("last_metrics");
     print(tojson(last_metrics));
 
-    assert.eq(last_metrics.version, 1);
+    assert.eq(last_metrics.version, 2);
 
     assert.commandWorked(conn.adminCommand({setFreeMonitoring: 1, action: "disable"}));
 

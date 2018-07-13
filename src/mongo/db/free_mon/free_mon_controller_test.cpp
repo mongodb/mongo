@@ -228,6 +228,8 @@ public:
         bool haltMetrics{false};
         bool fail2MetricsUploads{false};
         bool permanentlyDeleteAfter3{false};
+
+        bool resendRegistrationAfter3{false};
     };
 
     explicit FreeMonNetworkInterfaceMock(executor::ThreadPoolTaskExecutor* threadPool,
@@ -331,6 +333,10 @@ public:
 
         if (_options.permanentlyDeleteAfter3 && _metrics.loadRelaxed() > 3) {
             resp.setPermanentlyDelete(true);
+        }
+
+        if (_options.resendRegistrationAfter3 && _metrics.loadRelaxed() == 3) {
+            resp.setResendRegistration(true);
         }
 
         return resp;
@@ -551,6 +557,29 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
                        << "reportingInterval"
                        << 30 * 60 * 60 * 24LL))));
 
+    // Positive: version 2
+    ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
+        IDLParserErrorContext("foo"),
+        BSON("version" << 2LL << "haltMetricsUploading" << false << "id"
+                       << "mock123"
+                       << "informationalURL"
+                       << "http://www.example.com/123"
+                       << "message"
+                       << "msg456"
+                       << "reportingInterval"
+                       << 1LL))));
+
+    // Positive: empty registration id string
+    ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
+        IDLParserErrorContext("foo"),
+        BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
+                       << ""
+                       << "informationalURL"
+                       << "http://www.example.com/123"
+                       << "message"
+                       << "msg456"
+                       << "reportingInterval"
+                       << 1LL))));
 
     // Negative: bad protocol version
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
@@ -652,7 +681,38 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
                        << "reportingInterval"
                        << 1LL))));
 
-    // max reporting interval
+    // Positive: Support version 2
+    ASSERT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
+        IDLParserErrorContext("foo"),
+
+        BSON("version" << 2LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
+                       << "id"
+                       << "mock123"
+                       << "informationalURL"
+                       << "http://www.example.com/123"
+                       << "message"
+                       << "msg456"
+                       << "reportingInterval"
+                       << 1LL))));
+
+    // Positive: Add resendRegistration
+    ASSERT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
+        IDLParserErrorContext("foo"),
+
+        BSON("version" << 2LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
+                       << "id"
+                       << "mock123"
+                       << "informationalURL"
+                       << "http://www.example.com/123"
+                       << "message"
+                       << "msg456"
+                       << "reportingInterval"
+                       << 1LL
+                       << "resendRegistration"
+                       << true))));
+
+
+    // Positive: max reporting interval
     ASSERT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
         IDLParserErrorContext("foo"),
 
@@ -1192,6 +1252,28 @@ TEST_F(FreeMonControllerTest, TestPreRegistrationMetricBatching) {
     ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
 }
 
+// Positive: resend registration in metrics response
+TEST_F(FreeMonControllerTest, TestResendRegistration) {
+    FreeMonNetworkInterfaceMock::Options opts;
+    opts.resendRegistrationAfter3 = true;
+
+    ControllerHolder controller(_mockThreadPool.get(), opts);
+
+    controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
+
+    ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
+
+    controller->turnCrankForTest(Turner().registerServer().registerCommand().collect(2));
+
+    ASSERT_TRUE(!FreeMonStorage::read(_opCtx.get()).get().getRegistrationId().empty());
+
+    controller->turnCrankForTest(
+        Turner().metricsSend(3).collect(3).registerCommand().metricsSend(1));
+
+    ASSERT_EQ(controller.registerCollector->count(), 2UL);
+    ASSERT_GTE(controller.metricsCollector->count(), 4UL);
+}
+
 #if 0
 // Negative: Test metrics buffers on failure, and retries and ensure 2 metrics occurs after a blip
 // of an error
@@ -1372,13 +1454,13 @@ TEST_F(FreeMonControllerRSTest, StepdownDuringRegistration) {
 
     // Finish registration
     controller->turnCrankForTest(1);
-    controller->turnCrankForTest(Turner().metricsSend().collect(1));
+    controller->turnCrankForTest(Turner().metricsSend().collect(2));
 
     // Registration cannot write back to the local store so remain in pending
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::pending);
 
     ASSERT_EQ(controller.registerCollector->count(), 1UL);
-    ASSERT_EQ(controller.metricsCollector->count(), 2UL);
+    ASSERT_EQ(controller.metricsCollector->count(), 3UL);
 }
 
 // Negative: Tricky: Primary becomes secondary during metrics send

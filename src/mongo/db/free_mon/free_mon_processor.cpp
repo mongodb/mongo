@@ -52,7 +52,8 @@ namespace mongo {
 
 namespace {
 
-constexpr auto kProtocolVersion = 1;
+constexpr auto kMinProtocolVersion = 1;
+constexpr auto kMaxProtocolVersion = 2;
 constexpr auto kStorageVersion = 1;
 
 constexpr auto kRegistrationIdMaxLength = 4096;
@@ -269,13 +270,13 @@ void FreeMonProcessor::readState(OperationContext* opCtx) {
     _lastReadState = state;
 
     if (state.is_initialized()) {
-        invariant(state.get().getVersion() == kProtocolVersion);
+        invariant(state.get().getVersion() == kStorageVersion);
 
         _state = state.get();
     } else if (!state.is_initialized()) {
         // Default the state
         auto state = _state.synchronize();
-        state->setVersion(kProtocolVersion);
+        state->setVersion(kStorageVersion);
         state->setState(StorageStateEnum::disabled);
         state->setRegistrationId("");
         state->setInformationalURL("");
@@ -411,7 +412,7 @@ void FreeMonProcessor::doCommandRegister(Client* client,
         req.setId(regid);
     }
 
-    req.setVersion(kProtocolVersion);
+    req.setVersion(kMaxProtocolVersion);
 
     req.setLocalTime(client->getServiceContext()->getPreciseClockSource()->now());
 
@@ -431,6 +432,7 @@ void FreeMonProcessor::doCommandRegister(Client* client,
 
     // Record that the registration is pending
     _state->setState(StorageStateEnum::pending);
+    _registrationStatus = FreeMonRegistrationStatus::kPending;
 
     writeState(client);
 
@@ -451,12 +453,14 @@ void FreeMonProcessor::doCommandRegister(Client* client,
 
 Status FreeMonProcessor::validateRegistrationResponse(const FreeMonRegistrationResponse& resp) {
     // Any validation failure stops registration from proceeding to upload
-    if (resp.getVersion() != kProtocolVersion) {
+    if (!(resp.getVersion() >= kMinProtocolVersion && resp.getVersion() <= kMaxProtocolVersion)) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream()
-                          << "Unexpected registration response protocol version, expected '"
-                          << kProtocolVersion
-                          << "', received '"
+                          << "Unexpected registration response protocol version, expected ("
+                          << kMinProtocolVersion
+                          << ", "
+                          << kMaxProtocolVersion
+                          << "), received '"
                           << resp.getVersion()
                           << "'");
     }
@@ -525,11 +529,13 @@ void FreeMonProcessor::notifyPendingRegisters(const Status s) {
 
 Status FreeMonProcessor::validateMetricsResponse(const FreeMonMetricsResponse& resp) {
     // Any validation failure stops registration from proceeding to upload
-    if (resp.getVersion() != kProtocolVersion) {
+    if (!(resp.getVersion() >= kMinProtocolVersion && resp.getVersion() <= kMaxProtocolVersion)) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
-                      str::stream() << "Unexpected metrics response protocol version, expected '"
-                                    << kProtocolVersion
-                                    << "', received '"
+                      str::stream() << "Unexpected metrics response protocol version, expected ("
+                                    << kMinProtocolVersion
+                                    << ", "
+                                    << kMaxProtocolVersion
+                                    << "), received '"
                                     << resp.getVersion()
                                     << "'");
     }
@@ -598,7 +604,7 @@ void FreeMonProcessor::doAsyncRegisterComplete(
     // Our request is no longer in-progress so delete it
     _futureRegistrationResponse.reset();
 
-    if (_state->getState() != StorageStateEnum::pending) {
+    if (_registrationStatus != FreeMonRegistrationStatus::kPending) {
         notifyPendingRegisters(Status(ErrorCodes::BadValue, "Registration was canceled"));
 
         return;
@@ -612,6 +618,7 @@ void FreeMonProcessor::doAsyncRegisterComplete(
 
         // Disable on any error
         _state->setState(StorageStateEnum::disabled);
+        _registrationStatus = FreeMonRegistrationStatus::kDisabled;
 
         // Persist state
         writeState(client);
@@ -642,6 +649,8 @@ void FreeMonProcessor::doAsyncRegisterComplete(
         state->setState(StorageStateEnum::enabled);
     }
 
+    _registrationStatus = FreeMonRegistrationStatus::kEnabled;
+
     // Persist state
     writeState(client);
 
@@ -663,7 +672,7 @@ void FreeMonProcessor::doAsyncRegisterFail(
     // Our request is no longer in-progress so delete it
     _futureRegistrationResponse.reset();
 
-    if (_state->getState() != StorageStateEnum::pending) {
+    if (_registrationStatus != FreeMonRegistrationStatus::kPending) {
         notifyPendingRegisters(Status(ErrorCodes::BadValue, "Registration was canceled"));
 
         return;
@@ -689,6 +698,7 @@ void FreeMonProcessor::doCommandUnregister(
     readState(client);
 
     _state->setState(StorageStateEnum::disabled);
+    _registrationStatus = FreeMonRegistrationStatus::kDisabled;
 
     writeState(client);
 
@@ -733,16 +743,18 @@ std::string compressMetrics(MetricsBuffer& buffer) {
 void FreeMonProcessor::doMetricsSend(Client* client) {
     readState(client);
 
-    if (_state->getState() != StorageStateEnum::enabled) {
+    // Only continue metrics send if the local disk state (in-case user deleted local document)
+    // and in-memory status both say to continue.
+    if (_registrationStatus != FreeMonRegistrationStatus::kEnabled ||
+        _state->getState() != StorageStateEnum::enabled) {
         // If we are recently disabled, then stop sending metrics
         return;
     }
 
     // Build outbound request
     FreeMonMetricsRequest req;
-    invariant(!_state->getRegistrationId().empty());
 
-    req.setVersion(kProtocolVersion);
+    req.setVersion(kMaxProtocolVersion);
     req.setLocalTime(client->getServiceContext()->getPreciseClockSource()->now());
     req.setEncoding(MetricsEncodingEnum::snappy);
 
@@ -781,6 +793,8 @@ void FreeMonProcessor::doAsyncMetricsComplete(
 
         // Disable free monitoring on validation errors
         _state->setState(StorageStateEnum::disabled);
+        _registrationStatus = FreeMonRegistrationStatus::kDisabled;
+
         writeState(client);
 
         // If validation fails, we do not retry
@@ -793,6 +807,7 @@ void FreeMonProcessor::doAsyncMetricsComplete(
         FreeMonStorage::deleteState(opCtxUnique.get());
 
         _state->setState(StorageStateEnum::pending);
+        _registrationStatus = FreeMonRegistrationStatus::kDisabled;
 
         // Clear out the in-memory state
         _lastReadState = boost::none;
@@ -833,9 +848,13 @@ void FreeMonProcessor::doAsyncMetricsComplete(
     _metricsRetry->setMin(Seconds(resp.getReportingInterval()));
     _metricsRetry->reset();
 
-    // Enqueue next metrics upload
-    enqueue(FreeMonMessage::createWithDeadline(FreeMonMessageType::MetricsSend,
-                                               _metricsRetry->getNextDeadline(client)));
+    if (resp.getResendRegistration().is_initialized() && resp.getResendRegistration()) {
+        enqueue(FreeMonRegisterCommandMessage::createNow(_tags));
+    } else {
+        // Enqueue next metrics upload
+        enqueue(FreeMonMessage::createWithDeadline(FreeMonMessageType::MetricsSend,
+                                                   _metricsRetry->getNextDeadline(client)));
+    }
 }
 
 void FreeMonProcessor::doAsyncMetricsFail(
@@ -952,6 +971,7 @@ void FreeMonProcessor::doNotifyOnDelete(Client* client) {
 
     // So we mark the internal state as disabled which stop registration and metrics send
     _state->setState(StorageStateEnum::pending);
+    _registrationStatus = FreeMonRegistrationStatus::kDisabled;
 
     // Clear out the in-memory state
     _lastReadState = boost::none;
