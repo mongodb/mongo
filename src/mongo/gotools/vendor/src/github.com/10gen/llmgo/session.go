@@ -4225,7 +4225,7 @@ func (s *Session) AcquireSocketPrivate(slaveOk bool) (*MongoSocket, error) {
 }
 
 func (s *Session) AcquireSocketDirect() (*MongoSocket, error) {
-	sock, err := s.cluster().AcquireSocket(Strong, true, s.syncTimeout, s.sockTimeout, s.queryConfig.op.ServerTags, s.poolLimit)
+	sock, err := s.cluster().AcquireSocket(Strong, false, s.syncTimeout, s.sockTimeout, s.queryConfig.op.ServerTags, s.poolLimit)
 	if err != nil {
 		return nil, err
 	}

@@ -10,6 +10,7 @@ package options
 
 func init() {
 	ConnectionOptFunctions = append(ConnectionOptFunctions, registerSSLOptions)
+	BuiltWithSSL = true
 }
 
 func registerSSLOptions(self *ToolOptions) error {
@@ -20,6 +21,5 @@ func registerSSLOptions(self *ToolOptions) error {
 	if self.enabledOptions.URI {
 		self.URI.AddKnownURIParameters(KnownURIOptionsSSL)
 	}
-	BuiltWithSSL = true
 	return nil
 }

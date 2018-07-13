@@ -6,6 +6,10 @@
 
 package mongoreplay
 
+import (
+	mgo "github.com/10gen/llmgo"
+)
+
 // Options stores settings for any mongoreplay command
 type Options struct {
 	Verbosity []bool `short:"v" long:"verbosity" description:"increase the detail regarding the tools performance on the input file that is output to logs (include multiple times for increased logging verbosity, e.g. -vvv)"`
@@ -25,6 +29,10 @@ func (opts *Options) SetLogging() {
 	toolDebugLogger.setVerbosity(d)
 	if d > 0 || v > 0 {
 		printVersionInfo()
+	}
+	if d == DebugHigh {
+		mgo.SetLogger(toolDebugLogger)
+		mgo.SetDebug(true)
 	}
 }
 

@@ -69,3 +69,8 @@ func (lw *logWrapper) Logv(minVerb int, msg string) {
 func (lw *logWrapper) isInVerbosity(minVerb int) bool {
 	return minVerb <= lw.verbosity
 }
+
+func (lw *logWrapper) Output(calldepth int, s string) error {
+	lw.Logv(DebugHigh, s)
+	return nil
+}

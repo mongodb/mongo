@@ -8,6 +8,7 @@ package main
 
 import (
 	"github.com/jessevdk/go-flags"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongoreplay"
 
 	"fmt"
@@ -44,10 +45,17 @@ func main() {
 
 	var parser = flags.NewParser(&opts, flags.Default)
 
-	_, err = parser.AddCommand("play", "Play captured traffic against a mongodb instance", "",
-		&mongoreplay.PlayCommand{GlobalOpts: &opts})
+	playCmd := &mongoreplay.PlayCommand{GlobalOpts: &opts}
+	playCmdParser, err := parser.AddCommand("play", "Play captured traffic against a mongodb instance", "", playCmd)
 	if err != nil {
 		panic(err)
+	}
+	if options.BuiltWithSSL {
+		playCmd.SSLOpts = &options.SSL{}
+		_, err := playCmdParser.AddGroup("ssl", "", playCmd.SSLOpts)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	_, err = parser.AddCommand("record", "Convert network traffic into mongodb queries", "",

@@ -322,7 +322,6 @@ func NewSocket(server *MongoServer, conn net.Conn, timeout time.Duration) *Mongo
 	}
 	stats.socketsAlive(+1)
 	debugf("Socket %p to %s: initialized", socket, socket.addr)
-	socket.resetNonce()
 	go socket.readLoop()
 	return socket
 }

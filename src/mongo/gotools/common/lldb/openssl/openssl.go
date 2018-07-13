@@ -14,12 +14,12 @@ import (
 	"net"
 	"time"
 
+	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/openssl"
-	"github.com/mongodb/mongo-tools/common/db/kerberos"
+	"github.com/mongodb/mongo-tools/common/lldb/kerberos"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
-	"gopkg.in/mgo.v2"
 )
 
 // For connecting to the database over ssl

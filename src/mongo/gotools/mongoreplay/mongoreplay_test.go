@@ -476,7 +476,7 @@ func comparePayloadType1(t *testing.T, p1, p2 interface{}) {
 		t.Errorf("Payload sizes not matched Saw: %d --- Expected: %d", p1AsPayload.Size, p2AsPayload.Size)
 	}
 	if p1AsPayload.Identifier != p2AsPayload.Identifier {
-		t.Errorf("Payload identifiers not matched Saw: %d --- Expected: %d", p1AsPayload.Identifier, p2AsPayload.Identifier)
+		t.Errorf("Payload identifiers not matched Saw: %s --- Expected: %s", p1AsPayload.Identifier, p2AsPayload.Identifier)
 	}
 }
 
