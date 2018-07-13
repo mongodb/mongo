@@ -199,6 +199,10 @@ public:
                 return true;
             }
 
+            // Before starting the downgrade process, check indexes for index namespaces that would
+            // fail 4.0 length constraints.
+            uassertStatusOK(checkIndexNamespacesOnDowngrade(opCtx));
+
             FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
 
             {

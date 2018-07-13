@@ -69,4 +69,10 @@ void updateUniqueIndexesOnUpgrade(OperationContext* opCtx);
  * Updates non-replicated unique indexes to timestamp safe unique index format.
  */
 Status updateNonReplicatedUniqueIndexes(OperationContext* opCtx);
+
+/*
+ * Checks index namespaces that would exceed 4.0 constraints on setFCV=4.0.
+ */
+Status checkIndexNamespacesOnDowngrade(OperationContext* opCtx);
+
 }  // namespace mongo

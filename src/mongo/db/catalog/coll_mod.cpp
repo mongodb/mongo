@@ -66,6 +66,19 @@ namespace {
 // databases if none are provided).
 MONGO_FAIL_POINT_DEFINE(hangBeforeDatabaseUpgrade);
 
+/**
+ * Returns list of database names.
+ */
+std::vector<std::string> getDatabaseNames(OperationContext* opCtx) {
+    std::vector<std::string> dbNames;
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    {
+        Lock::GlobalLock lk(opCtx, MODE_IS);
+        storageEngine->listDatabases(&dbNames);
+    }
+    return dbNames;
+}
+
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
@@ -600,17 +613,51 @@ Status updateNonReplicatedUniqueIndexes(OperationContext* opCtx) {
 
     // Update all unique indexes belonging to all non-replicated collections.
     // (_id indexes are not updated).
-    std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    {
-        Lock::GlobalLock lk(opCtx, MODE_IS);
-        storageEngine->listDatabases(&dbNames);
-    }
+    auto dbNames = getDatabaseNames(opCtx);
     for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
         auto dbName = *it;
         auto schemaStatus = _updateNonReplicatedUniqueIndexesPerDatabase(opCtx, dbName);
         if (!schemaStatus.isOK()) {
             return schemaStatus;
+        }
+    }
+    return Status::OK();
+}
+
+Status checkIndexNamespacesOnDowngrade(OperationContext* opCtx) {
+    auto dbNames = getDatabaseNames(opCtx);
+    for (const auto& dbName : dbNames) {
+        AutoGetDb autoDb(opCtx, dbName, MODE_IS);
+        auto db = autoDb.getDb();
+        // If the database no longer exists, there's nothing to do.
+        if (!db) {
+            continue;
+        }
+
+        for (auto collIter : *db) {
+            const auto nss = collIter->ns();
+            if (nss.isDropPendingNamespace()) {
+                continue;
+            }
+
+            AutoGetCollectionForRead autoColl(opCtx, nss);
+            auto coll = autoColl.getCollection();
+            if (!coll) {
+                continue;
+            }
+
+            const bool includeUnfinishedIndexes = true;
+            auto it = coll->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
+            while (it.more()) {
+                auto desc = it.next();
+                if (desc->indexNamespace().length() > NamespaceString::MaxNsLen) {
+                    return Status(ErrorCodes::IndexNamespaceTooLong,
+                                  str::stream() << "index namespace \"" << desc->indexNamespace()
+                                                << "\" is too long for downgrade to 4.0 ("
+                                                << NamespaceString::MaxNsLen
+                                                << " byte max)");
+                }
+            }
         }
     }
     return Status::OK();
