@@ -16,7 +16,7 @@
     const admin = db.getSisterDB('admin');
 
     // Get current log level.
-    let originalLogLevel = assert.commandWorked(admin.setLogLevel(5)).was.verbosity;
+    let originalLogLevel = assert.commandWorked(admin.setLogLevel(1)).was.verbosity;
 
     try {
         const listAllLocalSessions = function() {

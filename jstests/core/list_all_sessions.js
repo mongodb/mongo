@@ -15,27 +15,34 @@
         return config.system.sessions.aggregate(pipeline);
     }
 
-    // Start a new session and capture its sessionId.
-    const myid = assert.commandWorked(admin.runCommand({startSession: 1})).id.id;
-    assert(myid !== undefined);
-    assert.commandWorked(admin.runCommand({refreshLogicalSessionCacheNow: 1}));
+    // Get current log level.
+    let originalLogLevel = assert.commandWorked(admin.setLogLevel(1)).was.verbosity;
 
-    // Ensure that the cache now contains the session and is visible by admin.
-    assert.soon(function() {
-        const resultArray = listSessions().toArray();
-        if (resultArray.length < 1) {
-            return false;
-        }
-        const resultArrayMine = resultArray
-                                    .map(function(sess) {
-                                        return sess._id.id;
-                                    })
-                                    .filter(function(id) {
-                                        return 0 == bsonWoCompare({x: id}, {x: myid});
-                                    });
-        return resultArrayMine.length == 1;
-    }, "Failed to locate session in collection");
+    try {
+        // Start a new session and capture its sessionId.
+        const myid = assert.commandWorked(admin.runCommand({startSession: 1})).id.id;
+        assert(myid !== undefined);
+        assert.commandWorked(admin.runCommand({refreshLogicalSessionCacheNow: 1}));
 
-    // Make sure pipelining other collections fail.
-    assertErrorCode(admin.system.collections, pipeline, ErrorCodes.InvalidNamespace);
+        // Ensure that the cache now contains the session and is visible by admin.
+        assert.soon(function() {
+            const resultArray = listSessions().toArray();
+            if (resultArray.length < 1) {
+                return false;
+            }
+            const resultArrayMine = resultArray
+                                        .map(function(sess) {
+                                            return sess._id.id;
+                                        })
+                                        .filter(function(id) {
+                                            return 0 == bsonWoCompare({x: id}, {x: myid});
+                                        });
+            return resultArrayMine.length == 1;
+        }, "Failed to locate session in collection");
+
+        // Make sure pipelining other collections fail.
+        assertErrorCode(admin.system.collections, pipeline, ErrorCodes.InvalidNamespace);
+    } finally {
+        admin.setLogLevel(originalLogLevel);
+    }
 })();
