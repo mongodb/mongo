@@ -107,13 +107,6 @@ public:
         return Status::OK();
     }
 
-    virtual Status recoverOrphanedIdent(OperationContext* opCtx,
-                                        StringData ns,
-                                        StringData ident,
-                                        const CollectionOptions& options) {
-        return Status::OK();
-    }
-
     virtual bool hasIdent(OperationContext* opCtx, StringData ident) const {
         return true;
     }

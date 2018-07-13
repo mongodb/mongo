@@ -51,16 +51,11 @@ namespace mongo {
 ServiceContextMongoDTest::ServiceContextMongoDTest()
     : ServiceContextMongoDTest("ephemeralForTest") {}
 
-ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine)
-    : ServiceContextMongoDTest(engine, RepairAction::kNoRepair) {}
-
-ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAction repair) {
+ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine) {
 
     _stashedStorageParams.engine = std::exchange(storageGlobalParams.engine, std::move(engine));
     _stashedStorageParams.engineSetByUser =
         std::exchange(storageGlobalParams.engineSetByUser, true);
-    _stashedStorageParams.repair =
-        std::exchange(storageGlobalParams.repair, (repair == RepairAction::kRepair));
 
     auto const serviceContext = getServiceContext();
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
@@ -91,7 +86,6 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
     shutdownGlobalStorageEngineCleanly(getGlobalServiceContext());
     std::swap(storageGlobalParams.engine, _stashedStorageParams.engine);
     std::swap(storageGlobalParams.engineSetByUser, _stashedStorageParams.engineSetByUser);
-    std::swap(storageGlobalParams.repair, _stashedStorageParams.repair);
 }
 
 }  // namespace mongo

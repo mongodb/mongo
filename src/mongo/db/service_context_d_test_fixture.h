@@ -39,22 +39,18 @@ namespace mongo {
  */
 class ServiceContextMongoDTest : public ServiceContextTest {
 protected:
-    enum class RepairAction { kNoRepair, kRepair };
-
     ServiceContextMongoDTest();
 
     /**
      * Build a ServiceContextMongoDTest, using the named storage engine.
      */
     explicit ServiceContextMongoDTest(std::string engine);
-    explicit ServiceContextMongoDTest(std::string engine, RepairAction repair);
     virtual ~ServiceContextMongoDTest();
 
 private:
     struct {
         std::string engine;
         bool engineSetByUser;
-        bool repair;
     } _stashedStorageParams;
 };
 

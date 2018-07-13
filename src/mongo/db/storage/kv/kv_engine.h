@@ -163,24 +163,6 @@ public:
 
     virtual Status dropIdent(OperationContext* opCtx, StringData ident) = 0;
 
-    /**
-     * Attempts to locate and recover a file that is "orphaned" from the storage engine's metadata,
-     * but may still exist on disk if this is a durable storage engine. Returns Status::OK if a new
-     * record store was successfully created.
-     *
-     * This may return an error if a storage engine chooses not to implement recovery, is unable to
-     * implement recovery because it is not durable, or if the storage engine attempted to recover
-     * the file and failed. A storage engine that is not durable may choose to return an OK status
-     * after creating a new, empty record store.
-     *
-     * This recovery process makes no guarantees about the integrity of data recovered or even that
-     * it still exists when recovered.
-     */
-    virtual Status recoverOrphanedIdent(OperationContext* opCtx,
-                                        StringData ns,
-                                        StringData ident,
-                                        const CollectionOptions& options) = 0;
-
     virtual void alterIdentMetadata(OperationContext* opCtx,
                                     StringData ident,
                                     const IndexDescriptor* desc){};
