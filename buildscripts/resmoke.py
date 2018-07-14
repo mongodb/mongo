@@ -22,8 +22,7 @@ def _execute_suite(suite):
     """
     Executes the test suite, failing fast if requested.
 
-    Returns true if the execution of the suite was interrupted by the
-    user, and false otherwise.
+    Returns true if the execution of the suite was interrupted, and false otherwise.
     """
 
     logger = resmokelib.logging.loggers.EXECUTOR_LOGGER
@@ -67,15 +66,17 @@ def _execute_suite(suite):
             logger=logger)
 
     executor_config = suite.get_executor_config()
-    executor = resmokelib.testing.executor.TestSuiteExecutor(
-        logger, suite, archive_instance=archive, **executor_config)
 
     try:
+        executor = resmokelib.testing.executor.TestSuiteExecutor(
+            logger, suite, archive_instance=archive, **executor_config)
         executor.run()
         if suite.options.fail_fast and suite.return_code != 0:
             return False
-    except resmokelib.errors.UserInterrupt:
-        suite.return_code = 130  # Simulate SIGINT as exit code.
+    except (resmokelib.errors.UserInterrupt, resmokelib.errors.LoggerRuntimeConfigError) as err:
+        logger.error("Encountered an error when running %ss of suite %s: %s",
+                     suite.test_kind, suite.get_display_name(), err)
+        suite.return_code = err.EXIT_CODE
         return True
     except:
         logger.exception("Encountered an error when running %ss of suite %s.",
@@ -201,6 +202,7 @@ class Main(object):
                                     test, suite_names)
             sys.exit(0)
 
+        exit_code = 0
         try:
             for suite in suites:
                 resmoke_logger.info(_dump_suite_config(suite, logging_config))
@@ -216,7 +218,8 @@ class Main(object):
                 if interrupted or (suite.options.fail_fast and suite.return_code != 0):
                     time_taken = time.time() - self.__start_time
                     _log_summary(resmoke_logger, suites, time_taken)
-                    sys.exit(suite.return_code)
+                    exit_code = suite.return_code
+                    sys.exit(exit_code)
 
             time_taken = time.time() - self.__start_time
             _log_summary(resmoke_logger, suites, time_taken)
@@ -230,6 +233,20 @@ class Main(object):
 
             resmokelib.reportfile.write(suites)
 
+            if not interrupted and resmokelib.logging.buildlogger.is_log_output_incomplete():
+                if exit_code == 0:
+                    # We don't anticipate users to look at passing Evergreen tasks very often that
+                    # even if the log output is incomplete, we'd still rather not show anything in
+                    # the Evergreen UI or cause a JIRA ticket to be created.
+                    resmoke_logger.info(
+                        "We failed to flush all log output to logkeeper but all tests passed, so"
+                        " ignoring.")
+                else:
+                    resmoke_logger.info(
+                        "Exiting with code %d rather than requested code %d because we failed to"
+                        " flush all log output to logkeeper.",
+                        resmokelib.errors.LoggerRuntimeConfigError.EXIT_CODE, exit_code)
+                    sys.exit(resmokelib.errors.LoggerRuntimeConfigError.EXIT_CODE)
 
 if __name__ == "__main__":
     Main().run()

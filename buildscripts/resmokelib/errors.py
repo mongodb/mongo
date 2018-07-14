@@ -25,12 +25,14 @@ class StopExecution(ResmokeError):
     pass
 
 
-class UserInterrupt(StopExecution):
-    """
-    Exception that is raised when a user signals resmoke.py to
-    unconditionally stop executing tests.
-    """
-    pass
+class UserInterrupt(StopExecution):  # noqa: D204
+    """Exception raised when a user signals resmoke.py to unconditionally stop executing tests."""
+    EXIT_CODE = 130  # Simulate SIGINT as exit code.
+
+
+class LoggerRuntimeConfigError(StopExecution):  # noqa: D204
+    """Exception raised when a logging handler couldn't be configured at runtime."""
+    EXIT_CODE = 75
 
 
 class TestFailure(ResmokeError):
