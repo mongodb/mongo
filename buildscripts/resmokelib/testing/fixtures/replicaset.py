@@ -148,9 +148,9 @@ class ReplicaSetFixture(interface.ReplFixture):
             replset_settings = self.replset_config_options["settings"]
             config["settings"] = replset_settings
 
-        # If secondaries vote, all nodes are not electable, and no election timeout was specified,
-        # increase the election timeout to 24 hours to prevent elections.
-        if self.voting_secondaries and not self.all_nodes_electable:
+        # If secondaries vote and no election timeout was specified, then we increase the election
+        # timeout to 24 hours to prevent spurious elections.
+        if self.voting_secondaries:
             config.setdefault("settings", {})
             if "electionTimeoutMillis" not in config["settings"]:
                 config["settings"]["electionTimeoutMillis"] = 24 * 60 * 60 * 1000
