@@ -127,14 +127,14 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target= 'op_observer_impl_test',
-    source= 'op_observer_impl_test.cpp',
+    target='op_observer_impl_test',
+    source='op_observer_impl_test.cpp',
     LIBDEPS=[
+        'auth/authmocks',
         'common',
         'op_observer_d',
+        'repl/replmocks',
         'service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
     ],
 )
 

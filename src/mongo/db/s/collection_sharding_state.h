@@ -28,9 +28,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
@@ -64,7 +61,6 @@ public:
      * returned pointer should never be stored.
      */
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
-    static CollectionShardingState* get(OperationContext* opCtx, const std::string& ns);
 
     /**
      * Reports all collections which have filtering information associated.

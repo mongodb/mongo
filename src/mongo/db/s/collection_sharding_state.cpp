@@ -110,14 +110,13 @@ public:
 
     static const ServiceContext::Decoration<CollectionShardingStateMap> get;
 
-    CollectionShardingState& getOrCreate(const std::string& ns) {
+    CollectionShardingState& getOrCreate(const NamespaceString& nss) {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-        auto it = _collections.find(ns);
+        auto it = _collections.find(nss.ns());
         if (it == _collections.end()) {
             auto inserted = _collections.try_emplace(
-                ns,
-                std::make_shared<CollectionShardingState>(get.owner(this), NamespaceString(ns)));
+                nss.ns(), std::make_shared<CollectionShardingState>(get.owner(this), nss));
             invariant(inserted.second);
             it = std::move(inserted.first);
         }
@@ -143,9 +142,9 @@ public:
     }
 
 private:
-    mutable stdx::mutex _mutex;
-
     using CollectionsMap = StringMap<std::shared_ptr<CollectionShardingState>>;
+
+    stdx::mutex _mutex;
     CollectionsMap _collections;
 };
 
@@ -161,16 +160,11 @@ CollectionShardingState::CollectionShardingState(ServiceContext* sc, NamespaceSt
 
 CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
-    return CollectionShardingState::get(opCtx, nss.ns());
-}
-
-CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
-                                                      const std::string& ns) {
     // Collection lock must be held to have a reference to the collection's sharding state
-    dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IS));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IS));
 
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
-    return &collectionsMap.getOrCreate(ns);
+    return &collectionsMap.getOrCreate(nss);
 }
 
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {

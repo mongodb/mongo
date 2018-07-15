@@ -284,8 +284,8 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
             case dbDelete:   // path, so no need to check them here as well
                 break;
             default:
-                auto css = CollectionShardingState::get(_opCtx, ns);
-                css->checkShardVersionOrThrow(_opCtx);
+                CollectionShardingState::get(_opCtx, NamespaceString(ns))
+                    ->checkShardVersionOrThrow(_opCtx);
                 break;
         }
     }

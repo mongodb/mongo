@@ -323,7 +323,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           NamespaceString const& nss,
                                           BSONObj const& doc) {
-    auto css = CollectionShardingState::get(opCtx, nss.ns());
+    auto css = CollectionShardingState::get(opCtx, nss);
     getDeleteState(opCtx) = ShardObserverDeleteState::make(opCtx, css, doc);
 }
 
