@@ -303,4 +303,6 @@ private:
 typedef std::unique_ptr<WiredTigerSession,
                         typename WiredTigerSessionCache::WiredTigerSessionDeleter>
     UniqueWiredTigerSession;
+
+extern const std::string kWTRepairMsg;
 }  // namespace

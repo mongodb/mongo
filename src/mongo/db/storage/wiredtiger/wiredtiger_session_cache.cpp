@@ -76,6 +76,10 @@ namespace mongo {
 // is a good compromise for most workloads.
 AtomicInt32 kWiredTigerCursorCacheSize(-100);
 
+const std::string kWTRepairMsg =
+    "Please read the documentation for starting MongoDB with --repair here: "
+    "http://dochub.mongodb.org/core/repair";
+
 ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>
     WiredTigerCursorCacheSizeSetting(ServerParameterSet::getGlobal(),
                                      "wiredTigerCursorCacheSize",
@@ -119,8 +123,12 @@ WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, boo
     WT_CURSOR* c = NULL;
     int ret = _session->open_cursor(
         _session, uri.c_str(), NULL, forRecordStore ? "" : "overwrite=false", &c);
-    if (ret != ENOENT)
-        invariantWTOK(ret);
+    if (ret != ENOENT && ret != 0) {
+        error() << "Failed to open a WiredTiger cursor: " << uri;
+        error() << "This may be due to metadata corruption. " << kWTRepairMsg;
+
+        fassertFailedNoTrace(50882);
+    }
     if (c)
         _cursorsOut++;
     return c;
