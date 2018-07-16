@@ -191,7 +191,9 @@ void openWiredTiger(const std::string& path,
         fassertFailedNoTrace(28561);
     }
 
-    severe() << wtRCToStatus(ret).reason();
+    severe() << "Reason: " << wtRCToStatus(ret).reason();
+    severe() << "Failed to open a WiredTiger connection. This may be due to metadata corruption. "
+             << kWTRepairMsg;
     fassertFailedNoTrace(28595);
 }
 }  // namespace

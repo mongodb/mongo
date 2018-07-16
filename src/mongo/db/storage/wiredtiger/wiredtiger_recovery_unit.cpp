@@ -530,7 +530,10 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
     _session = _ru->getSession();
     _cursor = _session->getCursor(uri, tableId, forRecordStore);
     if (!_cursor) {
-        error() << "no cursor for uri: " << uri;
+        // It could be an index file or a data file here.
+        error() << "Failed to get the cursor for uri: " << uri;
+        error() << "This may be due to missing data files. " << kWTRepairMsg;
+        fassertFailedNoTrace(50883);
     }
 }
 

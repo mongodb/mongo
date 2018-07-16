@@ -7,26 +7,13 @@
 
 (function() {
 
+    load('jstests/disk/libs/wt_file_helper.js');
+
     const baseName = "wt_repair_missing_files";
     const collName = "test";
     const dbpath = MongoRunner.dataPath + baseName + "/";
 
     resetDbpath(dbpath);
-
-    let getUriForColl = function(coll) {
-        assert(coll.exists());  // Collection must exist
-        let uri = coll.stats().wiredTiger.uri.split("table:")[1];
-        assert.neq(typeof(uri), 'undefined');
-        return uri;
-    };
-
-    let getUriForIndex = function(coll, indexName) {
-        assert(coll.exists());  // Collection must exist
-        let ret = coll.getDB().runCommand({collStats: coll.getName()});
-        let uri = ret.indexDetails[indexName].uri.split("table:")[1];
-        assert.neq(typeof(uri), 'undefined');
-        return uri;
-    };
 
     /**
      * Test 1. Create a collection, delete it's .wt file, run repair. Verify that repair succeeds at
