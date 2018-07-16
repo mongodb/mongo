@@ -32,6 +32,7 @@
 #include <iostream>
 
 #include "mongo/base/init.h"
+#include "mongo/config.h"
 
 #ifdef _WIN32
 #include <io.h>
@@ -67,7 +68,7 @@ public:
         setp(&(_buffer[0]), &(_buffer[_bufferSize - 1]));
     }
 
-    int_type overflow(int_type ch) {
+    int_type overflow(int_type ch) override {
         if (ch == traits_type::eof()) {
             return ch;
         }
@@ -138,7 +139,7 @@ public:
         return flushToConsole() ? ch : traits_type::eof();
     }
 
-    int sync() {
+    int sync() override {
         return flushToConsole() ? 0 : -1;
     }
 
@@ -178,6 +179,14 @@ private:
             unwrittenCount -= written;
             unwrittenBegin += written;
         }
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+        if (IsDebuggerPresent()) {
+            bufferWide[std::min(static_cast<size_t>(length), _bufferSize - 1)] = L'\0';
+            OutputDebugStringW(bufferWide);
+        }
+#endif
+
         return true;
     }
 
