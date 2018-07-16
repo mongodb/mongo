@@ -115,7 +115,6 @@ class Job(object):
 
         finally:
             success = self.report.find_test_info(test).status == "pass"
-            self.archival.archive(self.logger, test, success)
             if self.archival:
                 self.archival.archive(self.logger, test, success)
 
