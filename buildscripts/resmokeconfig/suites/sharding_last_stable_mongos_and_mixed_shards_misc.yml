@@ -87,7 +87,6 @@ selector:
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
   - jstests/sharding/delete_during_migrate.js
   - jstests/sharding/change_stream_chunk_migration.js
-  - jstests/sharding/change_streams_primary_shard_unaware.js
   - jstests/sharding/parallel.js
   - jstests/sharding/diffservers1.js
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
@@ -105,7 +104,6 @@ selector:
   - jstests/sharding/autosplit_with_balancer.js
   - jstests/sharding/migrateBig.js
   - jstests/sharding/migrateBig_balancer.js
-  - jstests/sharding/resume_change_stream_on_subset_of_shards.js
   - jstests/sharding/mapReduce_inSharded.js
   - jstests/sharding/cursor_valid_after_shard_stepdown.js
   - jstests/sharding/movechunk_parallel.js
@@ -141,17 +139,14 @@ selector:
   - jstests/sharding/zero_shard_version.js
   - jstests/sharding/remove1.js
   - jstests/sharding/multi_write_target.js
-  - jstests/sharding/change_streams.js
   - jstests/sharding/array_shard_key.js
   - jstests/sharding/validate_collection.js
   - jstests/sharding/move_chunk_wc.js
   - jstests/sharding/cursor_timeout.js
   - jstests/sharding/hash_basic.js
-  - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js
   - jstests/sharding/cursor1.js
   - jstests/sharding/mapReduce_nonSharded.js
   - jstests/sharding/hash_shard_num_chunks.js
-  - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/coll_epoch_test2.js
   - jstests/sharding/tag_auto_split.js
   - jstests/sharding/sharding_balance2.js
@@ -169,7 +164,6 @@ selector:
   - jstests/sharding/addshard5.js
   - jstests/sharding/count2.js
   - jstests/sharding/features1.js
-  - jstests/sharding/change_stream_metadata_notifications.js
   - jstests/sharding/regex_targeting.js
   - jstests/sharding/shard6.js
   - jstests/sharding/query_config.js
@@ -227,7 +221,6 @@ selector:
   - jstests/sharding/shard_aware_on_add_shard.js
   - jstests/sharding/migration_server_status.js
   - jstests/sharding/agg_project_limit_pipe_split.js
-  - jstests/sharding/update_sharded.js
   - jstests/sharding/movechunk_with_moveParanoia.js
   - jstests/sharding/movechunk_with_default_paranoia.js
   - jstests/sharding/shard_key_immutable.js
@@ -284,7 +277,6 @@ selector:
   - jstests/sharding/bulk_insert.js
   - jstests/sharding/mrShardedOutput.js
   - jstests/sharding/authConnectionHook.js
-  - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/oplog_document_key.js
   - jstests/sharding/top_chunk_split.js
   - jstests/sharding/split_large_key.js
@@ -361,16 +353,24 @@ selector:
   - jstests/sharding/geo_near_random2.js
   - jstests/sharding/shard7.js
   # SERVER-35977
+  - jstests/sharding/change_stream_lookup_single_shard_cluster.js
+  - jstests/sharding/change_stream_metadata_notifications.js
   - jstests/sharding/change_stream_read_preference.js
   - jstests/sharding/change_stream_resume_from_different_mongos.js
+  - jstests/sharding/change_streams.js
   - jstests/sharding/change_stream_shard_failover.js
+  - jstests/sharding/change_streams_primary_shard_unaware.js
+  - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/change_streams_whole_db.js
   - jstests/sharding/change_stream_update_lookup_collation.js
   - jstests/sharding/change_stream_update_lookup_read_concern.js
+  - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js
   - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
   - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
   - jstests/sharding/resume_change_stream.js
   - jstests/sharding/resume_change_stream_from_stale_mongos.js
+  - jstests/sharding/resume_change_stream_on_subset_of_shards.js
+  - jstests/sharding/update_sharded.js
 
 
 executor:
