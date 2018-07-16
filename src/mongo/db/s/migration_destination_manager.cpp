@@ -734,7 +734,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         }
 
         // Wait for any other, overlapping queued deletions to drain
-        auto status = CollectionShardingState::waitForClean(opCtx, _nss, _epoch, footprint);
+        auto status = CollectionShardingRuntime::waitForClean(opCtx, _nss, _epoch, footprint);
         if (!status.isOK()) {
             _setStateFail(redact(status.reason()));
             return;
@@ -1099,11 +1099,12 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
     return true;
 }
 
-CollectionShardingState::CleanupNotification MigrationDestinationManager::_notePending(
+CollectionShardingRuntime::CleanupNotification MigrationDestinationManager::_notePending(
     OperationContext* opCtx, ChunkRange const& range) {
 
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX, MODE_X);
-    auto css = CollectionShardingState::get(opCtx, _nss);
+    auto* const css = CollectionShardingRuntime::get(opCtx, _nss);
+
     auto metadata = css->getMetadata(opCtx);
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
@@ -1127,14 +1128,14 @@ CollectionShardingState::CleanupNotification MigrationDestinationManager::_noteP
 }
 
 void MigrationDestinationManager::_forgetPending(OperationContext* opCtx, ChunkRange const& range) {
-
     if (!_chunkMarkedPending) {  // (no lock needed, only the migrate thread looks at this.)
         return;  // no documents can have been moved in, so there is nothing to clean up.
     }
 
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX, MODE_X);
-    auto css = CollectionShardingState::get(opCtx, _nss);
+    auto* const css = CollectionShardingRuntime::get(opCtx, _nss);
+
     auto metadata = css->getMetadata(opCtx);
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for

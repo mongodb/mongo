@@ -37,7 +37,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
@@ -107,7 +107,7 @@ public:
         }
 
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        CollectionShardingState* const css = CollectionShardingState::get(opCtx, nss);
+        auto* const css = CollectionShardingRuntime::get(opCtx, nss);
 
         const auto metadata = css->getMetadata(opCtx);
         if (metadata->isSharded()) {

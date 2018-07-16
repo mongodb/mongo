@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/s/metadata_manager.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 
 namespace mongo {
 

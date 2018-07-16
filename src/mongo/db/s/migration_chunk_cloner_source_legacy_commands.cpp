@@ -40,7 +40,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/active_migrations_registry.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/write_concern.h"
@@ -71,7 +71,7 @@ public:
                 str::stream() << "Collection " << nss->ns() << " does not exist",
                 _autoColl->getCollection());
 
-        if (auto msm = MigrationSourceManager::get(CollectionShardingState::get(opCtx, *nss))) {
+        if (auto msm = MigrationSourceManager::get(CollectionShardingRuntime::get(opCtx, *nss))) {
             // It is now safe to access the cloner
             _chunkCloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(msm->getCloner());
             invariant(_chunkCloner);

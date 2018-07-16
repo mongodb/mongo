@@ -32,18 +32,8 @@
 
 #include "mongo/db/s/collection_sharding_state.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/service_context.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_thread_pool.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
@@ -51,72 +41,21 @@
 namespace mongo {
 namespace {
 
-// How long to wait before starting cleanup of an emigrated chunk range
-MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
-
-/**
- * Lazy-instantiated task executor shared by the collection range deleters. Must outlive the
- * CollectionShardingStateMap below.
- */
-class RangeDeleterExecutorHolder {
-    MONGO_DISALLOW_COPYING(RangeDeleterExecutorHolder);
-
-public:
-    RangeDeleterExecutorHolder() = default;
-
-    ~RangeDeleterExecutorHolder() {
-        if (_taskExecutor) {
-            _taskExecutor->shutdown();
-            _taskExecutor->join();
-        }
-    }
-
-    executor::TaskExecutor* getOrCreateExecutor() {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-        if (!_taskExecutor) {
-            const std::string kExecName("CollectionRangeDeleter-TaskExecutor");
-
-            auto net = executor::makeNetworkInterface(kExecName);
-            auto pool = stdx::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
-            auto taskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool),
-                                                                                    std::move(net));
-            taskExecutor->startup();
-
-            _taskExecutor = std::move(taskExecutor);
-        }
-
-        return _taskExecutor.get();
-    }
-
-private:
-    stdx::mutex _mutex;
-    std::unique_ptr<executor::TaskExecutor> _taskExecutor{nullptr};
-};
-
-const auto getRangeDeleterExecutorHolder =
-    ServiceContext::declareDecoration<RangeDeleterExecutorHolder>();
-
-/**
- * This map matches 1:1 with the set of collections in the storage catalog. It is not safe to
- * look-up values from this map without holding some form of collection lock. It is only safe to
- * add/remove values when holding X lock on the respective namespace.
- */
 class CollectionShardingStateMap {
     MONGO_DISALLOW_COPYING(CollectionShardingStateMap);
 
 public:
-    CollectionShardingStateMap() = default;
+    static const ServiceContext::Decoration<boost::optional<CollectionShardingStateMap>> get;
 
-    static const ServiceContext::Decoration<CollectionShardingStateMap> get;
+    CollectionShardingStateMap(std::unique_ptr<CollectionShardingStateFactory> factory)
+        : _factory(std::move(factory)) {}
 
     CollectionShardingState& getOrCreate(const NamespaceString& nss) {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
         auto it = _collections.find(nss.ns());
         if (it == _collections.end()) {
-            auto inserted = _collections.try_emplace(
-                nss.ns(), std::make_shared<CollectionShardingState>(get.owner(this), nss));
+            auto inserted = _collections.try_emplace(nss.ns(), _factory->make(nss));
             invariant(inserted.second);
             it = std::move(inserted.first);
         }
@@ -144,19 +83,19 @@ public:
 private:
     using CollectionsMap = StringMap<std::shared_ptr<CollectionShardingState>>;
 
+    std::unique_ptr<CollectionShardingStateFactory> _factory;
+
     stdx::mutex _mutex;
     CollectionsMap _collections;
 };
 
-const ServiceContext::Decoration<CollectionShardingStateMap> CollectionShardingStateMap::get =
-    ServiceContext::declareDecoration<CollectionShardingStateMap>();
+const ServiceContext::Decoration<boost::optional<CollectionShardingStateMap>>
+    CollectionShardingStateMap::get =
+        ServiceContext::declareDecoration<boost::optional<CollectionShardingStateMap>>();
 
 }  // namespace
 
-CollectionShardingState::CollectionShardingState(ServiceContext* sc, NamespaceString nss)
-    : _nss(std::move(nss)),
-      _metadataManager(std::make_shared<MetadataManager>(
-          sc, _nss, getRangeDeleterExecutorHolder(sc).getOrCreateExecutor())) {}
+CollectionShardingState::CollectionShardingState(NamespaceString nss) : _nss(std::move(nss)) {}
 
 CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
@@ -164,58 +103,16 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IS));
 
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
-    return &collectionsMap.getOrCreate(nss);
+    return &collectionsMap->getOrCreate(nss);
 }
 
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
-    collectionsMap.report(opCtx, builder);
+    collectionsMap->report(opCtx, builder);
 }
 
 ScopedCollectionMetadata CollectionShardingState::getMetadata(OperationContext* opCtx) {
-    auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-    return _metadataManager->getActiveMetadata(_metadataManager, atClusterTime);
-}
-
-void CollectionShardingState::refreshMetadata(OperationContext* opCtx,
-                                              std::unique_ptr<CollectionMetadata> newMetadata) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
-
-    _metadataManager->refreshActiveMetadata(std::move(newMetadata));
-}
-
-void CollectionShardingState::markNotShardedAtStepdown() {
-    _metadataManager->refreshActiveMetadata(nullptr);
-}
-
-auto CollectionShardingState::beginReceive(ChunkRange const& range) -> CleanupNotification {
-    return _metadataManager->beginReceive(range);
-}
-
-void CollectionShardingState::forgetReceive(const ChunkRange& range) {
-    _metadataManager->forgetReceive(range);
-}
-
-auto CollectionShardingState::cleanUpRange(ChunkRange const& range, CleanWhen when)
-    -> CleanupNotification {
-    Date_t time = (when == kNow) ? Date_t{} : Date_t::now() +
-            stdx::chrono::seconds{orphanCleanupDelaySecs.load()};
-    return _metadataManager->cleanUpRange(range, time);
-}
-
-void CollectionShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
-    _critSec.enterCriticalSectionCatchUpPhase();
-}
-
-void CollectionShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
-    _critSec.enterCriticalSectionCommitPhase();
-}
-
-void CollectionShardingState::exitCriticalSection(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
-    _critSec.exitCriticalSection();
+    return _getMetadata(opCtx);
 }
 
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {
@@ -304,78 +201,32 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     MONGO_UNREACHABLE;
 }
 
-// Call with collection unlocked.  Note that the CollectionShardingState object involved might not
-// exist anymore at the time of the call, or indeed anytime outside the AutoGetCollection block, so
-// anything that might alias something in it must be copied first.
-
-Status CollectionShardingState::waitForClean(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             OID const& epoch,
-                                             ChunkRange orphanRange) {
-    while (true) {
-        boost::optional<CleanupNotification> stillScheduled;
-
-        {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            auto css = CollectionShardingState::get(opCtx, nss);
-
-            {
-                // First, see if collection was dropped, but do it in a separate scope in order to
-                // not hold reference on it, which would make it appear in use
-                auto metadata =
-                    css->_metadataManager->getActiveMetadata(css->_metadataManager, boost::none);
-
-                if (!metadata->isSharded() || metadata->getCollVersion().epoch() != epoch) {
-                    return {ErrorCodes::ConflictingOperationInProgress,
-                            "Collection being migrated was dropped"};
-                }
-            }
-
-            stillScheduled = css->trackOrphanedDataCleanup(orphanRange);
-            if (!stillScheduled) {
-                log() << "Finished deleting " << nss.ns() << " range "
-                      << redact(orphanRange.toString());
-                return Status::OK();
-            }
-        }
-
-        log() << "Waiting for deletion of " << nss.ns() << " range " << orphanRange;
-
-        Status result = stillScheduled->waitStatus(opCtx);
-        if (!result.isOK()) {
-            return result.withContext(str::stream() << "Failed to delete orphaned " << nss.ns()
-                                                    << " range "
-                                                    << orphanRange.toString());
-        }
-    }
-
-    MONGO_UNREACHABLE;
+void CollectionShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    _critSec.enterCriticalSectionCatchUpPhase();
 }
 
-auto CollectionShardingState::trackOrphanedDataCleanup(ChunkRange const& range)
-    -> boost::optional<CleanupNotification> {
-    return _metadataManager->trackOrphanedDataCleanup(range);
+void CollectionShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    _critSec.enterCriticalSectionCommitPhase();
 }
 
-boost::optional<ChunkRange> CollectionShardingState::getNextOrphanRange(BSONObj const& from) {
-    return _metadataManager->getNextOrphanRange(from);
+void CollectionShardingState::exitCriticalSection(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    _critSec.exitCriticalSection();
 }
 
-CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns)
-    : _nss(std::move(ns)), _opCtx(opCtx) {
-    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
-    CollectionShardingState::get(opCtx, _nss)->enterCriticalSectionCatchUpPhase(_opCtx);
+void CollectionShardingStateFactory::set(ServiceContext* service,
+                                         std::unique_ptr<CollectionShardingStateFactory> factory) {
+    auto& collectionsMap = CollectionShardingStateMap::get(service);
+    invariant(!collectionsMap);
+    invariant(factory);
+    collectionsMap.emplace(std::move(factory));
 }
 
-CollectionCriticalSection::~CollectionCriticalSection() {
-    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
-    CollectionShardingState::get(_opCtx, _nss)->exitCriticalSection(_opCtx);
-}
-
-void CollectionCriticalSection::enterCommitPhase() {
-    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
-    CollectionShardingState::get(_opCtx, _nss)->enterCriticalSectionCommitPhase(_opCtx);
+void CollectionShardingStateFactory::clear(ServiceContext* service) {
+    auto& collectionsMap = CollectionShardingStateMap::get(service);
+    collectionsMap.reset();
 }
 
 }  // namespace mongo

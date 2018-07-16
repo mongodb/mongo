@@ -1,0 +1,162 @@
+/**
+ *    Copyright (C) 2018 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
+ */
+
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/s/collection_sharding_runtime.h"
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/util/log.h"
+
+namespace mongo {
+namespace {
+
+// How long to wait before starting cleanup of an emigrated chunk range
+MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
+
+}  // namespace
+
+CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* sc,
+                                                     NamespaceString nss,
+                                                     executor::TaskExecutor* rangeDeleterExecutor)
+    : CollectionShardingState(nss),
+      _nss(std::move(nss)),
+      _metadataManager(std::make_shared<MetadataManager>(sc, _nss, rangeDeleterExecutor)) {}
+
+CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCtx,
+                                                          const NamespaceString& nss) {
+    auto* const css = CollectionShardingState::get(opCtx, nss);
+    return checked_cast<CollectionShardingRuntime*>(css);
+}
+
+void CollectionShardingRuntime::refreshMetadata(OperationContext* opCtx,
+                                                std::unique_ptr<CollectionMetadata> newMetadata) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+
+    _metadataManager->refreshActiveMetadata(std::move(newMetadata));
+}
+
+void CollectionShardingRuntime::markNotShardedAtStepdown() {
+    _metadataManager->refreshActiveMetadata(nullptr);
+}
+
+auto CollectionShardingRuntime::beginReceive(ChunkRange const& range) -> CleanupNotification {
+    return _metadataManager->beginReceive(range);
+}
+
+void CollectionShardingRuntime::forgetReceive(const ChunkRange& range) {
+    _metadataManager->forgetReceive(range);
+}
+
+auto CollectionShardingRuntime::cleanUpRange(ChunkRange const& range, CleanWhen when)
+    -> CleanupNotification {
+    Date_t time = (when == kNow) ? Date_t{} : Date_t::now() +
+            stdx::chrono::seconds{orphanCleanupDelaySecs.load()};
+    return _metadataManager->cleanUpRange(range, time);
+}
+
+Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               OID const& epoch,
+                                               ChunkRange orphanRange) {
+    while (true) {
+        boost::optional<CleanupNotification> stillScheduled;
+
+        {
+            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+            auto* const self = CollectionShardingRuntime::get(opCtx, nss);
+
+            {
+                // First, see if collection was dropped, but do it in a separate scope in order to
+                // not hold reference on it, which would make it appear in use
+                auto metadata =
+                    self->_metadataManager->getActiveMetadata(self->_metadataManager, boost::none);
+
+                if (!metadata->isSharded() || metadata->getCollVersion().epoch() != epoch) {
+                    return {ErrorCodes::ConflictingOperationInProgress,
+                            "Collection being migrated was dropped"};
+                }
+            }
+
+            stillScheduled = self->trackOrphanedDataCleanup(orphanRange);
+            if (!stillScheduled) {
+                log() << "Finished deleting " << nss.ns() << " range "
+                      << redact(orphanRange.toString());
+                return Status::OK();
+            }
+        }
+
+        log() << "Waiting for deletion of " << nss.ns() << " range " << orphanRange;
+
+        Status result = stillScheduled->waitStatus(opCtx);
+        if (!result.isOK()) {
+            return result.withContext(str::stream() << "Failed to delete orphaned " << nss.ns()
+                                                    << " range "
+                                                    << orphanRange.toString());
+        }
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+auto CollectionShardingRuntime::trackOrphanedDataCleanup(ChunkRange const& range)
+    -> boost::optional<CleanupNotification> {
+    return _metadataManager->trackOrphanedDataCleanup(range);
+}
+
+boost::optional<ChunkRange> CollectionShardingRuntime::getNextOrphanRange(BSONObj const& from) {
+    return _metadataManager->getNextOrphanRange(from);
+}
+
+ScopedCollectionMetadata CollectionShardingRuntime::_getMetadata(OperationContext* opCtx) {
+    auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    return _metadataManager->getActiveMetadata(_metadataManager, atClusterTime);
+}
+
+CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns)
+    : _nss(std::move(ns)), _opCtx(opCtx) {
+    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
+    CollectionShardingState::get(opCtx, _nss)->enterCriticalSectionCatchUpPhase(_opCtx);
+}
+
+CollectionCriticalSection::~CollectionCriticalSection() {
+    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
+    CollectionShardingState::get(_opCtx, _nss)->exitCriticalSection(_opCtx);
+}
+
+void CollectionCriticalSection::enterCommitPhase() {
+    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
+    CollectionShardingState::get(_opCtx, _nss)->enterCriticalSectionCommitPhase(_opCtx);
+}
+
+}  // namespace mongo

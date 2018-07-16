@@ -613,7 +613,6 @@ env.Library(
         'catalog_raii',
         'curop',
         's/sharding_api_d',
-        's/sharding',
         'stats/top',
     ],
 )
@@ -1111,7 +1110,6 @@ env.Library(
         "repl/topology_coordinator",
         "rw_concern_d",
         "s/commands_db_s",
-        "s/sharding_api_d",
         "s/sharding_runtime_d",
         "startup_warnings_mongod",
         "stats/counters",

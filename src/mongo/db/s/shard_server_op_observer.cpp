@@ -36,7 +36,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/chunk_split_state_driver.h"
 #include "mongo/db/s/chunk_splitter.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
@@ -79,7 +78,7 @@ public:
         // This is a hack to get around CollectionShardingState::refreshMetadata() requiring the X
         // lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary measure until
         // SERVER-31595 removes the X lock requirement.
-        CollectionShardingState::get(_opCtx, _nss)->markNotShardedAtStepdown();
+        CollectionShardingRuntime::get(_opCtx, _nss)->markNotShardedAtStepdown();
     }
 
     void rollback() override {}
@@ -273,7 +272,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                 // This is a hack to get around CollectionShardingState::refreshMetadata() requiring
                 // the X lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary
                 // measure until SERVER-31595 removes the X lock requirement.
-                CollectionShardingState::get(opCtx, updatedNss)->markNotShardedAtStepdown();
+                CollectionShardingRuntime::get(opCtx, updatedNss)->markNotShardedAtStepdown();
             }
         }
     }
@@ -323,7 +322,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           NamespaceString const& nss,
                                           BSONObj const& doc) {
-    auto css = CollectionShardingState::get(opCtx, nss);
+    auto* const css = CollectionShardingRuntime::get(opCtx, nss);
     getDeleteState(opCtx) = ShardObserverDeleteState::make(opCtx, css, doc);
 }
 
@@ -392,7 +391,7 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
 }
 
 void shardObserveInsertOp(OperationContext* opCtx,
-                          CollectionShardingState* css,
+                          CollectionShardingRuntime* css,
                           const BSONObj& insertedDoc,
                           const repl::OpTime& opTime) {
     css->checkShardVersionOrThrow(opCtx);
@@ -403,7 +402,7 @@ void shardObserveInsertOp(OperationContext* opCtx,
 }
 
 void shardObserveUpdateOp(OperationContext* opCtx,
-                          CollectionShardingState* css,
+                          CollectionShardingRuntime* css,
                           const BSONObj& updatedDoc,
                           const repl::OpTime& opTime,
                           const repl::OpTime& prePostImageOpTime) {
@@ -415,7 +414,7 @@ void shardObserveUpdateOp(OperationContext* opCtx,
 }
 
 void shardObserveDeleteOp(OperationContext* opCtx,
-                          CollectionShardingState* css,
+                          CollectionShardingRuntime* css,
                           const ShardObserverDeleteState& deleteState,
                           const repl::OpTime& opTime,
                           const repl::OpTime& preImageOpTime) {
@@ -427,7 +426,7 @@ void shardObserveDeleteOp(OperationContext* opCtx,
 }
 
 ShardObserverDeleteState ShardObserverDeleteState::make(OperationContext* opCtx,
-                                                        CollectionShardingState* css,
+                                                        CollectionShardingRuntime* css,
                                                         const BSONObj& docToDelete) {
     auto msm = MigrationSourceManager::get(css);
     auto metadata = css->getMetadata(opCtx);

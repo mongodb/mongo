@@ -36,7 +36,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -118,7 +118,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // Exclusive collection lock needed since we're now changing the metadata
         AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
-        auto css = CollectionShardingState::get(opCtx, nss);
+        auto* const css = CollectionShardingRuntime::get(opCtx, nss);
         css->refreshMetadata(opCtx, nullptr);
 
         return ChunkVersion::UNSHARDED();
@@ -141,7 +141,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     // Exclusive collection lock needed since we're now changing the metadata
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
-    auto css = CollectionShardingState::get(opCtx, nss);
+    auto* const css = CollectionShardingRuntime::get(opCtx, nss);
+
     auto metadata = css->getMetadata(opCtx);
 
     // We already have newer version

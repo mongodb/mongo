@@ -31,7 +31,7 @@
 #include "mongo/db/s/active_migrations_registry.h"
 
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/service_context.h"
@@ -121,7 +121,7 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
         AutoGetCollection autoColl(opCtx, nss.get(), MODE_IS);
 
         if (auto msm =
-                MigrationSourceManager::get(CollectionShardingState::get(opCtx, nss.get()))) {
+                MigrationSourceManager::get(CollectionShardingRuntime::get(opCtx, nss.get()))) {
             return msm->getMigrationStatusReport();
         }
     }

@@ -44,7 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -74,11 +74,12 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                                   std::string* errMsg) {
     BSONObj startingFromKey = startingFromKeyConst;
     boost::optional<ChunkRange> targetRange;
-    CollectionShardingState::CleanupNotification notifn;
+    CollectionShardingRuntime::CleanupNotification notifn;
 
     {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        const auto css = CollectionShardingState::get(opCtx, ns);
+        auto* const css = CollectionShardingRuntime::get(opCtx, ns);
+
         auto metadata = css->getMetadata(opCtx);
         if (!metadata->isSharded()) {
             log() << "skipping orphaned data cleanup for " << ns.toString()
@@ -110,7 +111,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 
         *stoppedAtKey = targetRange->getMax();
 
-        notifn = css->cleanUpRange(*targetRange, CollectionShardingState::kNow);
+        notifn = css->cleanUpRange(*targetRange, CollectionShardingRuntime::kNow);
     }
 
     // Sleep waiting for our own deletion. We don't actually care about any others, so there is no

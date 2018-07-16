@@ -29,36 +29,38 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/metadata_manager.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/util/decorable.h"
 
 namespace mongo {
 
-class OperationContext;
-
 /**
- * Contains all sharding-related runtime state for a given collection. One such object is assigned
- * to each sharded collection known on a mongod instance. A set of these objects is linked off the
- * instance's sharding state.
+ * Each collection on a mongod instance is dynamically assigned two pieces of information for the
+ * duration of its lifetime:
+ *  CollectionShardingState - this is a passive data-only state, which represents what is the
+ * shard's knowledge of its the shard version and the set of chunks that it owns.
+ *  CollectionShardingRuntime (missing from the embedded mongod) - this is the heavyweight machinery
+ * which implements the sharding protocol functions and is what controls the data-only state.
  *
- * Synchronization rules: In order to look-up this object in the instance's sharding map, one must
- * have some lock on the respective collection.
+ * The CollectionShardingStateFactory class below is used in order to allow for the collection
+ * runtime to be instantiated separately from the sharding state.
+ *
+ * Synchronization rule: In order to obtain an instance of this object, the caller must have some
+ * lock on the respective collection.
  */
-class CollectionShardingState : public Decorable<CollectionShardingState> {
+class CollectionShardingState {
     MONGO_DISALLOW_COPYING(CollectionShardingState);
 
 public:
-    CollectionShardingState(ServiceContext* sc, NamespaceString nss);
+    virtual ~CollectionShardingState() = default;
 
     /**
      * Obtains the sharding state for the specified collection. If it does not exist, it will be
-     * created and will remain active until the collection is dropped or unsharded.
+     * created and will remain in memory until the collection is dropped.
      *
      * Must be called with some lock held on the specific collection being looked up and the
-     * returned pointer should never be stored.
+     * returned pointer must not be stored.
      */
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
 
@@ -85,36 +87,6 @@ public:
     void checkShardVersionOrThrow(OperationContext* opCtx);
 
     /**
-     * BSON output of the pending metadata into a BSONArray
-     */
-    void toBSONPending(BSONArrayBuilder& bb) const {
-        _metadataManager->toBSONPending(bb);
-    }
-
-    //
-    // Methods used by the sharding runtime only (all runtime)
-    //
-
-    /**
-     * Updates the metadata based on changes received from the config server and also resolves the
-     * pending receives map in case some of these pending receives have completed or have been
-     * abandoned.  If newMetadata is null, unshard the collection.
-     *
-     * Must always be called with an exclusive collection lock.
-     */
-    void refreshMetadata(OperationContext* opCtx, std::unique_ptr<CollectionMetadata> newMetadata);
-
-    /**
-     * Marks the collection as not sharded at stepdown time so that no filtering will occur for
-     * slaveOk queries.
-     */
-    void markNotShardedAtStepdown();
-
-    //
-    // Methods used by the sharding runtime only (donor shard)
-    //
-
-    /**
      * Methods to control the collection's critical section. Must be called with the collection X
      * lock held.
      */
@@ -130,102 +102,48 @@ public:
         return _critSec.getSignal(op);
     }
 
-    //
-    // Methods used by the sharding runtime only (recipient shard)
-    //
-
-    /**
-     * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
-     * on them, and adds the range to the list of pending ranges. Otherwise, returns a notification
-     * that yields bad status immediately.  Does not block.  Call waitStatus(opCtx) on the result
-     * to wait for the deletion to complete or fail.  After that, call waitForClean to ensure no
-     * other deletions are pending for the range.
-     */
-    using CleanupNotification = CollectionRangeDeleter::DeleteNotification;
-    CleanupNotification beginReceive(ChunkRange const& range);
-
-    /*
-     * Removes `range` from the list of pending ranges, and schedules any documents in the range for
-     * immediate cleanup. Does not block.
-     */
-    void forgetReceive(const ChunkRange& range);
-
-    /**
-     * Schedules documents in `range` for cleanup after any running queries that may depend on them
-     * have terminated. Does not block. Fails if range overlaps any current local shard chunk.
-     * Passed kDelayed, an additional delay (configured via server parameter orphanCleanupDelaySecs)
-     * is added to permit (most) dependent queries on secondaries to complete, too.
-     *
-     * Call result.waitStatus(opCtx) to wait for the deletion to complete or fail. If that succeeds,
-     * waitForClean can be called to ensure no other deletions are pending for the range. Call
-     * result.abandon(), instead of waitStatus, to ignore the outcome.
-     */
-    enum CleanWhen { kNow, kDelayed };
-    CleanupNotification cleanUpRange(ChunkRange const& range, CleanWhen when);
-
-    /**
-     * Tracks deletion of any documents within the range, returning when deletion is complete.
-     * Throws if the collection is dropped while it sleeps.
-     */
-    static Status waitForClean(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               OID const& epoch,
-                               ChunkRange orphanRange);
-
-    /**
-     * Reports whether any range still scheduled for deletion overlaps the argument range. If so,
-     * it returns a notification n such that n->get(opCtx) will wake when the newest overlapping
-     * range's deletion (possibly the one of interest) completes or fails. This should be called
-     * again after each wakeup until it returns boost::none, because there can be more than one
-     * range scheduled for deletion that overlaps its argument.
-     */
-    auto trackOrphanedDataCleanup(ChunkRange const& range) -> boost::optional<CleanupNotification>;
-
-    /**
-     * Returns a range _not_ owned by this shard that starts no lower than the specified
-     * startingFrom key value, if any, or boost::none if there is no such range.
-     */
-    boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& startingFrom);
+protected:
+    CollectionShardingState(NamespaceString nss);
 
 private:
     // Namespace this state belongs to.
     const NamespaceString _nss;
 
-    // Contains all the metadata associated with this collection.
-    std::shared_ptr<MetadataManager> _metadataManager;
-
     // Tracks the migration critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;
 
-    // for access to _metadataManager
-    friend auto CollectionRangeDeleter::cleanUpNextRange(OperationContext*,
-                                                         NamespaceString const&,
-                                                         OID const& epoch,
-                                                         int maxToDelete,
-                                                         CollectionRangeDeleter*)
-        -> boost::optional<Date_t>;
+    // Obtains the current metadata for the collection
+    virtual ScopedCollectionMetadata _getMetadata(OperationContext* opCtx) = 0;
 };
 
 /**
- * RAII-style class, which obtains a reference to the critical section for the
- * specified collection.
+ * Singleton factory to instantiate CollectionShardingState objects specific to the type of instance
+ * which is running.
  */
-class CollectionCriticalSection {
-    MONGO_DISALLOW_COPYING(CollectionCriticalSection);
+class CollectionShardingStateFactory {
+    MONGO_DISALLOW_COPYING(CollectionShardingStateFactory);
 
 public:
-    CollectionCriticalSection(OperationContext* opCtx, NamespaceString ns);
-    ~CollectionCriticalSection();
+    static void set(ServiceContext* service,
+                    std::unique_ptr<CollectionShardingStateFactory> factory);
+    static void clear(ServiceContext* service);
+
+    virtual ~CollectionShardingStateFactory() = default;
 
     /**
-     * Enters the commit phase of the critical section and blocks reads.
+     * Called by the CollectionShardingState::get method once per newly cached namespace. It is
+     * invoked under a mutex and must not acquire any locks or do blocking work.
+     *
+     * Implementations must be thread-safe when called from multiple threads.
      */
-    void enterCommitPhase();
+    virtual std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) = 0;
 
-private:
-    NamespaceString _nss;
+protected:
+    CollectionShardingStateFactory(ServiceContext* serviceContext)
+        : _serviceContext(serviceContext) {}
 
-    OperationContext* _opCtx;
+    // The service context which owns this factory
+    ServiceContext* const _serviceContext;
 };
 
 }  // namespace mongo

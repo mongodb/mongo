@@ -29,7 +29,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -143,7 +143,7 @@ using DeleteStateTest = ShardServerTestFixture;
 
 TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    auto* css = CollectionShardingState::get(operationContext(), kTestNss);
+    auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
 
     auto doc = BSON("key3"
                     << "abc"
@@ -165,7 +165,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    auto* css = CollectionShardingState::get(operationContext(), kTestNss);
+    auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
 
     // Push a CollectionMetadata with a shard key not including "_id"...
     css->refreshMetadata(operationContext(), makeAMetadata(BSON("key" << 1 << "key3" << 1)));
@@ -192,7 +192,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    auto* css = CollectionShardingState::get(operationContext(), kTestNss);
+    auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
 
     // Push a CollectionMetadata with a shard key that does have "_id" in the middle...
     css->refreshMetadata(operationContext(),
@@ -218,7 +218,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    auto* css = CollectionShardingState::get(operationContext(), kTestNss);
+    auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
 
     // Push a CollectionMetadata with a shard key "_id", hashed.
     auto aMetadata = makeAMetadata(BSON("_id"

@@ -12,6 +12,7 @@ env.Library(
     target='sharding_api_d',
     source=[
         'collection_metadata.cpp',
+        'collection_sharding_state.cpp',
         'database_sharding_state.cpp',
         'operation_sharding_state.cpp',
         'sharded_connection_info.cpp',
@@ -19,6 +20,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/range_arithmetic',
         '$BUILD_DIR/mongo/s/sharding_routing_table',
     ],
@@ -30,18 +32,22 @@ env.Library(
         'active_migrations_registry.cpp',
         'active_move_primaries_registry.cpp',
         'chunk_move_write_concern_options.cpp',
-        'periodic_balancer_config_refresher.cpp',
         'chunk_splitter.cpp',
+        'collection_range_deleter.cpp',
+        'collection_sharding_runtime.cpp',
+        'collection_sharding_state_factory_shard.cpp',
         'config_server_op_observer.cpp',
         'implicit_create_collection.cpp',
-        'migration_chunk_cloner_source.cpp',
+        'metadata_manager.cpp',
         'migration_chunk_cloner_source_legacy.cpp',
+        'migration_chunk_cloner_source.cpp',
         'migration_destination_manager.cpp',
         'migration_source_manager.cpp',
         'migration_util.cpp',
         'move_primary_source_manager.cpp',
         'move_timing_helper.cpp',
         'namespace_metadata_change_notifications.cpp',
+        'periodic_balancer_config_refresher.cpp',
         'read_only_catalog_cache_loader.cpp',
         'scoped_operation_completion_sharding_actions.cpp',
         'session_catalog_migration_destination.cpp',
@@ -65,9 +71,19 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         'chunk_splitter',
-        'sharding',
         'sharding_api_d',
         'sharding_catalog_manager',
+        'sharding',
+    ],
+)
+
+env.Library(
+    target='sharding_runtime_d_embedded',
+    source=[
+        'collection_sharding_state_factory_embedded.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_api_d',
     ],
 )
 
@@ -146,9 +162,6 @@ env.Library(
 env.Library(
     target='sharding',
     source=[
-        'collection_range_deleter.cpp',
-        'collection_sharding_state.cpp',
-        'metadata_manager.cpp',
         'sharding_egress_metadata_hook_for_mongod.cpp',
         'sharding_initialization_mongod.cpp',
         'sharding_state.cpp',

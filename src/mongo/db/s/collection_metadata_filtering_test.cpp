@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_server_test_fixture.h"
 
@@ -95,7 +95,8 @@ protected:
         ASSERT_EQ(4, cm->numChunks());
         {
             AutoGetCollection autoColl(operationContext(), kNss, MODE_X);
-            auto const css = CollectionShardingState::get(operationContext(), kNss);
+            auto* const css = CollectionShardingRuntime::get(operationContext(), kNss);
+
             css->refreshMetadata(operationContext(),
                                  std::make_unique<CollectionMetadata>(cm, ShardId("0")));
         }

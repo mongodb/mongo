@@ -38,7 +38,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/chunk_version.h"
@@ -84,7 +84,8 @@ protected:
         std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, Timestamp(100, 0));
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
-        auto const css = CollectionShardingState::get(operationContext(), kNss);
+        auto* const css = CollectionShardingRuntime::get(operationContext(), kNss);
+
         css->refreshMetadata(operationContext(),
                              stdx::make_unique<CollectionMetadata>(cm, ShardId("thisShard")));
     }
@@ -92,8 +93,9 @@ protected:
     void tearDown() override {
         {
             AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
-            auto collectionShardingState = CollectionShardingState::get(operationContext(), kNss);
-            collectionShardingState->refreshMetadata(operationContext(), nullptr);
+            auto* const css = CollectionShardingRuntime::get(operationContext(), kNss);
+
+            css->refreshMetadata(operationContext(), nullptr);
         }
 
         ShardServerTestFixture::tearDown();
