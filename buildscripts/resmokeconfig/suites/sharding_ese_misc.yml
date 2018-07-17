@@ -308,7 +308,7 @@ selector:
   - jstests/sharding/uuid_propagated_to_recipient_shard_on_recvChunkStart.js
   - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js
   - jstests/sharding/version1.js
-  - jstests/sharding/hash_skey_split.js
+  - jstests/sharding/initial_split_validate_shard_collections.js
   - jstests/sharding/stale_version_write.js
   - jstests/sharding/moveChunk_recipient_rejects_chunk_if_UUID_mismatch.js
   - jstests/sharding/missing_key.js

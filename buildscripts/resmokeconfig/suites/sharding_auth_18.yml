@@ -22,7 +22,7 @@ selector:
   - jstests/sharding/missing_key.js
   - jstests/sharding/database_versioning_safe_secondary_reads.js
   - jstests/sharding/split_large_key.js
-  - jstests/sharding/hash_skey_split.js
+  - jstests/sharding/initial_split_validate_shard_collections.js
   - jstests/sharding/replication_with_undefined_shard_key.js
   - jstests/sharding/keys_rotation_interval_sec.js
   - jstests/sharding/listshards.js
