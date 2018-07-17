@@ -325,7 +325,12 @@ public:
         return;
     }
 
-    boost::optional<Timestamp> getLastStableCheckpointTimestamp(
+    boost::optional<Timestamp> getLastStableRecoveryTimestamp(
+        ServiceContext* serviceCtx) const override {
+        return boost::none;
+    }
+
+    boost::optional<Timestamp> getLastStableCheckpointTimestampDeprecated(
         ServiceContext* serviceCtx) const override {
         return boost::none;
     }

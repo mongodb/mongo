@@ -316,9 +316,9 @@ public:
     }
 
     /**
-     * See `StorageEngine::getLastStableCheckpointTimestamp`
+     * See `StorageEngine::getLastStableRecoveryTimestamp`
      */
-    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const {
+    virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const {
         MONGO_UNREACHABLE;
     }
 

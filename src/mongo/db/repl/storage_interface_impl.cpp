@@ -1138,18 +1138,30 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
         oplog.getCollection()->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
 }
 
-boost::optional<Timestamp> StorageInterfaceImpl::getLastStableCheckpointTimestamp(
+boost::optional<Timestamp> StorageInterfaceImpl::getLastStableRecoveryTimestamp(
     ServiceContext* serviceCtx) const {
     if (!supportsRecoverToStableTimestamp(serviceCtx)) {
         return boost::none;
     }
 
-    const auto ret = serviceCtx->getStorageEngine()->getLastStableCheckpointTimestamp();
+    const auto ret = serviceCtx->getStorageEngine()->getLastStableRecoveryTimestamp();
     if (ret == boost::none) {
         return Timestamp::min();
     }
 
     return ret;
+}
+
+boost::optional<Timestamp> StorageInterfaceImpl::getLastStableCheckpointTimestampDeprecated(
+    ServiceContext* serviceCtx) const {
+    if (serviceCtx->getStorageEngine()->isEphemeral()) {
+        return boost::none;
+    }
+
+    // A persisted storage engine will set its recovery timestamp to its last stable checkpoint.
+    // (Reporting last stable checkpoint in replication will be removed in v4.4 (SERVER-36194). The
+    // storage layer has already removed the direct API support.)
+    return getLastStableRecoveryTimestamp(serviceCtx);
 }
 
 bool StorageInterfaceImpl::supportsDocLocking(ServiceContext* serviceCtx) const {

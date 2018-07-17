@@ -560,8 +560,8 @@ boost::optional<Timestamp> KVStorageEngine::getRecoveryTimestamp() const {
     return _engine->getRecoveryTimestamp();
 }
 
-boost::optional<Timestamp> KVStorageEngine::getLastStableCheckpointTimestamp() const {
-    return _engine->getLastStableCheckpointTimestamp();
+boost::optional<Timestamp> KVStorageEngine::getLastStableRecoveryTimestamp() const {
+    return _engine->getLastStableRecoveryTimestamp();
 }
 
 bool KVStorageEngine::supportsReadConcernSnapshot() const {

@@ -267,19 +267,19 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             client = secondary.mongo_client()
             minvalid_doc = client.local["replset.minvalid"].find_one()
             oplog_truncate_after_doc = client.local["replset.oplogTruncateAfterPoint"].find_one()
-            checkpoint_timestamp_res = client.admin.command("replSetTest",
-                                                            getLastStableCheckpointTimestamp=True)
+            recovery_timestamp_res = client.admin.command("replSetTest",
+                                                          getLastStableRecoveryTimestamp=True)
             latest_oplog_doc = client.local["oplog.rs"].find_one(sort=[("$natural",
                                                                         pymongo.DESCENDING)])
 
             self.logger.info("Checking invariants: minValid: {}, oplogTruncateAfterPoint: {},"
-                             " stable checkpoint timestamp: {}, latest oplog doc: {}".format(
-                                 minvalid_doc, oplog_truncate_after_doc, checkpoint_timestamp_res,
+                             " stable recovery timestamp: {}, latest oplog doc: {}".format(
+                                 minvalid_doc, oplog_truncate_after_doc, recovery_timestamp_res,
                                  latest_oplog_doc))
 
             null_ts = bson.Timestamp(0, 0)
 
-            # We wait for a stable checkpoint at setup, so we must have an oplog.
+            # We wait for a stable recovery timestamp at setup, so we must have an oplog.
             latest_oplog_entry_ts = null_ts
             if latest_oplog_doc is None:
                 raise errors.ServerFailure("No latest oplog entry")
@@ -295,57 +295,61 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                 oplog_truncate_after_ts = oplog_truncate_after_doc.get(
                     "oplogTruncateAfterPoint", null_ts)
 
-            # The "lastStableCheckpointTimestamp" field is present if the storage engine supports
-            # "recover to a timestamp". If it's a null timestamp that means that we do not have a
-            # stable checkpoint yet and are restarting at the top of the oplog. Since we wait for
-            # a stable checkpoint at test fixture setup, we should never see a null timestamp here.
-            checkpoint_timestamp = checkpoint_timestamp_res.get("lastStableCheckpointTimestamp")
-            if checkpoint_timestamp == null_ts:
+            # The "lastStableRecoveryTimestamp" field is present if the storage engine supports
+            # "recover to a timestamp". If it's a null timestamp on a durable storage engine, that
+            # means we do not yet have a stable checkpoint timestamp and must be restarting at the
+            # top of the oplog. Since we wait for a stable recovery timestamp at test fixture setup,
+            # we should never encounter a null timestamp here.
+            recovery_timestamp = recovery_timestamp_res.get("lastStableRecoveryTimestamp")
+            if recovery_timestamp == null_ts:
                 raise errors.ServerFailure(
-                    "Received null stable checkpoint timestamp {}".format(checkpoint_timestamp_res))
+                    "Received null stable recovery timestamp {}".format(recovery_timestamp_res))
             # On a storage engine that doesn't support "recover to a timestamp", we default to null.
-            if checkpoint_timestamp is None:
-                checkpoint_timestamp = null_ts
+            if recovery_timestamp is None:
+                recovery_timestamp = null_ts
 
-            # last stable checkpoint timestamp <= top of oplog
-            if not checkpoint_timestamp <= latest_oplog_entry_ts:
-                raise errors.ServerFailure("The condition last stable checkpoint timestamp <= top"
+            # last stable recovery timestamp <= top of oplog
+            if not recovery_timestamp <= latest_oplog_entry_ts:
+                raise errors.ServerFailure("The condition last stable recovery timestamp <= top"
                                            " of oplog ({} <= {}) doesn't hold:"
-                                           " getLastStableCheckpointTimestamp result={},"
+                                           " getLastStableRecoveryTimestamp result={},"
                                            " latest oplog entry={}".format(
-                                               checkpoint_timestamp, latest_oplog_entry_ts,
-                                               checkpoint_timestamp_res, latest_oplog_doc))
+                                               recovery_timestamp, latest_oplog_entry_ts,
+                                               recovery_timestamp_res, latest_oplog_doc))
 
             if minvalid_doc is not None:
                 applied_through_ts = minvalid_doc.get("begin", {}).get("ts", null_ts)
                 minvalid_ts = minvalid_doc.get("ts", null_ts)
 
-                # The "appliedThrough" value should always equal the "last stable checkpoint
-                # timestamp".  The writes to "appliedThrough" are given the timestamp of the end of
-                # the batch, and batch boundaries are the only valid timestamps in which we could
-                # take checkpoints, so if you see a non-null applied through in a stable checkpoint
-                # it must be at the same timestamp as the checkpoint.
-                if (checkpoint_timestamp != null_ts and applied_through_ts != null_ts
-                        and (not checkpoint_timestamp == applied_through_ts)):
+                # The "appliedThrough" value should always equal the "last stable recovery
+                # timestamp", AKA the stable checkpoint for durable engines, on server restart.
+                #
+                # The written "appliedThrough" time is updated with the latest timestamp at the end
+                # of each batch application, and batch boundaries are the only valid stable
+                # timestamps on secondaries. Therefore, a non-null appliedThrough timestamp must
+                # equal the checkpoint timestamp, because any stable timestamp that the checkpoint
+                # could use includes an equal persisted appliedThrough timestamp.
+                if (recovery_timestamp != null_ts and applied_through_ts != null_ts
+                        and (not recovery_timestamp == applied_through_ts)):
                     raise errors.ServerFailure(
-                        "The condition last stable checkpoint timestamp ({}) == appliedThrough ({})"
+                        "The condition last stable recovery timestamp ({}) == appliedThrough ({})"
                         " doesn't hold: minValid document={},"
-                        " getLastStableCheckpointTimestamp result={}, last oplog entry={}".format(
-                            checkpoint_timestamp, applied_through_ts, minvalid_doc,
-                            checkpoint_timestamp_res, latest_oplog_doc))
+                        " getLastStableRecoveryTimestamp result={}, last oplog entry={}".format(
+                            recovery_timestamp, applied_through_ts, minvalid_doc,
+                            recovery_timestamp_res, latest_oplog_doc))
 
                 if applied_through_ts == null_ts:
                     # We clear "appliedThrough" to represent having applied through the top of the
                     # oplog in PRIMARY state or immediately after "rollback via refetch".
                     # If we are using a storage engine that supports "recover to a timestamp,"
-                    # then we will have a "last stable checkpoint timestamp" and we should use that
+                    # then we will have a "last stable recovery timestamp" and we should use that
                     # as our "appliedThrough" (similarly to why we assert their equality above).
                     # If both are null, then we are in PRIMARY state on a storage engine that does
                     # not support "recover to a timestamp" or in RECOVERING immediately after
                     # "rollback via refetch". Since we do not update "minValid" in PRIMARY state,
                     # we leave "appliedThrough" as null so that the invariants below hold, rather
                     # than substituting the latest oplog entry for the "appliedThrough" value.
-                    applied_through_ts = checkpoint_timestamp
+                    applied_through_ts = recovery_timestamp
 
                 if minvalid_ts == null_ts:
                     # The server treats the "ts" field in the minValid document as missing when its
@@ -410,11 +414,11 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
-                " the last stable checkpoint timestamp, or the latest oplog entry from the"
+                " the last stable recovery timestamp, or the latest oplog entry from the"
                 " mongod on port %d", secondary.port)
             raise errors.ServerFailure(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
-                " the last stable checkpoint timestamp, or the latest oplog entry from the"
+                " the last stable recovery timestamp, or the latest oplog entry from the"
                 " mongod on port {}: {}".format(secondary.port, err.args[0]))
         finally:
             # Set the secondary's options back to their original values.

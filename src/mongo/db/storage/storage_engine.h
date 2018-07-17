@@ -349,12 +349,16 @@ public:
     }
 
     /**
-     * Returns a timestamp that is guaranteed to be persisted to disk in a checkpoint. Returns
-     * boost::none if there is no stable checkpoint. This method should return at least the value of
-     * `getRecoveryTimestamp` if the node started from a stable checkpoint. fasserts if
-     * StorageEngine::supportsRecoverToStableTimestamp() would return false.
+     * Returns a timestamp that is guaranteed to exist on storage engine recovery to a stable
+     * timestamp. This indicates when the storage engine can safely rollback to stable; and for
+     * durable engines, it is also the guaranteed minimum stable recovery point on server restart
+     * after crash or shutdown.
+     *
+     * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return false. Returns
+     * boost::none if the recovery time has not yet been established. Replication recoverable
+     * rollback may not succeed before establishment, and restart will require resync.
      */
-    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const {
+    virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const {
         MONGO_UNREACHABLE;
     }
 

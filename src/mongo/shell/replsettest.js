@@ -923,8 +923,9 @@ var ReplSetTest = function(opts) {
      * aren't authorized to run replSetGetStatus.
      * TODO(SERVER-14017): remove this in favor of using initiate() everywhere.
      */
-    this.initiateWithAnyNodeAsPrimary = function(
-        cfg, initCmd, {doNotWaitForStableCheckpoint: doNotWaitForStableCheckpoint = false} = {}) {
+    this.initiateWithAnyNodeAsPrimary = function(cfg, initCmd, {
+        doNotWaitForStableRecoveryTimestamp: doNotWaitForStableRecoveryTimestamp = false
+    } = {}) {
         var master = this.nodes[0].getDB("admin");
         var config = cfg || this.getReplSetConfig();
         var cmd = {};
@@ -1085,8 +1086,8 @@ var ReplSetTest = function(opts) {
             });
         }
 
-        if (!doNotWaitForStableCheckpoint) {
-            self.awaitLastStableCheckpointTimestamp();
+        if (!doNotWaitForStableRecoveryTimestamp) {
+            self.awaitLastStableRecoveryTimestamp();
         }
     };
 
@@ -1224,14 +1225,16 @@ var ReplSetTest = function(opts) {
     };
 
     /**
-     * This function waits for all nodes in this replica set to take a stable checkpoint. In order
-     * to be able to roll back a node must have a stable timestamp. In order to be able to restart
-     * and not go into resync right after initial sync, a node must have a stable checkpoint. By
-     * waiting for all nodes to report having a stable checkpoint, we ensure that both of these
-     * conditions are met and that our tests can run as expected. Beyond simply waiting, this
-     * function does writes to ensure that a stable checkpoint will be taken.
+     * This function performs some writes and then waits for all nodes in this replica set to
+     * establish a stable recovery timestamp. The writes are necessary to prompt storage engines to
+     * quickly establish stable recovery timestamps.
+     *
+     * A stable recovery timestamp ensures recoverable rollback is possible, as well as startup
+     * recovery without re-initial syncing in the case of durable storage engines. By waiting for
+     * all nodes to report having a stable recovery timestamp, we ensure a degree of stability in
+     * our tests to run as expected.
      */
-    this.awaitLastStableCheckpointTimestamp = function() {
+    this.awaitLastStableRecoveryTimestamp = function() {
         let rst = this;
         let master = rst.getPrimary();
         let id = tojson(rst.nodeList());
@@ -1243,7 +1246,7 @@ var ReplSetTest = function(opts) {
         //
         // 2) Perform a second write. This will guarantee that all nodes will update their commit
         //    point to a time that is >= the previous write. That will trigger a stable checkpoint
-        //    on all nodes.
+        //    on all persisted storage engine nodes.
         // TODO(SERVER-33248): Remove this block. We should not need to prod the replica set to
         // advance the commit point if the commit point being lagged is sufficient to choose a
         // sync source.
@@ -1253,11 +1256,11 @@ var ReplSetTest = function(opts) {
             const appendOplogNoteFn = function() {
                 assert.commandWorked(db.adminCommand({
                     "appendOplogNote": 1,
-                    "data": {"awaitLastStableCheckpointTimestamp": 1},
+                    "data": {"awaitLastStableRecoveryTimestamp": 1},
                     "writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}
                 }));
                 assert.commandWorked(db.adminCommand(
-                    {"appendOplogNote": 1, "data": {"awaitLastStableCheckpointTimestamp": 2}}));
+                    {"appendOplogNote": 1, "data": {"awaitLastStableRecoveryTimestamp": 2}}));
             };
 
             // TODO(SERVER-14017): Remove this extra sub-shell in favor of a cleaner authentication
@@ -1265,7 +1268,7 @@ var ReplSetTest = function(opts) {
             const masterId = "n" + rst.getNodeId(master);
             const masterOptions = rst.nodeOptions[masterId] || {};
             if (masterOptions.clusterAuthMode === "x509") {
-                print("AwaitLastStableCheckpointTimestamp: authenticating on separate shell " +
+                print("AwaitLastStableRecoveryTimestamp: authenticating on separate shell " +
                       "with x509 for " + id);
                 const subShellArgs = [
                     'mongo',
@@ -1284,14 +1287,14 @@ var ReplSetTest = function(opts) {
                 assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
             } else {
                 if (masterOptions.clusterAuthMode) {
-                    print("AwaitLastStableCheckpointTimestamp: authenticating with " +
+                    print("AwaitLastStableRecoveryTimestamp: authenticating with " +
                           masterOptions.clusterAuthMode + " for " + id);
                 }
                 asCluster(master, appendOplogNoteFn, masterOptions.keyFile);
             }
         }
 
-        print("AwaitLastStableCheckpointTimestamp: Beginning for " + id);
+        print("AwaitLastStableRecoveryTimestamp: Beginning for " + id);
 
         let replSetStatus = assert.commandWorked(master.adminCommand("replSetGetStatus"));
         if (replSetStatus["configsvr"]) {
@@ -1303,17 +1306,15 @@ var ReplSetTest = function(opts) {
         rst.awaitNodesAgreeOnPrimary();
         master = rst.getPrimary();
 
-        print("AwaitLastStableCheckpointTimestamp: ensuring the commit point advances for " + id);
+        print("AwaitLastStableRecoveryTimestamp: ensuring the commit point advances for " + id);
         advanceCommitPoint(master);
 
-        print("AwaitLastStableCheckpointTimestamp: Waiting for stable checkpoints for " + id);
+        print("AwaitLastStableRecoveryTimestamp: Waiting for stable recovery timestamps for " + id);
 
         assert.soonNoExcept(function() {
             for (let node of rst.nodes) {
-                // The `lastStableCheckpointTimestamp` field contains the timestamp of a previous
-                // checkpoint taken at a stable timestamp. At startup recovery, this field
-                // contains the timestamp reflected in the data. After startup recovery, it may
-                // be lagged and there may be a stable checkpoint at a newer timestamp.
+                // The `lastStableRecoveryTimestamp` field contains a stable timestamp guaranteed to
+                // exist on storage engine recovery to stable timestamp.
                 let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
 
                 // Continue if we're connected to an arbiter.
@@ -1321,25 +1322,35 @@ var ReplSetTest = function(opts) {
                     continue;
                 }
 
-                // A missing `lastStableCheckpointTimestamp` field indicates that the storage
+                // A missing `lastStableRecoveryTimestamp` field indicates that the storage
                 // engine does not support `recover to a stable timestamp`.
-                if (!res.hasOwnProperty("lastStableCheckpointTimestamp")) {
-                    continue;
+                //
+                // A null `lastStableRecoveryTimestamp` indicates that the storage engine supports
+                // "recover to a stable timestamp", but does not have a stable recovery timestamp
+                // yet.
+                if (res.hasOwnProperty("lastStableRecoveryTimestamp") &&
+                    res.lastStableRecoveryTimestamp.getTime() === 0) {
+                    print("AwaitLastStableRecoveryTimestamp: " + node.host +
+                          " does not have a stable recovery timestamp yet.");
+                    return false;
                 }
 
-                // A null `lastStableCheckpointTimestamp` indicates that the storage engine supports
-                // "recover to a stable timestamp" but does not have a stable checkpoint yet.
-                if (res.lastStableCheckpointTimestamp.getTime() === 0) {
-                    print("AwaitLastStableCheckpointTimestamp: " + node.host +
-                          " does not have a stable checkpoint yet.");
+                // The `lastStableCheckpointTimestamp` field was added in v4.0, then deprecated and
+                // replaced in v4.2 with `lastStableRecoveryTimestamp`. So we check it, too, for
+                // backwards compatibility with v4.0 mongods.
+                if (res.hasOwnProperty("lastStableCheckpointTimestamp") &&
+                    res.lastStableCheckpointTimestamp.getTime() === 0) {
+                    print("AwaitLastStableRecoveryTimestamp: " + node.host +
+                          " does not have a stable recovery (checkpoint) timestamp yet.");
                     return false;
                 }
             }
 
             return true;
-        }, "Not all members have a stable checkpoint");
+        }, "Not all members have a stable recovery timestamp");
 
-        print("AwaitLastStableCheckpointTimestamp: Successfully took stable checkpoints on " + id);
+        print("AwaitLastStableRecoveryTimestamp: A stable recovery timestamp has successfully " +
+              "established on " + id);
     };
 
     // Wait until the optime of the specified type reaches the primary's last applied optime. Blocks

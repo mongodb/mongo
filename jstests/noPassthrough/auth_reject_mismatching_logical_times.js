@@ -46,8 +46,9 @@
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
 
-    // TODO: Wait for stable checkpoint when SERVER-32672 is fixed.
-    rst.initiateWithAnyNodeAsPrimary(null, "replSetInitiate", {doNotWaitForStableCheckpoint: true});
+    // TODO: Wait for stable recovery timestamp when SERVER-32672 is fixed.
+    rst.initiateWithAnyNodeAsPrimary(
+        null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
     assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
 
     const testDB = st.s.getDB("test");

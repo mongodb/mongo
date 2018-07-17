@@ -182,7 +182,10 @@ public:
                               const Timestamp& ts,
                               bool orderedCommit) override;
 
-    boost::optional<Timestamp> getLastStableCheckpointTimestamp(
+    boost::optional<Timestamp> getLastStableRecoveryTimestamp(
+        ServiceContext* serviceCtx) const override;
+
+    boost::optional<Timestamp> getLastStableCheckpointTimestampDeprecated(
         ServiceContext* serviceCtx) const override;
 
 private:

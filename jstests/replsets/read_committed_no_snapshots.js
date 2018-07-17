@@ -32,9 +32,9 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
         return;
     }
 
-    // Cannot wait for a stable checkpoint due to the no-snapshot secondary.
+    // Cannot wait for a stable recovery timestamp due to the no-snapshot secondary.
     replTest.initiateWithAnyNodeAsPrimary(
-        null, "replSetInitiate", {doNotWaitForStableCheckpoint: true});
+        null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
     // Get connections and collection.
     var primary = replTest.getPrimary();

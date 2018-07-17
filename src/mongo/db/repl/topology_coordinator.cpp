@@ -1378,8 +1378,10 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const OpTime lastOpApplied = getMyLastAppliedOpTime();
     const OpTime lastOpDurable = getMyLastDurableOpTime();
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
-    const boost::optional<Timestamp>& lastStableCheckpointTimestamp =
-        rsStatusArgs.lastStableCheckpointTimestamp;
+    const boost::optional<Timestamp>& lastStableRecoveryTimestamp =
+        rsStatusArgs.lastStableRecoveryTimestamp;
+    const boost::optional<Timestamp>& lastStableCheckpointTimestampDeprecated =
+        rsStatusArgs.lastStableCheckpointTimestampDeprecated;
 
     if (_selfIndex == -1) {
         // We're REMOVED or have an invalid config
@@ -1555,9 +1557,13 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     appendOpTime(&optimes, "appliedOpTime", lastOpApplied, _rsConfig.getProtocolVersion());
     appendOpTime(&optimes, "durableOpTime", lastOpDurable, _rsConfig.getProtocolVersion());
     response->append("optimes", optimes.obj());
-    if (lastStableCheckpointTimestamp) {
-        // Make sure to omit if the storage engine does not support recovering to a timestamp.
-        response->append("lastStableCheckpointTimestamp", *lastStableCheckpointTimestamp);
+    if (lastStableRecoveryTimestamp) {
+        // Only include this field if the storage engine supports RTT.
+        response->append("lastStableRecoveryTimestamp", *lastStableRecoveryTimestamp);
+    }
+    if (lastStableCheckpointTimestampDeprecated) {
+        // Only include this field if the storage engine supports RTT and persists data.
+        response->append("lastStableCheckpointTimestamp", *lastStableCheckpointTimestampDeprecated);
     }
 
     if (!initialSyncStatus.isEmpty()) {

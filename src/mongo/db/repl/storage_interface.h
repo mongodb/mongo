@@ -410,11 +410,28 @@ public:
                                       bool orderedCommit) = 0;
 
     /**
+     * Returns a timestamp that is guaranteed to exist on storage engine recovery to a stable
+     * timestamp. This indicates when the storage engine can safely rollback to stable; and for
+     * durable engines, it is also the guaranteed minimum stable recovery point on server restart
+     * after crash or shutdown.
+     *
+     * Returns `Timestamp::min()` if no stable recovery timestamp has yet been established.
+     * Replication recoverable rollback may not succeed before establishment, and restart will
+     * require resync. Returns boost::none if `supportsRecoverToStableTimestamp` returns false.
+     */
+    virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp(
+        ServiceContext* serviceCtx) const = 0;
+
+    /**
+     * DEPRECATED. Use getLastStableRecoveryTimestamp instead!
+     *
      * Returns a timestamp that is guaranteed to be persisted on disk in a checkpoint. Returns
      * `Timestamp::min()` if no stable checkpoint has been taken. Returns boost::none if
-     * `supportsRecoverToStableTimestamp` returns false.
+     * `supportsRecoverToStableTimestamp` returns false or if this is not a persisted data engine.
+     *
+     * TODO: delete this in v4.4 (SERVER-36194).
      */
-    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp(
+    virtual boost::optional<Timestamp> getLastStableCheckpointTimestampDeprecated(
         ServiceContext* serviceCtx) const = 0;
 };
 

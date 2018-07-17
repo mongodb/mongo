@@ -218,10 +218,10 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self._await_cmd_all_nodes(check_rcmaj_optime, "waiting for last committed optime")
 
     def await_ready(self):
-        """Wait for replica set tpo be ready."""
+        """Wait for replica set to be ready."""
         self._await_primary()
         self._await_secondaries()
-        self._await_stable_checkpoint()
+        self._await_stable_recovery_timestamp()
 
     def _await_primary(self):
         # Wait for the primary to be elected.
@@ -266,7 +266,20 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         return client
 
-    def _await_stable_checkpoint(self):
+    def _await_stable_recovery_timestamp(self):
+        """
+        Awaits stable recovery timestamps on all nodes in the replica set.
+
+        Performs some writes and then waits for all nodes in this replica set to establish a stable
+        recovery timestamp. The writes are necessary to prompt storage engines to quickly establish
+        stable recovery timestamps.
+
+        A stable recovery timestamp ensures recoverable rollback is possible, as well as startup
+        recovery without re-initial syncing in the case of durable storage engines. By waiting for
+        all nodes to report having a stable recovery timestamp, we ensure a degree of stability in
+        our tests to run as expected.
+        """
+
         # Since this method is called at startup we expect the first node to be primary even when
         # self.all_nodes_electable is True.
         primary_client = self.nodes[0].mongo_client()
@@ -279,17 +292,18 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         #
         # 2) Perform a second write. This will guarantee that all nodes will update their commit
         #    point to a time that is >= the previous write. That will trigger a stable checkpoint
-        #    on all nodes.
+        #    on all persisted storage engine nodes.
         # TODO(SERVER-33248): Remove this block. We should not need to prod the replica set to
         # advance the commit point if the commit point being lagged is sufficient to choose a
         # sync source.
         admin = primary_client.get_database(
             "admin", write_concern=pymongo.write_concern.WriteConcern(w="majority"))
-        admin.command("appendOplogNote", data={"await_stable_checkpoint": 1})
-        admin.command("appendOplogNote", data={"await_stable_checkpoint": 2})
+        admin.command("appendOplogNote", data={"await_stable_recovery_timestamp": 1})
+        admin.command("appendOplogNote", data={"await_stable_recovery_timestamp": 2})
 
         for node in self.nodes:
-            self.logger.info("Waiting for node on port %d to have a stable checkpoint.", node.port)
+            self.logger.info("Waiting for node on port %d to have a stable recovery timestamp.",
+                             node.port)
             client = node.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
             self.auth(client, self.auth_options)
 
@@ -297,22 +311,21 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
             while True:
                 status = client_admin.command("replSetGetStatus")
-                # The `lastStableCheckpointTimestamp` field contains the timestamp of a previous
-                # checkpoint taken at a stable timestamp. At startup recovery, this field
-                # contains the timestamp reflected in the data. After startup recovery, it may
-                # be lagged and there may be a stable checkpoint at a newer timestamp.
-                last_stable = status.get("lastStableCheckpointTimestamp", None)
+                # The `lastStableRecoveryTimestamp` field contains a stable timestamp guaranteed to
+                # exist on storage engine recovery to a stable timestamp.
+                last_stable_recovery_timestamp = status.get("lastStableRecoveryTimestamp", None)
 
-                # A missing `lastStableCheckpointTimestamp` field indicates that the storage
+                # A missing `lastStableRecoveryTimestamp` field indicates that the storage
                 # engine does not support "recover to a stable timestamp".
-                if not last_stable:
+                if not last_stable_recovery_timestamp:
                     break
 
-                # A null `lastStableCheckpointTimestamp` indicates that the storage engine supports
-                # "recover to a stable timestamp" but does not have a stable checkpoint yet.
-                if last_stable.time:
-                    self.logger.info("Node on port %d now has a stable checkpoint. Time: %s",
-                                     node.port, last_stable)
+                # A null `lastStableRecoveryTimestamp` indicates that the storage engine supports
+                # "recover to a stable timestamp" but does not have a stable recovery timestamp yet.
+                if last_stable_recovery_timestamp.time:
+                    self.logger.info(
+                        "Node on port %d now has a stable timestamp for recovery. Time: %s",
+                        node.port, last_stable_recovery_timestamp)
                     break
                 time.sleep(0.1)  # Wait a little bit before trying again.
 

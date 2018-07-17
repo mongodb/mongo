@@ -134,12 +134,12 @@ public:
 
             uassertStatusOK(status);
             return true;
-        } else if (cmdObj.hasElement("getLastStableCheckpointTimestamp")) {
+        } else if (cmdObj.hasElement("getLastStableRecoveryTimestamp")) {
             boost::optional<Timestamp> ts =
                 StorageInterface::get(getGlobalServiceContext())
-                    ->getLastStableCheckpointTimestamp(getGlobalServiceContext());
+                    ->getLastStableRecoveryTimestamp(getGlobalServiceContext());
             if (ts) {
-                result.append("lastStableCheckpointTimestamp", ts.get());
+                result.append("lastStableRecoveryTimestamp", ts.get());
             }
             return true;
         }

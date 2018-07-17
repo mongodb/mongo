@@ -38,9 +38,10 @@ load("jstests/libs/analyze_plan.js");
             }
         });
         replTest.startSet();
-        // Cannot wait for a stable checkpoint with 'testingSnapshotBehaviorInIsolation' set.
+        // Cannot wait for a stable recovery timestamp with 'testingSnapshotBehaviorInIsolation'
+        // set.
         replTest.initiateWithAnyNodeAsPrimary(
-            null, "replSetInitiate", {doNotWaitForStableCheckpoint: true});
+            null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
         const session =
             replTest.getPrimary().getDB("test").getMongo().startSession({causalConsistency: false});

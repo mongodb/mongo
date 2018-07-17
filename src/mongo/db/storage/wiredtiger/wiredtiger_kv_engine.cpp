@@ -1385,7 +1385,7 @@ boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {
     return _recoveryTimestamp;
 }
 
-boost::optional<Timestamp> WiredTigerKVEngine::getLastStableCheckpointTimestamp() const {
+boost::optional<Timestamp> WiredTigerKVEngine::getLastStableRecoveryTimestamp() const {
     if (!supportsRecoverToStableTimestamp()) {
         severe() << "WiredTiger is configured to not support recover to a stable timestamp";
         fassertFailed(50770);

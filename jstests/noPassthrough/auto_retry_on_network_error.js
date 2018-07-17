@@ -44,8 +44,9 @@
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
 
-    // awaitLastStableCheckpointTimestamp runs an 'appendOplogNote' command which is not retryable.
-    rst.initiateWithAnyNodeAsPrimary(null, "replSetInitiate", {doNotWaitForStableCheckpoint: true});
+    // awaitLastStableRecoveryTimestamp runs an 'appendOplogNote' command which is not retryable.
+    rst.initiateWithAnyNodeAsPrimary(
+        null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
     const dbName = "test";
     const collName = "auto_retry";

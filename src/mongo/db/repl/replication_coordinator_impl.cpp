@@ -2020,7 +2020,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             static_cast<unsigned>(time(0) - serverGlobalParams.started),
             _getCurrentCommittedSnapshotOpTime_inlock(),
             initialSyncProgress,
-            _storage->getLastStableCheckpointTimestamp(_service)},
+            _storage->getLastStableCheckpointTimestampDeprecated(_service),
+            _storage->getLastStableRecoveryTimestamp(_service)},
         response,
         &result);
     return result;

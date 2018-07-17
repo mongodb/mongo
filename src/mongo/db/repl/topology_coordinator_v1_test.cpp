@@ -1584,7 +1584,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     OpTime oplogDurable(Timestamp(3, 4), 1);
     OpTime lastCommittedOpTime(Timestamp(2, 3), 6);
     OpTime readConcernMajorityOpTime(Timestamp(4, 5), 7);
-    Timestamp lastStableCheckpointTimestamp(9, 9);
+    Timestamp lastStableRecoveryTimestamp(9, 9);
+    Timestamp lastStableCheckpointTimestampDeprecated(9, 9);
     BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
     std::string setName = "mySet";
 
@@ -1642,7 +1643,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
             static_cast<unsigned>(durationCount<Seconds>(uptimeSecs)),
             readConcernMajorityOpTime,
             initialSyncStatus,
-            lastStableCheckpointTimestamp},
+            lastStableCheckpointTimestampDeprecated,
+            lastStableRecoveryTimestamp},
         &statusBuilder,
         &resultStatus);
     ASSERT_OK(resultStatus);
@@ -1652,7 +1654,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // Test results for all non-self members
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_EQUALS(curTime.asInt64(), rsStatus["date"].Date().asInt64());
-    ASSERT_EQUALS(lastStableCheckpointTimestamp,
+    ASSERT_EQUALS(lastStableRecoveryTimestamp, rsStatus["lastStableRecoveryTimestamp"].timestamp());
+    ASSERT_EQUALS(lastStableCheckpointTimestampDeprecated,
                   rsStatus["lastStableCheckpointTimestamp"].timestamp());
     ASSERT_FALSE(rsStatus.hasField("electionTime"));
     ASSERT_FALSE(rsStatus.hasField("pingMs"));
@@ -1684,6 +1687,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
                   member0Status["optimeDate"].Date());
     ASSERT_EQUALS(timeoutTime, member0Status["lastHeartbeat"].date());
     ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].date());
+    ASSERT_FALSE(member0Status.hasField("lastStableRecoveryTimestamp"));
     ASSERT_FALSE(member0Status.hasField("lastStableCheckpointTimestamp"));
     ASSERT_FALSE(member0Status.hasField("electionTime"));
     ASSERT_TRUE(member0Status.hasField("pingMs"));
@@ -1703,6 +1707,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(heartbeatTime, member1Status["lastHeartbeat"].date());
     ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].date());
     ASSERT_EQUALS("READY", member1Status["lastHeartbeatMessage"].str());
+    ASSERT_FALSE(member1Status.hasField("lastStableRecoveryTimestamp"));
     ASSERT_FALSE(member1Status.hasField("lastStableCheckpointTimestamp"));
     ASSERT_FALSE(member1Status.hasField("electionTime"));
     ASSERT_TRUE(member1Status.hasField("pingMs"));
@@ -1718,6 +1723,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_TRUE(member2Status.hasField("optimeDate"));
     ASSERT_FALSE(member2Status.hasField("lastHearbeat"));
     ASSERT_FALSE(member2Status.hasField("lastHearbeatRecv"));
+    ASSERT_FALSE(member2Status.hasField("lastStableRecoveryTimestamp"));
     ASSERT_FALSE(member2Status.hasField("lastStableCheckpointTimestamp"));
     ASSERT_FALSE(member2Status.hasField("electionTime"));
     ASSERT_TRUE(member2Status.hasField("pingMs"));
@@ -1736,6 +1742,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_TRUE(selfStatus.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   selfStatus["optimeDate"].Date());
+    ASSERT_FALSE(selfStatus.hasField("lastStableRecoveryTimestamp"));
     ASSERT_FALSE(selfStatus.hasField("lastStableCheckpointTimestamp"));
     ASSERT_EQUALS(electionTime, selfStatus["electionTime"].timestamp());
     ASSERT_FALSE(selfStatus.hasField("pingMs"));
@@ -1743,7 +1750,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(2000, rsStatus["heartbeatIntervalMillis"].numberInt());
     ASSERT_BSONOBJ_EQ(initialSyncStatus, rsStatus["initialSyncStatus"].Obj());
 
-    // Test no lastStableCheckpointTimestamp field.
+    // Test no lastStableRecoveryTimestamp field.
     BSONObjBuilder statusBuilder2;
     getTopoCoord().prepareStatusResponse(
         TopologyCoordinator::ReplSetStatusArgs{
@@ -1757,6 +1764,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     rsStatus = statusBuilder2.obj();
     unittest::log() << rsStatus;
     ASSERT_EQUALS(setName, rsStatus["set"].String());
+    ASSERT_FALSE(rsStatus.hasField("lastStableRecoveryTimestamp"));
     ASSERT_FALSE(rsStatus.hasField("lastStableCheckpointTimestamp"));
 }
 

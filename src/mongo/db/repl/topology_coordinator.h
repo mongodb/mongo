@@ -316,9 +316,18 @@ public:
         const OpTime& readConcernMajorityOpTime;
         const BSONObj& initialSyncStatus;
 
-        // boost::none if the storage engine does not support recovering to a
-        // timestamp. Timestamp::min() if a stable checkpoint is yet to be taken.
-        const boost::optional<Timestamp> lastStableCheckpointTimestamp;
+        // boost::none if the storage engine does not support RTT, or if it does but does not
+        // persist data to necessitate taking checkpoints. Timestamp::min() if a checkpoint is yet
+        // to be taken.
+        const boost::optional<Timestamp> lastStableCheckpointTimestampDeprecated;
+
+        // boost::none if the storage engine does not support recovery to a timestamp.
+        // Timestamp::min() if a stable recovery timestamp is yet to be taken.
+        //
+        // On the replication layer, a non-min() timestamp ensures recoverable rollback is possible,
+        // as well as startup recovery without re-initial syncing in the case of durable storage
+        // engines.
+        const boost::optional<Timestamp> lastStableRecoveryTimestamp;
     };
 
     // produce a reply to a status request
