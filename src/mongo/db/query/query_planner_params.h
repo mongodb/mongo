@@ -70,35 +70,31 @@ struct QueryPlannerParams {
         // Set this if you want to turn on index intersection.
         INDEX_INTERSECTION = 1 << 4,
 
-        // Set this if you want to try to keep documents deleted or mutated during the execution
-        // of the query in the query results.
-        KEEP_MUTATIONS = 1 << 5,
-
         // Indicate to the planner that the caller is requesting a count operation, possibly through
         // a count command, or as part of an aggregation pipeline.
-        IS_COUNT = 1 << 6,
+        IS_COUNT = 1 << 5,
 
         // Set this if you want to handle batchSize properly with sort(). If limits on SORT
         // stages are always actually limits, then this should be left off. If they are
         // sometimes to be interpreted as batchSize, then this should be turned on.
-        SPLIT_LIMITED_SORT = 1 << 7,
+        SPLIT_LIMITED_SORT = 1 << 6,
 
         // Set this to prevent the planner from generating plans which answer a predicate
         // implicitly via exact index bounds for index intersection solutions.
-        CANNOT_TRIM_IXISECT = 1 << 8,
+        CANNOT_TRIM_IXISECT = 1 << 7,
 
         // Set this if you don't want any plans with a non-covered projection stage. All projections
         // must be provided/covered by an index.
-        NO_UNCOVERED_PROJECTIONS = 1 << 10,
+        NO_UNCOVERED_PROJECTIONS = 1 << 8,
 
         // Set this to generate covered whole IXSCAN plans.
-        GENERATE_COVERED_IXSCANS = 1 << 11,
+        GENERATE_COVERED_IXSCANS = 1 << 9,
 
         // Set this to track the most recent timestamp seen by this cursor while scanning the oplog.
-        TRACK_LATEST_OPLOG_TS = 1 << 12,
+        TRACK_LATEST_OPLOG_TS = 1 << 10,
 
         // Set this so that collection scans on the oplog wait for visibility before reading.
-        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 13,
+        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 11,
     };
 
     // See Options enum above.

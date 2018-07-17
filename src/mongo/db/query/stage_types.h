@@ -58,10 +58,6 @@ enum StageType {
 
     STAGE_EOF,
 
-    // This is more of an "internal-only" stage where we try to keep docs that were mutated
-    // during query execution.
-    STAGE_KEEP_MUTATIONS,
-
     STAGE_FETCH,
 
     // The two $geoNear impls imply a fetch+sort and must be stages.

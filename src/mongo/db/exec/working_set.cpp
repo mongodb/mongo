@@ -80,21 +80,6 @@ void WorkingSet::free(WorkingSetID i) {
     _freeList = i;
 }
 
-void WorkingSet::flagForReview(WorkingSetID i) {
-    WorkingSetMember* member = get(i);
-    verify(WorkingSetMember::OWNED_OBJ == member->_state);
-    _flagged.insert(i);
-}
-
-const stdx::unordered_set<WorkingSetID>& WorkingSet::getFlagged() const {
-    return _flagged;
-}
-
-bool WorkingSet::isFlagged(WorkingSetID id) const {
-    invariant(id < _data.size());
-    return _flagged.end() != _flagged.find(id);
-}
-
 void WorkingSet::clear() {
     for (size_t i = 0; i < _data.size(); i++) {
         delete _data[i].member;
@@ -105,7 +90,6 @@ void WorkingSet::clear() {
     // point to nothing.
     _freeList = INVALID_ID;
 
-    _flagged.clear();
     _yieldSensitiveIds.clear();
 }
 

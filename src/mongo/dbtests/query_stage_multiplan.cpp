@@ -388,8 +388,6 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     // Get planner params.
     QueryPlannerParams plannerParams;
     fillOutPlannerParams(_opCtx.get(), collection, cq.get(), &plannerParams);
-    // Turn this off otherwise it pops up in some plans.
-    plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
     // Plan.
     auto statusWithSolutions = QueryPlanner::plan(*cq, plannerParams);

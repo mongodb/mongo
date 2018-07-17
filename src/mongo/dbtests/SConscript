@@ -91,7 +91,6 @@ dbtest = env.Program(
         'query_stage_ensure_sorted.cpp',
         'query_stage_fetch.cpp',
         'query_stage_ixscan.cpp',
-        'query_stage_keep.cpp',
         'query_stage_limit_skip.cpp',
         'query_stage_merge_sort.cpp',
         'query_stage_near.cpp',

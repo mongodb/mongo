@@ -111,8 +111,6 @@ public:
 
         QueryPlannerParams plannerParams;
         fillOutPlannerParams(&_opCtx, collection, cq, &plannerParams);
-        // Turn this off otherwise it pops up in some plans.
-        plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
         // Plan.
         auto statusWithSolutions = QueryPlanner::plan(*cq, plannerParams);

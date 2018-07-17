@@ -38,7 +38,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count_scan.h"
-#include "mongo/db/exec/keep_mutations.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"

@@ -111,9 +111,6 @@ string optionString(size_t options) {
             case QueryPlannerParams::INDEX_INTERSECTION:
                 ss << "INDEX_INTERSECTION ";
                 break;
-            case QueryPlannerParams::KEEP_MUTATIONS:
-                ss << "KEEP_MUTATIONS ";
-                break;
             case QueryPlannerParams::IS_COUNT:
                 ss << "IS_COUNT ";
                 break;

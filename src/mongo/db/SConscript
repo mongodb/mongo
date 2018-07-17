@@ -960,7 +960,6 @@ env.Library(
         'exec/geo_near.cpp',
         'exec/idhack.cpp',
         'exec/index_scan.cpp',
-        'exec/keep_mutations.cpp',
         'exec/limit.cpp',
         'exec/merge_sort.cpp',
         'exec/multi_iterator.cpp',

@@ -207,12 +207,10 @@ PlanStage::StageState AndHashStage::doWork(WorkingSetID* out) {
     // We know that we've ADVANCED.  See if the WSM is in our table.
     WorkingSetMember* member = _ws->get(*out);
 
-    // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
-    // with this WSM.
-    if (!member->hasRecordId()) {
-        _ws->flagForReview(*out);
-        return PlanStage::NEED_TIME;
-    }
+    // The child must give us a WorkingSetMember with a record id, since we intersect index keys
+    // based on the record id. The planner ensures that the child stage can never produce an WSM
+    // with no record id.
+    invariant(member->hasRecordId());
 
     DataMap::iterator it = _dataMap.find(member->recordId);
     if (_dataMap.end() == it) {
@@ -252,12 +250,10 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
     if (PlanStage::ADVANCED == childStatus) {
         WorkingSetMember* member = _ws->get(id);
 
-        // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
-        // with this WSM.
-        if (!member->hasRecordId()) {
-            _ws->flagForReview(id);
-            return PlanStage::NEED_TIME;
-        }
+        // The child must give us a WorkingSetMember with a record id, since we intersect index keys
+        // based on the record id. The planner ensures that the child stage can never produce an WSM
+        // with no record id.
+        invariant(member->hasRecordId());
 
         if (!_dataMap.insert(std::make_pair(member->recordId, id)).second) {
             // Didn't insert because we already had this RecordId inside the map. This should only
@@ -311,14 +307,11 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
     if (PlanStage::ADVANCED == childStatus) {
         WorkingSetMember* member = _ws->get(id);
 
-        // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
-        // with this WSM.
-        if (!member->hasRecordId()) {
-            _ws->flagForReview(id);
-            return PlanStage::NEED_TIME;
-        }
+        // The child must give us a WorkingSetMember with a record id, since we intersect index keys
+        // based on the record id. The planner ensures that the child stage can never produce an
+        // WSM with no record id.
+        invariant(member->hasRecordId());
 
-        verify(member->hasRecordId());
         if (_dataMap.end() == _dataMap.find(member->recordId)) {
             // Ignore.  It's not in any previous child.
         } else {
@@ -390,6 +383,8 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
     }
 }
 
+// TODO SERVER-16857: Delete this method, as the invalidation mechanism was only needed for the
+// MMAPv1 storage engine.
 void AndHashStage::doInvalidate(OperationContext* opCtx,
                                 const RecordId& dl,
                                 InvalidationType type) {
@@ -405,7 +400,6 @@ void AndHashStage::doInvalidate(OperationContext* opCtx,
             WorkingSetMember* member = _ws->get(_lookAheadResults[i]);
             if (member->hasRecordId() && member->recordId == dl) {
                 WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-                _ws->flagForReview(_lookAheadResults[i]);
                 _lookAheadResults[i] = WorkingSet::INVALID_ID;
             }
         }
@@ -434,9 +428,6 @@ void AndHashStage::doInvalidate(OperationContext* opCtx,
 
         // The RecordId is about to be invalidated.  Fetch it and clear the RecordId.
         WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-
-        // Add the WSID to the to-be-reviewed list in the WS.
-        _ws->flagForReview(id);
 
         // And don't return it from this stage.
         _dataMap.erase(it);

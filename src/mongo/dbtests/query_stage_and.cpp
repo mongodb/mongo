@@ -163,10 +163,10 @@ private:
 //
 
 /**
- * Invalidate a RecordId held by a hashed AND before the AND finishes evaluating.  The AND should
- * process all other data just fine and flag the invalidated RecordId in the WorkingSet.
+ * Delete a RecordId held by a hashed AND before the AND finishes evaluating. The AND should
+ * return the result despite its deletion.
  */
-class QueryStageAndHashInvalidation : public QueryStageAndBase {
+class QueryStageAndHashDeleteDuringYield : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
@@ -188,7 +188,7 @@ public:
         WorkingSet ws;
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
-        // Foo <= 20
+        // Foo <= 20.
         IndexScanParams params;
         params.descriptor = getIndex(BSON("foo" << 1), coll);
         params.bounds.isSimpleRange = true;
@@ -198,7 +198,7 @@ public:
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
-        // Bar >= 10
+        // Bar >= 10.
         params.descriptor = getIndex(BSON("bar" << 1), coll);
         params.bounds.startKey = BSON("" << 10);
         params.bounds.endKey = BSONObj();
@@ -206,24 +206,21 @@ public:
         params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
-        // ah reads the first child into its hash table.
-        // ah should read foo=20, foo=19, ..., foo=0 in that order.
-        // Read half of them...
+        // 'ah' reads the first child into its hash table: foo=20, foo=19, ..., foo=0
+        // in that order. Read half of them.
         for (int i = 0; i < 10; ++i) {
             WorkingSetID out;
             PlanStage::StageState status = ah->work(&out);
             ASSERT_EQUALS(PlanStage::NEED_TIME, status);
         }
 
-        // ...yield
+        // Save state and delete one of the read objects.
         ah->saveState();
-        // ...invalidate one of the read objects
         set<RecordId> data;
         getRecordIds(&data, coll);
         size_t memUsageBefore = ah->getMemUsage();
         for (set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
             if (coll->docFor(&_opCtx, *it).value()["foo"].numberInt() == 15) {
-                ah->invalidate(&_opCtx, *it, INVALIDATION_DELETION);
                 remove(coll->docFor(&_opCtx, *it).value());
                 break;
             }
@@ -231,23 +228,13 @@ public:
         size_t memUsageAfter = ah->getMemUsage();
         ah->restoreState();
 
-        // Invalidating a read object should decrease memory usage.
-        ASSERT_LESS_THAN(memUsageAfter, memUsageBefore);
+        // The deleted result should still be buffered inside the AND_HASH stage, so there should be
+        // no change in memory consumption.
+        ASSERT_EQ(memUsageAfter, memUsageBefore);
 
-        // And expect to find foo==15 it flagged for review.
-        const stdx::unordered_set<WorkingSetID>& flagged = ws.getFlagged();
-        ASSERT_EQUALS(size_t(1), flagged.size());
-
-        // Expect to find the right value of foo in the flagged item.
-        WorkingSetMember* member = ws.get(*flagged.begin());
-        ASSERT_TRUE(NULL != member);
-        ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->getState());
-        BSONElement elt;
-        ASSERT_TRUE(member->getFieldDotted("foo", &elt));
-        ASSERT_EQUALS(15, elt.numberInt());
-
-        // Now, finish up the AND.  Since foo == bar, we would have 11 results, but we subtract
-        // one because of a mid-plan invalidation, so 10.
+        // Now, finish up the AND. We expect 10 results. Although the deleted result is still
+        // buffered, the {bar: 1} index scan won't encounter the deleted document, and hence the
+        // document won't appear in the result set.
         int count = 0;
         while (!ah->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
@@ -257,7 +244,8 @@ public:
             }
 
             ++count;
-            member = ws.get(id);
+            BSONElement elt;
+            WorkingSetMember* member = ws.get(id);
 
             ASSERT_TRUE(member->getFieldDotted("foo", &elt));
             ASSERT_LESS_THAN_OR_EQUALS(elt.numberInt(), 20);
@@ -270,8 +258,8 @@ public:
     }
 };
 
-// Invalidate one of the "are we EOF?" lookahead results.
-class QueryStageAndHashInvalidateLookahead : public QueryStageAndBase {
+// Delete one of the "are we EOF?" lookahead results while the plan is yielded.
+class QueryStageAndHashDeleteLookaheadDuringYield : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
@@ -294,7 +282,7 @@ public:
         WorkingSet ws;
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
-        // Foo <= 20 (descending)
+        // Foo <= 20 (descending).
         IndexScanParams params;
         params.descriptor = getIndex(BSON("foo" << 1), coll);
         params.bounds.isSimpleRange = true;
@@ -304,45 +292,39 @@ public:
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
-        // Bar <= 19 (descending)
+        // Bar <= 19 (descending).
         params.descriptor = getIndex(BSON("bar" << 1), coll);
         params.bounds.startKey = BSON("" << 19);
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
-        // First call to work reads the first result from the children.
-        // The first result is for the first scan over foo is {foo: 20, bar: 20, baz: 20}.
-        // The first result is for the second scan over bar is {foo: 19, bar: 19, baz: 19}.
+        // First call to work reads the first result from the children. The first result for the
+        // first scan over foo is {foo: 20, bar: 20, baz: 20}. The first result for the second scan
+        // over bar is {foo: 19, bar: 19, baz: 19}.
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState status = ah->work(&id);
         ASSERT_EQUALS(PlanStage::NEED_TIME, status);
 
-        const stdx::unordered_set<WorkingSetID>& flagged = ws.getFlagged();
-        ASSERT_EQUALS(size_t(0), flagged.size());
-
-        // "delete" deletedObj (by invalidating the RecordId of the obj that matches it).
+        // Delete 'deletedObj' from the collection.
         BSONObj deletedObj = BSON("_id" << 20 << "foo" << 20 << "bar" << 20 << "baz" << 20);
         ah->saveState();
         set<RecordId> data;
         getRecordIds(&data, coll);
 
         size_t memUsageBefore = ah->getMemUsage();
-        for (set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
-            if (0 == deletedObj.woCompare(coll->docFor(&_opCtx, *it).value())) {
-                ah->invalidate(&_opCtx, *it, INVALIDATION_DELETION);
+        for (auto&& recordId : data) {
+            if (0 == deletedObj.woCompare(coll->docFor(&_opCtx, recordId).value())) {
+                remove(coll->docFor(&_opCtx, recordId).value());
                 break;
             }
         }
 
+        // The deletion should not affect the amount of data buffered inside the AND_HASH stage.
         size_t memUsageAfter = ah->getMemUsage();
-        // Look ahead results do not count towards memory usage.
         ASSERT_EQUALS(memUsageBefore, memUsageAfter);
 
         ah->restoreState();
 
-        // The deleted obj should show up in flagged.
-        ASSERT_EQUALS(size_t(1), flagged.size());
-
-        // And not in our results.
+        // We expect that the deleted document doers not appear in our result set.
         int count = 0;
         while (!ah->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
@@ -1003,10 +985,9 @@ public:
 //
 
 /**
- * Invalidate a RecordId held by a sorted AND before the AND finishes evaluating.  The AND should
- * process all other data just fine and flag the invalidated RecordId in the WorkingSet.
+ * Delete a RecordId held by a sorted AND before the AND finishes evaluating.
  */
-class QueryStageAndSortedInvalidation : public QueryStageAndBase {
+class QueryStageAndSortedDeleteDuringYield : public QueryStageAndBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
@@ -1018,7 +999,7 @@ public:
             wuow.commit();
         }
 
-        // Insert a bunch of data
+        // Insert a bunch of data.
         for (int i = 0; i < 50; ++i) {
             insert(BSON("foo" << 1 << "bar" << 1));
         }
@@ -1028,7 +1009,7 @@ public:
         WorkingSet ws;
         auto ah = make_unique<AndSortedStage>(&_opCtx, &ws, coll);
 
-        // Scan over foo == 1
+        // Scan over foo == 1.
         IndexScanParams params;
         params.descriptor = getIndex(BSON("foo" << 1), coll);
         params.bounds.isSimpleRange = true;
@@ -1038,7 +1019,7 @@ public:
         params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
-        // Scan over bar == 1
+        // Scan over bar == 1.
         params.descriptor = getIndex(BSON("bar" << 1), coll);
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
@@ -1047,32 +1028,20 @@ public:
         getRecordIds(&data, coll);
 
         // We're making an assumption here that happens to be true because we clear out the
-        // collection before running this: increasing inserts have increasing RecordIds.
-        // This isn't true in general if the collection is not dropped beforehand.
+        // collection before running this: increasing inserts have increasing RecordIds. This isn't
+        // true in general if the collection is not dropped beforehand.
         WorkingSetID id = WorkingSet::INVALID_ID;
 
         // Sorted AND looks at the first child, which is an index scan over foo==1.
         ah->work(&id);
 
         // The first thing that the index scan returns (due to increasing RecordId trick) is the
-        // very first insert, which should be the very first thing in data.  Let's invalidate it
-        // and make sure it shows up in the flagged results.
+        // very first insert, which should be the very first thing in data. Delete it.
         ah->saveState();
-        ah->invalidate(&_opCtx, *data.begin(), INVALIDATION_DELETION);
         remove(coll->docFor(&_opCtx, *data.begin()).value());
         ah->restoreState();
 
-        // Make sure the nuked obj is actually in the flagged data.
-        ASSERT_EQUALS(ws.getFlagged().size(), size_t(1));
-        WorkingSetMember* member = ws.get(*ws.getFlagged().begin());
-        ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->getState());
-        BSONElement elt;
-        ASSERT_TRUE(member->getFieldDotted("foo", &elt));
-        ASSERT_EQUALS(1, elt.numberInt());
-        ASSERT_TRUE(member->getFieldDotted("bar", &elt));
-        ASSERT_EQUALS(1, elt.numberInt());
-
-        set<RecordId>::iterator it = data.begin();
+        auto it = data.begin();
 
         // Proceed along, AND-ing results.
         int count = 0;
@@ -1085,8 +1054,9 @@ public:
 
             ++count;
             ++it;
-            member = ws.get(id);
+            WorkingSetMember* member = ws.get(id);
 
+            BSONElement elt;
             ASSERT_TRUE(member->getFieldDotted("foo", &elt));
             ASSERT_EQUALS(1, elt.numberInt());
             ASSERT_TRUE(member->getFieldDotted("bar", &elt));
@@ -1098,14 +1068,12 @@ public:
         for (int i = 0; i < count + 10; ++i) {
             ++it;
         }
-        // Remove a result that's coming up.  It's not the 'target' result of the AND so it's
-        // not flagged.
+        // Remove a result that's coming up.
         ah->saveState();
-        ah->invalidate(&_opCtx, *it, INVALIDATION_DELETION);
         remove(coll->docFor(&_opCtx, *it).value());
         ah->restoreState();
 
-        // Get all results aside from the two we killed.
+        // Get all results aside from the two we deleted.
         while (!ah->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status = ah->work(&id);
@@ -1114,8 +1082,9 @@ public:
             }
 
             ++count;
-            member = ws.get(id);
+            WorkingSetMember* member = ws.get(id);
 
+            BSONElement elt;
             ASSERT_TRUE(member->getFieldDotted("foo", &elt));
             ASSERT_EQUALS(1, elt.numberInt());
             ASSERT_TRUE(member->getFieldDotted("bar", &elt));
@@ -1123,8 +1092,6 @@ public:
         }
 
         ASSERT_EQUALS(count, 48);
-
-        ASSERT_EQUALS(size_t(1), ws.getFlagged().size());
     }
 };
 
@@ -1453,7 +1420,7 @@ public:
     All() : Suite("query_stage_and") {}
 
     void setupTests() {
-        add<QueryStageAndHashInvalidation>();
+        add<QueryStageAndHashDeleteDuringYield>();
         add<QueryStageAndHashTwoLeaf>();
         add<QueryStageAndHashTwoLeafFirstChildLargeKeys>();
         add<QueryStageAndHashTwoLeafLastChildLargeKeys>();
@@ -1461,11 +1428,11 @@ public:
         add<QueryStageAndHashThreeLeafMiddleChildLargeKeys>();
         add<QueryStageAndHashWithNothing>();
         add<QueryStageAndHashProducesNothing>();
-        add<QueryStageAndHashInvalidateLookahead>();
+        add<QueryStageAndHashDeleteLookaheadDuringYield>();
         add<QueryStageAndHashFirstChildFetched>();
         add<QueryStageAndHashSecondChildFetched>();
         add<QueryStageAndHashDeadChild>();
-        add<QueryStageAndSortedInvalidation>();
+        add<QueryStageAndSortedDeleteDuringYield>();
         add<QueryStageAndSortedThreeLeaf>();
         add<QueryStageAndSortedWithNothing>();
         add<QueryStageAndSortedProducesNothing>();

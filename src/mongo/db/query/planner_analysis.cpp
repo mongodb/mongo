@@ -673,53 +673,6 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
     const QueryRequest& qr = query.getQueryRequest();
 
-    // If we can (and should), add the keep mutations stage.
-
-    // We cannot keep mutated documents if:
-    //
-    // 1. The query requires an index to evaluate the predicate ($text).  We can't tell whether
-    // or not the doc actually satisfies the $text predicate since we can't evaluate a
-    // text MatchExpression.
-    //
-    // 2. The query implies a sort ($geoNear).  It would be rather expensive and hacky to merge
-    // the document at the right place.
-    //
-    // 3. There is an index-provided sort.  Ditto above comment about merging.
-    //
-    // 4. There is a SORT that is not at the root of solution tree. Ditto above comment about
-    // merging.
-    //
-    // TODO: do we want some kind of pre-planning step where we look for certain nodes and cache
-    // them?  We do lookups in the tree a few times.  This may not matter as most trees are
-    // shallow in terms of query nodes.
-    const bool hasNotRootSort = hasSortStage && STAGE_SORT != solnRoot->getType();
-
-    const bool cannotKeepFlagged = hasNode(solnRoot.get(), STAGE_TEXT) ||
-        hasNode(solnRoot.get(), STAGE_GEO_NEAR_2D) ||
-        hasNode(solnRoot.get(), STAGE_GEO_NEAR_2DSPHERE) ||
-        (!qr.getSort().isEmpty() && !hasSortStage) || hasNotRootSort;
-
-    // Only index intersection stages ever produce flagged results.
-    const bool couldProduceFlagged = hasAndHashStage || hasNode(solnRoot.get(), STAGE_AND_SORTED);
-
-    const bool shouldAddMutation = !cannotKeepFlagged && couldProduceFlagged;
-
-    if (shouldAddMutation && (params.options & QueryPlannerParams::KEEP_MUTATIONS)) {
-        KeepMutationsNode* keep = new KeepMutationsNode();
-
-        // We must run the entire expression tree to make sure the document is still valid.
-        keep->filter = query.root()->shallowClone();
-
-        if (STAGE_SORT == solnRoot->getType()) {
-            // We want to insert the invalidated results before the sort stage, if there is one.
-            verify(1 == solnRoot->children.size());
-            keep->children.push_back(solnRoot->children[0]);
-            solnRoot->children[0] = keep;
-        } else {
-            keep->children.push_back(solnRoot.release());
-            solnRoot.reset(keep);
-        }
-    }
 
     if (qr.getSkip()) {
         auto skip = std::make_unique<SkipNode>();

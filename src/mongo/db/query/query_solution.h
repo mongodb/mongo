@@ -848,44 +848,6 @@ struct ShardingFilterNode : public QuerySolutionNode {
 };
 
 /**
- * If documents mutate or are deleted during a query, we can (in some cases) fetch them
- * and still return them.  This stage merges documents that have been mutated or deleted
- * into the query result stream.
- */
-struct KeepMutationsNode : public QuerySolutionNode {
-    KeepMutationsNode() : sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
-
-    virtual ~KeepMutationsNode() {}
-
-    virtual StageType getType() const {
-        return STAGE_KEEP_MUTATIONS;
-    }
-    virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
-
-    // Any flagged results are OWNED_OBJ and therefore we're covered if our child is.
-    bool fetched() const {
-        return children[0]->fetched();
-    }
-
-    // Any flagged results are OWNED_OBJ and as such they'll have any field we need.
-    bool hasField(const std::string& field) const {
-        return children[0]->hasField(field);
-    }
-
-    bool sortedByDiskLoc() const {
-        return false;
-    }
-    const BSONObjSet& getSort() const {
-        return sorts;
-    }
-
-    QuerySolutionNode* clone() const;
-
-    // Since we merge in flagged results we have no sort order.
-    BSONObjSet sorts;
-};
-
-/**
  * Distinct queries only want one value for a given field.  We run an index scan but
  * *always* skip over the current key to the next key.
  */
