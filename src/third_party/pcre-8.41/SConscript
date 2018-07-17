@@ -63,7 +63,4 @@ env.Library( "pcrecpp", [
         "pcrecpp.cc",
         "pcre_scanner.cc",
         "pcre_stringpiece.cc",
-        # pcre posix
-        "pcreposix.c",
         ] )
-
