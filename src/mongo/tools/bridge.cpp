@@ -413,6 +413,7 @@ int bridgeMain(int argc, char** argv, char** envp) {
     runGlobalInitializersOrDie(argc, argv, envp);
     startSignalProcessingThread(LogFileStatus::kNoLogFileToRotate);
 
+    setGlobalServiceContext(ServiceContext::make());
     auto serviceContext = getGlobalServiceContext();
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>(serviceContext));
     serviceContext->setServiceExecutor(

@@ -56,6 +56,7 @@
 #include "mongo/db/repl/sync_source_selector_mock.h"
 #include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
@@ -112,7 +113,9 @@ struct CollectionCloneInfo {
     Status status{ErrorCodes::NotYetInitialized, ""};
 };
 
-class InitialSyncerTest : public executor::ThreadPoolExecutorTest, public SyncSourceSelector {
+class InitialSyncerTest : public executor::ThreadPoolExecutorTest,
+                          public SyncSourceSelector,
+                          public ScopedGlobalServiceContextForTest {
 public:
     InitialSyncerTest() {}
 
@@ -419,6 +422,7 @@ protected:
         _dbWorkThreadPool.reset();
         _replicationProcess.reset();
         _storageInterface.reset();
+        Client::destroy();
     }
 
     /**

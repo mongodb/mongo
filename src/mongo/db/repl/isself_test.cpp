@@ -31,6 +31,7 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
@@ -43,7 +44,7 @@ namespace {
 
 using std::string;
 
-TEST(IsSelf, DetectsSameHostIPv4) {
+TEST_F(ServiceContextTest, DetectsSameHostIPv4) {
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
     bool wasEnabled = IPv6Enabled();
     enableIPv6(false);
@@ -60,7 +61,7 @@ TEST(IsSelf, DetectsSameHostIPv4) {
 #endif
 }
 
-TEST(IsSelf, DetectsSameHostIPv6) {
+TEST_F(ServiceContextTest, DetectsSameHostIPv6) {
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
     bool wasEnabled = IPv6Enabled();
     enableIPv6(true);

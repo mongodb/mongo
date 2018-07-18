@@ -34,17 +34,25 @@
 
 namespace mongo {
 
+
+class ScopedGlobalServiceContextForTest {
+public:
+    /**
+    * Returns a service context, which is only valid for this instance of the test.
+    * Must not be called before setUp or after tearDown.
+    */
+    ServiceContext* getServiceContext();
+
+protected:
+    ScopedGlobalServiceContextForTest();
+    virtual ~ScopedGlobalServiceContextForTest();
+};
+
 /**
  * Test fixture for tests that require a properly initialized global service context.
  */
-class ServiceContextTest : public unittest::Test {
+class ServiceContextTest : public unittest::Test, public ScopedGlobalServiceContextForTest {
 public:
-    /**
-     * Returns a service context, which is only valid for this instance of the test.
-     * Must not be called before setUp or after tearDown.
-     */
-    ServiceContext* getServiceContext();
-
     /**
      * Returns the default Client for this test.
      */

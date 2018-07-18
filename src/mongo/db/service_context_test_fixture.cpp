@@ -38,21 +38,27 @@
 
 namespace mongo {
 
-ServiceContextTest::ServiceContextTest() {
+ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
     setGlobalServiceContext(ServiceContext::make());
     auto const serviceContext = getGlobalServiceContext();
-    Client::initThread(getThreadName());
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     serviceContext->setOpObserver(std::move(observerRegistry));
 }
 
-ServiceContextTest::~ServiceContextTest() {
-    Client::destroy();
+ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {
     setGlobalServiceContext({});
 }
 
-ServiceContext* ServiceContextTest::getServiceContext() {
+ServiceContext* ScopedGlobalServiceContextForTest::getServiceContext() {
     return getGlobalServiceContext();
+}
+
+ServiceContextTest::ServiceContextTest() {
+    Client::initThread(getThreadName());
+}
+
+ServiceContextTest::~ServiceContextTest() {
+    Client::destroy();
 }
 
 Client* ServiceContextTest::getClient() {

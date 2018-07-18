@@ -65,6 +65,11 @@ void TaskExecutorTest::setUp() {
     _executor = makeTaskExecutor(std::move(net));
 }
 
+void TaskExecutorTest::tearDown() {
+    _executor.reset(nullptr);
+    _net = nullptr;
+}
+
 void TaskExecutorTest::launchExecutorThread() {
     _executor->startup();
     postExecutorThreadLaunch();

@@ -169,6 +169,7 @@ ServiceContext* initialize(const char* yaml_config) {
 
     Status status = mongo::runGlobalInitializers(yaml_config ? 1 : 0, argv, nullptr);
     uassertStatusOKWithContext(status, "Global initilization failed");
+    setGlobalServiceContext(ServiceContext::make());
 
     Client::initThread("initandlisten");
 

@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -43,13 +44,13 @@
 namespace mongo {
 namespace {
 
-class CatalogRAIITestFixture : public unittest::Test {
+class CatalogRAIITestFixture : public ServiceContextTest {
 public:
     typedef std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
         ClientAndCtx;
 
     ClientAndCtx makeClientWithLocker(const std::string& clientName) {
-        auto client = getGlobalServiceContext()->makeClient(clientName);
+        auto client = getServiceContext()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
         opCtx->swapLockState(stdx::make_unique<LockerImpl>());
         return std::make_pair(std::move(client), std::move(opCtx));

@@ -38,28 +38,25 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(
-    LoadTimeZoneDB, ("GlobalLogManager", "EndStartupOptionStorage", "ServiceContext"))
-(InitializerContext* context) {
-    auto serviceContext = getGlobalServiceContext();
-    if (!serverGlobalParams.timeZoneInfoPath.empty()) {
-        std::unique_ptr<timelib_tzdb, TimeZoneDatabase::TimeZoneDBDeleter> timeZoneDatabase(
-            timelib_zoneinfo(const_cast<char*>(serverGlobalParams.timeZoneInfoPath.c_str())),
-            TimeZoneDatabase::TimeZoneDBDeleter());
-        if (!timeZoneDatabase) {
-            return {ErrorCodes::FailedToParse,
-                    str::stream() << "failed to load time zone database from path \""
-                                  << serverGlobalParams.timeZoneInfoPath
-                                  << "\""};
+namespace {
+ServiceContext::ConstructorActionRegisterer loadTimeZoneDB{
+    "LoadTimeZoneDB", [](ServiceContext* service) {
+        if (!serverGlobalParams.timeZoneInfoPath.empty()) {
+            std::unique_ptr<timelib_tzdb, TimeZoneDatabase::TimeZoneDBDeleter> timeZoneDatabase(
+                timelib_zoneinfo(const_cast<char*>(serverGlobalParams.timeZoneInfoPath.c_str())),
+                TimeZoneDatabase::TimeZoneDBDeleter());
+            if (!timeZoneDatabase) {
+                uasserted(ErrorCodes::FailedToParse,
+                          str::stream() << "failed to load time zone database from path \""
+                                        << serverGlobalParams.timeZoneInfoPath
+                                        << "\"");
+            }
+            TimeZoneDatabase::set(service,
+                                  stdx::make_unique<TimeZoneDatabase>(std::move(timeZoneDatabase)));
+        } else {
+            // No 'zoneInfo' specified on the command line, fall back to the built-in rules.
+            TimeZoneDatabase::set(service, stdx::make_unique<TimeZoneDatabase>());
         }
-        TimeZoneDatabase::set(serviceContext,
-                              stdx::make_unique<TimeZoneDatabase>(std::move(timeZoneDatabase)));
-    } else {
-        // No 'zoneInfo' specified on the command line, fall back to the built-in rules.
-        TimeZoneDatabase::set(serviceContext, stdx::make_unique<TimeZoneDatabase>());
-    }
-    return Status::OK();
-}
-
+    }};
+}  // namespace
 }  // namespace mongo

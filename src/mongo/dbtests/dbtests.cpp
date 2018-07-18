@@ -168,6 +168,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     repl::ReplSettings replSettings;
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
+    setGlobalServiceContext(ServiceContext::make());
     ServiceContext* service = getGlobalServiceContext();
     service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
 

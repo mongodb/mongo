@@ -31,6 +31,7 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
@@ -43,7 +44,7 @@ namespace {
 
 using namespace mongo;
 
-class WiredTigerFactoryTest : public mongo::unittest::Test {
+class WiredTigerFactoryTest : public ServiceContextTest {
 private:
     virtual void setUp() {
         ServiceContext* globalEnv = getGlobalServiceContext();

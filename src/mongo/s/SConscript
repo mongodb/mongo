@@ -466,6 +466,7 @@ env.CppUnitTest(
         'client/shard_connection_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/util/net/network',
         'client/sharding_connection_hook',

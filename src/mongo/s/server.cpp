@@ -559,7 +559,6 @@ ExitCode mongoSMain(int argc, char* argv[], char** envp) {
     if (argc < 1)
         return EXIT_BADOPTIONS;
 
-    registerShutdownTask([&]() { cleanupTask(getGlobalServiceContext()); });
 
     setupSignalHandlers();
 
@@ -568,6 +567,16 @@ ExitCode mongoSMain(int argc, char* argv[], char** envp) {
         severe(LogComponent::kDefault) << "Failed global initialization: " << status;
         return EXIT_ABRUPT;
     }
+
+    try {
+        setGlobalServiceContext(ServiceContext::make());
+    } catch (...) {
+        auto cause = exceptionToStatus();
+        severe(LogComponent::kDefault) << "Failed to create service context: " << redact(cause);
+        return EXIT_ABRUPT;
+    }
+
+    registerShutdownTask([&]() { cleanupTask(getGlobalServiceContext()); });
 
     ErrorExtraInfo::invariantHaveAllParsers();
 

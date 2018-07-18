@@ -47,6 +47,8 @@ namespace {
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper() : _dbpath("wt-kv-harness") {
+        if (!hasGlobalServiceContext())
+            setGlobalServiceContext(ServiceContext::make());
         _engine.reset(new WiredTigerKVEngine(
             kWiredTigerEngineName, _dbpath.path(), _cs.get(), "", 1, false, false, false, false));
         repl::ReplicationCoordinator::set(
@@ -57,6 +59,7 @@ public:
 
     virtual ~WiredTigerKVHarnessHelper() {
         _engine.reset(NULL);
+        // Cannot cleanup the global service context here, the test still have clients remaining.
     }
 
     virtual KVEngine* restartEngine() {

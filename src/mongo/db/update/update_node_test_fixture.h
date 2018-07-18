@@ -30,12 +30,13 @@
 
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/update/update_node.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-class UpdateNodeTest : public mongo::unittest::Test {
+class UpdateNodeTest : public ServiceContextTest {
 public:
     ~UpdateNodeTest() override = default;
 

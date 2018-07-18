@@ -342,7 +342,7 @@ COMMON_EXECUTOR_TEST(EventWaitingWithTimeoutTest) {
 
     auto eventThatWillNeverBeTriggered = unittest::assertGet(executor.makeEvent());
 
-    auto serviceContext = getGlobalServiceContext();
+    auto serviceContext = ServiceContext::make();
 
     serviceContext->setFastClockSource(stdx::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
@@ -364,7 +364,7 @@ COMMON_EXECUTOR_TEST(EventSignalWithTimeoutTest) {
 
     auto eventSignalled = unittest::assertGet(executor.makeEvent());
 
-    auto serviceContext = getGlobalServiceContext();
+    auto serviceContext = ServiceContext::make();
 
     serviceContext->setFastClockSource(stdx::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());

@@ -884,6 +884,7 @@ env.CppUnitTest(
         'repl_coordinator_impl',
         'replmocks',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
     ],
 )
 
@@ -1027,6 +1028,7 @@ env.CppUnitTest('isself_test',
                     '$BUILD_DIR/mongo/db/auth/authmocks',
                     '$BUILD_DIR/mongo/db/serveronly',
                     '$BUILD_DIR/mongo/db/service_context_d',
+                    '$BUILD_DIR/mongo/db/service_context_test_fixture',
                     'isself',
                 ],
                 )
@@ -1218,6 +1220,7 @@ env.Library(
     ],
     LIBDEPS=[
         'replmocks',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
     ],
@@ -1299,6 +1302,7 @@ env.CppUnitTest(
         'oplog_entry',
         'replmocks',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
@@ -1382,6 +1386,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'multiapplier',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
@@ -1464,6 +1469,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
         '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
         'base_cloner_test_fixture',

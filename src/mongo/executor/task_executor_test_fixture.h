@@ -72,6 +72,7 @@ public:
      * Initializes both the NetworkInterfaceMock and TaskExecutor but does not start the executor.
      */
     void setUp() override;
+    void tearDown() override;
 
     void launchExecutorThread();
     void shutdownExecutorThread();

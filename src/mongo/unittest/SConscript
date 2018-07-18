@@ -46,6 +46,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
     ],
 )
@@ -59,6 +60,7 @@ bmEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/shim_benchmark',
     ],
 )
