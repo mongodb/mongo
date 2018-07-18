@@ -295,6 +295,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',

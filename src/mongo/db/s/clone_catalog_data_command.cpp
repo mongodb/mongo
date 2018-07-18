@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -117,22 +118,24 @@ public:
         const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
             opCtx, dbname, repl::ReadConcernLevel::kMajorityReadConcern);
 
-        BSONArrayBuilder barr;
+        CloneOptions opts;
+        opts.fromDB = dbname;
         for (const auto& shardedColl : shardedColls) {
-            barr.append(shardedColl.ns());
+            opts.shardedColls.insert(shardedColl.ns());
         }
 
-        BSONObjBuilder cloneCommandBuilder;
-        cloneCommandBuilder << "clone" << from << "collsToIgnore" << barr.arr()
-                            << bypassDocumentValidationCommandOption() << true;
+        DisableDocumentValidation disableValidation(opCtx);
 
-        BSONObj cloneResult;
-        DBDirectClient client(opCtx);
-        client.runCommand(dbname, cloneCommandBuilder.obj(), cloneResult);
+        // Clone the non-ignored collections.
+        std::set<std::string> clonedColls;
+        Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
 
-        uassertStatusOK(getStatusFromCommandResult(cloneResult));
-
-        result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(cloneResult));
+        Cloner cloner;
+        uassertStatusOK(cloner.copyDb(opCtx, dbname, from.toString(), opts, &clonedColls));
+        {
+            BSONArrayBuilder cloneBarr = result.subarrayStart("clonedColls");
+            cloneBarr.append(clonedColls);
+        }
 
         return true;
     }
