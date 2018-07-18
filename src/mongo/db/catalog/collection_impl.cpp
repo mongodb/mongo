@@ -218,13 +218,6 @@ std::unique_ptr<SeekableRecordCursor> CollectionImpl::getCursor(OperationContext
     return _recordStore->getCursor(opCtx, forward);
 }
 
-vector<std::unique_ptr<RecordCursor>> CollectionImpl::getManyCursors(
-    OperationContext* opCtx) const {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
-
-    return _recordStore->getManyCursors(opCtx);
-}
-
 
 bool CollectionImpl::findDoc(OperationContext* opCtx,
                              const RecordId& loc,

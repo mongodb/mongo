@@ -119,10 +119,6 @@ public:
         std::abort();
     }
 
-    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* opCtx) const {
-        std::abort();
-    }
-
     void deleteDocument(OperationContext* opCtx,
                         StmtId stmtId,
                         const RecordId& loc,

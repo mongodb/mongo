@@ -123,12 +123,6 @@ public:
                                                     bool forward = true) const final;
 
     /**
-     * Returns many cursors that partition the Collection into many disjoint sets. Iterating
-     * all returned cursors is equivalent to iterating the full collection.
-     */
-    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* opCtx) const final;
-
-    /**
      * Deletes the document with the given RecordId from the collection.
      *
      * 'stmtId' the statement id for this delete operation. Pass in kUninitializedStmtId if not

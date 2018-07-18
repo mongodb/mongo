@@ -213,9 +213,6 @@ public:
         virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                                 bool forward) const = 0;
 
-        virtual std::vector<std::unique_ptr<RecordCursor>> getManyCursors(
-            OperationContext* opCtx) const = 0;
-
         virtual void deleteDocument(OperationContext* opCtx,
                                     StmtId stmtId,
                                     const RecordId& loc,
@@ -419,15 +416,6 @@ public:
     inline std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* const opCtx,
                                                            const bool forward = true) const {
         return this->_impl().getCursor(opCtx, forward);
-    }
-
-    /**
-     * Returns many cursors that partition the Collection into many disjoint sets. Iterating
-     * all returned cursors is equivalent to iterating the full collection.
-     */
-    inline std::vector<std::unique_ptr<RecordCursor>> getManyCursors(
-        OperationContext* const opCtx) const {
-        return this->_impl().getManyCursors(opCtx);
     }
 
     /**

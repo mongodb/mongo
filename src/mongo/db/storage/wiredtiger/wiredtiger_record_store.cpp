@@ -1480,13 +1480,6 @@ std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(
     return getRandomCursorWithOptions(opCtx, extraConfig);
 }
 
-std::vector<std::unique_ptr<RecordCursor>> WiredTigerRecordStore::getManyCursors(
-    OperationContext* opCtx) const {
-    std::vector<std::unique_ptr<RecordCursor>> cursors(1);
-    cursors[0] = getCursor(opCtx, /*forward=*/true);
-    return cursors;
-}
-
 Status WiredTigerRecordStore::truncate(OperationContext* opCtx) {
     WiredTigerCursor startWrap(_uri, _tableId, true, opCtx);
     WT_CURSOR* start = startWrap.get();

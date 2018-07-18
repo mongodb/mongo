@@ -178,8 +178,6 @@ public:
     virtual std::unique_ptr<RecordCursor> getRandomCursorWithOptions(
         OperationContext* opCtx, StringData extraConfig) const = 0;
 
-    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* opCtx) const final;
-
     virtual Status truncate(OperationContext* opCtx);
 
     virtual bool compactSupported() const {

@@ -486,17 +486,6 @@ public:
         return {};
     }
 
-    /**
-     * Returns many RecordCursors that partition the RecordStore into many disjoint sets.
-     * Iterating all returned RecordCursors is equivalent to iterating the full store.
-     */
-    virtual std::vector<std::unique_ptr<RecordCursor>> getManyCursors(
-        OperationContext* opCtx) const {
-        std::vector<std::unique_ptr<RecordCursor>> out(1);
-        out[0] = getCursor(opCtx);
-        return out;
-    }
-
     // higher level
 
 
