@@ -103,7 +103,8 @@ public:
 
         NamespaceString ns() const override {
             // TODO get the ns from the parsed QueryRequest.
-            return NamespaceString(CommandHelpers::parseNsFromCommand(_dbName, _request.body));
+            return NamespaceString(
+                CommandHelpers::parseNsCollectionRequired(_dbName, _request.body));
         }
 
         /**
