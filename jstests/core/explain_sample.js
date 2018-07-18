@@ -8,6 +8,13 @@
 
     load("jstests/libs/analyze_plan.js");
 
+    // Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring
+    // that the parallel suite runs this test only on WT configurations.
+    if (jsTest.options().storageEngine !== "wiredTiger") {
+        jsTest.log("Skipping test on non-WT storage engine: " + jsTest.options().storageEngine);
+        return;
+    }
+
     const coll = db.explain_sample;
     coll.drop();
 
