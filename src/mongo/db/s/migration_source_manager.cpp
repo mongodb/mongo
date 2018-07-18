@@ -605,16 +605,24 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                                      refreshedMetadata->getCollVersion());
     }
 
+    std::string orphanedRangeCleanUpErrMsg = str::stream()
+        << "Moved chunks successfully but failed to clean up " << getNss().ns() << " range "
+        << redact(range.toString()) << " due to: ";
+
     if (_args.getWaitForDelete()) {
         log() << "Waiting for cleanup of " << getNss().ns() << " range "
               << redact(range.toString());
-        return notification.waitStatus(opCtx);
+        auto deleteStatus = notification.waitStatus(opCtx);
+        if (!deleteStatus.isOK()) {
+            return {ErrorCodes::OrphanedRangeCleanUpFailed,
+                    orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
+        }
+        return Status::OK();
     }
 
     if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
-        warning() << "Failed to initiate cleanup of " << getNss().ns() << " range "
-                  << redact(range.toString())
-                  << " due to: " << redact(notification.waitStatus(opCtx));
+        return {ErrorCodes::OrphanedRangeCleanUpFailed,
+                orphanedRangeCleanUpErrMsg + redact(notification.waitStatus(opCtx))};
     } else {
         log() << "Leaving cleanup of " << getNss().ns() << " range " << redact(range.toString())
               << " to complete in background";

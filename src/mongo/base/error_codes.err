@@ -262,6 +262,7 @@ error_code("TooManyFilesOpen", 261);
 error_code("FailPointSetFailed", 262)
 error_code("OperationNotSupportedInTransaction", 263)
 error_code("TooManyLogicalSessions", 264);
+error_code("OrphanedRangeCleanUpFailed", 265);
 
 # Error codes 4000-8999 are reserved.
 
