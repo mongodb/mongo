@@ -954,7 +954,6 @@ env.Library(
         'exec/multi_iterator.cpp',
         'exec/multi_plan.cpp',
         'exec/near.cpp',
-        'exec/oplogstart.cpp',
         'exec/or.cpp',
         'exec/pipeline_proxy.cpp',
         'exec/plan_stage.cpp',

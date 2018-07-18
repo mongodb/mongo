@@ -11,6 +11,8 @@
         assert.commandWorked(
             t.getDB().createCollection(t.getName(), {capped: true, size: 16 * 1024}));
 
+        const isOplog = t.getName().startsWith("oplog.");
+
         /**
          * Helper function for making timestamps with the property that if i < j, then makeTS(i) <
          * makeTS(j).
@@ -110,7 +112,10 @@
                       .addOption(DBQuery.Option.oplogReplay)
                       .explain("executionStats");
         assert.commandWorked(res);
-        assert.lte(res.executionStats.totalDocsExamined, 2, tojson(res));
+        // If this is the oplog, we expect to be able to seek directly to the entry with a 'ts' of
+        // 10. Otherwise, we have to scan from the beginning of the oplog.
+        let expectedDocsExamined = isOplog ? 2 : 11;
+        assert.lte(res.executionStats.totalDocsExamined, expectedDocsExamined, tojson(res));
         let collScanStage = getPlanStage(res.executionStats.executionStages, "COLLSCAN");
         assert.neq(
             null, collScanStage, "no collection scan found in explain output: " + tojson(res));
@@ -163,18 +168,25 @@
                   .addOption(DBQuery.Option.oplogReplay)
                   .explain("executionStats");
         assert.commandWorked(res);
-        assert.lte(res.executionStats.totalDocsExamined, 2, tojson(res));
+        // If this is the oplog, we expect to be able to seek directly to the entry with a 'ts' of
+        // 5. Otherwise, we have to scan from the beginning of the oplog.
+        expectedDocsExamined = isOplog ? 2 : 11;
+        assert.lte(res.executionStats.totalDocsExamined, expectedDocsExamined, tojson(res));
         collScanStage = getPlanStage(res.executionStats.executionStages, "COLLSCAN");
         assert.neq(
             null, collScanStage, "no collection scan found in explain output: " + tojson(res));
         assert.eq(makeTS(5), collScanStage.maxTs, tojson(res));
 
-        // An $eq query for a non-existent timestamp scans a single document.
+        // An $eq query for a non-existent timestamp scans a single oplog document.
         res = t.find({ts: {$eq: makeTS(200)}})
                   .addOption(DBQuery.Option.oplogReplay)
                   .explain("executionStats");
         assert.commandWorked(res);
-        assert.lte(res.executionStats.totalDocsExamined, 1, tojson(res));
+        // If this is the oplog, we expect to be able to seek directly to the end of the oplog.
+        // Otherwise, we have to scan the entire oplog before determining that 'ts' 100 does not
+        // exist.
+        expectedDocsExamined = isOplog ? 1 : 100;
+        assert.lte(res.executionStats.totalDocsExamined, expectedDocsExamined, tojson(res));
         collScanStage = getPlanStage(res.executionStats.executionStages, "COLLSCAN");
         assert.neq(
             null, collScanStage, "no collection scan found in explain output: " + tojson(res));
@@ -186,7 +198,10 @@
                   .addOption(DBQuery.Option.oplogReplay)
                   .explain("executionStats");
         assert.commandWorked(res);
-        assert.lte(res.executionStats.totalDocsExamined, 6, tojson(res));
+        // If this is the oplog, we expect to be able to seek directly to the start of the 'ts'
+        // range. Otherwise, we have to scan the capped collection from the beginning.
+        expectedDocsExamined = isOplog ? 6 : 9;
+        assert.lte(res.executionStats.totalDocsExamined, expectedDocsExamined, tojson(res));
         collScanStage = getPlanStage(res.executionStats.executionStages, "COLLSCAN");
         assert.neq(
             null, collScanStage, "no collection scan found in explain output: " + tojson(res));
