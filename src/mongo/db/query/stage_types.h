@@ -54,9 +54,6 @@ enum StageType {
     // scan stage is an ixscan with some key-skipping behvaior that only distinct uses.
     STAGE_DISTINCT_SCAN,
 
-    // Dummy stage used for receiving notifications of deletions during chunk migration.
-    STAGE_NOTIFY_DELETE,
-
     STAGE_ENSURE_SORTED,
 
     STAGE_EOF,
