@@ -1417,7 +1417,7 @@ TEST_F(CachePlanSelectionTest,
 
     assertPlanCacheRecoversSolution(
         query,
-        "{fetch: {filter: null, node: {andSorted: {nodes: ["
+        "{fetch: {filter: {$and: [{a: 2}, {a: 3}]}, node: {andSorted: {nodes: ["
         "{ixscan: {pattern: {a: 1}, bounds: {a: [[2, 2, true, true]]}}}, "
         "{ixscan: {pattern: {a: 1}, bounds: {a: [[3, 3, true, true]]}}}]}}}}");
 }
@@ -1441,7 +1441,7 @@ TEST_F(CachePlanSelectionTest,
 
     assertPlanCacheRecoversSolution(
         query,
-        "{fetch: {filter: null, node: {andHash: {nodes: ["
+        "{fetch: {filter: {$and:[{a:{$gte:2}},{a:{$lt:3}}]}, node: {andHash: {nodes: ["
         "{ixscan: {pattern: {a: 1}, bounds: {a: [[2, Infinity, true, true]]}}}, "
         "{ixscan: {pattern: {a: 1}, bounds: {a: [[-Infinity, 3, true, false]]}}}]}}}}");
 }
@@ -1628,7 +1628,7 @@ TEST_F(CachePlanSelectionTest, ContainedOrAndIntersection) {
     runQuery(query);
     assertPlanCacheRecoversSolution(
         query,
-        "{fetch: {filter: null, node: {andHash: {nodes: ["
+        "{fetch: {filter: {$and:[{a:5},{$or:[{a:5,b:6},{c:7}]}]}, node: {andHash: {nodes: ["
         "{or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
         "true]]}}},"

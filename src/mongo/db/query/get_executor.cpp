@@ -195,12 +195,6 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
 
-    // Doc-level locking storage engines cannot answer predicates implicitly via exact index bounds
-    // for index intersection plans, as this can lead to spurious matches.
-    if (supportsDocLocking()) {
-        plannerParams->options |= QueryPlannerParams::CANNOT_TRIM_IXISECT;
-    }
-
     if (shouldWaitForOplogVisibility(
             opCtx, collection, canonicalQuery->getQueryRequest().isTailable())) {
         plannerParams->options |= QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;

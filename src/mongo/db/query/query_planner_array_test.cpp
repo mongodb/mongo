@@ -1640,7 +1640,7 @@ TEST_F(QueryPlannerTest, ContainedOrElemMatchPredicateIsLeadingFieldIndexInterse
         "'MaxKey', true, true]]}}}"
         "}}");
     assertSolutionExists(
-        "{fetch: {filter: null, node: {andHash: {nodes: ["
+        "{fetch: {filter: {$and:[{a:5},{$or:[{a:5,b:6},{c:7}]}]}, node: {andHash: {nodes: ["
         "{or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
         "true]]}}},"

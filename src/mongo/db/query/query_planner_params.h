@@ -79,22 +79,18 @@ struct QueryPlannerParams {
         // sometimes to be interpreted as batchSize, then this should be turned on.
         SPLIT_LIMITED_SORT = 1 << 6,
 
-        // Set this to prevent the planner from generating plans which answer a predicate
-        // implicitly via exact index bounds for index intersection solutions.
-        CANNOT_TRIM_IXISECT = 1 << 7,
-
         // Set this if you don't want any plans with a non-covered projection stage. All projections
         // must be provided/covered by an index.
-        NO_UNCOVERED_PROJECTIONS = 1 << 8,
+        NO_UNCOVERED_PROJECTIONS = 1 << 7,
 
         // Set this to generate covered whole IXSCAN plans.
-        GENERATE_COVERED_IXSCANS = 1 << 9,
+        GENERATE_COVERED_IXSCANS = 1 << 8,
 
         // Set this to track the most recent timestamp seen by this cursor while scanning the oplog.
-        TRACK_LATEST_OPLOG_TS = 1 << 10,
+        TRACK_LATEST_OPLOG_TS = 1 << 9,
 
         // Set this so that collection scans on the oplog wait for visibility before reading.
-        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 11,
+        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 10,
     };
 
     // See Options enum above.

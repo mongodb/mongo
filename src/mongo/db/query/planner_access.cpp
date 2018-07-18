@@ -957,16 +957,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
     std::unique_ptr<MatchExpression> ownedRoot,
     const vector<IndexEntry>& indices,
     const QueryPlannerParams& params) {
-    // If we are not allowed to trim for ixisect, then clone the match expression before
-    // passing it to processIndexScans(), which may do the trimming. If we end up with
-    // an index intersection solution, then we use our copy of the match expression to be
-    // sure that the FETCH stage will recheck the entire predicate.
-    //
-    // XXX: This block is a hack to accommodate the storage layer concurrency model.
-    std::unique_ptr<MatchExpression> clonedRoot;
-    if (params.options & QueryPlannerParams::CANNOT_TRIM_IXISECT) {
-        clonedRoot = root->shallowClone();
-    }
+    // Clone the match expression before passing it to processIndexScans(), as it may trim
+    // predicates. If we end up with an index intersection solution, then we use our copy of the
+    // match expression to be sure that the FETCH stage will recheck the entire predicate. It is not
+    // correct to trim predicates for index intersection plans, as this can lead to spurious matches
+    // (see SERVER-16750).
+    auto clonedRoot = root->shallowClone();
 
     std::vector<std::unique_ptr<QuerySolutionNode>> ixscanNodes;
     const bool inArrayOperator = !ownedRoot;
@@ -1034,12 +1030,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         return andResult;
     }
 
-    // XXX: This block is a hack to accommodate the storage layer concurrency model.
-    if ((params.options & QueryPlannerParams::CANNOT_TRIM_IXISECT) &&
-        (andResult->getType() == STAGE_AND_HASH || andResult->getType() == STAGE_AND_SORTED)) {
-        // We got an index intersection solution, and we aren't allowed to answer predicates
-        // using the index. We add a fetch with the entire filter.
-        invariant(clonedRoot.get());
+    if (andResult->getType() == STAGE_AND_HASH || andResult->getType() == STAGE_AND_SORTED) {
+        // We got an index intersection solution, so we aren't allowed to answer predicates exactly
+        // using the index. This is because the index intersection stage finds documents that match
+        // each index's predicate, but the document isn't guaranteed to be in a state where it
+        // matches all indexed predicates simultaneously. Therefore, it is necessary to add a fetch
+        // stage which will explicitly evaluate the entire predicate (see SERVER-16750).
+        invariant(clonedRoot);
         auto fetch = stdx::make_unique<FetchNode>();
         fetch->filter = std::move(clonedRoot);
         // Takes ownership of 'andResult'.
