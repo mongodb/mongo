@@ -1,6 +1,7 @@
 """GDB Pretty-printers for MongoDB."""
 from __future__ import print_function
 
+import re
 import struct
 import sys
 
@@ -243,6 +244,133 @@ class DecorablePrinter(object):
             yield ('value', obj)
 
 
+def _get_flags(flag_val, flags):
+    """
+    Return a list of flag name strings.
+
+    `flags` is a list of `(flag_name, flag_value)` pairs. The list must be in sorted in order of the
+    highest `flag_value` first and the lowest last.
+    """
+    if not flags:
+        return "Flags not parsed from source."
+
+    ret = []
+    for name, hex_val in flags:
+        dec_val = int(hex_val, 16)
+        if flag_val < dec_val:
+            continue
+
+        ret.append(name)
+        flag_val -= dec_val
+
+    return ret
+
+
+class WtCursorPrinter(object):
+    """
+    Pretty-printer for WT_CURSOR objects.
+
+    Complement the `flags: int` field with the macro names used in the source code.
+    """
+
+    try:
+        with open("./src/third_party/wiredtiger/src/include/wiredtiger.in") as wiredtiger_header:
+            file_contents = wiredtiger_header.read()
+            cursor_flags_re = re.compile(r"#define\s+WT_CURSTD_(\w+)\s+0x(\d+)u")
+            cursor_flags = cursor_flags_re.findall(file_contents)[::-1]
+    except IOError:
+        cursor_flags = []
+
+    def __init__(self, val):
+        """Initializer."""
+        self.val = val
+
+    # pylint: disable=R0201
+    def to_string(self):
+        """to_string."""
+        return None
+
+    def children(self):
+        """children."""
+        for field in self.val.type.fields():
+            field_val = self.val[field.name]
+            if field.name == "flags":
+                yield ("flags", "{} ({})".format(field_val,
+                                                 str(_get_flags(field_val, self.cursor_flags))))
+            else:
+                yield (field.name, field_val)
+
+
+class WtSessionImplPrinter(object):
+    """
+    Pretty-printer for WT_SESSION_IMPL objects.
+
+    Complement the `flags: int` field with the macro names used in the source code.
+    """
+
+    try:
+        with open("./src/third_party/wiredtiger/src/include/session.h") as session_header:
+            file_contents = session_header.read()
+            session_flags_re = re.compile(r"#define\s+WT_SESSION_(\w+)\s+0x(\d+)u")
+            session_flags = session_flags_re.findall(file_contents)[::-1]
+    except IOError:
+        session_flags = []
+
+    def __init__(self, val):
+        """Initializer."""
+        self.val = val
+
+    # pylint: disable=R0201
+    def to_string(self):
+        """to_string."""
+        return None
+
+    def children(self):
+        """children."""
+        for field in self.val.type.fields():
+            field_val = self.val[field.name]
+            if field.name == "flags":
+                yield ("flags", "{} ({})".format(field_val,
+                                                 str(_get_flags(field_val, self.session_flags))))
+            else:
+                yield (field.name, field_val)
+
+
+class WtTxnPrinter(object):
+    """
+    Pretty-printer for WT_TXN objects.
+
+    Complement the `flags: int` field with the macro names used in the source code.
+    """
+
+    try:
+        with open("./src/third_party/wiredtiger/src/include/txn.h") as txn_header:
+            file_contents = txn_header.read()
+            txn_flags_re = re.compile(r"#define\s+WT_TXN_(\w+)\s+0x(\d+)u")
+            txn_flags = txn_flags_re.findall(file_contents)[::-1]
+    except IOError:
+        txn_flags = []
+
+    def __init__(self, val):
+        """Initializer."""
+        self.val = val
+
+    # pylint: disable=R0201
+    def to_string(self):
+        """to_string."""
+        return None
+
+    def children(self):
+        """children."""
+        for field in self.val.type.fields():
+            field_val = self.val[field.name]
+            if field.name == "flags":
+                yield ("flags", "{} ({})".format(field_val,
+                                                 str(_get_flags(field_val, self.txn_flags))))
+            else:
+                yield (field.name, field_val)
+
+
 def find_match_brackets(search, opening='<', closing='>'):
     """Return the index of the closing bracket that matches the first opening bracket.
 
@@ -334,6 +462,9 @@ def build_pretty_printer():
     pp.add('StringData', 'mongo::StringData', False, StringDataPrinter)
     pp.add('UnorderedFastKeyTable', 'mongo::UnorderedFastKeyTable', True,
            UnorderedFastKeyTablePrinter)
+    pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
+    pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
+    pp.add('__wt_txn', '__wt_txn', False, WtTxnPrinter)
     return pp
 
 
