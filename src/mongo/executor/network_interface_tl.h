@@ -110,6 +110,7 @@ private:
         Promise<RemoteCommandResponse> promise;
     };
 
+    void _run();
     void _eraseInUseConn(const TaskExecutor::CallbackHandle& handle);
     Future<RemoteCommandResponse> _onAcquireConn(std::shared_ptr<CommandState> state,
                                                  Future<RemoteCommandResponse> future,

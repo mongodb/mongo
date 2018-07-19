@@ -101,17 +101,37 @@ void NetworkInterfaceTL::startup() {
         std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
     _ioThread = stdx::thread([this] {
         setThreadName(_instanceName);
-        LOG(2) << "The NetworkInterfaceTL reactor thread is spinning up";
-        _reactor->run();
+        _run();
     });
 }
 
-void NetworkInterfaceTL::shutdown() {
-    _inShutdown.store(true);
-    _reactor->stop();
-    _ioThread.join();
+void NetworkInterfaceTL::_run() {
+    LOG(2) << "The NetworkInterfaceTL reactor thread is spinning up";
+
+    // This returns when the reactor is stopped in shutdown()
+    _reactor->run();
+
+    // Note that the pool will shutdown again when the ConnectionPool dtor runs
+    // This prevents new timers from being set, calls all cancels via the factory registry, and
+    // destructs all connections for all existing pools.
     _pool->shutdown();
+
+    // Close out all remaining tasks in the reactor now that they've all been canceled.
+    _reactor->drain();
+
     LOG(2) << "NetworkInterfaceTL shutdown successfully";
+}
+
+void NetworkInterfaceTL::shutdown() {
+    if (_inShutdown.swap(true))
+        return;
+
+    LOG(2) << "Shutting down network interface.";
+
+    // Stop the reactor/thread first so that nothing runs on a partially dtor'd pool.
+    _reactor->stop();
+
+    _ioThread.join();
 }
 
 bool NetworkInterfaceTL::inShutdown() const {

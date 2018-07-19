@@ -93,12 +93,13 @@ class HangingHook : public executor::NetworkConnectionHook {
     }
 
     Status handleReply(const HostAndPort& remoteHost, RemoteCommandResponse&& response) final {
-        if (pingCommandMissing(response)) {
-            return {ErrorCodes::NetworkInterfaceExceededTimeLimit,
-                    "No ping command. Simulating timeout"};
+        if (!pingCommandMissing(response)) {
+            ASSERT_EQ(ErrorCodes::CallbackCanceled, response.status);
+            return response.status;
         }
 
-        MONGO_UNREACHABLE;
+        return {ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                "No ping command. Simulating timeout"};
     }
 };
 

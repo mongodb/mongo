@@ -62,9 +62,8 @@ void NetworkInterfaceIntegrationFixture::startNet(
 }
 
 void NetworkInterfaceIntegrationFixture::tearDown() {
-    if (!_net->inShutdown()) {
-        _net->shutdown();
-    }
+    // Network interface will only shutdown once because of an internal shutdown guard
+    _net->shutdown();
 }
 
 NetworkInterface& NetworkInterfaceIntegrationFixture::net() {

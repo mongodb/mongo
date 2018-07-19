@@ -59,7 +59,8 @@ namespace executor {
  * go out of existence after hostTimeout passes without any of their
  * connections being used.
  */
-class ConnectionPool::SpecificPool {
+class ConnectionPool::SpecificPool final
+    : public std::enable_shared_from_this<ConnectionPool::SpecificPool> {
 public:
     /**
      * These active client methods must be used whenever entering a specific pool outside of the
@@ -219,7 +220,7 @@ private:
 
     std::vector<Request> _requests;
 
-    std::unique_ptr<TimerInterface> _requestTimer;
+    std::shared_ptr<TimerInterface> _requestTimer;
     Date_t _requestTimerExpiration;
     size_t _activeClients;
     size_t _generation;
@@ -266,7 +267,7 @@ constexpr Milliseconds ConnectionPool::kDefaultRefreshTimeout;
 const Status ConnectionPool::kConnectionStateUnknown =
     Status(ErrorCodes::InternalError, "Connection is in an unknown state");
 
-ConnectionPool::ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl,
+ConnectionPool::ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> impl,
                                std::string name,
                                Options options)
     : _name(std::move(name)),
@@ -289,6 +290,8 @@ ConnectionPool::~ConnectionPool() {
 }
 
 void ConnectionPool::shutdown() {
+    _factory->shutdown();
+
     std::vector<SpecificPool*> pools;
 
     // Ensure we decrement active clients for all pools that we inc on (because we intend to process
@@ -515,6 +518,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
     auto needsRefreshTP = connPtr->getLastUsed() + _parent->_options.refreshRequirement;
 
     auto conn = takeFromPool(_checkedOutPool, connPtr);
+    invariant(conn);
 
     updateStateInLock();
 
@@ -611,29 +615,27 @@ void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk
     // Our strategy for refreshing connections is to check them out and
     // immediately check them back in (which kicks off the refresh logic in
     // returnConnection
-    connPtr->setTimeout(_parent->_options.refreshRequirement, [this, connPtr]() {
-        OwnedConnection conn;
+    connPtr->setTimeout(_parent->_options.refreshRequirement,
+                        [ this, connPtr, anchor = shared_from_this() ]() {
+                            runWithActiveClient([&](stdx::unique_lock<stdx::mutex> lk) {
+                                auto conn = takeFromPool(_readyPool, connPtr);
 
-        runWithActiveClient([&](stdx::unique_lock<stdx::mutex> lk) {
-            if (!_readyPool.count(connPtr)) {
-                // We've already been checked out. We don't need to refresh
-                // ourselves.
-                return;
-            }
+                                // We've already been checked out. We don't need to refresh
+                                // ourselves.
+                                if (!conn)
+                                    return;
 
-            conn = takeFromPool(_readyPool, connPtr);
+                                // If we're in shutdown, we don't need to refresh connections
+                                if (_state == State::kInShutdown)
+                                    return;
 
-            // If we're in shutdown, we don't need to refresh connections
-            if (_state == State::kInShutdown)
-                return;
+                                _checkedOutPool[connPtr] = std::move(conn);
 
-            _checkedOutPool[connPtr] = std::move(conn);
+                                connPtr->indicateSuccess();
 
-            connPtr->indicateSuccess();
-
-            returnConnection(connPtr, std::move(lk));
-        });
-    });
+                                returnConnection(connPtr, std::move(lk));
+                            });
+                        });
 
     fulfillRequests(lk);
 }
@@ -764,14 +766,13 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
             fassertFailed(40336);
         }
 
-        auto connPtr = handle.get();
-        _processingPool[connPtr] = std::move(handle);
+        _processingPool[handle.get()] = handle;
 
         ++_created;
 
         // Run the setup callback
         lk.unlock();
-        connPtr->setup(
+        handle->setup(
             _parent->_options.refreshTimeout, [this](ConnectionInterface* connPtr, Status status) {
                 runWithActiveClient([&](stdx::unique_lock<stdx::mutex> lk) {
                     auto conn = takeFromProcessingPool(connPtr);
@@ -844,7 +845,8 @@ template <typename OwnershipPoolType>
 typename OwnershipPoolType::mapped_type ConnectionPool::SpecificPool::takeFromPool(
     OwnershipPoolType& pool, typename OwnershipPoolType::key_type connPtr) {
     auto iter = pool.find(connPtr);
-    invariant(iter != pool.end());
+    if (iter == pool.end())
+        return typename OwnershipPoolType::mapped_type();
 
     auto conn = std::move(iter->second);
     pool.erase(iter);
@@ -853,8 +855,9 @@ typename OwnershipPoolType::mapped_type ConnectionPool::SpecificPool::takeFromPo
 
 ConnectionPool::SpecificPool::OwnedConnection ConnectionPool::SpecificPool::takeFromProcessingPool(
     ConnectionInterface* connPtr) {
-    if (_processingPool.count(connPtr))
-        return takeFromPool(_processingPool, connPtr);
+    auto conn = takeFromPool(_processingPool, connPtr);
+    if (conn)
+        return conn;
 
     return takeFromPool(_droppedProcessingPool, connPtr);
 }

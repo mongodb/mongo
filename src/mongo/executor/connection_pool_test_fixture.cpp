@@ -42,6 +42,8 @@ TimerImpl::~TimerImpl() {
 }
 
 void TimerImpl::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
+    _timers.erase(this);
+
     _cb = std::move(cb);
     _expiration = _global->now() + timeout;
 
@@ -50,10 +52,14 @@ void TimerImpl::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
 
 void TimerImpl::cancelTimeout() {
     _timers.erase(this);
+    _cb = TimeoutCallback{};
 }
 
 void TimerImpl::clear() {
-    _timers.clear();
+    while (!_timers.empty()) {
+        auto* timer = *_timers.begin();
+        timer->cancelTimeout();
+    }
 }
 
 void TimerImpl::fireIfNecessary() {
@@ -233,7 +239,7 @@ std::shared_ptr<ConnectionPool::ConnectionInterface> PoolImpl::makeConnection(
     return std::make_shared<ConnectionImpl>(hostAndPort, generation, this);
 }
 
-std::unique_ptr<ConnectionPool::TimerInterface> PoolImpl::makeTimer() {
+std::shared_ptr<ConnectionPool::TimerInterface> PoolImpl::makeTimer() {
     return stdx::make_unique<TimerImpl>(this);
 }
 
