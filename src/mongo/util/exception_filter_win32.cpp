@@ -134,8 +134,8 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
               sizeof(addressString),
               "0x%p",
               excPointers->ExceptionRecord->ExceptionAddress);
-    log() << "*** unhandled exception " << exceptionString << " at " << addressString
-          << ", terminating";
+    severe() << "*** unhandled exception " << exceptionString << " at " << addressString
+             << ", terminating";
     if (excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
         ULONG acType = excPointers->ExceptionRecord->ExceptionInformation[0];
         const char* acTypeString;
@@ -157,10 +157,10 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
                   sizeof(addressString),
                   " 0x%llx",
                   excPointers->ExceptionRecord->ExceptionInformation[1]);
-        log() << "*** access violation was a " << acTypeString << addressString;
+        severe() << "*** access violation was a " << acTypeString << addressString;
     }
 
-    log() << "*** stack trace for unhandled exception:";
+    severe() << "*** stack trace for unhandled exception:";
 
     // Create a copy of context record because printWindowsStackTrace will mutate it.
     CONTEXT contextCopy(*(excPointers->ContextRecord));
@@ -171,7 +171,7 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
 
     // Don't go through normal shutdown procedure. It may make things worse.
     // Do not go through _exit or ExitProcess(), terminate immediately
-    log() << "*** immediate exit due to unhandled exception";
+    severe() << "*** immediate exit due to unhandled exception";
     TerminateProcess(GetCurrentProcess(), EXIT_ABRUPT);
 
     // We won't reach here
