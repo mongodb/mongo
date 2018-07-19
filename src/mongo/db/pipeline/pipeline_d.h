@@ -126,7 +126,8 @@ private:
                                 DepsTracker deps,
                                 const BSONObj& queryObj = BSONObj(),
                                 const BSONObj& sortObj = BSONObj(),
-                                const BSONObj& projectionObj = BSONObj());
+                                const BSONObj& projectionObj = BSONObj(),
+                                bool failsForExecutionLevelExplain = false);
 };
 
 }  // namespace mongo

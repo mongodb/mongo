@@ -181,6 +181,13 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
     if (!explain)
         return Value();
 
+    if (*explain >= ExplainOptions::Verbosity::kExecStats) {
+        uassert(50851,
+                "Attempting to explain() pipeline with a cursor that cannot be explained at level "
+                "'executionStats' or above. Try running the explain with verbosity level "
+                "'queryPlanner'",
+                !_failsForExecutionLevelExplain);
+    }
     // Get planner-level explain info from the underlying PlanExecutor.
     invariant(_exec);
     BSONObjBuilder explainBuilder;
@@ -268,11 +275,13 @@ DocumentSourceCursor::~DocumentSourceCursor() {
 DocumentSourceCursor::DocumentSourceCursor(
     Collection* collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const intrusive_ptr<ExpressionContext>& pCtx)
+    const intrusive_ptr<ExpressionContext>& pCtx,
+    bool failsForExecutionLevelExplain)
     : DocumentSource(pCtx),
       _docsAddedToBatches(0),
       _exec(std::move(exec)),
-      _outputSorts(_exec->getOutputSorts()) {
+      _outputSorts(_exec->getOutputSorts()),
+      _failsForExecutionLevelExplain(failsForExecutionLevelExplain) {
 
     _planSummary = Explain::getPlanSummary(_exec.get());
     recordPlanSummaryStats();
@@ -285,9 +294,10 @@ DocumentSourceCursor::DocumentSourceCursor(
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     Collection* collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    intrusive_ptr<DocumentSourceCursor> source(
-        new DocumentSourceCursor(collection, std::move(exec), pExpCtx));
+    const intrusive_ptr<ExpressionContext>& pExpCtx,
+    bool failsForExecutionLevelExplain) {
+    intrusive_ptr<DocumentSourceCursor> source(new DocumentSourceCursor(
+        collection, std::move(exec), pExpCtx, failsForExecutionLevelExplain));
     return source;
 }
 }

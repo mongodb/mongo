@@ -625,7 +625,13 @@ void PipelineD::prepareCursorSource(Collection* collection,
                     pipeline,
                     expCtx,
                     std::move(exec),
-                    pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata));
+                    pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata),
+                    BSONObj(),  // queryObj
+                    BSONObj(),  // sortObj
+                    BSONObj(),  // projectionObj
+                    // Do not allow execution-level explains on this DocumentSourceCursor,
+                    // as it contains a RandomCursor, which will never return EOF.
+                    true);
                 return;
             }
         }
@@ -870,13 +876,14 @@ void PipelineD::addCursorSource(Collection* collection,
                                 DepsTracker deps,
                                 const BSONObj& queryObj,
                                 const BSONObj& sortObj,
-                                const BSONObj& projectionObj) {
+                                const BSONObj& projectionObj,
+                                bool failsForExecutionLevelExplain) {
     // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved.
     exec->saveState();
 
     // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
-    intrusive_ptr<DocumentSourceCursor> pSource =
-        DocumentSourceCursor::create(collection, std::move(exec), expCtx);
+    intrusive_ptr<DocumentSourceCursor> pSource = DocumentSourceCursor::create(
+        collection, std::move(exec), expCtx, failsForExecutionLevelExplain);
 
     // Note the query, sort, and projection for explain.
     pSource->setQuery(queryObj);

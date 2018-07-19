@@ -74,7 +74,8 @@ public:
     static boost::intrusive_ptr<DocumentSourceCursor> create(
         Collection* collection,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        bool failsForExecutionLevelExplain = false);
 
     /*
       Record the query that was specified for the cursor this wraps, if
@@ -163,7 +164,8 @@ protected:
 private:
     DocumentSourceCursor(Collection* collection,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                         bool failsForExecutionLevelExplain = false);
     ~DocumentSourceCursor();
 
     /**
@@ -202,6 +204,12 @@ private:
     BSONObjSet _outputSorts;
     std::string _planSummary;
     PlanSummaryStats _planSummaryStats;
+
+    // It may be unsafe or impossible to explain certain types of cursors at an 'execution' level
+    // (for example, a random cursor, which never produces EOF). If we attempt to run explain() on
+    // a pipeline containing a cursor with this flag set to false, we'll uassert. This limitation
+    // has been relaxed in more recent branches as part of SERVER-29421.
+    const bool _failsForExecutionLevelExplain;
 };
 
 }  // namespace mongo
