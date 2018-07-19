@@ -41,6 +41,9 @@
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/uuid.h"
 
+#define LOG_CATALOG_REFRESH(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kShardingCatalogRefresh)
+
 namespace mongo {
 
 class NamespaceString;

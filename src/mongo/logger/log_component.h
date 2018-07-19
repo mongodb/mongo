@@ -56,6 +56,7 @@ public:
         kReplicationHeartbeats,
         kReplicationRollback,
         kSharding,
+        kShardingCatalogRefresh,
         kStorage,
         kStorageRecovery,
         kJournal,
