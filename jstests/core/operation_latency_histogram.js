@@ -121,8 +121,12 @@
 
     // CreateIndex
     assert.commandWorked(testColl.createIndex({pt: "2dsphere"}));
-    // TODO SERVER-24705: createIndex is not currently counted in Top.
-    lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 0);
+    // The createIndex shell helper is run as an insert when writeMode is not "commands".
+    if (testDB.getMongo().writeMode() === "commands") {
+        lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
+    } else {
+        lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 1, 0);
+    }
 
     // $geoNear aggregation stage
     assert.commandWorked(testDB.runCommand({

@@ -44,6 +44,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
@@ -291,6 +292,11 @@ public:
             });
             result.appendBool("createdCollectionAutomatically", true);
         }
+
+        // Use AutoStatsTracker to update Top.
+        boost::optional<AutoStatsTracker> statsTracker;
+        const boost::optional<int> dbProfilingLevel = boost::none;
+        statsTracker.emplace(opCtx, ns, Top::LockType::WriteLocked, dbProfilingLevel);
 
         auto indexSpecsWithDefaults =
             resolveCollectionDefaultProperties(opCtx, collection, std::move(specs));
