@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_request.h"
@@ -666,13 +667,12 @@ void MigrationChunkClonerSourceLegacy::_xfer(OperationContext* opCtx,
     arr.done();
 }
 
-repl::OpTime MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
+boost::optional<repl::OpTime> MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
     OperationContext* opCtx, BSONArrayBuilder* arrBuilder) {
     repl::OpTime opTimeToWait;
-    auto seenOpTimeTerm = repl::OpTime::kUninitializedTerm;
 
     if (!_sessionCatalogSource) {
-        return {};
+        return boost::none;
     }
 
     while (_sessionCatalogSource->hasMoreOplog()) {
@@ -685,15 +685,6 @@ repl::OpTime MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
         }
 
         auto newOpTime = result.oplog->getOpTime();
-        if (seenOpTimeTerm == repl::OpTime::kUninitializedTerm) {
-            seenOpTimeTerm = newOpTime.getTerm();
-        } else {
-            uassert(40650,
-                    str::stream() << "detected change of term from " << seenOpTimeTerm << " to "
-                                  << newOpTime.getTerm(),
-                    seenOpTimeTerm == newOpTime.getTerm());
-        }
-
         auto oplogDoc = result.oplog->toBSON();
 
         // Use the builder size instead of accumulating the document sizes directly so that we
@@ -713,7 +704,7 @@ repl::OpTime MigrationChunkClonerSourceLegacy::nextSessionMigrationBatch(
         }
     }
 
-    return opTimeToWait;
+    return boost::make_optional(opTimeToWait);
 }
 
 }  // namespace mongo
