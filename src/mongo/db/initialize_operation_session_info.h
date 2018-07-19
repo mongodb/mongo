@@ -37,7 +37,8 @@ namespace mongo {
  * operation context. Must only be called once per operation and should be done right in the
  * beginning.
  *
- * Throws if the sessionId/txnNumber combination is not properly formatted.
+ * Returns InvalidOptions error code if FCV is not 3.6. or if the sessionId/txnNumber combination is
+ * not properly formatted.
  *
  * requiresAuth specifies if the command we're initializing operationSessionInfo for requires
  * authorization or not.  This can be determined by invoking ->requiresAuth() on the parsed command.
@@ -45,10 +46,10 @@ namespace mongo {
  * Both isReplSetMemberOrMongos and supportsDocLocking need to be true if the command contains a
  * transaction number, otherwise this function will throw.
  */
-void initializeOperationSessionInfo(OperationContext* opCtx,
-                                    const BSONObj& requestBody,
-                                    bool requiresAuth,
-                                    bool isReplSetMemberOrMongos,
-                                    bool supportsDocLocking);
+Status initializeOperationSessionInfo(OperationContext* opCtx,
+                                      const BSONObj& requestBody,
+                                      bool requiresAuth,
+                                      bool isReplSetMemberOrMongos,
+                                      bool supportsDocLocking);
 
 }  // namespace mongo

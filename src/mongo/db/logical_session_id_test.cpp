@@ -243,7 +243,8 @@ TEST_F(LogicalSessionIdTest, GenWithoutAuthedUser) {
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_NoSessionIdNoTransactionNumber) {
     addSimpleUser(UserName("simple", "test"));
-    initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true, true, true);
+    uassertStatusOK(
+        initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true, true, true));
 
     ASSERT(!_opCtx->getLogicalSessionId());
     ASSERT(!_opCtx->getTxnNumber());
@@ -254,12 +255,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdNoTransacti
     LogicalSessionFromClient lsid{};
     lsid.setId(UUID::gen());
 
-    initializeOperationSessionInfo(_opCtx.get(),
-                                   BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "OtherField"
-                                                  << "TestField"),
-                                   true,
-                                   true,
-                                   true);
+    uassertStatusOK(initializeOperationSessionInfo(_opCtx.get(),
+                                                   BSON("TestCmd" << 1 << "lsid" << lsid.toBSON()
+                                                                  << "OtherField"
+                                                                  << "TestField"),
+                                                   true,
+                                                   true,
+                                                   true));
 
     ASSERT(_opCtx->getLogicalSessionId());
     ASSERT_EQ(lsid.getId(), _opCtx->getLogicalSessionId()->getId());
@@ -269,15 +271,15 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdNoTransacti
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_MissingSessionIdWithTransactionNumber) {
     addSimpleUser(UserName("simple", "test"));
-    ASSERT_THROWS_CODE(
-        initializeOperationSessionInfo(_opCtx.get(),
-                                       BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
-                                                      << "TestField"),
-                                       true,
-                                       true,
-                                       true),
-        AssertionException,
-        ErrorCodes::IllegalOperation);
+    ASSERT_THROWS_CODE(uassertStatusOK(initializeOperationSessionInfo(
+                           _opCtx.get(),
+                           BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
+                                          << "TestField"),
+                           true,
+                           true,
+                           true)),
+                       AssertionException,
+                       ErrorCodes::IllegalOperation);
 }
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransactionNumber) {
@@ -285,13 +287,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
     LogicalSessionFromClient lsid;
     lsid.setId(UUID::gen());
 
-    initializeOperationSessionInfo(
+    uassertStatusOK(initializeOperationSessionInfo(
         _opCtx.get(),
         BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                        << "TestField"),
         true,
         true,
-        true);
+        true));
 
     ASSERT(_opCtx->getLogicalSessionId());
     ASSERT_EQ(lsid.getId(), _opCtx->getLogicalSessionId()->getId());
@@ -306,13 +308,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IsReplSetMemberOrMon
     lsid.setId(UUID::gen());
 
     ASSERT_THROWS_CODE(
-        initializeOperationSessionInfo(
+        uassertStatusOK(initializeOperationSessionInfo(
             _opCtx.get(),
             BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                            << "TestField"),
             true,
             false,
-            true),
+            true)),
         AssertionException,
         ErrorCodes::IllegalOperation);
 }
@@ -323,13 +325,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SupportsDocLockingFa
     lsid.setId(UUID::gen());
 
     ASSERT_THROWS_CODE(
-        initializeOperationSessionInfo(
+        uassertStatusOK(initializeOperationSessionInfo(
             _opCtx.get(),
             BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                            << "TestField"),
             true,
             true,
-            false),
+            false)),
         AssertionException,
         ErrorCodes::IllegalOperation);
 }
@@ -354,13 +356,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IncompatibleFCV) {
     lsid.setId(UUID::gen());
 
     ASSERT_THROWS_CODE(
-        initializeOperationSessionInfo(
+        uassertStatusOK(initializeOperationSessionInfo(
             _opCtx.get(),
             BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                            << "TestField"),
             true,
             true,
-            true),
+            true)),
         AssertionException,
         ErrorCodes::InvalidOptions);
 }

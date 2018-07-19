@@ -35,6 +35,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -262,12 +263,20 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         _stats.setSessionsCollectionJobCount(_stats.getSessionsCollectionJobCount() + 1);
     }
 
+    bool isFCV36 = (serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+
     // This will finish timing _refresh for our stats no matter when we return.
     const auto timeRefreshJob = MakeGuard([this] {
         stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
         auto millis = now() - _stats.getLastSessionsCollectionJobTimestamp();
         _stats.setLastSessionsCollectionJobDurationMillis(millis.count());
     });
+
+    if (!isFCV36) {
+        // TODO: SERVER-36104
+        return;
+    }
 
     // get or make an opCtx
     boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;

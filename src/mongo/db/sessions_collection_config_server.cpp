@@ -95,6 +95,13 @@ Status SessionsCollectionConfigServer::setupSessionsCollection(OperationContext*
         return {ErrorCodes::ShardingStateNotInitialized, "sharding state is not yet initialized"};
     }
 
+    bool isFCV36 = (serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+
+    if (!isFCV36) {
+        return {ErrorCodes::MustUpgrade, "Can not create config.system.sessions collection"};
+    }
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     {
         // Only try to set up this collection until we have done so successfully once.

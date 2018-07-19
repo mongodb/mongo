@@ -84,6 +84,9 @@ public:
         auto mockSessions = stdx::make_unique<MockSessionsCollection>(_sessions);
         _cache = stdx::make_unique<LogicalSessionCacheImpl>(
             std::move(mockService), std::move(mockSessions), nullptr);
+
+        serverGlobalParams.featureCompatibility.setVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
     }
 
     void tearDown() override {

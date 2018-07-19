@@ -251,7 +251,8 @@ public:
             // The ephemeral for test storage engine doesn't support document-level locking, so
             // requests with txnNumbers aren't allowed. To get around this, we have to manually set
             // up the session state and perform the insert.
-            initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
+            uassertStatusOK(initializeOperationSessionInfo(
+                innerOpCtx.get(), insertBuilder.obj(), true, true, true));
             OperationContextSession sessionTxnState(innerOpCtx.get(), true);
             const auto reply = performInserts(innerOpCtx.get(), insertRequest);
             ASSERT(reply.results.size() == 1);

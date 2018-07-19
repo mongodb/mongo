@@ -144,6 +144,13 @@ auto dispatch(const NamespaceString& ns,
 }  // namespace
 
 Status SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
+    bool isFCV36 = (serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+
+    if (!isFCV36) {
+        return {ErrorCodes::MustUpgrade, "Can not create config.system.sessions collection"};
+    }
+
     return dispatch(
         kSessionsNamespaceString,
         MODE_IX,

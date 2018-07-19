@@ -38,13 +38,13 @@
 
 namespace mongo {
 
-void initializeOperationSessionInfo(OperationContext* opCtx,
-                                    const BSONObj& requestBody,
-                                    bool requiresAuth,
-                                    bool isReplSetMemberOrMongos,
-                                    bool supportsDocLocking) {
+Status initializeOperationSessionInfo(OperationContext* opCtx,
+                                      const BSONObj& requestBody,
+                                      bool requiresAuth,
+                                      bool isReplSetMemberOrMongos,
+                                      bool supportsDocLocking) {
     if (!requiresAuth) {
-        return;
+        return Status::OK();
     }
 
     {
@@ -54,13 +54,20 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
         if (authSession && authSession->isUsingLocalhostBypass() &&
             !authSession->getAuthenticatedUserNames().more()) {
-            return;
+            return Status::OK();
         }
     }
 
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
+    bool isFCV36 = (serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+
     if (osi.getSessionId()) {
+        if (!isFCV36) {
+            return SessionsCommandFCV34Status("Sessions");
+        }
+
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
         opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
@@ -72,27 +79,35 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
     if (osi.getTxnNumber()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-        uassert(ErrorCodes::IllegalOperation,
-                "Transaction number requires a sessionId to be specified",
-                opCtx->getLogicalSessionId());
-        uassert(ErrorCodes::IllegalOperation,
-                "Transaction numbers are only allowed on a replica set member or mongos",
-                isReplSetMemberOrMongos);
-        uassert(ErrorCodes::IllegalOperation,
-                "Transaction numbers are only allowed on storage engines that support "
-                "document-level locking",
-                supportsDocLocking);
-        uassert(ErrorCodes::BadValue,
-                "Transaction number cannot be negative",
-                *osi.getTxnNumber() >= 0);
+        if (!opCtx->getLogicalSessionId()) {
+            return {ErrorCodes::IllegalOperation,
+                    "Transaction number requires a sessionId to be specified"};
+        }
 
-        if (serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            uassertStatusOK(SessionsCommandFCV34Status("Retryable writes"));
+        if (!isReplSetMemberOrMongos) {
+            return {ErrorCodes::IllegalOperation,
+                    "Transaction numbers are only allowed on a replica set member or mongos"};
+        }
+
+
+        if (!supportsDocLocking) {
+            return {ErrorCodes::IllegalOperation,
+                    "Transaction numbers are only allowed on storage engines that support "
+                    "document-level locking"};
+        }
+
+        if (*osi.getTxnNumber() < 0) {
+            return {ErrorCodes::BadValue, "Transaction number cannot be negative"};
+        }
+
+        if (!isFCV36) {
+            return SessionsCommandFCV34Status("Retryable writes");
         }
 
         opCtx->setTxnNumber(*osi.getTxnNumber());
     }
+
+    return Status::OK();
 }
 
 }  // namespace mongo
