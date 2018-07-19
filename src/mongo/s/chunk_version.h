@@ -179,6 +179,10 @@ public:
         return equals(otherVersion);
     }
 
+    bool operator!=(const ChunkVersion& otherVersion) const {
+        return !(otherVersion == *this);
+    }
+
     bool operator>(const ChunkVersion& otherVersion) const {
         return this->_combined > otherVersion._combined;
     }
