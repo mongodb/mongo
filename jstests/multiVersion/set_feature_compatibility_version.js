@@ -224,9 +224,6 @@ TestData.skipCheckDBHashes = true;
     // upgraded to 'latestFCV'.
     // Note: the 'lastStable' secondary must stop replicating during the upgrade to ensure it has no
     // chance of seeing the 'upgrading to latest' message in the oplog, whereupon it would crash.
-
-    // TODO: Revisit the value of this section of code in SERVER-35884.
-    /*
     stopServerReplication(secondary);
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
     restartServerReplication(secondary);
@@ -234,7 +231,6 @@ TestData.skipCheckDBHashes = true;
     assert.writeOK(primaryAdminDB.getSiblingDB("test").coll.insert({shouldReplicate: false}));
     assert.eq(secondaryAdminDB.getSiblingDB("test").coll.find({shouldReplicate: false}).itcount(),
               0);
-    */
     rst.stopSet();
 
     // Test idempotency for setFeatureCompatibilityVersion.
