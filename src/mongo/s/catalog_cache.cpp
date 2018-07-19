@@ -416,20 +416,30 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock,
                                             const std::string& dbName,
                                             std::shared_ptr<DatabaseInfoEntry> dbEntry) {
 
-    log() << "Refreshing cached database entry for " << dbName
-          << "; current cached database info is "
-          << (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj());
+    LOG_CATALOG_REFRESH(1) << "Refreshing cached database entry for " << dbName
+                           << "; current cached database info is "
+                           << (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj());
 
     const auto onRefreshCompleted =
-        [ this, t = Timer(), dbName ](const StatusWith<DatabaseType>& swDbt) {
+        [ this, t = Timer(), dbName, dbEntry ](const StatusWith<DatabaseType>& swDbt) {
         // TODO (SERVER-34164): Track and increment stats for database refreshes.
         if (!swDbt.isOK()) {
-            log() << "Refresh for database " << dbName << " took " << t.millis() << " ms and failed"
-                  << causedBy(redact(swDbt.getStatus()));
+            LOG_CATALOG_REFRESH(0) << "Refresh for database " << dbName << " took " << t.millis()
+                                   << " ms and failed" << causedBy(redact(swDbt.getStatus()));
             return;
         }
-        log() << "Refresh for database " << dbName << " took " << t.millis() << " ms and found "
-              << swDbt.getValue().toBSON();
+
+        const auto dbVersionAfterRefresh = swDbt.getValue().getVersion();
+        const int logLevel =
+            (!dbEntry->dbt ||
+             (dbEntry->dbt &&
+              !databaseVersion::equal(dbVersionAfterRefresh, dbEntry->dbt->getVersion())))
+            ? 0
+            : 1;
+        LOG_CATALOG_REFRESH(logLevel)
+            << "Refresh for database " << dbName << " from version "
+            << (dbEntry->dbt ? dbEntry->dbt->getVersion().toBSON() : BSONObj()) << " to version "
+            << dbVersionAfterRefresh.toBSON() << " took " << t.millis() << " ms";
     };
 
     const auto onRefreshFailed =
@@ -495,7 +505,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
     }
 
     // Invoked when one iteration of getChunksSince has completed, whether with success or error
-    const auto onRefreshCompleted = [ this, t = Timer(), nss, isIncremental ](
+    const auto onRefreshCompleted = [ this, t = Timer(), nss, isIncremental, existingRoutingInfo ](
         const Status& status, RoutingTableHistory* routingInfoAfterRefresh) {
         if (isIncremental) {
             _stats.numActiveIncrementalRefreshes.subtractAndFetch(1);
@@ -506,14 +516,24 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         if (!status.isOK()) {
             _stats.countFailedRefreshes.addAndFetch(1);
 
-            log() << "Refresh for collection " << nss << " took " << t.millis() << " ms and failed"
-                  << causedBy(redact(status));
+            LOG_CATALOG_REFRESH(0) << "Refresh for collection " << nss << " took " << t.millis()
+                                   << " ms and failed" << causedBy(redact(status));
         } else if (routingInfoAfterRefresh) {
-            log() << "Refresh for collection " << nss << " took " << t.millis()
-                  << " ms and found version " << routingInfoAfterRefresh->getVersion();
+            const int logLevel = (!existingRoutingInfo || (existingRoutingInfo &&
+                                                           routingInfoAfterRefresh->getVersion() !=
+                                                               existingRoutingInfo->getVersion()))
+                ? 0
+                : 1;
+            LOG_CATALOG_REFRESH(logLevel)
+                << "Refresh for collection " << nss.toString()
+                << (existingRoutingInfo
+                        ? (" from version " + existingRoutingInfo->getVersion().toString())
+                        : "")
+                << " to version " << routingInfoAfterRefresh->getVersion().toString() << " took "
+                << t.millis() << " ms";
         } else {
-            log() << "Refresh for collection " << nss << " took " << t.millis()
-                  << " ms and found the collection is not sharded";
+            LOG_CATALOG_REFRESH(0) << "Refresh for collection " << nss << " took " << t.millis()
+                                   << " ms and found the collection is not sharded";
         }
     };
 
@@ -573,8 +593,8 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
     const ChunkVersion startingCollectionVersion =
         (existingRoutingInfo ? existingRoutingInfo->getVersion() : ChunkVersion::UNSHARDED());
 
-    log() << "Refreshing chunks for collection " << nss << " based on version "
-          << startingCollectionVersion;
+    LOG_CATALOG_REFRESH(1) << "Refreshing chunks for collection " << nss << " based on version "
+                           << startingCollectionVersion;
 
     try {
         _cacheLoader.getChunksSince(nss, startingCollectionVersion, refreshCallback);

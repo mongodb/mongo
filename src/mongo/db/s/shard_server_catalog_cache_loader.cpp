@@ -636,8 +636,9 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                 return;
             }
 
-            LOG(1) << "Cache loader remotely refreshed for collection " << nss << " from version "
-                   << maxLoaderVersion << " and no metadata was found.";
+            LOG_CATALOG_REFRESH(1) << "Cache loader remotely refreshed for collection " << nss
+                                   << " from version " << maxLoaderVersion
+                                   << " and no metadata was found.";
         } else if (swCollectionAndChangedChunks.isOK()) {
             auto& collAndChunks = swCollectionAndChangedChunks.getValue();
 
@@ -667,10 +668,10 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                     }
                 }
 
-                LOG(1) << "Cache loader remotely refreshed for collection " << nss
-                       << " from collection version " << maxLoaderVersion
-                       << " and found collection version "
-                       << collAndChunks.changedChunks.back().getVersion();
+                LOG_CATALOG_REFRESH(1) << "Cache loader remotely refreshed for collection " << nss
+                                       << " from collection version " << maxLoaderVersion
+                                       << " and found collection version "
+                                       << collAndChunks.changedChunks.back().getVersion();
 
                 // Metadata was found remotely -- otherwise would have received NamespaceNotFound
                 // rather than Status::OK(). Return metadata for CatalogCache that's GTE
@@ -722,8 +723,8 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
                 return;
             }
 
-            LOG(1) << "Cache loader remotely refreshed for database " << name
-                   << " and found the database has been dropped.";
+            LOG_CATALOG_REFRESH(1) << "Cache loader remotely refreshed for database " << name
+                                   << " and found the database has been dropped.";
 
         } else if (swDatabaseType.isOK()) {
             Status scheduleStatus = _ensureMajorityPrimaryAndScheduleDbTask(
@@ -733,8 +734,8 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
                 return;
             }
 
-            LOG(1) << "Cache loader remotely refreshed for database " << name << " and found "
-                   << swDatabaseType.getValue().toBSON();
+            LOG_CATALOG_REFRESH(1) << "Cache loader remotely refreshed for database " << name
+                                   << " and found " << swDatabaseType.getValue().toBSON();
         }
 
         // Complete the callbackFn work.
@@ -769,18 +770,19 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         persisted = std::move(swPersisted.getValue());
     }
 
-    LOG(1) << "Cache loader found "
-           << (enqueued.changedChunks.empty()
-                   ? (tasksAreEnqueued ? "a drop enqueued" : "no enqueued metadata")
-                   : ("enqueued metadata from " +
-                      enqueued.changedChunks.front().getVersion().toString() + " to " +
-                      enqueued.changedChunks.back().getVersion().toString()))
-           << " and " << (persisted.changedChunks.empty()
-                              ? "no persisted metadata"
-                              : ("persisted metadata from " +
-                                 persisted.changedChunks.front().getVersion().toString() + " to " +
-                                 persisted.changedChunks.back().getVersion().toString()))
-           << ", GTE cache version " << catalogCacheSinceVersion;
+    LOG_CATALOG_REFRESH(1)
+        << "Cache loader found "
+        << (enqueued.changedChunks.empty()
+                ? (tasksAreEnqueued ? "a drop enqueued" : "no enqueued metadata")
+                : ("enqueued metadata from " +
+                   enqueued.changedChunks.front().getVersion().toString() + " to " +
+                   enqueued.changedChunks.back().getVersion().toString()))
+        << " and " << (persisted.changedChunks.empty()
+                           ? "no persisted metadata"
+                           : ("persisted metadata from " +
+                              persisted.changedChunks.front().getVersion().toString() + " to " +
+                              persisted.changedChunks.back().getVersion().toString()))
+        << ", GTE cache version " << catalogCacheSinceVersion;
 
     if (!tasksAreEnqueued) {
         // There are no tasks in the queue. Return the persisted metadata.
@@ -1026,8 +1028,9 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
                       << task.maxQueryVersion.toString()
                       << "'. Will be retried.");
 
-    LOG(1) << "Successfully updated persisted chunk metadata for collection '" << nss << "' from '"
-           << task.minQueryVersion << "' to collection version '" << task.maxQueryVersion << "'.";
+    LOG_CATALOG_REFRESH(1) << "Successfully updated persisted chunk metadata for collection '"
+                           << nss << "' from '" << task.minQueryVersion
+                           << "' to collection version '" << task.maxQueryVersion << "'.";
 }
 
 void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext* opCtx,
@@ -1059,7 +1062,8 @@ void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext*
                                              << dbName.toString()
                                              << "'. Will be retried.");
 
-    LOG(1) << "Successfully updated persisted metadata for db " << dbName.toString();
+    LOG_CATALOG_REFRESH(1) << "Successfully updated persisted metadata for db "
+                           << dbName.toString();
 }
 
 CollectionAndChangedChunks
@@ -1094,9 +1098,10 @@ ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVer
             return collAndChangedChunks;
         }
 
-        LOG(1) << "Cache loader read meatadata while updates were being applied: this metadata may"
-               << " be incomplete. Retrying. Refresh state before read: " << beginRefreshState
-               << ". Current refresh state: '" << endRefreshState << "'.";
+        LOG_CATALOG_REFRESH(1)
+            << "Cache loader read meatadata while updates were being applied: this metadata may"
+            << " be incomplete. Retrying. Refresh state before read: " << beginRefreshState
+            << ". Current refresh state: '" << endRefreshState << "'.";
     }
 }
 
