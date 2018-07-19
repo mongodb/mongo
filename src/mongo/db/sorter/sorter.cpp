@@ -463,6 +463,7 @@ private:
     }
 
     void spill() {
+        this->_usedDisk = true;
         if (_data.empty())
             return;
 
@@ -741,6 +742,7 @@ private:
     }
 
     void spill() {
+        this->_usedDisk = true;
         if (_data.empty())
             return;
 
@@ -932,7 +934,6 @@ Sorter<Key, Value>* Sorter<Key, Value>::make(const SortOptions& opts,
     massert(17149,
             "Attempting to use external sort without setting SortOptions::tempDir",
             !(opts.extSortAllowed && opts.tempDir.empty()));
-
     switch (opts.limit) {
         case 0:
             return new sorter::NoLimitSorter<Key, Value, Comparator>(opts, comp, settings);

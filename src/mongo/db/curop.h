@@ -166,6 +166,8 @@ public:
 
     bool hasSortStage{false};  // true if the query plan involves an in-memory sort
 
+    bool usedDisk{false};  // true if the given query used disk
+
     // True if the plan came from the multi-planner (not from the plan cache and not a query with a
     // single solution).
     bool fromMultiPlanner{false};

@@ -173,11 +173,15 @@ public:
     virtual ~Sorter() {}
 
     // TEMP these are here for compatibility. Will be replaced with a general stats API
+    bool usedDisk() {
+        return _usedDisk;
+    }
     virtual int numFiles() const = 0;
     virtual size_t memUsed() const = 0;
 
 protected:
-    Sorter() {}  // can only be constructed as a base
+    bool _usedDisk{false};  // Keeps track of whether the sorter used disk or not
+    Sorter() {}             // can only be constructed as a base
 };
 
 /// Writes pre-sorted data to a sorted file and hands-back an Iterator over that file.

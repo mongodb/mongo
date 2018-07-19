@@ -88,7 +88,7 @@ public:
             DocumentSourceSort::create(pExpCtx,
                                        change_stream_constants::kSortSpec,
                                        noLimit,
-                                       DocumentSourceSort::kMaxMemoryUsageBytes,
+                                       internalDocumentSourceSortMaxBlockingSortBytes.load(),
                                        mergingPresorted);
         return {sortMergingPresorted, this};
     }

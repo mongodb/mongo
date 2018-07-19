@@ -267,6 +267,14 @@ DocumentSource::StageConstraints DocumentSourceFacet::constraints(
             TransactionRequirement::kAllowed};
 }
 
+bool DocumentSourceFacet::usedDisk() {
+    for (auto&& facet : _facets) {
+        if (facet.pipeline->usedDisk())
+            return true;
+    }
+    return false;
+}
+
 DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
     const bool scopeHasVariables = pExpCtx->variablesParseState.hasDefinedVariables();
     for (auto&& facet : _facets) {

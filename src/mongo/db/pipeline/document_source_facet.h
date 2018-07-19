@@ -138,6 +138,7 @@ public:
     void detachFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    bool usedDisk() final;
 
 protected:
     void doDispose() final;

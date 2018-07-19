@@ -95,7 +95,8 @@
         // which we do not expect them to appear.
         const ignoreFields =
             (isMongos
-                 ? ["docsExamined", "keysExamined", "keysInserted", "keysDeleted", "planSummary"]
+                 ? ["docsExamined", "keysExamined", "keysInserted", "keysDeleted", "planSummary", 
+					 "usedDisk", "hasSortStage"]
                  : ["nShards"]);
 
         // Legacy operations do not produce a 'command: <name>' field in the log.
@@ -320,6 +321,26 @@
                                        keysDeleted: 1
                                      })
             },
+            {
+              test: function(db) {
+                  const originalSortBytes = db.adminCommand(
+                      {getParameter: 1, internalDocumentSourceSortMaxBlockingSortBytes: 1});
+                  assert.commandWorked(originalSortBytes);
+                  assert.commandWorked(db.adminCommand(
+                      {setParameter: 1, internalDocumentSourceSortMaxBlockingSortBytes: 10}));
+                  assert.eq(
+                      coll.aggregate([{$match: {a: 1}}, {$sort: {a: 1}}], {allowDiskUse: true})
+                          .itcount(),
+                      1);
+                  assert.commandWorked(db.adminCommand({
+                      setParameter: 1,
+                      internalDocumentSourceSortMaxBlockingSortBytes:
+                          originalSortBytes.internalDocumentSourceSortMaxBlockingSortBytes
+                  }));
+              },
+              logFields:
+                  {command: "aggregate", aggregate: coll.getName(), hasSortStage: 1, usedDisk: 1}
+            }
         ];
 
         // Confirm log contains collation for find command.

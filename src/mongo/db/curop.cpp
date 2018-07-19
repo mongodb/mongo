@@ -555,6 +555,7 @@ string OpDebug::report(Client* client,
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
     OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
+    OPDEBUG_TOSTRING_HELP_BOOL(usedDisk);
     OPDEBUG_TOSTRING_HELP_BOOL(fromMultiPlanner);
     OPDEBUG_TOSTRING_HELP_BOOL(replanned);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nMatched", additiveMetrics.nMatched);
@@ -639,6 +640,7 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_APPEND_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
     OPDEBUG_APPEND_BOOL(hasSortStage);
+    OPDEBUG_APPEND_BOOL(usedDisk);
     OPDEBUG_APPEND_BOOL(fromMultiPlanner);
     OPDEBUG_APPEND_BOOL(replanned);
     OPDEBUG_APPEND_OPTIONAL("nMatched", additiveMetrics.nMatched);
@@ -695,6 +697,7 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     additiveMetrics.keysExamined = planSummaryStats.totalKeysExamined;
     additiveMetrics.docsExamined = planSummaryStats.totalDocsExamined;
     hasSortStage = planSummaryStats.hasSortStage;
+    usedDisk = planSummaryStats.usedDisk;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
     replanned = planSummaryStats.replanned;
 }

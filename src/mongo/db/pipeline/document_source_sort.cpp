@@ -243,10 +243,12 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     BSONObj sortOrder,
     long long limit,
-    uint64_t maxMemoryUsageBytes,
+    boost::optional<uint64_t> maxMemoryUsageBytes,
     bool mergingPresorted) {
     intrusive_ptr<DocumentSourceSort> pSort(new DocumentSourceSort(pExpCtx));
-    pSort->_maxMemoryUsageBytes = maxMemoryUsageBytes;
+    pSort->_maxMemoryUsageBytes = maxMemoryUsageBytes
+        ? *maxMemoryUsageBytes
+        : internalDocumentSourceSortMaxBlockingSortBytes.load();
     pSort->_rawSort = sortOrder.getOwned();
     pSort->_mergingPresorted = mergingPresorted;
 
@@ -362,8 +364,13 @@ void DocumentSourceSort::loadingDone() {
         _sorter.reset(MySorter::make(makeSortOptions(), Comparator(*this)));
     }
     _output.reset(_sorter->done());
+    _usedDisk = _sorter->usedDisk() || _usedDisk;
     _sorter.reset();
     _populated = true;
+}
+
+bool DocumentSourceSort::usedDisk() {
+    return _usedDisk;
 }
 
 Value DocumentSourceSort::getCollationComparisonKey(const Value& val) const {

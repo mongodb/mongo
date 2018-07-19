@@ -232,7 +232,6 @@ DocumentSource::GetNextResult DocumentSourceLookUp::getNext() {
 
     std::vector<Value> results;
     int objsize = 0;
-
     while (auto result = pipeline->getNext()) {
         objsize += result->getApproximateSize();
         uassert(4568,
@@ -242,6 +241,10 @@ DocumentSource::GetNextResult DocumentSourceLookUp::getNext() {
                               << " exceeds maximum document size",
                 objsize <= BSONObjMaxInternalSize);
         results.emplace_back(std::move(*result));
+    }
+    for (auto&& source : pipeline->getSources()) {
+        if (source->usedDisk())
+            _usedDisk = true;
     }
 
     MutableDocument output(std::move(inputDoc));
@@ -428,8 +431,15 @@ std::string DocumentSourceLookUp::getUserPipelineDefinition() {
     return _resolvedPipeline.back().toString();
 }
 
+bool DocumentSourceLookUp::usedDisk() {
+    if (_pipeline)
+        _usedDisk = _usedDisk || _pipeline->usedDisk();
+    return _usedDisk;
+}
+
 void DocumentSourceLookUp::doDispose() {
     if (_pipeline) {
+        _usedDisk = _usedDisk || _pipeline->usedDisk();
         _pipeline->dispose(pExpCtx->opCtx);
         _pipeline.reset();
     }
@@ -542,6 +552,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         }
 
         if (_pipeline) {
+            _usedDisk = _usedDisk || _pipeline->usedDisk();
             _pipeline->dispose(pExpCtx->opCtx);
         }
 

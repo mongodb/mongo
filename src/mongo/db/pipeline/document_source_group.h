@@ -43,8 +43,6 @@ public:
     using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
-    static const size_t kDefaultMaxMemoryUsageBytes = 100 * 1024 * 1024;
-
     // Virtuals from DocumentSource.
     boost::intrusive_ptr<DocumentSource> optimize() final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
@@ -54,13 +52,14 @@ public:
     BSONObjSet getOutputSorts() final;
 
     /**
-     * Convenience method for creating a new $group stage.
+     * Convenience method for creating a new $group stage. If maxMemoryUsageBytes is boost::none,
+     * then it will actually use the value of internalDocumentSourceGroupMaxMemoryBytes.
      */
     static boost::intrusive_ptr<DocumentSourceGroup> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
         std::vector<AccumulationStatement> accumulationStatements,
-        size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
+        boost::optional<size_t> maxMemoryUsageBytes = boost::none);
 
     /**
      * Parses 'elem' into a $group stage, or throws a AssertionException if 'elem' was an invalid
@@ -103,12 +102,17 @@ public:
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final;
 
+    /**
+     * Returns true if this $group stage used disk during execution and false otherwise.
+     */
+    bool usedDisk() final;
+
 protected:
     void doDispose() final;
 
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                 size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
+                                 boost::optional<size_t> maxMemoryUsageBytes = boost::none);
 
     /**
      * getNext() dispatches to one of these three depending on what type of $group it is. All three
@@ -157,6 +161,7 @@ private:
      */
     Value expandId(const Value& val);
 
+    bool _usedDisk;  // Keeps track of whether this $group spilled to disk.
     std::vector<AccumulationStatement> _accumulatedFields;
 
     bool _doingMerge;

@@ -58,6 +58,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/document_source_sample.h"
@@ -639,32 +640,35 @@ Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
     return Timestamp();
 }
 
-std::string PipelineD::getPlanSummaryStr(const Pipeline* pPipeline) {
+std::string PipelineD::getPlanSummaryStr(const Pipeline* pipeline) {
     if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(pPipeline->_sources.front().get())) {
+            dynamic_cast<DocumentSourceCursor*>(pipeline->_sources.front().get())) {
         return docSourceCursor->getPlanSummaryStr();
     }
 
     return "";
 }
 
-void PipelineD::getPlanSummaryStats(const Pipeline* pPipeline, PlanSummaryStats* statsOut) {
+void PipelineD::getPlanSummaryStats(const Pipeline* pipeline, PlanSummaryStats* statsOut) {
     invariant(statsOut);
 
     if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(pPipeline->_sources.front().get())) {
+            dynamic_cast<DocumentSourceCursor*>(pipeline->_sources.front().get())) {
         *statsOut = docSourceCursor->getPlanSummaryStats();
     }
 
     bool hasSortStage{false};
-    for (auto&& source : pPipeline->_sources) {
-        if (dynamic_cast<DocumentSourceSort*>(source.get())) {
+    bool usedDisk{false};
+    for (auto&& source : pipeline->_sources) {
+        if (dynamic_cast<DocumentSourceSort*>(source.get()))
             hasSortStage = true;
-            break;
-        }
-    }
 
+        usedDisk = usedDisk || source->usedDisk();
+        if (usedDisk && hasSortStage)
+            break;
+    }
     statsOut->hasSortStage = hasSortStage;
+    statsOut->usedDisk = usedDisk;
 }
 
 PipelineD::MongoDInterface::MongoDInterface(OperationContext* opCtx) : _client(opCtx) {}

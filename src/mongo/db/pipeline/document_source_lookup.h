@@ -139,6 +139,8 @@ public:
 
     void reattachToOperationContext(OperationContext* opCtx) final;
 
+    bool usedDisk() final;
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
@@ -251,7 +253,6 @@ private:
     static void copyVariablesToExpCtx(const Variables& vars,
                                       const VariablesParseState& vps,
                                       ExpressionContext* expCtx);
-
     /**
      * Resolves let defined variables against 'localDoc' and stores the results in 'variables'.
      */
@@ -286,6 +287,7 @@ private:
         _cache.emplace(maxCacheSizeBytes);
     }
 
+    bool _usedDisk = false;
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
     FieldPath _as;

@@ -46,20 +46,11 @@
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
     assert(!profileObj.hasOwnProperty("hasSortStage"), tojson(profileObj));
+    // Testing that 'usedDisk' is set when disk is used requires either using a lot of data or
+    // configuring a server parameter which could mess up other tests. This testing is
+    // done elsewhere so that this test can stay in the core suite
+    assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
     assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
-
-    //
-    // Confirm hasSortStage with in-memory sort.
-    //
-    coll.drop();
-    for (i = 0; i < 10; ++i) {
-        assert.writeOK(coll.insert({a: i}));
-    }
-
-    assert.eq(8, coll.aggregate([{$match: {a: {$gte: 2}}}, {$sort: {a: 1}}]).itcount());
-    profileObj = getLatestProfilerEntry(testDB);
-
-    assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
 
     //
     // Confirm "fromMultiPlanner" metric.

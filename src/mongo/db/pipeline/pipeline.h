@@ -167,6 +167,11 @@ public:
     void dispose(OperationContext* opCtx);
 
     /**
+     * Checks to see if disk is ever used within the pipeline.
+     */
+    bool usedDisk();
+
+    /**
      * Split the current Pipeline into a Pipeline for each shard, and a Pipeline that combines the
      * results within mongos. This permanently alters this pipeline for the merging operation, and
      * returns a Pipeline object that should be executed on each targeted shard.

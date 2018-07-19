@@ -496,6 +496,10 @@ public:
 
     virtual void reattachToOperationContext(OperationContext* opCtx) {}
 
+    virtual bool usedDisk() {
+        return false;
+    };
+
     /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */

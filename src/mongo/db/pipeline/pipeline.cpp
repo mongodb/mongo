@@ -330,6 +330,11 @@ void Pipeline::dispose(OperationContext* opCtx) {
     }
 }
 
+bool Pipeline::usedDisk() {
+    return std::any_of(
+        _sources.begin(), _sources.end(), [](const auto& stage) { return stage->usedDisk(); });
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::splitForSharded() {
     invariant(!isSplitForShards());
     invariant(!isSplitForMerge());
