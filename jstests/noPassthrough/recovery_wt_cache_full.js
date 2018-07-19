@@ -58,14 +58,6 @@
     assert.commandWorked(
         secondary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
 
-    // (3.6 only) To make the secondary replay the update operations during startup recovery, we
-    // restore the pre-update state of the minvalid document before restarting the secondary.
-    // As of 4.0, it is not necessary to replace the minvalid to replay oplog entries during
-    // startup; it is sufficient for the purposes of this test to disable snapshotting.
-    const minValidColl = secondary.getCollection('local.replset.minvalid');
-    const minValidDocBeforeUpdate = minValidColl.findOne();
-    jsTestLog('Minvalid document before updates: ' + tojson(minValidDocBeforeUpdate));
-
     const numUpdates = 1000;
     jsTestLog('Writing ' + numUpdates + ' updates to ' + numDocs +
               ' documents on secondary after disabling snapshots.');
@@ -78,13 +70,6 @@
     jsTestLog('Waiting for updates on secondary ' + secondary.host +
               ' to be written to the oplog.');
     rst.awaitReplication();
-
-    // Overwrite the minvalid document with its pre-update values before restarting the secondary.
-    const minValidDocAfterUpdate = minValidColl.findOne();
-    jsTestLog('Minvalid document after updates: ' + tojson(minValidDocAfterUpdate));
-    assert.writeOK(minValidColl.remove({}));
-    assert.writeOK(minValidColl.save(minValidDocBeforeUpdate));
-    jsTestLog('Minvalid document after replacement: ' + tojson(minValidColl.findOne()));
 
     secondary = rst.restart(1, {
         setParameter: {
