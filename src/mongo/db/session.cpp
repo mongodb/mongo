@@ -902,7 +902,6 @@ void Session::_abortArbitraryTransaction(WithLock lock) {
 }
 
 void Session::abortActiveTransaction(OperationContext* opCtx) {
-    stdx::unique_lock<Client> clientLock(*opCtx->getClient());
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     if (!_txnState.inMultiDocumentTransaction(lock)) {
