@@ -334,6 +334,14 @@ void runCommand(OperationContext* opCtx,
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, opType);
 
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    auto readConcernParseStatus = readConcernArgs.initialize(request.body);
+    if (!readConcernParseStatus.isOK()) {
+        auto builder = replyBuilder->getBodyBuilder();
+        CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
+        return;
+    }
+
     boost::optional<ScopedRouterSession> scopedSession;
     if (auto osi = initializeOperationSessionInfo(
             opCtx, request.body, command->requiresAuth(), true, true, true)) {
@@ -350,16 +358,8 @@ void runCommand(OperationContext* opCtx,
             auto startTxnSetting = osi->getStartTransaction();
             bool startTransaction = startTxnSetting ? *startTxnSetting : false;
 
-            routerSession->beginOrContinueTxn(*txnNumber, startTransaction);
+            routerSession->beginOrContinueTxn(opCtx, *txnNumber, startTransaction);
         }
-    }
-
-    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    auto readConcernParseStatus = readConcernArgs.initialize(request.body);
-    if (!readConcernParseStatus.isOK()) {
-        auto builder = replyBuilder->getBodyBuilder();
-        CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
-        return;
     }
 
     try {

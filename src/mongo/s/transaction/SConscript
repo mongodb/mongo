@@ -11,6 +11,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/s/common_s',
     ],
 )
@@ -21,6 +22,7 @@ env.CppUnitTest(
         'router_session_runtime_state_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'router_session',
     ]
 )
