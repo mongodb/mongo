@@ -38,6 +38,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
@@ -260,7 +261,7 @@ public:
 
         BSONArrayBuilder arrBuilder;
 
-        repl::OpTime opTime;
+        boost::optional<repl::OpTime> opTime;
 
         writeConflictRetry(opCtx,
                            "Fetching session related oplogs for migration",
@@ -271,10 +272,31 @@ public:
                                    opCtx, &arrBuilder);
                            });
 
-        WriteConcernResult wcResult;
-        WriteConcernOptions majorityWC(
-            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0);
-        uassertStatusOK(waitForWriteConcern(opCtx, opTime, majorityWC, &wcResult));
+        // If the batch returns something, we wait for write concern to ensure that all the entries
+        // in the batch have been majority committed. We then need to check that the rollback id
+        // hasn't changed since we started migration, because a change would indicate that some data
+        // in this batch may have been rolled back. In this case, we abort the migration.
+        if (opTime) {
+            WriteConcernResult wcResult;
+            WriteConcernOptions majorityWC(
+                WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0);
+            uassertStatusOK(waitForWriteConcern(opCtx, opTime.get(), majorityWC, &wcResult));
+
+            auto rollbackIdAtMigrationInit = [&]() {
+                AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
+                return autoCloner.getCloner()->getRollbackIdAtInit();
+            }();
+
+            // The check for rollback id must be done after having waited for majority in order to
+            // ensure that whatever was waited on didn't get rolled back.
+            auto rollbackId = repl::ReplicationProcess::get(opCtx)->getRollbackID();
+            uassert(50881,
+                    str::stream() << "rollback detected, rollbackId was "
+                                  << rollbackIdAtMigrationInit
+                                  << " but is now "
+                                  << rollbackId,
+                    rollbackId == rollbackIdAtMigrationInit);
+        }
 
         result.appendArray("oplog", arrBuilder.arr());
         return true;

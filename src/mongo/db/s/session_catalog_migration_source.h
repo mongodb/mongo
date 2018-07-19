@@ -109,6 +109,13 @@ public:
      */
     void notifyNewWriteOpTime(repl::OpTime opTimestamp);
 
+    /**
+     * Returns the rollback ID recorded at the beginning of session migration.
+     */
+    int getRollbackIdAtInit() const {
+        return _rollbackIdAtInit;
+    }
+
 private:
     /**
      * An iterator for extracting session write oplogs that need to be cloned during migration.
