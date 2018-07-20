@@ -285,6 +285,30 @@ TEST(MatchExpressionParserTest, TextParsesSuccessfullyWhenAllowed) {
             .getStatus());
 }
 
+TEST(MatchExpressionParserTest, TextFailsToParseIfNotTopLevel) {
+    auto query = fromjson("{a: {$text: {$search: 'str'}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kText)
+            .getStatus());
+}
+
+TEST(MatchExpressionParserTest, TextWithinElemMatchFailsToParse) {
+    auto query = fromjson("{a: {$elemMatch: {$text: {$search: 'str'}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kText)
+            .getStatus());
+
+    query = fromjson("{a: {$elemMatch: {$elemMatch: {$text: {$search: 'str'}}}}}");
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kText)
+            .getStatus());
+}
+
 TEST(MatchExpressionParserTest, WhereFailsToParseWhenDisallowed) {
     auto query = fromjson("{$where: 'this.a == this.b'}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

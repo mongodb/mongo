@@ -427,6 +427,11 @@ StatusWithMatchExpression parseText(StringData name,
                                     const ExtensionsCallback* extensionsCallback,
                                     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                     DocumentParseLevel currentLevel) {
+    if (currentLevel == DocumentParseLevel::kUserSubDocument) {
+        return {
+            Status(ErrorCodes::BadValue, "$text can only be applied to the top-level document")};
+    }
+
     if ((allowedFeatures & MatchExpressionParser::AllowedFeatures::kText) == 0u) {
         return {Status(ErrorCodes::BadValue, "$text is not allowed in this context")};
     }
