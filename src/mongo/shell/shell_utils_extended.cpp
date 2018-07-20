@@ -43,6 +43,7 @@
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/password.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
 
@@ -300,6 +301,11 @@ BSONObj getHostName(const BSONObj& a, void* data) {
     return BSON("" << buf);
 }
 
+BSONObj passwordPrompt(const BSONObj& a, void* data) {
+    uassert(50890, "passwordPrompt accepts no arguments", a.nFields() == 0);
+    return BSON("" << askPassword());
+}
+
 void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("getHostName", getHostName);
     scope.injectNative("removeFile", removeFile);
@@ -313,6 +319,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("hostname", hostname);
     scope.injectNative("md5sumFile", md5sumFile);
     scope.injectNative("mkdir", mkdir);
+    scope.injectNative("passwordPrompt", passwordPrompt);
 }
 }
 }
