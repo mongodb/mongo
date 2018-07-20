@@ -23,7 +23,7 @@
 
         jsTestLog("Attempt to drop the collection. This should fail due to the open transaction.");
         assert.commandFailedWithCode(testDB.runCommand({drop: collName, maxTimeMS: 1000}),
-                                     ErrorCodes.ExceededTimeLimit);
+                                     ErrorCodes.MaxTimeMSExpired);
 
         jsTestLog("Downgrade the featureCompatibilityVersion.");
         assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));

@@ -26,7 +26,7 @@
     assert.commandFailedWithCode(
         admin.runCommand(
             {setFeatureCompatibilityVersion: lastStableFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
-        ErrorCodes.ExceededTimeLimit,
+        ErrorCodes.MaxTimeMSExpired,
         "expected setFeatureCompatibilityVersion to fail due to maxTimeAlwaysTimeOut fail point");
 
     // Negative test for "setFeatureCompatibilityVersion"

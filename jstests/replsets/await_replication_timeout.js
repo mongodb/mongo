@@ -32,8 +32,7 @@
     // Test maxTimeMS timeout
     res = testDB.runCommand(
         {insert: collName, documents: [{a: 1}], writeConcern: {w: 3}, maxTimeMS: 1000});
-    assert.commandFailedWithCode(res, ErrorCodes.ExceededTimeLimit);
-    assert.eq(ErrorCodes.ExceededTimeLimit, res.writeConcernError.code);
+    assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
 
     // Test with wtimeout < maxTimeMS
     res = testDB.runCommand({
@@ -52,8 +51,7 @@
         writeConcern: {w: 3, wtimeout: 10 * 1000},
         maxTimeMS: 1000
     });
-    assert.commandFailedWithCode(res, ErrorCodes.ExceededTimeLimit);
-    assert.eq(ErrorCodes.ExceededTimeLimit, res.writeConcernError.code);
+    assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
 
     // dropDatabase respects the 'w' field when it is stronger than the default of majority.
     res = testDB.runCommand({dropDatabase: 1, writeConcern: {w: 3, wtimeout: 1000}});

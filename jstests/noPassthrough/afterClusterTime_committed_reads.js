@@ -45,7 +45,7 @@
             writeConcern: {w: "majority"},
             maxTimeMS: 1000
         }),
-                                     ErrorCodes.ExceededTimeLimit);
+                                     ErrorCodes.MaxTimeMSExpired);
 
         // Restart replication.
         restartReplicationOnSecondaries(rst);

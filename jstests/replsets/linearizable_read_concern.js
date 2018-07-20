@@ -87,7 +87,7 @@ load('jstests/libs/write_concern_util.js');
 
     var result = primary.getDB("test").runCommand(
         {"find": "foo", "readConcern": {level: "linearizable"}, "maxTimeMS": 3000});
-    assert.commandFailedWithCode(result, ErrorCodes.ExceededTimeLimit);
+    assert.commandFailedWithCode(result, ErrorCodes.MaxTimeMSExpired);
 
     jsTestLog("Testing to make sure linearizable read command does not block forever.");
 

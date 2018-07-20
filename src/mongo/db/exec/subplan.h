@@ -103,7 +103,7 @@ public:
      *
      * Returns a non-OK status if query planning fails. In particular, this function returns
      * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield, or
-     * ErrorCodes::ExceededTimeLimit if the operation has exceeded its time limit.
+     * ErrorCodes::MaxTimeMSExpired if the operation has exceeded its time limit.
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 

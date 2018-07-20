@@ -33,7 +33,7 @@ cursor.maxTimeMS(100);
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected query to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+assert.eq(ErrorCodes.MaxTimeMSExpired, error.code);
 
 //
 // Simple negative test for query: a ~300ms query with a 10s time limit should not hit the time
@@ -83,7 +83,7 @@ error = assert.throws(function() {
     cursor.next();
     cursor.next();
 }, [], "expected batch 2 (getmore) to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+assert.eq(ErrorCodes.MaxTimeMSExpired, error.code);
 
 //
 // Simple negative test for getmore:
@@ -139,7 +139,7 @@ cursor.maxTimeMS(6 * 1000);
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected find() to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+assert.eq(ErrorCodes.MaxTimeMSExpired, error.code);
 
 //
 // Many-batch negative test for getmore:
@@ -171,7 +171,7 @@ assert.doesNotThrow(function() {
 
 t.drop();
 res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 100});
-assert(res.ok == 0 && res.code == ErrorCodes.ExceededTimeLimit,
+assert(res.ok == 0 && res.code == ErrorCodes.MaxTimeMSExpired,
        "expected sleep command to abort due to time limit, ok=" + res.ok + ", code=" + res.code);
 
 //
@@ -299,7 +299,7 @@ t.drop();
 assert.eq(
     1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}).ok);
 res = t.getDB().runCommand({ping: 1, maxTimeMS: 10 * 1000});
-assert(res.ok == 0 && res.code == ErrorCodes.ExceededTimeLimit,
+assert(res.ok == 0 && res.code == ErrorCodes.MaxTimeMSExpired,
        "expected command to trigger maxTimeAlwaysTimeOut fail point, ok=" + res.ok + ", code=" +
            res.code);
 assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
@@ -412,7 +412,7 @@ assert.commandWorked(
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected query to abort due to time limit");
-assert.eq(ErrorCodes.ExceededTimeLimit, error.code);
+assert.eq(ErrorCodes.MaxTimeMSExpired, error.code);
 assert.commandWorked(
     t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
 

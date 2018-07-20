@@ -73,7 +73,7 @@
     primarySession.startTransaction(
         {readConcern: {level: "snapshot", atClusterTime: clusterTimeAfter}});
     assert.commandFailedWithCode(primaryDB.runCommand({find: collName, maxTimeMS: 1000}),
-                                 ErrorCodes.ExceededTimeLimit);
+                                 ErrorCodes.MaxTimeMSExpired);
     primarySession.abortTransaction();
 
     // Restart replication on one of the secondaries.
@@ -101,7 +101,7 @@
     secondarySession.startTransaction(
         {readConcern: {level: "snapshot", atClusterTime: clusterTimeAfter}});
     assert.commandFailedWithCode(secondaryDB0.runCommand({find: collName, maxTimeMS: 1000}),
-                                 ErrorCodes.ExceededTimeLimit);
+                                 ErrorCodes.MaxTimeMSExpired);
     secondarySession.abortTransaction();
 
     // Restart replication on the lagged secondary.

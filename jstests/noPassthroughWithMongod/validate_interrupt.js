@@ -29,7 +29,7 @@
 
     if (res.ok === 0) {
         assert.eq(res.code,
-                  ErrorCodes.ExceededTimeLimit,
+                  ErrorCodes.MaxTimeMSExpired,
                   'validate command did not time out:\n' + tojson(res));
     } else {
         // validate() should only succeed if it EBUSY'd. See SERVER-23131.

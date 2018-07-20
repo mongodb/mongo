@@ -368,7 +368,8 @@ Message getMore(OperationContext* opCtx,
             uassert(40136,
                     "Illegal attempt to set operation deadline within DBDirectClient",
                     !opCtx->getClient()->isInDirectClient());
-            opCtx->setDeadlineAfterNowBy(cc->getLeftoverMaxTimeMicros());
+            opCtx->setDeadlineAfterNowBy(cc->getLeftoverMaxTimeMicros(),
+                                         ErrorCodes::MaxTimeMSExpired);
         }
         opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
@@ -589,7 +590,7 @@ std::string runQuery(OperationContext* opCtx,
         uassert(40116,
                 "Illegal attempt to set operation deadline within DBDirectClient",
                 !opCtx->getClient()->isInDirectClient());
-        opCtx->setDeadlineAfterNowBy(Milliseconds{qr.getMaxTimeMS()});
+        opCtx->setDeadlineAfterNowBy(Milliseconds{qr.getMaxTimeMS()}, ErrorCodes::MaxTimeMSExpired);
     }
     opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 

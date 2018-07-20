@@ -28,7 +28,7 @@
                 readConcern: {afterOpTime: {ts: twoKSecTS, t: term}},
                 maxTimeMS: 5000,
             }),
-                                         ErrorCodes.ExceededTimeLimit);
+                                         ErrorCodes.MaxTimeMSExpired);
         };
 
         // Run the time out test 3 times with replication debug log level increased to 2

@@ -125,8 +125,8 @@
     configureMaxTimeAlwaysTimeOut("alwaysOn");
     assert.commandFailedWithCode(
         coll.runCommand("validate", {maxTimeMS: 60 * 1000}),
-        ErrorCodes.ExceededTimeLimit,
-        "expected vailidate to fail with code " + ErrorCodes.ExceededTimeLimit +
+        ErrorCodes.MaxTimeMSExpired,
+        "expected vailidate to fail with code " + ErrorCodes.MaxTimeMSExpired +
             " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "validate".
@@ -136,11 +136,11 @@
 
     // Positive test for "count".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
-    assert.commandFailedWithCode(
-        coll.runCommand("count", {maxTimeMS: 60 * 1000}),
-        ErrorCodes.ExceededTimeLimit,
-        "expected count to fail with code " + ErrorCodes.ExceededTimeLimit +
-            " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
+    assert.commandFailedWithCode(coll.runCommand("count", {maxTimeMS: 60 * 1000}),
+                                 ErrorCodes.MaxTimeMSExpired,
+                                 "expected count to fail with code " + ErrorCodes.MaxTimeMSExpired +
+                                     " due to maxTimeAlwaysTimeOut fail point, but instead got: " +
+                                     tojson(res));
 
     // Negative test for "count".
     configureMaxTimeAlwaysTimeOut("off");
@@ -151,8 +151,8 @@
     configureMaxTimeAlwaysTimeOut("alwaysOn");
     assert.commandFailedWithCode(
         coll.runCommand("collStats", {maxTimeMS: 60 * 1000}),
-        ErrorCodes.ExceededTimeLimit,
-        "expected collStats to fail with code " + ErrorCodes.ExceededTimeLimit +
+        ErrorCodes.MaxTimeMSExpired,
+        "expected collStats to fail with code " + ErrorCodes.MaxTimeMSExpired +
             " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "collStats".
@@ -174,8 +174,8 @@
     });
     assert.commandFailedWithCode(
         res,
-        ErrorCodes.ExceededTimeLimit,
-        "expected mapReduce to fail with code " + ErrorCodes.ExceededTimeLimit +
+        ErrorCodes.MaxTimeMSExpired,
+        "expected mapReduce to fail with code " + ErrorCodes.MaxTimeMSExpired +
             " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "mapReduce".
@@ -196,8 +196,8 @@
     configureMaxTimeAlwaysTimeOut("alwaysOn");
     assert.commandFailedWithCode(
         coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
-        ErrorCodes.ExceededTimeLimit,
-        "expected aggregate to fail with code " + ErrorCodes.ExceededTimeLimit +
+        ErrorCodes.MaxTimeMSExpired,
+        "expected aggregate to fail with code " + ErrorCodes.MaxTimeMSExpired +
             " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "aggregate".

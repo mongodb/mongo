@@ -17,7 +17,7 @@
     // Error codes we expect to see.
 
     // If the secondary is not caught up.
-    var noCaughtUpSecondariesCode = 50;
+    const noCaughtUpSecondariesCode = ErrorCodes.ExceededTimeLimit;
 
     // If the stepdown period is shorter than the secondaryCatchUpPeriodSecs argument.
     var stepDownPeriodTooShortCode = 2;

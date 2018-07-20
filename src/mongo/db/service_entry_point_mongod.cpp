@@ -57,7 +57,7 @@ public:
             opCtx, repl::ReadConcernArgs::get(opCtx), invocation->allowsAfterClusterTime());
 
         if (!rcStatus.isOK()) {
-            if (rcStatus == ErrorCodes::ExceededTimeLimit) {
+            if (ErrorCodes::isExceededTimeLimitError(rcStatus.code())) {
                 const int debugLevel =
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
                 LOG(debugLevel) << "Command on database " << request.getDatabase()

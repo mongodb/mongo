@@ -33,7 +33,7 @@
     var pingIntervalSeconds = 10;
     assert.commandFailedWithCode(
         runFindCommand(new Timestamp(lastOp.ts.getTime() + pingIntervalSeconds * 5, 0)),
-        ErrorCodes.ExceededTimeLimit);
+        ErrorCodes.MaxTimeMSExpired);
 
     var msg = 'Command on database local timed out waiting for read concern to be satisfied.';
     assert.soon(function() {

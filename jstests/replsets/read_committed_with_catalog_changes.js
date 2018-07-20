@@ -218,7 +218,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
         var res =
             coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 5000});
         assert.commandFailedWithCode(res,
-                                     ErrorCodes.ExceededTimeLimit,
+                                     ErrorCodes.MaxTimeMSExpired,
                                      "Expected read of " + coll.getFullName() + " to block");
     }
 
