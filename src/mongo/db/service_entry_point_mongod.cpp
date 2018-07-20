@@ -810,15 +810,16 @@ void execCommandDatabase(OperationContext* opCtx,
 
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
-                   << "with arguments '" << command->getRedactedCopyForLogging(request.body)
-                   << "' and operationTime '" << operationTime.toString() << "': " << e.toString();
+                   << "with arguments '" << redact(command->getRedactedCopyForLogging(request.body))
+                   << "' and operationTime '" << operationTime.toString()
+                   << "': " << redact(e.toString());
 
             _generateErrorResponse(opCtx, replyBuilder, e, metadata, operationTime);
         } else {
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
-                   << "with arguments '" << command->getRedactedCopyForLogging(request.body)
-                   << "': " << e.toString();
+                   << "with arguments '" << redact(command->getRedactedCopyForLogging(request.body))
+                   << "': " << redact(e.toString());
 
             _generateErrorResponse(opCtx, replyBuilder, e, metadata);
         }
@@ -889,7 +890,7 @@ DbResponse runCommands(OperationContext* opCtx, const Message& message) {
             }
 
             LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
-                   << c->getRedactedCopyForLogging(request.body);
+                   << redact(c->getRedactedCopyForLogging(request.body));
 
             {
                 // Try to set this as early as possible, as soon as we have figured out the command.
