@@ -423,7 +423,11 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
 }
 
 void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
-    invariant(!_inUnitOfWork);
+    // This can be called either outside of a WriteUnitOfWork or in a prepared transaction after
+    // setPrepareTimestamp() is called. Prepared transactions ensure the correct timestamping
+    // semantics and the set-once commitTimestamp behavior is exactly what prepared transactions
+    // want.
+    invariant(!_inUnitOfWork || !_prepareTimestamp.isNull());
     invariant(_commitTimestamp.isNull(),
               str::stream() << "Commit timestamp set to " << _commitTimestamp.toString()
                             << " and trying to set it to "
@@ -437,7 +441,7 @@ void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
     _commitTimestamp = timestamp;
 }
 
-Timestamp WiredTigerRecoveryUnit::getCommitTimestamp() {
+Timestamp WiredTigerRecoveryUnit::getCommitTimestamp() const {
     return _commitTimestamp;
 }
 

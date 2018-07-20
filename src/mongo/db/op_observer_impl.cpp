@@ -963,20 +963,43 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
 
 }  //  namespace
 
-void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
+void OpObserverImpl::onTransactionCommit(OperationContext* opCtx, bool wasPrepared) {
     invariant(opCtx->getTxnNumber());
-    Session* const session = OperationContextSession::get(opCtx);
-    invariant(session);
-    auto stmts = session->endTransactionAndRetrieveOperations(opCtx);
+    if (wasPrepared) {
+        // TODO (SERVER-35865): log commitTransaction oplog entry correctly. We log a dummy entry to
+        // test the timestamping behavior.
+        const NamespaceString cmdNss{"admin", "$cmd"};
+        const auto cmdObj = BSON("commitTransaction" << 1);
+        Session::SideTransactionBlock sideTxn(opCtx);
+        WriteUnitOfWork wuow(opCtx);
+        logOperation(opCtx,
+                     "c",
+                     cmdNss,
+                     boost::none,
+                     cmdObj,
+                     nullptr,
+                     false,
+                     getWallClockTimeForOpLog(opCtx),
+                     {},
+                     kUninitializedStmtId,
+                     {},
+                     false /* prepare */,
+                     OplogSlot());
+        wuow.commit();
+    } else {
+        Session* const session = OperationContextSession::get(opCtx);
+        invariant(session);
+        const auto stmts = session->endTransactionAndRetrieveOperations(opCtx);
 
-    // It is possible that the transaction resulted in no changes.  In that case, we should
-    // not write an empty applyOps entry.
-    if (stmts.empty())
-        return;
+        // It is possible that the transaction resulted in no changes.  In that case, we should
+        // not write an empty applyOps entry.
+        if (stmts.empty())
+            return;
 
-    const auto commitOpTime =
-        logApplyOpsForTransaction(opCtx, session, stmts, false /* prepare */).writeOpTime;
-    invariant(!commitOpTime.isNull());
+        const auto commitOpTime =
+            logApplyOpsForTransaction(opCtx, session, stmts, false /* prepare */).writeOpTime;
+        invariant(!commitOpTime.isNull());
+    }
 }
 
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx) {

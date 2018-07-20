@@ -80,6 +80,18 @@ public:
         return _prepareTimestamp;
     }
 
+    virtual void setCommitTimestamp(Timestamp ts) override {
+        _commitTimestamp = ts;
+    }
+
+    virtual Timestamp getCommitTimestamp() const override {
+        return _commitTimestamp;
+    }
+
+    virtual void clearCommitTimestamp() override {
+        _commitTimestamp = Timestamp::min();
+    }
+
 private:
     typedef std::shared_ptr<Change> ChangePtr;
     typedef std::vector<ChangePtr> Changes;
@@ -88,6 +100,7 @@ private:
     stdx::function<void()> _waitUntilDurableCallback;
 
     Timestamp _prepareTimestamp = Timestamp::min();
+    Timestamp _commitTimestamp = Timestamp::min();
 };
 
 }  // namespace mongo

@@ -1013,7 +1013,7 @@ std::vector<repl::ReplOperation> Session::endTransactionAndRetrieveOperations(
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
     // Ensure that we only ever end a transaction when prepared or committing.
-    invariant(_txnState.isPrepared(lk) || _txnState.isCommitting(lk),
+    invariant(_txnState.isPrepared(lk) || _txnState.isCommittingWithoutPrepare(lk),
               str::stream() << "Current state: " << _txnState);
 
     invariant(!_autocommit);
@@ -1021,25 +1021,44 @@ std::vector<repl::ReplOperation> Session::endTransactionAndRetrieveOperations(
     return std::move(_transactionOperations);
 }
 
-void Session::commitTransaction(OperationContext* opCtx) {
+void Session::commitTransaction(OperationContext* opCtx,
+                                boost::optional<Timestamp> commitTimestamp) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
     // and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    _commitTransaction(std::move(lk), opCtx);
+    _commitTransaction(std::move(lk), opCtx, commitTimestamp);
 }
 
-void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx) {
-    _txnState.transitionTo(lk, TransitionTable::State::kCommitting);
+void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk,
+                                 OperationContext* opCtx,
+                                 boost::optional<Timestamp> commitTimestamp) {
+    if (_txnState.isPrepared(lk)) {
+        uassert(ErrorCodes::InvalidOptions,
+                "commitTransaction on a prepared transaction expects a 'commitTimestamp'",
+                commitTimestamp);
+        uassert(ErrorCodes::InvalidOptions,
+                "'commitTimestamp' cannot be null",
+                !commitTimestamp->isNull());
+
+        _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithPrepare);
+        opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp.get());
+    } else {
+        uassert(ErrorCodes::InvalidOptions,
+                "commitTransaction on a non-prepared transaction cannot have a 'commitTimestamp'",
+                !commitTimestamp);
+        _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithoutPrepare);
+    }
 
     // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
     // into the session.
     lk.unlock();
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
-    opObserver->onTransactionCommit(opCtx);
+    const bool wasPrepared = commitTimestamp != boost::none;
+    opObserver->onTransactionCommit(opCtx, wasPrepared);
     lk.lock();
 
     // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session
@@ -1385,8 +1404,10 @@ std::string Session::TransitionTable::toString(State state) {
             return "TxnState::InProgress";
         case Session::TransitionTable::State::kPrepared:
             return "TxnState::Prepared";
-        case Session::TransitionTable::State::kCommitting:
-            return "TxnState::Committing";
+        case Session::TransitionTable::State::kCommittingWithoutPrepare:
+            return "TxnState::CommittingWithoutPrepare";
+        case Session::TransitionTable::State::kCommittingWithPrepare:
+            return "TxnState::CommittingWithPrepare";
         case Session::TransitionTable::State::kCommitted:
             return "TxnState::Committed";
         case Session::TransitionTable::State::kAborted:
@@ -1410,7 +1431,7 @@ bool Session::TransitionTable::_isLegalTransition(State oldState, State newState
             switch (newState) {
                 case State::kNone:
                 case State::kPrepared:
-                case State::kCommitting:
+                case State::kCommittingWithoutPrepare:
                 case State::kAborted:
                     return true;
                 default:
@@ -1419,14 +1440,15 @@ bool Session::TransitionTable::_isLegalTransition(State oldState, State newState
             MONGO_UNREACHABLE;
         case State::kPrepared:
             switch (newState) {
-                case State::kCommitting:
+                case State::kCommittingWithPrepare:
                 case State::kAborted:
                     return true;
                 default:
                     return false;
             }
             MONGO_UNREACHABLE;
-        case State::kCommitting:
+        case State::kCommittingWithPrepare:
+        case State::kCommittingWithoutPrepare:
             switch (newState) {
                 case State::kNone:
                 case State::kCommitted:

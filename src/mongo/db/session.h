@@ -274,8 +274,11 @@ public:
     /**
      * Commits the transaction, including committing the write unit of work and updating
      * transaction state.
+     *
+     * If the transaction is prepared, a 'commitTimestamp' is expected, otherwise providing one will
+     * throw an exception.
      */
-    void commitTransaction(OperationContext* opCtx);
+    void commitTransaction(OperationContext* opCtx, boost::optional<Timestamp> commitTimestamp);
 
     /**
      * Puts a transaction into a prepared state.
@@ -399,7 +402,7 @@ public:
 
     void transitionToCommittingforTest() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _txnState.transitionTo(lk, TransitionTable::State::kCommitting);
+        _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithoutPrepare);
     }
 
 private:
@@ -453,7 +456,15 @@ private:
      */
     class TransitionTable {
     public:
-        enum class State { kNone, kInProgress, kPrepared, kCommitting, kCommitted, kAborted };
+        enum class State {
+            kNone,
+            kInProgress,
+            kPrepared,
+            kCommittingWithoutPrepare,
+            kCommittingWithPrepare,
+            kCommitted,
+            kAborted
+        };
 
         /**
          * Transitions the session from the current state to the new state. If transition validation
@@ -481,8 +492,12 @@ private:
             return _state == State::kPrepared;
         }
 
-        bool isCommitting(WithLock) const {
-            return _state == State::kCommitting;
+        bool isCommittingWithoutPrepare(WithLock) const {
+            return _state == State::kCommittingWithoutPrepare;
+        }
+
+        bool isCommittingWithPrepare(WithLock) const {
+            return _state == State::kCommittingWithPrepare;
         }
 
         bool isCommitted(WithLock) const {
@@ -518,11 +533,11 @@ private:
     // Releases stashed transaction resources to abort the transaction.
     void _abortTransaction(WithLock);
 
-    // Committing a transaction first changes its state to "Committing" and writes to the oplog,
+    // Committing a transaction first changes its state to "Committing*" and writes to the oplog,
     // then it changes the state to "Committed".
     //
-    // When a transaction is in "Committing" state, it's not allowed for other threads to change its
-    // state (i.e. abort the transaction), otherwise the on-disk state will diverge from the
+    // When a transaction is in "Committing*" state, it's not allowed for other threads to change
+    // its state (i.e. abort the transaction), otherwise the on-disk state will diverge from the
     // in-memory state.
     // There are 3 cases where the transaction will be aborted.
     // 1) abortTransaction command. Session check-out mechanism only allows one client to access a
@@ -530,7 +545,9 @@ private:
     // 2) killSession, stepdown, transaction timeout and any thread that aborts the transaction
     // outside of session checkout. They can safely skip the committing transactions.
     // 3) Migration. Should be able to skip committing transactions.
-    void _commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx);
+    void _commitTransaction(stdx::unique_lock<stdx::mutex> lk,
+                            OperationContext* opCtx,
+                            boost::optional<Timestamp> commitTimestamp);
 
     const LogicalSessionId _sessionId;
 

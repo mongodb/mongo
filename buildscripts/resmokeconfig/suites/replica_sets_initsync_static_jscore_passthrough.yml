@@ -11,6 +11,9 @@ selector:
   - jstests/core/capped_update.js
   # Having duplicate namespaces is not supported and will cause initial sync to fail.
   - jstests/core/views/duplicate_ns.js
+  # TODO (SERVER-35865): Unblacklist when we correctly write and apply 'commitTransaction' oplog
+  # entries.
+  - jstests/core/txns/commit_prepared_transaction.js
 
 run_hook_interval: &run_hook_interval 20
 executor:

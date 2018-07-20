@@ -261,8 +261,10 @@ public:
     /**
      * The onTransactionCommit method is called on the commit of an atomic transaction, before the
      * RecoveryUnit onCommit() is called.  It must not be called when no transaction is active.
+     * It accepts a 'wasPrepared' argument specifying if the transaction was prepared before commit
+     * was called.
      */
-    virtual void onTransactionCommit(OperationContext* opCtx) = 0;
+    virtual void onTransactionCommit(OperationContext* opCtx, bool wasPrepared) = 0;
 
     /**
      * The onTransactionPrepare method is called when an atomic transaction is prepared. It must be

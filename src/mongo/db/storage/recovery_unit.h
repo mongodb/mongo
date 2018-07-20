@@ -188,7 +188,8 @@ public:
      * specified in the last setTimestamp() call in the transaction, at commit time.
      *
      * setTimestamp() will fail if a commit timestamp is set using setCommitTimestamp() and not
-     * yet cleared with clearCommitTimestamp().
+     * yet cleared with clearCommitTimestamp(). setTimestamp() will also fail if a prepareTimestamp
+     * has been set.
      */
     virtual Status setTimestamp(Timestamp timestamp) {
         return Status::OK();
@@ -196,14 +197,22 @@ public:
 
     /**
      * Sets a timestamp that will be assigned to all future writes on this RecoveryUnit until
-     * clearCommitTimestamp() is called. This must be called outside of a WUOW and setTimestamp()
-     * must not be called while a commit timestamp is set.
+     * clearCommitTimestamp() is called. This must be called either outside of a WUOW or on a
+     * prepared transaction after setPrepareTimestamp() is called. setTimestamp() must not be called
+     * while a commit timestamp is set.
      */
     virtual void setCommitTimestamp(Timestamp timestamp) {}
 
+    /**
+     * Clears the commit timestamp that was set by setCommitTimestamp(). This must be called outside
+     * of a WUOW. This must be called when a commit timestamp is set.
+     */
     virtual void clearCommitTimestamp() {}
 
-    virtual Timestamp getCommitTimestamp() {
+    /**
+     * Returns the commit timestamp. Can be called at any time.
+     */
+    virtual Timestamp getCommitTimestamp() const {
         return {};
     }
 

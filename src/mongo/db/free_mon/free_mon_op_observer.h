@@ -131,7 +131,7 @@ public:
                        const NamespaceString& collectionName,
                        OptionalCollectionUUID uuid) final {}
 
-    void onTransactionCommit(OperationContext* opCtx) final {}
+    void onTransactionCommit(OperationContext* opCtx, bool wasPrepared) final {}
 
     void onTransactionPrepare(OperationContext* opCtx) final {}
 

@@ -66,7 +66,7 @@ public:
                     "Transaction isn't in progress",
                     session->inMultiDocumentTransaction());
 
-            session->commitTransaction(opCtx);
+            session->commitTransaction(opCtx, boost::none);
         }
 
     private:

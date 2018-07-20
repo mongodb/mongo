@@ -132,7 +132,7 @@ public:
                        const NamespaceString& collectionName,
                        OptionalCollectionUUID uuid) override {}
 
-    void onTransactionCommit(OperationContext* opCtx) override {}
+    void onTransactionCommit(OperationContext* opCtx, bool wasPrepared) override {}
 
     void onTransactionPrepare(OperationContext* opCtx) override {}
 

@@ -56,14 +56,14 @@ public:
     /**
      * Called by doTxn() when ops are ready to commit.
      */
-    void onTransactionCommit(OperationContext* opCtx) override;
+    void onTransactionCommit(OperationContext* opCtx, bool wasPrepared) override;
 
     // If present, holds the applyOps oplog entry written out by the ObObserverImpl
     // onTransactionCommit.
     boost::optional<OplogEntry> applyOpsOplogEntry;
 };
 
-void OpObserverMock::onTransactionCommit(OperationContext* opCtx) {
+void OpObserverMock::onTransactionCommit(OperationContext* opCtx, bool wasPrepared) {
     OplogInterfaceLocal oplogInterface(opCtx, NamespaceString::kRsOplogNamespace.ns());
     auto oplogIter = oplogInterface.makeIterator();
     auto opEntry = unittest::assertGet(oplogIter->next());

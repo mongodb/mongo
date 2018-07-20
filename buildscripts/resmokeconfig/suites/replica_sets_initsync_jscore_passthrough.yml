@@ -74,6 +74,9 @@ selector:
   - jstests/core/txns/transactions_profiling.js
   # The downstream syncing node affects the top output.
   - jstests/core/top.js
+  # TODO (SERVER-35865): Unblacklist when we correctly write and apply 'commitTransaction' oplog
+  # entries.
+  - jstests/core/txns/commit_prepared_transaction.js
 
 run_hook_interval: &run_hook_interval 20
 executor:

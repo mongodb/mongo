@@ -17,7 +17,9 @@ selector:
   # Prepare is not a command on mongos.
   - jstests/core/txns/empty_prepare.js
   - jstests/core/txns/prepare_conflict.js
-  - jstests/core/txns/prepare_transaction.js
+  - jstests/core/txns/abort_prepared_transaction.js
+  - jstests/core/txns/commit_prepared_transaction.js
+  - jstests/core/txns/commit_prepared_transaction_errors.js
 
   # Implicitly creates a database through a collection rename, which does not work in a sharded
   # cluster.

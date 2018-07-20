@@ -23,6 +23,9 @@ selector:
   # TODO SERVER-35217: Attempting to kill a session while multiple transactions have been started on
   # the server may lead to deadlock.
   - jstests/core/txns/kill_sessions_kills_transaction.js
+  # TODO (SERVER-35865): Unblacklist when we correctly write and apply 'commitTransaction' oplog
+  # entries.
+  - jstests/core/txns/commit_prepared_transaction.js
 
 executor:
   archive:

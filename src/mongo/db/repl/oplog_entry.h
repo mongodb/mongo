@@ -55,7 +55,8 @@ public:
         kEmptyCapped,
         kConvertToCapped,
         kCreateIndexes,
-        kDropIndexes
+        kDropIndexes,
+        kCommitTransaction,
     };
 
     // Current oplog version, should be the value of the v field in all oplog entries.

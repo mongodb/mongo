@@ -303,7 +303,7 @@ Status doTxn(OperationContext* opCtx,
 
         numApplied = 0;
         uassertStatusOK(_doTxn(opCtx, dbName, doTxnCmd, &intermediateResult, &numApplied));
-        session->commitTransaction(opCtx);
+        session->commitTransaction(opCtx, boost::none);
         result->appendElements(intermediateResult.obj());
     } catch (const DBException& ex) {
         session->abortActiveTransaction(opCtx);

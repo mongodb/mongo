@@ -89,7 +89,7 @@ public:
 
     void clearCommitTimestamp() override;
 
-    Timestamp getCommitTimestamp() override;
+    Timestamp getCommitTimestamp() const override;
 
     void setPrepareTimestamp(Timestamp timestamp) override;
 

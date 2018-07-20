@@ -292,6 +292,7 @@ private:
     };
     bool _alwaysAllowWrites = false;
     bool _resetLastOpTimesCalled = false;
+    long long _term = OpTime::kInitialTerm;
 };
 
 }  // namespace repl
