@@ -91,7 +91,7 @@
             // Wait for the drop to have a pending MODE_X lock on the database, which will block
             // MODE_IS lock requests behind it.
             let res = testDB.runCommand({find: collName, maxTimeMS: 100});
-            if (res.code == ErrorCodes.ExceededTimeLimit) {
+            if (res.code == ErrorCodes.MaxTimeMSExpired) {
                 return true;
             }
             assert.commandWorked(res);

@@ -217,7 +217,7 @@ public:
 
 TEST_F(OperationDeadlineTests, OperationDeadlineExpiration) {
     auto opCtx = client->makeOperationContext();
-    opCtx->setDeadlineAfterNowBy(Seconds{1});
+    opCtx->setDeadlineAfterNowBy(Seconds{1}, ErrorCodes::ExceededTimeLimit);
     mockClock->advance(Milliseconds{500});
     ASSERT_OK(opCtx->checkForInterruptNoAssert());
 
@@ -245,7 +245,7 @@ TEST_F(OperationDeadlineTests, OperationDeadlineExpiration) {
 template <typename D>
 void assertLargeRelativeDeadlineLikeInfinity(Client& client, D maxTime) {
     auto opCtx = client.makeOperationContext();
-    opCtx->setDeadlineAfterNowBy(maxTime);
+    opCtx->setDeadlineAfterNowBy(maxTime, ErrorCodes::ExceededTimeLimit);
     ASSERT_FALSE(opCtx->hasDeadline()) << "Tried to set maxTime to " << maxTime;
 }
 
@@ -274,7 +274,7 @@ TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesNanoseconds) {
     // Nanoseconds::max() is less than Microseconds::max(), so it is possible to set
     // a deadline of that duration.
     auto opCtx = client->makeOperationContext();
-    opCtx->setDeadlineAfterNowBy(Nanoseconds::max());
+    opCtx->setDeadlineAfterNowBy(Nanoseconds::max(), ErrorCodes::ExceededTimeLimit);
     ASSERT_TRUE(opCtx->hasDeadline());
     ASSERT_EQ(mockClock->now() + mockClock->getPrecision() +
                   duration_cast<Milliseconds>(Nanoseconds::max()),
@@ -283,7 +283,7 @@ TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesNanoseconds) {
 
 TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCV) {
     auto opCtx = client->makeOperationContext();
-    opCtx->setDeadlineByDate(mockClock->now());
+    opCtx->setDeadlineByDate(mockClock->now(), ErrorCodes::ExceededTimeLimit);
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
@@ -292,7 +292,7 @@ TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCV) {
 
 TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCVWithWaitUntilSet) {
     auto opCtx = client->makeOperationContext();
-    opCtx->setDeadlineByDate(mockClock->now());
+    opCtx->setDeadlineByDate(mockClock->now(), ErrorCodes::ExceededTimeLimit);
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
@@ -323,7 +323,7 @@ TEST_F(OperationDeadlineTests, WaitForUntilExpiredCV) {
 
 TEST_F(OperationDeadlineTests, WaitForUntilExpiredCVWithMaxTimeSet) {
     auto opCtx = client->makeOperationContext();
-    opCtx->setDeadlineByDate(mockClock->now() + Seconds{10});
+    opCtx->setDeadlineByDate(mockClock->now() + Seconds{10}, ErrorCodes::ExceededTimeLimit);
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
@@ -343,7 +343,7 @@ TEST_F(OperationDeadlineTests, WaitForDurationExpired) {
 
 TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpiration) {
     auto opCtx = client->makeOperationContext();
-    opCtx->setDeadlineByDate(mockClock->now());
+    opCtx->setDeadlineByDate(mockClock->now(), ErrorCodes::ExceededTimeLimit);
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
@@ -378,7 +378,7 @@ public:
         auto barrier = std::make_shared<unittest::Barrier>(2);
         auto task = stdx::packaged_task<bool()>([=] {
             if (maxTime < Date_t::max()) {
-                opCtx->setDeadlineByDate(maxTime);
+                opCtx->setDeadlineByDate(maxTime, ErrorCodes::ExceededTimeLimit);
             }
             auto predicate = [state] { return state->isSignaled; };
             stdx::unique_lock<stdx::mutex> lk(state->mutex);

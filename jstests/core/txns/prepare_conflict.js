@@ -17,7 +17,7 @@
     function assertPrepareConflict(filter) {
         assert.commandFailedWithCode(
             testDB.runCommand({find: collName, filter: filter, maxTimeMS: 1000}),
-            ErrorCodes.ExceededTimeLimit);
+            ErrorCodes.MaxTimeMSExpired);
 
         let prepareConflicted = false;
         const cur =

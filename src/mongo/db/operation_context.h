@@ -377,22 +377,22 @@ public:
      *
      * To remove a deadline, pass in Date_t::max().
      */
-    void setDeadlineByDate(Date_t when);
+    void setDeadlineByDate(Date_t when, ErrorCodes::Error timeoutError);
 
     /**
      * Sets the deadline for this operation to the maxTime plus the current time reported
      * by the ServiceContext's fast clock source.
      */
-    void setDeadlineAfterNowBy(Microseconds maxTime);
+    void setDeadlineAfterNowBy(Microseconds maxTime, ErrorCodes::Error timeoutError);
     template <typename D>
-    void setDeadlineAfterNowBy(D maxTime) {
+    void setDeadlineAfterNowBy(D maxTime, ErrorCodes::Error timeoutError) {
         if (maxTime <= D::zero()) {
             maxTime = D::zero();
         }
         if (maxTime <= Microseconds::max()) {
-            setDeadlineAfterNowBy(duration_cast<Microseconds>(maxTime));
+            setDeadlineAfterNowBy(duration_cast<Microseconds>(maxTime), timeoutError);
         } else {
-            setDeadlineByDate(Date_t::max());
+            setDeadlineByDate(Date_t::max(), timeoutError);
         }
     }
 
@@ -436,7 +436,7 @@ private:
      * Sets the deadline and maxTime as described. It is up to the caller to ensure that
      * these correctly correspond.
      */
-    void setDeadlineAndMaxTime(Date_t when, Microseconds maxTime);
+    void setDeadlineAndMaxTime(Date_t when, Microseconds maxTime, ErrorCodes::Error timeoutError);
 
     /**
      * Compute maxTime based on the given deadline.
@@ -500,6 +500,8 @@ private:
 
     Date_t _deadline =
         Date_t::max();  // The timepoint at which this operation exceeds its time limit.
+
+    ErrorCodes::Error _timeoutError = ErrorCodes::ExceededTimeLimit;
 
     // Max operation time requested by the user or by the cursor in the case of a getMore with no
     // user-specified maxTime. This is tracked with microsecond granularity for the purpose of

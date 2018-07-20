@@ -66,7 +66,7 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
     assert.commandFailedWithCode(
         noSnapshotSecondary.getDB(name).foo.runCommand(
             'find', {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}),
-        ErrorCodes.ExceededTimeLimit);
+        ErrorCodes.MaxTimeMSExpired);
 
     // Reconfig to make the no-snapshot secondary the primary
     var config = primary.getDB("local").system.replset.findOne();
@@ -79,6 +79,6 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
     assert.commandFailedWithCode(
         primary.getSiblingDB(name).foo.runCommand(
             'find', {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}),
-        ErrorCodes.ExceededTimeLimit);
+        ErrorCodes.MaxTimeMSExpired);
     replTest.stopSet();
 })();

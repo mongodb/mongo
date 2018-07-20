@@ -122,7 +122,7 @@ load("jstests/libs/write_concern_util.js");
         readConcern: {level: "linearizable"},
         maxTimeMS: 3000
     });
-    assert.commandFailedWithCode(result, ErrorCodes.ExceededTimeLimit);
+    assert.commandFailedWithCode(result, ErrorCodes.MaxTimeMSExpired);
 
     st.stop();
 })();

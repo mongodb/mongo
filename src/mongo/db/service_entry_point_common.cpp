@@ -807,7 +807,7 @@ void execCommandDatabase(OperationContext* opCtx,
             uassert(40119,
                     "Illegal attempt to set operation deadline within DBDirectClient",
                     !opCtx->getClient()->isInDirectClient());
-            opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
+            opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
         }
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);

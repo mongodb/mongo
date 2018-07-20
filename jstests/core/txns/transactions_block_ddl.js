@@ -27,7 +27,7 @@
         assert.commandWorked(sessionColl.insert({a: 5, b: 6}));
         assert.commandFailedWithCode(
             testDB.getSiblingDB(cmdDBName).runCommand(Object.assign({}, ddlCmd, {maxTimeMS: 500})),
-            ErrorCodes.ExceededTimeLimit);
+            ErrorCodes.MaxTimeMSExpired);
         assert.commandWorked(session.commitTransaction_forTesting());
     }
 

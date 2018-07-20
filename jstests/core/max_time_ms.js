@@ -33,10 +33,10 @@ cursor.maxTimeMS(100);
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected query to abort due to time limit");
-// TODO SERVER-32565: The error should always be ExceededTimeLimit, but there are rare cases where
+// TODO SERVER-32565: The error should always be MaxTimeMSExpired, but there are rare cases where
 // interrupting javascript execution on the server with a stepdown or timeout causes an
 // InternalError instead, so we also accept that here.
-assert(ErrorCodes.ExceededTimeLimit == error.code || ErrorCodes.InternalError == error.code,
+assert(ErrorCodes.MaxTimeMSExpired == error.code || ErrorCodes.InternalError == error.code,
        "Failed with error: " + tojson(error));
 
 //
@@ -88,10 +88,10 @@ error = assert.throws(function() {
     cursor.next();
     cursor.next();
 }, [], "expected batch 2 (getmore) to abort due to time limit");
-// TODO SERVER-32565: The error should always be ExceededTimeLimit, but there are rare cases where
+// TODO SERVER-32565: The error should always be MaxTimeMSExpired, but there are rare cases where
 // interrupting javascript execution on the server with a stepdown or timeout causes an
 // InternalError instead, so we also accept that here.
-assert(ErrorCodes.ExceededTimeLimit == error.code || ErrorCodes.InternalError == error.code,
+assert(ErrorCodes.MaxTimeMSExpired == error.code || ErrorCodes.InternalError == error.code,
        "Failed with error: " + tojson(error));
 
 //
@@ -149,10 +149,10 @@ cursor.maxTimeMS(6 * 1000);
 error = assert.throws(function() {
     cursor.itcount();
 }, [], "expected find() to abort due to time limit");
-// TODO SERVER-32565: The error should always be ExceededTimeLimit, but there are rare cases where
+// TODO SERVER-32565: The error should always be MaxTimeMSExpired, but there are rare cases where
 // interrupting javascript execution on the server with a stepdown or timeout causes an
 // InternalError instead, so we also accept that here.
-assert(ErrorCodes.ExceededTimeLimit == error.code || ErrorCodes.InternalError == error.code,
+assert(ErrorCodes.MaxTimeMSExpired == error.code || ErrorCodes.InternalError == error.code,
        "Failed with error: " + tojson(error));
 
 //
@@ -186,7 +186,7 @@ assert.doesNotThrow(function() {
 
 t.drop();
 res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 100});
-assert(res.ok == 0 && res.code == ErrorCodes.ExceededTimeLimit,
+assert(res.ok == 0 && res.code == ErrorCodes.MaxTimeMSExpired,
        "expected sleep command to abort due to time limit, ok=" + res.ok + ", code=" + res.code);
 
 //
@@ -314,7 +314,7 @@ t.drop();
 assert.eq(
     1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}).ok);
 res = t.getDB().runCommand({ping: 1, maxTimeMS: 10 * 1000});
-assert(res.ok == 0 && res.code == ErrorCodes.ExceededTimeLimit,
+assert(res.ok == 0 && res.code == ErrorCodes.MaxTimeMSExpired,
        "expected command to trigger maxTimeAlwaysTimeOut fail point, ok=" + res.ok + ", code=" +
            res.code);
 assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);

@@ -49,7 +49,7 @@ error_code("LockBusy", 46)
 error_code("NoMatchingDocument", 47)
 error_code("NamespaceExists", 48)
 error_code("InvalidRoleModification", 49)
-error_code("ExceededTimeLimit", 50)
+error_code("MaxTimeMSExpired", 50)
 error_code("ManualInterventionRequired", 51)
 error_code("DollarPrefixedFieldName", 52)
 error_code("InvalidIdField", 53)
@@ -263,6 +263,7 @@ error_code("FailPointSetFailed", 262)
 error_code("OperationNotSupportedInTransaction", 263)
 error_code("TooManyLogicalSessions", 264);
 error_code("OrphanedRangeCleanUpFailed", 265);
+error_code("ExceededTimeLimit", 266);
 
 # Error codes 4000-8999 are reserved.
 
@@ -293,6 +294,7 @@ error_class("Interruption", ["Interrupted",
                              "InterruptedAtShutdown",
                              "InterruptedDueToStepDown",
                              "ExceededTimeLimit",
+                             "MaxTimeMSExpired",
                              "CursorKilled",
                              "LockTimeout"])
 
@@ -320,6 +322,6 @@ error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])
 error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
                                                  "TooManyDocumentSequences"])
 
-error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "NetworkInterfaceExceededTimeLimit"])
+error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "MaxTimeMSExpired", "NetworkInterfaceExceededTimeLimit"])
 
 error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChunkHistory"])

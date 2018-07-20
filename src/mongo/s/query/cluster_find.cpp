@@ -396,7 +396,8 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
                 "maxTimeMS can only be used with getMore for tailable, awaitData cursors"};
     } else if (cursor->getLeftoverMaxTimeMicros() < Microseconds::max()) {
         // Be sure to do this only for non-tailable cursors.
-        opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
+        opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros(),
+                                     ErrorCodes::MaxTimeMSExpired);
     }
     return Status::OK();
 }

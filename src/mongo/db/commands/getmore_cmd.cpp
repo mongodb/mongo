@@ -401,7 +401,8 @@ public:
                         opCtx->getServiceContext()->getPreciseClockSource()->now() +
                         _request.awaitDataTimeout.value_or(Seconds{1});
                 } else if (cursor->getLeftoverMaxTimeMicros() < Microseconds::max()) {
-                    opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
+                    opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros(),
+                                                 ErrorCodes::MaxTimeMSExpired);
                 }
             }
             if (!cursor->isAwaitData()) {

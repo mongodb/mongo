@@ -98,7 +98,7 @@
         // However, the "dbHash" command should block behind the transaction if "atClusterTime"
         // wasn't specified.
         res = assert.commandFailedWithCode(db.runCommand({dbHash: 1, maxTimeMS: 1000}),
-                                           ErrorCodes.ExceededTimeLimit);
+                                           ErrorCodes.MaxTimeMSExpired);
 
         otherSession.abortTransaction();
         otherSession.endSession();

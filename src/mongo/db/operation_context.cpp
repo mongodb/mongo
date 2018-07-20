@@ -83,11 +83,15 @@ OperationContext::OperationContext(Client* client, unsigned int opId)
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
                           : SystemTickSource::get()) {}
 
-void OperationContext::setDeadlineAndMaxTime(Date_t when, Microseconds maxTime) {
+void OperationContext::setDeadlineAndMaxTime(Date_t when,
+                                             Microseconds maxTime,
+                                             ErrorCodes::Error timeoutError) {
     invariant(!getClient()->isInDirectClient());
+    invariant(ErrorCodes::isExceededTimeLimitError(timeoutError));
     uassert(40120, "Illegal attempt to change operation deadline", !hasDeadline());
     _deadline = when;
     _maxTime = maxTime;
+    _timeoutError = timeoutError;
 }
 
 Microseconds OperationContext::computeMaxTimeFromDeadline(Date_t when) {
@@ -103,11 +107,11 @@ Microseconds OperationContext::computeMaxTimeFromDeadline(Date_t when) {
     return maxTime;
 }
 
-void OperationContext::setDeadlineByDate(Date_t when) {
-    setDeadlineAndMaxTime(when, computeMaxTimeFromDeadline(when));
+void OperationContext::setDeadlineByDate(Date_t when, ErrorCodes::Error timeoutError) {
+    setDeadlineAndMaxTime(when, computeMaxTimeFromDeadline(when), timeoutError);
 }
 
-void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime) {
+void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime, ErrorCodes::Error timeoutError) {
     Date_t when;
     if (maxTime < Microseconds::zero()) {
         maxTime = Microseconds::zero();
@@ -121,7 +125,7 @@ void OperationContext::setDeadlineAfterNowBy(Microseconds maxTime) {
             when += clock->getPrecision() + maxTime;
         }
     }
-    setDeadlineAndMaxTime(when, maxTime);
+    setDeadlineAndMaxTime(when, maxTime, timeoutError);
 }
 
 bool OperationContext::hasDeadlineExpired() const {
@@ -195,8 +199,8 @@ Status OperationContext::checkForInterruptNoAssert() {
     }
 
     if (hasDeadlineExpired()) {
-        markKilled(ErrorCodes::ExceededTimeLimit);
-        return Status(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
+        markKilled(_timeoutError);
+        return Status(_timeoutError, "operation exceeded time limit");
     }
 
     MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
@@ -298,7 +302,7 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
     // that we expect to time out at the same time as the existing deadline expires. If, when we
     // time out, we find that the op's deadline has not expired (as will always be the case if
     // maxTimeNeverTimeOut is set) then we assume that the incongruity is due to a clock mismatch
-    // and return ExceededTimeLimit regardless. To prevent this behaviour, only consider the op's
+    // and return _timeoutError regardless. To prevent this behaviour, only consider the op's
     // deadline in the event that the maxTimeNeverTimeOut failpoint is not set.
     bool opHasDeadline = (hasDeadline() && !MONGO_FAIL_POINT(maxTimeNeverTimeOut));
 
@@ -334,8 +338,8 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
         // is slightly ahead of the FastClock used in checkForInterrupt. In this case,
         // we treat the operation as though it has exceeded its time limit, just as if the
         // FastClock and system clock had agreed.
-        markKilled(ErrorCodes::ExceededTimeLimit);
-        return Status(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
+        markKilled(_timeoutError);
+        return Status(_timeoutError, "operation exceeded time limit");
     }
     return waitStatus;
 }

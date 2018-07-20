@@ -70,7 +70,7 @@
     jsTestLog("Do a conflicting single document insert outside of transaction with maxTimeMS.");
     assert.commandFailedWithCode(
         testColl.runCommand({insert: collName, documents: [nonTxnDoc], maxTimeMS: 100}),
-        ErrorCodes.ExceededTimeLimit);
+        ErrorCodes.MaxTimeMSExpired);
 
     jsTestLog("Doing conflicting single document write in separate thread.");
     let thread = new ScopedThread(singleDocWrite, dbName, collName, nonTxnDoc);
