@@ -11,7 +11,9 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: load("jstests/libs/override_methods/enable_sessions.js")
+      eval: >-
+        load('jstests/libs/override_methods/enable_sessions.js');
+        load('jstests/libs/jstestfuzz/disable_enable_sessions_hook.js');
       readMode: commands
   hooks:
   - class: CheckReplDBHash
