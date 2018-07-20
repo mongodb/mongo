@@ -1871,6 +1871,7 @@ if env.TargetOSIs('posix'):
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
     env.Append( CCFLAGS=["-fno-omit-frame-pointer",
                          "-fno-strict-aliasing",
+                         "-fasynchronous-unwind-tables",
                          "-ggdb" if not env.TargetOSIs('emscripten') else "-g",
                          "-pthread",
                          "-Wall",
