@@ -263,21 +263,26 @@ void appendReplyMetadataOnError(OperationContext* opCtx, BSONObjBuilder* metadat
     const bool isReplSet =
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
 
-    if (isReplSet) {
+    if (isReplSet && LogicalClock::get(opCtx)->isEnabled()) {
         if (serverGlobalParams.featureCompatibility.getVersion() ==
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-                // No need to sign cluster times for internal clients.
-                SignedLogicalTime currentTime(
-                    LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
-                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                logicalTimeMetadata.writeToMetadata(metadataBob);
-            } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
-                auto currentTime =
-                    validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-                if (currentTime.getKeyId() != 0) {
+
+            if (LogicalClock::get(opCtx)->isEnabled()) {
+                if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+                    // No need to sign cluster times for internal clients.
+                    SignedLogicalTime currentTime(LogicalClock::get(opCtx)->getClusterTime(),
+                                                  TimeProofService::TimeProof(),
+                                                  0);
                     rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
                     logicalTimeMetadata.writeToMetadata(metadataBob);
+                } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
+                    auto currentTime =
+                        validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
+                    // Do not add $clusterTime if the signature and keyId is dummy.
+                    if (currentTime.getKeyId() != 0) {
+                        rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                        logicalTimeMetadata.writeToMetadata(metadataBob);
+                    }
                 }
             }
         }

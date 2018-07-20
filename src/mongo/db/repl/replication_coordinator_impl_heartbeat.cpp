@@ -35,6 +35,8 @@
 #include <algorithm>
 
 #include "mongo/base/status.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/freshness_checker.h"
@@ -528,6 +530,13 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
         bool isArbiter = myIndex.isOK() && myIndex.getValue() != -1 &&
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
+
+        if (isArbiter) {
+            LogicalClock::get(getGlobalServiceContext())->setEnabled(false);
+            if (auto validator = LogicalTimeValidator::get(getGlobalServiceContext())) {
+                validator->stopKeyManager();
+            }
+        }
 
         if (!isArbiter && isFirstConfig) {
             shouldStartDataReplication = true;
