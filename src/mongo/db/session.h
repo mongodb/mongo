@@ -493,6 +493,12 @@ private:
             kAborted = 1 << 6
         };
 
+        using StateSet = int;
+
+        bool isInSet(WithLock, StateSet stateSet) const {
+            return _state & stateSet;
+        }
+
         /**
          * Transitions the session from the current state to the new state. If transition validation
          * is not relaxed, invariants if the transition is illegal.
@@ -555,10 +561,18 @@ private:
         return (s << txnState.toString());
     }
 
+    // Abort the transaction if it's in one of the expected states and clean up the transaction
+    // states associated with the opCtx.
+    void _abortActiveTransaction(OperationContext* opCtx,
+                                 TransactionState::StateSet expectedStates);
+
     void _abortArbitraryTransaction(WithLock);
 
-    // Releases stashed transaction resources to abort the transaction.
-    void _abortTransaction(WithLock);
+    // Releases stashed transaction resources to abort the transaction on the session.
+    void _abortTransactionOnSession(WithLock);
+
+    // Clean up the transaction resources unstashed on operation context.
+    void _cleanUpTxnResourceOnOpCtx(OperationContext* opCtx);
 
     // Committing a transaction first changes its state to "Committing*" and writes to the oplog,
     // then it changes the state to "Committed".

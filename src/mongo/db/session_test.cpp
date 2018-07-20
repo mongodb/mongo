@@ -186,36 +186,45 @@ protected:
                            OplogSlot());
     }
 
-    void bumpTxnNumberFromDifferentOpCtx(Session* session, TxnNumber newTxnNum) {
+    void runFunctionFromDifferentOpCtx(std::function<void(OperationContext*)> func) {
         // Stash the original client.
         auto originalClient = Client::releaseCurrent();
 
-        // Create a migration client and opCtx.
+        // Create a new client (e.g. for migration) and opCtx.
         auto service = opCtx()->getServiceContext();
-        auto migrationClientOwned = service->makeClient("migrationClient");
-        auto migrationClient = migrationClientOwned.get();
-        Client::setCurrent(std::move(migrationClientOwned));
-        auto migrationOpCtx = migrationClient->makeOperationContext();
+        auto newClientOwned = service->makeClient("newClient");
+        auto newClient = newClientOwned.get();
+        Client::setCurrent(std::move(newClientOwned));
+        auto newOpCtx = newClient->makeOperationContext();
 
-        // Check that there is a transaction in progress with a lower txnNumber.
-        ASSERT(session->inMultiDocumentTransaction());
-        ASSERT_LT(session->getActiveTxnNumberForTest(), newTxnNum);
-
-        // Check that the transaction has some operations, so we can ensure they are cleared.
-        ASSERT_GT(session->transactionOperationsForTest().size(), 0u);
-
-        // Bump the active transaction number on the session. This should clear all state from the
-        // previous transaction.
-        session->beginOrContinueTxnOnMigration(migrationOpCtx.get(), newTxnNum);
-        ASSERT_EQ(session->getActiveTxnNumberForTest(), newTxnNum);
-        ASSERT_FALSE(session->inMultiDocumentTransaction());
-        ASSERT_FALSE(session->transactionIsAborted());
-        ASSERT_EQ(session->transactionOperationsForTest().size(), 0u);
+        // Run the function on bahalf of another operation context.
+        func(newOpCtx.get());
 
         // Restore the original client.
-        migrationOpCtx.reset();
+        newOpCtx.reset();
         Client::releaseCurrent();
         Client::setCurrent(std::move(originalClient));
+    }
+
+    void bumpTxnNumberFromDifferentOpCtx(Session* session, TxnNumber newTxnNum) {
+        auto func = [session, newTxnNum](OperationContext* opCtx) {
+            // Check that there is a transaction in progress with a lower txnNumber.
+            ASSERT(session->inMultiDocumentTransaction());
+            ASSERT_LT(session->getActiveTxnNumberForTest(), newTxnNum);
+
+            // Check that the transaction has some operations, so we can ensure they are cleared.
+            ASSERT_GT(session->transactionOperationsForTest().size(), 0u);
+
+            // Bump the active transaction number on the session. This should clear all state from
+            // the previous transaction.
+            session->beginOrContinueTxnOnMigration(opCtx, newTxnNum);
+            ASSERT_EQ(session->getActiveTxnNumberForTest(), newTxnNum);
+            ASSERT_FALSE(session->inMultiDocumentTransaction());
+            ASSERT_FALSE(session->transactionIsAborted());
+            ASSERT_EQ(session->transactionOperationsForTest().size(), 0u);
+        };
+
+        runFunctionFromDifferentOpCtx(func);
     }
 
     OpObserverMock* _opObserver = nullptr;
@@ -1401,6 +1410,56 @@ TEST_F(SessionTest, ConcurrencyOfCommitTransactionAndAbort) {
                        ErrorCodes::NoSuchTransaction);
 }
 
+TEST_F(SessionTest, ConcurrencyOfActiveAbortAndArbitraryAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 26;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    session.unstashTransactionResources(opCtx(), "insert");
+    ASSERT(session.inMultiDocumentTransaction());
+
+    // The transaction may be aborted without checking out the session.
+    session.abortArbitraryTransaction();
+
+    // The operation throws for some reason and aborts implicitly.
+    // Abort active transaction after it's been aborted by KillSession is a no-op.
+    session.abortActiveTransaction(opCtx());
+    ASSERT(session.transactionIsAborted());
+    ASSERT(opCtx()->getWriteUnitOfWork() == nullptr);
+}
+
+TEST_F(SessionTest, ConcurrencyOfActiveAbortAndMigration) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 26;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    session.unstashTransactionResources(opCtx(), "insert");
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    session.addTransactionOperation(opCtx(), operation);
+    ASSERT(session.inMultiDocumentTransaction());
+
+    // A migration may bump the active transaction number without checking out the session.
+    const TxnNumber higherTxnNum = 27;
+    bumpTxnNumberFromDifferentOpCtx(&session, higherTxnNum);
+
+    // The operation throws for some reason and aborts implicitly.
+    // Abort active transaction after it's been aborted by migration is a no-op.
+    session.abortActiveTransaction(opCtx());
+    // The session's state is None after migration, but we should have cleared
+    // the states of opCtx.
+    ASSERT(opCtx()->getWriteUnitOfWork() == nullptr);
+}
+
 TEST_F(SessionTest, ConcurrencyOfPrepareTransactionAndAbort) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
@@ -1549,7 +1608,8 @@ TEST_F(SessionTest, AbortDuringPreparedCommitDoesNotAbortTransaction) {
         ASSERT(wasPrepared);
 
         // The transaction may be aborted without checking out the session.
-        session.abortActiveTransaction(opCtx());
+        auto func = [&](OperationContext* opCtx) { session.abortActiveTransaction(opCtx); };
+        runFunctionFromDifferentOpCtx(func);
         ASSERT_FALSE(session.transactionIsAborted());
     };
 
@@ -1631,7 +1691,8 @@ TEST_F(SessionTest, AbortDuringUnpreparedCommitDoesNotAbortTransaction) {
         ASSERT_FALSE(wasPrepared);
 
         // The transaction may be aborted without checking out the session.
-        session.abortActiveTransaction(opCtx());
+        auto func = [&](OperationContext* opCtx) { session.abortActiveTransaction(opCtx); };
+        runFunctionFromDifferentOpCtx(func);
         ASSERT_FALSE(session.transactionIsAborted());
     };
 

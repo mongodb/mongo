@@ -572,7 +572,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
                 // implicitly abort the transaction. It is not safe to continue the transaction, in
                 // particular because we have not saved the readConcern from the first statement of
                 // the transaction.
-                _abortTransaction(wl);
+                _abortTransactionOnSession(wl);
                 uasserted(ErrorCodes::NoSuchTransaction,
                           str::stream() << "Transaction " << txnNumber << " has been aborted.");
             }
@@ -898,19 +898,69 @@ void Session::_abortArbitraryTransaction(WithLock lock) {
         return;
     }
 
-    _abortTransaction(lock);
+    _abortTransactionOnSession(lock);
 }
 
 void Session::abortActiveTransaction(OperationContext* opCtx) {
+    _abortActiveTransaction(opCtx, TransactionState::kInProgress | TransactionState::kPrepared);
+}
+
+void Session::_abortActiveTransaction(OperationContext* opCtx,
+                                      TransactionState::StateSet expectedStates) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    if (!_txnState.inMultiDocumentTransaction(lock)) {
-        return;
+    // Only abort the transaction in session if it's in expected states.
+    // When the state of active transaction on session is not expected, it means another
+    // thread has already aborted the transaction on session.
+    if (_txnState.isInSet(lock, expectedStates)) {
+        invariant(opCtx->getTxnNumber() == _activeTxnNumber);
+        _abortTransactionOnSession(lock);
     }
 
-    _abortTransaction(lock);
+    // Clean up the transaction resources on opCtx even if the transaction on session has been
+    // aborted.
+    _cleanUpTxnResourceOnOpCtx(opCtx);
 
-    // Abort the WUOW. We should be able to abort empty transactions that don't have WUOW.
+    if (!_txnState.isNone(lock)) {
+        // Add the latest operation stats to the aggregate OpDebug object stored in the
+        // SingleTransactionStats instance on the Session.
+        _singleTransactionStats->getOpDebug()->additiveMetrics.add(
+            CurOp::get(opCtx)->debug().additiveMetrics);
+
+        // Update the LastClientInfo object stored in the SingleTransactionStats instance on the
+        // Session with this Client's information.
+        _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
+    }
+}
+
+void Session::_abortTransactionOnSession(WithLock wl) {
+    if (_txnResourceStash) {
+        // The transaction is stashed, so we abort the inactive transaction on session.
+        _txnResourceStash = boost::none;
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
+    } else {
+        // Transaction resource has been unstashed and transferred into an active opCtx, which will
+        // clean it up.
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
+    }
+
+    _transactionOperationBytes = 0;
+    _transactionOperations.clear();
+    _txnState.transitionTo(wl, TransactionState::kAborted);
+    _speculativeTransactionReadOpTime = repl::OpTime();
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
+    if (!_txnState.isNone(wl)) {
+        _singleTransactionStats->setEndTime(curTimeMicros64());
+        // The transaction has aborted, so we mark it as inactive.
+        if (_singleTransactionStats->isActive()) {
+            _singleTransactionStats->setInactive(curTimeMicros64());
+        }
+    }
+}
+
+void Session::_cleanUpTxnResourceOnOpCtx(OperationContext* opCtx) {
+    // Reset the WUOW. We should be able to abort empty transactions that don't have WUOW.
     if (opCtx->getWriteUnitOfWork()) {
         opCtx->setWriteUnitOfWork(nullptr);
     }
@@ -919,39 +969,6 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
     opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     opCtx->lockState()->unsetMaxLockTimeout();
-
-    // Add the latest operation stats to the aggregate OpDebug object stored in the
-    // SingleTransactionStats instance on the Session.
-    _singleTransactionStats->getOpDebug()->additiveMetrics.add(
-        CurOp::get(opCtx)->debug().additiveMetrics);
-
-    // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
-    // with this Client's information.
-    _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
-}
-
-void Session::_abortTransaction(WithLock wl) {
-    // If the transaction is stashed, then we have aborted an inactive transaction.
-    if (_txnResourceStash) {
-        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
-    } else {
-        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
-    }
-
-    _txnResourceStash = boost::none;
-    _transactionOperationBytes = 0;
-    _transactionOperations.clear();
-    _txnState.transitionTo(wl, TransactionState::kAborted);
-    _speculativeTransactionReadOpTime = repl::OpTime();
-    ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
-    if (!_txnState.isNone(wl)) {
-        _singleTransactionStats->setEndTime(curTimeMicros64());
-        // The transaction has aborted, so we mark it as inactive.
-        if (_singleTransactionStats->isActive()) {
-            _singleTransactionStats->setInactive(curTimeMicros64());
-        }
-    }
-    ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
@@ -968,7 +985,7 @@ void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
 void Session::_setActiveTxn(WithLock wl, TxnNumber txnNumber) {
     // Abort the existing transaction if it's not prepared, committed, or aborted.
     if (_txnState.isInProgress(wl)) {
-        _abortTransaction(wl);
+        _abortTransactionOnSession(wl);
     }
     _activeTxnNumber = txnNumber;
     _activeTxnCommittedStatements.clear();
@@ -1075,47 +1092,15 @@ void Session::commitPreparedTransaction(OperationContext* opCtx, Timestamp commi
 }
 
 void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx) {
-
-    bool committed = false;
-    ON_BLOCK_EXIT([this, &committed, opCtx]() {
-        // If we're still "committing", the recovery unit failed to commit, and the lock is not
-        // held.  We can't safely use _txnState here, as it is protected by the lock.
-        if (!committed) {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            opCtx->setWriteUnitOfWork(nullptr);
-
-            // Make sure the transaction didn't change because of chunk migration.
-            if (opCtx->getTxnNumber() == _activeTxnNumber) {
-                _txnState.transitionTo(lk, TransactionState::kAborted);
-                ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
-                // After the transaction has been aborted, we must update the end time and mark it
-                // as inactive.
-                auto curTime = curTimeMicros64();
-                _singleTransactionStats->setEndTime(curTime);
-                if (_singleTransactionStats->isActive()) {
-                    _singleTransactionStats->setInactive(curTime);
-                }
-                ServerTransactionsMetrics::get(opCtx)->incrementTotalAborted();
-                ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
-                // Add the latest operation stats to the aggregate OpDebug object stored in the
-                // SingleTransactionStats instance on the Session.
-                _singleTransactionStats->getOpDebug()->additiveMetrics.add(
-                    CurOp::get(opCtx)->debug().additiveMetrics);
-                // Update the LastClientInfo object stored in the SingleTransactionStats instance on
-                // the Session with this Client's information.
-                _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
-            }
-        }
-        // We must clear the recovery unit and locker so any post-transaction writes can run without
-        // transactional settings such as a read timestamp.
-        opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        opCtx->lockState()->unsetMaxLockTimeout();
+    auto abortGuard = MakeGuard([this, opCtx]() {
+        _abortActiveTransaction(opCtx,
+                                TransactionState::kCommittingWithoutPrepare |
+                                    TransactionState::kCommittingWithPrepare);
     });
     lk.unlock();
     opCtx->getWriteUnitOfWork()->commit();
     opCtx->setWriteUnitOfWork(nullptr);
-    committed = true;
+    abortGuard.Dismiss();
     lk.lock();
     auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
     // If no writes have been done, set the client optime forward to the read timestamp so waiting
@@ -1127,6 +1112,11 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
     _txnState.transitionTo(lk, TransactionState::kCommitted);
+
+    // We must clear the recovery unit and locker so any post-transaction writes can run without
+    // transactional settings such as a read timestamp.
+    _cleanUpTxnResourceOnOpCtx(opCtx);
+
     ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
     // After the transaction has been committed, we must update the end time and mark it as
     // inactive.
