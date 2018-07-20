@@ -161,7 +161,12 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             LOG(2) << "Tried reading at last-applied time: " << *lastAppliedTimestamp
                    << " on nss: " << nss.ns() << ", but future catalog changes are pending at time "
                    << *minSnapshot << ". Trying again without reading at last-applied time.";
+            // Destructing the block sets _shouldConflictWithSecondaryBatchApplication back to the
+            // previous value. If the previous value is false (because there is another
+            // shouldNotConflictWithSecondaryBatchApplicationBlock outside of this function), this
+            // does not take the PBWM lock.
             _shouldNotConflictWithSecondaryBatchApplicationBlock = boost::none;
+            invariant(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
             opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
         }
 
