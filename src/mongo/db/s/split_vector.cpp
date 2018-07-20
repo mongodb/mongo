@@ -123,9 +123,8 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
             maxChunkSize = maxChunkSize.get() * 1 << 20;
         }
 
-        // We need a maximum size for the chunk, unless we're not actually capable of finding any
-        // split points.
-        if ((!maxChunkSize || maxChunkSize.get() <= 0) && recCount != 0) {
+        // We need a maximum size for the chunk.
+        if (!maxChunkSize || maxChunkSize.get() <= 0) {
             return {ErrorCodes::InvalidOptions, "need to specify the desired max chunk size"};
         }
 
