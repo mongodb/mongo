@@ -110,8 +110,6 @@ public:
 
     virtual Status touch(OperationContext* opCtx, BSONObjBuilder* output) const;
 
-    virtual void increaseStorageSize(OperationContext* opCtx, int size);
-
     virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = NULL,
                                 int infoLevel = 0) const;

@@ -621,11 +621,6 @@ Status EphemeralForTestRecordStore::touch(OperationContext* opCtx, BSONObjBuilde
     return Status::OK();
 }
 
-void EphemeralForTestRecordStore::increaseStorageSize(OperationContext* opCtx, int size) {
-    // unclear what this would mean for this class. For now, just error if called.
-    invariant(!"increaseStorageSize not yet implemented");
-}
-
 int64_t EphemeralForTestRecordStore::storageSize(OperationContext* opCtx,
                                                  BSONObjBuilder* extraInfo,
                                                  int infoLevel) const {
