@@ -73,7 +73,7 @@
 
     secondary = rst.restart(1, {
         setParameter: {
-            logComponentVerbosity: tojsononeline({replication: 2}),
+            logComponentVerbosity: tojsononeline({storage: {recovery: 2}}),
         },
         // Constrain the storage engine cache size to make it easier to fill it up with unflushed
         // modification.
