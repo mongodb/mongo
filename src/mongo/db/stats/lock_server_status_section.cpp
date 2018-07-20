@@ -85,7 +85,9 @@ public:
         {
             BSONObjBuilder activeClientsBuilder(ret.subobjStart("activeClients"));
 
-            activeClientsBuilder.append("total", clientStatusCounts.sum());
+            activeClientsBuilder.append("total",
+                                        clientStatusCounts[Locker::kActiveReader] +
+                                            clientStatusCounts[Locker::kActiveWriter]);
             activeClientsBuilder.append("readers", clientStatusCounts[Locker::kActiveReader]);
             activeClientsBuilder.append("writers", clientStatusCounts[Locker::kActiveWriter]);
             activeClientsBuilder.done();
