@@ -61,10 +61,10 @@
             commandName = Object.keys(commandObjUnwrapped)[0];
         }
 
-        if (commandObj[commandName] === "system.profile") {
-            throw new Error("Cowardly refusing to run test with overridden read preference" +
-                            " when it reads from a non-replicated collection: " +
-                            tojson(commandObj));
+        if (commandObj[commandName] === "system.profile" || commandName === 'profile') {
+            throw new Error(
+                "Cowardly refusing to run test that interacts with the system profiler as the " +
+                "'system.profile' collection is not replicated" + tojson(commandObj));
         }
 
         if (conn.isReplicaSetConnection()) {
