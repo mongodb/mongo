@@ -50,8 +50,9 @@
         checkLog.contains(secondary, failPoint + " fail point enabled for " + nss);
 
         // Restarting the secondary may have resulted in an election.  Wait until the system
-        // stabilizes.
+        // stabilizes and reaches RS_STARTUP2 state.
         replTest.getPrimary();
+        replTest.waitForState(secondary, ReplSetTest.State.STARTUP_2);
     }
 
     function finishTest({failPoint, secondaryStartupParams, expectedLog, waitForDrop, createNew}) {
