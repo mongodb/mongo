@@ -281,9 +281,9 @@ public:
     void commitTransaction(OperationContext* opCtx, boost::optional<Timestamp> commitTimestamp);
 
     /**
-     * Puts a transaction into a prepared state.
+     * Puts a transaction into a prepared state and returns the prepareTimestamp.
      */
-    void prepareTransaction(OperationContext* opCtx);
+    Timestamp prepareTransaction(OperationContext* opCtx);
 
     /**
      * Aborts the transaction outside the transaction, releasing transaction resources.

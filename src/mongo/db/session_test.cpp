@@ -52,6 +52,7 @@ namespace {
 
 const NamespaceString kNss("TestDB", "TestColl");
 const OptionalCollectionUUID kUUID;
+const Timestamp kPrepareTimestamp(Timestamp(1, 1));
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
@@ -100,6 +101,10 @@ public:
 void OpObserverMock::onTransactionPrepare(OperationContext* opCtx) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
     OpObserverNoop::onTransactionPrepare(opCtx);
+
+    // Get the recovery unit and set the prepareTimestamp.
+    RecoveryUnit* recoveryUnit = opCtx->recoveryUnit();
+    recoveryUnit->setPrepareTimestamp(kPrepareTimestamp);
 
     uassert(ErrorCodes::OperationFailed,
             "onTransactionPrepare() failed",
@@ -1413,7 +1418,9 @@ TEST_F(SessionTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
         ASSERT_FALSE(session.transactionIsAborted());
     };
 
-    session.prepareTransaction(opCtx());
+    // Check that prepareTimestamp gets set.
+    auto prepareTimestamp = session.prepareTransaction(opCtx());
+    ASSERT_EQ(kPrepareTimestamp, prepareTimestamp);
     ASSERT(_opObserver->transactionPrepared);
     ASSERT_FALSE(session.transactionIsAborted());
 }
@@ -1708,7 +1715,10 @@ TEST_F(SessionTest, KillSessionsDoesNotAbortPreparedTransactions) {
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "insert");
-    session.prepareTransaction(opCtx());
+
+    // Check that prepareTimestamp is set.
+    auto prepareTimestamp = session.prepareTransaction(opCtx());
+    ASSERT_EQ(kPrepareTimestamp, prepareTimestamp);
     session.stashTransactionResources(opCtx());
 
     session.abortArbitraryTransaction();

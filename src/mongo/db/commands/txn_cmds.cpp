@@ -140,8 +140,8 @@ public:
                 "Transaction isn't in progress",
                 session->inMultiDocumentTransaction());
 
-        session->prepareTransaction(opCtx);
-        auto timestamp = opCtx->recoveryUnit()->getPrepareTimestamp();
+        // Add prepareTimestamp to the command response.
+        auto timestamp = session->prepareTransaction(opCtx);
         result.append("prepareTimestamp", timestamp);
         return true;
     }

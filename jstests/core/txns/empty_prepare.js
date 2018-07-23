@@ -33,17 +33,21 @@
 
     session.startTransaction();
     assert.eq(doc, sessionColl.findOne({a: 1}));
-    assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
+    let res = assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
+    // Makes sure prepareTransaction returns prepareTimestamp in its response.
+    assert(res.hasOwnProperty("prepareTimestamp"), tojson(res));
     session.abortTransaction();
 
     // ---- Test 3. Noop writes before prepare ----
 
     session.startTransaction();
-    let res = assert.commandWorked(sessionColl.update({a: 1}, {$set: {b: 1}}));
+    res = assert.commandWorked(sessionColl.update({a: 1}, {$set: {b: 1}}));
     assert.eq(res.nMatched, 1, tojson(res));
     assert.eq(res.nModified, 0, tojson(res));
     assert.eq(res.nUpserted, 0, tojson(res));
-    assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
+    res = assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
+    // Makes sure prepareTransaction returns prepareTimestamp in its response.
+    assert(res.hasOwnProperty("prepareTimestamp"), tojson(res));
     session.abortTransaction();
 
 }());

@@ -846,7 +846,7 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterPreallocateSnapshot);
 }
 
-void Session::prepareTransaction(OperationContext* opCtx) {
+Timestamp Session::prepareTransaction(OperationContext* opCtx) {
     // This ScopeGuard is created outside of the lock so that the lock is always released before
     // this is called.
     ScopeGuard abortGuard = MakeGuard([&] { abortActiveTransaction(opCtx); });
@@ -873,6 +873,9 @@ void Session::prepareTransaction(OperationContext* opCtx) {
     opCtx->getWriteUnitOfWork()->prepare();
 
     abortGuard.Dismiss();
+
+    // Return the prepareTimestamp from the recovery unit.
+    return opCtx->recoveryUnit()->getPrepareTimestamp();
 }
 
 void Session::abortArbitraryTransaction() {
