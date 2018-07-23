@@ -1,6 +1,6 @@
 /**
  * Fills WiredTiger cache during initial sync oplog replay.
- * @tags: [requires_wiredtiger]
+ * @tags: [requires_replication, requires_wiredtiger]
  */
 (function() {
     'use strict';
