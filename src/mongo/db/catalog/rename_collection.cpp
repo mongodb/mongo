@@ -410,11 +410,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
         writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            indexer.commit();
-            for (auto&& infoObj : indexesToCopy) {
-                getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, tmpName, newUUID, infoObj, false);
-            }
+            indexer.commit([opCtx, &tmpName, tmpColl](const BSONObj& spec) {
+                opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                    opCtx, tmpName, tmpColl->uuid(), spec, false);
+            });
             wunit.commit();
         });
     }
