@@ -53,7 +53,7 @@ err:	__wt_free(session, config);
 	 * there was no metadata entry.
 	 */
 	if (ret == WT_NOTFOUND)
-		ret = ENOENT;
+		ret = __wt_set_return(session, ENOENT);
 
 	return (ret);
 }

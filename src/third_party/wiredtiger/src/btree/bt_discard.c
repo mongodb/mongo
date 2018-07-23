@@ -32,29 +32,14 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	WT_ASSERT(session, S2BT(session)->evict_ref != ref);
 
-#ifdef HAVE_DIAGNOSTIC
-	{
-	WT_HAZARD *hp;
-	int i;
 	/*
 	 * Make sure no other thread has a hazard pointer on the page we are
 	 * about to discard.  This is complicated by the fact that readers
 	 * publish their hazard pointer before re-checking the page state, so
 	 * our check can race with readers without indicating a real problem.
-	 * Wait for up to a second for hazard pointers to be cleared.
+	 * If we find a hazard pointer, wait for it to be cleared.
 	 */
-	for (hp = NULL, i = 0; i < 100; i++) {
-		if ((hp = __wt_hazard_check(session, ref)) == NULL)
-			break;
-		__wt_sleep(0, 10000);
-	}
-	if (hp != NULL)
-		__wt_errx(session,
-		    "discarded page has hazard pointer: (%p: %s, line %d)",
-		    (void *)hp->ref, hp->file, hp->line);
-	WT_ASSERT(session, hp == NULL);
-	}
-#endif
+	WT_ASSERT(session, __wt_hazard_check_assert(session, ref, true));
 
 	__wt_page_out(session, &ref->page);
 }
@@ -262,6 +247,9 @@ __wt_free_ref(
 
 	if (ref == NULL)
 		return;
+
+	/* Assert there are no hazard pointers. */
+	WT_ASSERT(session, __wt_hazard_check_assert(session, ref, false));
 
 	/*
 	 * Optionally free the referenced pages.  (The path to free referenced

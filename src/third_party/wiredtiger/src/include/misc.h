@@ -338,3 +338,50 @@ union __wt_rand_state {
 			continue;					\
 		}
 #define	WT_TAILQ_SAFE_REMOVE_END }
+
+/*
+ * WT_VA_ARGS_BUF_FORMAT --
+ *	Format into a scratch buffer, extending it as necessary. This is a
+ * macro because we need to repeatedly call va_start/va_end and there's no
+ * way to do that inside a function call.
+ */
+#define	WT_VA_ARGS_BUF_FORMAT(session, buf, fmt, concatenate) do {	\
+	size_t __len, __space;						\
+	va_list __ap;							\
+	int __ret_xx;		/* __ret already used by WT_RET */	\
+	char *__p;							\
+									\
+	/*								\
+	 * This macro is used to both initialize and concatenate into a	\
+	 * buffer. If not concatenating, clear the size so we don't use	\
+	 * any existing contents.					\
+	 */								\
+	if (!concatenate)						\
+		(buf)->size = 0;					\
+	for (;;) {							\
+		WT_ASSERT(session, (buf)->memsize >= (buf)->size);	\
+		__p = (char *)((uint8_t *)(buf)->mem + (buf)->size);	\
+		__space = (buf)->memsize - (buf)->size;			\
+									\
+		/* Format into the buffer. */				\
+		va_start(__ap, fmt);					\
+		__ret_xx = __wt_vsnprintf_len_set(			\
+		    __p, __space, &__len, fmt, __ap);			\
+		va_end(__ap);						\
+		WT_RET(__ret_xx);					\
+									\
+		/* Check if there was enough space. */			\
+		if (__len < __space) {					\
+			(buf)->data = (buf)->mem;			\
+			(buf)->size += __len;				\
+			break;						\
+		}							\
+									\
+		/*							\
+		 * If not, double the size of the buffer: we're dealing	\
+		 * with strings, we don't expect the size to get huge.	\
+		 */							\
+		WT_RET(__wt_buf_extend(					\
+		    session, buf, (buf)->size + __len + 1));		\
+	}								\
+} while (0)

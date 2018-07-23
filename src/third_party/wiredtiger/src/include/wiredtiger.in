@@ -2334,15 +2334,15 @@ struct __wt_connection {
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
 	 * chosen from the following options: \c "api"\, \c "block"\, \c
-	 * "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c "evict"\,
-	 * \c "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "handleops"\,
-	 * \c "log"\, \c "lookaside"\, \c "lookaside_activity"\, \c "lsm"\, \c
-	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
-	 * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
-	 * "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,
-	 * \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c
-	 * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default
-	 * empty.}
+	 * "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c
+	 * "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c "evictserver"\,
+	 * \c "fileops"\, \c "handleops"\, \c "log"\, \c "lookaside"\, \c
+	 * "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\,
+	 * \c "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c
+	 * "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "salvage"\,
+	 * \c "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\,
+	 * \c "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
+	 * "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -2902,9 +2902,10 @@ struct __wt_connection {
  * flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery
  * or error if recovery needs to run after an unclean shutdown., a string\,
- * chosen from the following options: \c "error"\, \c "on"; default \c on.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into log
- * files., a boolean flag; default \c false.}
+ * chosen from the following options: \c "error"\, \c "on"\, \c "salvage";
+ * default \c on.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write
+ * zeroes into log files., a boolean flag; default \c false.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
  * management.  The LSM manager is started automatically the first time an LSM
@@ -3017,14 +3018,14 @@ struct __wt_connection {
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
  * values chosen from the following options: \c "api"\, \c "block"\, \c
- * "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c "evict"\, \c
- * "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\,
- * \c "lookaside"\, \c "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c
- * "metadata"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c
- * "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "salvage"\, \c
- * "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\, \c
- * "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c "write";
- * default empty.}
+ * "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c "error_returns"\,
+ * \c "evict"\, \c "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c
+ * "handleops"\, \c "log"\, \c "lookaside"\, \c "lookaside_activity"\, \c
+ * "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
+ * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
+ * "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
+ * "temporary"\, \c "thread_group"\, \c "timestamp"\, \c "transaction"\, \c
+ * "verify"\, \c "version"\, \c "write"; default empty.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to
  * files.  Ignored on non-Windows systems.  Options are given as a list\, such
  * as <code>"write_through=[data]"</code>. Configuring \c write_through requires
@@ -3549,18 +3550,17 @@ struct __wt_config_parser {
  */
 
 /*!
- * Return a buffer's CRC32C checksum.
+ * Return a pointer to a function that calculates a CRC32C checksum.
  *
  * The WiredTiger library CRC32C checksum function uses hardware support where
  * available, else it falls back to a software implementation.
  *
  * @snippet ex_all.c Checksum a buffer
  *
- * @param buffer a pointer to a buffer
- * @param len the number of valid bytes in the buffer
- * @returns the buffer's CRC32C checksum
+ * @returns a pointer to a function that takes a buffer and length and returns
+ * the CRC32C checksum
  */
-uint32_t wiredtiger_checksum_crc32c(const void *buffer, size_t len)
+uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
     WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*! @} */

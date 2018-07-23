@@ -26,9 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "wt_internal.h"
+#include <inttypes.h>
+#include <stddef.h>
 
-#if defined(HAVE_CRC32_HARDWARE)
 #if (defined(__amd64) || defined(__x86_64))
 /*
  * __wt_checksum_hw --
@@ -116,17 +116,21 @@ __wt_checksum_hw(const void *chunk, size_t len)
 	return (~crc);
 }
 #endif
-#endif /* HAVE_CRC32_HARDWARE */
+
+extern uint32_t __wt_checksum_sw(const void *chunk, size_t len);
+#if defined(__GNUC__)
+extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
+    __attribute__((visibility("default")));
+#else
+extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
+#endif
 
 /*
- * __wt_checksum_init --
- *	WiredTiger: detect CRC hardware and set the checksum function.
+ * wiredtiger_crc32c_func --
+ *	WiredTiger: detect CRC hardware and return the checksum function.
  */
-void
-__wt_checksum_init(void)
-    WT_GCC_FUNC_ATTRIBUTE((cold))
+uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 {
-#if defined(HAVE_CRC32_HARDWARE)
 #if (defined(__amd64) || defined(__x86_64))
 	unsigned int eax, ebx, ecx, edx;
 
@@ -137,9 +141,8 @@ __wt_checksum_init(void)
 
 #define	CPUID_ECX_HAS_SSE42	(1 << 20)
 	if (ecx & CPUID_ECX_HAS_SSE42)
-		__wt_process.checksum = __wt_checksum_hw;
-	else
-		__wt_process.checksum = __wt_checksum_sw;
+		return (__wt_checksum_hw);
+	return (__wt_checksum_sw);
 
 #elif defined(_M_AMD64)
 	int cpuInfo[4];
@@ -148,14 +151,10 @@ __wt_checksum_init(void)
 
 #define	CPUID_ECX_HAS_SSE42	(1 << 20)
 	if (cpuInfo[2] & CPUID_ECX_HAS_SSE42)
-		__wt_process.checksum = __wt_checksum_hw;
-	else
-		__wt_process.checksum = __wt_checksum_sw;
-#else
-	__wt_process.checksum = __wt_checksum_sw;
-#endif
+		return (__wt_checksum_hw);
+	return (__wt_checksum_sw);
 
-#else /* !HAVE_CRC32_HARDWARE */
-	__wt_process.checksum = __wt_checksum_sw;
-#endif /* HAVE_CRC32_HARDWARE */
+#else
+	return (__wt_checksum_sw);
+#endif
 }

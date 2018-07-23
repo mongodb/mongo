@@ -915,10 +915,11 @@ __wt_btree_immediately_durable(WT_SESSION_IMPL *session)
 
 	/*
 	 * This is used to determine whether timestamp updates should
-	 * be rolled back for this btree. It's likely that the particular
-	 * test required here will change when rollback to stable is
-	 * supported with in-memory configurations.
+	 * be rolled back for this btree. With in-memory, the logging
+	 * setting on tables is still important and when enabled they
+	 * should be considered "durable".
 	 */
-	return (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) &&
+	return ((FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) ||
+	    (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))) &&
 	    !F_ISSET(btree, WT_BTREE_NO_LOGGING));
 }

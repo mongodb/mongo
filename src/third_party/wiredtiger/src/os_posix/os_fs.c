@@ -338,7 +338,7 @@ __posix_file_advise(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session,
 	 */
 	if (ret == EINVAL) {
 		file_handle->fh_advise = NULL;
-		return (ENOTSUP);
+		return (__wt_set_return(session, ENOTSUP));
 	}
 
 	WT_RET_MSG(session, ret,

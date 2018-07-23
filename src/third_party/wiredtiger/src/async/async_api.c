@@ -145,7 +145,7 @@ retry:
 	 */
 	if (op == NULL || op->state != WT_ASYNCOP_FREE) {
 		WT_STAT_CONN_INCR(session, async_full);
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 	}
 	/*
 	 * Set the state of this op handle as READY for the user to use.

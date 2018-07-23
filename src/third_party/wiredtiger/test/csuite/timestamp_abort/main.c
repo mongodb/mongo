@@ -210,7 +210,7 @@ thread_ckpt_run(void *arg)
 		    session, "use_timestamp=true"));
 		testutil_check(td->conn->query_timestamp(
 		    td->conn, buf, "get=last_checkpoint"));
-		sscanf(buf, "%" SCNx64, &stable);
+		testutil_assert(sscanf(buf, "%" SCNx64, &stable) == 1);
 		printf("Checkpoint %d complete at stable %"
 		    PRIu64 ".\n", i, stable);
 		fflush(stdout);
@@ -728,7 +728,7 @@ main(int argc, char *argv[])
 	if (use_ts) {
 		testutil_check(
 		    conn->query_timestamp(conn, buf, "get=recovery"));
-		sscanf(buf, "%" SCNx64, &stable_val);
+		testutil_assert(sscanf(buf, "%" SCNx64, &stable_val) == 1);
 		printf("Got stable_val %" PRIu64 "\n", stable_val);
 	}
 

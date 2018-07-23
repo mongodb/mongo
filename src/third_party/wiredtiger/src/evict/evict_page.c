@@ -42,7 +42,7 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	WT_STAT_DATA_INCR(session, cache_eviction_hazard);
 	WT_STAT_CONN_INCR(session, cache_eviction_hazard);
-	return (EBUSY);
+	return (__wt_set_return(session, EBUSY));
 }
 
 /*
@@ -453,7 +453,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 			 * page.
 			 */
 			if (__wt_page_del_active(session, child, true))
-				return (EBUSY);
+				return (__wt_set_return(session, EBUSY));
 			break;
 		case WT_REF_LOOKASIDE:
 			/*
@@ -461,10 +461,10 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 			 * can be ignored.
 			 */
 			if (__wt_page_las_active(session, child))
-				return (EBUSY);
+				return (__wt_set_return(session, EBUSY));
 			break;
 		default:
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 		}
 	} WT_INTL_FOREACH_END;
 
@@ -528,7 +528,7 @@ __evict_review(
 	 * should be uncommon - we don't add clean pages to the queue.
 	 */
 	if (F_ISSET(conn, WT_CONN_IN_MEMORY) && !modified && !closing)
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	/* Check if the page can be evicted. */
 	if (!closing) {
@@ -541,7 +541,7 @@ __evict_review(
 			    session, WT_TXN_OLDEST_STRICT));
 
 		if (!__wt_page_can_evict(session, ref, inmem_splitp))
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 
 		/*
 		 * Check for an append-only workload needing an in-memory
@@ -563,7 +563,7 @@ __evict_review(
 	 * eviction that writes to lookaside), give up.
 	 */
 	if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	/*
 	 * If the page is dirty, reconcile it to decide if we can evict it.
@@ -636,7 +636,7 @@ __evict_review(
 	if (WT_SESSION_IS_CHECKPOINT(session) && !__wt_page_is_modified(page) &&
 	    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
 	    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp)))
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	/*
 	 * If reconciliation fails but reports it might succeed if we use the
@@ -663,7 +663,7 @@ __evict_review(
 	 */
 	if (WT_SESSION_IS_CHECKPOINT(session) &&
 	    page->modify->rec_result == WT_PM_REC_MULTIBLOCK)
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	/*
 	 * Success: assert the page is clean or reconciliation was configured

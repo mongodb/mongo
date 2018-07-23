@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, subprocess, sys
+import os, re, subprocess, sys
 from run import wt_builddir
 from wttest import WiredTigerTestCase
 
@@ -79,23 +79,51 @@ class suite_subprocess:
             print '********************************'
             self.fail('ERROR found in output file: ' + filename)
 
+    # If the string is of the form '/.../', then return just the embedded
+    # pattern, otherwise, return None
+    def convert_to_pattern(self, s):
+        if len(s) >= 2 and s[0] == '/' and s[-1] == '/':
+            return s[1:-1]
+        else:
+            return None
+
     def check_file_content(self, filename, expect):
         with open(filename, 'r') as f:
             got = f.read(len(expect) + 100)
             self.assertEqual(got, expect, filename + ': does not contain expected:\n\'' + expect + '\', but contains:\n\'' + got + '\'.')
 
-    def check_file_contains(self, filename, expect):
+    def check_file_contains_one_of(self, filename, expectlist):
         """
         Check that the file contains the expected string in the first 100K bytes
         """
         maxbytes = 1024*100
         with open(filename, 'r') as f:
             got = f.read(maxbytes)
-            if not (expect in got):
-                if len(got) >= maxbytes:
-                    self.fail(filename + ': does not contain expected \'' + expect + '\', or output is too large')
+            found = False
+            for expect in expectlist:
+                pat = self.convert_to_pattern(expect)
+                if pat == None:
+                    if expect in got:
+                        found = True
+                        break
                 else:
-                    self.fail(filename + ': does not contain expected \'' + expect + '\'')
+                    if re.search(pat, got):
+                        found = True
+                        break
+            if not found:
+                if len(expectlist) == 1:
+                    expect = '\'' + expectlist[0] + '\''
+                else:
+                    expect = str(expectlist)
+                gotstr = '\'' + \
+                    (got if len(got) < 1000 else (got[0:1000] + '...')) + '\''
+                if len(got) >= maxbytes:
+                    self.fail(filename + ': does not contain expected ' + expect + ', or output is too large, got ' + gotstr)
+                else:
+                    self.fail(filename + ': does not contain expected ' + expect + ', got ' + gotstr)
+
+    def check_file_contains(self, filename, expect):
+        self.check_file_contains_one_of(filename, [expect])
 
     def check_empty_file(self, filename):
         """
@@ -165,8 +193,21 @@ class suite_subprocess:
                 procargs = [ wtexe ]
                 if self._gdbSubprocess:
                     procargs = [ "gdb", "--args" ] + procargs
+                elif self._lldbSubprocess:
+                    procargs = [ "lldb", "--" ] + procargs
                 procargs.extend(args)
                 if self._gdbSubprocess:
+                    infilepart = ""
+                    if infilename != None:
+                        infilepart = "<" + infilename + " "
+                    print str(procargs)
+                    print "*********************************************"
+                    print "**** Run 'wt' via: run " + \
+                        " ".join(procargs[3:]) + infilepart + \
+                        ">" + wtoutname + " 2>" + wterrname
+                    print "*********************************************"
+                    returncode = subprocess.call(procargs)
+                elif self._lldbSubprocess:
                     infilepart = ""
                     if infilename != None:
                         infilepart = "<" + infilename + " "

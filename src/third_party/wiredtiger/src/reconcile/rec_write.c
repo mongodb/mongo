@@ -420,7 +420,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 	if (LF_ISSET(WT_REC_EVICT) &&
 	    !__wt_page_can_evict(session, ref, NULL)) {
 		WT_PAGE_UNLOCK(session, page);
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 	}
 
 	/* Initialize the reconciliation structure for each new run. */
@@ -442,8 +442,9 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 	if (LF_ISSET(WT_REC_EVICT)) {
 		mod->last_eviction_id = oldest_id;
 #ifdef HAVE_TIMESTAMPS
-		__wt_txn_pinned_timestamp(
-		    session, &mod->last_eviction_timestamp);
+		if (S2C(session)->txn_global.has_pinned_timestamp)
+			__wt_txn_pinned_timestamp(
+			    session, &mod->last_eviction_timestamp);
 #endif
 		mod->last_evict_pass_gen = S2C(session)->cache->evict_pass_gen;
 	}
@@ -651,7 +652,7 @@ __rec_write_check_complete(
 		return (0);
 
 	*lookaside_retryp = true;
-	return (EBUSY);
+	return (__wt_set_return(session, EBUSY));
 }
 
 /*
@@ -1397,7 +1398,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			if (F_ISSET(r, WT_REC_UPDATE_RESTORE) &&
 			    *updp != NULL && uncommitted) {
 				r->leave_dirty = true;
-				return (EBUSY);
+				return (__wt_set_return(session, EBUSY));
 			}
 
 			if (upd->type == WT_UPDATE_BIRTHMARK)
@@ -1517,9 +1518,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * the WT_REC_LOOKASIDE flag.
 	 */
 	if (!F_ISSET(r, WT_REC_LOOKASIDE | WT_REC_UPDATE_RESTORE))
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 	if (uncommitted && !F_ISSET(r, WT_REC_UPDATE_RESTORE))
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	WT_ASSERT(session, r->max_txn != WT_TXN_NONE);
 
@@ -1704,7 +1705,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * the original page and which should see the deleted page).
 	 */
 	if (F_ISSET(r, WT_REC_EVICT))
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	/*
 	 * If there are deleted child pages we can't discard immediately, keep
@@ -1789,7 +1790,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 */
 			WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
 			if (F_ISSET(r, WT_REC_EVICT))
-				return (EBUSY);
+				return (__wt_set_return(session, EBUSY));
 
 			/*
 			 * If called during checkpoint, the child is being
@@ -1817,7 +1818,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			if (F_ISSET(r, WT_REC_EVICT) &&
 			    __wt_page_las_active(session, ref)) {
 				WT_ASSERT(session, false);
-				return (EBUSY);
+				return (__wt_set_return(session, EBUSY));
 			}
 
 			/*
@@ -1842,7 +1843,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 */
 			WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
 			if (F_ISSET(r, WT_REC_EVICT))
-				return (EBUSY);
+				return (__wt_set_return(session, EBUSY));
 
 			/*
 			 * If called during checkpoint, acquire a hazard pointer
@@ -1877,7 +1878,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 */
 			WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT));
 			if (F_ISSET(r, WT_REC_EVICT))
-				return (EBUSY);
+				return (__wt_set_return(session, EBUSY));
 			goto done;
 
 		case WT_REF_SPLIT:
@@ -1894,7 +1895,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * for checkpoint.
 			 */
 			WT_ASSERT(session, WT_REF_SPLIT != WT_REF_SPLIT);
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -3704,7 +3705,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * allocate a zero-length array.
 		 */
 		if (r->page->type != WT_PAGE_ROW_LEAF && chunk->entries == 0)
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 
 		if (F_ISSET(r, WT_REC_LOOKASIDE)) {
 			r->cache_write_lookaside = true;

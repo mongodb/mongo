@@ -19,6 +19,13 @@
 #define	WT_DIAGNOSTIC_YIELD
 #endif
 
+#define	__wt_err(session, error, ...)					\
+	__wt_err_func(session, error, __func__, __LINE__, __VA_ARGS__)
+#define	__wt_errx(session, ...)						\
+	__wt_errx_func(session, __func__, __LINE__, __VA_ARGS__)
+#define	__wt_set_return(session, error)					\
+	__wt_set_return_func(session, __func__, __LINE__, error)
+
 /* Set "ret" and branch-to-err-label tests. */
 #define	WT_ERR(a) do {							\
 	if ((ret = (a)) != 0)						\
@@ -125,8 +132,10 @@
  */
 #ifdef HAVE_DIAGNOSTIC
 #define	WT_ASSERT(session, exp) do {					\
-	if (!(exp))							\
-		__wt_assert(session, 0, __func__, __LINE__, "%s", #exp);\
+	if (!(exp)) {							\
+		__wt_errx(session, "%s", #exp);				\
+		__wt_abort(session);					\
+	}								\
 } while (0)
 #else
 #define	WT_ASSERT(session, exp)						\
