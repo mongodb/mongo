@@ -495,7 +495,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     // and subsequent callers will try to do a full refresh.
     const auto refreshStatus = [&] {
         try {
-            forceShardFilteringMetadataRefresh(opCtx, getNss());
+            forceShardFilteringMetadataRefresh(opCtx, getNss(), true);
             return Status::OK();
         } catch (const DBException& ex) {
             return ex.toStatus();
