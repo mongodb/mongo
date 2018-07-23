@@ -44,8 +44,7 @@
                 if (c.name === "foo") {
                     let foo = testDB.getCollection(c.name);
                     assert.commandWorked(foo.createIndex({id: 1}, {unique: true}));
-                    assert.commandWorked(
-                        foo.createIndex({sno: 1}, {name: "sno_1"}, {unique: true, v: 1}));
+                    assert.commandWorked(foo.createIndex({sno: 1}, {unique: true, v: 1}));
                 }
             });
         }
@@ -67,7 +66,7 @@
                 let currentCollection = mdb.getCollection(c.name);
                 currentCollection.getIndexes().forEach(function(i) {
                     if (i.unique) {
-                        if (i.v === "1") {
+                        if (i.v === 1) {
                             unique_idx_v1.push(i);
                             return;
                         }

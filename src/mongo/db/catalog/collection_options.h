@@ -38,9 +38,6 @@
 
 namespace mongo {
 
-// TODO(SERVER-34489) Remove when upgrade/downgrade is ready.
-extern bool createTimestampSafeUniqueIndex;
-
 class CollatorFactoryInterface;
 
 /**

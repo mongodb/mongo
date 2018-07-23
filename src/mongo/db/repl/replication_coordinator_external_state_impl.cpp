@@ -450,9 +450,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         // to that shard, the new node will still start up with featureCompatibilityVersion 4.0 and
         // may need to have unique index version updated. Such indexes would be updated during
         // InitialSync because the new node is a secondary.
-        // TODO(SERVER-34489) Add a check for latest FCV when upgrade/downgrade is ready.
-        if (FeatureCompatibilityVersion::isCleanStartUp() &&
-            serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
+            FeatureCompatibilityVersion::isCleanStartUp()) {
             auto updateStatus = updateNonReplicatedUniqueIndexes(opCtx);
             if (!updateStatus.isOK())
                 return updateStatus;

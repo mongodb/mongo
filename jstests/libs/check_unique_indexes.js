@@ -5,13 +5,6 @@
  * are in correct data format version.
  */
 function checkUniqueIndexFormatVersion(adminDB, currentFCV) {
-    let getParameterResult =
-        adminDB.runCommand({getParameter: 1, createTimestampSafeUniqueIndex: 1});
-    assert.commandWorked(getParameterResult);
-    // TODO(SERVER-34489) Remove this check when upgrade/downgrade is ready.
-    if (!getParameterResult.createTimestampSafeUniqueIndex)
-        return;
-
     // Data format version is WiredTiger specific and not required to be tested for other storage
     // engines.
     const isWiredTiger =
@@ -24,7 +17,12 @@ function checkUniqueIndexFormatVersion(adminDB, currentFCV) {
 
     databaseList.forEach(function(database) {
         let currentDatabase = adminDB.getSiblingDB(database.name);
-        currentDatabase.getCollectionInfos().forEach(function(c) {
+        // Get the list of collections including collections that are pending drop. This is to
+        // ensure that every unique index has the correct format version.
+        let collectionsWithPending =
+            currentDatabase.runCommand("listCollections", {includePendingDrops: true})
+                .cursor.firstBatch;
+        collectionsWithPending.forEach(function(c) {
             let currentCollection = currentDatabase.getCollection(c.name);
             currentCollection.getIndexes().forEach(function(index) {
                 if (index.unique) {
@@ -36,8 +34,8 @@ function checkUniqueIndexFormatVersion(adminDB, currentFCV) {
                     if (index.v === 2) {
                         if (currentFCV === latestFCV)
                             assert.eq(ifv,
-                                      10,
-                                      "Expected index format version 10 for unique index: " +
+                                      12,
+                                      "Expected index format version 12 for unique index: " +
                                           tojson(index));
                         else
                             assert.eq(ifv,
@@ -47,8 +45,8 @@ function checkUniqueIndexFormatVersion(adminDB, currentFCV) {
                     } else {
                         if (currentFCV === latestFCV)
                             assert.eq(ifv,
-                                      9,
-                                      "Expected index format version 9 for unique index: " +
+                                      11,
+                                      "Expected index format version 11 for unique index: " +
                                           tojson(index));
                         else
                             assert.eq(ifv,

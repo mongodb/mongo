@@ -1127,9 +1127,9 @@ void InitialSyncer::_rollbackCheckerCheckForRollbackCallback(
     // Update all unique indexes belonging to non-replicated collections on secondaries. See comment
     // in ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage() for the explanation of
     // why we do this.
-    // TODO: SERVER-34489 should add a check for latest FCV before making the upgrade call when
-    // upgrade downgrade is ready.
-    if (createTimestampSafeUniqueIndex) {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
         auto opCtx = makeOpCtx();
         auto updateStatus = _storage->upgradeNonReplicatedUniqueIndexes(opCtx.get());
         if (!updateStatus.isOK()) {

@@ -117,12 +117,12 @@ Status checkKeySize(const BSONObj& key) {
 
 
 // Keystring format 7 was used in 3.3.6 - 3.3.8 development releases. 4.2 onwards, unique indexes
-// can be either format version 9 or 10. On upgrading to 4.2, an existing format 6 unique index
-// will upgrade to format 9 and an existing format 8 unique index will upgrade to format 10.
+// can be either format version 11 or 12. On upgrading to 4.2, an existing format 6 unique index
+// will upgrade to format 11 and an existing format 8 unique index will upgrade to format 12.
 const int kDataFormatV1KeyStringV0IndexVersionV1 = 6;
 const int kDataFormatV2KeyStringV1IndexVersionV2 = 8;
-const int kDataFormatV3KeyStringV0UniqueIndexVersionV1 = 9;
-const int kDataFormatV4KeyStringV1UniqueIndexVersionV2 = 10;
+const int kDataFormatV3KeyStringV0UniqueIndexVersionV1 = 11;
+const int kDataFormatV4KeyStringV1UniqueIndexVersionV2 = 12;
 const int kMinimumIndexVersion = kDataFormatV1KeyStringV0IndexVersionV1;
 const int kMaximumIndexVersion = kDataFormatV4KeyStringV1UniqueIndexVersionV2;
 
@@ -180,10 +180,10 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexDescriptor& de
 
     int keyStringVersion;
 
-    // The gating variable controls the creation between timestamp safe and timestamp unsafe
-    // unique indexes. The gating condition will be enhanced to check for FCV 4.2 by SERVER-34489
-    // and the gating variable will be removed when FCV 4.2 becomes available.
-    if (createTimestampSafeUniqueIndex && desc.unique() && !desc.isIdIndex()) {
+    // The  FCV controls the creation between timestamp safe and timestamp unsafe unique indexes.
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.isVersionUpgradingOrUpgraded() && desc.unique() &&
+        !desc.isIdIndex()) {
         keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
             ? kDataFormatV4KeyStringV1UniqueIndexVersionV2
             : kDataFormatV3KeyStringV0UniqueIndexVersionV1;
@@ -305,7 +305,7 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
     }
     _dataFormatVersion = version.getValue();
 
-    // Index data format 6 and 9 correspond to KeyString version V0 and data format 8 and 10
+    // Index data format 6 and 11 correspond to KeyString version V0 and data format 8 and 12
     // correspond to KeyString version V1
     _keyStringVersion = (_dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2 ||
                          _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2)
