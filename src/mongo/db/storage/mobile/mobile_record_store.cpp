@@ -401,13 +401,6 @@ Status MobileRecordStore::truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status MobileRecordStore::compact(OperationContext* opCtx,
-                                  RecordStoreCompactAdaptor* adaptor,
-                                  const CompactOptions* options,
-                                  CompactStats* stats) {
-    return Status::OK();
-}
-
 /**
  * Note: on full validation, this validates the entire database file, not just the table used by
  * this record store.

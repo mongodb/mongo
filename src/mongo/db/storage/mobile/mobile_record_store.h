@@ -95,17 +95,12 @@ public:
     }
 
     bool compactSupported() const override {
-        return true;
+        return false;
     }
 
     bool compactsInPlace() const override {
-        return true;
+        return false;
     }
-
-    Status compact(OperationContext* opCtx,
-                   RecordStoreCompactAdaptor* adaptor,
-                   const CompactOptions* options,
-                   CompactStats* stats) override;
 
     Status validate(OperationContext* opCtx,
                     ValidateCmdLevel level,
