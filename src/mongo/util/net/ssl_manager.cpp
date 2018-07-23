@@ -688,7 +688,13 @@ std::string escapeRfc2253(StringData str) {
     return ret;
 }
 
+TLSVersionCounts tlsVersionCounts;
+
 }  // namespace
+
+TLSVersionCounts& TLSVersionCounts::get() {
+    return tlsVersionCounts;
+}
 
 StatusWith<std::string> SSLX509Name::getOID(StringData oid) const {
     for (const auto& rdn : _entries) {
@@ -1473,8 +1479,37 @@ SSLConnection* SSLManager::accept(Socket* socket, const char* initialBytes, int 
     return sslConn.release();
 }
 
+
+void recordTLSVersion(const SSL* conn) {
+    int protocol = SSL_version(conn);
+
+    auto& counts = mongo::TLSVersionCounts::get();
+    switch (protocol) {
+        case TLS1_VERSION:
+            counts.tls10.addAndFetch(1);
+            break;
+        case TLS1_1_VERSION:
+            counts.tls11.addAndFetch(1);
+            break;
+        case TLS1_2_VERSION:
+            counts.tls12.addAndFetch(1);
+            break;
+#ifdef TLS1_3_VERSION
+        case TLS1_3_VERSION:
+            counts.tls13.addAndFetch(1);
+            break;
+#endif
+        default:
+            // Do nothing
+            break;
+    }
+}
+
 StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost) {
+
+    recordTLSVersion(conn);
+
     if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
 

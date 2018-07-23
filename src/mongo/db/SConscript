@@ -796,6 +796,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/clock_sources",
         "$BUILD_DIR/mongo/util/elapsed_tracker",
         "$BUILD_DIR/mongo/util/net/network",
+        "$BUILD_DIR/mongo/util/net/ssl_manager_status",
         "$BUILD_DIR/third_party/shim_snappy",
         "auth/authmongod",
         "authz_manager_external_state_factory_d",
