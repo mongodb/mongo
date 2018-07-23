@@ -109,6 +109,17 @@ public:
 
     static StatusWith<MongoURI> parse(const std::string& url);
 
+    /*
+     * Returns true if str starts with one of the uri schemes (e.g. mongodb:// or mongodb+srv://)
+     */
+    static bool isMongoURI(StringData str);
+
+    /*
+     * Returns a copy of the input url as a string with the password and connection options
+     * removed. This may uassert or return a mal-formed string if the input is not a valid URI
+     */
+    static std::string redact(StringData url);
+
     DBClientBase* connect(StringData applicationName,
                           std::string& errmsg,
                           boost::optional<double> socketTimeoutSecs = boost::none) const;
