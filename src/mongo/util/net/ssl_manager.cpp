@@ -428,11 +428,17 @@ void setupFIPS() {
     fassertFailedNoTrace(17089);
 #endif
 }
+
+TLSVersionCounts tlsVersionCounts;
+
 }  // namespace
+
+TLSVersionCounts& TLSVersionCounts::get() {
+    return tlsVersionCounts;
+}
 
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
-
 
 MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
     SSL_library_init();
@@ -1362,8 +1368,36 @@ bool SSLManager::_hostNameMatch(const char* nameToMatch, const char* certHostNam
     }
 }
 
+void recordTLSVersion(const SSL* conn) {
+    int protocol = SSL_version(conn);
+
+    auto& counts = mongo::TLSVersionCounts::get();
+    switch (protocol) {
+        case TLS1_VERSION:
+            counts.tls10.addAndFetch(1);
+            break;
+        case TLS1_1_VERSION:
+            counts.tls11.addAndFetch(1);
+            break;
+        case TLS1_2_VERSION:
+            counts.tls12.addAndFetch(1);
+            break;
+#ifdef TLS1_3_VERSION
+        case TLS1_3_VERSION:
+            counts.tls13.addAndFetch(1);
+            break;
+#endif
+        default:
+            // Do nothing
+            break;
+    }
+}
+
 StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost) {
+
+    recordTLSVersion(conn);
+
     if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
 

@@ -64,6 +64,20 @@ networkEnv.Library(
 )
 
 env.Library(
+    target='ssl_manager_status',
+    source=[
+        "ssl_manager_status.cpp",
+    ],
+    LIBDEPS=[
+        'network',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/server_status',
+    ],
+)
+
+env.Library(
     target='message_port_mock',
     source=[
         "message_port_mock.cpp",

@@ -663,6 +663,7 @@ serveronlyLibdeps = [
     "$BUILD_DIR/mongo/util/clock_sources",
     "$BUILD_DIR/mongo/util/elapsed_tracker",
     "$BUILD_DIR/mongo/util/net/network",
+    "$BUILD_DIR/mongo/util/net/ssl_manager_status",
     "$BUILD_DIR/mongo/db/storage/mmap_v1/file_allocator",
     "$BUILD_DIR/third_party/shim_snappy",
     '$BUILD_DIR/mongo/db/ttl_collection_cache',
