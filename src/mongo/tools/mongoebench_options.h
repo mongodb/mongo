@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/filesystem.hpp>
 #include <cstdint>
 #include <iosfwd>
 #include <memory>
@@ -52,6 +53,7 @@ namespace moe = mongo::optionenvironment;
 struct MongoeBenchGlobalParams {
     std::unique_ptr<BenchRunConfig> preConfig;
     std::unique_ptr<BenchRunConfig> opsConfig;
+    boost::filesystem::path outputFile;
 };
 
 extern MongoeBenchGlobalParams mongoeBenchGlobalParams;

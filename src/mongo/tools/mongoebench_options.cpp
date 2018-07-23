@@ -65,6 +65,11 @@ Status addMongoeBenchOptions(moe::OptionSection* options) {
     options->addOptionChaining("time", "time,s", moe::Double, "seconds to run benchRun for")
         .setDefault(moe::Value(1.0));
 
+    options->addOptionChaining("output",
+                               "output,o",
+                               moe::String,
+                               "output file for benchRun stats (defaults to <dbPath>/perf.json)");
+
     return Status::OK();
 }
 
@@ -89,6 +94,8 @@ BSONObj getBsonFromJsonFile(const std::string& filename) {
     std::string data((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
     return fromjson(data);
 }
+
+boost::filesystem::path kDefaultOutputFile("perf.json");
 
 }  // namespace
 
@@ -129,6 +136,23 @@ Status storeMongoeBenchOptions(const moe::Environment& params,
         if (params.count("time")) {
             mongoeBenchGlobalParams.opsConfig->seconds = params["time"].as<double>();
         }
+    }
+
+    if (params.count("output")) {
+        mongoeBenchGlobalParams.outputFile =
+            boost::filesystem::path(params["output"].as<std::string>());
+    } else {
+        boost::filesystem::path dbpath(storageGlobalParams.dbpath);
+        mongoeBenchGlobalParams.outputFile = dbpath / kDefaultOutputFile;
+    }
+
+    mongoeBenchGlobalParams.outputFile = mongoeBenchGlobalParams.outputFile.lexically_normal();
+    auto parentPath = mongoeBenchGlobalParams.outputFile.parent_path();
+    if (!parentPath.empty() && !boost::filesystem::exists(parentPath)) {
+        return {ErrorCodes::NonExistentPath,
+                str::stream() << "Directory containing output file must already exist, but "
+                              << parentPath.string()
+                              << " wasn't found"};
     }
 
     return Status::OK();

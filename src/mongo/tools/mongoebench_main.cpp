@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/filesystem.hpp>
+
 #include "mongo/base/init.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/service_context.h"
@@ -129,7 +131,11 @@ int mongoeBenchMain(int argc, char* argv[], char** envp) {
         sleepmillis(static_cast<long long>(seconds * 1000));
 
         BSONObj stats = BenchRunner::finish(runner.release());
-        log() << "stats: " << stats;
+        log() << "writing stats to " << mongoeBenchGlobalParams.outputFile.string() << ": "
+              << stats;
+
+        boost::filesystem::ofstream outfile(mongoeBenchGlobalParams.outputFile);
+        outfile << stats.jsonString() << '\n';
     }
 
     shutdown(EXIT_CLEAN);

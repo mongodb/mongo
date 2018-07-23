@@ -41,7 +41,7 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoeBenchOptions)(InitializerContext* c
 
 GlobalInitializerRegisterer mongoeBenchOptionsStore(
     "MongoeBenchOptions_Store",
-    {"BeginStartupOptionStorage"},
+    {"BeginStartupOptionStorage", "EmbeddedOptions_Store"},
     {"EndStartupOptionStorage"},
     [](InitializerContext* context) {
         if (!handlePreValidationMongoeBenchOptions(moe::startupOptionsParsed)) {
