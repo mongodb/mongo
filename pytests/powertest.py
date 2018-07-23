@@ -891,13 +891,22 @@ class WindowsService(object):
 
         return ret, output
 
-    def stop(self):
-        """Stop service. Return (code, output) tuple."""
+    def stop(self, timeout):
+        """Stop service, waiting for 'timeout' seconds. Return (code, output) tuple."""
         self.pids = []
         if self.status() not in self._states.values():
             return 1, "Service '{}' status: {}".format(self.name, self.status())
         try:
             win32serviceutil.StopService(serviceName=self.name)
+            start = time.time()
+            status = self.status()
+            while status == "stop pending":
+                if time.time() - start >= timeout:
+                    ret = 1
+                    output = "Service '{}' status is '{}'".format(self.name, status)
+                    break
+                time.sleep(3)
+                status = self.status()
             ret = 0
             output = "Service '{}' stopped".format(self.name)
         except pywintypes.error as err:
@@ -964,7 +973,7 @@ class PosixService(object):
             self.pids = proc.get_pids()
         return ret, output
 
-    def stop(self):
+    def stop(self, timeout):  # pylint: disable=unused-argument
         """Stop process. Returns (code, output) tuple."""
         proc = ProcessControl(name=self.bin_name)
         proc.kill()
@@ -1076,9 +1085,9 @@ class MongodControl(object):  # pylint: disable=too-many-instance-attributes
         """Return tuple (ret, ouput)."""
         return self.service.update()
 
-    def stop(self):
+    def stop(self, timeout=0):
         """Return tuple (ret, ouput)."""
-        return self.service.stop()
+        return self.service.stop(timeout)
 
     def status(self):
         """Return status of the process."""
@@ -1182,8 +1191,17 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
                 pass
 
         elif operation == "kill_mongod":
-            # Unconditional kill of mongod
+            # Unconditional kill of mongod.
             ret, output = kill_mongod()
+            if ret:
+                LOGGER.error("kill_mongod failed %s", output)
+                return ret
+            # Ensure the mongod service is not in a running state.
+            mongod.stop(timeout=30)
+            status = mongod.status()
+            if status != "stopped":
+                LOGGER.error("Unable to stop the mongod service, in state '%s'", status)
+                ret = 1
 
         elif operation == "install_mongod":
             ret, output = mongod.install(root_dir, options.tarball_url)
