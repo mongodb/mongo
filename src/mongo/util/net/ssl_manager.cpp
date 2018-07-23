@@ -39,6 +39,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/session.h"
@@ -227,7 +228,14 @@ std::string x509OidToShortName(const std::string& name) {
     return it->second;
 }
 #endif
+
+const auto getTLSVersionCounts = ServiceContext::declareDecoration<TLSVersionCounts>();
+
 }  // namespace
+
+TLSVersionCounts& TLSVersionCounts::get(ServiceContext* serviceContext) {
+    return getTLSVersionCounts(serviceContext);
+}
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLogManager"))
 (InitializerContext*) {
@@ -241,6 +249,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLog
             LOG(1) << "Server Certificate Expiration: " << config.serverCertificateExpirationDate;
         }
     }
+
     return Status::OK();
 }
 
@@ -718,6 +727,32 @@ std::string escapeRfc2253(StringData str) {
 
     return ret;
 }
+
+/**
+ * Status section of which tls versions connected to MongoDB and completed an SSL handshake.
+ * Note: Clients are only not counted if they try to connect to the server with a unsupported TLS
+ * version. They are still counted if the server rejects them for certificate issues in
+ * parseAndValidatePeerCertificate.
+ */
+class TLSVersionSatus : public ServerStatusSection {
+public:
+    TLSVersionSatus() : ServerStatusSection("transportSecurity") {}
+
+    bool includeByDefault() const final {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
+        auto& counts = TLSVersionCounts::get(opCtx->getServiceContext());
+
+        BSONObjBuilder builder;
+        builder.append("1.0", counts.tls10.load());
+        builder.append("1.1", counts.tls11.load());
+        builder.append("1.2", counts.tls12.load());
+        return builder.obj();
+    }
+} tlsVersionStatus;
+
 
 #endif
 

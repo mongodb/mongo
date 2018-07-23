@@ -1244,8 +1244,43 @@ SSLPeerInfo SSLManagerApple::parseAndValidatePeerCertificateDeprecated(
     return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
 }
 
+void recordTLSVersion(::SSLContextRef ssl) {
+    ::SSLProtocol protocol;
+
+    uassertOSStatusOK(::SSLGetNegotiatedProtocolVersion(ssl, &protocol));
+
+    auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());
+    switch (protocol) {
+        case kTLSProtocol1:
+            counts.tls10.addAndFetch(1);
+            break;
+        case kTLSProtocol11:
+            counts.tls11.addAndFetch(1);
+            break;
+        case kTLSProtocol12:
+            counts.tls12.addAndFetch(1);
+            break;
+        // case kTLSProtocol13:
+        //     counts.tls13.addAndFetch(1);
+        //     break;
+        case kSSLProtocolUnknown:
+        case kSSLProtocol2:
+        case kSSLProtocol3:
+        case kSSLProtocol3Only:
+        case kTLSProtocol1Only:
+        case kSSLProtocolAll:
+        case kDTLSProtocol1:
+            // Do nothing
+            break;
+    }
+}
+
+
 StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCertificate(
     ::SSLContextRef ssl, const std::string& remoteHost) {
+
+    // Record TLS version stats
+    recordTLSVersion(ssl);
 
     /* While we always have a system CA via the Keychain,
      * we'll pretend not to in terms of validation if the server

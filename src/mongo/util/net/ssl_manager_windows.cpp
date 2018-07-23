@@ -436,7 +436,7 @@ StatusWith<UniqueCertChainEngine> initChainEngine(CERT_CHAIN_ENGINE_CONFIG* chai
                                     << errnoWithDescription(gle));
     }
 
-    return chainEngine;
+    return {chainEngine};
 }
 
 Status SSLManagerWindows::_initChainEngines(bool hasCAFile) {
@@ -873,8 +873,7 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
                                     << errnoWithDescription(gle));
     }
 
-    return std::move(
-        UniqueCertificateWithPrivateKey(std::move(certHolder), std::move(cryptProvider)));
+    return UniqueCertificateWithPrivateKey(std::move(certHolder), std::move(cryptProvider));
 }
 
 Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
@@ -1633,9 +1632,48 @@ Status validatePeerCertificate(const std::string& remoteHost,
     return Status::OK();
 }
 
+Status recordTLSVersion(PCtxtHandle ssl) {
+    SecPkgContext_ConnectionInfo connInfo;
+
+    SECURITY_STATUS ss = QueryContextAttributes(ssl, SECPKG_ATTR_CONNECTION_INFO, &connInfo);
+
+    if (ss != SEC_E_OK) {
+        return Status(ErrorCodes::SSLHandshakeFailed,
+                      str::stream() << "QueryContextAttributes for connection info failed with"
+                                    << ss);
+    }
+
+    auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());
+    switch (connInfo.dwProtocol) {
+        case SP_PROT_TLS1_CLIENT:
+        case SP_PROT_TLS1_SERVER:
+            counts.tls10.addAndFetch(1);
+            break;
+        case SP_PROT_TLS1_1_CLIENT:
+        case SP_PROT_TLS1_1_SERVER:
+            counts.tls11.addAndFetch(1);
+            break;
+        case SP_PROT_TLS1_2_CLIENT:
+        case SP_PROT_TLS1_2_SERVER:
+            counts.tls12.addAndFetch(1);
+            break;
+        default:
+            // Do nothing
+            break;
+    }
+
+    return Status::OK();
+}
+
 StatusWith<boost::optional<SSLPeerInfo>> SSLManagerWindows::parseAndValidatePeerCertificate(
     PCtxtHandle ssl, const std::string& remoteHost) {
     PCCERT_CONTEXT cert;
+
+    auto countStatus = recordTLSVersion(ssl);
+    if (!countStatus.isOK()) {
+        return countStatus;
+    }
+
     if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
 

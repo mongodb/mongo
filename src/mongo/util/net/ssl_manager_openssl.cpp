@@ -64,6 +64,7 @@
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/evp.h>
+#include <openssl/ssl.h>
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
 #if defined(_WIN32)
@@ -1235,8 +1236,37 @@ SSLConnectionInterface* SSLManagerOpenSSL::accept(Socket* socket,
     return sslConn.release();
 }
 
+
+void recordTLSVersion(const SSL* conn) {
+    int protocol = SSL_version(conn);
+
+    auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());
+    switch (protocol) {
+        case TLS1_VERSION:
+            counts.tls10.addAndFetch(1);
+            break;
+        case TLS1_1_VERSION:
+            counts.tls11.addAndFetch(1);
+            break;
+        case TLS1_2_VERSION:
+            counts.tls12.addAndFetch(1);
+            break;
+#ifdef TLS1_3_VERSION
+        case TLS1_3_VERSION:
+            counts.tls13.addAndFetch(1);
+            break;
+#endif
+        default:
+            // Do nothing
+            break;
+    }
+}
+
 StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost) {
+
+    recordTLSVersion(conn);
+
     if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
 
