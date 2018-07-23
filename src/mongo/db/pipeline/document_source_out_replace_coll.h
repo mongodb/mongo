@@ -37,11 +37,11 @@ namespace mongo {
  * Version of $out which directs writes to a temporary collection, then renames the temp collection
  * to the target collection with the 'dropTarget' option set to true.
  */
-class DocumentSourceOutDropTarget final : public DocumentSourceOut {
+class DocumentSourceOutReplaceColl final : public DocumentSourceOut {
 public:
     using DocumentSourceOut::DocumentSourceOut;
 
-    ~DocumentSourceOutDropTarget() {
+    ~DocumentSourceOutReplaceColl() {
         DESTRUCTOR_GUARD(
             // Make sure we drop the temp collection if anything goes wrong. Errors are ignored
             // here because nothing can be done about them. Additionally, if this fails and the

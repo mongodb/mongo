@@ -34,11 +34,12 @@ imports:
 
 enums:
     WriteMode:
-        description: "Possible merge mode values."
+        description: "Possible write mode values."
         type: string
         values:
-            kModeInsert: "insert"
-            kModeReplace: "replace"
+            kModeReplaceCollection: "replaceCollection"
+            kModeInsertDocuments: "insertDocuments"
+            kModeReplaceDocuments: "replaceDocuments"
 
 structs:
     DocumentSourceOutSpec:
@@ -60,18 +61,10 @@ structs:
             mode:
                 cpp_name: mode
                 type: WriteMode
-                description: The merge mode for the output operation.
+                description: The write mode for the output operation.
 
             uniqueKey:
                 cpp_name: uniqueKey
                 type: object
                 optional: true
                 description: Document of fields representing the unique key.
-
-            dropTarget:
-                cpp_name: dropTarget
-                type: bool
-                default: false
-                description: If true, the 'to' collection is atomically dropped and replaced with 
-                             the results of the aggregation.
-              

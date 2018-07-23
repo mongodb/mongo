@@ -44,7 +44,6 @@ public:
     DocumentSourceOut(const NamespaceString& outputNs,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       WriteModeEnum mode,
-                      bool dropTarget,
                       boost::optional<Document> uniqueKey);
 
     virtual ~DocumentSourceOut() = default;
@@ -105,7 +104,6 @@ private:
 
     const NamespaceString _outputNs;
     WriteModeEnum _mode;
-    bool _dropTarget;
     boost::optional<Document> _uniqueKey;
 };
 

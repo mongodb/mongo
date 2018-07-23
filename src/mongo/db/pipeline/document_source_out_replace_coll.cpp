@@ -28,13 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_out_drop_target.h"
+#include "mongo/db/pipeline/document_source_out_replace_coll.h"
 
 namespace mongo {
 
 static AtomicUInt32 aggOutCounter;
 
-void DocumentSourceOutDropTarget::initializeWriteNs() {
+void DocumentSourceOutReplaceColl::initializeWriteNs() {
     DBClientBase* conn = pExpCtx->mongoProcessInterface->directClient();
 
     const auto& outputNs = getOutputNs();
@@ -98,7 +98,7 @@ void DocumentSourceOutDropTarget::initializeWriteNs() {
     }
 };
 
-void DocumentSourceOutDropTarget::finalize() {
+void DocumentSourceOutReplaceColl::finalize() {
     const auto& outputNs = getOutputNs();
     auto renameCommandObj =
         BSON("renameCollection" << _tempNs.ns() << "to" << outputNs.ns() << "dropTarget" << true);

@@ -30,9 +30,9 @@
 
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/db/pipeline/document_source_out_drop_target.h"
 #include "mongo/db/pipeline/document_source_out_gen.h"
 #include "mongo/db/pipeline/document_source_out_in_place.h"
+#include "mongo/db/pipeline/document_source_out_replace_coll.h"
 
 namespace mongo {
 
@@ -144,13 +144,11 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
 DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      WriteModeEnum mode,
-                                     bool dropTarget,
                                      boost::optional<Document> uniqueKey)
     : DocumentSource(expCtx),
       _done(false),
       _outputNs(outputNs),
       _mode(mode),
-      _dropTarget(dropTarget),
       _uniqueKey(uniqueKey) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
@@ -165,8 +163,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
             "$out cannot be used with a 'majority' read concern level",
             readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern);
 
-    bool dropTarget = true;
-    auto mode = WriteModeEnum::kModeInsert;
+    auto mode = WriteModeEnum::kModeReplaceCollection;
     boost::optional<Document> uniqueKey;
     NamespaceString outputNs;
     if (elem.type() == BSONType::String) {
@@ -175,11 +172,11 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
         auto spec =
             DocumentSourceOutSpec::parse(IDLParserErrorContext("$out"), elem.embeddedObject());
 
-        dropTarget = spec.getDropTarget();
         mode = spec.getMode();
         uassert(ErrorCodes::InvalidOptions,
-                "$out is currently supported only with mode insert.",
-                mode == WriteModeEnum::kModeInsert);
+                str::stream() << "$out is not currently supported with mode "
+                              << WriteMode_serializer(mode),
+                mode != WriteModeEnum::kModeReplaceDocuments);
 
         if (auto uniqueKeyDoc = spec.getUniqueKey()) {
             uniqueKey = Document{{uniqueKeyDoc.get()}};
@@ -201,17 +198,19 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
 
     uassert(17385, "Can't $out to special collection: " + outputNs.coll(), !outputNs.isSpecial());
 
-    if (dropTarget) {
-        return new DocumentSourceOutDropTarget(outputNs, expCtx, mode, dropTarget, uniqueKey);
-    } else {
-        return new DocumentSourceOutInPlace(outputNs, expCtx, mode, dropTarget, uniqueKey);
+    switch (mode) {
+        case WriteModeEnum::kModeReplaceCollection:
+            return new DocumentSourceOutReplaceColl(outputNs, expCtx, mode, uniqueKey);
+        case WriteModeEnum::kModeInsertDocuments:
+            return new DocumentSourceOutInPlace(outputNs, expCtx, mode, uniqueKey);
+        default:
+            MONGO_UNREACHABLE;
     }
 }
 
 Value DocumentSourceOut::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument serialized(
         Document{{DocumentSourceOutSpec::kTargetCollectionFieldName, _outputNs.coll()},
-                 {DocumentSourceOutSpec::kDropTargetFieldName, _dropTarget},
                  {DocumentSourceOutSpec::kTargetDbFieldName, _outputNs.db()},
                  {DocumentSourceOutSpec::kModeFieldName, WriteMode_serializer(_mode)}});
     if (_uniqueKey) {
