@@ -33,6 +33,11 @@ Remove-Item $CompassExe -ErrorAction:Ignore
 
 try {
     Write-Output "Downloading Compass from $CompassUrl"
+
+    # Default PowerShell SecurityProtocol does not support Tls1.2 (required by domain)
+    if ([Net.ServicePointManager]::SecurityProtocol.ToString() -NotMatch "Tls12") {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    }
     Invoke-WebRequest -Uri $CompassUrl -OutFile $CompassExe
 
     Write-Output "Installing Compass"
