@@ -170,6 +170,7 @@ private:
     class SetHeadChange;
 
     bool _catalogIsReady(OperationContext* opCtx) const;
+    bool _catalogIsPresent(OperationContext* opCtx) const;
     RecordId _catalogHead(OperationContext* opCtx) const;
 
     /**

@@ -86,6 +86,8 @@ public:
 
     bool isIndexReady(OperationContext* opCtx, StringData indexName) const final;
 
+    bool isIndexPresent(OperationContext* opCtx, StringData indexName) const final;
+
     KVPrefix getIndexPrefix(OperationContext* opCtx, StringData indexName) const final;
 
     Status removeIndex(OperationContext* opCtx, StringData indexName) final;
