@@ -162,21 +162,60 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
     const BatchItemRef& item = writeOp.getWriteItem();
     const BatchedCommandRequest::BatchType batchType = item.getOpType();
 
+    using UpdateOpEntry = write_ops::UpdateOpEntry;
+    using DeleteOpEntry = write_ops::DeleteOpEntry;
+
     if (batchType == BatchedCommandRequest::BatchType_Insert) {
         return item.getDocument().objsize();
     } else if (batchType == BatchedCommandRequest::BatchType_Update) {
-        // Note: Be conservative here - it's okay if we send slightly too many batches
-        auto collationSize =
-            item.getUpdate().getCollation() ? item.getUpdate().getCollation()->objsize() : 0;
-        auto estSize = item.getUpdate().getQ().objsize() + item.getUpdate().getU().objsize() +
-            collationSize + kEstUpdateOverheadBytes;
+        // Note: Be conservative here - it's okay if we send slightly too many batches.
+        auto estSize = static_cast<int>(BSONObj::kMinBSONLength);
+        static const auto boolSize = 1;
+
+        // Add the size of the 'collation' field, if present.
+        estSize +=
+            !item.getUpdate().getCollation() ? 0 : (UpdateOpEntry::kCollationFieldName.size() +
+                                                    item.getUpdate().getCollation()->objsize());
+
+        // Add the size of the 'arrayFilters' field, if present.
+        estSize += !item.getUpdate().getArrayFilters() ? 0 : ([&item]() {
+            auto size = BSONObj::kMinBSONLength + UpdateOpEntry::kArrayFiltersFieldName.size();
+            for (auto&& filter : *item.getUpdate().getArrayFilters()) {
+                size += filter.objsize();
+            }
+            return size;
+        })();
+
+        // Add the sizes of the 'multi' and 'upsert' fields.
+        estSize += UpdateOpEntry::kUpsertFieldName.size() + boolSize;
+        estSize += UpdateOpEntry::kMultiFieldName.size() + boolSize;
+
+        // Add the sizes of the 'q' and 'u' fields, plus the constant updateOp overhead size.
+        estSize += (UpdateOpEntry::kQFieldName.size() + item.getUpdate().getQ().objsize() +
+                    UpdateOpEntry::kUFieldName.size() + item.getUpdate().getU().objsize() +
+                    kEstUpdateOverheadBytes);
+
+        // When running a debug build, verify that estSize is at least the BSON serialization size.
         dassert(estSize >= item.getUpdate().toBSON().objsize());
         return estSize;
     } else if (batchType == BatchedCommandRequest::BatchType_Delete) {
-        // Note: Be conservative here - it's okay if we send slightly too many batches
-        auto collationSize =
-            item.getDelete().getCollation() ? item.getDelete().getCollation()->objsize() : 0;
-        auto estSize = item.getDelete().getQ().objsize() + collationSize + kEstDeleteOverheadBytes;
+        // Note: Be conservative here - it's okay if we send slightly too many batches.
+        auto estSize = static_cast<int>(BSONObj::kMinBSONLength);
+        static const auto intSize = 4;
+
+        // Add the size of the 'collation' field, if present.
+        estSize +=
+            !item.getDelete().getCollation() ? 0 : (DeleteOpEntry::kCollationFieldName.size() +
+                                                    item.getDelete().getCollation()->objsize());
+
+        // Add the size of the 'limit' field.
+        estSize += DeleteOpEntry::kMultiFieldName.size() + intSize;
+
+        // Add the size of the 'q' field, plus the constant deleteOp overhead size.
+        estSize += kEstDeleteOverheadBytes +
+            (DeleteOpEntry::kQFieldName.size() + item.getDelete().getQ().objsize());
+
+        // When running a debug build, verify that estSize is at least the BSON serialization size.
         dassert(estSize >= item.getDelete().toBSON().objsize());
         return estSize;
     }
