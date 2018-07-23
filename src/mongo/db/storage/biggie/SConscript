@@ -4,6 +4,37 @@ Import("env")
 
 env = env.Clone()
 
+env.Library(
+    target= 'storage_biggie_core',
+    source= [
+        'biggie_kv_engine.cpp',
+        'store.cpp',
+        'biggie_record_store.cpp',
+        'biggie_sorted_impl.cpp'
+    ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
+        ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/snapshot_window_options',
+    ],
+    )
+
+env.Library(
+    target= 'storage_biggie',
+    source= [
+        'biggie_init.cpp',
+    ],
+    LIBDEPS= [
+        'storage_biggie_core',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
+    ],
+)
+
 env.CppUnitTest(
     target='storage_biggie_store_test',
     source=[

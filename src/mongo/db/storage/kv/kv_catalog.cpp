@@ -414,7 +414,7 @@ Status KVCatalog::newCollection(OperationContext* opCtx,
     {
         BSONObjBuilder b;
         b.append("ns", ns);
-        b.append("ident", ident);
+        b.append("ident", ident);  
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = ns.toString();
         md.options = options;
