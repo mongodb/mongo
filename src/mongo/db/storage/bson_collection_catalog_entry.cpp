@@ -190,6 +190,13 @@ RecordId BSONCollectionCatalogEntry::getIndexHead(OperationContext* opCtx,
     return md.indexes[offset].head;
 }
 
+bool BSONCollectionCatalogEntry::isIndexPresent(OperationContext* opCtx,
+                                                StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    return offset >= 0;
+}
+
 bool BSONCollectionCatalogEntry::isIndexReady(OperationContext* opCtx, StringData indexName) const {
     MetaData md = _getMetaData(opCtx);
 
