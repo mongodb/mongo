@@ -7,17 +7,36 @@
  * "ManualInterventionRequired" error, performing the cleanup, and transparently retrying the
  * command.
  */
-(function() {
-    let manualInterventionActions = {
-        removePartiallyWrittenChunks: function(mongosConn, ns, cmdObj, numAttempts) {
-            print("command " + tojson(cmdObj) + " failed after " + numAttempts +
-                  " attempts due to seeing partially written chunks for collection " + ns +
-                  ", probably due to a previous failed shardCollection attempt. Manually" +
-                  " deleting chunks for " + ns + " from config.chunks and retrying the command.");
-            assert.writeOK(mongosConn.getDB("config").chunks.remove(
-                {ns: ns}, {writeConcern: {w: "majority"}}));
-        }
+
+var ManualInterventionActions = (function() {
+
+    this.removePartiallyWrittenChunks = function(mongosConn, ns, cmdObj, numAttempts) {
+        print("command " + tojson(cmdObj) + " failed after " + numAttempts +
+              " attempts due to seeing partially written chunks for collection " + ns +
+              ", probably due to a previous failed shardCollection attempt. Manually" +
+              " deleting chunks for " + ns + " from config.chunks and retrying the command.");
+        assert.writeOK(
+            mongosConn.getDB("config").chunks.remove({ns: ns}, {writeConcern: {w: "majority"}}));
     };
+
+    this.removePartiallyWrittenChunksAndDropCollection = function(
+        mongosConn, ns, cmdObj, numAttempts) {
+        print("command " + tojson(cmdObj) + " failed after " + numAttempts +
+              " attempts due to seeing partially written chunks for collection " + ns +
+              ", probably due to a previous failed shardCollection attempt. Manually" +
+              " deleting chunks for " + ns + " from config.chunks" +
+              ", dropping the collection, and retrying the command.");
+        assert.writeOK(
+            mongosConn.getDB("config").chunks.remove({ns: ns}, {writeConcern: {w: "majority"}}));
+        const[dbName, collName] = ns.split(".");
+        assert.commandWorked(
+            mongosConn.getDB(dbName).runCommand({"drop": collName, writeConcern: {w: "majority"}}));
+    };
+
+    return this;
+})();
+
+(function() {
 
     const mongoRunCommandOriginal = Mongo.prototype.runCommand;
 
@@ -45,7 +64,7 @@
 
             if (cmdName === "shardCollection" || cmdName === "shardcollection") {
                 const ns = cmdObj[cmdName];
-                manualInterventionActions.removePartiallyWrittenChunks(
+                ManualInterventionActions.removePartiallyWrittenChunks(
                     this, ns, cmdObj, numAttempts);
             } else if (cmdName === "mapReduce" || cmdName === "mapreduce") {
                 const out = cmdObj.out;
@@ -70,7 +89,7 @@
                 const outDbName = out.db || dbName;
 
                 const ns = outDbName + "." + outCollName;
-                manualInterventionActions.removePartiallyWrittenChunks(
+                ManualInterventionActions.removePartiallyWrittenChunksAndDropCollection(
                     this, ns, cmdObj, numAttempts);
             }
         }
