@@ -48,6 +48,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/backup_cursor_service.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
@@ -343,9 +344,11 @@ void FSyncLockThread::run() {
             fsyncCmd.acquireFsyncLockSyncCV.notify_one();
             return;
         }
+
+        auto backupCursorService = BackupCursorService::get(opCtx.getServiceContext());
         try {
-            writeConflictRetry(&opCtx, "beginBackup", "global", [&storageEngine, &opCtx] {
-                uassertStatusOK(storageEngine->beginBackup(&opCtx));
+            writeConflictRetry(&opCtx, "beginBackup", "global", [&opCtx, backupCursorService] {
+                backupCursorService->fsyncLock(&opCtx);
             });
         } catch (const DBException& e) {
             error() << "storage engine unable to begin backup : " << e.toString();
@@ -361,7 +364,7 @@ void FSyncLockThread::run() {
             fsyncCmd.releaseFsyncLockSyncCV.wait(lk);
         }
 
-        storageEngine->endBackup(&opCtx);
+        backupCursorService->fsyncUnlock(&opCtx);
 
     } catch (const std::exception& e) {
         severe() << "FSyncLockThread exception: " << e.what();

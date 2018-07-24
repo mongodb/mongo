@@ -247,6 +247,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='backup_cursor_service',
+    source=[
+        'backup_cursor_service.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.CppUnitTest(
     target= 'storage_engine_metadata_test',
     source = 'storage_engine_metadata_test.cpp',
@@ -262,4 +272,14 @@ env.CppUnitTest(
         'key_string',
         '$BUILD_DIR/mongo/base',
         ]
+)
+
+env.CppUnitTest(
+    target='backup_cursor_service_test',
+    source='backup_cursor_service_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        'backup_cursor_service',
+    ],
 )

@@ -123,6 +123,12 @@ public:
         return Timestamp();
     }
 
+    virtual Status beginBackup(OperationContext* opCtx) override {
+        return Status::OK();
+    }
+
+    virtual void endBackup(OperationContext* opCtx) {}
+
 private:
     std::shared_ptr<void> _catalogInfo;
 
