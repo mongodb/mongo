@@ -351,6 +351,13 @@ def format_func(clang_format):
     _format_files(clang_format, files)
 
 
+def format_my_func(clang_format, origin_branch):
+    """My Format files command entry point."""
+    files = git.get_my_files_to_check(is_interesting_file, origin_branch)
+
+    _format_files(clang_format, files)
+
+
 def reformat_branch(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         clang_format, commit_prior_to_reformat, commit_after_reformat):
     """Reformat a branch made before a clang-format run."""
@@ -497,8 +504,10 @@ def reformat_branch(  # pylint: disable=too-many-branches,too-many-locals,too-ma
 def usage():
     """Print usage."""
     print(
-        "clang-format.py supports 5 commands [ lint, lint-all, lint-patch, format, reformat-branch]."
+        "clang-format.py supports 6 commands [ lint, lint-all, lint-patch, format, format-my, reformat-branch]."
     )
+    print("\nformat-my <origin branch>")
+    print("   <origin branch>  - upstream branch to compare against")
 
 
 def main():
@@ -519,6 +528,9 @@ def main():
             lint_patch(options.clang_format, args[2:])
         elif command == "format":
             format_func(options.clang_format)
+        elif command == "format-my":
+
+            format_my_func(options.clang_format, args[2] if len(args) > 2 else "origin/master")
         elif command == "reformat-branch":
 
             if len(args) < 3:

@@ -97,6 +97,27 @@ class Repo(_git.Repository):
         """Query git to get a list of all files in the repo to consider for analysis."""
         return self._git_ls_files(["--cached"], filter_function)
 
+    def get_my_candidate_files(self, filter_function, origin_branch):
+        # type: (Callable[[str], bool], str) -> List[str]
+        """Query git to get a list of files in the repo from a diff."""
+        # There are 3 diffs we run:
+        # 1. List of commits between origin/master and HEAD of current branch
+        # 2. Cached/Staged files (--cached)
+        # 3. Working Tree files git tracks
+
+        fork_point = self.get_merge_base(origin_branch)
+
+        diff_files = self.git_diff(["--name-only", "%s..HEAD" % (fork_point)])
+        diff_files += self.git_diff(["--name-only", "--cached"])
+        diff_files += self.git_diff(["--name-only"])
+
+        file_set = {
+            line.rstrip()
+            for line in diff_files.splitlines() if filter_function(line.rstrip())
+        }
+
+        return list(file_set)
+
     def get_working_tree_candidate_files(self, filter_function):
         # type: (Callable[[str], bool]) -> List[str]
         # pylint: disable=invalid-name
@@ -185,5 +206,18 @@ def get_files_to_check_from_patch(patches, filter_function):
     valid_files = list(
         itertools.chain.from_iterable(
             [r.get_candidates(candidates, filter_function) for r in repos]))
+
+    return valid_files
+
+
+def get_my_files_to_check(filter_function, origin_branch):
+    # type: (Callable[[str], bool], str) -> List[str]
+    """Get a list of files that need to be checked based on which files are managed by git."""
+    # Get a list of candidate_files based on diff between this branch and origin/master
+    repos = get_repos()
+
+    valid_files = list(
+        itertools.chain.from_iterable(
+            [r.get_my_candidate_files(filter_function, origin_branch) for r in repos]))
 
     return valid_files
