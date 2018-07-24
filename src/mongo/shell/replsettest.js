@@ -1672,10 +1672,19 @@ var ReplSetTest = function(opts) {
                         // doing any I/O to avoid any overhead from allocating or deleting data
                         // files when using the MMAPv1 storage engine. We call awaitReplication()
                         // later on to ensure the collMod is replicated to all nodes.
-                        assert.commandWorked(dbHandle.runCommand({
-                            collMod: collInfo.name,
-                            usePowerOf2Sizes: true,
-                        }));
+                        try {
+                            assert.commandWorked(dbHandle.runCommand({
+                                collMod: collInfo.name,
+                                usePowerOf2Sizes: true,
+                            }));
+                        } catch (e) {
+                            // Ignore NamespaceNotFound errors because a background thread could
+                            // have dropped the collection after getCollectionInfos but before
+                            // running collMod.
+                            if (e.code != ErrorCodes.NamespaceNotFound) {
+                                throw e;
+                            }
+                        }
                     }
                 });
         }
