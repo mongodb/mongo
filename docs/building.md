@@ -13,6 +13,7 @@ To build MongoDB, you will need:
 * Python 2.7.x and Pip modules:
   * pyyaml
   * typing
+  * cheetah
 
 MongoDB supports the following architectures: arm64, ppc64le, s390x, and x86-64.
 More detailed platform instructions can be found below.
@@ -49,6 +50,10 @@ If you want to build everything (mongod, mongo, tests, etc):
 If you only want to build the database:
 
     $ python2 buildscripts/scons.py mongod
+
+***Note***: For C++ compilers that are newer than the supported version, the compiler may issue new warnings that cause MongoDB to fail to build since the build system treats compiler warnings as errors. To ignore the warnings, pass the switch --disable-warnings-as-errors to scons.
+
+    $ python2 buildscripts/scons.py mongod --disable-warnings-as-errors
 
 To install
 
