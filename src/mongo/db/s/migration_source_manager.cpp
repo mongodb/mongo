@@ -520,48 +520,62 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                            << redact(status)});
     }
 
-    // Do a best effort attempt to incrementally refresh the metadata before leaving the critical
-    // section. It is okay if the refresh fails because that will cause the metadata to be cleared
-    // and subsequent callers will try to do a full refresh.
-    ChunkVersion unusedShardVersion;
-    Status refreshStatus =
-        ShardingState::get(opCtx)->refreshMetadataNow(opCtx, getNss(), &unusedShardVersion);
+    // Because the CatalogCache's WithRefresh methods (on which forceShardFilteringMetadataRefresh
+    // depends) are not causally consistent, we need to perform up to two refresh rounds if refresh
+    // returns that the shard still owns the chunk
+    ChunkVersion collectionVersionAfterRefresh;
 
-    if (!refreshStatus.isOK()) {
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
+    for (int retriesLeft = 2; retriesLeft > 0; --retriesLeft) {
+        ChunkVersion unusedShardVersion;
+        Status refreshStatus =
+            ShardingState::get(opCtx)->refreshMetadataNow(opCtx, getNss(), &unusedShardVersion);
 
-        CollectionShardingState::get(opCtx, getNss())->refreshMetadata(opCtx, nullptr);
+        // If the refresh fails, there is no way to confirm whether the migration commit actually
+        // went through or not. Because of that, the collection's metadata is reset to UNSHARDED so
+        // that subsequent versioned requests will get StaleShardVersion and will retry the refresh.
+        if (!refreshStatus.isOK()) {
+            AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
-        log() << "Failed to refresh metadata after a "
-              << (migrationCommitStatus.isOK() ? "failed commit attempt" : "successful commit")
-              << ". Metadata was cleared so it will get a full refresh when accessed again."
-              << causedBy(redact(refreshStatus));
+            CollectionShardingState::get(opCtx, getNss())->refreshMetadata(opCtx, nullptr);
 
-        // migrationCommitStatus may be OK or an error. The migration is considered a success at
-        // this point if the commit succeeded. The metadata refresh either occurred or the metadata
-        // was safely cleared.
-        return {migrationCommitStatus.code(),
+            log() << "Failed to refresh metadata after a "
+                  << (migrationCommitStatus.isOK() ? "failed commit attempt" : "successful commit")
+                  << ". Metadata was cleared so it will get a full refresh when accessed again."
+                  << causedBy(redact(refreshStatus));
+
+            return {
+                migrationCommitStatus.code(),
                 str::stream() << "Orphaned range not cleaned up. Failed to refresh metadata after"
                                  " migration commit due to '"
                               << refreshStatus.toString()
                               << "', and commit failed due to '"
                               << migrationCommitStatus.toString()
                               << "'"};
-    }
+        }
 
-    auto refreshedMetadata = [&] {
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
-        return CollectionShardingState::get(opCtx, getNss())->getMetadata();
-    }();
+        auto refreshedMetadata = [&] {
+            AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
+            return CollectionShardingState::get(opCtx, getNss())->getMetadata();
+        }();
 
-    if (!refreshedMetadata) {
-        return {ErrorCodes::NamespaceNotSharded,
-                str::stream() << "Chunk move failed because collection '" << getNss().ns()
-                              << "' is no longer sharded. The migration commit error was: "
-                              << migrationCommitStatus.toString()};
-    }
+        if (!refreshedMetadata) {
+            return {ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "Chunk move failed because collection '" << getNss().ns()
+                                  << "' is no longer sharded. The migration commit error was: "
+                                  << migrationCommitStatus.toString()};
+        }
 
-    if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
+        // If after a successful refresh the metadata indicates that the node still owns the chunk,
+        // we must do one more refresh in order to ensure that the previous refresh round didn't
+        // join an already active catalog cache refresh and missed its own commit
+        if (!refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
+            collectionVersionAfterRefresh = refreshedMetadata->getCollVersion();
+            break;
+        }
+
+        if (retriesLeft)
+            continue;
+
         // This condition may only happen if the migration commit has failed for any reason
         if (migrationCommitStatus.isOK()) {
             severe() << "The migration commit succeeded, but the new chunk placement was not "
@@ -585,9 +599,11 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                               << migrationCommitStatus.reason()};
     }
 
+    invariant(collectionVersionAfterRefresh.isSet());
+
     // Migration succeeded
     log() << "Migration succeeded and updated collection version to "
-          << refreshedMetadata->getCollVersion();
+          << collectionVersionAfterRefresh;
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
@@ -624,11 +640,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
     if (!MONGO_FAIL_POINT(doNotRefreshRecipientAfterCommit)) {
         // Best-effort make the recipient refresh its routing table to the new collection version.
-        refreshRecipientRoutingTable(opCtx,
-                                     getNss(),
-                                     _args.getToShardId(),
-                                     _recipientHost,
-                                     refreshedMetadata->getCollVersion());
+        refreshRecipientRoutingTable(
+            opCtx, getNss(), _args.getToShardId(), _recipientHost, collectionVersionAfterRefresh);
     }
 
     if (_args.getWaitForDelete()) {
