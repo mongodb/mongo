@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOSTAT" "1" "January 30, 2015" "3.0" "mongodb-manual"
+.TH "MONGOSTAT" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
 .SH NAME
 mongostat \- MongoDB Use Statistics
 .
@@ -30,52 +30,71 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.SS On this page
+.INDENT 0.0
+.IP \(bu 2
+\fI\%Synopsis\fP
+.IP \(bu 2
+\fI\%Required Access\fP
+.IP \(bu 2
+\fI\%Options\fP
+.IP \(bu 2
+\fI\%Fields\fP
+.IP \(bu 2
+\fI\%Use\fP
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.IP "Mac OSX Sierra and Go 1.6 Incompatibility"
+.sp
+Users running on Mac OSX Sierra require the 3.2.10 or newer version
+of  mongostat\&.
+.UNINDENT
+.UNINDENT
 .SH SYNOPSIS
 .sp
-The \fBmongostat\fP utility provides a quick overview of the
+The \fI\%mongostat\fP utility provides a quick overview of the
 status of a currently running \fBmongod\fP
 or \fBmongos\fP
-instance. \fBmongostat\fP is functionally similar to the
+instance. \fI\%mongostat\fP is functionally similar to the
 UNIX/Linux file system utility \fBvmstat\fP, but provides data regarding
 \fBmongod\fP and \fBmongos\fP instances.
+.sp
+Run \fI\%mongostat\fP from the system command line, not the \fBmongo\fP shell.
 .sp
 \fBSEE ALSO:\fP
 .INDENT 0.0
 .INDENT 3.5
 For more information about monitoring MongoDB, see
-http://docs.mongodb.org/manual/administration/monitoring\&.
+/administration/monitoring\&.
 .sp
-For more background on various other MongoDB status outputs see:
+For more background on other MongoDB status outputs see:
 .INDENT 0.0
 .IP \(bu 2
-http://docs.mongodb.org/manual/reference/command/serverStatus
+/reference/command/serverStatus
 .IP \(bu 2
-http://docs.mongodb.org/manual/reference/command/replSetGetStatus
+/reference/command/replSetGetStatus
 .IP \(bu 2
-http://docs.mongodb.org/manual/reference/command/dbStats
+/reference/command/dbStats
 .IP \(bu 2
-http://docs.mongodb.org/manual/reference/command/collStats
+/reference/command/collStats
 .UNINDENT
 .sp
 For an additional utility that provides MongoDB metrics see
-\fBmongotop\fP\&.
+mongotop\&.
 .UNINDENT
 .UNINDENT
-.SH ACCESS CONTROL REQUIREMENTS
+.SH REQUIRED ACCESS
 .sp
 In order to connect to a \fBmongod\fP that enforces authorization
-with the \fI\-\-auth\fP option, specify the
-\fI\-\-username\fP and \fI\-\-password\fP options, and the user specified must have the
+with the \fB\-\-auth\fP option, specify the
+\fI\%\-\-username\fP and \fI\%\-\-password\fP options, and the connecting user must have the
 \fBserverStatus\fP privilege action on the cluster resources.
 .sp
 The built\-in role \fBclusterMonitor\fP provides this privilege as
 well as other privileges. To create a role with just the privilege to
-run \fBmongostat\fP, see \fIcreate\-role\-for\-mongostat\fP\&.
+run \fI\%mongostat\fP, see create\-role\-for\-mongostat\&.
 .SH OPTIONS
-.INDENT 0.0
-.TP
-.B mongostat
-.UNINDENT
 .INDENT 0.0
 .TP
 .B mongostat
@@ -99,6 +118,60 @@ Returns the \fBmongostat\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-\-uri <connectionString>
+New in version 3.4.6.
+
+.sp
+Specify a resolvable URI
+connection string for the \fBmongod\fP to which to
+connect.
+.sp
+The following is the standard
+URI connection scheme:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+For detailed explanations of the components of this string, refer to
+the
+Connection String URI Format
+documentation.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+The following \fI\%mongostat\fP options are incompatible with the
+\fB\-\-uri\fP option. Instead, specify these options as part of your
+\fB\-\-uri\fP connection string when applicable:
+.INDENT 0.0
+.IP \(bu 2
+\fB\-\-host\fP
+.IP \(bu 2
+\fB\-\-port\fP
+.IP \(bu 2
+\fB\-\-db\fP
+.IP \(bu 2
+\fB\-\-username\fP
+.IP \(bu 2
+\fB\-\-password\fP (when specifying the password as part of the
+URI connection string)
+.IP \(bu 2
+\fB\-\-authenticationDatabase\fP
+.IP \(bu 2
+\fB\-\-authenticationMechanism\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-\-host <hostname><:port>, \-h <hostname><:port>
 \fIDefault\fP: localhost:27017
 .sp
@@ -106,22 +179,19 @@ Specifies a resolvable hostname for the \fBmongod\fP to which to
 connect. By default, the \fBmongostat\fP attempts to connect to a MongoDB
 instance running on the localhost on port number \fB27017\fP\&.
 .sp
-To connect to a replica set, specify the
-\fBreplSetName\fP and a seed list of set members, as in
-the following:
+To connect to a replica set, you can specify the set member or
+members to report on, as in the following (see also the
+\fB\-\-discover\fP flag):
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+\-\-host <hostname1><:port>,<hostname2><:port>,<...>
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
-.sp
-You can always connect directly to a single MongoDB instance by
-specifying the host and port number directly.
 .sp
 Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP format, you must
 enclose the portion of an address and port combination in
@@ -139,9 +209,12 @@ client connections.
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support and allows the \fBmongostat\fP to connect to the
-MongoDB instance using an IPv6 network. All MongoDB programs and
-processes disable IPv6 support by default.
+\fIRemoved in version 3.0.\fP
+.sp
+Enables IPv6 support and allows \fBmongostat\fP to connect to the
+MongoDB instance using an IPv6 network. Prior to MongoDB 3.0, you
+had to specify \fI\%\-\-ipv6\fP to use IPv6. In MongoDB 3.0 and later, IPv6
+is always enabled.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -150,10 +223,11 @@ New in version 2.6.
 
 .sp
 Enables connection to a \fBmongod\fP or \fBmongos\fP that has
-SSL support enabled.
+TLS/SSL support enabled.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -165,23 +239,32 @@ Specifies the \fB\&.pem\fP file that contains the root certificate chain
 from the Certificate Authority. Specify the file name of the
 \fB\&.pem\fP file using relative or absolute paths.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+Starting in version 3.4, if \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP is not
+specified and you are not using x.509 authentication, the
+system\-wide CA certificate store will be used when connecting to an
+TLS/SSL\-enabled server.
+.sp
+If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
+must be specified.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
-If the \fBmongo\fP shell or any other tool that connects to
-\fBmongos\fP or \fBmongod\fP is run without
-\fI\-\-sslCAFile\fP, it will not attempt to validate
-server certificates. This results in vulnerability to expired
-\fBmongod\fP and \fBmongos\fP certificates as well as to foreign
-processes posing as valid \fBmongod\fP or \fBmongos\fP
-instances. Ensure that you \fIalways\fP specify the CA file against which
-server certificates should be validated in cases where intrusion is a
-possibility.
+\fBVersion 3.2 and earlier:\fP For TLS/SSL connections (\fB\-\-ssl\fP) to
+\fBmongod\fP and \fBmongos\fP, if the \fBmongostat\fP runs without the
+\fI\%\-\-sslCAFile\fP, \fBmongostat\fP will not attempt
+to validate the server certificates. This creates a vulnerability
+to expired \fBmongod\fP and \fBmongos\fP certificates as
+well as to foreign processes posing as valid \fBmongod\fP or
+\fBmongos\fP instances. Ensure that you \fIalways\fP specify the
+CA file to validate the server certificates in cases where
+intrusion is a possibility.
 .UNINDENT
 .UNINDENT
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -189,17 +272,18 @@ possibility.
 New in version 2.6.
 
 .sp
-Specifies the \fB\&.pem\fP file that contains both the SSL certificate
+Specifies the \fB\&.pem\fP file that contains both the TLS/SSL certificate
 and key. Specify the file name of the \fB\&.pem\fP file using relative
 or absolute paths.
 .sp
-This option is required when using the \fI\-\-ssl\fP option to connect
+This option is required when using the \fI\%\-\-ssl\fP option to connect
 to a \fBmongod\fP or \fBmongos\fP that has
 \fBCAFile\fP enabled \fIwithout\fP
 \fBallowConnectionsWithoutCertificates\fP\&.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -208,16 +292,17 @@ New in version 2.6.
 
 .sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fI\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
+\fI\%\-\-sslPEMKeyFile\fP). Use the \fI\%\-\-sslPEMKeyPassword\fP option only if the
 certificate\-key file is encrypted. In all cases, the \fBmongostat\fP will
 redact the password from all logging and reporting output.
 .sp
 If the private key in the PEM file is encrypted and you do not specify
-the \fI\-\-sslPEMKeyPassword\fP option, the \fBmongostat\fP will prompt for a passphrase. See
-\fIssl\-certificate\-password\fP\&.
+the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmongostat\fP will prompt for a passphrase. See
+ssl\-certificate\-password\&.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -229,8 +314,9 @@ Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -243,8 +329,36 @@ the use of invalid certificates. When using the
 \fBallowInvalidCertificates\fP setting, MongoDB logs as a
 warning the use of the invalid certificate.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+Starting in MongoDB 4.0, if you specify
+\fB\-\-sslAllowInvalidCertificates\fP or \fBssl.allowInvalidCertificates:
+true\fP when using x.509 authentication, an invalid certificate is
+only sufficient to establish a TLS/SSL connection but is
+\fIinsufficient\fP for authentication.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+For TLS/SSL connections to \fBmongod\fP and
+\fBmongos\fP, avoid using
+\fB\-\-sslAllowInvalidCertificates\fP if possible and only use
+\fB\-\-sslAllowInvalidCertificates\fP on systems where intrusion is
+not possible.
+.sp
+If the \fBmongo\fP shell (and other
+mongodb\-tools\-support\-ssl) runs with the
+\fB\-\-sslAllowInvalidCertificates\fP option, the
+\fBmongo\fP shell (and other
+mongodb\-tools\-support\-ssl) will not attempt to validate
+the server certificates. This creates a vulnerability to expired
+\fBmongod\fP and \fBmongos\fP certificates as
+well as to foreign processes posing as valid
+\fBmongod\fP or \fBmongos\fP instances.
+.UNINDENT
+.UNINDENT
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -252,9 +366,13 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 New in version 3.0.
 
 .sp
-Disables the validation of the hostnames in SSL certificates. Allows
-\fBmongostat\fP to connect to MongoDB instances if the hostname their
+Disables the validation of the hostnames in TLS/SSL certificates. Allows
+\fBmongostat\fP to connect to MongoDB instances even if the hostname in their
 certificates do not match the specified hostname.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -264,14 +382,14 @@ New in version 2.6.
 .sp
 Directs the \fBmongostat\fP to use the FIPS mode of the installed OpenSSL
 library. Your system must have a FIPS compliant OpenSSL library to use
-the \fI\-\-sslFIPSMode\fP option.
+the \fI\%\-\-sslFIPSMode\fP option.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-FIPS Compatible SSL is
+FIPS\-compatible TLS/SSL is
 available only in \fI\%MongoDB Enterprise\fP\&. See
-http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+/tutorial/configure\-fips for more information.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -289,34 +407,39 @@ Specifies a password with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fB\-\-username\fP and
 \fB\-\-authenticationDatabase\fP options.
 .sp
-If you do not specify an argument for \fI\-\-password\fP, \fBmongostat\fP will
-prompt interactively for a password on the console.
+Changed in version 3.0.0: If you do not specify an argument for \fI\%\-\-password\fP, \fBmongostat\fP returns
+an error.
+
+.sp
+Changed in version 3.0.2: If you wish \fBmongostat\fP to prompt the user
+for the password, pass the \fI\%\-\-username\fP option without
+\fI\%\-\-password\fP or specify an empty string as the \fI\%\-\-password\fP value,
+as in \fB\-\-password ""\fP .
+
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationDatabase <dbname>
-New in version 2.4.
-
+Specifies the database in which the user is created.
+See user\-authentication\-database\&.
 .sp
-Specifies the database that holds the user\(aqs credentials.
-.sp
-\fI\-\-authenticationDatabase\fP is required for \fBmongod\fP
-and \fBmongos\fP instances that use \fIauthentication\fP\&.
+\fI\%\-\-authenticationDatabase\fP is required for \fBmongod\fP
+and \fBmongos\fP instances that use authentication\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationMechanism <name>
-\fIDefault\fP: MONGODB\-CR
-.sp
-New in version 2.4.
-
-.sp
-Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBMONGODB\-X509\fP authentication
-mechanisms.
-
+\fIDefault\fP: SCRAM\-SHA\-1
 .sp
 Specifies the authentication mechanism the \fBmongostat\fP instance uses to
 authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+.sp
+Changed in version 4.0: MongoDB removes support for the deprecated MongoDB
+Challenge\-Response (\fBMONGODB\-CR\fP) authentication mechanism.
+.sp
+MongoDB adds support for SCRAM mechanism using the SHA\-256 hash
+function (\fBSCRAM\-SHA\-256\fP).
+
 .TS
 center;
 |l|l|.
@@ -328,31 +451,45 @@ Description
 T}
 _
 T{
-MONGODB\-CR
+SCRAM\-SHA\-1
 T}	T{
-MongoDB challenge/response authentication.
+\fI\%RFC 5802\fP standard
+Salted Challenge Response Authentication Mechanism using the SHA\-1
+hash function.
+T}
+_
+T{
+SCRAM\-SHA\-256
+T}	T{
+\fI\%RFC 7677\fP standard
+Salted Challenge Response Authentication Mechanism using the SHA\-256
+hash function.
+.sp
+Requires featureCompatibilityVersion set to \fB4.0\fP\&.
+.sp
+New in version 4.0.
 T}
 _
 T{
 MONGODB\-X509
 T}	T{
-MongoDB SSL certificate authentication.
+MongoDB TLS/SSL certificate authentication.
 T}
 _
 T{
-PLAIN
+GSSAPI (Kerberos)
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%MongoDB Enterprise\fP\&.
+T}
+_
+T{
+PLAIN (LDAP SASL)
 T}	T{
 External authentication using LDAP. You can also use \fBPLAIN\fP
 for authenticating in\-database users. \fBPLAIN\fP transmits
 passwords in plain text. This mechanism is available only in
 \fI\%MongoDB Enterprise\fP\&.
-T}
-_
-T{
-GSSAPI
-T}	T{
-External authentication using Kerberos. This mechanism is
-available only in \fI\%MongoDB Enterprise\fP\&.
 T}
 _
 .TE
@@ -363,7 +500,7 @@ _
 New in version 2.6.
 
 .sp
-Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
+Specify the name of the service using GSSAPI/Kerberos\&. Only required if the service does not use the
 default name of \fBmongodb\fP\&.
 .sp
 This option is available only in MongoDB Enterprise.
@@ -374,10 +511,141 @@ This option is available only in MongoDB Enterprise.
 New in version 2.6.
 
 .sp
-Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
+Specify the hostname of a service using GSSAPI/Kerberos\&. \fIOnly\fP required if the hostname of a machine does
 not match the hostname resolved by DNS.
 .sp
 This option is available only in MongoDB Enterprise.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-humanReadable boolean
+\fIDefault\fP: True
+.sp
+New in version 3.4.
+
+.sp
+When \fBtrue\fP, \fBmongostat\fP formats dates and quantity values for
+easier reading, as in the following sample output:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+insert query update delete getmore command dirty used flushes vsize  res qrw arw net_in net_out conn                time
+   991    *0     *0     *0       0     2|0  3.4% 4.5%       0 2.90G 297M 0|0 0|0  12.9m   84.2k    2 Oct  6 09:45:37.478
+   989    *0     *0     *0       0     2|0  3.6% 4.7%       0 2.91G 310M 0|0 0|0  12.9m   84.1k    2 Oct  6 09:45:38.476
+   988    *0     *0     *0       0     1|0  3.7% 4.8%       0 2.92G 323M 0|0 0|0  12.8m   83.8k    2 Oct  6 09:45:39.481
+   976    *0     *0     *0       0     2|0  3.9% 5.0%       0 2.94G 335M 0|0 0|0  12.7m   83.7k    2 Oct  6 09:45:40.476
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+When \fBfalse\fP, \fBmongostat\fP returns the raw data, as in the following
+sample output:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+insert query update delete getmore command dirty used flushes      vsize       res qrw arw   net_in net_out conn                      time
+   992    *0     *0     *0       0     2|0   1.3  2.4       0 2941255680 149946368 0|0 0|0 12913607   84271    2 2016\-10\-06T09:45:25\-04:00
+   989    *0     *0     *0       0     1|0   1.5  2.6       0 2974810112 163577856 0|0 0|0 12873225   84087    2 2016\-10\-06T09:45:26\-04:00
+   996    *0     *0     *0       0     1|0   1.6  2.8       0 2972712960 177209344 0|0 0|0 12955423   84345    2 2016\-10\-06T09:45:27\-04:00
+   987    *0     *0     *0       0     1|0   1.8  2.9       0 2989490176 190840832 0|0 0|0 12861852   84008    2 2016\-10\-06T09:45:28\-04:00
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-o <field list>
+New in version 3.4.
+
+.sp
+When specified, \fBmongostat\fP includes \fBonly\fP the specified fields
+in the \fBmongostat\fP output.
+.sp
+Use dot notation to specify
+\fBserverStatus fields\fP, as in
+\fBmetrics.document.inserted\fP\&.
+.sp
+To specify a custom name for a field, use \fB<field>=<customName>\fP,
+as in:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongostat \-o \(aqhost=H,time=T,version=MongoDB Version\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fI\%\-o\fP supports the following methods to modify the information
+returned for a given serverStatus field:
+.INDENT 7.0
+.TP
+.B rate()
+Use \fI\%\&.rate()\fP to view the rate per second at which a
+serverStatus field is changing from \fI\%mongostat\fP call to
+call.
+.sp
+\fI\%View Rate of Change for a Field with .rate()\fP illustrates how to use
+\fI\%mongostat\fP with \fI\%\-o\fP and the \fI\%\&.rate()\fP
+method.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B diff()
+Use \fI\%\&.diff()\fP to view how much a serverStatus field has
+changed since the previous \fI\%mongostat\fP call. The interval
+between calls is specified by \fB<sleeptime>\fP\&.
+.sp
+\fI\%View Field Changes with .diff()\fP illustrates how to use
+\fI\%mongostat\fP with \fI\%\-o\fP and the \fI\%\&.diff()\fP
+method.
+.UNINDENT
+.sp
+\fBmongostat\fP supports specifying \fIeither\fP \fI\%\-o\fP or \fI\%\-O\fP:
+you cannot include both options.
+.sp
+See \fI\%Specify mongostat Output Fields\fP for an example of
+\fI\%\-o\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-O <field list>
+New in version 3.4.
+
+.sp
+When specified, \fBmongostat\fP includes the specified
+\fBserverStatus\fP fields after the default \fBmongostat\fP output.
+.sp
+Use dot notation to specify
+\fBserverStatus fields\fP, as in
+\fBmetrics.document.inserted\fP\&.
+.sp
+To specify a custom name for a field, use \fB<field>=<customName>\fP,
+as in:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongostat \-O host=H,time=T
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBmongostat\fP supports specifying \fIeither\fP \fI\%\-O\fP or \fI\%\-o\fP:
+you cannot include both options.
+.sp
+See \fI\%Add Fields to mongostat Output\fP for an example of
+\fI\%\-O\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -389,39 +657,43 @@ Disables the output of column or field names.
 .B \-\-rowcount <number>, \-n <number>
 Controls the number of rows to output. Use in conjunction with
 the \fBsleeptime\fP argument to control the duration of a
-\fBmongostat\fP operation.
+\fI\%mongostat\fP operation.
 .sp
-Unless \fI\-\-rowcount\fP is specified, \fBmongostat\fP
+Unless \fI\%\-\-rowcount\fP is specified, \fI\%mongostat\fP
 will return an infinite number of rows (e.g. value of \fB0\fP\&.)
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-http
-Configures \fBmongostat\fP to collect data using the HTTP interface
-rather than a raw database connection.
+.B \-\-discover
+Discovers and reports on statistics from all members of a replica
+set or sharded cluster\&. When connected to any member of a
+replica set, \fI\%\-\-discover\fP all non\-hidden members of the replica set. When connected to a \fBmongos\fP,
+\fI\%mongostat\fP will return data from all shards in
+the cluster. If a replica set provides a shard in the sharded cluster,
+\fI\%mongostat\fP will report on non\-hidden members of that replica
+set.
+.sp
+The \fI\%mongostat \-\-host\fP option is not required but
+potentially useful in this case.
+.sp
+Changed in version 2.6: When running with \fI\%\-\-discover\fP, \fI\%mongostat\fP now
+respects \fI\%\-\-rowcount\fP\&.
+
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-discover
-Discovers and reports on statistics from all members of a \fIreplica
-set\fP or \fIsharded cluster\fP\&. When connected to any member of a
-replica set, \fI\%\-\-discover\fP all non\-\fIhidden members\fP of the replica set. When connected to a \fBmongos\fP,
-\fBmongostat\fP will return data from all \fIshards\fP in
-the cluster. If a replica set provides a shard in the sharded cluster,
-\fBmongostat\fP will report on non\-hidden members of that replica
-set.
+.B \-\-http
+Configures \fI\%mongostat\fP to collect data using the HTTP interface
+rather than a raw database connection.
 .sp
-The \fImongostat \-\-host\fP option is not required but
-potentially useful in this case.
-.sp
-Changed in version 2.6: When running with \fI\%\-\-discover\fP, \fBmongostat\fP now
-respects :option:\-\-rowcount\(ga.
+Changed in version 3.6: MongoDB 3.6 removes the deprecated HTTP interface and REST API to
+MongoDB.
 
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-all
-Configures \fBmongostat\fP to return all optional \fI\%fields\fP\&.
+Configures \fI\%mongostat\fP to return all optional \fI\%fields\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -429,28 +701,44 @@ Configures \fBmongostat\fP to return all optional \fI\%fields\fP\&.
 New in version 3.0.0.
 
 .sp
-Returns output for \fBmongostat\fP in \fIJSON\fP format.
+Returns output for \fBmongostat\fP in JSON format.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-interactive
+New in version 3.4.
+
+.sp
+Display \fBmongostat\fP output in an interactive non\-scrolling interface
+rather than the default scrolling output.
+.sp
+\fI\%\-\-interactive\fP is not available with the \fI\%\-\-json\fP
+option.
+.sp
+See: \fI\%View Statistics in an Interactive Interface\fP for an example of \fI\%\-\-interactive\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B <sleeptime>
-The final argument is the length of time, in seconds, that
-\fBmongostat\fP waits in between calls. By default \fBmongostat\fP
+\fIDefault\fP: 1
+.sp
+The final \fBmongostat\fP argument is the length of time, in seconds, that
+\fI\%mongostat\fP waits in between calls. By default \fI\%mongostat\fP
 returns one call every second.
 .sp
-\fBmongostat\fP returns values that reflect the operations
+\fI\%mongostat\fP returns values that reflect the operations
 over a 1 second period. For values of \fB<sleeptime>\fP greater
-than 1, \fBmongostat\fP averages data to reflect average
+than 1, \fI\%mongostat\fP averages data to reflect average
 operations per second.
 .UNINDENT
 .SH FIELDS
 .sp
-\fBmongostat\fP returns values that reflect the operations over a
+\fI\%mongostat\fP returns values that reflect the operations over a
 1 second period. When \fBmongostat <sleeptime>\fP has a value
-greater than 1, \fBmongostat\fP averages the statistics to reflect
+greater than 1, \fI\%mongostat\fP averages the statistics to reflect
 average operations per second.
 .sp
-\fBmongostat\fP outputs the following fields:
+\fI\%mongostat\fP outputs the following fields:
 .INDENT 0.0
 .TP
 .B inserts
@@ -481,82 +769,153 @@ The number of get more (i.e. cursor batch) operations per second.
 .INDENT 0.0
 .TP
 .B command
-The number of commands per second. On \fIslave\fP and
-\fIsecondary\fP systems, \fBmongostat\fP presents two values
+The number of commands per second. On
+secondary systems, \fI\%mongostat\fP presents two values
 separated by a pipe character (e.g. \fB|\fP), in the form of
 \fBlocal|replicated\fP commands.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B flushes
-The number of \fIfsync\fP operations per second.
+Changed in version 3.0.
+
+.sp
+For the storage\-wiredtiger, \fBflushes\fP refers to the number
+of WiredTiger checkpoints triggered between each polling interval.
+.sp
+For the storage\-mmapv1, \fBflushes\fP represents the number of
+fsync operations per second.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B dirty
+New in version 3.0.
+
+.sp
+Only for storage\-wiredtiger\&. The percentage of the WiredTiger
+cache with dirty bytes, calculated by
+\fBwiredTiger.cache.tracked dirty bytes in the cache\fP
+/ \fBwiredTiger.cache.maximum bytes configured\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B used
+New in version 3.0.
+
+.sp
+Only for storage\-wiredtiger\&. The percentage of the WiredTiger
+cache that is in use, calculated by
+\fBwiredTiger.cache.bytes currently in the cache\fP /
+\fBwiredTiger.cache.maximum bytes configured\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B mapped
-The total amount of data mapped in megabytes. This is the total
-data size at the time of the last \fBmongostat\fP call.
+Changed in version 3.0.
+
+.sp
+Only for storage\-mmapv1\&. The total amount of data mapped in
+megabytes. This is the total data size at the time of the last
+\fI\%mongostat\fP call.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B size
+.B vsize
 The amount of virtual memory in megabytes used by the process at
-the time of the last \fBmongostat\fP call.
+the time of the last \fI\%mongostat\fP call.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B non\-mapped
-The total amount of virtual memory excluding all mapped memory at
-the time of the last \fBmongostat\fP call.
+Changed in version 3.0.
+
+.sp
+Only for storage\-mmapv1\&.
+.sp
+\fIOptional\fP\&. The total amount of virtual memory excluding all mapped memory at
+the time of the last \fI\%mongostat\fP call.
+.sp
+\fI\%mongostat\fP only returns this value when started with the
+\fI\%\-\-all\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B res
 The amount of resident memory in megabytes used by the process at
-the time of the last \fBmongostat\fP call.
+the time of the last \fI\%mongostat\fP call.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B faults
-Changed in version 2.1.
+Changed in version 3.0.
 
 .sp
-The number of page faults per second.
+Only for storage\-mmapv1\&. The number of page faults per second.
 .sp
-Before version 2.1 this value was only provided for MongoDB
+Changed in version 2.1: Before version 2.1, this value was only provided for MongoDB
 instances running on Linux hosts.
+
+.UNINDENT
+.INDENT 0.0
+.TP
+.B lr
+New in version 3.2.
+
+.sp
+Only for storage\-mmapv1\&. The percentage of read lock
+acquisitions that had to wait. \fI\%mongostat\fP displays \fBlr|lw\fP
+if a lock acquisition waited.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B lw
+New in version 3.2.
+
+.sp
+Only for storage\-mmapv1\&. The percentage of write lock
+acquisitions that had to wait. \fI\%mongostat\fP displays \fBlr|lw\fP
+if a lock acquisition waited.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B lrt
+New in version 3.2.
+
+.sp
+Only for storage\-mmapv1\&. The average acquire time, in
+microseconds, of read lock acquisitions that waited.
+\fI\%mongostat\fP displays \fBlrt|lwt\fP if a lock acquisition
+waited.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B lwt
+New in version 3.2.
+
+.sp
+Only for storage\-mmapv1\&. The average acquire time, in
+microseconds, of write lock acquisitions that waited.
+\fI\%mongostat\fP displays \fBlrt|lwt\fP if a lock acquisition
+waited.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B locked
+Changed in version 3.0: Only appears when \fI\%mongostat\fP runs against pre\-3.0
+versions of MongoDB instances.
+
+.sp
 The percent of time in a global write lock.
-.sp
-Changed in version 2.2: The \fBlocked db\fP field replaces the \fBlocked %\fP field to
-more appropriate data regarding the database specific locks in
-version 2.2.
-
-.UNINDENT
-.INDENT 0.0
-.TP
-.B locked db
-New in version 2.2.
-
-.sp
-The percent of time in the per\-database context\-specific
-lock. \fBmongostat\fP will report the database that has spent
-the most time since the last \fBmongostat\fP call with a write
-lock.
-.sp
-This value represents the amount of time that the listed database
-spent in a locked state \fIcombined\fP with the time that the
-\fBmongod\fP spent in the global lock. Because of this, and
-the sampling method, you may see some values greater than 100%.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B idx miss
-The percent of index access attempts that required a page fault
-to load a btree node. This is a sampled value.
+Changed in version 3.0.
+
+.sp
+Only for storage\-mmapv1\&. The percent of index access attempts
+that required a page fault to load a btree node. This is a sampled
+value.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -585,14 +944,14 @@ The number of active clients performing write operations.
 .B netIn
 The amount of network traffic, in \fIbytes\fP, received by the MongoDB instance.
 .sp
-This includes traffic from \fBmongostat\fP itself.
+This includes traffic from \fI\%mongostat\fP itself.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B netOut
 The amount of network traffic, in \fIbytes\fP, sent by the MongoDB instance.
 .sp
-This includes traffic from \fBmongostat\fP itself.
+This includes traffic from \fI\%mongostat\fP itself.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -621,13 +980,13 @@ _
 T{
 M
 T}	T{
-\fImaster\fP
+master
 T}
 _
 T{
 SEC
 T}	T{
-\fIsecondary\fP
+secondary
 T}
 _
 T{
@@ -643,23 +1002,24 @@ unknown
 T}
 _
 T{
-SLV
+RTR
 T}	T{
-\fIslave\fP
+mongos process (“router”)
 T}
 _
 T{
-RTR
+ARB
 T}	T{
-mongos process ("router")
+arbiter
 T}
 _
 .TE
 .UNINDENT
-.SH USAGE
+.SH USE
+.SS Specify \fBmongostat\fP Collection Period and Frequency
 .sp
-In the first example, \fBmongostat\fP will return data every
-second for 20 seconds. \fBmongostat\fP collects data from the
+In the first example, \fI\%mongostat\fP will return data every
+second for 20 seconds. \fI\%mongostat\fP collects data from the
 \fBmongod\fP instance running on the localhost interface on
 port 27017. All of the following invocations produce identical
 behavior:
@@ -677,11 +1037,11 @@ mongostat \-n 20
 .UNINDENT
 .UNINDENT
 .sp
-In the next example, \fBmongostat\fP returns data every 5 minutes
-(or 300 seconds) for as long as the program runs. \fBmongostat\fP
+In the next example, \fI\%mongostat\fP returns data every 5 minutes
+(or 300 seconds) for as long as the program runs. \fI\%mongostat\fP
 collects data from the \fBmongod\fP instance running on the
-localhost interface on port \fB27017\fP\&. Both of the following
-invocations produce identical behavior.
+localhost interface on port \fB27017\fP\&. The following
+invocations produce identical behavior:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -695,11 +1055,11 @@ mongostat 300
 .UNINDENT
 .UNINDENT
 .sp
-In the following example, \fBmongostat\fP returns data every 5
-minutes for an hour (12 times.) \fBmongostat\fP collects data
+In the following example, \fI\%mongostat\fP returns data every 5
+minutes for an hour (12 times.) \fI\%mongostat\fP collects data
 from the \fBmongod\fP instance running on the localhost interface
-on port 27017. Both of the following invocations produce identical
-behavior.
+on port 27017. The following invocations produce identical
+behavior:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -711,11 +1071,166 @@ mongostat \-n 12 300
 .fi
 .UNINDENT
 .UNINDENT
+.SS Add Fields to \fI\%mongostat\fP Output
 .sp
-In many cases, using the \fI\-\-discover\fP
+New in version 3.4.
+
+.sp
+\fI\%\-O\fP allows you to specify fields from
+\fBserverStatus\fP output to add to the default
+\fI\%mongostat\fP output. The following example adds the \fBhost\fP
+and \fBversion\fP fields as well as the \fBnetwork.numRequests\fP field,
+which will display as “network requests”, to the default
+\fI\%mongostat\fP output:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongostat \-O \(aqhost,version,network.numRequests=network requests\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The \fI\%mongostat\fP output would then resemble:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+insert query update delete getmore command dirty used flushes vsize   res qrw arw net_in net_out conn                time            host version network requests
+    *0    *0     *0     *0       0     2|0  0.0% 0.0%       0 2.51G 19.0M 0|0 0|0   158b   39.4k    2 Oct 11 12:14:45.878 localhost:37017  3.3.14               91
+    *0    *0     *0     *0       0     1|0  0.0% 0.0%       0 2.51G 19.0M 0|0 0|0   157b   39.3k    2 Oct 11 12:14:46.879 localhost:37017  3.3.14               95
+    *0    *0     *0     *0       0     1|0  0.0% 0.0%       0 2.51G 19.0M 0|0 0|0   157b   39.2k    2 Oct 11 12:14:47.884 localhost:37017  3.3.14               99
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS Specify \fI\%mongostat\fP Output Fields
+.sp
+New in version 3.4.
+
+.sp
+\fI\%\-o\fP specifies the columns \fI\%mongostat\fP includes in its
+output. You can specify any \fBserverStatus\fP field as a
+\fI\%mongostat\fP output column. The following example specifies the
+\fBhost\fP, \fBtime\fP, and  \fBmetrics.document.inserted\fP fields:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongostat \-o \(aqhost,time,metrics.document.inserted\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The \fI\%mongostat\fP output would then resemble:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+           host                time metrics.document.inserted
+localhost:37017 Oct 11 12:21:17.370                         0
+localhost:37017 Oct 11 12:21:18.371                         0
+localhost:37017 Oct 11 12:21:19.371                         0
+localhost:37017 Oct 11 12:21:20.368                         0
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS View Rate of Change for a Field with \fI\%\&.rate()\fP
+.sp
+New in version 3.4.
+
+.sp
+\fI\%\&.rate()\fP enables you to view the rate per second at which a
+numerical field has changed from one \fI\%mongostat\fP call to the
+next. For example, you can view the rate at which documents have been
+inserted during an insert operation. \fI\%\&.rate()\fP can therefore
+help you view the performance of your \fBmongod\fP instance.
+.sp
+The following example reports on the rate of change of the
+\fBmetrics.document.inserted\fP \fBserverStatus\fP field. The
+invocation uses \fI\%\-o\fP’s ability to specify the name of an column
+to label \fBmetrics.document.inserted.rate()\fP as “inserted rate” and
+\fBmetrics.document.inserted\fP as “inserted”:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongostat \-o \(aqhost,mem,bits,metrics.document.inserted.rate()=inserted rate,metrics.document.inserted=inserted\(aq \-\-rowcount 5
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The output would then resemble:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+           host mem.bits inserted rate inserted
+localhost:37017       64           501     3455
+localhost:37017       64           967    13128
+localhost:37017       64           972    22851
+localhost:37017       64           214    25000
+localhost:37017       64             0    25000
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS View Field Changes with \fI\%\&.diff()\fP
+.sp
+New in version 3.4.
+
+.sp
+\fI\%\&.diff()\fP returns the difference between the current
+\fBserverStatus\fP field value and the value from the previous
+\fI\%mongostat\fP call. The following example returns statistics on
+the number of documents being inserted into a collection: \fBinserted
+diff\fP is the difference in the
+\fBmetrics.document.inserted\fP field between subsequent
+calls, while \fBinserted\fP is the value of
+\fBmetrics.document.inserted\fP:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongostat \-o \(aqhost,mem.bits,metrics.document.inserted.diff()=inserted diff,metrics.document.inserted=inserted\(aq \-\-rowcount 5
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The output would then resemble:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+           host mem.bits inserted diff inserted
+localhost:27017       64             0    25359
+localhost:27017       64            94    25453
+localhost:27017       64           938    26391
+localhost:27017       64           964    27355
+localhost:27017       64           978    28333
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS View Statistics for a Replica Set or Sharded Cluster
+.sp
+In many cases, using the \fI\%\-\-discover\fP option
 will help provide a more complete snapshot of the state of an entire
 group of machines. If a \fBmongos\fP process connected to a
-\fIsharded cluster\fP is running on port \fB27017\fP of the local
+sharded cluster is running on port \fB27017\fP of the local
 machine, you can use the following form to return statistics from all
 members of the cluster:
 .INDENT 0.0
@@ -728,9 +1243,51 @@ mongostat \-\-discover
 .fi
 .UNINDENT
 .UNINDENT
+.SS View Statistics in an Interactive Interface
+.sp
+New in version 3.4.
+
+.sp
+Use the \fI\%\-\-interactive\fP option to
+view statistics in a non\-scrolling \fI\%ncurses\fP \-style
+interactive output. The \fI\%\-\-interactive\fP option lets you highlight specific
+hosts, columns, or fields to view. When combined with \fI\%\-\-discover\fP,
+\fI\%\-\-interactive\fP displays statistics for all members of a
+replica set or sharded cluster, as in the following example:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongostat \-\-discover \-\-interactive
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The output for a sharded cluster would then resemble:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+                  host insert query update delete getmore command dirty used flushes mapped vsize   res faults qrw arw net_in net_out conn set repl                time
+hostname.local:27018     *0    *0     *0     *0       0     1|0  0.0% 0.0%       0        3.25G 25.0M    n/a 0|0 1|0   157b   43.9k   19 tic  PRI Nov  2 11:44:46.439
+hostname.local:27019     *0    *0     *0     *0       0     2|0  0.0% 0.0%       0        3.18G 26.0M    n/a 0|0 1|0   322b   44.4k   12 tic  SEC Nov  2 11:44:46.439
+hostname.local:27020     *0    *0     *0     *0       0     2|0  0.0% 0.0%       0        3.18G 26.0M    n/a 0|0 1|0   322b   44.4k   12 tic  SEC Nov  2 11:44:46.439
+hostname.local:27021   2017    *0     *0     *0     826  1029|0  0.0% 0.0%       0        3.25G 31.0M    n/a 0|0 1|0  1.74m   1.60m   20 tac  PRI Nov  2 11:44:46.439
+hostname.local:27022  *2021    *0     *0     *0       0     2|0  0.0% 0.0%       0        3.19G 32.0M    n/a 0|0 1|0   322b   44.6k   12 tac  SEC Nov  2 11:44:46.438
+hostname.local:27023  *2022    *0     *0     *0       0     3|0  0.0% 0.0%       0        3.19G 33.0M    n/a 0|0 1|0   323b   44.7k   12 tac  SEC Nov  2 11:44:46.438
+     localhost:27017   2071    *0     *0     *0       0  2073|0                  0     0B 2.43G 9.00M      0 0|0 0|0   249k    130k    4      RTR Nov  2 11:44:47.429
+
+Press \(aq?\(aq to toggle help
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2015
+2008-2018
 .\" Generated by docutils manpage writer.
 .

@@ -1,0 +1,2740 @@
+.\" Man page generated from reStructuredText.
+.
+.TH "MONGODB-PARAMETERS" "5" "Jun 21, 2018" "4.0" "mongodb-manual"
+.SH NAME
+mongodb-parameters \- MongoDB setParameter Options
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SS On this page
+.INDENT 0.0
+.IP \(bu 2
+\fI\%Synopsis\fP
+.IP \(bu 2
+\fI\%Parameters\fP
+.INDENT 2.0
+.IP \(bu 2
+\fI\%Authentication Parameters\fP
+.IP \(bu 2
+\fI\%General Parameters\fP
+.IP \(bu 2
+\fI\%Logging Parameters\fP
+.IP \(bu 2
+\fI\%Diagnostic Parameters\fP
+.IP \(bu 2
+\fI\%Logical Session Parameters\fP
+.IP \(bu 2
+\fI\%Replication Parameters\fP
+.IP \(bu 2
+\fI\%Sharding Parameters\fP
+.IP \(bu 2
+\fI\%Storage Parameters\fP
+.IP \(bu 2
+\fI\%WiredTiger Parameters\fP
+.IP \(bu 2
+\fI\%Auditing Parameters\fP
+.IP \(bu 2
+\fI\%Transaction Parameters\fP
+.UNINDENT
+.UNINDENT
+.SH SYNOPSIS
+.sp
+MongoDB provides a number of configuration options that you can set
+using:
+.INDENT 0.0
+.IP \(bu 2
+the \fBsetParameter\fP command:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, <parameter>: <value>  } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+the \fBsetParameter\fP configuration setting:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+setParameter:
+   <parameter1>: <value1>
+   ...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.IP \(bu 2
+the \fB\-\-setParameter\fP command\-line option for \fBmongod\fP
+and \fBmongos\fP:
+.INDENT 2.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter <parameter>=<value>
+mongos \-\-setParameter <parameter>=<value>
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.sp
+For additional configuration options, see
+/reference/configuration\-options, \fBmongod\fP and
+\fBmongos\fP\&.
+.SH PARAMETERS
+.SS Authentication Parameters
+.INDENT 0.0
+.TP
+.B authenticationMechanisms
+Changed in version 4.0: Remove support for the deprecated \fBMONGODB\-CR\fP authentication mechanism.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Specifies the list of authentication mechanisms the server accepts. Set
+this to one or more of the following values. If you specify multiple
+values, use a comma\-separated list and no spaces. For descriptions
+of the authentication mechanisms, see /core/authentication\&.
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+SCRAM\-SHA\-1
+T}	T{
+\fI\%RFC 5802\fP standard
+Salted Challenge Response Authentication Mechanism using the SHA\-1
+hash function.
+T}
+_
+T{
+SCRAM\-SHA\-256
+T}	T{
+\fI\%RFC 7677\fP standard
+Salted Challenge Response Authentication Mechanism using the SHA\-256
+hash function.
+.sp
+Requires featureCompatibilityVersion set to \fB4.0\fP\&.
+.sp
+New in version 4.0.
+T}
+_
+T{
+MONGODB\-X509
+T}	T{
+MongoDB TLS/SSL certificate authentication.
+T}
+_
+T{
+GSSAPI (Kerberos)
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%MongoDB Enterprise\fP\&.
+T}
+_
+T{
+PLAIN (LDAP SASL)
+T}	T{
+External authentication using LDAP. You can also use \fBPLAIN\fP
+for authenticating in\-database users. \fBPLAIN\fP transmits
+passwords in plain text. This mechanism is available only in
+\fI\%MongoDB Enterprise\fP\&.
+T}
+_
+.TE
+.sp
+You can only set \fI\%authenticationMechanisms\fP during
+start\-up.
+.sp
+For example, to specify both \fBPLAIN\fP and \fBSCRAM\-SHA\-256\fP as the
+authentication mechanisms, use the following command:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter authenticationMechanisms=PLAIN,SCRAM\-SHA\-256 \-\-auth
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B clusterAuthMode
+New in version 2.6.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Set the \fBclusterAuthMode\fP to either \fBsendX509\fP or
+\fBx509\fP\&. Useful during rolling upgrade to use x509 for
+membership authentication
+to minimize downtime.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, clusterAuthMode: "sendX509" } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B enableLocalhostAuthBypass
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Specify \fB0\fP or \fBfalse\fP to disable localhost authentication
+bypass. Enabled by default.
+.sp
+\fI\%enableLocalhostAuthBypass\fP is not available using
+\fBsetParameter\fP database command. Use the
+\fBsetParameter\fP option in the configuration file or the
+\fB\-\-setParameter\fP option on the
+command line.
+.sp
+See localhost\-exception for more information.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B KeysRotationIntervalSec
+New in version 3.6.
+
+.sp
+\fIDefault\fP: 7776000 seconds (90 days)
+.sp
+Specifies the number of seconds for which an \fI\%HMAC signing key\fP
+is valid before rotating to the next one. This parameter is intended
+primarily to facilitate authentication testing.
+.sp
+You can only set \fI\%KeysRotationIntervalSec\fP during
+start\-up, and cannot change this setting with the
+\fBsetParameter\fP database command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B ldapUserCacheInvalidationInterval
+For use with MongoDB servers using security\-ldap\-external\&.
+.sp
+The interval (in seconds) MongoDB waits
+between external user cache flushes. After MongoDB flushes the external
+user cache, the next operation an LDAP\-authorized user, MongoDB
+reacquires authorization data from the LDAP server.
+.sp
+Increasing the value specified increases the amount of time
+MongoDB and the LDAP server can be out of sync, but reduces the load on
+the LDAP server. Conversely, decreasing the value specified
+decreases the time MongoDB and the LDAP server can be out of sync while
+increasing the load on the LDAP server.
+.sp
+Defaults to 30 seconds.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B opensslCipherConfig
+New in version 3.6.
+
+.sp
+Specify the cipher string for OpenSSL when using TLS/SSL encryption.
+For a list of cipher strings, see
+\fI\%https://wiki.openssl.org/index.php/Manual:Ciphers(1)#CIPHER_STRINGS\fP
+.sp
+You can only set \fI\%opensslCipherConfig\fP during start\-up, and
+cannot change this setting using the \fBsetParameter\fP
+database command.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter opensslCipherConfig=HIGH:!EXPORT:!aNULL@STRENGTH \-\-sslMode requireSSL \-\-sslPEMKeyFile Certs/server.pem
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B saslauthdPath
+.
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Available only in MongoDB Enterprise (except MongoDB Enterprise for Windows).
+.UNINDENT
+.UNINDENT
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Specify the path to the Unix Domain Socket of the \fBsaslauthd\fP
+instance to use for proxy authentication.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B saslHostName
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+\fI\%saslHostName\fP overrides MongoDB’s default hostname
+detection for the purpose of configuring SASL and Kerberos
+authentication.
+.sp
+\fI\%saslHostName\fP does not affect the hostname of the
+\fBmongod\fP or \fBmongos\fP instance for any purpose
+beyond the configuration of SASL and Kerberos.
+.sp
+You can only set \fI\%saslHostName\fP during start\-up, and
+cannot change this setting using the \fBsetParameter\fP
+database command.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%saslHostName\fP supports Kerberos authentication and is
+only included in MongoDB Enterprise. For Linux systems, see
+/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
+for more information.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B saslServiceName
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Allows users to override the default Kerberos
+service name component of the Kerberos
+principal name, on a per\-instance basis. If unspecified, the
+default value is \fBmongodb\fP\&.
+.sp
+MongoDB only permits setting \fI\%saslServiceName\fP at
+startup. The \fBsetParameter\fP command can not change
+this setting.
+.sp
+\fI\%saslServiceName\fP is only available in MongoDB
+Enterprise.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+Ensure that your driver supports alternate service names.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B scramIterationCount
+New in version 3.0.0.
+
+.sp
+\fIDefault\fP: \fB10000\fP
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Changes the number of hashing iterations used for all new
+\fBSCRAM\-SHA\-1\fP passwords. More iterations increase the amount of
+time required for clients to authenticate to MongoDB, but makes
+passwords less susceptible to brute\-force attempts. The default
+value is ideal for most common use cases and requirements.
+.sp
+If you modify this value, it does not change the iteration count for
+existing passwords. The \fI\%scramIterationCount\fP value must
+be \fB5000\fP or greater.
+.sp
+For example, the following sets the \fI\%scramIterationCount\fP
+to \fB12000\fP\&.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter scramIterationCount=12000
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Or, if using the \fBsetParameter\fP command within the
+\fBmongo\fP shell:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, scramIterationCount: 12000 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+.INDENT 0.0
+.IP \(bu 2
+\fBdb.changeUserPassword()\fP
+.IP \(bu 2
+\fBdb.createUser()\fP
+.IP \(bu 2
+\fBdb.updateUser()\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B scramSHA256IterationCount
+New in version 4.0.
+
+.sp
+\fIDefault\fP: \fB15000\fP
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Changes the number of hashing iterations used for all new
+\fBSCRAM\-SHA\-256\fP passwords. More iterations increase the amount of
+time required for clients to authenticate to MongoDB, but makes
+passwords less susceptible to brute\-force attempts. The default
+value is ideal for most common use cases and requirements.
+.sp
+If you modify this value, it does not change iteration count for
+existing passwords. The \fI\%scramSHA256IterationCount\fP value
+must be \fB5000\fP or greater.
+.sp
+For example, the following sets the \fI\%scramSHA256IterationCount\fP
+to \fB20000\fP\&.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter scramSHA256IterationCount=20000
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Or, if using the \fBsetParameter\fP command within the
+\fBmongo\fP shell:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, scramSHA256IterationCount: 20000 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+.INDENT 0.0
+.IP \(bu 2
+\fBdb.changeUserPassword()\fP
+.IP \(bu 2
+\fBdb.createUser()\fP
+.IP \(bu 2
+\fBdb.updateUser()\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B sslMode
+New in version 2.6.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Set the \fBnet.ssl.mode\fP to either \fBpreferSSL\fP or
+\fBrequireSSL\fP\&. Useful during rolling upgrade to TLS/SSL to minimize downtime.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, sslMode: "preferSSL" } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B userCacheInvalidationIntervalSecs
+\fIDefault\fP: 30
+.sp
+Available for \fBmongos\fP only.
+.sp
+On a \fBmongos\fP instance, specifies the interval (in seconds)
+at which the \fBmongos\fP instance checks to determine whether
+the in\-memory cache of user objects has stale data, and if so,
+clears the cache. If there are no changes to user objects,
+\fBmongos\fP will not clear the cache.
+.sp
+This parameter has a minimum value of \fB1\fP second and a maximum
+value of \fB86400\fP seconds (24 hours).
+.sp
+Changed in version 3.0: Default value has changed to \fB30\fP seconds, and the minimum
+value allowed has changed to \fB1\fP second. \fBmongos\fP
+only clears the user cache if there are changes.
+
+.UNINDENT
+.INDENT 0.0
+.TP
+.B authFailedDelayMs
+\fIDefault\fP: 0
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+New in version 3.4.
+
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.sp
+The number of milliseconds to wait before informing clients that their
+authentication attempt has failed. This parameter may be in the range
+\fB0\fP to \fB5000\fP, inclusive.
+.sp
+Setting this parameter makes brute\-force login attacks on a database
+more time\-consuming. However, clients waiting for a response from the
+MongoDB server still consume server resources, and this may adversely
+impact benign login attempts if the server is denying access to many
+other clients simultaneously.
+.UNINDENT
+.SS General Parameters
+.INDENT 0.0
+.TP
+.B connPoolMaxShardedConnsPerHost
+New in version 2.6.
+
+.sp
+\fIDefault\fP: 200
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Sets the maximum size of the legacy connection pools for communication to the
+shards. The size of a pool does not prevent the creation of
+additional connections, but \fIdoes\fP prevent the connection pools from
+retaining connections above this limit.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+The parameter is separate from the connections in TaskExecutor
+pools. See \fI\%ShardingTaskExecutorPoolMaxSize\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+Increase the \fI\%connPoolMaxShardedConnsPerHost\fP value
+\fBonly\fP if the number of connections in a connection pool has a
+high level of churn or if the total number of created connections
+increase.
+.sp
+You can only set \fI\%connPoolMaxShardedConnsPerHost\fP during
+startup in the config file or on the command line. For example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter connPoolMaxShardedConnsPerHost=250
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B connPoolMaxShardedInUseConnsPerHost
+New in version 3.6.3.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Sets the maximum number of in\-use connections at any given time for
+the legacy sharded cluster connection pools.
+.sp
+By default, the parameter is unset.
+.sp
+You can only set \fI\%connPoolMaxShardedConnsPerHost\fP during
+startup in the config file or on the command line. For example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter connPoolMaxShardedInUseConnsPerHost=100
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%connPoolMaxShardedConnsPerHost\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B shardedConnPoolIdleTimeoutMinutes
+New in version 3.6.3.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Sets the time limit that a connection in the legacy sharded cluster
+connection pool can remain idle before being closed.
+.sp
+By default, the parameter is unset.
+.sp
+You can only set \fI\%shardedConnPoolIdleTimeoutMinutes\fP during
+startup in the config file or on the command line. For example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter shardedConnPoolIdleTimeoutMinutes=10
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%connPoolMaxShardedConnsPerHost\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B connPoolMaxConnsPerHost
+New in version 2.6.
+
+.sp
+\fIDefault\fP: 200
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Sets the maximum size of the legacy connection pools for outgoing connections
+to other \fBmongod\fP instances in the global connection pool. The size
+of a pool does not prevent the creation of additional connections,
+but \fIdoes\fP prevent a connection pool from retaining connections in
+excess of the value of \fI\%connPoolMaxConnsPerHost\fP\&.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+The parameter is separate from the connections in TaskExecutor
+pools. See \fI\%ShardingTaskExecutorPoolMaxSize\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+\fBOnly\fP adjust this setting if your driver does \fInot\fP pool
+connections and you’re using authentication in the
+context of a sharded cluster.
+.sp
+You can only set \fI\%connPoolMaxConnsPerHost\fP during startup
+in the config file or on the command line. For example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter connPoolMaxConnsPerHost=250
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B connPoolMaxInUseConnsPerHost
+New in version 3.6.3.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Sets the maximum number of in\-use connections at any given time for
+for outgoing connections to other \fBmongod\fP instances in
+the legacy global connection pool.
+.sp
+By default, the parameter is unset.
+.sp
+You can only set \fI\%connPoolMaxInUseConnsPerHost\fP during
+startup in the config file or on the command line. For example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter connPoolMaxInUseConnsPerHost=100
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%connPoolMaxConnsPerHost\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B globalConnPoolIdleTimeoutMinutes
+New in version 3.6.3.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Sets the time limit that connection in the legacy global connection
+pool can remain idle before being closed.
+.sp
+By default, the parameter is unset.
+.sp
+You can only set \fI\%globalConnPoolIdleTimeoutMinutes\fP
+during startup in the config file or on the command line. For
+example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter globalConnPoolIdleTimeoutMinutes=10
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%connPoolMaxShardedConnsPerHost\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B cursorTimeoutMillis
+New in version 3.0.2.
+
+.sp
+\fIDefault\fP: 600000 (i.e. 10 minutes)
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Sets the expiration threshold in milliseconds for idle cursors
+before MongoDB removes them; i.e. MongoDB removes cursors that have
+been idle for the specified \fI\%cursorTimeoutMillis\fP\&.
+.sp
+For example, the following sets the \fI\%cursorTimeoutMillis\fP
+to \fB300000\fP milliseconds (i.e. 5 minutes).
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter cursorTimeoutMillis=300000
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Or, if using the \fBsetParameter\fP command within the
+\fBmongo\fP shell:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, cursorTimeoutMillis: 300000 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B failIndexKeyTooLong
+New in version 2.6.
+
+.sp
+Available for \fBmongod\fP only.
+.sp
+In MongoDB 2.6, if you attempt to insert or update a document so
+that the value of an indexed field is longer than the
+\fBIndex Key Length Limit\fP, the operation
+will fail and return an error to the client. In previous versions
+of MongoDB, these operations would successfully insert or modify a
+document but the index or indexes would not include references to
+the document.
+.sp
+To avoid this issue, consider using hashed indexes or indexing a computed value. If you have an
+existing data set and want to disable this behavior so you can
+upgrade and then gradually resolve these indexing issues, you can
+use \fI\%failIndexKeyTooLong\fP to disable this behavior.
+.sp
+\fI\%failIndexKeyTooLong\fP defaults to \fBtrue\fP\&. When
+\fBfalse\fP, a 2.6 \fBmongod\fP instance will provide the 2.4
+behavior.
+.sp
+Issue the following command to disable the index key length
+validation:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, failIndexKeyTooLong: false } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+You can also set \fI\%failIndexKeyTooLong\fP  at
+startup time with the following option:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter failIndexKeyTooLong=false
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B newCollectionsUsePowerOf2Sizes
+Deprecated since version 3.0.0: MongoDB deprecates the
+\fI\%newCollectionsUsePowerOf2Sizes\fP parameter such that
+you cannot set the \fI\%newCollectionsUsePowerOf2Sizes\fP to
+\fBfalse\fP and \fI\%newCollectionsUsePowerOf2Sizes\fP set to
+\fBtrue\fP is a no\-op. To disable the power of 2 allocation for a collection, use the
+\fBcollMod\fP command with the \fBnoPadding\fP flag
+or the \fBdb.createCollection()\fP method with the
+\fBnoPadding\fP option.
+
+.sp
+\fIDefault\fP: \fBtrue\fP\&.
+.sp
+Available for \fBmongod\fP only.
+.sp
+Available for the MMAPv1 storage engine only.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B notablescan
+Available for \fBmongod\fP only.
+.sp
+Specify whether \fBall\fP queries must use indexes. If \fB1\fP, MongoDB
+will not execute queries that require a collection scan and will return an
+error.
+.sp
+Consider the following example which sets \fI\%notablescan\fP to \fB1\fP
+or true:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, notablescan: 1 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Setting \fI\%notablescan\fP to \fB1\fP can be useful for testing
+application queries, for example, to identify queries that scan an
+entire collection and cannot use an index.
+.sp
+To detect unindexed queries without \fBnotablescan\fP, consider reading
+the /tutorial/evaluate\-operation\-performance and
+/tutorial/optimize\-query\-performance\-with\-indexes\-and\-projections
+sections and using the \fI\%logLevel\fP parameter,
+/reference/program/mongostat and profiling\&.
+.sp
+Don’t run production \fBmongod\fP instances with
+\fI\%notablescan\fP because preventing collection scans can potentially
+affect queries in all databases, including administrative queries.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B ttlMonitorEnabled
+Available for \fBmongod\fP only.
+.sp
+To support TTL Indexes, \fBmongod\fP
+instances have a background thread that is responsible for deleting
+documents from collections with TTL indexes.
+.sp
+To disable this worker thread for a \fBmongod\fP, set
+\fI\%ttlMonitorEnabled\fP to \fBfalse\fP, as in the following
+operations:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, ttlMonitorEnabled: false } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Alternately, you may disable the thread at startup time by starting the
+\fBmongod\fP instance with the following option:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter ttlMonitorEnabled=false
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B disableJavaScriptJIT
+Changed in version 4.0: The JavaScript engine’s JIT compiler is now disabled by default.
+
+.sp
+Available for \fBmongod\fP only.
+.sp
+The MongoDB JavaScript engine uses SpiderMonkey, which implements
+Just\-in\-Time (JIT) compilation for improved performance when running scripts.
+.sp
+To enable the JIT, set \fI\%disableJavaScriptJIT\fP to \fBfalse\fP, as in
+the following example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, disableJavaScriptJIT: false } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Be aware that \fBgroup\fP and \fB$where\fP will reuse existing
+JavaScript interpreter contexts, so changes to
+\fI\%disableJavaScriptJIT\fP may not take effect immediately for these
+operations.
+.sp
+Alternately, you may enable the JIT at startup time by starting the
+\fBmongod\fP instance with the following option:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter disableJavaScriptJIT=false
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B maxIndexBuildMemoryUsageMegabytes
+New in version 3.4.
+
+.sp
+\fIDefault\fP: 500
+.sp
+Limits the amount of memory that simultaneous foreground index
+builds on one collection may consume for the duration of the
+builds.
+.sp
+Foreground index builds may be initiated either by a user command
+such as Create Index
+or by an administrative process such as an
+initial sync\&.
+Both are subject to the limit set by
+\fI\%maxIndexBuildMemoryUsageMegabytes\fP\&.
+.sp
+An initial sync operation populates
+only one collection at a time and has no risk of exceeding the memory
+limit. However, it is possible for a user to start foreground index
+builds on multiple collections in multiple databases simultaneously
+and potentially consume an amount of memory greater than the limit
+set in \fI\%maxIndexBuildMemoryUsageMegabytes\fP\&.
+.INDENT 7.0
+.INDENT 3.5
+.SS Tip
+.sp
+To minimize the impact of building an index on replica sets and
+sharded clusters with replica set shards, use a rolling index build
+procedure as described on
+/tutorial/build\-indexes\-on\-replica\-sets\&.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B watchdogPeriodSeconds
+New in version 3.6.
+
+.sp
+Available for \fBmongod\fP only.
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: \-1 (disabled)
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Available only in MongoDB Enterprise. Not available on macOS.
+.UNINDENT
+.UNINDENT
+.sp
+Determines how often the
+Storage Node Watchdog checks the status of
+the monitored filesystems.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+If a filesystem on a monitored directory becomes unresponsive, it can
+take a maximum of nearly \fItwice\fP the value of
+\fI\%watchdogPeriodSeconds\fP to terminate the \fBmongod\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+Valid values are \-1, meaning the
+Storage Node Watchdog is disabled, or an
+integer greater than or equal to 60.
+.sp
+By default the Storage Node Watchdog is
+disabled. To enable it, \fI\%watchdogPeriodSeconds\fP must be set at
+startup time.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter watchdogPeriodSeconds=60
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+You can only enable the Storage Node Watchdog
+at startup.
+.sp
+However, once enabled, you can pause the Storage Node Watchdog or change the \fI\%watchdogPeriodSeconds\fP
+during runtime.
+.sp
+To pause the Storage Node Watchdog during
+runtime, set \fI\%watchdogPeriodSeconds\fP to \-1.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, watchdogPeriodSeconds: \-1 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+To resume or change the period during runtime, set
+\fI\%watchdogPeriodSeconds\fP to a number greater than or equal to 60.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, watchdogPeriodSeconds: 120 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+It is an error to set \fI\%watchdogPeriodSeconds\fP at runtime if the
+Storage Node Watchdog was not enabled at
+startup time.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SS Logging Parameters
+.INDENT 0.0
+.TP
+.B logLevel
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Specify an integer between \fB0\fP and \fB5\fP signifying the verbosity
+of the logging, where \fB5\fP is the most verbose.
+.sp
+Consider the following example which sets the
+\fI\%logLevel\fP to \fB2\fP:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, logLevel: 2 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The default \fI\%logLevel\fP is \fB0\fP\&.
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fBverbosity\fP\&.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B logComponentVerbosity
+New in version 3.0.0.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Sets the verbosity levels of various components for log messages\&. The verbosity level determines the
+amount of Informational and Debug
+messages MongoDB outputs.
+.sp
+The verbosity level can range from \fB0\fP to \fB5\fP:
+.INDENT 7.0
+.IP \(bu 2
+\fB0\fP is the MongoDB’s default log verbosity level, to include
+Informational messages.
+.IP \(bu 2
+\fB1\fP to \fB5\fP increases the verbosity level to include
+Debug messages.
+.UNINDENT
+.sp
+For a component, you can also specify \fB\-1\fP to inherit the parent’s
+verbosity level.
+.sp
+To specify the verbosity level, use a document similar to the
+following:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+{
+  verbosity: <int>,
+  <component1>: { verbosity: <int> },
+  <component2>: {
+     verbosity: <int>,
+     <component3>: { verbosity: <int> }
+  },
+  ...
+}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+For the components, you can specify just the \fB<component>: <int>\fP
+in the document, unless you are setting both the parent verbosity
+level and that of the child component(s) as well:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+{
+  verbosity: <int>,
+  <component1>: <int> ,
+  <component2>: {
+     verbosity: <int>,
+     <component3>: <int>
+  }
+  ...
+}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The top\-level \fBverbosity\fP field corresponds to
+\fBsystemLog.verbosity\fP which sets the default level for all
+components. The default value of \fBsystemLog.verbosity\fP is
+\fB0\fP\&.
+.sp
+The components correspond to the following settings:
+.INDENT 7.0
+.IP \(bu 2
+\fBaccessControl\fP
+.IP \(bu 2
+\fBcommand\fP
+.IP \(bu 2
+\fBcontrol\fP
+.IP \(bu 2
+\fBgeo\fP
+.IP \(bu 2
+\fBindex\fP
+.IP \(bu 2
+\fBnetwork\fP
+.IP \(bu 2
+\fBquery\fP
+.IP \(bu 2
+\fBreplication\fP
+.IP \(bu 2
+\fBrecovery\fP
+.IP \(bu 2
+\fBsharding\fP
+.IP \(bu 2
+\fBstorage\fP
+.IP \(bu 2
+\fBstorage.journal\fP
+.IP \(bu 2
+\fBwrite\fP
+.UNINDENT
+.sp
+Unless explicitly set, the component has the verbosity level of its
+parent. For example, \fBstorage\fP is the parent of
+\fBstorage.journal\fP\&. That is, if you specify a \fBstorage\fP verbosity level, this level
+also applies to:
+.INDENT 7.0
+.IP \(bu 2
+\fBstorage.journal\fP components
+\fIunless\fP you specify the verbosity level for
+\fBstorage.journal\fP\&.
+.IP \(bu 2
+\fBstorage.recovery\fP components
+\fIunless\fP you specify the verbosity level for
+\fBstorage.recovery\fP\&.
+.UNINDENT
+.sp
+For example, the following sets the \fBdefault verbosity
+level\fP to \fB1\fP, the \fBquery\fP to \fB2\fP, the
+\fBstorage\fP to \fB2\fP,
+and the \fBstorage.journal\fP to \fB1\fP\&.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( {
+   setParameter: 1,
+   logComponentVerbosity: {
+      verbosity: 1,
+      query: { verbosity: 2 },
+      storage: {
+         verbosity: 2,
+         journal: {
+            verbosity: 1
+         }
+      }
+   }
+} )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+You can also set parameter \fI\%logComponentVerbosity\fP at
+startup time, passing the verbosity level document as a string.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter "logComponentVerbosity={command: 3}"
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The \fBmongo\fP shell also provides the \fBdb.setLogLevel()\fP
+to set the log level for a single component. For various ways to set
+the log verbosity level, see log\-messages\-configure\-verbosity\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B maxLogSizeKB
+New in version 3.4.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 10
+.sp
+Specifies the maximum size, in kilobytes, for a log line. Lines exceeding
+this limit print only the beginning and end of the line, excising the middle
+portion.
+.sp
+For example, the following sets the maximum size to \fB20\fP kilobytes:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter maxLogSizeKB=20
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+Using a large value for \fI\%maxLogSizeKB\fP may adversely affect
+system performance and negatively impact database operations.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B quiet
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Sets quiet logging mode. If
+\fB1\fP, \fBmongod\fP will go into a quiet logging
+mode which will not log the following events/activities:
+.INDENT 7.0
+.IP \(bu 2
+connection events;
+.IP \(bu 2
+the \fBdrop\fP command, the
+\fBdropIndexes\fP command, the
+\fBdiagLogging\fP command, the
+\fBvalidate\fP command, and the
+\fBclean\fP command; and
+.IP \(bu 2
+replication synchronization activities.
+.UNINDENT
+.sp
+Consider the following example which sets the
+\fBquiet\fP to \fB1\fP:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, quiet: 1 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fBquiet\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B traceExceptions
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Configures \fBmongod\fP to log full source code stack traces
+for every database and socket C++ exception, for use with debugging.
+If \fBtrue\fP, \fBmongod\fP will log full stack traces.
+.sp
+Consider the following example which sets the
+\fBtraceExceptions\fP to \fBtrue\fP:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, traceExceptions: true } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fBsystemLog.traceAllExceptions\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SS Diagnostic Parameters
+.sp
+To facilitate analysis of the MongoDB server behavior by MongoDB
+engineers, MongoDB logs server statistics to diagnostic files at
+periodic intervals.
+.sp
+For \fBmongod\fP, the diagnostic data files are stored in the
+\fBdiagnostic.data\fP directory under the \fBmongod\fP instance’s
+\fB\-\-dbpath\fP or \fBstorage.dbPath\fP\&.
+.sp
+For \fBmongos\fP, the diagnostic data files, by default, are
+stored in a directory under the \fBmongos\fP instance’s
+\fB\-\-logpath\fP or \fBsystemLog.path\fP directory. The diagnostic
+data directory is computed by truncating the logpath’s file
+extension(s) and concatenating \fBdiagnostic.data\fP to the remaining
+name.
+.sp
+For example, if \fBmongos\fP has \fB\-\-logpath
+/var/log/mongos.log.201708015\fP, then the diagnostic data directory is
+\fB/var/log/mongos.diagnostic.data/\fP directory. To specify a different
+diagnostic data directory for \fBmongos\fP, set the
+\fI\%diagnosticDataCollectionDirectoryPath\fP parameter.
+.sp
+The following parameters support diagnostic data capture (FTDC):
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+The default values for the diagnostic data capture interval and the
+maximum sizes are chosen to provide useful data to MongoDB engineers
+with minimal impact on performance and storage size. Typically, these
+values will only need modifications as requested by MongoDB engineers
+for specific diagnostic purposes.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B diagnosticDataCollectionEnabled
+New in version 3.2.
+
+.sp
+Changed in version 3.6: Available for both \fBmongod\fP and \fBmongos\fP\&.
+
+.sp
+\fIType\fP: boolean
+.sp
+\fIDefault\fP: true
+.sp
+Determines whether to enable the collecting and logging of data for
+diagnostic purposes. Diagnostic logging is enabled by default.
+.sp
+For example, the following disables the diagnostic collection:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter diagnosticDataCollectionEnabled=false
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B diagnosticDataCollectionDirectoryPath
+New in version 3.6.
+
+.sp
+\fIType\fP: String
+.sp
+Available for \fBmongos\fP only.
+.sp
+Specify the directory for the diagnostic directory for
+\fBmongos\fP\&. If the directory does not exist,
+\fBmongos\fP creates the directory.
+.sp
+If unspecified, the diagnostic data directory is computed by
+truncating the \fBmongos\fP instance’s \fB\-\-logpath\fP or
+\fBsystemLog.path\fP file extension(s) and concatenating
+\fBdiagnostic.data\fP\&.
+.sp
+For example, if \fBmongos\fP has \fB\-\-logpath
+/var/log/mongos.log.201708015\fP, then the diagnostic data directory is
+\fB/var/log/mongos.diagnostic.data/\fP\&.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+If \fBmongos\fP cannot create the specified directory, e.g.
+a file exists with the same name in the path or the process does
+not have permissions to create the directory, the diagnostic data
+capture will be disabled for that instance.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B diagnosticDataCollectionDirectorySizeMB
+New in version 3.2.
+
+.sp
+Changed in version 3.4: Increased default size to 200 megabytes.
+
+.sp
+Changed in version 3.6: Available for both \fBmongod\fP and \fBmongos\fP\&.
+
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 200
+.sp
+Specifies the maximum size, in megabytes, of the \fBdiagnostic.data\fP
+directory. If directory size exceeds this number, the oldest
+diagnostic files in the directory are automatically deleted based on
+the timestamp in the file name.
+.sp
+For example, the following sets the maximum size of the directory to
+\fB250\fP megabytes:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter diagnosticDataCollectionDirectorySizeMB=250
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The minimum value for
+\fI\%diagnosticDataCollectionDirectorySizeMB\fP is \fB10\fP
+megabytes. \fI\%diagnosticDataCollectionDirectorySizeMB\fP must
+be greater than maximum diagnostic file size
+\fI\%diagnosticDataCollectionFileSizeMB\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B diagnosticDataCollectionFileSizeMB
+New in version 3.2.
+
+.sp
+Changed in version 3.6: Available for both \fBmongod\fP and \fBmongos\fP\&.
+
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 10
+.sp
+Specifies the maximum size, in megabytes, of each diagnostic
+file\&. If the file exceeds the maximum
+file size, MongoDB creates a new file.
+.sp
+For example, the following sets the maximum size of each diagnostic
+file to \fB20\fP megabytes:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter diagnosticDataCollectionFileSizeMB=20
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The minimum value for
+\fI\%diagnosticDataCollectionFileSizeMB\fP is \fB1\fP megabyte.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B diagnosticDataCollectionPeriodMillis
+New in version 3.2.
+
+.sp
+Changed in version 3.6: Available for both \fBmongod\fP and \fBmongos\fP\&.
+
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 1000
+.sp
+Specifies the interval, in milliseconds, at which to collect
+diagnostic data.
+.sp
+For example, the following sets the interval to
+\fB5000\fP milliseconds or 5 seconds:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter diagnosticDataCollectionPeriodMillis=5000
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The minimum value for
+\fI\%diagnosticDataCollectionPeriodMillis\fP is \fB100\fP
+milliseconds.
+.UNINDENT
+.SS Logical Session Parameters
+.INDENT 0.0
+.TP
+.B logicalSessionRefreshMinutes
+New in version 3.6.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 5
+.sp
+The interval (in minutes) at which the cache refreshes its logical
+session records against the main session store.
+.sp
+You can only set \fI\%logicalSessionRefreshMinutes\fP at
+startup and cannot change this setting with the
+\fBsetParameter\fP command.
+.sp
+For example, to set the \fI\%logicalSessionRefreshMinutes\fP
+for a \fBmongod\fP instance to 10 minutes:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter logicalSessionRefreshMinutes=10
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B localLogicalSessionTimeoutMinutes
+New in version 3.6.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 30
+.INDENT 7.0
+.INDENT 3.5
+.IP "For testing purposes only"
+.sp
+This parameter is intended for testing purposes only and not for
+production use.
+.UNINDENT
+.UNINDENT
+.sp
+The time in minutes that a session remains active
+after its most recent use. Sessions that have not received a new
+read/write operation from the client or been refreshed with
+\fBrefreshSessions\fP within this threshold are cleared from the
+cache. State associated with an expired session may be cleaned up by the
+server at any time.
+.sp
+This parameter applies only to the instance on which it is set. To
+set this parameter on replica sets and sharded clusters, you must
+specify the same value on every member; otherwise, sessions will
+not function properly.
+.sp
+You can only set \fI\%localLogicalSessionTimeoutMinutes\fP at
+startup and cannot change this setting with the
+\fBsetParameter\fP command.
+.sp
+For example, to set the \fI\%localLogicalSessionTimeoutMinutes\fP
+for a test \fBmongod\fP instance to 20 minutes:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter localLogicalSessionTimeoutMinutes=20
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B maxAcceptableLogicalClockDriftSecs
+New in version 3.6.
+
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 31536000 (1 year)
+.sp
+The maximum amount by which the current cluster time can be advanced;
+i.e., \fI\%maxAcceptableLogicalClockDriftSecs\fP is the maximum
+difference between the new value of the cluster time and the current
+cluster time. Cluster time is a logical time used for ordering of
+operations.
+.sp
+You cannot advance the cluster time to a new value if the new
+cluster time differs from the current cluster time by more than
+\fI\%maxAcceptableLogicalClockDriftSecs\fP,
+.sp
+You can only set \fI\%maxAcceptableLogicalClockDriftSecs\fP at
+startup and cannot change this setting with the
+\fBsetParameter\fP command.
+.sp
+For example, to set the \fI\%maxAcceptableLogicalClockDriftSecs\fP
+for a \fBmongod\fP instance to 15 minutes:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter maxAcceptableLogicalClockDriftSecs=900
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B TransactionRecordMinimumLifetimeMinutes
+New in version 3.6.
+
+.sp
+Available for \fBmongod\fP only.
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 30
+.sp
+The minimum lifetime a transaction record exists in the
+\fBtransactions\fP collection before the record becomes
+eligible for cleanup.
+.sp
+You can only set \fI\%TransactionRecordMinimumLifetimeMinutes\fP at
+startup and cannot change this setting with the
+\fBsetParameter\fP command.
+.sp
+For example, to set the \fI\%TransactionRecordMinimumLifetimeMinutes\fP
+for a \fBmongod\fP instance to 20 minutes:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter TransactionRecordMinimumLifetimeMinutes=20
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%localLogicalSessionTimeoutMinutes\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B maxTransactionLockRequestTimeoutMillis
+New in version 4.0.
+
+.sp
+Available for \fBmongod\fP only.
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 5
+.sp
+The amount of time in milliseconds that multi\-document
+transactions should wait to aquire locks
+required by the operations in the transaction.
+.sp
+If the transaction cannot aquire the locks after waiting
+\fI\%maxTransactionLockRequestTimeoutMillis\fP, the transaction
+aborts.
+.sp
+By default, multi\-document transactions
+wait \fB5\fP milliseconds. That is, if the transaction cannot acquire
+the locks within \fB5\fP milliseconds, the transaction aborts. If an
+operation provides a greater timeout in a lock request,
+\fI\%maxTransactionLockRequestTimeoutMillis\fP overrides the
+operation\-specific timeout.
+.sp
+You can set \fI\%maxTransactionLockRequestTimeoutMillis\fP to:
+.INDENT 7.0
+.IP \(bu 2
+\fB0\fP such that if the transaction cannot acquire the required
+locks immediately, the transaction aborts.
+.IP \(bu 2
+A number greater than \fB0\fP to wait the specified time to acquire
+the required locks. This can help obviate transaction aborts on
+momentary concurrent lock acquisitions, like fast\-running metadata
+operations. However, this could possibly delay the abort of
+deadlocked transaction operations.
+.IP \(bu 2
+\fB\-1\fP to use the operation specific timeout.
+.UNINDENT
+.sp
+The following sets the
+\fI\%maxTransactionLockRequestTimeoutMillis\fP to \fB20\fP
+milliseconds:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, maxTransactionLockRequestTimeoutMillis: 20 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+You can also set this parameter during start\-up:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter maxTransactionLockRequestTimeoutMillis=20
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SS Replication Parameters
+.INDENT 0.0
+.TP
+.B oplogInitialFindMaxSeconds
+New in version 3.6.
+
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 60
+.sp
+Available for \fBmongod\fP only.
+.sp
+Maximum time in seconds for a member of a replica set to wait
+for the \fBfind\fP command to finish during
+data synchronization\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B replIndexPrefetch
+Available for \fBmongod\fP only.
+.sp
+Use \fI\%replIndexPrefetch\fP in conjunction with
+\fBreplSetName\fP when configuring a replica
+set. The default value is \fBall\fP and available
+options are:
+.INDENT 7.0
+.IP \(bu 2
+\fBnone\fP
+.IP \(bu 2
+\fBall\fP
+.IP \(bu 2
+\fB_id_only\fP
+.UNINDENT
+.sp
+By default secondary members of a replica set will
+load all indexes related to an operation into memory before
+applying operations from the oplog. You can modify this behavior so
+that the secondaries will only load the \fB_id\fP index. Specify
+\fB_id_only\fP or \fBnone\fP to prevent the \fBmongod\fP from
+loading \fIany\fP index into memory.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B replWriterThreadCount
+New in version 3.2.
+
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 16
+.sp
+Available for \fBmongod\fP only.
+.sp
+Number of threads to use to apply replicated operations in parallel.
+Values can range from 1 to 256 inclusive. You can only set
+\fI\%replWriterThreadCount\fP at startup and cannot change this
+setting with the \fBsetParameter\fP command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B rollbackTimeLimitSecs
+New in version 4.0.
+
+.sp
+\fIType\fP: 64\-bit integer
+.sp
+\fIDefault\fP: 1800
+.sp
+Maximum age of data that will be rolled back in the event of a
+replication operations failure. If the time between the end of the
+rolled back instance oplog and the common point (the last point where
+the source node and the rolled back node had the same data) exceeds
+this value, the rollback will fail. Note that negative values for
+this parameter are not valid.
+.sp
+To set an effectively unlimited rollback period, set the value to
+\fB2147483647\fP which is the maximum value allowed and equivalent to
+roughly 68 years.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B waitForSecondaryBeforeNoopWriteMS
+New in version 3.6.
+
+.sp
+Available for \fBmongod\fP only.
+.sp
+\fIType\fP: integer
+.sp
+\fIDefault\fP: 10
+.sp
+The length of time (in milliseconds) that a secondary must wait if
+the \fBafterClusterTime\fP is greater than the last applied time from
+the oplog. After the \fBwaitForSecondaryBeforeNoopWriteMS\fP passes,
+if the \fBafterClusterTime\fP is still greater than the last applied
+time, the secondary makes a no\-op write to advance the last applied
+time.
+.sp
+The following example sets the
+\fI\%waitForSecondaryBeforeNoopWriteMS\fP to 20 seconds:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter waitForSecondaryBeforeNoopWriteMS=20
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+During runtime, you can also set the parameter with the
+\fBsetParameter\fP command:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, waitForSecondaryBeforeNoopWriteMS: 20 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B createRollbackDataFiles
+Available for \fBmongod\fP only.
+.sp
+\fIType\fP: boolean
+.sp
+\fIDefault\fP: true
+.sp
+New in version 4.0.
+
+.sp
+Flag that determines whether MongoDB creates rollback files that contains documents affected during a
+rollback.
+.sp
+By default, \fI\%createRollbackDataFiles\fP is \fBtrue\fP and
+MongoDB creates the rollback files.
+.sp
+The following example sets \fI\%createRollbackDataFiles\fP
+to false so that the rollback files are not created:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter createRollbackDataFiles=false
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+During runtime, you can also set the parameter with the
+\fBsetParameter\fP command:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, createRollbackDataFiles: false } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+For more information, see rollback\-data\-files\&.
+.UNINDENT
+.SS Sharding Parameters
+.INDENT 0.0
+.TP
+.B AsyncRequestsSenderUseBaton
+Type: boolean
+.sp
+Default: true
+.sp
+A flag that enables performance optimization on Linux for
+scatter/gather operations on \fBmongos\fP when using a
+single \fI\%Task Executor connection pool\fP\&.
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%taskExecutorPoolSize\fP
+.UNINDENT
+.UNINDENT
+.sp
+New in version 4.0.
+
+.UNINDENT
+.INDENT 0.0
+.TP
+.B recoverShardingState
+Available for \fBmongod\fP only.
+.sp
+Specify a boolean to check or ignore sharding state recovery
+information. Default is \fBtrue\fP to check the sharding state
+recovery information.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B replMonitorMaxFailedChecks
+\fIAvailable in MongoDB 3.2 only\fP
+.sp
+Type: integer
+.sp
+Default: 30
+.sp
+The number of times the \fBmongod\fP or \fBmongos\fP
+instance tries to reach the replica sets in the sharded cluster
+(e.g. shard replica sets, config server replica set) to monitor the
+replica set status and topology.
+.sp
+When the number of consecutive unsuccessful attempts exceeds this
+parameter value, the \fBmongod\fP or \fBmongos\fP instance
+denotes the monitored replica set as unavailable. If the monitored
+replica set is the config server replica set:
+.INDENT 7.0
+.IP \(bu 2
+For MongoDB 3.2.0\-3.2.9, the monitoring \fBmongod\fP or
+\fBmongos\fP instance will become unusable and needs to be
+restarted. See the troubleshooting guide for more details.
+.IP \(bu 2
+For MongoDB 3.2.10 and later 3.2\-series, see also
+\fI\%timeOutMonitoringReplicaSets\fP\&.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B timeOutMonitoringReplicaSets
+\fIAvailable in MongoDB 3.2.10 and later 3.2\-series only\fP
+.sp
+Type: integer
+.sp
+Default: false
+.sp
+The flag that determines whether the \fBmongod\fP or
+\fBmongos\fP instance should stop its attempt to reach the
+monitored replica set after unsuccessfully trying
+\fI\%replMonitorMaxFailedChecks\fP number of times.
+.sp
+If the monitored replica set is the config server replica set and
+\fI\%timeOutMonitoringReplicaSets\fP is set to \fBtrue\fP, you
+must restart \fBmongod\fP or \fBmongos\fP if the
+\fBmongod\fP or \fBmongos\fP instance cannot reach any of
+the config servers for the specified number of times. See the
+troubleshooting guide for more details.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B ShardingTaskExecutorPoolHostTimeoutMS
+Type: integer
+.sp
+Default: 300000 (i.e. 5 minutes)
+.sp
+Available for \fBmongos\fP only.
+.sp
+Maximum time that \fBmongos\fP goes without communication to a
+host before \fBmongos\fP drops all connections to the host.
+.sp
+You can only set this parameter during start\-up and cannot change
+this setting using the \fBsetParameter\fP database command.
+.sp
+If set, \fI\%ShardingTaskExecutorPoolHostTimeoutMS\fP should be
+greater than the sum of
+:parameter\(gaShardingTaskExecutorPoolRefreshRequirementMS\(ga and
+\fI\%ShardingTaskExecutorPoolRefreshTimeoutMS\fP\&. Otherwise,
+\fBmongos\fP adjusts the value of
+\fI\%ShardingTaskExecutorPoolHostTimeoutMS\fP to be greater than the
+sum.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter ShardingTaskExecutorPoolHostTimeoutMS=120000
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B ShardingTaskExecutorPoolMaxConnecting
+New in version 3.6.
+
+.sp
+Type: integer
+.sp
+Default: 2
+.sp
+Available for \fBmongos\fP only.
+.sp
+Maximum number of simultaneous initiating connections (including
+pending connections in setup/refresh state) each TaskExecutor
+connection pool can have to a \fBmongod\fP instance. You can
+set this parameter to control the rate at which \fBmongos\fP
+adds connections to a \fBmongod\fP instance.
+.sp
+If set, \fI\%ShardingTaskExecutorPoolMaxConnecting\fP should be
+less than or equal to \fI\%ShardingTaskExecutorPoolMaxSize\fP\&.
+If it is greater, \fBmongos\fP ignores the
+\fI\%ShardingTaskExecutorPoolMaxConnecting\fP value.
+.sp
+You can only set this parameter during start\-up and cannot change
+this setting using the \fBsetParameter\fP database command.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter ShardingTaskExecutorPoolMaxConnecting=20
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B ShardingTaskExecutorPoolMaxSize
+Type: integer
+.sp
+Default: 2\s-2\u64\d\s0 \- 1
+.sp
+Available for \fBmongos\fP only.
+.sp
+Maximum number of outbound connections each TaskExecutor connection
+pool can open to any given \fBmongod\fP instance. The maximum
+possible connections to any given host across all TaskExecutor pools
+is:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+ShardingTaskExecutorPoolMaxSize * taskExecutorPoolSize
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+You can only set this parameter during start\-up and cannot change
+this setting using the \fBsetParameter\fP database command.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter ShardingTaskExecutorPoolMaxSize=4
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBmongos\fP can have up to \fBn\fP TaskExecutor connection
+pools, where \fBn\fP is the number of cores. See
+\fI\%taskExecutorPoolSize\fP\&.
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%ShardingTaskExecutorPoolMinSize\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B ShardingTaskExecutorPoolMinSize
+Type: integer
+.sp
+Default: 1
+.sp
+Available for \fBmongos\fP only.
+.sp
+Minimum number of outbound connections each TaskExecutor connection
+pool can open to any given \fBmongod\fP instance.
+.sp
+\fBShardingTaskExecutorPoolMinSize\fP connections are created the
+first time a connection to a new host is requested from the pool.
+While the pool is idle, the pool maintains this number of
+connections until \fI\%ShardingTaskExecutorPoolHostTimeoutMS\fP
+milliseconds pass without the any application using that pool.
+.sp
+You can only set this parameter during start\-up and cannot change
+this setting using the \fBsetParameter\fP database command.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter ShardingTaskExecutorPoolMinSize=2
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBmongos\fP can have up to \fBn\fP TaskExecutor connection
+pools, where \fBn\fP is the number of cores. See
+\fI\%taskExecutorPoolSize\fP\&.
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%ShardingTaskExecutorPoolMaxSize\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B ShardingTaskExecutorPoolRefreshRequirementMS
+Type: integer
+.sp
+Default: 60000 (1 minute)
+.sp
+Available for \fBmongos\fP only.
+.sp
+Maximum time the \fBmongos\fP waits before attempting to
+heartbeat a resting connection in the pool.
+.sp
+You can only set this parameter during start\-up and cannot change
+this setting using the \fBsetParameter\fP database command.
+.sp
+If set, \fI\%ShardingTaskExecutorPoolRefreshRequirementMS\fP should be
+greater than \fI\%ShardingTaskExecutorPoolRefreshTimeoutMS\fP\&.
+Otherwise, \fBmongos\fP adjusts the value of
+\fI\%ShardingTaskExecutorPoolRefreshTimeoutMS\fP to be less than
+\fI\%ShardingTaskExecutorPoolRefreshRequirementMS\fP\&.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter ShardingTaskExecutorPoolRefreshRequirementMS=90000
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B ShardingTaskExecutorPoolRefreshTimeoutMS
+Type: integer
+.sp
+Default: 20000 (20 seconds)
+.sp
+Available for \fBmongos\fP only.
+.sp
+Maximum time the \fBmongos\fP waits for a heartbeat before
+timing out the heartbeat.
+.sp
+You can only set this parameter during start\-up and cannot change
+this setting using the \fBsetParameter\fP database command.
+.sp
+If set, \fI\%ShardingTaskExecutorPoolRefreshTimeoutMS\fP should be
+less than \fI\%ShardingTaskExecutorPoolRefreshRequirementMS\fP\&.
+Otherwise, \fBmongos\fP adjusts the value of
+\fI\%ShardingTaskExecutorPoolRefreshTimeoutMS\fP to be less than
+\fI\%ShardingTaskExecutorPoolRefreshRequirementMS\fP\&.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter ShardingTaskExecutorPoolRefreshTimeoutMS=30000
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B taskExecutorPoolSize
+Changed in version 4.0.
+
+.sp
+Type: integer
+.sp
+Default: 1
+.sp
+Available for \fBmongos\fP only.
+.sp
+The number of Task Executor connection pools to use for a given
+\fBmongos\fP\&.
+.sp
+If the parameter value is \fB0\fP or less, the number of Task Executor
+connection pools is the number of cores with the following
+exceptions:
+.INDENT 7.0
+.IP \(bu 2
+If the number of cores is less than 4, the number of Task Executor
+connection pools is 4.
+.IP \(bu 2
+If the number of cores is greater than 64, the number of Task
+Executor connection pools is 64.
+.UNINDENT
+.sp
+Starting in MongoDB 4.0, the default value of
+\fI\%taskExecutorPoolSize\fP is \fB1\fP\&. For the previous
+behavior, set \fI\%taskExecutorPoolSize\fP to 0 and, on Linux,
+set \fI\%AsyncRequestsSenderUseBaton\fP to \fBfalse\fP\&.
+.sp
+You can only set this parameter during start\-up and cannot change
+this setting using the \fBsetParameter\fP database command.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongos \-\-setParameter taskExecutorPoolSize=6
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+.INDENT 0.0
+.IP \(bu 2
+\fI\%ShardingTaskExecutorPoolMaxSize\fP
+.IP \(bu 2
+\fI\%ShardingTaskExecutorPoolMinSize\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B orphanCleanupDelaySecs
+New in version 3.6.
+
+.sp
+Default: 900 (15 minutes)
+.sp
+Available for \fBmongod\fP only.
+.sp
+Minimum delay before a migrated chunk is deleted from the source
+shard.
+.sp
+Before deleting the chunk during chunk migration, MongoDB waits for
+\fI\%orphanCleanupDelaySecs\fP or for in\-progress queries involving
+the chunk to complete on the shard primary, whichever is longer.
+.sp
+However, because the shard primary has no knowledge of in\-progress queries
+run on the shard secondaries, queries that use the chunk but are run on
+secondaries may see documents disappear if these queries take longer than
+the time to complete the shard primary queries and the
+\fI\%orphanCleanupDelaySecs\fP\&.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+This behavior only affects in\-progress queries that start before the
+chunk migration. Queries that start after the chunk migration starts
+will not use the migrating chunk.
+.UNINDENT
+.UNINDENT
+.sp
+If a shard has storage constraints, consider reducing this value
+temporarily. If running queries that exceed 15 minutes on shard
+secondaries, consider increasing this value.
+.sp
+The following sets the \fI\%orphanCleanupDelaySecs\fP to 20 minutes:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter orphanCleanupDelaySecs=1200
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+This may also be set using the \fBsetParameter\fP command:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, orphanCleanupDelaySecs: 1200 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SS Storage Parameters
+.INDENT 0.0
+.TP
+.B journalCommitInterval
+Available for \fBmongod\fP only.
+.sp
+Specify an integer between \fB1\fP and \fB500\fP signifying the number
+of milliseconds (ms) between journal commits.
+.sp
+Consider the following example which sets the
+\fI\%journalCommitInterval\fP to \fB200\fP ms:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, journalCommitInterval: 200 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fBstorage.journal.commitIntervalMs\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B syncdelay
+Available for \fBmongod\fP only.
+.sp
+Specify the interval in seconds between fsync operations
+where \fBmongod\fP flushes its working memory to disk. By
+default, \fBmongod\fP flushes memory to disk every 60
+seconds. In almost every situation you should not set this value
+and use the default setting.
+.sp
+Consider the following example which sets the \fBsyncdelay\fP to
+\fB60\fP seconds:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, syncdelay: 60 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fBsyncPeriodSecs\fP and
+\fI\%journalCommitInterval\fP\&.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B honorSystemUmask
+New in version 3.6.
+
+.sp
+\fIDefault\fP: \fBfalse\fP
+.sp
+If \fI\%honorSystemUmask\fP is set to \fBtrue\fP, new files
+created by MongoDB have permissions in accordance with the
+user’s \fBumask\fP settings.
+.sp
+If \fI\%honorSystemUmask\fP is set to \fBfalse\fP, new files
+created by MongoDB have permissions set to \fB600\fP, which gives
+read and write permissions only to the owner. New directories have
+permissions set to \fB700\fP\&.
+.sp
+You can only set this parameter during start\-up and cannot change
+this setting using the \fBsetParameter\fP database command.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter honorSystemUmask=true
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fI\%honorSystemUmask\fP is not available on Windows systems.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SS WiredTiger Parameters
+.INDENT 0.0
+.TP
+.B wiredTigerConcurrentReadTransactions
+New in version 3.0.0.
+
+.sp
+Available for \fBmongod\fP only.
+.sp
+Available for the WiredTiger storage engine only.
+.sp
+Specify the maximum number of concurrent read transactions allowed
+into the WiredTiger storage engine.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, wiredTigerConcurrentReadTransactions: <num> } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fBwiredTiger.concurrentTransactions\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B wiredTigerConcurrentWriteTransactions
+New in version 3.0.0.
+
+.sp
+Available for \fBmongod\fP only.
+.sp
+Available for the WiredTiger storage engine only.
+.sp
+Specify the maximum number of concurrent write transactions allowed
+into the WiredTiger storage engine.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, wiredTigerConcurrentWriteTransactions: <num> } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fBwiredTiger.concurrentTransactions\fP
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B wiredTigerEngineRuntimeConfig
+New in version 3.0.0.
+
+.sp
+Available for \fBmongod\fP only.
+.sp
+Specify \fBwiredTiger\fP storage engine configuration options for a
+running \fBmongod\fP instance. You can \fIonly\fP set this
+parameter using the \fBsetParameter\fP command and \fInot\fP
+using the command line or configuration file option.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+Avoid modifying the \fI\%wiredTigerEngineRuntimeConfig\fP
+unless under the direction from MongoDB engineers as this setting has
+major implication across both WiredTiger and MongoDB.
+.UNINDENT
+.UNINDENT
+.sp
+Consider the following operation prototype:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand({
+   "setParameter": 1,
+   "wiredTigerEngineRuntimeConfig": "<option>=<setting>,<option>=<setting>"
+})
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+See the WiredTiger documentation for all available \fI\%WiredTiger
+configuration options\fP\&.
+.UNINDENT
+.SS Auditing Parameters
+.INDENT 0.0
+.TP
+.B auditAuthorizationSuccess
+New in version 2.6.5.
+
+.sp
+\fIDefault\fP: \fBfalse\fP
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Available only in \fI\%MongoDB Enterprise\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+Available for both \fBmongod\fP and \fBmongos\fP\&.
+.sp
+Enables the auditing of authorization
+successes for the authCheck
+action.
+.sp
+When \fI\%auditAuthorizationSuccess\fP is \fBfalse\fP, the
+audit system only logs the authorization
+failures for \fBauthCheck\fP\&.
+.sp
+To enable the audit of authorization successes, issue the following
+command:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, auditAuthorizationSuccess: true } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Enabling \fI\%auditAuthorizationSuccess\fP degrades performance
+more than logging only the authorization failures.
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 0.0
+.INDENT 3.5
+\fBgetParameter\fP
+.UNINDENT
+.UNINDENT
+.SS Transaction Parameters
+.INDENT 0.0
+.TP
+.B transactionLifetimeLimitSeconds
+New in version 4.0.
+
+.sp
+\fIDefault\fP: 60
+.sp
+Specifies the lifetime of multi\-document transactions\&. Transactions that exceeds this limit are
+considered expired and will be aborted by a periodic cleanup
+process. The cleanup process runs every
+\fI\%transactionLifetimeLimitSeconds\fP/2 seconds or at least
+once per every 60 seconds.
+.sp
+The minimum value for transactionLifetimeLimitSeconds is \fB1\fP
+second.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand( { setParameter: 1, transactionLifetimeLimitSeconds: 30 } )
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+You can also set parameter \fI\%transactionLifetimeLimitSeconds\fP at
+startup time.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongod \-\-setParameter "transactionLifetimeLimitSeconds=30"
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SH AUTHOR
+MongoDB Documentation Project
+.SH COPYRIGHT
+2008-2018
+.\" Generated by docutils manpage writer.
+.

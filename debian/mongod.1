@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOD" "1" "January 30, 2015" "3.0" "mongodb-manual"
+.TH "MONGOD" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
 .SH NAME
 mongod \- MongoDB Server
 .
@@ -30,23 +30,65 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.SS On this page
+.INDENT 0.0
+.IP \(bu 2
+\fI\%Synopsis\fP
+.IP \(bu 2
+\fI\%Options\fP
+.INDENT 2.0
+.IP \(bu 2
+\fI\%Core Options\fP
+.IP \(bu 2
+\fI\%Free Monitoring\fP
+.IP \(bu 2
+\fI\%LDAP Authentication or Authorization Options\fP
+.IP \(bu 2
+\fI\%Storage Options\fP
+.IP \(bu 2
+\fI\%WiredTiger Options\fP
+.IP \(bu 2
+\fI\%Replication Options\fP
+.IP \(bu 2
+\fI\%Sharded Cluster Options\fP
+.IP \(bu 2
+\fI\%TLS/SSL Options\fP
+.IP \(bu 2
+\fI\%Profiler Options\fP
+.IP \(bu 2
+\fI\%Audit Options\fP
+.IP \(bu 2
+\fI\%SNMP Options\fP
+.IP \(bu 2
+\fI\%inMemory Options\fP
+.IP \(bu 2
+\fI\%Encryption Key Management Options\fP
+.IP \(bu 2
+\fI\%Text Search Options\fP
+.UNINDENT
+.UNINDENT
 .SH SYNOPSIS
 .sp
-\fBmongod\fP is the primary daemon process for the MongoDB
+\fI\%mongod\fP is the primary daemon process for the MongoDB
 system. It handles data requests, manages data access, and performs
 background management operations.
 .sp
 This document provides a complete overview of all command line options
-for \fBmongod\fP\&. These command line options are primarily useful
-for testing: In common operation, use the \fBconfiguration file
-options\fP to control the behavior of
+for \fI\%mongod\fP\&. These command line options are primarily useful
+for testing: In common operation, use the configuration file
+options to control the behavior of
 your database.
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Starting in version 4.0, MongoDB disables support for TLS 1.0
+encryption on systems where TLS 1.1+ is available. For
+more details, see 4.0\-disable\-tls\&.
+.UNINDENT
+.UNINDENT
 .SH OPTIONS
 .SS Core Options
-.INDENT 0.0
-.TP
-.B mongod
-.UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-help, \-h
@@ -63,7 +105,7 @@ Returns the \fBmongod\fP release number.
 Specifies a configuration file for runtime configuration options. The
 configuration file is the preferred method for runtime configuration of
 \fBmongod\fP\&. The options are equivalent to the command\-line
-configuration options. See http://docs.mongodb.org/manual/reference/configuration\-options for
+configuration options. See /reference/configuration\-options for
 more information.
 .sp
 Ensure the configuration file uses ASCII encoding. The \fBmongod\fP
@@ -80,13 +122,13 @@ including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
 .INDENT 0.0
 .TP
 .B \-\-quiet
-Runs the \fBmongod\fP in a quiet mode that attempts to limit the amount
+Runs \fBmongod\fP in a quiet mode that attempts to limit the amount
 of output.
 .sp
 This option suppresses:
 .INDENT 7.0
 .IP \(bu 2
-output from \fIdatabase commands\fP
+output from database commands
 .IP \(bu 2
 replication activity
 .IP \(bu 2
@@ -106,35 +148,188 @@ client connections.
 .INDENT 0.0
 .TP
 .B \-\-bind_ip <ip address>
-\fIDefault\fP: All interfaces.
+\fIDefault\fP: localhost
 .sp
-Changed in version 2.6.0: The \fBdeb\fP and \fBrpm\fP packages include a default
-configuration file that sets \fI\-\-bind_ip\fP to \fB127.0.0.1\fP\&.
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Starting in MongoDB 3.6, \fBmongod\fP bind to localhost
+(\fB127.0.0.1\fP) by default. See 3.6\-bind\-to\-localhost\&.
+.UNINDENT
+.UNINDENT
+.sp
+The IP addresses and/or full Unix domain socket paths on which
+\fBmongod\fP should listen for client connections. You may attach
+\fBmongod\fP to any interface. To bind to multiple addresses, enter a
+list of comma\-separated values.
+.INDENT 7.0
+.INDENT 3.5
+.SS Example
+.sp
+\fBlocalhost,/tmp/mongod.sock\fP
+.UNINDENT
+.UNINDENT
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+Before you bind to other ip addresses, consider enabling
+access control and other security measures listed
+in /administration/security\-checklist to prevent unauthorized
+access.
+.UNINDENT
+.UNINDENT
+.sp
+To bind to all IPv4 addresses, enter \fB0.0.0.0\fP\&.
+.sp
+To bind to all IPv4 and IPv6 addresses, enter \fB0.0.0.0,::\fP
+or alternatively, use the \fBnet.bindIpAll\fP setting.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fB\-\-bind_ip\fP and \fB\-\-bind_ip_all\fP are mutually exclusive. That
+is, you can specify one or the other, but not both.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-bind_ip_all
+New in version 3.6.
 
 .sp
-Specifies the IP address that \fBmongod\fP binds to in order to listen
-for connections from applications. You may attach \fBmongod\fP to any
-interface. When attaching \fBmongod\fP to a publicly accessible
-interface, ensure that you have implemented proper authentication and
-firewall restrictions to protect the integrity of your database.
+If specified, the \fBmongod\fP instance binds to all ip addresses. When
+attaching \fBmongod\fP to a publicly accessible interface, ensure
+that you have implemented proper authentication and firewall
+restrictions to protect the integrity of your database.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+Before you bind to other ip addresses, consider enabling
+access control and other security measures listed
+in /administration/security\-checklist to prevent unauthorized
+access.
+.UNINDENT
+.UNINDENT
+.sp
+Alternatively, you can set the \fB\-\-bind_ip\fP option to
+\fB0.0.0.0,::\fP to bind to all IP addresses.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fB\-\-bind_ip\fP and \fB\-\-bind_ip_all\fP are mutually exclusive. That
+is, you can specify one or the other, but not both.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ipv6
+Enables IPv6 support. \fBmongod\fP disables IPv6 support by default.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-listenBacklog <number>
+\fIDefault\fP: Target system \fBSOMAXCONN\fP constant
+.sp
+New in version 3.6.
+
+.sp
+The maximum number of connections that can exist in the listen
+queue.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+Consult your local system’s documentation to understand the
+limitations and configuration requirements before using this
+parameter.
+.UNINDENT
+.UNINDENT
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+To prevent undefined behavior, specify a value for this
+parameter between \fB1\fP and the local system \fBSOMAXCONN\fP
+constant.
+.UNINDENT
+.UNINDENT
+.sp
+The default value for the \fBlistenBacklog\fP parameter is set at
+compile time to the target system \fBSOMAXCONN\fP constant.
+\fBSOMAXCONN\fP is the maximum valid value that is documented for
+the \fIbacklog\fP parameter to the \fIlisten\fP system call.
+.sp
+Some systems may interpret \fBSOMAXCONN\fP symbolically, and others
+numerically. The actual \fIlisten backlog\fP applied in practice may
+differ from any numeric interpretation of the \fBSOMAXCONN\fP constant
+or argument to \fB\-\-listenBacklog\fP, and may also be constrained by
+system settings like \fBnet.core.somaxconn\fP on Linux.
+.sp
+Passing a value for the \fBlistenBacklog\fP parameter that exceeds the
+\fBSOMAXCONN\fP constant for the local system is, by the letter of the
+standards, undefined behavior. Higher values may be silently integer
+truncated, may be ignored, may cause unexpected resource
+consumption, or have other adverse consequences.
+.sp
+On systems with workloads that exhibit connection spikes, for which
+it is empirically known that the local system can honor higher
+values for the \fIbacklog\fP parameter than the \fBSOMAXCONN\fP constant,
+setting the \fBlistenBacklog\fP parameter to a higher value may reduce
+operation latency as observed by the client by reducing the number
+of connections which are forced into a backoff state.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-maxConns <number>
 The maximum number of simultaneous connections that \fBmongod\fP will
 accept. This setting has no effect if it is higher than your operating
-system\(aqs configured maximum connection tracking threshold.
+system’s configured maximum connection tracking threshold.
 .sp
-Changed in version 2.6: MongoDB removed the upward limit on the \fBmaxIncomingConnections\fP setting.
+Do not assign too low of a value to this option, or you will
+encounter errors during normal application operation.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Changed in version 2.6: MongoDB removed the upward limit on the \fBmaxIncomingConnections\fP
+setting.
 
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-logpath <path>
+Sends all diagnostic logging information to a log file instead of to
+standard output or to the host’s syslog system. MongoDB creates
+the log file at the path you specify.
+.sp
+By default, MongoDB will move any existing log file rather than overwrite
+it. To instead append to the log file, set the \fI\%\-\-logappend\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-syslog
-Sends all logging output to the host\(aqs \fIsyslog\fP system rather
-than to standard output or to a log file. , as with \fI\-\-logpath\fP\&.
+Sends all logging output to the host’s syslog system rather
+than to standard output or to a log file. , as with \fI\%\-\-logpath\fP\&.
 .sp
-The \fI\-\-syslog\fP option is not supported on Windows.
+The \fI\%\-\-syslog\fP option is not supported on Windows.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+The \fBsyslog\fP daemon generates timestamps when it logs a message, not
+when MongoDB issues the message. This can lead to misleading timestamps
+for log entries, especially when the system is under heavy load. We
+recommend using the \fI\%\-\-logpath\fP option for production systems to
+ensure accurate timestamps.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -143,49 +338,35 @@ The \fI\-\-syslog\fP option is not supported on Windows.
 .sp
 Specifies the facility level used when logging messages to syslog.
 The value you specify must be supported by your
-operating system\(aqs implementation of syslog. To use this option, you
-must enable the \fI\-\-syslog\fP option.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-logpath <path>
-Sends all diagnostic logging information to a log file instead of to
-standard output or to the host\(aqs \fIsyslog\fP system. MongoDB creates
-the log file at the path you specify.
-.sp
-By default, MongoDB overwrites the log file when the process restarts.
-To instead append to the log file, set the \fI\-\-logappend\fP option.
+operating system’s implementation of syslog. To use this option, you
+must  enable the \fI\%\-\-syslog\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-logappend
-Appends new entries to the end of the log file rather than overwriting
-the content of the log when the \fBmongod\fP instance restarts.
+Appends new entries to the end of the existing log file when the \fBmongod\fP
+instance restarts. Without this option, \fI\%mongod\fP will back up the
+existing log and create a new file.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-logRotate <string>
 \fIDefault\fP: rename
 .sp
-New in version 3.0.0: Specifies the \fBlogRotate\fP behavior.
+New in version 3.0.0.
 
 .sp
-Specify either \fBrename\fP or \fBreopen\fP\&.
-.sp
-\fBrename\fP renames the log file.
-.sp
-\fBreopen\fP closes and reopens the log file following the typical
-Linux/Unix log rotate behavior.
-Use \fBreopen\fP when using the Linux/Unix
-logrotate utility to avoid log loss.
-.sp
-If you specify \fBreopen\fP, you must also use \fI\-\-logappend\fP\&.
-.sp
-\fBSEE ALSO:\fP
+Determines the behavior for the \fBlogRotate\fP command.
+Specify either \fBrename\fP or \fBreopen\fP:
 .INDENT 7.0
-.INDENT 3.5
-http://docs.mongodb.org/manual/reference/command/logRotate\&.
-.UNINDENT
+.IP \(bu 2
+\fBrename\fP renames the log file.
+.IP \(bu 2
+\fBreopen\fP closes and reopens the log file following the typical
+Linux/Unix log rotate behavior. Use \fBreopen\fP when using the
+Linux/Unix logrotate utility to avoid log loss.
+.sp
+If you specify \fBreopen\fP, you must also use \fI\%\-\-logappend\fP\&.
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
@@ -225,7 +406,7 @@ T{
 T}	T{
 Displays timestamps in local time in the ISO\-8601
 format. For example, for New York at the start of the Epoch:
-\fB1969\-12\-31T19:00:00.000+0500\fP
+\fB1969\-12\-31T19:00:00.000\-0500\fP
 T}
 _
 .TE
@@ -240,8 +421,8 @@ For internal diagnostic use only.
 .B \-\-pidfilepath <path>
 Specifies a file location to hold the process ID of the \fBmongod\fP
 process where \fBmongod\fP will write its PID. This is useful for
-tracking the \fBmongod\fP process in combination with the
-\fI\-\-fork\fP option. Without a specified \fI\-\-pidfilepath\fP option, the
+tracking the \fBmongod\fP process in combination with
+the \fI\%\-\-fork\fP option. Without a specified \fI\%\-\-pidfilepath\fP option, the
 process creates no PID file.
 .UNINDENT
 .INDENT 0.0
@@ -249,71 +430,35 @@ process creates no PID file.
 .B \-\-keyFile <file>
 Specifies the path to a key file that stores the shared secret
 that MongoDB instances use to authenticate to each other in a
-\fIsharded cluster\fP or \fIreplica set\fP\&. \fI\-\-keyFile\fP implies
-\fI\%\-\-auth\fP\&. See \fIinter\-process\-auth\fP for more
+sharded cluster or replica set\&. \fI\%\-\-keyFile\fP implies
+\fI\%\-\-auth\fP\&. See inter\-process\-auth for more
 information.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-setParameter <options>
 Specifies one of the MongoDB parameters described in
-http://docs.mongodb.org/manual/reference/parameters\&. You can specify multiple \fBsetParameter\fP
+/reference/parameters\&. You can specify multiple \fBsetParameter\fP
 fields.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-httpinterface
-New in version 2.6.
-
-.sp
-Enables the HTTP interface. Enabling the interface can increase
-network exposure.
-.sp
-Leave the HTTP interface \fIdisabled\fP for production deployments. If you
-\fIdo\fP enable this interface, you should only allow trusted clients to
-access this port. See \fIsecurity\-firewalls\fP\&.
-.sp
-\fBNOTE:\fP
-.INDENT 7.0
-.INDENT 3.5
-In MongoDB Enterprise, the HTTP Console does not support Kerberos
-Authentication.
-.UNINDENT
-.UNINDENT
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-nohttpinterface
-Deprecated since version 2.6: MongoDB disables the HTTP interface by default.
-
-.sp
-Disables the HTTP interface.
-.sp
-Do not use in conjunction with \fI\%\-\-rest\fP or \fI\-\-jsonp\fP\&.
-.sp
-\fBNOTE:\fP
-.INDENT 7.0
-.INDENT 3.5
-In MongoDB Enterprise, the HTTP Console does not support Kerberos
-Authentication.
-.UNINDENT
-.UNINDENT
-.UNINDENT
-.INDENT 0.0
-.TP
 .B \-\-nounixsocket
-Disables listening on the UNIX domain socket. The \fBmongod\fP process
+Disables listening on the UNIX domain socket. \fI\%\-\-nounixsocket\fP applies only
+to Unix\-based systems.
+.sp
+The \fBmongod\fP process
 always listens on the UNIX socket unless one of the following is true:
 .INDENT 7.0
 .IP \(bu 2
-\fI\-\-nounixsocket\fP is set
+\fI\%\-\-nounixsocket\fP is set
 .IP \(bu 2
-\fBbindIp\fP is not set
+\fBnet.bindIp\fP is not set
 .IP \(bu 2
-\fBbindIp\fP does not specify \fB127.0.0.1\fP
+\fBnet.bindIp\fP does not specify \fB127.0.0.1\fP
 .UNINDENT
 .sp
-New in version 2.6: \fBmongod\fP installed from official \fB\&.deb\fP and \fB\&.rpm\fP packages
+New in version 2.6: \fBmongod\fP installed from official \&.deb and \&.rpm packages
 have the \fBbind_ip\fP configuration set to \fB127.0.0.1\fP by
 default.
 
@@ -323,40 +468,54 @@ default.
 .B \-\-unixSocketPrefix <path>
 \fIDefault\fP: /tmp
 .sp
-The path for the UNIX socket. If this option has no value, the
+The path for the UNIX socket. \fI\%\-\-unixSocketPrefix\fP applies only
+to Unix\-based systems.
+.sp
+If this option has no value, the
 \fBmongod\fP process creates a socket with \fB/tmp\fP as a prefix. MongoDB
 creates and listens on a UNIX socket unless one of the following is true:
 .INDENT 7.0
 .IP \(bu 2
-\fI\-\-nounixsocket\fP is set
+\fBnet.unixDomainSocket.enabled\fP is \fBfalse\fP
 .IP \(bu 2
-\fBbindIp\fP is not set
+\fI\%\-\-nounixsocket\fP is set
 .IP \(bu 2
-\fBbindIp\fP does not specify \fB127.0.0.1\fP
+\fBnet.bindIp\fP is not set
+.IP \(bu 2
+\fBnet.bindIp\fP does not specify \fB127.0.0.1\fP
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-\-filePermissions <path>
+\fIDefault\fP: \fB0700\fP
+.sp
+Sets the permission for the UNIX domain socket file.
+.sp
+\fI\%\-\-filePermissions\fP applies only to Unix\-based systems.
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-\-fork
-Enables a \fIdaemon\fP mode that runs the \fBmongod\fP process in the
+Enables a daemon mode that runs the \fBmongod\fP process in the
 background. By default \fBmongod\fP does not run as a daemon:
 typically you will run \fBmongod\fP as a daemon, either by using
-\fI\-\-fork\fP or by using a controlling process that handles the
+\fI\%\-\-fork\fP or by using a controlling process that handles the
 daemonization process (e.g. as with \fBupstart\fP and \fBsystemd\fP).
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-auth
-Enables authorization to control user\(aqs access to database resources
+Enables authorization to control user’s access to database resources
 and operations. When authorization is enabled, MongoDB requires all
 clients to authenticate themselves first in order to determine the
 access for the client.
 .sp
-Configure users via the \fBmongo shell\fP\&. If no users exist, the localhost interface
+Configure users via the mongo shell\&. If no users exist, the localhost interface
 will continue to have access to the database until you create
 the first user.
 .sp
-See \fBSecurity\fP
+See Security
 for more information.
 .UNINDENT
 .INDENT 0.0
@@ -367,77 +526,35 @@ compatibility and clarity.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ipv6
-Enables IPv6 support and allows the \fBmongod\fP to connect to the
-MongoDB instance using an IPv6 network. All MongoDB programs and
-processes disable IPv6 support by default.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-jsonp
-Permits \fIJSONP\fP access via an HTTP interface. Enabling the
-interface can increase network exposure. The \fI\-\-jsonp\fP option enables the
-HTTP interface, even if the \fBHTTP interface\fP
-option is disabled.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-rest
-Enables the simple \fIREST\fP API. Enabling the \fIREST\fP API
-enables the HTTP interface, even if the \fBHTTP interface\fP option is disabled, and as a result can increase
-network exposure.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-slowms <integer>
-\fIDefault\fP: 100
+.B \-\-transitionToAuth
+New in version 3.4: Allows the \fBmongod\fP to accept and create authenticated and
+non\-authenticated connections to and from other \fI\%mongod\fP
+and \fBmongos\fP instances in the deployment. Used for
+performing rolling transition of replica sets or sharded clusters
+from a no\-auth configuration to internal authentication\&. Requires specifying a internal
+authentication mechanism such as
+\fI\%\-\-keyFile\fP\&.
+
 .sp
-The threshold in milliseconds at which the database profiler considers a
-query slow. MongoDB records all slow queries to the log, even when the
-database profiler is off. When the profiler is on, it writes to the
-\fBsystem.profile\fP collection. See the \fBprofile\fP command for
-more information on the database profiler.
+For example, if using keyfiles for
+internal authentication, the \fBmongod\fP creates
+an authenticated connection with any \fI\%mongod\fP or \fBmongos\fP
+in the deployment using a matching keyfile. If the security mechanisms do
+not match, the \fBmongod\fP utilizes a non\-authenticated connection instead.
+.sp
+A \fBmongod\fP running with \fI\%\-\-transitionToAuth\fP does not enforce user access
+controls\&. Users may connect to your deployment without any
+access control checks and perform read, write, and administrative operations.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+A \fBmongod\fP running with internal authentication and \fIwithout\fP \fI\%\-\-transitionToAuth\fP requires clients to connect
+using user access controls\&. Update clients to
+connect to the \fBmongod\fP using the appropriate user
+prior to restarting \fBmongod\fP without \fI\%\-\-transitionToAuth\fP\&.
 .UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-profile <level>
-\fIDefault\fP: 0
-.sp
-Changes the level of database profiling, which inserts information about
-operation performance into standard output or a log file. Specify one
-of the following levels:
-.TS
-center;
-|l|l|.
-_
-T{
-Level
-T}	T{
-Setting
-T}
-_
-T{
-0
-T}	T{
-Off. No profiling.
-T}
-_
-T{
-1
-T}	T{
-On. Only includes slow operations.
-T}
-_
-T{
-2
-T}	T{
-On. Includes all operations.
-T}
-_
-.TE
-.sp
-Database profiling can impact database
-performance. Enable this option only after careful consideration.
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -454,36 +571,13 @@ and the number of available physical pages.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-objcheck
-Forces the \fBmongod\fP to validate all requests from clients upon
-receipt to ensure that clients never insert invalid documents into the
-database. For objects with a high degree of sub\-document nesting, the
-\fI\-\-objcheck\fP option can have a small impact on performance. You can set
-\fI\-\-noobjcheck\fP to disable object checking at runtime.
-.sp
-Changed in version 2.4: MongoDB enables the \fI\-\-objcheck\fP option by default in order to prevent
-any client from inserting malformed or invalid BSON into a MongoDB
-database.
-
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-noobjcheck
-New in version 2.4.
-
-.sp
-Disables the default document validation that MongoDB performs on all
-incoming BSON documents.
-.UNINDENT
-.INDENT 0.0
-.TP
 .B \-\-noscripting
 Disables the scripting engine.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-notablescan
-Forbids operations that require a table scan. See \fBnotablescan\fP for additional information.
+Forbids operations that require a collection scan. See \fBnotablescan\fP for additional information.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -491,22 +585,829 @@ Forbids operations that require a table scan. See \fBnotablescan\fP for addition
 The \fI\%\-\-shutdown\fP option cleanly and safely terminates the \fBmongod\fP
 process. When invoking \fBmongod\fP with this option you must set the
 \fI\%\-\-dbpath\fP option either directly or by way of the
-\fBconfiguration file\fP and the
-\fI\-\-config\fP option.
+configuration file and the
+\fI\%\-\-config\fP option.
 .sp
 The \fI\%\-\-shutdown\fP option is available only on Linux systems.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-redactClientLogData
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+A \fBmongod\fP running with \fI\%\-\-redactClientLogData\fP redacts any message accompanying a given
+log event before logging. This prevents the \fBmongod\fP from writing
+potentially sensitive data stored on the database to the diagnostic log.
+Metadata such as error or operation codes, line numbers, and source file
+names are still visible in the logs.
+.sp
+Use \fI\%\-\-redactClientLogData\fP in conjunction with encryption to assist compliance with regulatory
+requirements.
+.sp
+For example, a MongoDB deployment might store Personally Identifiable
+Information (PII) in one or more collections. The \fBmongod\fP logs events
+such as those related to CRUD operations, sharding metadata, etc. It is
+possible that the \fBmongod\fP may expose PII as a part of these logging
+operations. A \fBmongod\fP running with \fI\%\-\-redactClientLogData\fP removes any message
+accompanying these events before being output to the log, effectively
+removing the PII.
+.sp
+Diagnostics on a \fBmongod\fP running with \fI\%\-\-redactClientLogData\fP may be more difficult
+due to the lack of data related to a log event. See the
+process logging manual page for an
+example of the effect of \fI\%\-\-redactClientLogData\fP on log output.
+.sp
+You can enable or disable log redaction on a running \fBmongod\fP
+using the \fBsetParameter\fP database command.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+db.adminCommand(
+  { setParameter: 1, redactClientLogData : true | false }
+)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-networkMessageCompressors <string>
+New in version 3.4.
+
+.sp
+.INDENT 7.0
+Changed in version 3.6: .IP \(bu 2
+Add support for zlib compressor.
+.IP \(bu 2
+Enabled by default. To disable, set to \fBdisabled\fP\&.
+.UNINDENT
+
+.sp
+Enables network compression for communication between this
+\fBmongod\fP instance and:
+.INDENT 7.0
+.IP \(bu 2
+other members of the replica set, if the instance is part of a
+replica set
+.IP \(bu 2
+other members of the sharded cluster, if the instance is part of a
+sharded cluster
+.IP \(bu 2
+a \fBmongo\fP shell,
+.IP \(bu 2
+drivers that support the \fBOP_COMPRESSED\fP message format.
+.UNINDENT
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+Messages are compressed when both parties enable network
+compression. Otherwise, messages between the parties are
+uncompressed.
+.UNINDENT
+.UNINDENT
+.sp
+You can specify the following compressors:
+.INDENT 7.0
+.IP \(bu 2
+snappy (Default)
+.IP \(bu 2
+zlib
+.UNINDENT
+.sp
+If you specify multiple compressors, then the order in which you list
+the compressors matter as well as the communication initiator. For
+example, if a \fBmongo\fP shell specifies the following network
+compressors \fBzlib,snappy\fP and the \fI\%mongod\fP specifies
+\fBsnappy,zlib\fP, messages between \fBmongo\fP shell and
+\fI\%mongod\fP uses \fBzlib\fP\&.
+.sp
+If the parties do not share at least one common compressor, messages
+between the parties are uncompressed. For example, if a
+\fBmongo\fP shell specifies the network compressor
+\fBzlib\fP and \fI\%mongod\fP specifies \fBsnappy\fP, messages
+between \fBmongo\fP shell and \fI\%mongod\fP are not compressed.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-timeZoneInfo <path>
+The full path from which to load the time zone database. If this option
+is not provided, then MongoDB will use its built\-in time zone database.
+.sp
+The configuration file included with Linux and macOS packages sets the time
+zone database path to \fB/usr/share/zoneinfo\fP by default.
+.sp
+The built\-in time zone database is a copy of the \fI\%Olson/IANA time zone
+database\fP\&. It is updated along with MongoDB
+releases, but the release cycle of the time zone database differs from the
+release cycle of MongoDB. A copy of the most recent release of the time zone
+database can be downloaded from
+\fI\%https://downloads.mongodb.org/olson_tz_db/timezonedb\-latest.zip\fP\&.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+wget https://downloads.mongodb.org/olson_tz_db/timezonedb\-latest.zip
+unzip timezonedb\-latest.zip
+mongod \-\-timeZoneInfo timezonedb\-2017b/
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+\fBprocessManagement.timeZoneInfo\fP\&.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-serviceExecutor <string>
+\fIDefault\fP: synchronous
+.sp
+New in version 3.6.
+
+.sp
+Determines the threading and execution model \fBmongod\fP uses to
+execute client requests. The \fB\-\-serviceExecutor\fP option accepts one
+of the following values:
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+\fBsynchronous\fP
+T}	T{
+The \fBmongod\fP uses synchronous networking and manages its
+networking thread pool on a per connection basis. Previous
+versions of MongoDB managed threads in this way.
+T}
+_
+T{
+\fBadaptive\fP
+T}	T{
+The \fBmongod\fP uses the new experimental asynchronous
+networking mode with an adaptive thread pool which manages
+threads on a per request basis. This mode should have more
+consistent performance and use less resources when there are
+more inactive connections than database requests.
+T}
+_
+.TE
+.UNINDENT
+.SS Free Monitoring
+.sp
+New in version 4.0.
+
+.INDENT 0.0
+.TP
+.B \-\-enableFreeMonitoring <runtime|on|off>
+New in version 4.0: Available for MongoDB Community Edition.
+
+.sp
+Enables or disables free MongoDB Cloud monitoring\&. \fI\%\-\-enableFreeMonitoring\fP accepts the following
+values:
+.TS
+center;
+|l|l|.
+_
+T{
+\fBruntime\fP
+T}	T{
+Default. You can enable or disable free monitoring during
+runtime.
+.sp
+To enable or disable free monitoring during runtime, see
+\fBdb.enableFreeMonitoring()\fP and
+\fBdb.disableFreeMonitoring()\fP\&.
+.sp
+To enable or disable free monitoring during runtime when
+running with access control, users must have required
+privileges. See \fBdb.enableFreeMonitoring()\fP and
+\fBdb.disableFreeMonitoring()\fP for details.
+T}
+_
+T{
+\fBon\fP
+T}	T{
+Enables free monitoring at startup; i.e. registers for free
+monitoring. When enabled at startup, you cannot disable free
+monitoring during runtime.
+T}
+_
+T{
+\fBoff\fP
+T}	T{
+Disables free monitoring at startup, regardless of whether
+you have previously registered for free monitoring.  When disabled at startup,
+you cannot enable free monitoring during runtime.
+T}
+_
+.TE
+.sp
+Once enabled, the free monitoring state remains enabled until
+explicitly disabled. That is, you do not need to re\-enable each time
+you start the server.
+.sp
+For the corresponding configuration file setting, see
+\fBcloud.monitoring.free.state\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-enableFreeMonitoringTag <string>
+New in version 4.0: Available for MongoDB Community Edition.
+
+.sp
+Optional tag to describe environment context. The tag can be sent as
+part of the free MongoDB Cloud monitoring registration at start up.
+.sp
+For the corresponding configuration file setting, see
+\fBcloud.monitoring.free.tag\fP\&.
+.UNINDENT
+.SS LDAP Authentication or Authorization Options
+.INDENT 0.0
+.TP
+.B \-\-ldapServers <host1>:<port>,<host2>:<port>,...,<hostN>:<port>
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+The LDAP server against which the \fBmongod\fP executes LDAP operations
+against to authenticate users or determine what actions a user is authorized
+to perform on a given database. If the LDAP server specified has any
+replicated instances, you may specify the host and port of each replicated
+server in a comma\-delimited list.
+.sp
+If your LDAP infrastrucure partitions the LDAP directory over multiple LDAP
+servers, specify \fIone\fP LDAP server any of its replicated instances to
+\fI\%\-\-ldapServers\fP\&. MongoDB supports following LDAP referrals as defined in \fI\%RFC 4511
+4.1.10\fP\&. Do not use \fI\%\-\-ldapServers\fP
+for listing every LDAP server in your infrastucture.
+.sp
+This setting can be configured on a running \fBmongod\fP using
+\fBsetParameter\fP\&.
+.sp
+If unset, \fBmongod\fP cannot use LDAP authentication or authorization\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapQueryUser <string>
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+The identity with which \fBmongod\fP binds as, when connecting to or
+performing queries on an LDAP server.
+.sp
+Only required if any of the following are true:
+.INDENT 7.0
+.IP \(bu 2
+Using LDAP authorization\&.
+.IP \(bu 2
+Using an LDAP query for \fI\%username transformation\fP\&.
+.IP \(bu 2
+The LDAP server disallows anonymous binds
+.UNINDENT
+.sp
+You must use \fI\%\-\-ldapQueryUser\fP with \fI\%\-\-ldapQueryPassword\fP\&.
+.sp
+If unset, \fBmongod\fP will not attempt to bind to the LDAP server.
+.sp
+This setting can be configured on a running \fBmongod\fP using
+\fBsetParameter\fP\&.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Windows MongoDB deployments can use \fI\%\-\-ldapBindWithOSDefaults\fP
+instead of \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapQueryPassword\fP\&. You cannot specify
+both \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the same time.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapQueryPassword <string>
+New in version 3.4: Available in MongoDB Enterprise only.
+.sp
+The password used to bind to an LDAP server when using
+\fI\%\-\-ldapQueryUser\fP\&. You must use \fI\%\-\-ldapQueryPassword\fP with
+\fI\%\-\-ldapQueryUser\fP\&.
+
+.sp
+If unset, \fBmongod\fP will not attempt to bind to the LDAP server.
+.sp
+This setting can be configured on a running \fBmongod\fP using
+\fBsetParameter\fP\&.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Windows MongoDB deployments can use \fI\%\-\-ldapBindWithOSDefaults\fP
+instead of \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapQueryPassword\fP\&. You cannot specify
+both \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the same time.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapBindWithOSDefaults <bool>
+\fIDefault\fP: False
+.sp
+New in version 3.4: Available in MongoDB Enterprise for the Windows platform only.
+
+.sp
+Allows \fBmongod\fP to authenticate, or bind, using your Windows login
+credentials when connecting to the LDAP server.
+.sp
+Only required if:
+.INDENT 7.0
+.IP \(bu 2
+Using LDAP authorization\&.
+.IP \(bu 2
+Using an LDAP query for \fI\%username transformation\fP\&.
+.IP \(bu 2
+The LDAP server disallows anonymous binds
+.UNINDENT
+.sp
+Use \fI\%\-\-ldapBindWithOSDefaults\fP to replace \fI\%\-\-ldapQueryUser\fP and
+\fI\%\-\-ldapQueryPassword\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapBindMethod <string>
+\fIDefault\fP: simple
+.sp
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+The method \fBmongod\fP uses to authenticate to an LDAP server.
+Use with \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapQueryPassword\fP to
+connect to the LDAP server.
+.sp
+\fI\%\-\-ldapBindMethod\fP supports the following values:
+.INDENT 7.0
+.IP \(bu 2
+\fBsimple\fP \- \fBmongod\fP uses simple authentication.
+.IP \(bu 2
+\fBsasl\fP \- \fBmongod\fP uses SASL protocol for authentication
+.UNINDENT
+.sp
+If you specify \fBsasl\fP, you can configure the available SASL mechanisms
+using \fI\%\-\-ldapBindSASLMechanisms\fP\&. \fBmongod\fP defaults to
+using \fBDIGEST\-MD5\fP mechanism.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapBindSASLMechanisms <string>
+\fIDefault\fP: DIGEST\-MD5
+.sp
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+A comma\-separated list of SASL mechanisms \fBmongod\fP can
+use when authenticating to the LDAP server. The \fBmongod\fP and the
+LDAP server must agree on at least one mechanism. The \fBmongod\fP
+dynamically loads any SASL mechanism libraries installed on the host
+machine at runtime.
+.sp
+Install and configure the appropriate libraries for the selected
+SASL mechanism(s) on both the \fBmongod\fP host and the remote
+LDAP server host. Your operating system may include certain SASL
+libraries by default. Defer to the documentation associated with each
+SASL mechanism for guidance on installation and configuration.
+.sp
+If using the \fBGSSAPI\fP SASL mechanism for use with
+security\-kerberos, verify the following for the
+\fBmongod\fP host machine:
+.INDENT 7.0
+.TP
+.B \fBLinux\fP
+.INDENT 7.0
+.IP \(bu 2
+The \fBKRB5_CLIENT_KTNAME\fP environment
+variable resolves to the name of the client keytab\-files
+for the host machine. For more on Kerberos environment
+variables, please defer to the
+\fI\%Kerberos documentation\fP\&.
+.IP \(bu 2
+The client keytab includes a
+kerberos\-user\-principal for the \fBmongod\fP to use when
+connecting to the LDAP server and execute LDAP queries.
+.UNINDENT
+.TP
+.B \fBWindows\fP
+If connecting to an Active Directory server, the Windows
+Kerberos configuration automatically generates a
+\fI\%Ticket\-Granting\-Ticket\fP
+when the user logs onto the system. Set \fI\%\-\-ldapBindWithOSDefaults\fP to
+\fBtrue\fP to allow \fBmongod\fP to use the generated credentials when
+connecting to the Active Directory server and execute queries.
+.UNINDENT
+.sp
+Set \fI\%\-\-ldapBindMethod\fP to \fBsasl\fP to use this option.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+For a complete list of SASL mechanisms see the
+\fI\%IANA listing\fP\&.
+Defer to the documentation for your LDAP or Active Directory
+service for identifying the SASL mechanisms compatible with the
+service.
+.sp
+MongoDB is not a source of SASL mechanism libraries, nor
+is the MongoDB documentation a definitive source for
+installing or configuring any given SASL mechanism. For
+documentation and support, defer to the SASL mechanism
+library vendor or owner.
+.sp
+For more information on SASL, defer to the following resources:
+.INDENT 0.0
+.IP \(bu 2
+For Linux, please see the \fI\%Cyrus SASL documentation\fP\&.
+.IP \(bu 2
+For Windows, please see the \fI\%Windows SASL documentation\fP\&.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapTransportSecurity <string>
+\fIDefault\fP: tls
+.sp
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+By default, \fBmongod\fP creates a TLS/SSL secured connection to the LDAP
+server.
+.sp
+For Linux deployments, you must configure the appropriate TLS Options in
+\fB/etc/openldap/ldap.conf\fP file. Your operating system’s package manager
+creates this file as part of the MongoDB Enterprise installation, via the
+\fBlibldap\fP dependency. See the documentation for \fBTLS Options\fP in the
+\fI\%ldap.conf OpenLDAP documentation\fP
+for more complete instructions.
+.sp
+For Windows deployment, you must add the LDAP server CA certificates to the
+Windows certificate management tool. The exact name and functionality of the
+tool may vary depending on operating system version. Please see the
+documentation for your version of Windows for more information on
+certificate management.
+.sp
+Set \fI\%\-\-ldapTransportSecurity\fP to \fBnone\fP to disable TLS/SSL between \fBmongod\fP and the LDAP
+server.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+Setting \fI\%\-\-ldapTransportSecurity\fP to \fBnone\fP transmits plaintext information and possibly
+credentials between \fBmongod\fP and the LDAP server.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapTimeoutMS <long>
+\fIDefault\fP: 10000
+.sp
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+The amount of time in milliseconds \fBmongod\fP should wait for an LDAP server
+to respond to a request.
+.sp
+Increasing the value of \fI\%\-\-ldapTimeoutMS\fP may prevent connection failure between the
+MongoDB server and the LDAP server, if the source of the failure is a
+connection timeout. Decreasing the value of \fI\%\-\-ldapTimeoutMS\fP reduces the time
+MongoDB waits for a response from the LDAP server.
+.sp
+This setting can be configured on a running \fBmongod\fP using
+\fBsetParameter\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapUserToDNMapping <string>
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+Maps the username provided to \fBmongod\fP for authentication to a LDAP
+Distinguished Name (DN). You may need to use \fI\%\-\-ldapUserToDNMapping\fP to transform a
+username into an LDAP DN in the following scenarios:
+.INDENT 7.0
+.IP \(bu 2
+Performing LDAP authentication with simple LDAP binding, where users
+authenticate to MongoDB with usernames that are not full LDAP DNs.
+.IP \(bu 2
+Using an \fI\%LDAP authorization query template\fP that requires a DN.
+.IP \(bu 2
+Transforming the usernames of clients authenticating to Mongo DB using
+different authentication mechanisms (e.g. x.509, kerberos) to a full LDAP
+DN for authorization.
+.UNINDENT
+.sp
+\fI\%\-\-ldapUserToDNMapping\fP expects a quote\-enclosed JSON\-string representing an ordered array
+of documents. Each document contains a regular expression \fBmatch\fP and
+either a \fBsubstitution\fP or \fBldapQuery\fP template used for transforming the
+incoming username.
+.sp
+Each document in the array has the following form:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+{
+  match: "<regex>"
+  substitution: "<LDAP DN>" | ldapQuery: "<LDAP Query>"
+}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.TS
+center;
+|l|l|l|.
+_
+T{
+Field
+T}	T{
+Description
+T}	T{
+Example
+T}
+_
+T{
+\fBmatch\fP
+T}	T{
+An ECMAScript\-formatted regular expression (regex) to match against a
+provided username. Each parenthesis\-enclosed section represents a
+regex capture group used by \fBsubstitution\fP or \fBldapQuery\fP\&.
+T}	T{
+\fB"(.+)ENGINEERING"\fP
+\fB"(.+)DBA"\fP
+T}
+_
+T{
+\fBsubstitution\fP
+T}	T{
+An LDAP distinguished name (DN) formatting template that converts the
+authentication name matched by the \fBmatch\fP regex into a LDAP DN.
+Each curly bracket\-enclosed numeric value is replaced by the
+corresponding \fI\%regex capture group\fP extracted
+from the authentication username via the \fBmatch\fP regex.
+T}	T{
+\fB"cn={0},ou=engineering,
+dc=example,dc=com"\fP
+T}
+_
+T{
+\fBldapQuery\fP
+T}	T{
+A LDAP query formatting template that inserts the authentication
+name matched by the \fBmatch\fP regex into an LDAP query URI encoded
+respecting RFC4515 and RFC4516. Each curly bracket\-enclosed numeric
+value is replaced by the corresponding \fI\%regex capture group\fP extracted
+from the authentication username via the \fBmatch\fP expression.
+\fBmongod\fP executes the query against the LDAP server to retrieve
+the LDAP DN for the authenticated user. \fBmongod\fP requires
+exactly one returned result for the transformation to be
+successful, or \fBmongod\fP skips this transformation.
+T}	T{
+\fB"ou=engineering,dc=example,
+dc=com??one?(user={0})"\fP
+T}
+_
+.TE
+.sp
+For each document in the array, you must use either \fBsubstitution\fP or
+\fBldapQuery\fP\&. You \fIcannot\fP specify both in the same document.
+.sp
+When performing authentication or authorization, \fBmongod\fP steps through
+each document in the array in the given order, checking the authentication
+username against the \fBmatch\fP filter.  If a match is found,
+\fBmongod\fP applies the transformation and uses the output for
+authenticating the user. \fBmongod\fP does not check the remaining documents
+in the array.
+.sp
+If the given document does not match the provided authentication name, or
+the transformation described by the document fails, \fBmongod\fP continues
+through the list of documents to find additional matches. If no matches are
+found in any document, \fBmongod\fP returns an error.
+.INDENT 7.0
+.INDENT 3.5
+.SS Example
+.sp
+The following shows two transformation documents. The first
+document matches against any string ending in \fB@ENGINEERING\fP, placing
+anything preceeding the suffix into a regex capture group. The
+second document matches against any string ending in \fB@DBA\fP, placing
+anything preceeding the suffix into a regex capture group.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 0.0
+.INDENT 3.5
+You must pass the array to \fI\%\-\-ldapUserToDNMapping\fP as a string.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"[
+   {
+      match: "(.+)@ENGINEERING.EXAMPLE.COM",
+      substitution: "cn={0},ou=engineering,dc=example,dc=com"
+   },
+   {
+      match: "(.+)@DBA.EXAMPLE.COM",
+      ldapQuery: "ou=dba,dc=example,dc=com??one?(user={0})"
+
+   }
+
+]"
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+A user with username \fBalice@ENGINEERING.EXAMPLE.COM\fP matches the first
+document. The regex capture group \fB{0}\fP corresponds to the string
+\fBalice\fP\&. The resulting output is the DN
+\fB"cn=alice,ou=engineering,dc=example,dc=com"\fP\&.
+.sp
+A user with username \fBbob@DBA.EXAMPLE.COM\fP matches the second document.
+The regex capture group \fB{0}\fP corresponds to the string \fBbob\fP\&.  The
+resulting output is the LDAP query
+\fB"ou=dba,dc=example,dc=com??one?(user=bob)"\fP\&. \fBmongod\fP executes this
+query against the LDAP server, returning the result
+\fB"cn=bob,ou=dba,dc=example,dc=com"\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+If \fI\%\-\-ldapUserToDNMapping\fP is unset, \fBmongod\fP applies no transformations to the username
+when attempting to authenticate or authorize a user against the LDAP server.
+.sp
+This setting can be configured on a running \fBmongod\fP using the
+\fBsetParameter\fP database command.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+An explanation of \fI\%RFC4515\fP,
+\fI\%RFC4516\fP or LDAP queries is out
+of scope for the MongoDB Documentation. Please review the RFC directly or
+use your preferred LDAP resource.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapAuthzQueryTemplate <string>
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+A relative LDAP query URL formatted conforming to \fI\%RFC4515\fP and \fI\%RFC4516\fP that \fBmongod\fP executes to obtain
+the LDAP groups to which the authenticated user belongs to. The query is
+relative to the host or hosts specified in \fI\%\-\-ldapServers\fP\&.
+.sp
+Use the \fB{USER}\fP placeholder in the URL to substitute the authenticated
+username, or the transformed username if a \fI\%username mapping\fP is specified.
+.sp
+When constructing the query URL, ensure that the order of LDAP parameters
+respects RFC4516:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+[ dn  [ ? [attributes] [ ? [scope] [ ? [filter] [ ? [Extensions] ] ] ] ] ]
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+If your query includes an attribute, \fBmongod\fP assumes that the query
+retrieves a the DNs which this entity is member of.
+.sp
+If your query does not include an attribute, \fBmongod\fP assumes
+the query retrieves all entities which the user is member of.
+.sp
+For each LDAP DN returned by the query, \fBmongod\fP assigns the authorized
+user a corresponding role on the \fBadmin\fP database. If a role on the on the
+\fBadmin\fP database exactly matches the DN, \fBmongod\fP grants the user the
+roles and privileges assigned to that role. See the
+\fBdb.createRole()\fP method for more information on creating roles.
+.INDENT 7.0
+.INDENT 3.5
+.SS Example
+.sp
+This LDAP query returns any groups listed in the LDAP user object’s
+\fBmemberOf\fP attribute.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"{USER}?memberOf?base"
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Your LDAP configuration may not include the \fBmemberOf\fP attribute as part
+of the user schema, may possess a different attribute for reporting group
+membership, or may not track group membership through attributes.
+Configure your query with respect to your own unique LDAP configuration.
+.UNINDENT
+.UNINDENT
+.sp
+If unset, \fBmongod\fP cannot authorize users using LDAP.
+.sp
+This setting can be configured on a running \fBmongod\fP using the
+\fBsetParameter\fP database command.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+An explanation of \fI\%RFC4515\fP,
+\fI\%RFC4516\fP or LDAP queries is out
+of scope for the MongoDB Documentation. Please review the RFC directly or
+use your preferred LDAP resource.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .SS Storage Options
 .INDENT 0.0
 .TP
+.B \-\-storageEngine string
+\fIDefault\fP: \fBwiredTiger\fP
+.sp
+Changed in version 4.0: MongoDB deprecates the MMAPv1 storage engine.
+
+.sp
+Specifies the storage engine for the \fBmongod\fP database. Available
+values include:
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+\fBwiredTiger\fP
+T}	T{
+To specify the /core/wiredtiger\&.
+T}
+_
+T{
+\fBinMemory\fP
+T}	T{
+To specify the /core/inmemory\&.
+.sp
+New in version 3.2: Available in MongoDB Enterprise only.
+T}
+_
+T{
+\fBmmapv1\fP (Deprecated in MongoDB 4.0)
+T}	T{
+To specify the /core/mmapv1\&.
+T}
+_
+.TE
+.sp
+If you attempt to start a \fBmongod\fP with a
+\fI\%\-\-dbpath\fP that contains data files produced by a
+storage engine other than the one specified by \fI\%\-\-storageEngine\fP, \fBmongod\fP
+will refuse to start.
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-\-dbpath <path>
-\fIDefault\fP: \fB/data/db\fP on Linux and OS X, \fB\edata\edb\fP on Windows
+\fIDefault\fP: \fB/data/db\fP on Linux and macOS, \fB\edata\edb\fP on Windows
 .sp
 The directory where the \fBmongod\fP instance stores its data.
 .sp
 If you
 installed MongoDB using a package management system, check the
-\fB/etc/mongodb.conf\fP file provided by your packages to see the
+\fB/etc/mongod.conf\fP file provided by your packages to see the
 directory is specified.
 .sp
 Changed in version 3.0: The files in \fI\%\-\-dbpath\fP must correspond to the storage engine
@@ -517,206 +1418,59 @@ start.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-storageEngine string
-\fIDefault\fP: \fBmmapv1\fP
-.sp
-New in version 3.0.0.
-
-.sp
-Specifies the storage engine for the \fBmongod\fP database. Valid
-options include \fBmmapv1\fP and \fBwiredTiger\fP\&.
-.sp
-If you attempt to start a \fBmongod\fP with a
-\fIstorage.dbPath\fP that contains data files produced by a
-storage engine other than the one specified by \fI\%\-\-storageEngine\fP, \fBmongod\fP
-will refuse to start.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-wiredTigerDirectoryForIndexes
-\fIType\fP: boolean
-.sp
-\fIDefault\fP: false
-.sp
-New in version 3.0.0.
-
-.sp
-When you start \fBmongod\fP with \fI\%\-\-wiredTigerDirectoryForIndexes\fP, \fBmongod\fP stores indexes
-and collections in separate directories.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-wiredTigerCacheSizeGB number
-\fIDefault\fP: the maximum of half of physical RAM or 1 gigabyte
-.sp
-New in version 3.0.0.
-
-.sp
-Defines the maximum size of the cache that WiredTiger will use for
-all data. Ensure that \fI\%\-\-wiredTigerCacheSizeGB\fP is sufficient to hold the entire
-working set for the \fBmongod\fP instance.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-wiredTigerCheckpointDelaySecs <seconds>
-\fIDefault\fP: 60
-.sp
-New in version 3.0.0.
-
-.sp
-Defines the interval between checkpoints when WiredTiger writes all
-modified data to the data files in \fBdbPath\fP\&. If
-the \fBmongod\fP exits between checkpoints and you do not have
-\fBstorage.journal.enabled\fP set to \fBtrue\fP, any data
-modified since the last checkpoint will not persist. The data files
-are \fIalways\fP valid even if \fBmongod\fP exits between or during a
-checkpoint.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-wiredTigerStatisticsLogDelaySecs <seconds>
-\fIDefault\fP: 0
-.sp
-New in version 3.0.0.
-
-.sp
-When \fB0\fP WiredTiger will not log statistics. Otherwise WiredTiger
-will log statistics to a file in the \fBdbPath\fP
-on the interval defined by \fI\%\-\-wiredTigerStatisticsLogDelaySecs\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-wiredTigerJournalCompressor <compressor>
-\fIDefault\fP: snappy
-.sp
-New in version 3.0.0.
-
-.sp
-Specifies the type of compression to use to compress the journal
-data (i.e. \fBstorage.journal\fP\&.)
-.sp
-Available compressors are:
-.INDENT 7.0
-.IP \(bu 2
-\fBnone\fP
-.IP \(bu 2
-\fIsnappy\fP
-.IP \(bu 2
-\fIzlib\fP
-.UNINDENT
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-wiredTigerCollectionBlockCompressor <compressor>
-\fIDefault\fP: none
-.sp
-New in version 3.0.0.
-
-.sp
-Specifies the default type of compression to use to compress index
-data. You can override this on a per\-index basis when creating
-indexes.
-.sp
-Available compressors are:
-.INDENT 7.0
-.IP \(bu 2
-\fBnone\fP
-.IP \(bu 2
-\fIsnappy\fP
-.IP \(bu 2
-\fIzlib\fP
-.UNINDENT
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-wiredTigerIndexPrefixCompression <boolean>
-\fIDefault\fP: true
-.sp
-New in version 3.0.0.
-
-.sp
-Specify \fBtrue\fP for \fI\%\-\-wiredTigerIndexPrefixCompression\fP to enable \fIprefix compression\fP for
-index data.
-.UNINDENT
-.INDENT 0.0
-.TP
 .B \-\-directoryperdb
-Stores each database\(aqs files in its own folder in the \fIdata
-directory\fP\&. When applied to an existing system, the
-\fI\%\-\-directoryperdb\fP option alters the storage pattern of the data
-directory.
+Uses a separate directory to store data for each database. The
+directories are under the \fI\%\-\-dbpath\fP directory, and each subdirectory
+name corresponds to the database name.
 .sp
-Use this option in conjunction with your file system and device
-configuration so that MongoDB will store data on a number of distinct
-disk devices to increase write throughput or disk capacity.
-.sp
-\fBWARNING:\fP
+Changed in version 3.0: To change the \fI\%\-\-directoryperdb\fP option for existing deployments, you must
+restart the \fI\%mongod\fP instances with the new \fI\%\-\-directoryperdb\fP
+value \fBand\fP a new data directory (\fI\%\-\-dbpath <new path>\fP), and then
+repopulate the data.
 .INDENT 7.0
-.INDENT 3.5
-To enable this option for an \fBexisting\fP system, migrate the
-database\-specific data files to the new directory structure before
-enabling \fI\%\-\-directoryperdb\fP\&. Database\-specific data files
-begin with the name of an existing database and end with either
-"\fBns\fP" or a number. For example, the following data directory
-includes files for the \fBlocal\fP and \fBtest\fP databases:
-.INDENT 0.0
-.INDENT 3.5
+.IP \(bu 2
+For standalone instances, you can use \fBmongodump\fP on
+the existing instance, stop the instance, restart with the new
+\fI\%\-\-directoryperdb\fP value \fBand\fP a new data directory, and use
+\fBmongorestore\fP to populate the new data directory.
+.IP \(bu 2
+For replica sets, you can update in a rolling manner by stopping
+a secondary member, restart with the new \fI\%\-\-directoryperdb\fP value \fBand\fP
+a new data directory, and use initial sync to populate the new data directory.
+To update all members, start with the secondary members first.
+Then step down the primary, and update the stepped\-down member.
+.UNINDENT
+
 .sp
-.nf
-.ft C
-journal
-mongod.lock
-local.0
-local.1
-local.ns
-test.0
-test.1
-test.ns
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
-After migration, the data directory would have the following structure:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-journal
-mongod.lock
-local/local.0
-local/local.1
-local/local.ns
-test/test.0
-test/test.1
-test/test.ns
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.UNINDENT
-.UNINDENT
+Not available for \fI\%mongod\fP instances that use the
+in\-memory storage engine\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-noIndexBuildRetry
-Stops the \fBmongod\fP from rebuilding incomplete indexes on the next
+Changed in version 4.0: \fI\%\-\-noIndexBuildRetry\fP cannot be used in
+conjunction with \fI\%\-\-replSet\fP\&.
+
+.sp
+Stops the \fBmongod\fP standalone instance from rebuilding incomplete indexes on the next
 start up. This applies in cases where the \fBmongod\fP restarts after it
 has shut down or stopped in the middle of an index build. In such cases,
 the \fBmongod\fP always removes any incomplete indexes, and then also, by
 default, attempts to rebuild them. To stop the \fBmongod\fP from
 rebuilding incomplete indexes on start up, include this option on the
 command\-line.
+.sp
+Not available for \fI\%mongod\fP instances that use the
+in\-memory storage engine\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-noprealloc
-Deprecated since version 2.6.
+Deprecated since version 2.6: By default, MongoDB does not preallocate data files. The option
+exists for compatibility and clarity.
 
 .sp
-Disables the preallocation of data files. Currently the default.
-Exists for future compatibility and clarity.
+Disables the preallocation of data files.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -752,7 +1506,7 @@ option requires that you set \fI\%\-\-quota\fP\&.
 .B \-\-smallfiles
 Sets MongoDB to use a smaller default file size. The \fI\%\-\-smallfiles\fP option
 reduces the initial size for data files and limits the maximum size to
-512 megabytes. \fI\%\-\-smallfiles\fP also reduces the size of each \fIjournal\fP
+512 megabytes. \fI\%\-\-smallfiles\fP also reduces the size of each journal
 file from 1 gigabyte to 128 megabytes. Use \fI\%\-\-smallfiles\fP if you have a large
 number of databases that each holds a small quantity of data.
 .sp
@@ -765,7 +1519,9 @@ number of files, which can affect performance for larger databases.
 \fIDefault\fP: 60
 .sp
 Controls how much time can pass before MongoDB flushes data to the data
-files via an \fIfsync\fP operation. \fBDo not set this value on
+files via an fsync operation.
+.sp
+\fBDo not set this value on
 production systems.\fP In almost every situation, you should use the
 default setting.
 .sp
@@ -778,11 +1534,18 @@ memory mapped files to disk.
 .UNINDENT
 .sp
 The \fBmongod\fP process writes data very quickly to the journal and
-lazily to the data files. \fBsyncPeriodSecs\fP has no effect on the
-\fBjournal\fP files or \fBjournaling\fP\&.
+lazily to the data files. \fI\%\-\-syncdelay\fP has no effect on the
+\fBjournal\fP files or journaling,
+but if \fI\%\-\-syncdelay\fP is set to \fB0\fP the journal will eventually consume
+all available disk space. If you set \fI\%\-\-syncdelay\fP to \fB0\fP for testing
+purposes, you should also set \fI\%\-\-nojournal\fP
+to \fBtrue\fP\&.
 .sp
 The \fBserverStatus\fP command reports the background flush
-thread\(aqs status via the \fBbackgroundFlushing\fP field.
+thread’s status via the \fBbackgroundFlushing\fP field.
+.sp
+Not available for \fI\%mongod\fP instances that use the
+in\-memory storage engine\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -807,96 +1570,274 @@ command on all databases.
 \fBWARNING:\fP
 .INDENT 7.0
 .INDENT 3.5
-During normal operations, only use the \fBrepairDatabase\fP
-command and wrappers including \fBdb.repairDatabase()\fP in the
-\fBmongo\fP shell and \fImongod \-\-repair\fP, to compact
-database files and/or reclaim disk space. Be aware that these
+.INDENT 0.0
+.IP \(bu 2
+Before using \fBrepairDatabase\fP, make a backup copy of
+the dbpath directory.
+.IP \(bu 2
+Avoid running \fBrepairDatabase\fP against a replica set.
+If you are trying to repair a replica set member, and you
+have access to an intact copy of your data (e.g. a recent backup
+or an intact member of the replica set), you should
+restore from that intact copy (see
+/tutorial/resync\-replica\-set\-member), and \fBnot\fP use
+\fBrepairDatabase\fP\&.
+.IP \(bu 2
+Only use the \fBrepairDatabase\fP command and associated
+wrappers, including \fBdb.repairDatabase()\fP and
+\fI\%mongod \-\-repair\fP, if you have no other options. These
 operations remove and do not save any corrupt data during the
 repair process.
-.sp
-If you are trying to repair a \fIreplica set\fP member, and you have
-access to an intact copy of your data (e.g. a recent backup or an
-intact member of the \fIreplica set\fP), you should restore from that
-intact copy, and \fBnot\fP use \fBrepairDatabase\fP\&.
+.UNINDENT
 .UNINDENT
 .UNINDENT
 .sp
-When using \fIjournaling\fP, there is almost never
-any need to run \fBrepairDatabase\fP\&. In the event of an
-unclean shutdown, the server will be able to restore the data files
-to a pristine state automatically.
+If you are running with journaling enabled, there is
+almost never any need to run \fBrepairDatabase\fP unless you
+need to recover from a disk\-level data corruption. In the event of an
+unclean shutdown, the server will be able to restore the data files to
+a clean state automatically.
 .sp
 Changed in version 2.1.2.
 
 .sp
 If you run the repair option \fIand\fP have data in a journal file, the
 \fBmongod\fP instance refuses to start. In these cases you should start
-the \fBmongod\fP without the \fI\-\-repair\fP option, which allows the
+the \fBmongod\fP without the \fI\%\-\-repair\fP option, which allows the
 \fBmongod\fP to recover data from the journal. This completes more
 quickly and is more likely to produce valid data files. To continue the
 repair operation despite the journal files, shut down the \fBmongod\fP
-cleanly and restart with the \fI\-\-repair\fP option.
+cleanly and restart with the \fI\%\-\-repair\fP option.
 .sp
-The \fI\-\-repair\fP option copies data from the source data files into new data
+The \fI\%\-\-repair\fP option copies data from the source data files into new data
 files in the \fBrepairPath\fP and then replaces the original data
 files with the repaired data files.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-repairpath <path>
-\fIDefault\fP: A \fB_tmp\fP directory within the path specified by the
-\fBdbPath\fP option.
+\fIDefault\fP: A \fB_tmp_repairDatabase_<num>\fP directory under the
+\fBdbPath\fP\&.
 .sp
 Specifies a working directory that MongoDB will use during the
-\fI\-\-repair\fP operation. After \fI\-\-repair\fP completes,
-the data files in \fBdbPath\fP and the \fI\%\-\-repairpath\fP
-directory is empty.
+\fI\%\-\-repair\fP operation. When \fB\-\-repair\fP completes, the
+\fI\%\-\-repairpath\fP directory is empty, and
+\fBdbPath\fP contains the repaired files.
 .sp
 The \fI\%\-\-repairpath\fP must be within the \fBdbPath\fP\&. You can
 specify a symlink to \fI\%\-\-repairpath\fP to use a path on a different file
 system.
+.sp
+Only available for \fI\%mongod\fP instance using the MMAPv1 storage engine.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-journal
-Enables the durability \fIjournal\fP to ensure data files remain valid
+Enables the durability journal to ensure data files remain valid
 and recoverable. This option applies only when you specify the
-\fI\%\-\-dbpath\fP option. The \fBmongod\fP enables journaling by default
-on 64\-bit builds of versions after 2.0.
+\fI\%\-\-dbpath\fP option. \fBmongod\fP enables journaling by default.
+.sp
+Not available for \fI\%mongod\fP instances that use the
+in\-memory storage engine\&.
+.sp
+If any voting member of a replica set uses the in\-memory
+storage engine, you must set
+\fBwriteConcernMajorityJournalDefault\fP to \fBfalse\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-nojournal
-Disables the durability journaling. The \fBmongod\fP instance
-enables journaling by default in 64\-bit versions after v2.0.
+Disables journaling\&. \fBmongod\fP
+enables journaling by default.
+.sp
+Not available for \fI\%mongod\fP instances that use the
+in\-memory storage engine\&.
+.sp
+Starting in MongoDB 4.0, you cannot specify \fI\%\-\-nojournal\fP option or \fBstorage.journal.enabled:
+false\fP for replica set members that use the
+WiredTiger storage engine.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-journalOptions <arguments>
 Provides functionality for testing. Not for general use, and will affect data
 file integrity in the case of abnormal system shutdown.
+.sp
+Not available for \fI\%mongod\fP instances that use the
+in\-memory storage engine\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-journalCommitInterval <value>
 \fIDefault\fP: 100 or 30
 .sp
-The maximum amount of time the \fBmongod\fP process allows between
-journal operations. Values can range from 2 to 300 milliseconds. Lower
+Changed in version 3.2.
+
+.sp
+The maximum amount of time in milliseconds that
+the \fBmongod\fP process allows between
+journal operations. Values can range from 1 to 500 milliseconds. Lower
 values increase the durability of the journal, at the expense of disk
-performance.
+performance.  The default journal commit interval is 100 milliseconds.
 .sp
-The default journal commit interval is 100 milliseconds if a single
-block device (e.g. physical volume, RAID device, or LVM volume) contains
-both the journal and the data files.
+On MMAPv1, if the journal is on a different block device (e.g. physical
+volume, RAID device, or LVM volume) than the data files, the default journal
+commit interval is 30 milliseconds. Additionally, on MMAPv1, when a write
+operation with \fBj:true\fP is pending, \fBmongod\fP will reduce
+\fBcommitIntervalMs\fP to a third of the set value.
 .sp
-If the journal is on a different block device than the data files the
-default journal commit interval is 30 milliseconds.
+On WiredTiger, the default journal commit interval is 100 milliseconds. Additionally,
+a write with \fBj:true\fP will cause an immediate sync of the journal.
 .sp
-To force \fBmongod\fP to commit to the journal more frequently, you
-can specify \fBj:true\fP\&. When a write operation with \fBj:true\fP is
-pending, \fBmongod\fP will reduce \fBcommitIntervalMs\fP
-to a third of the set value.
+Not available for \fI\%mongod\fP instances that use the
+in\-memory storage engine\&.
+.UNINDENT
+.SS WiredTiger Options
+.INDENT 0.0
+.TP
+.B \-\-wiredTigerCacheSizeGB float
+Defines the maximum size of the internal cache that WiredTiger will
+use for all data.
+.sp
+Changed in version 3.4: Values can range from 256MB to 10TB and can be a float. In
+addition, the default value has also changed.
+
+.sp
+Starting in 3.4, the WiredTiger internal cache, by default, will use
+the larger of either:
+.INDENT 7.0
+.IP \(bu 2
+50% of (RAM \- 1 GB), or
+.IP \(bu 2
+256 MB.
+.UNINDENT
+.sp
+For example, on a system with a total of 4GB of RAM the WiredTiger
+cache will use 1.5GB of RAM (\fB0.5 * (4 GB \- 1 GB) = 1.5 GB\fP).
+Conversely, a system with a total of 1.25 GB of RAM will allocate 256
+MB to the WiredTiger cache because that is more than half of the
+total RAM minus one gigabyte (\fB0.5 * (1.25 GB \- 1 GB) = 128 MB < 256 MB\fP).
+.sp
+Avoid increasing the WiredTiger internal cache size above its
+default value.
+.sp
+With WiredTiger, MongoDB utilizes both the WiredTiger internal cache
+and the filesystem cache.
+.sp
+Via the filesystem cache, MongoDB automatically uses all free memory
+that is not used by the WiredTiger cache or by other processes.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+The \fI\%\-\-wiredTigerCacheSizeGB\fP limits the size of the WiredTiger internal
+cache. The operating system will use the available free memory
+for filesystem cache, which allows the compressed MongoDB data
+files to stay in memory. In addition, the operating system will
+use any free RAM to buffer file system blocks and file system
+cache.
+.sp
+To accommodate the additional consumers of RAM, you may have to
+decrease WiredTiger internal cache size.
+.UNINDENT
+.UNINDENT
+.sp
+The default WiredTiger internal cache size value assumes that there is a
+single \fI\%mongod\fP instance per machine. If a single machine
+contains multiple MongoDB instances, then you should decrease the setting to
+accommodate the other \fI\%mongod\fP
+instances.
+.sp
+If you run \fI\%mongod\fP in a container (e.g. \fBlxc\fP,
+\fBcgroups\fP, Docker, etc.) that does \fInot\fP have access to all of the
+RAM available in a system, you must set \fI\%\-\-wiredTigerCacheSizeGB\fP to a value less
+than the amount of RAM available in the container. The exact amount
+depends on the other processes running in the container.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-wiredTigerJournalCompressor <compressor>
+\fIDefault\fP: snappy
+.sp
+New in version 3.0.0.
+
+.sp
+Specifies the type of compression to use to compress WiredTiger
+journal data.
+.sp
+Available compressors are:
+.INDENT 7.0
+.IP \(bu 2
+\fBnone\fP
+.IP \(bu 2
+snappy
+.IP \(bu 2
+zlib
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-wiredTigerDirectoryForIndexes
+New in version 3.0.0.
+
+.sp
+When you start \fBmongod\fP with \fI\%\-\-wiredTigerDirectoryForIndexes\fP, \fBmongod\fP stores indexes and collections in separate
+subdirectories under the data (i.e. \fI\%\-\-dbpath\fP) directory.
+Specifically, \fBmongod\fP stores the indexes in a subdirectory named
+\fBindex\fP and the collection data in a subdirectory named
+\fBcollection\fP\&.
+.sp
+By using a symbolic link, you can specify a different location for
+the indexes. Specifically, when \fI\%mongod\fP instance is \fBnot\fP
+running, move the \fBindex\fP subdirectory to the destination and
+create a symbolic link named \fBindex\fP under the data directory to
+the new destination.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-wiredTigerCollectionBlockCompressor <compressor>
+\fIDefault\fP: snappy
+.sp
+New in version 3.0.0.
+
+.sp
+Specifies the default type of compression to use to compress collection
+data. You can override this on a per\-collection basis when creating
+collections.
+.sp
+Available compressors are:
+.INDENT 7.0
+.IP \(bu 2
+\fBnone\fP
+.IP \(bu 2
+snappy
+.IP \(bu 2
+zlib
+.UNINDENT
+.sp
+\fI\%\-\-wiredTigerCollectionBlockCompressor\fP affects all collections created. If you change
+the value of \fI\%\-\-wiredTigerCollectionBlockCompressor\fP on an existing MongoDB deployment, all new
+collections will use the specified compressor. Existing collections
+will continue to use the compressor specified when they were
+created, or the default compressor at that time.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-wiredTigerIndexPrefixCompression <boolean>
+\fIDefault\fP: true
+.sp
+New in version 3.0.0.
+
+.sp
+Enables or disables prefix compression for index data.
+.sp
+Specify \fBtrue\fP for \fI\%\-\-wiredTigerIndexPrefixCompression\fP to enable prefix compression for
+index data, or \fBfalse\fP to disable prefix compression for index data.
+.sp
+The \fI\%\-\-wiredTigerIndexPrefixCompression\fP setting affects all indexes created. If you change
+the value of \fI\%\-\-wiredTigerIndexPrefixCompression\fP on an existing MongoDB deployment, all new
+indexes will use prefix compression. Existing indexes
+are not affected.
 .UNINDENT
 .SS Replication Options
 .INDENT 0.0
@@ -904,6 +1845,16 @@ to a third of the set value.
 .B \-\-replSet <setname>
 Configures replication. Specify a replica set name as an argument to
 this set. All hosts in the replica set must have the same set name.
+.sp
+Starting in MongoDB 4.0,
+.INDENT 7.0
+.IP \(bu 2
+\fI\%\-\-replSet\fP cannot be used in conjunction with
+\fI\%\-\-noIndexBuildRetry\fP\&.
+.IP \(bu 2
+For the WiredTiger storage engine, \fI\%\-\-replSet\fP cannot be used in
+conjunction with \fI\%\-\-nojournal\fP\&.
+.UNINDENT
 .sp
 If your application connects to more than one replica set, each set
 should have a distinct name. Some drivers group replica set
@@ -913,21 +1864,23 @@ connections by replica set name.
 .TP
 .B \-\-oplogSize <value>
 Specifies a maximum size in megabytes for the replication operation log
-(i.e., the \fIoplog\fP). The \fBmongod\fP process creates an
-\fIoplog\fP based on the maximum amount of space available. For 64\-bit
-systems, the oplog is typically 5% of available disk space. Once the
-\fBmongod\fP has created the oplog for the first time, changing the
-\fI\%\-\-oplogSize\fP option will not affect the size of the oplog.
+(i.e., the oplog). The \fBmongod\fP process creates an
+oplog based on the maximum amount of space available. For 64\-bit
+systems, the oplog is typically 5% of available disk space.
 .sp
-See \fIreplica\-set\-oplog\-sizing\fP for more information.
+Once the \fBmongod\fP has created the oplog for the first time,
+changing the \fI\%\-\-oplogSize\fP option will not affect the size of the oplog.
+Use the \fBreplSetResizeOplog\fP administrative command to
+change the oplog size of a running \fBmongod\fP replica set member.
+\fBreplSetResizeOplog\fP enables you to resize the oplog
+dynamically without restarting the \fI\%mongod\fP process.
+.sp
+See replica\-set\-oplog\-sizing for more information.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-replIndexPrefetch
 \fIDefault\fP: all
-.sp
-New in version 2.2.
-
 .INDENT 7.0
 .INDENT 3.5
 .IP "Storage Engine Specific Feature"
@@ -937,11 +1890,12 @@ storage engine.
 .UNINDENT
 .UNINDENT
 .sp
-Determines which indexes \fIsecondary\fP members of a \fIreplica
-set\fP load into memory before applying operations from the oplog. By
+Determines which indexes secondary members of a replica
+set load into memory before applying operations from the oplog. By
 default secondaries load all indexes related to an operation into memory
-before applying operations from the oplog. This option can have one of
-the following values:
+before applying operations from the oplog.
+.sp
+Set this option to one of the following:
 .TS
 center;
 |l|l|.
@@ -973,128 +1927,122 @@ T}
 _
 .TE
 .UNINDENT
-.SS Master\-Slave Replication
-.sp
-These options provide access to conventional master\-slave database
-replication. While this functionality remains accessible in MongoDB,
-replica sets are the preferred configuration for database replication.
 .INDENT 0.0
 .TP
-.B \-\-master
-Configures the \fBmongod\fP to run as a replication \fImaster\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-slave
-Configures the \fBmongod\fP to run as a replication \fIslave\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-source <host><:port>
-For use with the \fI\%\-\-slave\fP option, the \fB\-\-source\fP option
-designates the server that this instance will replicate.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-only <arg>
-For use with the \fI\%\-\-slave\fP option, the \fB\-\-only\fP option
-specifies only a single \fIdatabase\fP to replicate.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-slavedelay <value>
-For use with the \fI\%\-\-slave\fP option, the \fI\%\-\-slavedelay\fP
-option configures a "delay" in seconds, for this slave to wait to
-apply operations from the \fImaster\fP node.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-autoresync
-For use with the \fI\%\-\-slave\fP option. When set,
-the \fI\%\-\-autoresync\fP option allows this slave to automatically
-resync if it is more than 10 seconds behind the master. This
-setting may be problematic if the \fI\%\-\-oplogSize\fP specifies
-a too small oplog.
-.sp
-If the \fIoplog\fP is not large enough to store the difference in
-changes between the master\(aqs current state and the state of the slave,
-this instance will forcibly resync itself unnecessarily. If you don\(aqt
-specify \fI\%\-\-autoresync\fP, the slave will not attempt an automatic resync more
-than once in a ten minute period.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-fastsync
-In the context of \fIreplica set\fP replication, set this option
-if you have seeded this member with an up\-to\-date copy of the entire
-\fBdbPath\fP of another member of the set. Otherwise the
-\fBmongod\fP will attempt to perform an initial sync,
-as though the member were a new member.
-.sp
-\fBWARNING:\fP
-.INDENT 7.0
-.INDENT 3.5
-If the data is not perfectly synchronized \fIand\fP
-the \fBmongod\fP starts with \fIfastsync\fP, then the
-secondary or slave will be permanently out of sync with the
-primary, which may cause significant consistency problems.
-.UNINDENT
-.UNINDENT
+.B \-\-enableMajorityReadConcern
+Deprecated since version 3.6: Starting in MongoDB 3.6, \fB"majority"\fP read concern
+is always enabled, and this option has no effect.
+
 .UNINDENT
 .SS Sharded Cluster Options
 .INDENT 0.0
 .TP
 .B \-\-configsvr
-Declares that this \fBmongod\fP instance serves as the
-\fIconfig database\fP of a sharded cluster. When running with
-this option, clients (i.e. other cluster components) will not be
-able to write data to any database other than \fBconfig\fP and
-\fBadmin\fP\&. The default port for a \fBmongod\fP with this option is
+\fIRequired if starting a config server.\fP
+.sp
+Declares that this \fBmongod\fP instance serves as the config
+server of a sharded cluster. When
+running with this option, clients (i.e. other cluster components)
+cannot write data to any database other than \fBconfig\fP
+and \fBadmin\fP\&. The default port for a \fBmongod\fP with this option is
 \fB27019\fP and the default \fI\%\-\-dbpath\fP directory is
 \fB/data/configdb\fP, unless specified.
 .sp
-Changed in version 2.2: The \fI\%\-\-configsvr\fP option also sets \fI\%\-\-smallfiles\fP\&.
-
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+Starting in 3.4, you must deploy config servers as a replica set.
+The use of the deprecated mirrored \fI\%mongod\fP instances as
+config servers (SCCC) is no longer supported.
 .sp
-Changed in version 2.4: The \fI\%\-\-configsvr\fP option creates a local \fIoplog\fP\&.
-
+The replica set config servers (CSRS) must run the
+WiredTiger storage engine\&.
+.UNINDENT
+.UNINDENT
 .sp
-Do not use the \fI\%\-\-configsvr\fP option with \fI\%\-\-replSet\fP or
-\fI\%\-\-shardsvr\fP\&. Config servers cannot be a shard
-server or part of a \fIreplica set\fP\&.
+The \fI\%\-\-configsvr\fP option creates a local oplog\&.
+.sp
+Do not use the \fI\%\-\-configsvr\fP option with \fI\%\-\-shardsvr\fP\&. Config
+servers cannot be a shard server.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-configsvrMode <string>
+\fBAvailable in MongoDB 3.2 version only\fP
+.sp
+If set to \fBsccc\fP, indicates that the config servers are deployed
+as three mirrored \fI\%mongod\fP instances, even if one or more
+config servers is also a member of a replica set. \fBconfigsvrMode\fP
+only accepts the value \fBsccc\fP\&.
+.sp
+If unset, config servers running as replica sets expect to use the
+“config server replica set” protocol for writing to config servers,
+rather than the “mirrored mongod” write protocol.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-shardsvr
+\fIRequired if starting a shard server.\fP
+.sp
 Configures this \fBmongod\fP instance as a shard in a
-partitioned cluster. The default port for these instances is
-\fB27018\fP\&.  The only effect of \fI\%\-\-shardsvr\fP is to change
-the port number.
+sharded cluster. The default port for these instances is
+\fB27018\fP\&.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+Changed in version 3.6.
+
+.sp
+You must deploy shards as replica sets. See the \fI\%\-\-replSet\fP
+option to deploy \fBmongod\fP as part of a replica set.
 .UNINDENT
-.SS SSL Options
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-moveParanoia
+If specified, during chunk migration, a shard saves,
+to the \fBmoveChunk\fP directory of the \fB\-\-dbpath\fP, all documents
+migrated from that shard.
+.sp
+MongoDB does not automatically delete the data saved in the
+\fBmoveChunk\fP directory.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-noMoveParanoia
+Changed in version 3.2: Starting in 3.2, MongoDB uses \fB\-\-noMoveParanoia\fP as the default.
+
+.sp
+During chunk migration, a shard does not save documents migrated from
+the shard.
+.UNINDENT
+.SS TLS/SSL Options
 .INDENT 0.0
 .INDENT 3.5
 .SS See
 .sp
-http://docs.mongodb.org/manual/tutorial/configure\-ssl for full
-documentation of MongoDB\(aqs support.
+/tutorial/configure\-ssl for full
+documentation of MongoDB’s support.
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslOnNormalPorts
-Deprecated since version 2.6.
+Deprecated since version 2.6: Use \fI\%\-\-sslMode requireSSL\fP instead.
 
 .sp
-Enables SSL for \fBmongod\fP\&.
+Enables TLS/SSL for \fBmongod\fP\&.
 .sp
-With \fI\-\-sslOnNormalPorts\fP, a \fBmongod\fP requires SSL encryption for all
+With \fI\%\-\-sslOnNormalPorts\fP, a \fBmongod\fP requires TLS/SSL encryption for all
 connections on the default MongoDB port, or the port specified by
-\fI\-\-port\fP\&. By default, \fI\-\-sslOnNormalPorts\fP is
+\fI\%\-\-port\fP\&. By default, \fI\%\-\-sslOnNormalPorts\fP is
 disabled.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1102,8 +2050,8 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 New in version 2.6.
 
 .sp
-Enables SSL or mixed SSL used for all network connections. The
-argument to the \fI\-\-sslMode\fP option can be one of the following:
+Enables TLS/SSL or mixed TLS/SSL used for all network connections. The
+argument to the \fI\%\-\-sslMode\fP option can be one of the following:
 .TS
 center;
 |l|l|.
@@ -1117,67 +2065,72 @@ _
 T{
 \fBdisabled\fP
 T}	T{
-The server does not use SSL.
+The server does not use TLS/SSL.
 T}
 _
 T{
 \fBallowSSL\fP
 T}	T{
-Connections between servers do not use SSL. For incoming
-connections, the server accepts both SSL and non\-SSL.
+Connections between servers do not use TLS/SSL. For incoming
+connections, the server accepts both TLS/SSL and non\-TLS/non\-SSL.
 T}
 _
 T{
 \fBpreferSSL\fP
 T}	T{
-Connections between servers use SSL. For incoming
-connections, the server accepts both SSL and non\-SSL.
+Connections between servers use TLS/SSL. For incoming
+connections, the server accepts both TLS/SSL and non\-TLS/non\-SSL.
 T}
 _
 T{
 \fBrequireSSL\fP
 T}	T{
-The server uses and accepts only SSL encrypted connections.
+The server uses and accepts only TLS/SSL encrypted connections.
 T}
 _
 .TE
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+Starting in version 3.4, if \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP is not
+specified and you are not using x.509 authentication, the
+system\-wide CA certificate store will be used when connecting to an
+TLS/SSL\-enabled server.
+.sp
+If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
+must be specified.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslPEMKeyFile <filename>
-New in version 2.2.
-
-.sp
-Specifies the \fB\&.pem\fP file that contains both the SSL certificate
+Specifies the \fB\&.pem\fP file that contains both the TLS/SSL certificate
 and key. Specify the file name of the \fB\&.pem\fP file using relative
 or absolute paths.
 .sp
-When SSL is enabled, you must specify \fI\-\-sslPEMKeyFile\fP\&.
+You must specify \fI\%\-\-sslPEMKeyFile\fP when TLS/SSL is enabled.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslPEMKeyPassword <value>
-New in version 2.2.
-
-.sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fB\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
+\fI\%\-\-sslPEMKeyFile\fP). Use the \fI\%\-\-sslPEMKeyPassword\fP option only if the
 certificate\-key file is encrypted. In all cases, the \fBmongod\fP will
 redact the password from all logging and reporting output.
 .sp
 Changed in version 2.6: If the private key in the PEM file is encrypted and you do not
-specify the \fI\-\-sslPEMKeyPassword\fP option, the \fBmongod\fP will prompt for a
-passphrase. See \fIssl\-certificate\-password\fP\&.
+specify the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmongod\fP will prompt for a
+passphrase. See ssl\-certificate\-password\&.
 
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1188,7 +2141,7 @@ New in version 2.6.
 
 .sp
 The authentication mode used for cluster authentication. If you use
-\fIinternal x.509 authentication\fP,
+internal x.509 authentication,
 specify so here. This option can have one of the following values:
 .TS
 center;
@@ -1232,8 +2185,17 @@ T}
 _
 .TE
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+Starting in version 3.4, if \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP is not
+specified and you are not using x.509 authentication, the
+system\-wide CA certificate store will be used when connecting to an
+TLS/SSL\-enabled server.
+.sp
+If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
+must be specified.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1242,16 +2204,19 @@ New in version 2.6.
 
 .sp
 Specifies the \fB\&.pem\fP file that contains the x.509 certificate\-key
-file for \fImembership authentication\fP
+file for membership authentication
 for the cluster or replica set.
 .sp
-If \fI\-\-sslClusterFile\fP does not specify the \fB\&.pem\fP file for internal cluster
+If \fI\%\-\-sslClusterFile\fP does not specify the \fB\&.pem\fP file for internal cluster
 authentication, the cluster uses the \fB\&.pem\fP file specified in the
-\fI\-\-sslPEMKeyFile\fP option.
+\fI\%\-\-sslPEMKeyFile\fP option.
 .sp
-The default distribution of MongoDB does not contain support for
-SSL.  For more information on MongoDB and SSL, see
-http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
+must be specified.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1260,71 +2225,73 @@ New in version 2.6.
 
 .sp
 Specifies the password to de\-crypt the x.509 certificate\-key file
-specified with \fB\-\-sslClusterFile\fP\&. Use the \fI\-\-sslClusterPassword\fP option only
+specified with \fB\-\-sslClusterFile\fP\&. Use the \fI\%\-\-sslClusterPassword\fP option only
 if the certificate\-key file is encrypted. In all cases, the \fBmongod\fP
 will redact the password from all logging and reporting output.
 .sp
 If the x.509 key file is encrypted and you do not specify the
-\fI\-\-sslClusterPassword\fP option, the \fBmongod\fP will prompt for a passphrase. See
-\fIssl\-certificate\-password\fP\&.
+\fI\%\-\-sslClusterPassword\fP option, the \fBmongod\fP will prompt for a passphrase. See
+ssl\-certificate\-password\&.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslCAFile <filename>
-New in version 2.4.
-
-.sp
 Specifies the \fB\&.pem\fP file that contains the root certificate chain
 from the Certificate Authority. Specify the file name of the
 \fB\&.pem\fP file using relative or absolute paths.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+Starting in version 3.4, if \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP is not
+specified and you are not using x.509 authentication, the
+system\-wide CA certificate store will be used when connecting to an
+TLS/SSL\-enabled server.
 .sp
-\fBWARNING:\fP
-.INDENT 7.0
-.INDENT 3.5
-If the \fI\-\-sslCAFile\fP option and its target
-file are not specified, x.509 client and member authentication will not
-function. \fBmongod\fP, and \fBmongos\fP in sharded systems,
-will not be able to verify the certificates of processes connecting to it
-against the trusted certificate authority (CA) that issued them, breaking
-the certificate chain.
+If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
+must be specified.
 .sp
-As of version 2.6.4, \fBmongod\fP will not start with x.509
-authentication enabled if the CA file is not specified.
-.UNINDENT
-.UNINDENT
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslCRLFile <filename>
-New in version 2.4.
-
-.sp
-Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
+Specifies the the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslAllowInvalidCertificates
-New in version 2.6.
-
+Bypasses the validation checks for TLS/SSL certificates on other
+servers in the cluster and allows the use of invalid certificates to
+connect.
 .sp
-Bypasses the validation checks for SSL certificates on other servers
-in the cluster and allows the use of invalid certificates. When using
-the \fBallowInvalidCertificates\fP setting, MongoDB
-logs as a warning the use of the invalid certificate.
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Starting in MongoDB 4.0, if you specify
+\fB\-\-sslAllowInvalidCertificates\fP or \fBssl.allowInvalidCertificates:
+true\fP when using x.509 authentication, an invalid certificate is
+only sufficient to establish a TLS/SSL connection but is
+\fIinsufficient\fP for authentication.
+.UNINDENT
+.UNINDENT
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+When using
+the \fI\%\-\-sslAllowInvalidCertificates\fP setting, MongoDB
+logs a warning regarding the use of the invalid certificate.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1332,28 +2299,20 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 New in version 3.0.
 
 .sp
-Disables the validation of the hostnames in SSL certificates, when
-connecting to other \fBmongod\fP instances for inter\-process
-authentication. This allows \fBmongod\fP to connect to other
-\fBmongod\fP instances if the hostnames in their certificates do not
-match their configured hostname.
+Disables the validation of the hostnames in TLS/SSL certificates,
+when connecting to other members of the replica set or sharded cluster
+for inter\-process authentication. This allows \fBmongod\fP to connect
+to other members if the hostnames in their certificates do not match
+their configured hostname.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslAllowConnectionsWithoutCertificates
-New in version 2.4.
-
-.sp
-Changed in version 3.0.0: \fB\-\-sslAllowConnectionsWithoutCertificates\fP became \fI\%\-\-sslAllowConnectionsWithoutCertificates\fP\&. For
-compatibility, MongoDB processes continue to accept
-\fB\-\-sslAllowConnectionsWithoutCertificates\fP, but all users should
-update their configuration files.
-
-.sp
-Disables the requirement for SSL certificate validation that
+Disables the requirement for TLS/SSL certificate validation that
 \fB\-\-sslCAFile\fP enables. With the \fI\%\-\-sslAllowConnectionsWithoutCertificates\fP option, the \fBmongod\fP
 will accept connections when the client does not present a certificate
 when establishing the connection.
@@ -1366,37 +2325,164 @@ with invalid certificates.
 Use the \fI\%\-\-sslAllowConnectionsWithoutCertificates\fP option if you have a mixed deployment that includes
 clients that do not or cannot present certificates to the \fBmongod\fP\&.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslDisabledProtocols <protocol(s)>
+New in version 3.0.7.
+
+.sp
+Prevents a MongoDB server running with TLS/SSL from accepting
+incoming connections that use a specific protocol or protocols. To
+specify multiple protocols, use a comma separated list of protocols.
+.sp
+\fI\%\-\-sslDisabledProtocols\fP recognizes the following protocols: \fBTLS1_0\fP, \fBTLS1_1\fP,
+and \fBTLS1_2\fP\&.
+.INDENT 7.0
+.IP \(bu 2
+On macOS, you cannot disable \fBTLS1_1\fP and leave both \fBTLS1_0\fP and
+\fBTLS1_2\fP enabled. You must disable at least one of the other
+two, for example, \fBTLS1_0,TLS1_1\fP\&.
+.IP \(bu 2
+To list multiple protocols, specify as a comma separated list of
+protocols. For example \fBTLS1_0,TLS1_1\fP\&.
+.IP \(bu 2
+Specifying an unrecognized protocol will prevent the server from
+starting.
+.IP \(bu 2
+The specified disabled protocols overrides any default disabled
+protocols.
+.UNINDENT
+.sp
+Starting in version 4.0, MongoDB disables the use of TLS 1.0 if TLS
+1.1+ is available on the system. To enable the disabled TLS 1.0,
+specify \fBnone\fP to \fI\%\-\-sslDisabledProtocols\fP\&. 4.0\-disable\-tls
+.sp
+Members of replica sets and sharded clusters must speak at least one
+protocol in common.
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+ssl\-disallow\-protocols
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslFIPSMode
-New in version 2.4.
-
-.sp
 Directs the \fBmongod\fP to use the FIPS mode of the installed OpenSSL
-library. Your system must have a FIPS compliant OpenSSL library to use
-the \fI\-\-sslFIPSMode\fP option.
+library. Your system must have a FIPS
+compliant OpenSSL library to use the \fI\%\-\-sslFIPSMode\fP option.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-FIPS Compatible SSL is
+FIPS\-compatible TLS/SSL is
 available only in \fI\%MongoDB Enterprise\fP\&. See
-http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+/tutorial/configure\-fips for more information.
 .UNINDENT
 .UNINDENT
+.UNINDENT
+.SS Profiler Options
+.INDENT 0.0
+.TP
+.B \-\-profile <level>
+\fIDefault\fP: 0
+.sp
+Configures the database profiler level.
+The following profiler levels are available:
+.TS
+center;
+|l|l|.
+_
+T{
+Level
+T}	T{
+Description
+T}
+_
+T{
+\fB0\fP
+T}	T{
+The profiler is off and does not collect any data.
+This is the default profiler level.
+T}
+_
+T{
+\fB1\fP
+T}	T{
+The profiler collects data for operations that take longer
+than the value of \fBslowms\fP\&.
+T}
+_
+T{
+\fB2\fP
+T}	T{
+The profiler collects data for all operations.
+T}
+_
+.TE
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+Profiling can impact performance and shares settings with the system
+log. Carefully consider any performance and security implications
+before configuring and enabling the profiler on a production
+deployment.
+.sp
+See database\-profiling\-overhead for more information on
+potential performance degradation.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-slowms <integer>
+\fIDefault\fP: 100
+.sp
+The \fIslow\fP operation time threshold, in milliseconds. Operations
+that run for longer than this threshold are considered \fIslow\fP\&.
+.sp
+When \fBlogLevel\fP is set to \fB0\fP, MongoDB
+records \fIslow\fP operations to the diagnostic log at a rate determined by
+\fBslowOpSampleRate\fP\&. At higher
+\fBlogLevel\fP settings, all operations appear in the diagnostic
+log regardless of their latency.
+.sp
+For \fI\%mongod\fP instances, \fI\%\-\-slowms\fP affects the diagnostic log
+and, if enabled, the profiler.
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+/tutorial/manage\-the\-database\-profiler
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-slowOpSampleRate <double>
+\fIDefault\fP: 1.0
+.sp
+The fraction of \fIslow\fP operations that should be profiled or logged.
+\fI\%\-\-slowOpSampleRate\fP accepts values between 0 and 1, inclusive.
+.sp
+For \fI\%mongod\fP instances, \fI\%\-\-slowOpSampleRate\fP affects the
+diagnostic log and, if enabled, the profiler.
 .UNINDENT
 .SS Audit Options
 .INDENT 0.0
 .TP
 .B \-\-auditDestination
-New in version 2.6.
-
+Enables auditing and specifies where
+\fBmongod\fP sends all audit events.
 .sp
-Enables \fBauditing\fP\&. The \fI\-\-auditDestination\fP option can
-have one of the following values:
+\fI\%\-\-auditDestination\fP can have one of the following values:
 .TS
 center;
 |l|l|.
@@ -1429,8 +2515,8 @@ T{
 \fBfile\fP
 T}	T{
 Output the audit events to the file specified in
-\fI\-\-auditPath\fP in the format specified in
-\fI\-\-auditFormat\fP\&.
+\fI\%\-\-auditPath\fP in the format specified in
+\fI\%\-\-auditFormat\fP\&.
 T}
 _
 .TE
@@ -1448,8 +2534,8 @@ Available only in \fI\%MongoDB Enterprise\fP\&.
 New in version 2.6.
 
 .sp
-Specifies the format of the output file for \fBauditing\fP if \fI\-\-auditDestination\fP is \fBfile\fP\&. The
-\fI\-\-auditFormat\fP option can have one of the following values:
+Specifies the format of the output file for auditing if \fI\%\-\-auditDestination\fP is \fBfile\fP\&. The
+\fI\%\-\-auditFormat\fP option can have one of the following values:
 .TS
 center;
 |l|l|.
@@ -1464,14 +2550,14 @@ T{
 \fBJSON\fP
 T}	T{
 Output the audit events in JSON format to the file specified
-in \fI\-\-auditPath\fP\&.
+in \fI\%\-\-auditPath\fP\&.
 T}
 _
 T{
 \fBBSON\fP
 T}	T{
 Output the audit events in BSON binary format to the file
-specified in \fI\-\-auditPath\fP\&.
+specified in \fI\%\-\-auditPath\fP\&.
 T}
 _
 .TE
@@ -1492,8 +2578,8 @@ Available only in \fI\%MongoDB Enterprise\fP\&.
 New in version 2.6.
 
 .sp
-Specifies the output file for \fBauditing\fP if
-\fI\-\-auditDestination\fP has value of \fBfile\fP\&. The \fI\-\-auditPath\fP
+Specifies the output file for auditing if
+\fI\%\-\-auditDestination\fP has value of \fBfile\fP\&. The \fI\%\-\-auditPath\fP
 option can take either a full path name or a relative path name.
 .sp
 \fBNOTE:\fP
@@ -1509,7 +2595,7 @@ Available only in \fI\%MongoDB Enterprise\fP\&.
 New in version 2.6.
 
 .sp
-Specifies the filter to limit the \fItypes of operations\fP the \fBaudit system\fP records. The option takes a string representation
+Specifies the filter to limit the types of operations the audit system records. The option takes a string representation
 of a query document of the form:
 .INDENT 7.0
 .INDENT 3.5
@@ -1522,14 +2608,14 @@ of a query document of the form:
 .UNINDENT
 .UNINDENT
 .sp
-The \fB<field>\fP can be \fBany field in the audit message\fP, including fields returned in the
-\fIparam\fP document. The
-\fB<expression>\fP is a \fIquery condition expression\fP\&.
+The \fB<field>\fP can be any field in the audit message, including fields returned in the
+param document. The
+\fB<expression>\fP is a query condition expression\&.
 .sp
 To specify an audit filter, enclose the filter document in single
 quotes to pass the document as a string.
 .sp
-To specify the audit filter in a \fBconfiguration file\fP, you must use the YAML format of
+To specify the audit filter in a configuration file, you must use the YAML format of
 the configuration file.
 .sp
 \fBNOTE:\fP
@@ -1540,21 +2626,284 @@ Available only in \fI\%MongoDB Enterprise\fP\&.
 .UNINDENT
 .UNINDENT
 .SS SNMP Options
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+MongoDB Enterprise on macOS does \fInot\fP include support for SNMP due
+to \fI\%SERVER\-29352\fP\&.
+.UNINDENT
+.UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-snmp\-subagent
 Runs SNMP as a subagent. For more information, see
-http://docs.mongodb.org/manual/tutorial/monitor\-with\-snmp\&.
+/tutorial/monitor\-with\-snmp\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-snmp\-master
 Runs SNMP as a master. For more information, see
-http://docs.mongodb.org/manual/tutorial/monitor\-with\-snmp\&.
+/tutorial/monitor\-with\-snmp\&.
+.UNINDENT
+.SS inMemory Options
+.INDENT 0.0
+.TP
+.B \-\-inMemorySizeGB <float>
+\fIDefault\fP: 50% of physical RAM less 1 GB
+.sp
+Changed in version 3.4: Values can range from 256MB to 10TB and can be a float.
+
+.sp
+Maximum amount of memory to allocate for in\-memory storage
+engine data, including indexes, oplog if the
+\fI\%mongod\fP is part of replica set, replica set or sharded
+cluster metadata, etc.
+.sp
+By default, the in\-memory storage engine uses 50% of physical RAM minus
+1 GB.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SS Encryption Key Management Options
+.INDENT 0.0
+.TP
+.B \-\-enableEncryption <boolean>
+\fIDefault\fP: False
+.sp
+New in version 3.2.
+
+.sp
+Enables encryption for the WiredTiger storage engine. You must set
+to \fBtrue\fP to pass in encryption keys and configurations.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-encryptionCipherMode <string>
+\fIDefault\fP: AES256\-CBC
+.sp
+New in version 3.2.
+
+.sp
+The cipher mode to use for encryption at rest:
+.TS
+center;
+|l|l|.
+_
+T{
+Mode
+T}	T{
+Description
+T}
+_
+T{
+\fBAES256\-CBC\fP
+T}	T{
+256\-bit Advanced Encryption Standard in Cipher Block Chaining
+Mode
+T}
+_
+T{
+\fBAES256\-GCM\fP
+T}	T{
+256\-bit Advanced Encryption Standard in Galois/Counter Mode
+.sp
+Available only on Linux.
+.sp
+Changed in version 4.0: MongoDB Enterprise on Windows no longer supports \fBAES256\-GCM\fP\&.
+T}
+_
+.TE
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-encryptionKeyFile <string>
+New in version 3.2.
+
+.sp
+The path to the local keyfile when managing keys via process \fIother
+than\fP KMIP. Only set when managing keys via process other than KMIP.
+If data is already encrypted using KMIP, MongoDB will throw an error.
+.sp
+Requires \fBenableEncryption\fP to be \fBtrue\fP\&.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-kmipKeyIdentifier <string>
+New in version 3.2.
+
+.sp
+Unique KMIP identifier for an existing key within the KMIP server.
+Include to use the key associated with the identifier as the system
+key. You can only use the setting the first time you enable
+encryption for the \fI\%mongod\fP instance. Requires
+\fBenableEncryption\fP to be true.
+.sp
+If unspecified, MongoDB will request that the KMIP server create a
+new key to utilize as the system key.
+.sp
+If the KMIP server cannot locate a key with the specified identifier
+or the data is already encrypted with a key, MongoDB will throw an
+error
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-kmipRotateMasterKey <boolean>
+\fIDefault\fP: False
+.sp
+New in version 3.2.
+
+.sp
+If true, rotate the master key and re\-encrypt the internal
+keystore.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.sp
+\fBSEE ALSO:\fP
+.INDENT 7.0
+.INDENT 3.5
+kmip\-master\-key\-rotation
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-kmipServerName <string>
+New in version 3.2.
+
+.sp
+Hostname or IP address of key management solution running a KMIP
+server. Requires \fBenableEncryption\fP to be true.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-kmipPort <number>
+\fIDefault\fP: 5696
+.sp
+New in version 3.2.
+
+.sp
+Port number the KMIP server is listening on. Requires that a
+\fBkmipServerName\fP be provided. Requires
+\fBenableEncryption\fP to be true.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-kmipClientCertificateFile <string>
+New in version 3.2.
+
+.sp
+String containing the path to the client certificate used for
+authenticating MongoDB to the KMIP server. Requires that a
+\fBkmipServerName\fP be provided.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-kmipClientCertificatePassword <string>
+New in version 3.2.
+
+.sp
+The password (if one exists) for the client certificate passed into
+\fBkmipClientCertificateFile\fP\&. Is used for
+authenticating MongoDB to the KMIP server. Requires that a
+\fBkmipClientCertificateFile\fP be provided.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-kmipServerCAFile <string>
+New in version 3.2.
+
+.sp
+Path to CA File. Used for validating secure client connection to
+KMIP server.
+.UNINDENT
+.SS Text Search Options
+.INDENT 0.0
+.TP
+.B \-\-basisTechRootDirectory <path>
+New in version 3.2.
+
+.sp
+Specify the root directory of the Basis Technology Rosette
+Linguistics Platform installation to support additional languages for
+text search operations.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2015
+2008-2018
 .\" Generated by docutils manpage writer.
 .

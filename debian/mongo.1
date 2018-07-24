@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGO" "1" "January 30, 2015" "3.0" "mongodb-manual"
+.TH "MONGO" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
 .SH NAME
 mongo \- MongoDB Shell
 .
@@ -30,21 +30,41 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.SS On this page
+.INDENT 0.0
+.IP \(bu 2
+\fI\%Description\fP
+.IP \(bu 2
+\fI\%Options\fP
+.IP \(bu 2
+\fI\%Files\fP
+.IP \(bu 2
+\fI\%Environment\fP
+.IP \(bu 2
+\fI\%Keyboard Shortcuts\fP
+.IP \(bu 2
+\fI\%Use\fP
+.UNINDENT
 .SH DESCRIPTION
 .sp
-\fBmongo\fP is an interactive JavaScript shell interface to
+\fI\%mongo\fP is an interactive JavaScript shell interface to
 MongoDB, which provides a powerful interface for systems
 administrators as well as a way for developers to test queries and
-operations directly with the database. \fBmongo\fP also provides
+operations directly with the database. \fI\%mongo\fP also provides
 a fully functional JavaScript environment for use with a MongoDB. This
-document addresses the basic invocation of the \fBmongo\fP shell
+document addresses the basic invocation of the \fI\%mongo\fP shell
 and an overview of its usage.
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Starting in version 4.0, \fI\%mongo\fP disables support for TLS 1.0
+encryption on systems where TLS 1.1+ is available. For
+more details, see 4.0\-disable\-tls\&.
+.UNINDENT
+.UNINDENT
 .SH OPTIONS
 .SS Core Options
-.INDENT 0.0
-.TP
-.B mongo
-.UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-shell
@@ -58,7 +78,7 @@ provides the user with a shell prompt after the file finishes executing.
 .B \-\-nodb
 Prevents the shell from connecting to any database instances. Later, to
 connect to a database within the shell, see
-\fImongo\-shell\-new\-connections\fP\&.
+mongo\-shell\-new\-connections\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -75,14 +95,14 @@ Silences output from the shell during the connection process.
 .TP
 .B \-\-port <port>
 Specifies the port where the \fBmongod\fP or \fBmongos\fP
-instance is listening. If \fI\-\-port\fP is not specified,
+instance is listening. If \fI\%\-\-port\fP is not specified,
 \fBmongo\fP attempts to connect to port \fB27017\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-host <hostname>
-Specifies the name of the host machine where the \fBmongod\fP or
-\fBmongos\fP is running. If this is not specified,
+Specifies the name of the host machine where the
+\fBmongod\fP or \fBmongos\fP is running. If this is not specified,
 \fBmongo\fP attempts to connect to a MongoDB process running on
 the localhost.
 .sp
@@ -98,6 +118,35 @@ following form:
 .fi
 .UNINDENT
 .UNINDENT
+.sp
+For TLS/SSL connections (\fB\-\-ssl\fP), \fBmongo\fP verifies that the
+hostname of the \fBmongod\fP or \fBmongos\fP to which you are connecting matches
+the CN or SAN of the \fBmongod\fP or \fBmongos\fP’s \fB\-\-sslPEMKeyFile\fP certificate.
+If the hostname does not match the CN/SAN, \fBmongo\fP will fail to
+connect.
+.sp
+For \fI\%DNS seedlist connections\fP, specify the connection protocol as
+\fBmongodb+srv\fP, followed by the DNS SRV hostname record and any
+options. The  \fBauthSource\fP and \fBreplicaSet\fP options, if included in
+the connection string, will override any corresponding DNS\-configured options
+set in the TXT record. Use of the \fBmongodb+srv:\fP connection string implicitly
+enables TLS/SSL (normally set with \fBssl=true\fP) for the client connection. The
+TLS/SSL option can be turned off by setting \fBssl=false\fP in the query string.
+.sp
+Example:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongodb+srv://server.example.com/?connectionTimeout=3000ms
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+New in version 3.6.
+
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -117,9 +166,9 @@ that uses authentication. Use in conjunction with the \fB\-\-password\fP and
 .TP
 .B \-\-password <password>, \-p <password>
 Specifies a password with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fI\-\-username\fP
-and \fI\-\-authenticationDatabase\fP options. To force \fBmongo\fP to
-prompt for a password, enter the \fI\-\-password\fP option as the
+that uses authentication. Use in conjunction with the \fI\%\-\-username\fP
+and \fI\%\-\-authenticationDatabase\fP options. To force \fBmongo\fP to
+prompt for a password, enter the \fI\%\-\-password\fP option as the
 last option and leave out the argument.
 .UNINDENT
 .INDENT 0.0
@@ -140,15 +189,71 @@ process.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ipv6
-Enables IPv6 support and allows the \fBmongo\fP to connect to the
-MongoDB instance using an IPv6 network. All MongoDB programs and
-processes disable IPv6 support by default.
+.B \-\-networkMessageCompressors <string>
+New in version 3.4.
+
+.sp
+.INDENT 7.0
+Changed in version 3.6: .IP \(bu 2
+Add support for zlib compressor.
+.IP \(bu 2
+Enabled by default. To disable, set to \fBdisabled\fP\&.
+.UNINDENT
+
+.sp
+Enables network compression for communication between this
+\fBmongo\fP shell and:
+.INDENT 7.0
+.IP \(bu 2
+a \fBmongod\fP instance
+.IP \(bu 2
+a \fBmongos\fP instance.
+.UNINDENT
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+Messages are compressed when both parties enable network
+compression. Otherwise, messages between the parties are
+uncompressed.
+.UNINDENT
+.UNINDENT
+.sp
+You can specify the following compressors:
+.INDENT 7.0
+.IP \(bu 2
+snappy (Default)
+.IP \(bu 2
+zlib
+.UNINDENT
+.sp
+If you specify multiple compressors, then the order in which you list
+the compressors matter as well as the communication initiator. For
+example, if a \fI\%mongo\fP shell specifies the following network
+compressors \fBzlib,snappy\fP and the \fBmongod\fP specifies
+\fBsnappy,zlib\fP, messages between \fI\%mongo\fP shell and
+\fBmongod\fP uses \fBzlib\fP\&.
+.sp
+If the parties do not share at least one common compressor, messages
+between the parties are uncompressed. For example, if a
+\fI\%mongo\fP shell specifies the network compressor
+\fBzlib\fP and \fBmongod\fP specifies \fBsnappy\fP, messages
+between \fI\%mongo\fP shell and \fBmongod\fP are not compressed.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B <db address>
-Specifies the "database address" of the database to connect to. For
+.B \-\-ipv6
+\fIRemoved in version 3.0.\fP
+.sp
+Enables IPv6 support and allows \fBmongo\fP to connect to the
+MongoDB instance using an IPv6 network. Prior to MongoDB 3.0, you
+had to specify \fI\%\-\-ipv6\fP to use IPv6. In MongoDB 3.0 and later, IPv6
+is always enabled.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B <db name>
+Specifies the name of the database to connect to. For
 example:
 .INDENT 7.0
 .INDENT 3.5
@@ -162,7 +267,7 @@ mongo admin
 .UNINDENT
 .sp
 The above command will connect the \fBmongo\fP shell to the
-\fIadmin database\fP on the local machine. You may specify a remote
+admin database of the MongoDB deployment running on the local machine. You may specify a remote
 database instance, with the resolvable hostname or IP address. Separate
 the database name from the hostname using a \fB/\fP character. See the
 following examples:
@@ -171,7 +276,7 @@ following examples:
 .sp
 .nf
 .ft C
-mongo mongodb1.example.net
+mongo mongodb1.example.net/test
 mongo mongodb1/admin
 mongo 10.8.8.10/test
 .ft P
@@ -182,7 +287,84 @@ mongo 10.8.8.10/test
 This syntax is the \fIonly\fP way to connect to a specific database.
 .sp
 To specify alternate hosts and a database, you must use this syntax and cannot
-use \fI\-\-host\fP or \fI\-\-port\fP\&.
+use \fI\%\-\-host\fP or \fI\%\-\-port\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-enableJavaScriptJIT
+New in version 4.0.
+
+.sp
+Enable the JavaScript engine’s JIT compiler.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-disableJavaScriptJIT
+Changed in version 4.0: The JavaScript engine’s JIT compiler is now disabled by default.
+
+.sp
+Disables the JavaScript engine’s JIT compiler.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-disableJavaScriptProtection
+New in version 3.4.
+
+.sp
+Allows fields of type javascript and
+javascriptWithScope to be automatically
+marshalled to JavaScript functions in the \fI\%mongo\fP
+shell.
+.sp
+With the \fB\-\-disableJavaScriptProtection\fP flag set, it is possible
+to immediately execute JavaScript functions contained in documents.
+The following example demonstrates this behavior within the shell:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+> db.test.insert({ _id: 1, jsFunc: function(){ print("hello") } } )
+WriteResult({ "nInserted" : 1 })
+> var doc = db.test.findOne({ _id: 1 })
+> doc
+{ "_id" : 1, "jsFunc" : function (){ print ("hello") } }
+> typeof doc.jsFunc
+function
+> doc.jsFunc()
+hello
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The default behavior (when \fI\%mongo\fP starts \fIwithout\fP the
+\fB\-\-disableJavaScriptProtection\fP flag) is to convert embedded
+JavaScript functions to the non\-executable MongoDB shell type
+\fBCode\fP\&. The following example demonstrates the default behavior
+within the shell:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+> db.test.insert({ _id: 1, jsFunc: function(){ print("hello") } } )
+WriteResult({ "nInserted" : 1 })
+> var doc = db.test.findOne({ _id: 1 })
+> doc
+{ "_id" : 1, "jsFunc" : { "code" : "function (){print(\e"hello\e")}" } }
+> typeof doc.func
+object
+> doc.func instanceof Code
+true
+> doc.jsFunc()
+2016\-11\-09T12:30:36.808\-0800 E QUERY    [thread1] TypeError: doc.jsFunc is
+not a function :
+@(shell):1:1
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -195,8 +377,8 @@ be the last option specified.
 .sp
 To specify a JavaScript file to execute \fIand\fP allow
 \fBmongo\fP to prompt you for a password using
-\fI\-\-password\fP, pass the filename as the first parameter with
-\fI\-\-username\fP and \fI\-\-password\fP as the last options, as
+\fI\%\-\-password\fP, pass the filename as the first parameter with
+\fI\%\-\-username\fP and \fI\%\-\-password\fP as the last options, as
 in the following:
 .INDENT 0.0
 .INDENT 3.5
@@ -218,28 +400,26 @@ finishes running.
 .INDENT 0.0
 .TP
 .B \-\-authenticationDatabase <dbname>
-New in version 2.4.
-
+Specifies the database in which the user is created.
+See user\-authentication\-database\&.
 .sp
-Specifies the database that holds the user\(aqs credentials.
-.sp
-If you do not specify a value for \fI\-\-authenticationDatabase\fP, \fBmongo\fP uses the database
+If you do not specify a value for \fI\%\-\-authenticationDatabase\fP, \fBmongo\fP uses the database
 specified in the connection string.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationMechanism <name>
-\fIDefault\fP: MONGODB\-CR
-.sp
-New in version 2.4.
-
-.sp
-Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBMONGODB\-X509\fP authentication
-mechanisms.
-
+\fIDefault\fP: SCRAM\-SHA\-1
 .sp
 Specifies the authentication mechanism the \fBmongo\fP instance uses to
 authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+.sp
+Changed in version 4.0: MongoDB removes support for the deprecated MongoDB
+Challenge\-Response (\fBMONGODB\-CR\fP) authentication mechanism.
+.sp
+MongoDB adds support for SCRAM mechanism using the SHA\-256 hash
+function (\fBSCRAM\-SHA\-256\fP).
+
 .TS
 center;
 |l|l|.
@@ -251,31 +431,45 @@ Description
 T}
 _
 T{
-MONGODB\-CR
+SCRAM\-SHA\-1
 T}	T{
-MongoDB challenge/response authentication.
+\fI\%RFC 5802\fP standard
+Salted Challenge Response Authentication Mechanism using the SHA\-1
+hash function.
+T}
+_
+T{
+SCRAM\-SHA\-256
+T}	T{
+\fI\%RFC 7677\fP standard
+Salted Challenge Response Authentication Mechanism using the SHA\-256
+hash function.
+.sp
+Requires featureCompatibilityVersion set to \fB4.0\fP\&.
+.sp
+New in version 4.0.
 T}
 _
 T{
 MONGODB\-X509
 T}	T{
-MongoDB SSL certificate authentication.
+MongoDB TLS/SSL certificate authentication.
 T}
 _
 T{
-PLAIN
+GSSAPI (Kerberos)
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%MongoDB Enterprise\fP\&.
+T}
+_
+T{
+PLAIN (LDAP SASL)
 T}	T{
 External authentication using LDAP. You can also use \fBPLAIN\fP
 for authenticating in\-database users. \fBPLAIN\fP transmits
 passwords in plain text. This mechanism is available only in
 \fI\%MongoDB Enterprise\fP\&.
-T}
-_
-T{
-GSSAPI
-T}	T{
-External authentication using Kerberos. This mechanism is
-available only in \fI\%MongoDB Enterprise\fP\&.
 T}
 _
 .TE
@@ -286,7 +480,7 @@ _
 New in version 2.6.
 
 .sp
-Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
+Specify the hostname of a service using GSSAPI/Kerberos\&. \fIOnly\fP required if the hostname of a machine does
 not match the hostname resolved by DNS.
 .sp
 This option is available only in MongoDB Enterprise.
@@ -297,31 +491,38 @@ This option is available only in MongoDB Enterprise.
 New in version 2.6.
 
 .sp
-Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
+Specify the name of the service using GSSAPI/Kerberos\&. Only required if the service does not use the
 default name of \fBmongodb\fP\&.
 .sp
 This option is available only in MongoDB Enterprise.
 .UNINDENT
-.SS SSL Options
+.SS TLS/SSL Options
 .INDENT 0.0
 .TP
 .B \-\-ssl
-New in version 2.2.
+Changed in version 3.2.6.
 
 .sp
 Enables connection to a \fBmongod\fP or \fBmongos\fP that has
-SSL support enabled.
+TLS/SSL support enabled.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+Starting in version 3.2.6, if \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP is
+not specified, the system\-wide CA certificate store will be used
+when connecting to an TLS/SSL\-enabled server. In previous versions
+of MongoDB, the \fI\%mongo\fP shell exited with an error that
+it could not validate the certificate.
+.sp
+If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
+must be specified.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslPEMKeyFile <filename>
-New in version 2.4.
-
-.sp
-Specifies the \fB\&.pem\fP file that contains both the SSL certificate
+Specifies the \fB\&.pem\fP file that contains both the TLS/SSL certificate
 and key. Specify the file name of the \fB\&.pem\fP file using relative
 or absolute paths.
 .sp
@@ -330,68 +531,56 @@ to a \fBmongod\fP or \fBmongos\fP that has
 \fBCAFile\fP enabled \fIwithout\fP
 \fBallowConnectionsWithoutCertificates\fP\&.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslPEMKeyPassword <value>
-New in version 2.4.
-
-.sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fB\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
+\fB\-\-sslPEMKeyFile\fP). Use the \fI\%\-\-sslPEMKeyPassword\fP option only if the
 certificate\-key file is encrypted. In all cases, the \fBmongo\fP will
 redact the password from all logging and reporting output.
 .sp
-Changed in version 2.6: If the private key in the PEM file is encrypted and you do not
-specify the \fI\-\-sslPEMKeyPassword\fP option, the \fBmongo\fP will prompt for a
-passphrase. See \fIssl\-certificate\-password\fP\&.
-
+If the private key in the PEM file is encrypted and you do not
+specify the \fI\%\-\-sslPEMKeyPassword\fP option, the \fBmongo\fP will prompt for a
+passphrase. See ssl\-certificate\-password\&.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslCAFile <filename>
-New in version 2.4.
-
-.sp
 Specifies the \fB\&.pem\fP file that contains the root certificate chain
 from the Certificate Authority. Specify the file name of the
 \fB\&.pem\fP file using relative or absolute paths.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+Starting in version 3.2.6, if \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP is
+not specified, the system\-wide CA certificate store will be used
+when connecting to an TLS/SSL\-enabled server. In previous versions
+of MongoDB, the \fI\%mongo\fP shell exited with an error that
+it could not validate the certificate.
 .sp
-\fBWARNING:\fP
-.INDENT 7.0
-.INDENT 3.5
-If the \fBmongo\fP shell or any other tool that connects to
-\fBmongos\fP or \fBmongod\fP is run without
-\fI\-\-sslCAFile\fP, it will not attempt to validate
-server certificates. This results in vulnerability to expired
-\fBmongod\fP and \fBmongos\fP certificates as well as to foreign
-processes posing as valid \fBmongod\fP or \fBmongos\fP
-instances. Ensure that you \fIalways\fP specify the CA file against which
-server certificates should be validated in cases where intrusion is a
-possibility.
-.UNINDENT
-.UNINDENT
+If using x.509 authentication, \fB\-\-sslCAFile\fP or \fBssl.CAFile\fP
+must be specified.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslCRLFile <filename>
-New in version 2.4.
-
-.sp
 Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -401,30 +590,61 @@ New in version 2.6.
 .sp
 Directs the \fBmongo\fP to use the FIPS mode of the installed OpenSSL
 library. Your system must have a FIPS compliant OpenSSL library to use
-the \fI\-\-sslFIPSMode\fP option.
+the \fI\%\-\-sslFIPSMode\fP option.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-FIPS Compatible SSL is
+FIPS\-compatible TLS/SSL is
 available only in \fI\%MongoDB Enterprise\fP\&. See
-http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+/tutorial/configure\-fips for more information.
 .UNINDENT
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslAllowInvalidCertificates
-New in version 2.6.
-
-.sp
 Bypasses the validation checks for server certificates and allows
-the use of invalid certificates. When using the
-\fBallowInvalidCertificates\fP setting, MongoDB logs as a
-warning the use of the invalid certificate.
+the use of invalid certificates to connect.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Starting in MongoDB 4.0, if you specify
+\fB\-\-sslAllowInvalidCertificates\fP or \fBssl.allowInvalidCertificates:
+true\fP when using x.509 authentication, an invalid certificate is
+only sufficient to establish a TLS/SSL connection but is
+\fIinsufficient\fP for authentication.
+.UNINDENT
+.UNINDENT
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+For TLS/SSL connections to \fBmongod\fP and
+\fBmongos\fP, avoid using
+\fB\-\-sslAllowInvalidCertificates\fP if possible and only use
+\fB\-\-sslAllowInvalidCertificates\fP on systems where intrusion is
+not possible.
+.sp
+If the \fI\%mongo\fP shell (and other
+mongodb\-tools\-support\-ssl) runs with the
+\fB\-\-sslAllowInvalidCertificates\fP option, the
+\fI\%mongo\fP shell (and other
+mongodb\-tools\-support\-ssl) will not attempt to validate
+the server certificates. This creates a vulnerability to expired
+\fBmongod\fP and \fBmongos\fP certificates as
+well as to foreign processes posing as valid
+\fBmongod\fP or \fBmongos\fP instances.
+.UNINDENT
+.UNINDENT
+.sp
+When using the \fBallowInvalidCertificates\fP setting,
+MongoDB logs as a warning the use of the invalid certificate.
+.sp
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -432,49 +652,78 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 New in version 3.0.
 
 .sp
-Disables the validation of the hostnames in SSL certificates. Allows
-\fBmongo\fP to connect to MongoDB instances if the hostname their
+Disables the validation of the hostnames in TLS/SSL certificates. Allows
+\fBmongo\fP to connect to MongoDB instances even if the hostname in their
 certificates do not match the specified hostname.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+For more information about TLS/SSL and MongoDB, see
+/tutorial/configure\-ssl and
+/tutorial/configure\-ssl\-clients .
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslDisabledProtocols <string>
+Disables the specified TLS protocols. The option recognizes the
+following protocols: \fBTLS1_0\fP, \fBTLS1_1\fP, and \fBTLS1_2\fP:
+.INDENT 7.0
+.IP \(bu 2
+On macOS, you cannot disable \fBTLS1_1\fP and leave both \fBTLS1_0\fP and
+\fBTLS1_2\fP enabled. You must also disable at least one of the other
+two; for example, \fBTLS1_0,TLS1_1\fP\&.
+.IP \(bu 2
+To list multiple protocols, specify as a comma separated list of
+protocols. For example \fBTLS1_0,TLS1_1\fP\&.
+.IP \(bu 2
+The specified disabled protocols overrides any default disabled
+protocols.
+.UNINDENT
+.sp
+Starting in version 4.0, MongoDB disables the use of TLS 1.0 if TLS
+1.1+ is available on the system. To enable the
+disabled TLS 1.0, specify \fBnone\fP to \fI\%\-\-sslDisabledProtocols\fP\&.  See 4.0\-disable\-tls\&.
+.sp
+New in version 3.6.5.
+
+.UNINDENT
+.SS Sessions
+.INDENT 0.0
+.TP
+.B \-\-retryWrites
+New in version 3.6.
+
+.sp
+Enables retryable writes as the default for sessions in the
+\fI\%mongo\fP shell.
+.sp
+For more information on sessions, see sessions\&.
 .UNINDENT
 .SH FILES
 .INDENT 0.0
 .TP
 .B \fB~/.dbshell\fP
-\fBmongo\fP maintains a history of commands in the \fB\&.dbshell\fP
+\fI\%mongo\fP maintains a history of commands in the \fB\&.dbshell\fP
 file.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-\fBmongo\fP does not recorded interaction related to
+\fI\%mongo\fP does not record interaction related to
 authentication in the history file, including
 \fBauthenticate\fP and \fBdb.createUser()\fP\&.
-.UNINDENT
-.UNINDENT
-.sp
-\fBWARNING:\fP
-.INDENT 7.0
-.INDENT 3.5
-Versions of Windows \fBmongo.exe\fP earlier than 2.2.0 will
-save the \fI\&.dbshell\fP file in the \fBmongo.exe\fP working
-directory.
 .UNINDENT
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \fB~/.mongorc.js\fP
-\fBmongo\fP will read the \fB\&.mongorc.js\fP file from the home
-directory of the user invoking \fBmongo\fP\&. In the file, users
-can define variables, customize the \fBmongo\fP shell prompt,
+\fI\%mongo\fP will read the \fB\&.mongorc.js\fP file from the home
+directory of the user invoking \fI\%mongo\fP\&. In the file, users
+can define variables, customize the \fI\%mongo\fP shell prompt,
 or update information that they would like updated every time they
 launch a shell. If you use the shell to evaluate a JavaScript file
-or expression either on the command line with \fI\%\-\-eval\fP or
+or expression either on the command line with \fI\%mongo \-\-eval\fP or
 by specifying \fI\%a .js file to mongo\fP,
-\fBmongo\fP will read the \fB\&.mongorc.js\fP file \fIafter\fP the
+\fI\%mongo\fP will read the \fB\&.mongorc.js\fP file \fIafter\fP the
 JavaScript has finished processing.
 .sp
 Specify the \fI\%\-\-norc\fP option to disable
@@ -483,27 +732,27 @@ reading \fB\&.mongorc.js\fP\&.
 .INDENT 0.0
 .TP
 .B \fB/etc/mongorc.js\fP
-Global \fBmongorc.js\fP file which the \fBmongo\fP shell
+Global \fBmongorc.js\fP file which the \fI\%mongo\fP shell
 evaluates upon start\-up. If a user also has a \fB\&.mongorc.js\fP
-file located in the \fI\%HOME\fP directory, the \fBmongo\fP
+file located in the \fI\%HOME\fP directory, the \fI\%mongo\fP
 shell evaluates the global \fB/etc/mongorc.js\fP file \fIbefore\fP
-evaluating the user\(aqs \fB\&.mongorc.js\fP file.
+evaluating the user’s \fB\&.mongorc.js\fP file.
 .sp
 \fB/etc/mongorc.js\fP must have read permission for the user
-running the shell. The \fI\%\-\-norc\fP option for \fBmongo\fP
-suppresses only the user\(aqs \fB\&.mongorc.js\fP file.
+running the shell. The \fI\%\-\-norc\fP option for \fI\%mongo\fP
+suppresses only the user’s \fB\&.mongorc.js\fP file.
 .sp
 On Windows, the global \fBmongorc.js </etc/mongorc.js>\fP exists
 in the \fB%ProgramData%\eMongoDB\fP directory.
 .TP
-.B \fB/tmp/mongo_edit\fI<time_t>\fP\&.js\fP
-Created by \fBmongo\fP when editing a file. If the file exists,
-\fBmongo\fP will append an integer from \fB1\fP to \fB10\fP to the
+.B \fB/tmp/mongo_edit\fP\fI<time_t>\fP\fB\&.js\fP
+Created by \fI\%mongo\fP when editing a file. If the file exists,
+\fI\%mongo\fP will append an integer from \fB1\fP to \fB10\fP to the
 time value to attempt to create a unique file.
 .TP
-.B \fB%TEMP%mongo_edit\fI<time_t>\fP\&.js\fP
+.B \fB%TEMP%mongo_edit\fP\fI<time_t>\fP\fB\&.js\fP
 Created by \fBmongo.exe\fP on Windows when editing a file. If
-the file exists, \fBmongo\fP will append an integer from \fB1\fP
+the file exists, \fI\%mongo\fP will append an integer from \fB1\fP
 to \fB10\fP to the time value to attempt to create a unique file.
 .UNINDENT
 .SH ENVIRONMENT
@@ -517,7 +766,7 @@ command.  A JavaScript variable \fBEDITOR\fP will override the value of
 .INDENT 0.0
 .TP
 .B HOME
-Specifies the path to the home directory where \fBmongo\fP will
+Specifies the path to the home directory where \fI\%mongo\fP will
 read the \fB\&.mongorc.js\fP file and write the \fB\&.dbshell\fP
 file.
 .UNINDENT
@@ -525,19 +774,19 @@ file.
 .TP
 .B HOMEDRIVE
 On Windows systems, \fI\%HOMEDRIVE\fP specifies the path the
-directory where \fBmongo\fP will read the \fB\&.mongorc.js\fP
+directory where \fI\%mongo\fP will read the \fB\&.mongorc.js\fP
 file and write the \fB\&.dbshell\fP file.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B HOMEPATH
 Specifies the Windows path to the home directory where
-\fBmongo\fP will read the \fB\&.mongorc.js\fP file and write
+\fI\%mongo\fP will read the \fB\&.mongorc.js\fP file and write
 the \fB\&.dbshell\fP file.
 .UNINDENT
 .SH KEYBOARD SHORTCUTS
 .sp
-The \fBmongo\fP shell supports the following keyboard shortcuts:
+The \fI\%mongo\fP shell supports the following keyboard shortcuts:
 [1]
 .TS
 center;
@@ -630,13 +879,13 @@ _
 T{
 Ctrl\-C
 T}	T{
-Exit the \fBmongo\fP shell
+Exit the \fI\%mongo\fP shell
 T}
 _
 T{
 Ctrl\-D
 T}	T{
-Delete a char (or exit the \fBmongo\fP shell)
+Delete a char (or exit the \fI\%mongo\fP shell)
 T}
 _
 T{
@@ -810,11 +1059,11 @@ _
 .TE
 .IP [1] 5
 MongoDB accommodates multiple keybinding.
-Since 2.0, \fBmongo\fP includes support for basic emacs
+Since 2.0, \fI\%mongo\fP includes support for basic emacs
 keybindings.
 .SH USE
 .sp
-Typically users invoke the shell with the \fBmongo\fP command at
+Typically users invoke the shell with the \fI\%mongo\fP command at
 the system prompt. Consider the following examples for other
 scenarios.
 .sp
@@ -844,7 +1093,7 @@ mongo \-u <user> \-p <pass> \-\-host <host> \-\-port 28015
 .UNINDENT
 .sp
 Replace \fB<user>\fP, \fB<pass>\fP, and \fB<host>\fP with the appropriate
-values for your situation and substitute or omit the \fI\-\-port\fP
+values for your situation and substitute or omit the \fI\%\-\-port\fP
 as needed.
 .sp
 To execute a JavaScript file without evaluating the \fB~/.mongorc.js\fP
@@ -873,8 +1122,8 @@ mongo script\-file.js \-u <user> \-p
 .UNINDENT
 .UNINDENT
 .sp
-To print return a query as \fIJSON\fP, from the system prompt using
-the \fI\-\-eval\fP option, use the following form:
+To print return a query as JSON, from the system prompt using
+the \fI\%\-\-eval\fP option, use the following form:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -888,24 +1137,23 @@ mongo \-\-eval \(aqdb.collection.find().forEach(printjson)\(aq
 .sp
 Use single quotes (e.g. \fB\(aq\fP) to enclose the JavaScript, as well as
 the additional JavaScript required to generate this output.
-.SH ADDITIONAL INFORMATION
+.sp
+\fBSEE ALSO:\fP
+.INDENT 0.0
+.INDENT 3.5
 .INDENT 0.0
 .IP \(bu 2
-http://docs.mongodb.org/manual/reference/mongo\-shell
+/reference/mongo\-shell
 .IP \(bu 2
-http://docs.mongodb.org/manual/reference/method
+/reference/method
 .IP \(bu 2
-http://docs.mongodb.org/manual/tutorial/access\-mongo\-shell\-help
-.IP \(bu 2
-http://docs.mongodb.org/manual/tutorial/getting\-started\-with\-the\-mongo\-shell
-.IP \(bu 2
-http://docs.mongodb.org/manual/core/shell\-types
-.IP \(bu 2
-http://docs.mongodb.org/manual/tutorial/write\-scripts\-for\-the\-mongo\-shell
+/mongo
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2015
+2008-2018
 .\" Generated by docutils manpage writer.
 .

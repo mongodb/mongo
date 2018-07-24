@@ -1,8 +1,8 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOIMPORT" "1" "January 30, 2015" "3.0" "mongodb-manual"
+.TH "MONGOIMPORT" "1" "Jun 21, 2018" "4.0" "mongodb-manual"
 .SH NAME
-mongoimport \- MongoDB Import Utility
+mongoimport \- MongoDB LDAP Configuration Testing Utility
 .
 .nr rst2man-indent-level 0
 .
@@ -30,629 +30,689 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
+.SS On this page
+.INDENT 0.0
+.IP \(bu 2
+\fI\%Synopsis\fP
+.IP \(bu 2
+\fI\%Usage\fP
+.IP \(bu 2
+\fI\%Options\fP
+.UNINDENT
+.sp
+New in version 3.4: MongoDB Enterprise
+
 .SH SYNOPSIS
 .sp
-The \fBmongoimport\fP tool provides a route to import content from a
-JSON, CSV, or TSV export created by \fBmongoexport\fP, or
-potentially, another third\-party export tool. See the
-http://docs.mongodb.org/manual/core/import\-export document for a more in depth
-usage overview, and the \fBmongoexport\fP document for more
-information regarding \fBmongoexport\fP, which
-provides the inverse "exporting" capability.
-.SH CONSIDERATIONS
+Starting in version 3.4, MongoDB Enterprise provides
+\fI\%mongoldap\fP for testing MongoDB’s LDAP configuration
+options against a running LDAP server or set
+of servers.
 .sp
-Do not use \fBmongoimport\fP and \fBmongoexport\fP for
-full instance, production backups because they will not reliably capture data type
-information. Use \fBmongodump\fP and \fBmongorestore\fP as
-described in http://docs.mongodb.org/manual/core/backups for this kind of
-functionality.
+To validate the LDAP options in the configuration file, set the
+\fI\%mongoldap\fP \fI\%\-\-config\fP option to the configuration file’s
+path.
 .sp
-\fBmongoimport\fP is single\-threaded and inserts one document at
-a time into MongoDB. Custom import tools for data ingestion may have
-better performance for specific workloads.
-.SH OPTIONS
+To test the LDAP configuration options, you must specify a \fI\%\-\-user\fP
+and \fB\-\-password\fP\&. \fI\%mongoldap\fP simulates authentication to a
+MongoDB server running with the provided configuration options and credentials.
 .sp
-Changed in version 3.0.0: \fBmongoimport\fP removed the \fB\-\-dbpath\fP as well as related
-\fB\-\-directoryperdb\fP and \fB\-\-journal\fP options. You must use
-\fBmongoimport\fP while connected to a \fBmongod\fP instance.
-
-.INDENT 0.0
-.TP
-.B mongoimport
-.UNINDENT
-.INDENT 0.0
-.TP
-.B mongoimport
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-help
-Returns information on the options and use of \fBmongoimport\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-verbose, \-v
-Increases the amount of internal reporting returned on standard output
-or in log files. Increase the verbosity with the \fB\-v\fP form by
-including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-quiet
-Runs the \fBmongoimport\fP in a quiet mode that attempts to limit the amount
-of output.
+\fI\%mongoldap\fP returns a report that includes the success or failure of
+any step in the LDAP authentication or authorization procedure. Error messages
+include information on specific errors encountered and potential advice for
+resolving the error.
 .sp
-This option suppresses:
-.INDENT 7.0
-.IP \(bu 2
-output from \fIdatabase commands\fP
-.IP \(bu 2
-replication activity
-.IP \(bu 2
-connection accepted events
-.IP \(bu 2
-connection closed events
-.UNINDENT
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-version
-Returns the \fBmongoimport\fP release number.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-host <hostname><:port>, \-h <hostname><:port>
-\fIDefault\fP: localhost:27017
+When configuring options related to LDAP authorization, \fI\%mongoldap\fP executes an LDAP query
+constructed using the provided configuration options and username, and returns
+a list of roles on the \fBadmin\fP database which the user is authorized for.
 .sp
-Specifies a resolvable hostname for the \fBmongod\fP to which to
-connect. By default, the \fBmongoimport\fP attempts to connect to a MongoDB
-instance running on the localhost on port number \fB27017\fP\&.
+You can use this information when configuring LDAP authorization roles for user access control. For example, use
+\fI\%mongoldap\fP to ensure your configuration allows privileged users to
+gain the necessary roles to perform their expected tasks. Similarly, use
+\fI\%mongoldap\fP to ensure your configuration disallows non\-privileged
+users from gaining roles for accessing the MongoDB server, or performing
+unauthorized actions.
 .sp
-To connect to a replica set, specify the
-\fBreplSetName\fP and a seed list of set members, as in
-the following:
-.INDENT 7.0
+When configuring options related to LDAP authentication, use \fI\%mongoldap\fP to ensure that the authentication
+operation works as expected.
+.sp
+Run \fI\%mongoldap\fP from the system command line, not the \fBmongo\fP shell.
+.sp
+This document provides a complete overview of all command line options for
+\fI\%mongoldap\fP\&.
+.SH USAGE
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+A full description of LDAP or Active Directory is beyond the scope of
+this documentation.
+.UNINDENT
+.UNINDENT
+.sp
+Consider the following sample configuration file, designed to support
+LDAP authentication and authorization via Active Directory:
+.INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+security:
+   authorization: "enabled"
+   ldap:
+      servers: "activedirectory.example.net"
+      bind:
+         queryUser: "mongodbadmin@dba.example.com"
+         queryPassword: "secret123"
+      userToDNMapping:
+         \(aq[
+            {
+               match : "(.+)",
+               ldapQuery: "DC=example,DC=com??sub?(userPrincipalName={0})"
+            }
+         ]\(aq
+      authz:
+         queryTemplate: "DC=example,DC=com??sub?(&(objectClass=group)(member:1.2.840.113556.1.4.1941:={USER}))"
+setParameter:
+   authenticationMechanisms: "PLAIN"
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-You can always connect directly to a single MongoDB instance by
-specifying the host and port number directly.
-.sp
-Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP format, you must
-enclose the portion of an address and port combination in
-brackets (e.g. \fB[<address>]\fP).
-
-.UNINDENT
+You can use \fI\%mongoldap\fP to validate the configuration file, which
+returns a report of the procedure. You must specify a username and password
+for \fI\%mongoldap\fP\&.
 .INDENT 0.0
-.TP
-.B \-\-port <port>
-\fIDefault\fP: 27017
-.sp
-Specifies the TCP port on which the MongoDB instance listens for
-client connections.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-ipv6
-Enables IPv6 support and allows the \fBmongoimport\fP to connect to the
-MongoDB instance using an IPv6 network. All MongoDB programs and
-processes disable IPv6 support by default.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-ssl
-New in version 2.6.
-
-.sp
-Enables connection to a \fBmongod\fP or \fBmongos\fP that has
-SSL support enabled.
-.sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-sslCAFile <filename>
-New in version 2.6.
-
-.sp
-Specifies the \fB\&.pem\fP file that contains the root certificate chain
-from the Certificate Authority. Specify the file name of the
-\fB\&.pem\fP file using relative or absolute paths.
-.sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
-.sp
-\fBWARNING:\fP
-.INDENT 7.0
 .INDENT 3.5
-If the \fBmongo\fP shell or any other tool that connects to
-\fBmongos\fP or \fBmongod\fP is run without
-\fI\-\-sslCAFile\fP, it will not attempt to validate
-server certificates. This results in vulnerability to expired
-\fBmongod\fP and \fBmongos\fP certificates as well as to foreign
-processes posing as valid \fBmongod\fP or \fBmongos\fP
-instances. Ensure that you \fIalways\fP specify the CA file against which
-server certificates should be validated in cases where intrusion is a
-possibility.
+.sp
+.nf
+.ft C
+mongoldap \-\-config <path\-to\-config> \-\-user "bob@dba.example.com" \-\-password "secret123"
+.ft P
+.fi
 .UNINDENT
 .UNINDENT
+.sp
+If the provided credentials are valid, and the LDAP options in the
+configuration files are valid, the output might be as follows:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+Checking that an LDAP server has been specified...
+[OK] LDAP server found
+
+Connecting to LDAP server...
+[OK] Connected to LDAP server
+
+Parsing MongoDB to LDAP DN mappings..
+[OK] MongoDB to LDAP DN mappings appear to be valid
+
+Attempting to authenticate against the LDAP server...
+[OK] Successful authentication performed
+
+Checking if LDAP authorization has been enabled by configuration...
+[OK] LDAP authorization enabled
+
+Parsing LDAP query template..
+[OK] LDAP query configuration template appears valid
+
+Executing query against LDAP server...
+[OK] Successfully acquired the following roles:
+\&...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SH OPTIONS
+.INDENT 0.0
+.TP
+.B \-\-config <filename>, \-f <filename>
+Specifies a configuration file for runtime configuration options.
+The options are equivalent to the command\-line
+configuration options. See /reference/configuration\-options for
+more information.
+.sp
+\fBmongoldap\fP uses any configuration options related to security\-ldap
+or security\-ldap\-external for testing LDAP authentication or
+authorization.
+.sp
+Requires specifying \fI\%\-\-user\fP\&. May accept \fI\%\-\-password\fP for
+testing LDAP authentication.
+.sp
+Ensure the configuration file uses ASCII encoding. The \fBmongoldap\fP
+instance does not support configuration files with non\-ASCII encoding,
+including UTF\-8.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyFile <filename>
-New in version 2.6.
-
-.sp
-Specifies the \fB\&.pem\fP file that contains both the SSL certificate
-and key. Specify the file name of the \fB\&.pem\fP file using relative
-or absolute paths.
-.sp
-This option is required when using the \fI\-\-ssl\fP option to connect
-to a \fBmongod\fP or \fBmongos\fP that has
-\fBCAFile\fP enabled \fIwithout\fP
-\fBallowConnectionsWithoutCertificates\fP\&.
-.sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.B \-\-user <string>
+Username for \fBmongoldap\fP to use when attempting LDAP authentication or
+authorization.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslPEMKeyPassword <value>
-New in version 2.6.
-
-.sp
-Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fI\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
-certificate\-key file is encrypted. In all cases, the \fBmongoimport\fP will
-redact the password from all logging and reporting output.
-.sp
-If the private key in the PEM file is encrypted and you do not specify
-the \fI\-\-sslPEMKeyPassword\fP option, the \fBmongoimport\fP will prompt for a passphrase. See
-\fIssl\-certificate\-password\fP\&.
-.sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.B \-\-password <string>
+Password of the \fB\-\-user\fP for \fBmongoldap\fP to use when attempting LDAP
+authentication. Not required for LDAP authorization.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslCRLFile <filename>
-New in version 2.6.
+.B \-\-ldapServers <host1>:<port>,<host2>:<port>,...,<hostN>:<port>
+New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
-Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
-List. Specify the file name of the \fB\&.pem\fP file using relative or
-absolute paths.
+The LDAP server against which the \fBmongoldap\fP executes LDAP operations
+against to authenticate users or determine what actions a user is authorized
+to perform on a given database. If the LDAP server specified has any
+replicated instances, you may specify the host and port of each replicated
+server in a comma\-delimited list.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+If your LDAP infrastrucure partitions the LDAP directory over multiple LDAP
+servers, specify \fIone\fP LDAP server any of its replicated instances to
+\fI\%\-\-ldapServers\fP\&. MongoDB supports following LDAP referrals as defined in \fI\%RFC 4511
+4.1.10\fP\&. Do not use \fI\%\-\-ldapServers\fP
+for listing every LDAP server in your infrastucture.
+.sp
+This setting can be configured on a running \fBmongoldap\fP using
+\fBsetParameter\fP\&.
+.sp
+If unset, \fBmongoldap\fP cannot use LDAP authentication or authorization\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-sslAllowInvalidCertificates
-New in version 2.6.
+.B \-\-ldapQueryUser <string>
+New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
-Bypasses the validation checks for server certificates and allows
-the use of invalid certificates. When using the
-\fBallowInvalidCertificates\fP setting, MongoDB logs as a
-warning the use of the invalid certificate.
+The identity with which \fBmongoldap\fP binds as, when connecting to or
+performing queries on an LDAP server.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+Only required if any of the following are true:
+.INDENT 7.0
+.IP \(bu 2
+Using LDAP authorization\&.
+.IP \(bu 2
+Using an LDAP query for \fI\%username transformation\fP\&.
+.IP \(bu 2
+The LDAP server disallows anonymous binds
 .UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-sslAllowInvalidHostnames
-New in version 3.0.
-
 .sp
-Disables the validation of the hostnames in SSL certificates. Allows
-\fBmongoimport\fP to connect to MongoDB instances if the hostname their
-certificates do not match the specified hostname.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-sslFIPSMode
-New in version 2.6.
-
+You must use \fI\%\-\-ldapQueryUser\fP with \fI\%\-\-ldapQueryPassword\fP\&.
 .sp
-Directs the \fBmongoimport\fP to use the FIPS mode of the installed OpenSSL
-library. Your system must have a FIPS compliant OpenSSL library to use
-the \fI\-\-sslFIPSMode\fP option.
+If unset, \fBmongoldap\fP will not attempt to bind to the LDAP server.
+.sp
+This setting can be configured on a running \fBmongoldap\fP using
+\fBsetParameter\fP\&.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-FIPS Compatible SSL is
-available only in \fI\%MongoDB Enterprise\fP\&. See
-http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+Windows MongoDB deployments can use \fI\%\-\-ldapBindWithOSDefaults\fP
+instead of \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapQueryPassword\fP\&. You cannot specify
+both \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the same time.
 .UNINDENT
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u <username>
-Specifies a username with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fB\-\-password\fP and
-\fB\-\-authenticationDatabase\fP options.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-password <password>, \-p <password>
-Specifies a password with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fB\-\-username\fP and
-\fB\-\-authenticationDatabase\fP options.
+.B \-\-ldapQueryPassword <string>
+New in version 3.4: Available in MongoDB Enterprise only.
 .sp
-If you do not specify an argument for \fI\-\-password\fP, \fBmongoimport\fP will
-prompt interactively for a password on the console.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-authenticationDatabase <dbname>
-New in version 2.4.
+The password used to bind to an LDAP server when using
+\fI\%\-\-ldapQueryUser\fP\&. You must use \fI\%\-\-ldapQueryPassword\fP with
+\fI\%\-\-ldapQueryUser\fP\&.
 
 .sp
-Specifies the database that holds the user\(aqs credentials.
+If unset, \fBmongoldap\fP will not attempt to bind to the LDAP server.
+.sp
+This setting can be configured on a running \fBmongoldap\fP using
+\fBsetParameter\fP\&.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Windows MongoDB deployments can use \fI\%\-\-ldapBindWithOSDefaults\fP
+instead of \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapQueryPassword\fP\&. You cannot specify
+both \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the same time.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-authenticationMechanism <name>
-\fIDefault\fP: MONGODB\-CR
+.B \-\-ldapBindWithOSDefaults <bool>
+\fIDefault\fP: False
 .sp
-New in version 2.4.
+New in version 3.4: Available in MongoDB Enterprise for the Windows platform only.
 
 .sp
-Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBMONGODB\-X509\fP authentication
-mechanisms.
+Allows \fBmongoldap\fP to authenticate, or bind, using your Windows login
+credentials when connecting to the LDAP server.
+.sp
+Only required if:
+.INDENT 7.0
+.IP \(bu 2
+Using LDAP authorization\&.
+.IP \(bu 2
+Using an LDAP query for \fI\%username transformation\fP\&.
+.IP \(bu 2
+The LDAP server disallows anonymous binds
+.UNINDENT
+.sp
+Use \fI\%\-\-ldapBindWithOSDefaults\fP to replace \fI\%\-\-ldapQueryUser\fP and
+\fI\%\-\-ldapQueryPassword\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapBindMethod <string>
+\fIDefault\fP: simple
+.sp
+New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
-Specifies the authentication mechanism the \fBmongoimport\fP instance uses to
-authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+The method \fBmongoldap\fP uses to authenticate to an LDAP server.
+Use with \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapQueryPassword\fP to
+connect to the LDAP server.
+.sp
+\fI\%\-\-ldapBindMethod\fP supports the following values:
+.INDENT 7.0
+.IP \(bu 2
+\fBsimple\fP \- \fBmongoldap\fP uses simple authentication.
+.IP \(bu 2
+\fBsasl\fP \- \fBmongoldap\fP uses SASL protocol for authentication
+.UNINDENT
+.sp
+If you specify \fBsasl\fP, you can configure the available SASL mechanisms
+using \fI\%\-\-ldapBindSASLMechanisms\fP\&. \fBmongoldap\fP defaults to
+using \fBDIGEST\-MD5\fP mechanism.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapBindSASLMechanisms <string>
+\fIDefault\fP: DIGEST\-MD5
+.sp
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+A comma\-separated list of SASL mechanisms \fBmongoldap\fP can
+use when authenticating to the LDAP server. The \fBmongoldap\fP and the
+LDAP server must agree on at least one mechanism. The \fBmongoldap\fP
+dynamically loads any SASL mechanism libraries installed on the host
+machine at runtime.
+.sp
+Install and configure the appropriate libraries for the selected
+SASL mechanism(s) on both the \fBmongoldap\fP host and the remote
+LDAP server host. Your operating system may include certain SASL
+libraries by default. Defer to the documentation associated with each
+SASL mechanism for guidance on installation and configuration.
+.sp
+If using the \fBGSSAPI\fP SASL mechanism for use with
+security\-kerberos, verify the following for the
+\fBmongoldap\fP host machine:
+.INDENT 7.0
+.TP
+.B \fBLinux\fP
+.INDENT 7.0
+.IP \(bu 2
+The \fBKRB5_CLIENT_KTNAME\fP environment
+variable resolves to the name of the client keytab\-files
+for the host machine. For more on Kerberos environment
+variables, please defer to the
+\fI\%Kerberos documentation\fP\&.
+.IP \(bu 2
+The client keytab includes a
+kerberos\-user\-principal for the \fBmongoldap\fP to use when
+connecting to the LDAP server and execute LDAP queries.
+.UNINDENT
+.TP
+.B \fBWindows\fP
+If connecting to an Active Directory server, the Windows
+Kerberos configuration automatically generates a
+\fI\%Ticket\-Granting\-Ticket\fP
+when the user logs onto the system. Set \fI\%\-\-ldapBindWithOSDefaults\fP to
+\fBtrue\fP to allow \fBmongoldap\fP to use the generated credentials when
+connecting to the Active Directory server and execute queries.
+.UNINDENT
+.sp
+Set \fI\%\-\-ldapBindMethod\fP to \fBsasl\fP to use this option.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+For a complete list of SASL mechanisms see the
+\fI\%IANA listing\fP\&.
+Defer to the documentation for your LDAP or Active Directory
+service for identifying the SASL mechanisms compatible with the
+service.
+.sp
+MongoDB is not a source of SASL mechanism libraries, nor
+is the MongoDB documentation a definitive source for
+installing or configuring any given SASL mechanism. For
+documentation and support, defer to the SASL mechanism
+library vendor or owner.
+.sp
+For more information on SASL, defer to the following resources:
+.INDENT 0.0
+.IP \(bu 2
+For Linux, please see the \fI\%Cyrus SASL documentation\fP\&.
+.IP \(bu 2
+For Windows, please see the \fI\%Windows SASL documentation\fP\&.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapTransportSecurity <string>
+\fIDefault\fP: tls
+.sp
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+By default, \fBmongoldap\fP creates a TLS/SSL secured connection to the LDAP
+server.
+.sp
+For Linux deployments, you must configure the appropriate TLS Options in
+\fB/etc/openldap/ldap.conf\fP file. Your operating system’s package manager
+creates this file as part of the MongoDB Enterprise installation, via the
+\fBlibldap\fP dependency. See the documentation for \fBTLS Options\fP in the
+\fI\%ldap.conf OpenLDAP documentation\fP
+for more complete instructions.
+.sp
+For Windows deployment, you must add the LDAP server CA certificates to the
+Windows certificate management tool. The exact name and functionality of the
+tool may vary depending on operating system version. Please see the
+documentation for your version of Windows for more information on
+certificate management.
+.sp
+Set \fI\%\-\-ldapTransportSecurity\fP to \fBnone\fP to disable TLS/SSL between \fBmongoldap\fP and the LDAP
+server.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+Setting \fI\%\-\-ldapTransportSecurity\fP to \fBnone\fP transmits plaintext information and possibly
+credentials between \fBmongoldap\fP and the LDAP server.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapTimeoutMS <long>
+\fIDefault\fP: 10000
+.sp
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+The amount of time in milliseconds \fBmongoldap\fP should wait for an LDAP server
+to respond to a request.
+.sp
+Increasing the value of \fI\%\-\-ldapTimeoutMS\fP may prevent connection failure between the
+MongoDB server and the LDAP server, if the source of the failure is a
+connection timeout. Decreasing the value of \fI\%\-\-ldapTimeoutMS\fP reduces the time
+MongoDB waits for a response from the LDAP server.
+.sp
+This setting can be configured on a running \fBmongoldap\fP using
+\fBsetParameter\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapUserToDNMapping <string>
+New in version 3.4: Available in MongoDB Enterprise only.
+
+.sp
+Maps the username provided to \fBmongoldap\fP for authentication to a LDAP
+Distinguished Name (DN). You may need to use \fI\%\-\-ldapUserToDNMapping\fP to transform a
+username into an LDAP DN in the following scenarios:
+.INDENT 7.0
+.IP \(bu 2
+Performing LDAP authentication with simple LDAP binding, where users
+authenticate to MongoDB with usernames that are not full LDAP DNs.
+.IP \(bu 2
+Using an \fBLDAP authorization query template\fP that requires a DN.
+.IP \(bu 2
+Transforming the usernames of clients authenticating to Mongo DB using
+different authentication mechanisms (e.g. x.509, kerberos) to a full LDAP
+DN for authorization.
+.UNINDENT
+.sp
+\fI\%\-\-ldapUserToDNMapping\fP expects a quote\-enclosed JSON\-string representing an ordered array
+of documents. Each document contains a regular expression \fBmatch\fP and
+either a \fBsubstitution\fP or \fBldapQuery\fP template used for transforming the
+incoming username.
+.sp
+Each document in the array has the following form:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+{
+  match: "<regex>"
+  substitution: "<LDAP DN>" | ldapQuery: "<LDAP Query>"
+}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .TS
 center;
-|l|l|.
+|l|l|l|.
 _
 T{
-Value
+Field
 T}	T{
 Description
+T}	T{
+Example
 T}
 _
 T{
-MONGODB\-CR
+\fBmatch\fP
 T}	T{
-MongoDB challenge/response authentication.
+An ECMAScript\-formatted regular expression (regex) to match against a
+provided username. Each parenthesis\-enclosed section represents a
+regex capture group used by \fBsubstitution\fP or \fBldapQuery\fP\&.
+T}	T{
+\fB"(.+)ENGINEERING"\fP
+\fB"(.+)DBA"\fP
 T}
 _
 T{
-MONGODB\-X509
+\fBsubstitution\fP
 T}	T{
-MongoDB SSL certificate authentication.
+An LDAP distinguished name (DN) formatting template that converts the
+authentication name matched by the \fBmatch\fP regex into a LDAP DN.
+Each curly bracket\-enclosed numeric value is replaced by the
+corresponding \fI\%regex capture group\fP extracted
+from the authentication username via the \fBmatch\fP regex.
+T}	T{
+\fB"cn={0},ou=engineering,
+dc=example,dc=com"\fP
 T}
 _
 T{
-PLAIN
+\fBldapQuery\fP
 T}	T{
-External authentication using LDAP. You can also use \fBPLAIN\fP
-for authenticating in\-database users. \fBPLAIN\fP transmits
-passwords in plain text. This mechanism is available only in
-\fI\%MongoDB Enterprise\fP\&.
-T}
-_
-T{
-GSSAPI
+A LDAP query formatting template that inserts the authentication
+name matched by the \fBmatch\fP regex into an LDAP query URI encoded
+respecting RFC4515 and RFC4516. Each curly bracket\-enclosed numeric
+value is replaced by the corresponding \fI\%regex capture group\fP extracted
+from the authentication username via the \fBmatch\fP expression.
+\fBmongoldap\fP executes the query against the LDAP server to retrieve
+the LDAP DN for the authenticated user. \fBmongoldap\fP requires
+exactly one returned result for the transformation to be
+successful, or \fBmongoldap\fP skips this transformation.
 T}	T{
-External authentication using Kerberos. This mechanism is
-available only in \fI\%MongoDB Enterprise\fP\&.
+\fB"ou=engineering,dc=example,
+dc=com??one?(user={0})"\fP
 T}
 _
 .TE
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-gssapiServiceName
-New in version 2.6.
-
 .sp
-Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
-default name of \fBmongodb\fP\&.
+For each document in the array, you must use either \fBsubstitution\fP or
+\fBldapQuery\fP\&. You \fIcannot\fP specify both in the same document.
 .sp
-This option is available only in MongoDB Enterprise.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-gssapiHostName
-New in version 2.6.
-
+When performing authentication or authorization, \fBmongoldap\fP steps through
+each document in the array in the given order, checking the authentication
+username against the \fBmatch\fP filter.  If a match is found,
+\fBmongoldap\fP applies the transformation and uses the output for
+authenticating the user. \fBmongoldap\fP does not check the remaining documents
+in the array.
 .sp
-Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
-not match the hostname resolved by DNS.
-.sp
-This option is available only in MongoDB Enterprise.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-db <database>, \-d <database>
-Specifies the name of the database on which to run the \fBmongoimport\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-collection <collection>, \-c <collection>
-Specifies the collection to import.
-.sp
-New in version 2.6: If you do not specify \fI\-\-collection\fP,
-\fBmongoimport\fP takes the collection name from the input
-filename. MongoDB omits the extension of the file from the
-collection name, if the input file has an extension.
-
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-fields <field1[,field2]>, \-f <field1[,field2]>
-Specify a comma separated list of field names when importing \fIcsv\fP
-or \fItsv\fP files that do not have field names in the first (i.e.
-header) line of the file.
-.sp
-If you attempt to include \fI\%\-\-fields\fP when importing JSON data,
-\fBmongoimport\fP will return an error. \fI\%\-\-fields\fP is only for \fIcsv\fP
-or \fItsv\fP imports.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-fieldFile <filename>
-As an alternative to \fI\%\-\-fields\fP, the \fI\%\-\-fieldFile\fP
-option allows you to specify a file that holds a list of field names if
-your \fIcsv\fP or \fItsv\fP file does not include field names in the
-first line of the file (i.e. header). Place one field per line.
-.sp
-If you attempt to include \fI\%\-\-fieldFile\fP when importing JSON data,
-\fBmongoimport\fP will return an error. \fI\%\-\-fieldFile\fP is only for \fIcsv\fP
-or \fItsv\fP imports.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-ignoreBlanks
-Ignores empty fields in \fIcsv\fP and \fItsv\fP exports. If not
-specified, \fBmongoimport\fP creates fields without values in
-imported documents.
-.sp
-If you attempt to include \fI\%\-\-ignoreBlanks\fP when importing JSON data,
-\fBmongoimport\fP will return an error. \fI\%\-\-ignoreBlanks\fP is only for \fIcsv\fP
-or \fItsv\fP imports.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-type <json|csv|tsv>
-Specifies the file type to import. The default format is \fIJSON\fP,
-but it\(aqs possible to import \fIcsv\fP and \fItsv\fP files.
-.sp
-The \fBcsv\fP parser accepts that data that complies with RFC
-\fI\%RFC 4180\fP\&. As a result, backslashes are \fInot\fP a valid escape
-character. If you use double\-quotes to enclose fields in the CSV
-data, you must escape internal double\-quote marks by prepending
-another double\-quote.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-file <filename>
-Specifies the location and name of a file containing the data to import.
-If you do not specify a file, \fBmongoimport\fP reads data from
-standard input (e.g. "stdin").
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-drop
-Modifies the import process so that the target instance drops
-the collection before importing the data from the input.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-headerline
-If using \fI\-\-type csv\fP or \fI\-\-type
-tsv\fP, uses the first line as field names.
-Otherwise, \fBmongoimport\fP will import the first line as a
-distinct document.
-.sp
-If you attempt to include \fI\%\-\-headerline\fP when importing JSON data,
-\fBmongoimport\fP will return an error. \fI\%\-\-headerline\fP is only for \fIcsv\fP
-or \fItsv\fP imports.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-upsert
-Modifies the import process to update existing objects in the
-database if they match an imported object, while inserting all
-other objects.
-.sp
-If you do not specify a field or fields using the
-\fI\%\-\-upsertFields\fP \fBmongoimport\fP will upsert on the
-basis of the \fB_id\fP field.
+If the given document does not match the provided authentication name, or
+the transformation described by the document fails, \fBmongoldap\fP continues
+through the list of documents to find additional matches. If no matches are
+found in any document, \fBmongoldap\fP returns an error.
 .INDENT 7.0
-.TP
-.B \&..versionchanged:: 3.0.0
-\fI\%\-\-upsert\fP is no longer needed when specifying upserts. Use
-\fI\%\-\-upsertFields\fP, which produces the same behavior.
+.INDENT 3.5
+.SH EXAMPLE
+.sp
+The following shows two transformation documents. The first
+document matches against any string ending in \fB@ENGINEERING\fP, placing
+anything preceeding the suffix into a regex capture group. The
+second document matches against any string ending in \fB@DBA\fP, placing
+anything preceeding the suffix into a regex capture group.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 0.0
+.INDENT 3.5
+You must pass the array to \fI\%\-\-ldapUserToDNMapping\fP as a string.
 .UNINDENT
 .UNINDENT
 .INDENT 0.0
-.TP
-.B \-\-upsertFields <field1[,field2]>
-Specifies a list of fields for the query portion of the
-\fIupsert\fP\&. Use this option if the \fB_id\fP fields in the
-existing documents don\(aqt match the field in the document, but
-another field or field combination can uniquely identify
-documents as a basis for performing upsert operations.
+.INDENT 3.5
+.sp
+.nf
+.ft C
+"[
+   {
+      match: "(.+)@ENGINEERING.EXAMPLE.COM",
+      substitution: "cn={0},ou=engineering,dc=example,dc=com"
+   },
+   {
+      match: "(.+)@DBA.EXAMPLE.COM",
+      ldapQuery: "ou=dba,dc=example,dc=com??one?(user={0})"
+
+   }
+
+]"
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+A user with username \fBalice@ENGINEERING.EXAMPLE.COM\fP matches the first
+document. The regex capture group \fB{0}\fP corresponds to the string
+\fBalice\fP\&. The resulting output is the DN
+\fB"cn=alice,ou=engineering,dc=example,dc=com"\fP\&.
+.sp
+A user with username \fBbob@DBA.EXAMPLE.COM\fP matches the second document.
+The regex capture group \fB{0}\fP corresponds to the string \fBbob\fP\&.  The
+resulting output is the LDAP query
+\fB"ou=dba,dc=example,dc=com??one?(user=bob)"\fP\&. \fBmongoldap\fP executes this
+query against the LDAP server, returning the result
+\fB"cn=bob,ou=dba,dc=example,dc=com"\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+If \fI\%\-\-ldapUserToDNMapping\fP is unset, \fBmongoldap\fP applies no transformations to the username
+when attempting to authenticate or authorize a user against the LDAP server.
+.sp
+This setting can be configured on a running \fBmongoldap\fP using the
+\fBsetParameter\fP database command.
+.sp
+\fBNOTE:\fP
 .INDENT 7.0
-.TP
-.B \&..versionchanged:: 3.0.0
-Modifies the import process to update existing objects in the
-database if they match based on the specified fields, while
-inserting all other objects.
-.sp
-If you do not specify a field, \fI\%\-\-upsertFields\fP will upsert on the basis of
-the \fB_id\fP field.
+.INDENT 3.5
+An explanation of \fI\%RFC4515\fP,
+\fI\%RFC4516\fP or LDAP queries is out
+of scope for the MongoDB Documentation. Please review the RFC directly or
+use your preferred LDAP resource.
 .UNINDENT
-.sp
-To ensure adequate performance, indexes should exist for this
-field or fields.
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-stopOnError
-New in version 2.2.
+.B \-\-ldapAuthzQueryTemplate <string>
+New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
-Forces \fBmongoimport\fP to halt the import operation at the
-first error rather than continuing the operation despite errors.
+A relative LDAP query URL formatted conforming to \fI\%RFC4515\fP and \fI\%RFC4516\fP that \fBmongoldap\fP executes to obtain
+the LDAP groups to which the authenticated user belongs to. The query is
+relative to the host or hosts specified in \fI\%\-\-ldapServers\fP\&.
 .sp
-Changed in version 3.0.0: \fI\%\-\-stopOnError\fP interrupts the import operation when \fBmongoimport\fP encounters
-an insert or upsert error. Other error types will not stop
-the import.
-
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-jsonArray
-Accepts the import of data expressed with multiple MongoDB documents
-within a single \fIJSON\fP array. Limited to
-imports of 16 MB or smaller.
+Use the \fB{USER}\fP placeholder in the URL to substitute the authenticated
+username, or the transformed username if a \fI\%username mapping\fP is specified.
 .sp
-Use \fI\%\-\-jsonArray\fP in conjunction with \fImongoexport \-\-jsonArray\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-maintainInsertionOrder
-\fIDefault\fP: False
-.sp
-If specified, \fBmongoimport\fP inserts the documents in the order of
-their appearance in the input source, otherwise \fBmongoimport\fP may
-perform the insertions in an arbitrary order.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-writeConcern <document>
-\fIDefault\fP: majority
-.sp
-Specifies the \fIwrite concern\fP for each write operation that \fBmongoimport\fP
-writes to the target database.
-.sp
-Specify the write concern as a document with \fIw options\fP\&.
-.UNINDENT
-.SH USE
-.sp
-In this example, \fBmongoimport\fP imports the \fIcsv\fP
-formatted data in the \fB/opt/backups/contacts.csv\fP into the
-collection \fBcontacts\fP in the \fBusers\fP database on the MongoDB
-instance running on the localhost port numbered
-\fB27017\fP\&. \fBmongoimport\fP determines the name of files using
-the first line in the CSV file, because of the \fI\-\-headerline\fP:
-.INDENT 0.0
+When constructing the query URL, ensure that the order of LDAP parameters
+respects RFC4516:
+.INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongoimport \-\-db users \-\-collection contacts \-\-type csv \-\-headerline \-\-file /opt/backups/contacts.csv
+[ dn  [ ? [attributes] [ ? [scope] [ ? [filter] [ ? [Extensions] ] ] ] ] ]
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-Since \fBmongoimport\fP uses the input file name, without the
-extension, as the collection name if \fB\-c\fP or \fB\-\-collection\fP is
-unspecified. The following example is equivalent:
+If your query includes an attribute, \fBmongoldap\fP assumes that the query
+retrieves a the DNs which this entity is member of.
+.sp
+If your query does not include an attribute, \fBmongoldap\fP assumes
+the query retrieves all entities which the user is member of.
+.sp
+For each LDAP DN returned by the query, \fBmongoldap\fP assigns the authorized
+user a corresponding role on the \fBadmin\fP database. If a role on the on the
+\fBadmin\fP database exactly matches the DN, \fBmongoldap\fP grants the user the
+roles and privileges assigned to that role. See the
+\fBdb.createRole()\fP method for more information on creating roles.
+.INDENT 7.0
+.INDENT 3.5
+.SH EXAMPLE
+.sp
+This LDAP query returns any groups listed in the LDAP user object’s
+\fBmemberOf\fP attribute.
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongoimport \-\-db users \-\-type csv \-\-headerline \-\-file /opt/backups/contacts.csv
+"{USER}?memberOf?base"
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-In the following example, \fBmongoimport\fP imports the data in
-the \fIJSON\fP formatted file \fBcontacts.json\fP into the collection
-\fBcontacts\fP on the MongoDB instance running on the localhost port
-number 27017.
-.INDENT 0.0
+Your LDAP configuration may not include the \fBmemberOf\fP attribute as part
+of the user schema, may possess a different attribute for reporting group
+membership, or may not track group membership through attributes.
+Configure your query with respect to your own unique LDAP configuration.
+.UNINDENT
+.UNINDENT
+.sp
+If unset, \fBmongoldap\fP cannot authorize users using LDAP.
+.sp
+This setting can be configured on a running \fBmongoldap\fP using the
+\fBsetParameter\fP database command.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
 .INDENT 3.5
-.sp
-.nf
-.ft C
-mongoimport \-\-db users \-\-collection contacts \-\-file contacts.json
-.ft P
-.fi
+An explanation of \fI\%RFC4515\fP,
+\fI\%RFC4516\fP or LDAP queries is out
+of scope for the MongoDB Documentation. Please review the RFC directly or
+use your preferred LDAP resource.
 .UNINDENT
 .UNINDENT
-.sp
-In the next example, \fBmongoimport\fP imports data from the
-file \fB/opt/backups/mdb1\-examplenet.json\fP into the collection
-\fBcontacts\fP within the database \fBmarketing\fP on a remote MongoDB
-database. This \fBmongoimport\fP accesses the \fBmongod\fP
-instance running on the host \fBmongodb1.example.net\fP over port
-\fB37017\fP, which requires the username \fBuser\fP and the password
-\fBpass\fP\&.
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-mongoimport \-\-host mongodb1.example.net \-\-port 37017 \-\-username user \-\-password pass \-\-collection contacts \-\-db marketing \-\-file /opt/backups/mdb1\-examplenet.json
-.ft P
-.fi
 .UNINDENT
-.UNINDENT
-.SH TYPE FIDELITY
-.sp
-\fBWARNING:\fP
-.INDENT 0.0
-.INDENT 3.5
-\fBmongoimport\fP and \fBmongoexport\fP do not reliably
-preserve all rich \fIBSON\fP data types because \fIJSON\fP can
-only represent a subset of the types supported by BSON. As a result,
-data exported or imported with these tools may lose some measure of
-fidelity. See the \fBExtended JSON\fP
-reference for more information.
-.UNINDENT
-.UNINDENT
-.sp
-JSON can only represent a subset of the types supported by BSON. To
-preserve type information, \fBmongoimport\fP accepts \fBstrict
-mode representation\fP for certain
-types.
-.sp
-For example, to preserve type information for BSON types
-\fBdata_date\fP and \fBdata_numberlong\fP during
-\fBmongoimport\fP, the data should be in strict mode
-representation, as in the following:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-{ "_id" : 1, "volume" : { "$numberLong" : "2980000" }, "date" : { "$date" : "2014\-03\-13T13:47:42.483\-0400" } }
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
-For the \fBdata_numberlong\fP type, \fBmongoimport\fP
-converts into a float during the import.
-.sp
-See http://docs.mongodb.org/manual/reference/mongodb\-extended\-json for a complete list of
-these types and the representations used.
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2015
+2008-2018
 .\" Generated by docutils manpage writer.
 .
