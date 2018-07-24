@@ -32,6 +32,7 @@
 
 #include "mongo/s/transaction/router_session_runtime_state.h"
 
+#include "mongo/db/logical_session_id.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/log.h"
 
@@ -110,8 +111,8 @@ bool isTransactionCommand(const BSONObj& cmd) {
 
 }  // unnamed namespace
 
-TransactionParticipant::TransactionParticipant(bool isCoordinator)
-    : _isCoordinator(isCoordinator) {}
+TransactionParticipant::TransactionParticipant(bool isCoordinator, TxnNumber txnNumber)
+    : _isCoordinator(isCoordinator), _txnNumber(txnNumber) {}
 
 BSONObj TransactionParticipant::attachTxnFieldsIfNeeded(BSONObj cmd) {
     auto isTxnCmd = isTransactionCommand(cmd);  // check first before moving cmd.
@@ -126,6 +127,14 @@ BSONObj TransactionParticipant::attachTxnFieldsIfNeeded(BSONObj cmd) {
     }
 
     newCmd.append(kAutoCommitField, false);
+
+    if (!newCmd.hasField(OperationSessionInfo::kTxnNumberFieldName)) {
+        newCmd.append(OperationSessionInfo::kTxnNumberFieldName, _txnNumber);
+    } else {
+        auto osi =
+            OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, newCmd.asTempObj());
+        invariant(_txnNumber == *osi.getTxnNumber());
+    }
 
     // TODO: append readConcern
 
@@ -188,8 +197,8 @@ TransactionParticipant& RouterSessionRuntimeState::getOrCreateParticipant(const 
         _coordinatorId = shard.toString();
     }
 
-    auto resultPair =
-        _participants.try_emplace(shard.toString(), TransactionParticipant(isFirstParticipant));
+    auto resultPair = _participants.try_emplace(
+        shard.toString(), TransactionParticipant(isFirstParticipant, _txnNumber));
 
     return resultPair.first->second;
 }

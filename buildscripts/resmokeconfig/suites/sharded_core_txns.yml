@@ -36,11 +36,12 @@ selector:
   - jstests/core/txns/abort_expired_transaction.js
   - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
 
-  # TODO SERVER-35829: Mongos loses txnNumber when forwarding to shards.
+  # Writes to the local database are not allowed through mongos.
+  # TODO SERVER-28756: Mongos CSRS write retry logic drops txnNumbers.
   - jstests/core/txns/banned_txn_dbs.js
-  - jstests/core/txns/kill_cursors_in_transaction.js
 
-  # TODO SERVER-35829: Mongos loses txnNumber when forwarding to shards.
+  # TODO SERVER-36260: Mongos should reject commands with txnNumbers that aren't allowed in a
+  # transaction.
   # TODO SERVER-33709: Support readConcern snapshot in cluster count command.
   - jstests/core/txns/commands_not_allowed_in_txn.js
 

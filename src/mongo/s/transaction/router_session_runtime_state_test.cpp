@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/transaction/router_session_runtime_state.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -48,7 +49,9 @@ TEST(RouterSessionRuntimeStateTest, BasicStartTxn) {
                                   << "coordinator"
                                   << true
                                   << "autocommit"
-                                  << false);
+                                  << false
+                                  << "txnNumber"
+                                  << txnNum);
 
     ShardId shard1("a");
 
@@ -76,7 +79,9 @@ TEST(RouterSessionRuntimeStateTest, BasicStartTxn) {
                                << "coordinator"
                                << true
                                << "autocommit"
-                               << false),
+                               << false
+                               << "txnNumber"
+                               << txnNum),
                           newCmd);
     }
 }
@@ -106,7 +111,9 @@ TEST(RouterSessionRuntimeStateTest, NewParticipantMustAttachTxn) {
                                   << "coordinator"
                                   << true
                                   << "autocommit"
-                                  << false);
+                                  << false
+                                  << "txnNumber"
+                                  << txnNum);
 
     {
         auto& participant = sessionState.getOrCreateParticipant(shard1);
@@ -125,7 +132,9 @@ TEST(RouterSessionRuntimeStateTest, NewParticipantMustAttachTxn) {
                                << "coordinator"
                                << true
                                << "autocommit"
-                               << false),
+                               << false
+                               << "txnNumber"
+                               << txnNum),
                           newCmd);
     }
 
@@ -136,7 +145,9 @@ TEST(RouterSessionRuntimeStateTest, NewParticipantMustAttachTxn) {
                           << "startTransaction"
                           << true
                           << "autocommit"
-                          << false);
+                          << false
+                          << "txnNumber"
+                          << txnNum);
 
     {
         auto& participant = sessionState.getOrCreateParticipant(shard2);
@@ -153,7 +164,9 @@ TEST(RouterSessionRuntimeStateTest, NewParticipantMustAttachTxn) {
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "autocommit"
-                               << false),
+                               << false
+                               << "txnNumber"
+                               << txnNum),
                           newCmd);
     }
 }
@@ -177,7 +190,9 @@ TEST(RouterSessionRuntimeStateTest, StartingNewTxnShouldClearState) {
                                << "coordinator"
                                << true
                                << "autocommit"
-                               << false),
+                               << false
+                               << "txnNumber"
+                               << txnNum),
                           newCmd);
     }
 
@@ -191,7 +206,9 @@ TEST(RouterSessionRuntimeStateTest, StartingNewTxnShouldClearState) {
                                   << "coordinator"
                                   << true
                                   << "autocommit"
-                                  << false);
+                                  << false
+                                  << "txnNumber"
+                                  << txnNum2);
 
     {
         auto& participant = sessionState.getOrCreateParticipant(shard1);
@@ -239,6 +256,59 @@ TEST(RouterSessionRuntimeStateTest, FirstParticipantIsCoordinator) {
         ASSERT(sessionState.getCoordinatorId());
         ASSERT_EQ(*sessionState.getCoordinatorId(), shard2);
     }
+}
+
+TEST(RouterSessionRuntimeStateTest, DoesNotAttachTxnNumIfAlreadyThere) {
+    TxnNumber txnNum{3};
+
+    RouterSessionRuntimeState sessionState({});
+    sessionState.checkOut();
+    sessionState.beginOrContinueTxn(txnNum, true);
+
+    BSONObj expectedNewObj = BSON("insert"
+                                  << "test"
+                                  << "txnNumber"
+                                  << txnNum
+                                  << "startTransaction"
+                                  << true
+                                  << "coordinator"
+                                  << true
+                                  << "autocommit"
+                                  << false);
+
+    ShardId shard1("a");
+    auto& participant = sessionState.getOrCreateParticipant(shard1);
+    auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                           << "test"
+                                                           << "txnNumber"
+                                                           << txnNum));
+    ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+}
+
+DEATH_TEST(RouterSessionRuntimeStateTest, CrashesIfCmdHasDifferentTxnNumber, "invariant") {
+    TxnNumber txnNum{3};
+
+    RouterSessionRuntimeState sessionState({});
+    sessionState.checkOut();
+    sessionState.beginOrContinueTxn(txnNum, true);
+
+    BSONObj expectedNewObj = BSON("insert"
+                                  << "test"
+                                  << "txnNumber"
+                                  << txnNum
+                                  << "startTransaction"
+                                  << true
+                                  << "coordinator"
+                                  << true
+                                  << "autocommit"
+                                  << false);
+
+    ShardId shard1("a");
+    auto& participant = sessionState.getOrCreateParticipant(shard1);
+    participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                             << "test"
+                                             << "txnNumber"
+                                             << TxnNumber(10)));
 }
 
 }  // unnamed namespace

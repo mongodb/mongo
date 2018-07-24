@@ -40,9 +40,13 @@
 
 namespace mongo {
 
+/**
+ * Represents a shard participant in a distributed transaction. Lives only for the duration of the
+ * transaction that created it.
+ */
 class TransactionParticipant {
 public:
-    explicit TransactionParticipant(bool isCoordinator);
+    explicit TransactionParticipant(bool isCoordinator, TxnNumber txnNumber);
 
     enum class State {
         // Next transaction should include startTransaction.
@@ -70,7 +74,8 @@ public:
 
 private:
     State _state{State::kMustStart};
-    bool _isCoordinator{false};
+    const bool _isCoordinator{false};
+    const TxnNumber _txnNumber;
 };
 
 /**

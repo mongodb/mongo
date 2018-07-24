@@ -40,6 +40,13 @@ class ClusterKillCursorsCmd final : public KillCursorsCmdBase {
 public:
     ClusterKillCursorsCmd() = default;
 
+    bool supportsReadConcern(const std::string& dbName,
+                             const BSONObj& cmdObj,
+                             repl::ReadConcernLevel level) const final {
+        // killCursors must support read concerns in order to be run in transactions.
+        return true;
+    }
+
 private:
     Status _checkAuth(Client* client, const NamespaceString& nss, CursorId cursorId) const final {
         auto const authzSession = AuthorizationSession::get(client);
