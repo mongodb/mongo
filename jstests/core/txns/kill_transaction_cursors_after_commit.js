@@ -10,7 +10,7 @@
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb[collName];
 
-    sessionColl.drop();
+    sessionColl.drop({writeConcern: {w: "majority"}});
     for (let i = 0; i < 4; ++i) {
         assert.commandWorked(sessionColl.insert({_id: i}));
     }

@@ -77,7 +77,7 @@
     }
 
     function populateCollection() {
-        db.coll.drop();
+        db.coll.drop({writeConcern: {w: "majority"}});
         for (let i = 0; i < TestData.numDocs; i++) {
             assert.commandWorked(
                 db.coll.insert({_id: i, x: 1, location: [0, 0]}, {writeConcern: {w: "majority"}}));
@@ -130,7 +130,7 @@
         // Start a drop. This should block behind the command, since the command does not yield
         // locks.
         let awaitDrop = startParallelShell(function() {
-            db.getSiblingDB("test").coll.drop();
+            db.getSiblingDB("test").coll.drop({writeConcern: {w: "majority"}});
         }, rst.ports[0]);
 
         // Remove the hang. The command should complete successfully.

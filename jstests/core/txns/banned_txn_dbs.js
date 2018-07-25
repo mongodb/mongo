@@ -11,7 +11,7 @@
         jsTest.log("Testing database " + sessionDB.getName());
 
         let sessionColl = sessionDB[collName];
-        sessionColl.drop();
+        sessionColl.drop({writeConcern: {w: "majority"}});
         assert.commandWorked(sessionDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 
         jsTest.log("Testing read commands are forbidden.");

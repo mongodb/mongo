@@ -7,7 +7,7 @@
     const dbName = "test";
     const collName = "transactions_profiling";
     const testDB = db.getSiblingDB(dbName);
-    testDB[collName].drop();
+    testDB[collName].drop({writeConcern: {w: "majority"}});
 
     testDB.setProfilingLevel(2);
 

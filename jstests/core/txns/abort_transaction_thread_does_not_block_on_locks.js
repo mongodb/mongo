@@ -84,7 +84,8 @@
 
         jsTest.log("Starting a drop operation, which will block until both transactions finish");
         let awaitDrop = startParallelShell(function() {
-            db.getSiblingDB("test")["abort_transaction_thread_does_not_block_on_locks"].drop();
+            db.getSiblingDB("test")["abort_transaction_thread_does_not_block_on_locks"].drop(
+                {writeConcern: {w: "majority"}});
         });
 
         assert.soon(function() {

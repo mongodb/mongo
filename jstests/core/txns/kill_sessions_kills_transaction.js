@@ -42,7 +42,8 @@
 
     // Start a drop, which will hang.
     let awaitDrop = startParallelShell(function() {
-        db.getSiblingDB("test")["kill_sessions_kills_transaction"].drop();
+        db.getSiblingDB("test")["kill_sessions_kills_transaction"].drop(
+            {writeConcern: {w: "majority"}});
     });
 
     // Wait for the drop to have a pending MODE_X lock on the database.

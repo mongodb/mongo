@@ -11,7 +11,7 @@
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb[collName];
 
-    sessionColl.drop();
+    sessionColl.drop({writeConcern: {w: "majority"}});
     for (let i = 0; i < 4; ++i) {
         assert.commandWorked(sessionColl.insert({_id: i}));
     }
@@ -47,7 +47,8 @@
 
     // Start a drop, which will hang.
     let awaitDrop = startParallelShell(function() {
-        db.getSiblingDB("test")["kill_cursors_in_transaction"].drop();
+        db.getSiblingDB("test")["kill_cursors_in_transaction"].drop(
+            {writeConcern: {w: "majority"}});
     });
 
     // Wait for the drop to have a pending MODE_X lock on the database.

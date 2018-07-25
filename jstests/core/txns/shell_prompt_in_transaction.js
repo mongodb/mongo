@@ -6,7 +6,7 @@
 
     const collName = "shell_prompt_in_transaction";
 
-    db.getCollection(collName).drop();
+    db.getCollection(collName).drop({writeConcern: {w: "majority"}});
     assert.commandWorked(db.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
     // Override the global "db".
@@ -39,5 +39,5 @@
     session.commitTransaction();
     assert.docEq(doc, coll.findOne());
 
-    coll.drop();
+    coll.drop({writeConcern: {w: "majority"}});
 })();

@@ -4,7 +4,7 @@
  * suites where accessing or dropping the collection implicitly recreates it.
  */
 function assertDropCollection(db, collName) {
-    var cmdRes = db.runCommand({drop: collName});
+    var cmdRes = db.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert(cmdRes.ok === 1 || cmdRes.code === ErrorCodes.NamespaceNotFound, tojson(cmdRes));
 }
 

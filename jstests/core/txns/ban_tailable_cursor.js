@@ -8,7 +8,7 @@
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb.getCollection(collName);
 
-    sessionColl.drop();
+    sessionColl.drop({writeConcern: {w: "majority"}});
     assert.commandWorked(sessionDb.runCommand(
         {create: collName, writeConcern: {w: "majority"}, capped: true, size: 2048}));
 

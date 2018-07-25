@@ -8,7 +8,7 @@
     var session = db.getMongo().startSession({causalConsistency: false});
     var sessionDb = session.getDatabase(dbName);
 
-    mydb.foo.drop();
+    mydb.foo.drop({writeConcern: {w: "majority"}});
 
     assert.commandWorked(mydb.createCollection("foo", {writeConcern: {w: "majority"}}));
     session.startTransaction({readConcern: {level: "snapshot"}});
