@@ -42,6 +42,10 @@ namespace mongo {
 // ONLY be used for testing purposes. Production systems should not run transactions on the
 // 'inMemory' storage engines until "rollback to a timestamp" is supported on the 'inMemory' storage
 // engine (see SERVER-34165).
+//
+// TODO: inMemory now supports 'rollback to a timestamp', which consequently allows transactions
+// with inMemory. This parameter now has no effect. Update this comment when inMemory transaction
+// testing is turned on and transactions become officially supported (SERVER-36023).
 MONGO_EXPORT_SERVER_PARAMETER(enableInMemoryTransactions, bool, false);
 
 boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
@@ -119,17 +123,10 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
                 "Specifying autocommit=true is not allowed.",
                 !osi.getAutocommit().value());
 
-        // We allow transactions to run on in-memory storage engines for testing purposes.
-        bool allowInMemoryTransactions = false;
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        if (storageEngine) {
-            allowInMemoryTransactions =
-                storageEngine->isEphemeral() && enableInMemoryTransactions.load();
-        }
         uassert(ErrorCodes::IllegalOperation,
                 "Multi-document transactions are only allowed on storage engines that support "
                 "recover to stable timestamp.",
-                supportsRecoverToStableTimestamp || allowInMemoryTransactions);
+                supportsRecoverToStableTimestamp);
     } else {
         uassert(ErrorCodes::InvalidOptions,
                 "'startTransaction' field requires 'autocommit' field to also be specified",

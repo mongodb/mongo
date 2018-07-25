@@ -1194,7 +1194,7 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
     if (!_kvEngine->supportsRecoverToStableTimestamp()) {
         // For non-RTT storage engines, the oplog can always be truncated. They do not need the
-        // history.
+        // history for recoverable rollback or crash recovery.
         reclaimOplog(opCtx, Timestamp::max());
         return;
     }

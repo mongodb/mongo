@@ -261,8 +261,9 @@ public:
     void reclaimOplog(OperationContext* opCtx);
 
     /**
-     * The `recoveryTimestamp` is when replication recovery would need to replay from on a
-     * restart. `reclaimOplog` will not truncate oplog entries in front of this time.
+     * The `recoveryTimestamp` is when replication recovery would need to replay from for
+     * recoverable rollback, or restart for durable engines. `reclaimOplog` will not
+     * truncate oplog entries in front of this time.
      */
     void reclaimOplog(OperationContext* opCtx, Timestamp recoveryTimestamp);
 
