@@ -87,7 +87,6 @@ StatusWith<Shard::CommandResponse> RSLocalClient::runCommandOnce(OperationContex
         auto result = commandResponse->getCommandReply().getOwned();
         return Shard::CommandResponse(boost::none,
                                       result,
-                                      commandResponse->getMetadata().getOwned(),
                                       getStatusFromCommandResult(result),
                                       getWriteConcernStatusFromCommandResult(result));
     } catch (const DBException& ex) {

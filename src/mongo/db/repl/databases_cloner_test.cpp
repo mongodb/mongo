@@ -104,7 +104,7 @@ public:
                                  const BSONObj& obj) {
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
-        RemoteCommandResponse response(obj, BSONObj(), millis);
+        RemoteCommandResponse response(obj, millis);
         net->scheduleResponse(noi, net->now(), response);
     }
 
@@ -242,11 +242,10 @@ protected:
             log() << "Sending response for network request:";
             log() << "     req: " << noi->getRequest().dbname << "." << noi->getRequest().cmdObj;
             log() << "     resp:" << responses[processedRequests].second;
-            net->scheduleResponse(noi,
-                                  net->now(),
-                                  RemoteCommandResponse(responses[processedRequests].second,
-                                                        BSONObj(),
-                                                        Milliseconds(10)));
+            net->scheduleResponse(
+                noi,
+                net->now(),
+                RemoteCommandResponse(responses[processedRequests].second, Milliseconds(10)));
 
             if ((Date_t::now() - lastLog) > Seconds(1)) {
                 lastLog = Date_t();

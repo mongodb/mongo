@@ -212,15 +212,8 @@ void ReplCoordTest::assertStartSuccess(const BSONObj& configDoc, const HostAndPo
 
 executor::RemoteCommandResponse ReplCoordTest::makeResponseStatus(const BSONObj& doc,
                                                                   Milliseconds millis) {
-    return makeResponseStatus(doc, BSONObj(), millis);
-}
-
-executor::RemoteCommandResponse ReplCoordTest::makeResponseStatus(const BSONObj& doc,
-                                                                  const BSONObj& metadata,
-                                                                  Milliseconds millis) {
-    log() << "Responding with " << doc << " (metadata: " << metadata << "; elapsed: " << millis
-          << ")";
-    return RemoteCommandResponse(doc, metadata, millis);
+    log() << "Responding with " << doc << " (elapsed: " << millis << ")";
+    return RemoteCommandResponse(doc, millis);
 }
 
 void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {

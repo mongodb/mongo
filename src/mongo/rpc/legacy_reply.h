@@ -41,19 +41,13 @@ namespace rpc {
 /**
  * Immutable view of an OP_REPLY legacy-style command reply.
  */
-class LegacyReply : public ReplyInterface {
+class LegacyReply final : public ReplyInterface {
 public:
     /**
      * Construct a Reply from a Message.
      * The underlying message MUST outlive the Reply.
      */
     explicit LegacyReply(const Message* message);
-
-    /**
-     * Accessor for the metadata object. Metadata is generally used for information
-     * that is independent of any specific command, e.g. auditing information.
-     */
-    const BSONObj& getMetadata() const final;
 
     /**
      * The result of executing the command.

@@ -198,7 +198,6 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
 
     return Shard::CommandResponse(std::move(host),
                                   std::move(result),
-                                  response.metadata.getOwned(),
                                   std::move(commandStatus),
                                   std::move(writeConcernStatus));
 }

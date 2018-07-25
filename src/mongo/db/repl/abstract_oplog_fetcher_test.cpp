@@ -451,8 +451,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherTimesOutCorrectlyOnInitialFindReque
     net->enterNetwork();
     auto when = net->now() + initialFindMaxTime + kNetworkTimeoutBufferMS + Milliseconds(10);
     auto noi = getNet()->getNextReadyRequest();
-    RemoteCommandResponse response = {
-        {makeCursorResponse(1, {ops[0], ops[1]})}, rpc::makeEmptyMetadata(), Milliseconds(0)};
+    RemoteCommandResponse response = {{makeCursorResponse(1, {ops[0], ops[1]})}, Milliseconds(0)};
     auto request = net->scheduleSuccessfulResponse(noi, when, response);
     net->runUntil(when);
     net->runReadyNetworkOperations();
@@ -492,8 +491,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherTimesOutCorrectlyOnRetriedFindReque
     net->enterNetwork();
     auto when = net->now() + initialFindMaxTime + kNetworkTimeoutBufferMS + Milliseconds(10);
     auto noi = getNet()->getNextReadyRequest();
-    RemoteCommandResponse response = {
-        {makeCursorResponse(1, {ops[0], ops[1]})}, rpc::makeEmptyMetadata(), Milliseconds(0)};
+    RemoteCommandResponse response = {{makeCursorResponse(1, {ops[0], ops[1]})}, Milliseconds(0)};
     auto request = net->scheduleSuccessfulResponse(noi, when, response);
     net->runUntil(when);
     net->runReadyNetworkOperations();
@@ -503,8 +501,7 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherTimesOutCorrectlyOnRetriedFindReque
     net->enterNetwork();
     when = net->now() + retriedFindMaxTime + kNetworkTimeoutBufferMS + Milliseconds(10);
     noi = getNet()->getNextReadyRequest();
-    response = {
-        {makeCursorResponse(1, {ops[0], ops[1]})}, rpc::makeEmptyMetadata(), Milliseconds(0)};
+    response = {{makeCursorResponse(1, {ops[0], ops[1]})}, Milliseconds(0)};
     request = net->scheduleSuccessfulResponse(noi, when, response);
     net->runUntil(when);
     net->runReadyNetworkOperations();

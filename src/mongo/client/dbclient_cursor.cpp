@@ -262,7 +262,7 @@ BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
     if (_client->getReplyMetadataReader()) {
         uassertStatusOK(_client->getReplyMetadataReader()(
-            opCtx, commandReply->getMetadata(), _client->getServerAddress()));
+            opCtx, commandReply->getCommandReply(), _client->getServerAddress()));
     }
 
     return commandReply->getCommandReply().getOwned();

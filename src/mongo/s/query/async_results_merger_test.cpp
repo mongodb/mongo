@@ -186,7 +186,7 @@ protected:
         for (const auto& obj : objs) {
             ASSERT_TRUE(net->hasReadyRequests());
             Milliseconds millis(0);
-            RemoteCommandResponse response(obj, BSONObj(), millis);
+            RemoteCommandResponse response(obj, millis);
             executor::TaskExecutor::ResponseStatus responseStatus(response);
             net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
         }

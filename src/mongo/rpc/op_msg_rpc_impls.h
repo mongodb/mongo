@@ -39,9 +39,6 @@ class OpMsgReply final : public rpc::ReplyInterface {
 public:
     explicit OpMsgReply(const Message* message) : _msg(OpMsg::parseOwned(*message)) {}
     explicit OpMsgReply(OpMsg msg) : _msg(std::move(msg)) {}
-    const BSONObj& getMetadata() const override {
-        return _msg.body;
-    }
     const BSONObj& getCommandReply() const override {
         return _msg.body;
     }
@@ -67,10 +64,6 @@ public:
     }
     OpMsgBuilder::DocSequenceBuilder getDocSequenceBuilder(StringData name) override {
         return _builder.beginDocSequence(name);
-    }
-    ReplyBuilderInterface& setMetadata(const BSONObj& metadata) override {
-        _builder.resumeBody().appendElements(metadata);
-        return *this;
     }
     rpc::Protocol getProtocol() const override {
         return rpc::Protocol::kOpMsg;

@@ -519,7 +519,6 @@ void Command::generateHelpResponse(OperationContext* opCtx,
     helpBuilder.append("help",
                        str::stream() << "help for: " << command.getName() << " " << command.help());
     replyBuilder->setCommandReply(helpBuilder.obj());
-    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 }
 
 bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,

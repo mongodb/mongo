@@ -73,8 +73,8 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
             {"$replData": 1});
         assert.commandWorked(res.commandReply);
         assert.eq(res.commandReply.writeErrors, undefined);
-        log("done saving doc: optime " + tojson(res.metadata.$replData.lastOpVisible));
-        return res.metadata.$replData.lastOpVisible;
+        log("done saving doc: optime " + tojson(res.commandReply.$replData.lastOpVisible));
+        return res.commandReply.$replData.lastOpVisible;
     }
 
     function doDirtyRead(lastOp) {

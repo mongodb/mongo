@@ -169,8 +169,7 @@ void auth(RunCommandHook runCommand,
                      "authentication.";
 
             // We need to mock a successful AuthResponse.
-            return handler(
-                AuthResponse(RemoteCommandResponse(BSON("ok" << 1), BSONObj(), Milliseconds(0))));
+            return handler(AuthResponse(RemoteCommandResponse(BSON("ok" << 1), Milliseconds(0))));
         }
 
         // otherwise, call handler

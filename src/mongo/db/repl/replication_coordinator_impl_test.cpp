@@ -384,9 +384,8 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     hbResp.setConfigVersion(0);
     hbResp.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
     hbResp.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
-    getNet()->scheduleResponse(noi,
-                               startDate + Milliseconds(10),
-                               RemoteCommandResponse(hbResp.toBSON(), BSONObj(), Milliseconds(8)));
+    getNet()->scheduleResponse(
+        noi, startDate + Milliseconds(10), RemoteCommandResponse(hbResp.toBSON(), Milliseconds(8)));
     getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());
@@ -4521,9 +4520,8 @@ TEST_F(ReplCoordTest,
                                   << 3
                                   << "syncSourceIndex"
                                   << 1)));
-    BSONObjBuilder metadataBuilder;
-    ASSERT_OK(metadata.getValue().writeToMetadata(&metadataBuilder));
-    auto metadataObj = metadataBuilder.obj();
+    BSONObjBuilder responseBuilder;
+    ASSERT_OK(metadata.getValue().writeToMetadata(&responseBuilder));
 
     auto net = getNet();
     net->enterNetwork();
@@ -4538,7 +4536,8 @@ TEST_F(ReplCoordTest,
     hbResp.setConfigVersion(config.getConfigVersion());
     hbResp.setSetName(config.getReplSetName());
     hbResp.setState(MemberState::RS_SECONDARY);
-    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(), metadataObj));
+    responseBuilder.appendElements(hbResp.toBSON());
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(responseBuilder.obj()));
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
@@ -4647,9 +4646,8 @@ TEST_F(ReplCoordTest, TermAndLastCommittedOpTimeUpdatedFromHeartbeatWhenArbiter)
                                   << 3
                                   << "syncSourceIndex"
                                   << 1)));
-    BSONObjBuilder metadataBuilder;
-    ASSERT_OK(metadata.getValue().writeToMetadata(&metadataBuilder));
-    auto metadataObj = metadataBuilder.obj();
+    BSONObjBuilder responseBuilder;
+    ASSERT_OK(metadata.getValue().writeToMetadata(&responseBuilder));
 
     auto net = getNet();
     net->enterNetwork();
@@ -4664,7 +4662,8 @@ TEST_F(ReplCoordTest, TermAndLastCommittedOpTimeUpdatedFromHeartbeatWhenArbiter)
     hbResp.setConfigVersion(config.getConfigVersion());
     hbResp.setSetName(config.getReplSetName());
     hbResp.setState(MemberState::RS_SECONDARY);
-    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(), metadataObj));
+    responseBuilder.appendElements(hbResp.toBSON());
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(responseBuilder.obj()));
     net->runReadyNetworkOperations();
     net->exitNetwork();
 

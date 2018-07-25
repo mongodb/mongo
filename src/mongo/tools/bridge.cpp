@@ -303,14 +303,12 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
         invariant(!isFireAndForgetCommand);
 
         auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(request));
-        BSONObj metadata;
         BSONObj reply;
         StatusWith<BSONObj> commandReply(reply);
         if (!status->isOK()) {
             commandReply = StatusWith<BSONObj>(*status);
         }
-        return {
-            replyBuilder->setCommandReply(std::move(commandReply)).setMetadata(metadata).done()};
+        return {replyBuilder->setCommandReply(std::move(commandReply)).done()};
     }
 
 

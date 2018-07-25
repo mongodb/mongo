@@ -248,7 +248,6 @@ void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallA
 
     BSONObjBuilder mergedResultBob;
     mergedResultBob.append("commandReply", res->getCommandReply());
-    mergedResultBob.append("metadata", res->getMetadata());
 
     ValueReader(cx, args.rval()).fromBSON(mergedResultBob.obj(), nullptr, false);
     setHiddenMongo(cx, std::get<1>(resTuple), conn.get(), args);

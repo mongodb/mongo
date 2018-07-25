@@ -56,12 +56,10 @@ public:
     struct CommandResponse {
         CommandResponse(boost::optional<HostAndPort> hostAndPort,
                         BSONObj response,
-                        BSONObj metadata,
                         Status commandStatus,
                         Status writeConcernStatus)
             : hostAndPort(std::move(hostAndPort)),
               response(std::move(response)),
-              metadata(std::move(metadata)),
               commandStatus(std::move(commandStatus)),
               writeConcernStatus(std::move(writeConcernStatus)) {}
 
@@ -79,7 +77,6 @@ public:
 
         boost::optional<HostAndPort> hostAndPort;
         BSONObj response;
-        BSONObj metadata;
         Status commandStatus;
         Status writeConcernStatus;
     };

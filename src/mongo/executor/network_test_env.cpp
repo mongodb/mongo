@@ -52,7 +52,7 @@ void NetworkTestEnv::onCommand(OnCommandFunction func) {
     if (resultStatus.isOK()) {
         BSONObjBuilder result(std::move(resultStatus.getValue()));
         CommandHelpers::appendCommandStatusNoThrow(result, resultStatus.getStatus());
-        const RemoteCommandResponse response(result.obj(), BSONObj(), Milliseconds(1));
+        const RemoteCommandResponse response(result.obj(), Milliseconds(1));
 
         _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
     } else {
@@ -75,8 +75,7 @@ void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
     if (cmdResponseStatus.isOK()) {
         BSONObjBuilder result(std::move(cmdResponseStatus.data));
         CommandHelpers::appendCommandStatusNoThrow(result, cmdResponseStatus.status);
-        const RemoteCommandResponse response(
-            result.obj(), cmdResponseStatus.metadata, Milliseconds(1));
+        const RemoteCommandResponse response(result.obj(), Milliseconds(1));
 
         _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
     } else {
@@ -128,10 +127,10 @@ void NetworkTestEnv::onFindWithMetadataCommand(OnFindCommandWithMetadataFunction
 
         const NamespaceString nss =
             NamespaceString(request.dbname, request.cmdObj.firstElement().String());
-        BSONObjBuilder resultBuilder;
+        BSONObjBuilder resultBuilder(std::move(metadata));
         appendCursorResponseObject(0LL, nss.toString(), arr.arr(), &resultBuilder);
 
-        return RemoteCommandResponse(resultBuilder.obj(), metadata, Milliseconds(1));
+        return RemoteCommandResponse(resultBuilder.obj(), Milliseconds(1));
     });
 }
 

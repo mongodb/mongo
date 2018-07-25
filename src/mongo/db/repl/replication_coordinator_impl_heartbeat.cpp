@@ -149,7 +149,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         resp = cbData.response.data;
         responseStatus = hbResponse.initialize(resp, _topCoord->getTerm());
         StatusWith<rpc::ReplSetMetadata> replMetadata =
-            rpc::ReplSetMetadata::readFromMetadata(cbData.response.metadata);
+            rpc::ReplSetMetadata::readFromMetadata(cbData.response.data);
 
         LOG_FOR_HEARTBEATS(2) << "Received response to heartbeat (requestId: " << cbData.request.id
                               << ") from " << target << ", " << resp;

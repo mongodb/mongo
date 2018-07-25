@@ -208,8 +208,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
         // Update getLastError info for the client if we're tracking it.
         if (clusterGLE) {
-            auto swShardingMetadata =
-                rpc::ShardingMetadata::readFromMetadata(args.response.metadata);
+            auto swShardingMetadata = rpc::ShardingMetadata::readFromMetadata(args.response.data);
             if (swShardingMetadata.isOK()) {
                 auto shardingMetadata = std::move(swShardingMetadata.getValue());
 
@@ -224,7 +223,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             } else if (swShardingMetadata.getStatus() != ErrorCodes::NoSuchKey) {
                 warning() << "Got invalid sharding metadata "
                           << redact(swShardingMetadata.getStatus()) << " metadata object was '"
-                          << redact(args.response.metadata) << "'";
+                          << redact(args.response.data) << "'";
             }
         }
     };

@@ -153,8 +153,7 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
 
         conn->getCompressorManager().clientFinish(isMasterObj);
 
-        return executor::RemoteCommandResponse{
-            std::move(isMasterObj), result->getMetadata().getOwned(), finish - start};
+        return executor::RemoteCommandResponse{std::move(isMasterObj), finish - start};
 
     } catch (...) {
         return exceptionToStatus();

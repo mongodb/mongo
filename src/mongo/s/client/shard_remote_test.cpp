@@ -184,10 +184,11 @@ TEST_F(ShardRemoteTest, ScatterGatherRepliesWithLastCommittedOpTime) {
         onCommandWithMetadata([&](const executor::RemoteCommandRequest& request) {
             std::vector<BSONObj> batch = {BSON("_id" << 1)};
             CursorResponse cursorResponse(nss, CursorId(123), batch);
-            auto result = cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+            auto result = BSONObjBuilder(
+                cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse));
+            result.appendElements(makeLastCommittedOpTimeMetadata(expectedTime));
 
-            return executor::RemoteCommandResponse(
-                result, makeLastCommittedOpTimeMetadata(expectedTime), Milliseconds(1));
+            return executor::RemoteCommandResponse(result.obj(), Milliseconds(1));
         });
     }
 

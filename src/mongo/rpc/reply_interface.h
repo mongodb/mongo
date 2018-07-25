@@ -47,12 +47,6 @@ public:
     virtual ~ReplyInterface() = default;
 
     /**
-     * Accessor for the metadata object. Metadata is generally used for information
-     * that is independent of any specific command, e.g. auditing information.
-     */
-    virtual const BSONObj& getMetadata() const = 0;
-
-    /**
      * The result of executing the command.
      */
     virtual const BSONObj& getCommandReply() const = 0;

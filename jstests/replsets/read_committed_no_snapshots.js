@@ -55,7 +55,7 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
 
     // We need to propagate the lastOpVisible from the primary as afterOpTime in the secondaries to
     // ensure we wait for the write to be in the majority committed view.
-    var lastOp = res.metadata["$replData"].lastOpVisible;
+    var lastOp = res.commandReply["$replData"].lastOpVisible;
 
     // Timeout is based on heartbeat timeout.
     assert.commandWorked(healthySecondary.getDB(name).foo.runCommand(

@@ -207,7 +207,6 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
                                                              postConnectRequest->metadata));
 
             auto rcr = executor::RemoteCommandResponse(reply->getCommandReply().getOwned(),
-                                                       reply->getMetadata().getOwned(),
                                                        Date_t::now() - start);
 
             uassertStatusOK(_hook->handleReply(target, std::move(rcr)));

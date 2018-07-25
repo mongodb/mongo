@@ -360,7 +360,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
             if (_metadataHook && response.status.isOK()) {
                 auto target = state->conn->getHostAndPort().toString();
                 response.status =
-                    _metadataHook->readReplyMetadata(nullptr, std::move(target), response.metadata);
+                    _metadataHook->readReplyMetadata(nullptr, std::move(target), response.data);
             }
 
             return RemoteCommandResponse(std::move(response));

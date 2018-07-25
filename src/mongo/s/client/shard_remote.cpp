@@ -244,7 +244,6 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
 
     return Shard::CommandResponse(std::move(host),
                                   std::move(result),
-                                  response.metadata.getOwned(),
                                   std::move(commandStatus),
                                   std::move(writeConcernStatus));
 }

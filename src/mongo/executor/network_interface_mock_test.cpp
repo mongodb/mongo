@@ -116,8 +116,8 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
     RemoteCommandResponse expectedResponse{BSON("foo"
                                                 << "bar"
                                                 << "baz"
-                                                << "garply"),
-                                           BSON("bar"
+                                                << "garply"
+                                                << "bar"
                                                 << "baz"),
                                            Milliseconds(30)};
 
@@ -125,8 +125,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
     auto isMasterReplyData = BSON("iamyour"
                                   << "father");
 
-    RemoteCommandResponse isMasterReply{
-        isMasterReplyData.copy(), BSON("blah" << 2), Milliseconds(20)};
+    RemoteCommandResponse isMasterReply{isMasterReplyData.copy(), Milliseconds(20)};
 
     net().setHandshakeReplyForHost(testHost(), std::move(isMasterReply));
 
@@ -166,7 +165,6 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
         testHost(), "testDB", BSON("test" << 1), rpc::makeEmptyMetadata(), nullptr};
     RemoteCommandResponse actualResponseExpected{BSON("1212121212"
                                                       << "12121212121212"),
-                                                 BSONObj(),
                                                  Milliseconds(0)};
 
     ASSERT_OK(net().startCommand(cb, actualCommandExpected, [&](RemoteCommandResponse resp) {

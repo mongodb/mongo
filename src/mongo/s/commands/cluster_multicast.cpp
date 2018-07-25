@@ -134,7 +134,6 @@ public:
 
                     if (CommandHelpers::appendCommandStatusNoThrow(subbob, response.status)) {
                         subbob.append("data", response.data);
-                        subbob.append("metadata", response.metadata);
                         if (response.elapsedMillis) {
                             subbob.append("elapsedMillis", response.elapsedMillis->count());
                         }

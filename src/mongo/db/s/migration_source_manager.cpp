@@ -545,9 +545,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
             severe() << "The current config server opTime is " << Grid::get(opCtx)->configOpTime();
             severe() << "The commit response came from "
                      << redact(commitChunkMigrationResponse.getValue().hostAndPort->toString())
-                     << " and contained:";
-            severe() << "  metadata: "
-                     << redact(commitChunkMigrationResponse.getValue().metadata.toString());
+                     << " and contained";
             severe() << "  response: "
                      << redact(commitChunkMigrationResponse.getValue().response.toString());
 

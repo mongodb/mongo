@@ -580,7 +580,6 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
         return {};  // Don't reply.
     }
 
-    reply->setMetadata(BSONObj());  // mongos doesn't use metadata but the API requires this call.
     return DbResponse{reply->done()};
 }
 

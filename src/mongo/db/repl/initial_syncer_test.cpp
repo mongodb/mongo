@@ -162,7 +162,7 @@ public:
                                  const BSONObj& obj) {
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
-        RemoteCommandResponse response(obj, BSONObj(), millis);
+        RemoteCommandResponse response(obj, millis);
         log() << "Sending response for network request:";
         log() << "     req: " << noi->getRequest().dbname << "." << noi->getRequest().cmdObj;
         log() << "     resp:" << response;
@@ -501,9 +501,6 @@ RemoteCommandResponse makeCursorResponse(CursorId cursorId,
                                          int rbid = 1) {
     OpTime futureOpTime(Timestamp(1000, 1000), 1000);
     rpc::OplogQueryMetadata oqMetadata(futureOpTime, futureOpTime, rbid, 0, 0);
-    BSONObjBuilder metadataBob;
-    ASSERT_OK(oqMetadata.writeToMetadata(&metadataBob));
-    auto metadataObj = metadataBob.obj();
 
     BSONObjBuilder bob;
     {
@@ -518,8 +515,9 @@ RemoteCommandResponse makeCursorResponse(CursorId cursorId,
             }
         }
     }
+    ASSERT_OK(oqMetadata.writeToMetadata(&bob));
     bob.append("ok", 1);
-    return {bob.obj(), metadataObj, Milliseconds(0)};
+    return {bob.obj(), Milliseconds()};
 }
 
 /**

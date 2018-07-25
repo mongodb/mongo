@@ -326,7 +326,7 @@ void NetworkInterfaceMock::scheduleResponse(NetworkOperationIterator noi,
     if (_metadataHook && response.isOK()) {
         _metadataHook
             ->readReplyMetadata(
-                noi->getRequest().opCtx, noi->getRequest().target.toString(), response.metadata)
+                noi->getRequest().opCtx, noi->getRequest().target.toString(), response.data)
             .transitional_ignore();
     }
 
@@ -335,8 +335,7 @@ void NetworkInterfaceMock::scheduleResponse(NetworkOperationIterator noi,
 }
 
 RemoteCommandRequest NetworkInterfaceMock::scheduleSuccessfulResponse(const BSONObj& response) {
-    BSONObj metadata;
-    return scheduleSuccessfulResponse(RemoteCommandResponse(response, metadata, Milliseconds(0)));
+    return scheduleSuccessfulResponse(RemoteCommandResponse(response, Milliseconds(0)));
 }
 
 RemoteCommandRequest NetworkInterfaceMock::scheduleSuccessfulResponse(
@@ -479,7 +478,7 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
 
     auto handshakeReply = (handshakeReplyIter != std::end(_handshakeReplies))
         ? handshakeReplyIter->second
-        : RemoteCommandResponse(BSONObj(), BSONObj(), Milliseconds(0));
+        : RemoteCommandResponse(BSONObj(), Milliseconds(0));
 
     auto valid = _hook->validateHost(target, op.getRequest().cmdObj, handshakeReply);
     if (!valid.isOK()) {

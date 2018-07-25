@@ -54,8 +54,6 @@ public:
 
     BSONObjBuilder getBodyBuilder() final;
 
-    LegacyReplyBuilder& setMetadata(const BSONObj& metadata) final;
-
     void reset() final;
 
     Message done() final;
@@ -65,14 +63,12 @@ public:
     void reserveBytes(const std::size_t bytes) final;
 
 private:
-    enum class State { kMetadata, kCommandReply, kOutputDocs, kDone };
-
-    BufBuilder _builder{};
+    BufBuilder _builder;
     std::size_t _bodyOffset = 0;
     Message _message;
-    State _state{State::kCommandReply};
+    bool _haveCommandReply = false;
     // For stale config errors we need to set the correct ResultFlag.
-    bool _staleConfigError{false};
+    bool _staleConfigError = false;
 };
 
 }  // namespace rpc

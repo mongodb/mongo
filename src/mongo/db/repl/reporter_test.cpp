@@ -331,7 +331,7 @@ TEST_F(ReporterTestNoTriggerAtSetUp, IsNotActiveAfterUpdatePositionTimeoutExpire
     // Schedule a response to the updatePosition command at a time that exceeds the timeout. Then
     // make sure the reporter shut down due to a remote command timeout.
     auto updatePosRequest = net->getNextReadyRequest();
-    RemoteCommandResponse response(BSON("ok" << 1), BSONObj(), Milliseconds(0));
+    RemoteCommandResponse response(BSON("ok" << 1), Milliseconds(0));
     executor::TaskExecutor::ResponseStatus responseStatus(response);
     net->scheduleResponse(
         updatePosRequest, net->now() + updatePositionTimeout + Milliseconds(1), responseStatus);

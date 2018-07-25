@@ -61,12 +61,9 @@ struct RemoteCommandResponse {
 
     RemoteCommandResponse(Status s, Milliseconds millis);
 
-    RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj, Milliseconds millis);
+    RemoteCommandResponse(BSONObj dataObj, Milliseconds millis);
 
-    RemoteCommandResponse(Message messageArg,
-                          BSONObj dataObj,
-                          BSONObj metadataObj,
-                          Milliseconds millis);
+    RemoteCommandResponse(Message messageArg, BSONObj dataObj, Milliseconds millis);
 
     RemoteCommandResponse(const rpc::ReplyInterface& rpcReply, Milliseconds millis);
 
@@ -79,7 +76,6 @@ struct RemoteCommandResponse {
 
     std::shared_ptr<const Message> message;  // May be null.
     BSONObj data;                            // Always owned. May point into message.
-    BSONObj metadata;                        // Always owned. May point into message.
     boost::optional<Milliseconds> elapsedMillis;
     Status status = Status::OK();
 };

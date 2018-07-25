@@ -103,7 +103,7 @@ public:
     }
 
     void pushResponse(const BSONObj& cmd) {
-        _responses.emplace(cmd, BSONObj(), _millis);
+        _responses.emplace(cmd, _millis);
     }
 
     void pushRequest(StringData dbname, const BSONObj& cmd) {

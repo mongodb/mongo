@@ -102,10 +102,6 @@ LegacyReply::LegacyReply(const Message* message) {
     return;
 }
 
-const BSONObj& LegacyReply::getMetadata() const {
-    return _commandReply;
-}
-
 const BSONObj& LegacyReply::getCommandReply() const {
     return _commandReply;
 }

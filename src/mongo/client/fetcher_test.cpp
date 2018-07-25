@@ -143,7 +143,7 @@ void FetcherTest::processNetworkResponse(const BSONObj& obj,
                                          ReadyQueueState readyQueueStateAfterProcessing,
                                          FetcherState fetcherStateAfterProcessing) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-    getNet()->scheduleSuccessfulResponse({obj, {}, elapsed});
+    getNet()->scheduleSuccessfulResponse({obj, elapsed});
     finishProcessingNetworkResponse(readyQueueStateAfterProcessing, fetcherStateAfterProcessing);
 }
 
@@ -947,7 +947,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
         ASSERT_EQUALS(cursorId, cursors.front().numberLong());
 
         // Failed killCursors command response should be logged.
-        getNet()->scheduleSuccessfulResponse(noi, {BSON("ok" << false), {}, Milliseconds(0)});
+        getNet()->scheduleSuccessfulResponse(noi, {BSON("ok" << false), Milliseconds(0)});
         getNet()->runReadyNetworkOperations();
     }
 

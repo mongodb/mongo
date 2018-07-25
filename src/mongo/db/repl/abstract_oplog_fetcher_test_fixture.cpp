@@ -139,8 +139,7 @@ executor::RemoteCommandRequest AbstractOplogFetcherTest::processNetworkResponse(
 
 executor::RemoteCommandRequest AbstractOplogFetcherTest::processNetworkResponse(
     BSONObj obj, bool expectReadyRequestsAfterProcessing) {
-    return processNetworkResponse({obj, rpc::makeEmptyMetadata(), Milliseconds(0)},
-                                  expectReadyRequestsAfterProcessing);
+    return processNetworkResponse({obj, Milliseconds(0)}, expectReadyRequestsAfterProcessing);
 }
 
 }  // namespace repl

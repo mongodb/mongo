@@ -233,7 +233,7 @@ const BSONObj makeHeartbeatRequest(const ReplSetConfig& rsConfig, int myConfigIn
 executor::RemoteCommandResponse makeHeartbeatResponse(const ReplSetConfig& rsConfig,
                                                       const stdx::chrono::milliseconds millis,
                                                       const long long configVersion = 0,
-                                                      const BSONObj& metadata = {}) {
+                                                      const BSONObj& extraFields = {}) {
     ReplSetHeartbeatResponse hbResp;
     hbResp.setSetName(rsConfig.getReplSetName());
     hbResp.setConfigVersion(configVersion);
@@ -241,7 +241,9 @@ executor::RemoteCommandResponse makeHeartbeatResponse(const ReplSetConfig& rsCon
     OpTime opTime(Timestamp(), 0);
     hbResp.setAppliedOpTime(opTime);
     hbResp.setDurableOpTime(opTime);
-    return RemoteCommandResponse(hbResp.toBSON(), metadata, duration_cast<Milliseconds>(millis));
+    auto bob = BSONObjBuilder(hbResp.toBSON());
+    bob.appendElements(extraFields);
+    return RemoteCommandResponse(bob.obj(), duration_cast<Milliseconds>(millis));
 }
 
 TEST_F(CheckQuorumForInitiate, QuorumCheckSuccessForFiveNodes) {
@@ -399,13 +401,10 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetNameMismatch) {
                 (RemoteCommandResponse(
                     BSON("ok" << 0 << "code" << ErrorCodes::InconsistentReplicaSetNames << "errmsg"
                               << "replica set name doesn't match."),
-                    BSONObj(),
                     Milliseconds(8))));
         } else {
             getNet()->scheduleResponse(
-                noi,
-                startDate + 10ms,
-                (RemoteCommandResponse(BSON("ok" << 1), BSONObj(), Milliseconds(8))));
+                noi, startDate + 10ms, RemoteCommandResponse(BSON("ok" << 1), Milliseconds(8)));
         }
     }
     getNet()->runUntil(startDate + 10ms);
@@ -473,14 +472,14 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
                                           unexpectedId,
                                           rpc::ReplSetMetadata::kNoPrimary,
                                           -1);
-            BSONObjBuilder metadataBuilder;
-            metadata.writeToMetadata(&metadataBuilder).transitional_ignore();
+            BSONObjBuilder bob;
+            uassertStatusOK(metadata.writeToMetadata(&bob));
 
             long long configVersion = 0;
             getNet()->scheduleResponse(
                 noi,
                 startDate + 10ms,
-                makeHeartbeatResponse(rsConfig, 8ms, configVersion, metadataBuilder.obj()));
+                makeHeartbeatResponse(rsConfig, 8ms, configVersion, bob.obj()));
         } else {
             getNet()->scheduleResponse(noi, startDate + 10ms, makeHeartbeatResponse(rsConfig, 8ms));
         }
@@ -713,7 +712,6 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToIncompatibleSetName) {
                 (RemoteCommandResponse(
                     BSON("ok" << 0 << "code" << ErrorCodes::InconsistentReplicaSetNames << "errmsg"
                               << "replica set name doesn't match."),
-                    BSONObj(),
                     Milliseconds(8))));
         } else {
             getNet()->scheduleResponse(
@@ -949,10 +947,9 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckProcessesCallbackCanceledResponse) {
                 startDate + 10ms,
                 (RemoteCommandResponse(ErrorCodes::CallbackCanceled, "Testing canceled callback")));
         } else {
-            getNet()->scheduleResponse(
-                noi,
-                startDate + 10ms,
-                (RemoteCommandResponse(BSON("ok" << 0), BSONObj(), Milliseconds(8))));
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       RemoteCommandResponse(BSON("ok" << 0), Milliseconds(8)));
         }
     }
     getNet()->runUntil(startDate + 10ms);

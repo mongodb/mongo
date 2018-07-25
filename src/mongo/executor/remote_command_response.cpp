@@ -54,29 +54,21 @@ RemoteCommandResponse::RemoteCommandResponse(Status s, Milliseconds millis)
     invariant(!isOK());
 };
 
-RemoteCommandResponse::RemoteCommandResponse(BSONObj dataObj,
-                                             BSONObj metadataObj,
-                                             Milliseconds millis)
-    : data(std::move(dataObj)), metadata(std::move(metadataObj)), elapsedMillis(millis) {
+RemoteCommandResponse::RemoteCommandResponse(BSONObj dataObj, Milliseconds millis)
+    : data(std::move(dataObj)), elapsedMillis(millis) {
     // The buffer backing the default empty BSONObj has static duration so it is effectively
     // owned.
     invariant(data.isOwned() || data.objdata() == BSONObj().objdata());
-    invariant(metadata.isOwned() || metadata.objdata() == BSONObj().objdata());
 };
 
 RemoteCommandResponse::RemoteCommandResponse(Message messageArg,
                                              BSONObj dataObj,
-                                             BSONObj metadataObj,
                                              Milliseconds millis)
     : message(std::make_shared<const Message>(std::move(messageArg))),
       data(std::move(dataObj)),
-      metadata(std::move(metadataObj)),
       elapsedMillis(millis) {
     if (!data.isOwned()) {
         data.shareOwnershipWith(message->sharedBuffer());
-    }
-    if (!metadata.isOwned()) {
-        metadata.shareOwnershipWith(message->sharedBuffer());
     }
 }
 
@@ -84,8 +76,7 @@ RemoteCommandResponse::RemoteCommandResponse(Message messageArg,
 // have RCR hold those too, but we need more machinery before that is possible.
 RemoteCommandResponse::RemoteCommandResponse(const rpc::ReplyInterface& rpcReply,
                                              Milliseconds millis)
-    : RemoteCommandResponse(rpcReply.getCommandReply(), rpcReply.getMetadata(), std::move(millis)) {
-}
+    : RemoteCommandResponse(rpcReply.getCommandReply(), std::move(millis)) {}
 
 bool RemoteCommandResponse::isOK() const {
     return status.isOK();
@@ -101,8 +92,7 @@ bool RemoteCommandResponse::operator==(const RemoteCommandResponse& rhs) const {
         return true;
     }
     SimpleBSONObjComparator bsonComparator;
-    return bsonComparator.evaluate(data == rhs.data) &&
-        bsonComparator.evaluate(metadata == rhs.metadata) && elapsedMillis == rhs.elapsedMillis;
+    return bsonComparator.evaluate(data == rhs.data) && elapsedMillis == rhs.elapsedMillis;
 }
 
 bool RemoteCommandResponse::operator!=(const RemoteCommandResponse& rhs) const {

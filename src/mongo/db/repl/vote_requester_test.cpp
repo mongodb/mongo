@@ -153,7 +153,7 @@ protected:
         ReplSetRequestVotesResponse response;
         response.setVoteGranted(true);
         response.setTerm(1);
-        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
+        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedYesStatusNotOkBecauseFailedToStoreLastVote() {
@@ -164,7 +164,7 @@ protected:
         response.addToBSON(&result);
         auto status = Status(ErrorCodes::InterruptedDueToStepDown, "operation was interrupted");
         CommandHelpers::appendCommandStatusNoThrow(result, status);
-        return RemoteCommandResponse(result.obj(), BSONObj(), Milliseconds(10));
+        return RemoteCommandResponse(result.obj(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseConfigVersionDoesNotMatch() {
@@ -172,7 +172,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's config version differs from mine");
-        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
+        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseSetNameDiffers() {
@@ -180,7 +180,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's set name differs from mine");
-        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
+        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseLastOpTimeIsGreater() {
@@ -188,7 +188,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's data is staler than mine");
-        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
+        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseTermIsGreater() {
@@ -196,7 +196,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(3);
         response.setReason("candidate's term is lower than mine");
-        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
+        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
     }
 
     RemoteCommandResponse votedNoBecauseAlreadyVoted() {
@@ -204,7 +204,7 @@ protected:
         response.setVoteGranted(false);
         response.setTerm(2);
         response.setReason("already voted for another candidate this term");
-        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
+        return RemoteCommandResponse(response.toBSON(), Milliseconds(10));
     }
 
     std::unique_ptr<VoteRequester::Algorithm> _requester;

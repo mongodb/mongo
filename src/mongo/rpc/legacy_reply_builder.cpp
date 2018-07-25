@@ -54,7 +54,7 @@ LegacyReplyBuilder::~LegacyReplyBuilder() {}
 
 LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
                                                         BSONObj extraErrorInfo) {
-    invariant(_state == State::kCommandReply);
+    invariant(!_haveCommandReply);
     if (nonOKStatus == ErrorCodes::StaleConfig) {
         _staleConfigError = true;
 
@@ -77,32 +77,25 @@ LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
 }
 
 LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(const BSONObj& commandReply) {
-    invariant(_state == State::kCommandReply);
+    invariant(!_haveCommandReply);
+    _bodyOffset = _builder.len();
     commandReply.appendSelfToBufBuilder(_builder);
-    _state = State::kMetadata;
+    _haveCommandReply = true;
     return *this;
 }
 
 BSONObjBuilder LegacyReplyBuilder::getBodyBuilder() {
-    if (_state == State::kCommandReply) {
+    if (!_haveCommandReply) {
         auto bob = BSONObjBuilder(_builder);
         _bodyOffset = bob.offset();
-        _state = State::kMetadata;
+        _haveCommandReply = true;
         return bob;
     }
 
-    invariant(_state == State::kMetadata);
     invariant(_bodyOffset);
     return BSONObjBuilder(BSONObjBuilder::ResumeBuildingTag{}, _builder, _bodyOffset);
 }
 
-LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(const BSONObj& metadata) {
-    invariant(_state == State::kMetadata);
-    BSONObjBuilder(BSONObjBuilder::ResumeBuildingTag(), _builder, sizeof(QueryResult::Value))
-        .appendElements(metadata);
-    _state = State::kOutputDocs;
-    return *this;
-}
 
 Protocol LegacyReplyBuilder::getProtocol() const {
     return rpc::Protocol::kOpQuery;
@@ -116,20 +109,20 @@ void LegacyReplyBuilder::reserveBytes(const std::size_t bytes) {
 void LegacyReplyBuilder::reset() {
     // If we are in State::kMetadata, we are already in the 'start' state, so by
     // immediately returning, we save a heap allocation.
-    if (_state == State::kCommandReply) {
+    if (!_haveCommandReply) {
         return;
     }
     _builder.reset();
     _builder.skip(sizeof(QueryResult::Value));
     _message.reset();
-    _state = State::kCommandReply;
+    _haveCommandReply = false;
     _staleConfigError = false;
     _bodyOffset = 0;
 }
 
 
 Message LegacyReplyBuilder::done() {
-    invariant(_state == State::kOutputDocs);
+    invariant(_haveCommandReply);
 
     QueryResult::View qr = _builder.buf();
 
@@ -148,7 +141,6 @@ Message LegacyReplyBuilder::done() {
 
     _message.setData(_builder.release());
 
-    _state = State::kDone;
     return std::move(_message);
 }
 

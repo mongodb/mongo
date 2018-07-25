@@ -84,11 +84,10 @@ TEST_F(ClusterGetLastErrorTest,
     // Make the reply contain ShardingMetadata.
     repl::OpTime opTime{Timestamp{10, 10}, 10};
     onCommandWithMetadata([&](const RemoteCommandRequest& request) {
-        BSONObjBuilder metadataBob;
-        rpc::ShardingMetadata(opTime, OID() /* ignored OID field */)
-            .writeToMetadata(&metadataBob)
-            .transitional_ignore();
-        return RemoteCommandResponse(BSON("ok" << 1), metadataBob.obj(), Milliseconds(1));
+        auto bob = BSONObjBuilder(BSON("ok" << 1));
+        uassertStatusOK(
+            rpc::ShardingMetadata(opTime, OID() /* ignored OID field */).writeToMetadata(&bob));
+        return RemoteCommandResponse(bob.obj(), Milliseconds(1));
     });
 
     future.timed_get(kFutureTimeout);
@@ -129,11 +128,10 @@ TEST_F(ClusterGetLastErrorTest, ClusterLastErrorInfoNotUpdatedIfNotInitialized) 
     // Make the reply contain ShardingMetadata.
     repl::OpTime opTime{Timestamp{10, 10}, 10};
     onCommandWithMetadata([&](const RemoteCommandRequest& request) {
-        BSONObjBuilder metadataBob;
-        rpc::ShardingMetadata(opTime, OID() /* ignored OID field */)
-            .writeToMetadata(&metadataBob)
-            .transitional_ignore();
-        return RemoteCommandResponse(BSON("ok" << 1), metadataBob.obj(), Milliseconds(1));
+        auto bob = BSONObjBuilder(BSON("ok" << 1));
+        uassertStatusOK(
+            rpc::ShardingMetadata(opTime, OID() /* ignored OID field */).writeToMetadata(&bob));
+        return RemoteCommandResponse(bob.obj(), Milliseconds(1));
     });
 
     future.timed_get(kFutureTimeout);
@@ -174,7 +172,7 @@ TEST_F(ClusterGetLastErrorTest, ClusterLastErrorInfoNotUpdatedIfReplyDoesntHaveS
     // Do not return ShardingMetadata in the reply.
     repl::OpTime opTime{Timestamp{10, 10}, 10};
     onCommandWithMetadata([&](const RemoteCommandRequest& request) {
-        return RemoteCommandResponse(BSON("ok" << 1), BSONObj(), Milliseconds(1));
+        return RemoteCommandResponse(BSON("ok" << 1), Milliseconds(1));
     });
 
     future.timed_get(kFutureTimeout);

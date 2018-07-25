@@ -213,7 +213,7 @@ void generateErrorResponse(OperationContext* opCtx,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
     replyBuilder->setCommandReply(exception.toStatus(), extraFields);
-    replyBuilder->setMetadata(replyMetadata);
+    replyBuilder->getBodyBuilder().appendElements(replyMetadata);
 }
 
 BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& sessionOptions,
@@ -571,15 +571,10 @@ bool runCommandImpl(OperationContext* opCtx,
         }
     }
 
-    BSONObjBuilder metadataBob;
-    appendReplyMetadata(opCtx, request, &metadataBob);
+    auto commandBodyBob = replyBuilder->getBodyBuilder();
+    appendReplyMetadata(opCtx, request, &commandBodyBob);
+    appendClusterAndOperationTime(opCtx, &commandBodyBob, &commandBodyBob, startOperationTime);
 
-    {
-        auto commandBodyBob = replyBuilder->getBodyBuilder();
-        appendClusterAndOperationTime(opCtx, &commandBodyBob, &metadataBob, startOperationTime);
-    }
-
-    replyBuilder->setMetadata(metadataBob.obj());
     return ok;
 }
 

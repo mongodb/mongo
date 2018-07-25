@@ -125,7 +125,7 @@ TEST(LegacyReplyBuilder, CommandError) {
     const BSONObj extraObj = extra.obj();
     rpc::LegacyReplyBuilder replyBuilder;
     replyBuilder.setCommandReply(status, extraObj);
-    replyBuilder.setMetadata(metadata);
+    replyBuilder.getBodyBuilder().appendElements(metadata);
     auto msg = replyBuilder.done();
 
     rpc::LegacyReply parsed(&msg);
@@ -136,7 +136,6 @@ TEST(LegacyReplyBuilder, CommandError) {
         return unifiedBuilder.obj();
     }());
 
-    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), body);
     ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), body);
 }
 
@@ -149,7 +148,7 @@ TEST(OpMsgReplyBuilder, CommandError) {
     const BSONObj extraObj = extra.obj();
     rpc::OpMsgReplyBuilder replyBuilder;
     replyBuilder.setCommandReply(status, extraObj);
-    replyBuilder.setMetadata(metadata);
+    replyBuilder.getBodyBuilder().appendElements(metadata);
     auto msg = replyBuilder.done();
 
     rpc::OpMsgReply parsed(&msg);
@@ -160,7 +159,6 @@ TEST(OpMsgReplyBuilder, CommandError) {
         return unifiedBuilder.obj();
     }());
 
-    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), body);
     ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), body);
 }
 
@@ -170,7 +168,7 @@ void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder, bool unifiedBodyAnd
     auto commandReply = buildEmptyCommand();
 
     replyBuilder.setCommandReply(commandReply);
-    replyBuilder.setMetadata(metadata);
+    replyBuilder.getBodyBuilder().appendElements(metadata);
 
     auto msg = replyBuilder.done();
 
@@ -184,10 +182,8 @@ void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder, bool unifiedBodyAnd
         }());
 
         ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), body);
-        ASSERT_BSONOBJ_EQ(parsed.getMetadata(), body);
     } else {
         ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), commandReply);
-        ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
     }
 }
 
@@ -198,7 +194,7 @@ void testErrors(rpc::ReplyBuilderInterface& replyBuilder) {
     const auto status = Status(ErrorExtraInfoExample(123), "Why does this keep failing!");
 
     replyBuilder.setCommandReply(status);
-    replyBuilder.setMetadata(buildMetadata());
+    replyBuilder.getBodyBuilder().appendElements(buildMetadata());
 
     const auto msg = replyBuilder.done();
 

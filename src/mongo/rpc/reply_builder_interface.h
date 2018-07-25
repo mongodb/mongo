@@ -75,8 +75,6 @@ public:
         uasserted(50875, "Only OpMsg may use document sequences");
     }
 
-    virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;
-
     /**
      * Sets the reply for this command. If an engaged StatusWith<BSONObj> is passed, the command
      * reply will be set to the contained BSONObj, augmented with the element {ok, 1.0} if it

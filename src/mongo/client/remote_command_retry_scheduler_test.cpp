@@ -378,7 +378,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnFirstSuccessfu
     start(&scheduler);
 
     // Elapsed time in response is ignored on successful responses.
-    ResponseStatus response(BSON("ok" << 1 << "x" << 123), BSON("z" << 456), Milliseconds(100));
+    ResponseStatus response(BSON("ok" << 1 << "x" << 123 << "z" << 456), Milliseconds(100));
 
     processNetworkResponse(response);
     checkCompletionStatus(&scheduler, callback, response);
@@ -400,8 +400,9 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerIgnoresEmbeddedErrorInSuccessfu
     // This is the case with some commands (e.g. find) which do not always return errors using the
     // wire protocol.
     ResponseStatus response(BSON("ok" << 0 << "code" << int(ErrorCodes::FailedToParse) << "errmsg"
-                                      << "injected error"),
-                            BSON("z" << 456),
+                                      << "injected error"
+                                      << "z"
+                                      << 456),
                             Milliseconds(100));
 
     processNetworkResponse(response);
@@ -458,7 +459,7 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerShouldRetryUntilSuccessfulRespo
 
     processNetworkResponse({ErrorCodes::HostNotFound, "first", Milliseconds(0)});
 
-    ResponseStatus response(BSON("ok" << 1 << "x" << 123), BSON("z" << 456), Milliseconds(100));
+    ResponseStatus response(BSON("ok" << 1 << "x" << 123 << "z" << 456), Milliseconds(100));
     processNetworkResponse(response);
     checkCompletionStatus(&scheduler, callback, response);
 }
