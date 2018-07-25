@@ -41,8 +41,19 @@ namespace mongo {
 class Exchange : public RefCountable {
     static constexpr size_t kInvalidThreadId{std::numeric_limits<size_t>::max()};
 
+    /**
+     * Convert the BSON representation of boundaries (as deserialized off the wire) to the internal
+     * format (KeyString).
+     */
     static std::vector<std::string> extractBoundaries(
         const boost::optional<std::vector<BSONObj>>& obj);
+
+    /**
+     * Validate consumer ids coming off the wire. If the ids pass the validation then return them.
+     * If the ids are not provided (boost::none) then generate a sequence [0..nConsumer-1].
+     */
+    static std::vector<size_t> extractConsumerIds(
+        const boost::optional<std::vector<std::int32_t>>& consumerIds, size_t nConsumers);
 
 public:
     explicit Exchange(const ExchangeSpec& spec);
@@ -84,8 +95,17 @@ private:
     // A pattern for extracting a key from a document used by range and hash policies.
     const BSONObj _keyPattern;
 
-    // Range boundaries.
+    // Range boundaries. The boundaries are ordered and must cover the whole domain, e.g.
+    // [Min, -200, 0, 200, Max] partitions the domain into 4 ranges (i.e. 1 less than number of
+    // boundaries). Every range has an assigned consumer that will process documents in that range.
     const std::vector<std::string> _boundaries;
+
+    // A mapping from the range to consumer id. For the ranges from the example above the array must
+    // have 4 elements (1 for every range):
+    // [0, 1, 0, 1]
+    // consumer 0 processes ranges 1 and 3 (i.e. [Min,-200] and [0,200])
+    // consumer 1 processes ranges 2 and 4 (i.e. [-200,0] and [200,Max])
+    const std::vector<size_t> _consumerIds;
 
     // A policy that tells how to distribute input documents to consumers.
     const ExchangePolicyEnum _policy;

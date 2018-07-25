@@ -68,4 +68,8 @@ structs:
         type: array<object>
         optional: true
         description: Range/hash split points.
+      consumerids:
+        type: array<int>
+        optional: true
+        description: Mapping from a range index to a consumer id.
 

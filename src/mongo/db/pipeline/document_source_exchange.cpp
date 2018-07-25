@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <set>
 
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/storage/key_string.h"
@@ -80,6 +81,7 @@ Exchange::Exchange(const ExchangeSpec& spec)
     : _spec(spec),
       _keyPattern(spec.getKey().getOwned()),
       _boundaries(extractBoundaries(spec.getBoundaries())),
+      _consumerIds(extractConsumerIds(spec.getConsumerids(), spec.getConsumers())),
       _policy(spec.getPolicy()),
       _orderPreserving(spec.getOrderPreserving()),
       _maxBufferSize(spec.getBufferSize()) {
@@ -90,7 +92,7 @@ Exchange::Exchange(const ExchangeSpec& spec)
     if (_policy == ExchangePolicyEnum::kRange) {
         uassert(ErrorCodes::BadValue,
                 "$exchange boundaries do not much number of consumers.",
-                getConsumers() + 1 == _boundaries.size());
+                _boundaries.size() == _consumerIds.size() + 1);
     } else if (_policy == ExchangePolicyEnum::kHash) {
         uasserted(ErrorCodes::BadValue, "$exchange hash is not yet implemented.");
     }
@@ -121,6 +123,33 @@ std::vector<std::string> Exchange::extractBoundaries(
         uassert(ErrorCodes::BadValue,
                 str::stream() << "$exchange range boundaries are not in ascending order.",
                 ret[idx - 1] < ret[idx]);
+    }
+    return ret;
+}
+
+std::vector<size_t> Exchange::extractConsumerIds(
+    const boost::optional<std::vector<std::int32_t>>& consumerIds, size_t nConsumers) {
+
+    std::vector<size_t> ret;
+
+    if (!consumerIds) {
+        // If the ids are not specified than we generate a simple sequence 0,1,2,3,...
+        for (size_t idx = 0; idx < nConsumers; ++idx) {
+            ret.push_back(idx);
+        }
+    } else {
+        // Validate that the ids are dense (no hole) and in the range [0,nConsumers)
+        std::set<size_t> validation;
+
+        for (auto cid : *consumerIds) {
+            validation.insert(cid);
+            ret.push_back(cid);
+        }
+
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "$exchange consumers ids are invalid.",
+                nConsumers > 0 && validation.size() == nConsumers && *validation.begin() == 0 &&
+                    *validation.rbegin() == nConsumers - 1);
     }
     return ret;
 }
@@ -243,9 +272,12 @@ size_t Exchange::getTargetConsumer(const Document& input) {
     invariant(it != _boundaries.end());
 
     size_t distance = std::distance(_boundaries.begin(), it) - 1;
-    invariant(distance < _consumers.size());
+    invariant(distance < _consumerIds.size());
 
-    return distance;
+    size_t cid = _consumerIds[distance];
+    invariant(cid < _consumers.size());
+
+    return cid;
 }
 
 DocumentSource::GetNextResult Exchange::ExchangeBuffer::getNext() {

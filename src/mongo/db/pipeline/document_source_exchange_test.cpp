@@ -204,13 +204,12 @@ TEST_F(DocumentSourceExchangeTest, RangeExchangeNConsumer) {
     const size_t nDocs = 500;
     auto source = getMockSource(nDocs);
 
-    std::vector<BSONObj> boundaries;
-    boundaries.push_back(BSON("a" << MINKEY));
-    boundaries.push_back(BSON("a" << 100));
-    boundaries.push_back(BSON("a" << 200));
-    boundaries.push_back(BSON("a" << 300));
-    boundaries.push_back(BSON("a" << 400));
-    boundaries.push_back(BSON("a" << MAXKEY));
+    const std::vector<BSONObj> boundaries = {BSON("a" << MINKEY),
+                                             BSON("a" << 100),
+                                             BSON("a" << 200),
+                                             BSON("a" << 300),
+                                             BSON("a" << 400),
+                                             BSON("a" << MAXKEY)};
 
     const size_t nConsumers = boundaries.size() - 1;
 
@@ -258,17 +257,82 @@ TEST_F(DocumentSourceExchangeTest, RangeExchangeNConsumer) {
         _executor->wait(h);
 }
 
+TEST_F(DocumentSourceExchangeTest, RangeShardingExchangeNConsumer) {
+    const size_t nDocs = 500;
+    auto source = getMockSource(nDocs);
+
+    const std::vector<BSONObj> boundaries = {
+        BSON("a" << MINKEY),
+        BSON("a" << 50),
+        BSON("a" << 100),
+        BSON("a" << 150),
+        BSON("a" << 200),
+        BSON("a" << 250),
+        BSON("a" << 300),
+        BSON("a" << 350),
+        BSON("a" << 400),
+        BSON("a" << 450),
+        BSON("a" << MAXKEY),
+    };
+    std::vector<int> consumerIds({0, 0, 1, 1, 2, 2, 3, 3, 4, 4});
+
+    const size_t nConsumers = consumerIds.size() / 2;
+
+    ASSERT(nDocs % nConsumers == 0);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(boundaries);
+    spec.setConsumerids(consumerIds);
+    spec.setConsumers(nConsumers);
+    spec.setBufferSize(1024);
+
+    boost::intrusive_ptr<Exchange> ex = new Exchange(spec);
+
+    std::vector<boost::intrusive_ptr<DocumentSourceExchange>> prods;
+
+    for (size_t idx = 0; idx < nConsumers; ++idx) {
+        prods.push_back(new DocumentSourceExchange(getExpCtx(), ex, idx));
+        prods.back()->setSource(source.get());
+    }
+
+    std::vector<executor::TaskExecutor::CallbackHandle> handles;
+
+    for (size_t id = 0; id < nConsumers; ++id) {
+        auto handle = _executor->scheduleWork(
+            [prods, id, nDocs, nConsumers](const executor::TaskExecutor::CallbackArgs& cb) {
+                size_t docs = 0;
+                for (auto input = prods[id]->getNext(); input.isAdvanced();
+                     input = prods[id]->getNext()) {
+                    size_t value = input.getDocument()["a"].getInt();
+
+                    ASSERT(value >= id * 100);
+                    ASSERT(value < (id + 1) * 100);
+
+                    ++docs;
+                }
+
+                ASSERT_EQ(docs, nDocs / nConsumers);
+            });
+
+        handles.emplace_back(std::move(handle.getValue()));
+    }
+
+    for (auto& h : handles)
+        _executor->wait(h);
+}
+
 TEST_F(DocumentSourceExchangeTest, RangeRandomExchangeNConsumer) {
     const size_t nDocs = 500;
     auto source = getRandomMockSource(nDocs, getNewSeed());
 
-    std::vector<BSONObj> boundaries;
-    boundaries.push_back(BSON("a" << MINKEY));
-    boundaries.push_back(BSON("a" << 100));
-    boundaries.push_back(BSON("a" << 200));
-    boundaries.push_back(BSON("a" << 300));
-    boundaries.push_back(BSON("a" << 400));
-    boundaries.push_back(BSON("a" << MAXKEY));
+    const std::vector<BSONObj> boundaries = {BSON("a" << MINKEY),
+                                             BSON("a" << 100),
+                                             BSON("a" << 200),
+                                             BSON("a" << 300),
+                                             BSON("a" << 400),
+                                             BSON("a" << MAXKEY)};
 
     const size_t nConsumers = boundaries.size() - 1;
 
