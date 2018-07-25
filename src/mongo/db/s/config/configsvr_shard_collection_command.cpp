@@ -47,6 +47,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_database.h"
@@ -56,7 +57,6 @@
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
@@ -434,82 +434,6 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
                                                                    : response.writeConcernStatus;
         }
         uassertStatusOK(createIndexesStatus);
-    }
-}
-
-/**
- * For new collections which use hashed shard keys, we can can pre-split the range of possible
- * hashes into a large number of chunks, and distribute them evenly at creation time. Until we
- * design a better initialization scheme, the safest way to pre-split is to make one big chunk for
- * each shard and migrate them one at a time.
- *
- * Populates 'initSplits' with the split points to use on the primary shard to produce the initial
- * "big chunks."
- * Also populates 'allSplits' with the additional split points to use on the "big chunks" after the
- * "big chunks" have been spread evenly across shards through migrations.
- */
-void determinePresplittingPoints(OperationContext* opCtx,
-                                 int numShards,
-                                 bool isEmpty,
-                                 const BSONObj& proposedKey,
-                                 const ShardKeyPattern& shardKeyPattern,
-                                 const ConfigsvrShardCollectionRequest& request,
-                                 std::vector<BSONObj>* initSplits,
-                                 std::vector<BSONObj>* allSplits) {
-    auto numChunks = request.getNumInitialChunks();
-
-    if (request.getInitialSplitPoints()) {
-        *initSplits = std::move(*request.getInitialSplitPoints());
-        return;
-    }
-
-    if (shardKeyPattern.isHashedPattern() && isEmpty) {
-        // If initial split points are not specified, only pre-split when using a hashed shard
-        // key and the collection is empty
-        if (numChunks <= 0) {
-            // default number of initial chunks
-            numChunks = 2 * numShards;
-        }
-
-        // hashes are signed, 64-bit ints. So we divide the range (-MIN long, +MAX long)
-        // into intervals of size (2^64/numChunks) and create split points at the
-        // boundaries.  The logic below ensures that initial chunks are all
-        // symmetric around 0.
-        long long intervalSize = (std::numeric_limits<long long>::max() / numChunks) * 2;
-        long long current = 0;
-
-        if (numChunks % 2 == 0) {
-            allSplits->push_back(BSON(proposedKey.firstElementFieldName() << current));
-            current += intervalSize;
-        } else {
-            current += intervalSize / 2;
-        }
-
-        for (int i = 0; i < (numChunks - 1) / 2; i++) {
-            allSplits->push_back(BSON(proposedKey.firstElementFieldName() << current));
-            allSplits->push_back(BSON(proposedKey.firstElementFieldName() << -current));
-            current += intervalSize;
-        }
-
-        sort(allSplits->begin(),
-             allSplits->end(),
-             SimpleBSONObjComparator::kInstance.makeLessThan());
-
-        // The initial splits define the "big chunks" that we will subdivide later.
-        int lastIndex = -1;
-        for (int i = 1; i < numShards; i++) {
-            if (lastIndex < (i * numChunks) / numShards - 1) {
-                lastIndex = (i * numChunks) / numShards - 1;
-                initSplits->push_back(allSplits->at(lastIndex));
-            }
-        }
-    } else if (numChunks > 0) {
-        uasserted(ErrorCodes::InvalidOptions,
-                  str::stream() << (!shardKeyPattern.isHashedPattern()
-                                        ? "numInitialChunks is not supported "
-                                          "when the shard key is not hashed."
-                                        : "numInitialChunks is not supported "
-                                          "when the collection is not empty."));
     }
 }
 
@@ -901,15 +825,17 @@ public:
         // Step 5.
         std::vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
         std::vector<BSONObj> allSplits;   // all of the initial desired split points
-        determinePresplittingPoints(opCtx,
-                                    numShards,
-                                    isEmpty,
-                                    proposedKey,
-                                    shardKeyPattern,
-                                    request,
-                                    &initSplits,
-                                    &allSplits);
-
+        if (request.getInitialSplitPoints()) {
+            initSplits = std::move(*request.getInitialSplitPoints());
+        } else {
+            InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
+                shardKeyPattern,
+                isEmpty,
+                numShards,
+                request.getNumInitialChunks(),
+                &initSplits,
+                &allSplits);
+        }
 
         LOG(0) << "CMD: shardcollection: " << cmdObj;
 
@@ -919,7 +845,7 @@ public:
         // were specified in the request, i.e., by mapReduce. Otherwise, all the initial chunks are
         // placed on the primary shard, and may be distributed across shards through migrations
         // (below) if using a hashed shard key.
-        const bool distributeInitialChunks = request.getInitialSplitPoints().is_initialized();
+        const bool distributeInitialChunks = bool(request.getInitialSplitPoints());
 
         // Step 6. Actually shard the collection.
         catalogManager->shardCollection(opCtx,
