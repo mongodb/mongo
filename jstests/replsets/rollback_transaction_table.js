@@ -19,9 +19,9 @@
 (function() {
     "use strict";
 
-    // TODO(SERVER-35654): Re-enable once fixed.
-    if (true)
-        return;
+    // This test drops a collection in the config database, which is not allowed under a session. It
+    // also manually simulates a session, which is not compatible with implicit sessions.
+    TestData.disableImplicitSessions = true;
 
     load("jstests/libs/retryable_writes_util.js");
 
