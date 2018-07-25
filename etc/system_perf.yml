@@ -69,9 +69,10 @@ functions:
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
           MONGO_VERSION=$(git describe)
+
           # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
           # that githash to version string.
-          if [ "${wtdevelop|}" = "-wtdevelop" ]; then
+          if [ "${compile-variant|}" = "-wtdevelop" ]; then
             WT_VERSION=$(cd src/third_party/wtdevelop; git describe | cut -c 9-)
             MONGO_VERSION="$MONGO_VERSION-wtdevelop-$WT_VERSION"
           fi
@@ -136,17 +137,17 @@ functions:
             load('jstests/hooks/run_validate_collections.actual.js');
           EOF
           fi
-          tar czf mongodb${wtdevelop|}.tar.gz mongodb
+          tar czf mongodb${compile-variant|}.tar.gz mongodb
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb${wtdevelop|}.tar.gz
-        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz
+        local_file: src/mongodb${compile-variant|}.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: mongodb${wtdevelop|}.tar.gz
+        display_name: mongodb${compile-variant|}.tar.gz
 
   # NOTE: Unlike evergreen.yml, there's no conditional here. If called, this is never a noop!
   "use WiredTiger develop" :
@@ -188,7 +189,7 @@ functions:
           storageEngine: ${storageEngine}
           test_control: ${test}
           production: true
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz"
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz"
           workloads_dir: ../src/workloads/workloads
           ycsb_dir: ../src/YCSB/YCSB
           linkbench_dir: ../src/linkbench/linkbench
@@ -311,6 +312,19 @@ tasks:
         directory: src
     - func: "compile mongodb"
 
+- name: compile_enterprise
+  commands:
+    - command: manifest.load
+    - command: git.get_project
+      # In addition to mongo repo, checkout enterprise as module
+      params:
+        revisions:
+          enterprise: ${enterprise_rev}
+        directory: src
+    - func: "compile mongodb"
+      vars:
+        compile-variant: -enterprise
+
 - name: compile_wtdevelop
   commands:
     - command: manifest.load
@@ -324,7 +338,7 @@ tasks:
     - func: "use WiredTiger develop"
     - func: "compile mongodb"
       vars:
-        wtdevelop: -wtdevelop
+        compile-variant: -wtdevelop
 
 - name: linkbench
   priority: 5
@@ -620,6 +634,11 @@ modules:
   prefix: linkbench
   branch: master
 
+- name: enterprise
+  repo: git@github.com:10gen/mongo-enterprise-modules.git
+  prefix: src/mongo/db/modules
+  branch: v4.0
+
 #######################################
 #         Buildvariants               #
 #######################################
@@ -644,6 +663,21 @@ buildvariants:
   tasks:
     - name: compile
 
+- name: compile-amazon2
+  display_name: Compile enterprise on Amazon 2
+  modules:
+    - enterprise
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    platform: linux
+    project_dir: &project_dir dsi
+    tooltags: ""
+    use_scons_cache: true
+  run_on:
+      - "amazon2-build"
+  tasks:
+    - name: compile_enterprise
 
 #######################################
 #         Linux Buildvariants         #
@@ -709,6 +743,28 @@ buildvariants:
     - name: non_sharded_workloads
     - name: bestbuy_agg
     - name: bestbuy_query
+
+- name: linux-standalone-audit
+  display_name: Linux Standalone Audit
+  batchtime: 10080 # 7 days
+  modules: *modules
+  expansions:
+    setup: standalone-audit
+    cluster: single
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile-variant: -enterprise
+  run_on:
+      - "rhel70-perf-single"
+  depends_on:
+      - name: compile_enterprise
+        variant: compile-amazon2
+  tasks: &standalonetasks
+    - name: industry_benchmarks
+    - name: crud_workloads
+    - name: smoke_test
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
