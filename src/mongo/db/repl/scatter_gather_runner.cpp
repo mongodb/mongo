@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/scatter_gather_runner.h"
@@ -36,6 +38,7 @@
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -49,8 +52,10 @@ using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackA
 using RemoteCommandCallbackFn = executor::TaskExecutor::RemoteCommandCallbackFn;
 
 ScatterGatherRunner::ScatterGatherRunner(std::shared_ptr<ScatterGatherAlgorithm> algorithm,
-                                         executor::TaskExecutor* executor)
-    : _executor(executor), _impl(std::make_shared<RunnerImpl>(std::move(algorithm), executor)) {}
+                                         executor::TaskExecutor* executor,
+                                         std::string logMessage)
+    : _executor(executor),
+      _impl(std::make_shared<RunnerImpl>(std::move(algorithm), executor, std::move(logMessage))) {}
 
 Status ScatterGatherRunner::run() {
     auto finishEvh = start();
@@ -80,8 +85,9 @@ void ScatterGatherRunner::cancel() {
  * Scatter gather runner implementation.
  */
 ScatterGatherRunner::RunnerImpl::RunnerImpl(std::shared_ptr<ScatterGatherAlgorithm> algorithm,
-                                            executor::TaskExecutor* executor)
-    : _executor(executor), _algorithm(std::move(algorithm)) {}
+                                            executor::TaskExecutor* executor,
+                                            std::string logMessage)
+    : _executor(executor), _algorithm(std::move(algorithm)), _logMessage(std::move(logMessage)) {}
 
 StatusWith<EventHandle> ScatterGatherRunner::RunnerImpl::start(
     const RemoteCommandCallbackFn processResponseCB) {
@@ -98,6 +104,8 @@ StatusWith<EventHandle> ScatterGatherRunner::RunnerImpl::start(
 
     std::vector<RemoteCommandRequest> requests = _algorithm->getRequests();
     for (size_t i = 0; i < requests.size(); ++i) {
+        log() << "Scheduling remote command request for " << _logMessage << ": "
+              << requests[i].toString();
         const StatusWith<CallbackHandle> cbh =
             _executor->scheduleRemoteCommand(requests[i], processResponseCB);
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {

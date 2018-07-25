@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplicationElection
 
 #include "mongo/platform/basic.h"
 
@@ -188,7 +188,7 @@ StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
     int primaryIndex) {
     _algorithm = std::make_shared<Algorithm>(
         rsConfig, candidateIndex, term, dryRun, lastDurableOpTime, primaryIndex);
-    _runner = stdx::make_unique<ScatterGatherRunner>(_algorithm, executor);
+    _runner = stdx::make_unique<ScatterGatherRunner>(_algorithm, executor, "vote request");
     return _runner->start();
 }
 

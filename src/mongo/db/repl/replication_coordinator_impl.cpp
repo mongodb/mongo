@@ -27,6 +27,8 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define LOG_FOR_ELECTION(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationElection)
 
 #include "mongo/platform/basic.h"
 
@@ -2703,6 +2705,13 @@ void ReplicationCoordinatorImpl::CatchupState::signalHeartbeatUpdate_inlock() {
     }
 
     log() << "Heartbeats updated catchup target optime to " << *targetOpTime;
+    log() << "Latest known optime per replica set member:";
+    auto opTimesPerMember = _repl->_topCoord->latestKnownOpTimeSinceHeartbeatRestartPerMember();
+    for (auto&& pair : opTimesPerMember) {
+        log() << "Member ID: " << pair.first
+              << ", latest known optime: " << (pair.second ? (*pair.second).toString() : "unknown");
+    }
+
     if (_waiter) {
         _repl->_opTimeWaiterList.remove_inlock(_waiter.get());
     }

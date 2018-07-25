@@ -153,7 +153,7 @@ executor::TaskExecutor::CallbackFn getOnCompletionTestFunction(bool* ran) {
 // completed.
 TEST_F(ScatterGatherTest, DeleteAlgorithmAfterItHasCompleted) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner* sgr = new ScatterGatherRunner(sga, &getExecutor());
+    ScatterGatherRunner* sgr = new ScatterGatherRunner(sga, &getExecutor(), "test");
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr->start();
     ASSERT_OK(getExecutor()
@@ -195,7 +195,7 @@ TEST_F(ScatterGatherTest, DeleteAlgorithmAfterItHasCompleted) {
 
 TEST_F(ScatterGatherTest, DeleteAlgorithmBeforeItCompletes) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner* sgr = new ScatterGatherRunner(sga, &getExecutor());
+    ScatterGatherRunner* sgr = new ScatterGatherRunner(sga, &getExecutor(), "test");
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr->start();
     ASSERT_OK(status.getStatus());
@@ -236,7 +236,7 @@ TEST_F(ScatterGatherTest, DeleteAlgorithmBeforeItCompletes) {
 
 TEST_F(ScatterGatherTest, DeleteAlgorithmAfterCancel) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner* sgr = new ScatterGatherRunner(sga, &getExecutor());
+    ScatterGatherRunner* sgr = new ScatterGatherRunner(sga, &getExecutor(), "test");
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr->start();
     ASSERT_OK(status.getStatus());
@@ -274,7 +274,7 @@ TEST_F(ScatterGatherTest, DeleteAlgorithmAfterCancel) {
 // to return ErrorCodes::ShutdownInProgress.
 TEST_F(ScatterGatherTest, ShutdownExecutorBeforeRun) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner sgr(sga, &getExecutor());
+    ScatterGatherRunner sgr(sga, &getExecutor(), "test");
     shutdownExecutorThread();
     sga->finish();
     Status status = sgr.run();
@@ -285,7 +285,7 @@ TEST_F(ScatterGatherTest, ShutdownExecutorBeforeRun) {
 // finishes will cause run() to return Status::OK().
 TEST_F(ScatterGatherTest, ShutdownExecutorAfterRun) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner sgr(sga, &getExecutor());
+    ScatterGatherRunner sgr(sga, &getExecutor(), "test");
     ScatterGatherRunnerRunner sgrr(&sgr, &getExecutor());
     sgrr.run();
     // need to wait for the scatter-gather to be scheduled in the executor
@@ -307,7 +307,7 @@ TEST_F(ScatterGatherTest, ShutdownExecutorAfterRun) {
 // to return ErrorCodes::ShutdownInProgress and should not run onCompletion().
 TEST_F(ScatterGatherTest, ShutdownExecutorBeforeStart) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner sgr(sga, &getExecutor());
+    ScatterGatherRunner sgr(sga, &getExecutor(), "test");
     shutdownExecutorThread();
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr.start();
@@ -320,7 +320,7 @@ TEST_F(ScatterGatherTest, ShutdownExecutorBeforeStart) {
 // to return Status::OK and should not run onCompletion().
 TEST_F(ScatterGatherTest, ShutdownExecutorAfterStart) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner sgr(sga, &getExecutor());
+    ScatterGatherRunner sgr(sga, &getExecutor(), "test");
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr.start();
     ASSERT_OK(getExecutor()
@@ -335,7 +335,7 @@ TEST_F(ScatterGatherTest, ShutdownExecutorAfterStart) {
 // Confirm that responses are not processed once sufficient responses have been received.
 TEST_F(ScatterGatherTest, DoNotProcessMoreThanSufficientResponses) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner sgr(sga, &getExecutor());
+    ScatterGatherRunner sgr(sga, &getExecutor(), "test");
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr.start();
     ASSERT_OK(getExecutor()
@@ -378,7 +378,7 @@ TEST_F(ScatterGatherTest, DoNotProcessMoreThanSufficientResponses) {
 // and that the algorithm processes the response correctly.
 TEST_F(ScatterGatherTest, AlgorithmProcessesCallbackCanceledResponse) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner sgr(sga, &getExecutor());
+    ScatterGatherRunner sgr(sga, &getExecutor(), "test");
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr.start();
     ASSERT_OK(getExecutor()
@@ -422,7 +422,7 @@ TEST_F(ScatterGatherTest, DoNotCreateCallbacksIfHasSufficientResponsesReturnsTru
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
     // set hasReceivedSufficientResponses to return true before the run starts
     sga->finish();
-    ScatterGatherRunner sgr(sga, &getExecutor());
+    ScatterGatherRunner sgr(sga, &getExecutor(), "test");
     bool ranCompletion = false;
     StatusWith<executor::TaskExecutor::EventHandle> status = sgr.start();
     ASSERT_OK(getExecutor()
@@ -485,7 +485,7 @@ TEST_F(ScatterGatherTest, DoNotCreateCallbacksIfHasSufficientResponsesReturnsTru
 // Confirm that running via run() will finish once sufficient responses have been received.
 TEST_F(ScatterGatherTest, SuccessfulScatterGatherViaRun) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
-    ScatterGatherRunner sgr(sga, &getExecutor());
+    ScatterGatherRunner sgr(sga, &getExecutor(), "test");
     ScatterGatherRunnerRunner sgrr(&sgr, &getExecutor());
     sgrr.run();
 

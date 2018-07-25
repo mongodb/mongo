@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplicationElection
 
 #include "mongo/platform/basic.h"
 
@@ -53,6 +53,7 @@ public:
         if (_dismissed) {
             return;
         }
+        log() << "Lost " << (_isDryRun ? "dry run " : "") << "election due to internal error";
         _replCoord->_topCoord->processLoseElection();
         _replCoord->_voteRequester.reset(nullptr);
         if (_isDryRun && _replCoord->_electionDryRunFinishedEvent.isValid()) {

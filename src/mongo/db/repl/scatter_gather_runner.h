@@ -56,9 +56,12 @@ public:
      *
      * "executor" must remain in scope until the runner's destructor completes.
      * "algorithm" is shared between the runner and the caller.
+     * "logMessage" is the process for which this ScatterGatherRunner is used. It will be included
+     * in log lines written by the ScatterGatherRunner for remote command requests.
      */
     explicit ScatterGatherRunner(std::shared_ptr<ScatterGatherAlgorithm> algorithm,
-                                 executor::TaskExecutor* executor);
+                                 executor::TaskExecutor* executor,
+                                 std::string logMessage);
 
     /**
      * Runs the scatter-gather process and blocks until it completes.
@@ -94,7 +97,8 @@ private:
     class RunnerImpl {
     public:
         explicit RunnerImpl(std::shared_ptr<ScatterGatherAlgorithm> algorithm,
-                            executor::TaskExecutor* executor);
+                            executor::TaskExecutor* executor,
+                            std::string logMessage);
 
         /**
          * On success, returns an event handle that will be signaled when the runner has
@@ -125,6 +129,7 @@ private:
 
         executor::TaskExecutor* _executor;  // Not owned here.
         std::shared_ptr<ScatterGatherAlgorithm> _algorithm;
+        std::string _logMessage;
         executor::TaskExecutor::EventHandle _sufficientResponsesReceived;
         std::vector<executor::TaskExecutor::CallbackHandle> _callbacks;
         bool _started = false;

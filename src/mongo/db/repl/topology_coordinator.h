@@ -691,6 +691,13 @@ public:
      */
     boost::optional<OpTime> latestKnownOpTimeSinceHeartbeatRestart() const;
 
+    /**
+     * Similar to latestKnownOpTimeSinceHeartbeatRestart(), but returns the latest known optime for
+     * each member in the config. If the member is not up or hasn't responded to a heartbeat since
+     * we last restarted, then its value will be boost::none.
+     */
+    std::map<int, boost::optional<OpTime>> latestKnownOpTimeSinceHeartbeatRestartPerMember() const;
+
     ////////////////////////////////////////////////////////////
     //
     // Test support methods
@@ -844,6 +851,9 @@ private:
      * This is used to decide if we should transition to Role::candidate in a one-node replica set.
      */
     bool _isElectableNodeInSingleNodeReplicaSet() const;
+
+    // Returns a string representation of the current replica set status for logging purposes.
+    std::string _getReplSetStatusString();
 
     // This node's role in the replication protocol.
     Role _role;

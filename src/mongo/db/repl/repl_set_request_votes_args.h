@@ -50,6 +50,7 @@ public:
     bool isADryRun() const;
 
     void addToBSON(BSONObjBuilder* builder) const;
+    std::string toString() const;
 
 private:
     std::string _setName;  // Name of the replset.
@@ -75,6 +76,7 @@ public:
 
     void addToBSON(BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
+    std::string toString() const;
 
 private:
     long long _term = -1;

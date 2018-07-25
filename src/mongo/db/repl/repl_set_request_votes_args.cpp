@@ -132,6 +132,12 @@ void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
     _lastDurableOpTime.append(builder, kLastDurableOpTimeFieldName);
 }
 
+std::string ReplSetRequestVotesArgs::toString() const {
+    BSONObjBuilder builder;
+    addToBSON(&builder);
+    return builder.done().toString();
+}
+
 Status ReplSetRequestVotesResponse::initialize(const BSONObj& argsObj) {
     auto status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
     if (!status.isOK())
@@ -182,6 +188,12 @@ BSONObj ReplSetRequestVotesResponse::toBSON() const {
     BSONObjBuilder builder;
     addToBSON(&builder);
     return builder.obj();
+}
+
+std::string ReplSetRequestVotesResponse::toString() const {
+    BSONObjBuilder builder;
+    addToBSON(&builder);
+    return builder.done().toString();
 }
 
 }  // namespace repl

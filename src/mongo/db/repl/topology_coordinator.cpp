@@ -27,6 +27,8 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define LOG_FOR_ELECTION(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationElection)
 
 #include "mongo/platform/basic.h"
 
@@ -1096,21 +1098,24 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
 
         if (!catchupTakeoverDisabled && (_memberData.at(primaryIndex).getLastAppliedOpTime() <
                                          _memberData.at(_selfIndex).getLastAppliedOpTime())) {
-            LOG(2) << "I can take over the primary due to fresher data."
-                   << " Current primary index: " << primaryIndex << " in term "
-                   << _memberData.at(primaryIndex).getTerm() << "."
-                   << " Current primary optime: "
-                   << _memberData.at(primaryIndex).getLastAppliedOpTime()
-                   << " My optime: " << _memberData.at(_selfIndex).getLastAppliedOpTime();
+            LOG_FOR_ELECTION(2) << "I can take over the primary due to fresher data."
+                                << " Current primary index: " << primaryIndex << " in term "
+                                << _memberData.at(primaryIndex).getTerm() << "."
+                                << " Current primary optime: "
+                                << _memberData.at(primaryIndex).getLastAppliedOpTime()
+                                << " My optime: "
+                                << _memberData.at(_selfIndex).getLastAppliedOpTime();
+            LOG_FOR_ELECTION(4) << _getReplSetStatusString();
 
             scheduleCatchupTakeover = true;
         }
 
         if (_rsConfig.getMemberAt(primaryIndex).getPriority() <
             _rsConfig.getMemberAt(_selfIndex).getPriority()) {
-            LOG(2) << "I can take over the primary due to higher priority."
-                   << " Current primary index: " << primaryIndex << " in term "
-                   << _memberData.at(primaryIndex).getTerm();
+            LOG_FOR_ELECTION(2) << "I can take over the primary due to higher priority."
+                                << " Current primary index: " << primaryIndex << " in term "
+                                << _memberData.at(primaryIndex).getTerm();
+            LOG_FOR_ELECTION(4) << _getReplSetStatusString();
 
             schedulePriorityTakeover = true;
         }
@@ -1124,10 +1129,11 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
         // Otherwise, prefer to schedule a catchup takeover over a priority takeover
         if (scheduleCatchupTakeover && schedulePriorityTakeover &&
             _rsConfig.calculatePriorityRank(currentNodePriority) == 0) {
-            LOG(2) << "I can take over the primary because I have a higher priority, the highest "
-                   << "priority in the replica set, and fresher data."
-                   << " Current primary index: " << primaryIndex << " in term "
-                   << _memberData.at(primaryIndex).getTerm();
+            LOG_FOR_ELECTION(2)
+                << "I can take over the primary because I have a higher priority, the highest "
+                << "priority in the replica set, and fresher data."
+                << " Current primary index: " << primaryIndex << " in term "
+                << _memberData.at(primaryIndex).getTerm();
             return HeartbeatResponseAction::makePriorityTakeoverAction();
         }
         if (scheduleCatchupTakeover) {
@@ -1366,6 +1372,19 @@ const MemberConfig* TopologyCoordinator::_currentPrimaryMember() const {
         return NULL;
 
     return &(_rsConfig.getMemberAt(_currentPrimaryIndex));
+}
+
+std::string TopologyCoordinator::_getReplSetStatusString() {
+    // Construct a ReplSetStatusArgs using default parameters. Missing parameters will not be
+    // included in the status string.
+    ReplSetStatusArgs rsStatusArgs{Date_t::now(), 0U, OpTime(), BSONObj(), boost::none};
+    BSONObjBuilder builder;
+    Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
+    prepareStatusResponse(rsStatusArgs, &builder, &result);
+    if (!result.isOK()) {
+        return str::stream() << "Could not get replSetGetStatus output: " << result.toString();
+    }
+    return str::stream() << "Current replSetGetStatus output: " << builder.done().toString();
 }
 
 void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatusArgs,
@@ -2652,6 +2671,10 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
             response->setVoteGranted(true);
         }
     }
+
+    LOG_FOR_ELECTION(0) << "Received vote request: " << args.toString();
+    LOG_FOR_ELECTION(0) << "Sending vote response: " << response->toString();
+    LOG_FOR_ELECTION(4) << _getReplSetStatusString();
 }
 
 void TopologyCoordinator::loadLastVote(const LastVote& lastVote) {
@@ -2723,6 +2746,28 @@ boost::optional<OpTime> TopologyCoordinator::latestKnownOpTimeSinceHeartbeatRest
         }
     }
     return latest;
+}
+
+std::map<int, boost::optional<OpTime>>
+TopologyCoordinator::latestKnownOpTimeSinceHeartbeatRestartPerMember() const {
+    std::map<int, boost::optional<OpTime>> opTimesPerMember;
+    for (size_t i = 0; i < _memberData.size(); i++) {
+        auto& member = _memberData[i];
+        int memberId = _rsConfig.getMemberAt(i).getId();
+
+        if (!member.isUpdatedSinceRestart()) {
+            opTimesPerMember[memberId] = boost::none;
+            continue;
+        }
+
+        if (!member.up()) {
+            opTimesPerMember[memberId] = boost::none;
+            continue;
+        }
+
+        opTimesPerMember[memberId] = member.getHeartbeatAppliedOpTime();
+    }
+    return opTimesPerMember;
 }
 
 }  // namespace repl
