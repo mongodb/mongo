@@ -285,7 +285,7 @@ void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
     // Set the _isCommand flags based on network op only. For legacy writes on mongoS, we resolve
     // them to OpMsgRequests and then pass them into the Commands path, so having a valid Command*
     // here does not guarantee that the op was issued from the client using a command protocol.
-    const bool isCommand = (op == dbMsg || op == dbCommand || (op == dbQuery && nss.isCommand()));
+    const bool isCommand = (op == dbMsg || (op == dbQuery && nss.isCommand()));
     auto logicalOp = (command ? command->getLogicalOp() : networkOpToLogicalOp(op));
 
     stdx::lock_guard<Client> clientLock(*opCtx->getClient());
@@ -478,8 +478,6 @@ StringData getProtoString(int op) {
         return "op_msg";
     } else if (op == dbQuery) {
         return "op_query";
-    } else if (op == dbCommand) {
-        return "op_command";
     }
     MONGO_UNREACHABLE;
 }

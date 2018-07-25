@@ -109,7 +109,7 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
                                                 StringData applicationName) {
     try {
         // We need to force the usage of OP_QUERY on this command, even if we have previously
-        // detected support for OP_COMMAND on a connection. This is necessary to handle the case
+        // detected support for OP_MSG on a connection. This is necessary to handle the case
         // where we reconnect to an older version of MongoDB running at the same host/port.
         ScopedForceOpQuery forceOpQuery{conn};
 

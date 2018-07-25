@@ -47,7 +47,7 @@ namespace {
 /**
  * Protocols supported by order of preference.
  */
-const Protocol kPreferredProtos[] = {Protocol::kOpMsg, Protocol::kOpCommandV1, Protocol::kOpQuery};
+const Protocol kPreferredProtos[] = {Protocol::kOpMsg, Protocol::kOpQuery};
 
 struct ProtocolSetAndName {
     StringData name;
@@ -56,14 +56,11 @@ struct ProtocolSetAndName {
 
 constexpr ProtocolSetAndName protocolSetNames[] = {
     // Most common ones go first.
-    {"all"_sd, supports::kAll},                                                     // new mongod.
-    {"opQueryAndOpMsg"_sd, supports::kOpQueryOnly | supports::kOpMsgOnly},          // new mongos.
-    {"opQueryAndOpCommand"_sd, supports::kOpQueryOnly | supports::kOpCommandOnly},  // old mongod.
-    {"opQueryOnly"_sd, supports::kOpQueryOnly},  // old mongos or very old client or mongod.
+    {"all"_sd, supports::kAll},                  // new mongod and mongos or very new client.
+    {"opQueryOnly"_sd, supports::kOpQueryOnly},  // old mongos or mongod or moderately old client.
 
     // Then the rest (these should never happen in production).
     {"none"_sd, supports::kNone},
-    {"opCommandOnly"_sd, supports::kOpCommandOnly},
     {"opMsgOnly"_sd, supports::kOpMsgOnly},
 };
 
@@ -75,8 +72,6 @@ Protocol protocolForMessage(const Message& message) {
             return Protocol::kOpMsg;
         case mongo::dbQuery:
             return Protocol::kOpQuery;
-        case mongo::dbCommand:
-            return Protocol::kOpCommandV1;
         default:
             uasserted(ErrorCodes::UnsupportedFormat,
                       str::stream() << "Received a reply message with unexpected opcode: "
@@ -139,19 +134,6 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
         return minWireExtractStatus;
     }
 
-    bool isMongos = false;
-
-    std::string msgField;
-    auto msgFieldExtractStatus = bsonExtractStringField(isMasterReply, "msg", &msgField);
-
-    if (msgFieldExtractStatus == ErrorCodes::NoSuchKey) {
-        isMongos = false;
-    } else if (!msgFieldExtractStatus.isOK()) {
-        return msgFieldExtractStatus;
-    } else {
-        isMongos = (msgField == "isdbgrid");
-    }
-
     if (minWireVersion < 0 || maxWireVersion < 0 ||
         minWireVersion >= std::numeric_limits<int>::max() ||
         maxWireVersion >= std::numeric_limits<int>::max()) {
@@ -166,11 +148,6 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
     WireVersionInfo version{static_cast<int>(minWireVersion), static_cast<int>(maxWireVersion)};
 
     auto protos = computeProtocolSet(version);
-    if (isMongos) {
-        // Remove support for protocols that mongos doesn't support.
-        protos &= ~supports::kOpCommandOnly;
-    }
-
     return {{protos, version}};
 }
 
@@ -180,14 +157,12 @@ ProtocolSet computeProtocolSet(const WireVersionInfo version) {
         if (version.maxWireVersion >= WireVersion::SUPPORTS_OP_MSG) {
             result |= supports::kOpMsgOnly;
         }
-        if (version.maxWireVersion >= WireVersion::FIND_COMMAND &&
-            version.maxWireVersion <= WireVersion::SHARDED_TRANSACTIONS) {
-            // Future versions may remove support for OP_COMMAND.
-            result |= supports::kOpCommandOnly;
-        }
         if (version.minWireVersion <= WireVersion::RELEASE_2_4_AND_BEFORE) {
             result |= supports::kOpQueryOnly;
         }
+        // Note: this means anything using the internal handshake cannot talk to servers between 2.6
+        // and 3.6, since the servers will reply with higher minWireVersions. The shell should still
+        // be able to connect to those versions but will just use OP_QUERY to run commands.
     }
     return result;
 }

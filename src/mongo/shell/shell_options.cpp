@@ -216,7 +216,7 @@ Status addMongoShellOptions(moe::OptionSection* options) {
 
     options
         ->addOptionChaining(
-            "rpcProtocols", "rpcProtocols", moe::String, " none, opQueryOnly, opCommandOnly, all")
+            "rpcProtocols", "rpcProtocols", moe::String, " none, opQueryOnly, opMsgOnly, all")
         .hidden();
 
     auto ret = addMessageCompressionOptions(options, true);
@@ -379,8 +379,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
         if (!parsedRPCProtos.isOK()) {
             uasserted(28653,
                       str::stream() << "Unknown RPC Protocols: '" << protos
-                                    << "'. Valid values are {none, opQueryOnly, "
-                                    << "opCommandOnly, all}");
+                                    << "'. Valid values are {none, opQueryOnly, opMsgOnly, all}");
         }
         shellGlobalParams.rpcProtocols = parsedRPCProtos.getValue();
     }

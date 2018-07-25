@@ -51,7 +51,6 @@ const auto assert_negotiated = [](ProtocolSet fst, ProtocolSet snd, Protocol pro
 TEST(Protocol, SuccessfulNegotiation) {
     assert_negotiated(supports::kAll, supports::kAll, Protocol::kOpMsg);
     assert_negotiated(supports::kAll, supports::kOpMsgOnly, Protocol::kOpMsg);
-    assert_negotiated(supports::kAll, supports::kOpCommandOnly, Protocol::kOpCommandV1);
     assert_negotiated(supports::kAll, supports::kOpQueryOnly, Protocol::kOpQuery);
 }
 
@@ -63,21 +62,21 @@ const auto assert_not_negotiated = [](ProtocolSet fst, ProtocolSet snd) {
 };
 
 TEST(Protocol, FailedNegotiation) {
-    assert_not_negotiated(supports::kOpQueryOnly, supports::kOpCommandOnly);
+    assert_not_negotiated(supports::kOpQueryOnly, supports::kOpMsgOnly);
     assert_not_negotiated(supports::kAll, supports::kNone);
     assert_not_negotiated(supports::kOpQueryOnly, supports::kNone);
-    assert_not_negotiated(supports::kOpCommandOnly, supports::kNone);
+    assert_not_negotiated(supports::kOpMsgOnly, supports::kNone);
 }
 
 TEST(Protocol, parseProtocolSetFromIsMasterReply) {
     {
-        // MongoDB 3.8
-        auto mongod38 =
+        // MongoDB 4.0
+        auto mongod40 =
             BSON("maxWireVersion" << static_cast<int>(WireVersion::REPLICA_SET_TRANSACTIONS)
                                   << "minWireVersion"
                                   << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
 
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod38)).protocolSet,
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod40)).protocolSet,
                   supports::kAll);
     }
     {
@@ -98,7 +97,7 @@ TEST(Protocol, parseProtocolSetFromIsMasterReply) {
                                   << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
 
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod32)).protocolSet,
-                  supports::kOpQueryOnly | supports::kOpCommandOnly);
+                  supports::kOpQueryOnly);  // This used to also include OP_COMMAND.
     }
     {
         // MongoDB 3.2 (mongos)

@@ -53,10 +53,10 @@ enum NetworkOp : int32_t {
     dbGetMore = 2005,
     dbDelete = 2006,
     dbKillCursors = 2007,
-    // dbCommand_DEPRECATED = 2008, //
-    // dbCommandReply_DEPRECATED = 2009, //
-    dbCommand = 2010,
-    dbCommandReply = 2011,
+    // dbCommand_DEPRECATED = 2008,      // These were used during 3.2 development, but never in a
+    // dbCommandReply_DEPRECATED = 2009, // stable release.
+    // dbCommand = 2010,      // These were used for intra-cluster communication in 3.2, but never
+    // dbCommandReply = 2011, // by any driver. Deprecated in 3.6 by OP_MSG and removed in 4.2.
     dbCompressed = 2012,
     dbMsg = 2013,
 };
@@ -69,15 +69,15 @@ inline bool isSupportedRequestNetworkOp(NetworkOp op) {
         case dbGetMore:
         case dbDelete:
         case dbKillCursors:
-        case dbCommand:
-        case dbCompressed:
         case dbMsg:
             return true;
-        case dbCommandReply:
+
+        case dbCompressed:  // Can be used in requests, but must be decompressed prior to handling.
         case opReply:
-        default:
+        case opInvalid:
             return false;
     }
+    return false;
 }
 
 enum class LogicalOp {
@@ -88,7 +88,7 @@ enum class LogicalOp {
     opGetMore,
     opDelete,
     opKillCursors,
-    opCommand,
+    opCommand,  // This just means a "command" is being run. Not related to the old OP_COMMAND.
     opCompressed,
 };
 
@@ -107,15 +107,16 @@ inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
         case dbKillCursors:
             return LogicalOp::opKillCursors;
         case dbMsg:
-        case dbCommand:
             return LogicalOp::opCommand;
         case dbCompressed:
             return LogicalOp::opCompressed;
-        default:
-            int op = int(networkOp);
-            massert(34348, str::stream() << "cannot translate opcode " << op, !op);
+        case opInvalid:
             return LogicalOp::opInvalid;
+
+        case opReply:
+            break;  // This has no logical op since it should never be used in a request.
     }
+    msgasserted(34348, str::stream() << "cannot translate opcode " << int32_t(networkOp));
 }
 
 inline const char* networkOpToString(NetworkOp networkOp) {
@@ -136,19 +137,12 @@ inline const char* networkOpToString(NetworkOp networkOp) {
             return "remove";
         case dbKillCursors:
             return "killcursors";
-        case dbCommand:
-            return "command";
-        case dbCommandReply:
-            return "commandReply";
         case dbCompressed:
             return "compressed";
         case dbMsg:
             return "msg";
-        default:
-            int op = static_cast<int>(networkOp);
-            massert(16141, str::stream() << "cannot translate opcode " << op, !op);
-            return "";
     }
+    msgasserted(16141, str::stream() << "cannot translate opcode " << int32_t(networkOp));
 }
 
 inline const char* logicalOpToString(LogicalOp logicalOp) {
@@ -171,9 +165,11 @@ inline const char* logicalOpToString(LogicalOp logicalOp) {
             return "command";
         case LogicalOp::opCompressed:
             return "compressed";
-        default:
-            MONGO_UNREACHABLE;
     }
+
+    // Logical ops are always created in this process and never pulled out of network requests.
+    // Therefore, this could only be reached by memory corruptions or other severe bugs.
+    MONGO_UNREACHABLE;
 }
 
 namespace MSGHEADER {

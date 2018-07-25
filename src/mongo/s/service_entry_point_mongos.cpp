@@ -72,7 +72,6 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Message type " << op << " is not supported.",
             isSupportedRequestNetworkOp(op) &&
-                op != dbCommand &&    // mongos never implemented OP_COMMAND ingress support.
                 op != dbCompressed);  // Decompression should be handled above us.
 
     // Start a new LastError session. Any exceptions thrown from here onwards will be returned

@@ -40,7 +40,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
-#include "mongo/rpc/command_request.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -288,7 +287,7 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
     boost::optional<OpMsgRequest> cmdRequest;
     if ((request.operation() == dbQuery &&
          NamespaceString(DbMessage(request).getns()).isCommand()) ||
-        request.operation() == dbCommand || request.operation() == dbMsg) {
+        request.operation() == dbMsg) {
         cmdRequest = rpc::opMsgRequestFromAnyProtocol(request);
 
         dest.extractHostInfo(*cmdRequest);
@@ -350,10 +349,10 @@ DbResponse ServiceEntryPointBridge::handleRequest(OperationContext* opCtx, const
     uassertStatusOK(dest->sinkMessage(request));
 
     // Send the message we received from 'source' to 'dest'. 'dest' returns a response for
-    // OP_QUERY, OP_GET_MORE, and OP_COMMAND messages that we respond with.
+    // OP_QUERY, OP_GET_MORE, and OP_MSG messages that we respond with.
     if (!isFireAndForgetCommand &&
         (request.operation() == dbQuery || request.operation() == dbGetMore ||
-         request.operation() == dbCommand || request.operation() == dbMsg)) {
+         request.operation() == dbMsg)) {
         // TODO dbMsg moreToCome
         // Forward the message to 'dest' and receive its reply in 'response'.
         auto response = uassertStatusOK(dest->sourceMessage());

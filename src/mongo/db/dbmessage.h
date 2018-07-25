@@ -450,7 +450,7 @@ struct DbResponse {
 
 /**
  * Prepares query replies to legacy finds (opReply to dbQuery) in place. This is also used for
- * command responses that don't use the new dbCommand protocol.
+ * command responses that don't use the new dbMsg protocol.
  */
 class OpQueryReplyBuilder {
     MONGO_DISALLOW_COPYING(OpQueryReplyBuilder);

@@ -442,8 +442,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/clientdriver_network",
         "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/rpc/command_reply",
-        "$BUILD_DIR/mongo/rpc/command_request",
+        "$BUILD_DIR/mongo/rpc/rpc",
         "$BUILD_DIR/mongo/rpc/metadata",
         "$BUILD_DIR/mongo/util/processinfo",
         "$BUILD_DIR/mongo/util/signal_handlers",

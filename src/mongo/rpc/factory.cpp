@@ -30,10 +30,6 @@
 
 #include "mongo/rpc/factory.h"
 
-#include "mongo/rpc/command_reply.h"
-#include "mongo/rpc/command_reply_builder.h"
-#include "mongo/rpc/command_request.h"
-#include "mongo/rpc/command_request_builder.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
@@ -54,11 +50,8 @@ Message messageFromOpMsgRequest(Protocol proto, const OpMsgRequest& request) {
             return request.serialize();
         case Protocol::kOpQuery:
             return legacyRequestFromOpMsgRequest(request);
-        case Protocol::kOpCommandV1:
-            return opCommandRequestFromOpMsgRequest(request);
-        default:
-            MONGO_UNREACHABLE;
     }
+    MONGO_UNREACHABLE;
 }
 
 std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
@@ -67,8 +60,6 @@ std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
             return stdx::make_unique<OpMsgReply>(OpMsg::parseOwned(*unownedMessage));
         case mongo::opReply:
             return stdx::make_unique<LegacyReply>(unownedMessage);
-        case mongo::dbCommandReply:
-            return stdx::make_unique<CommandReply>(unownedMessage);
         default:
             uasserted(ErrorCodes::UnsupportedFormat,
                       str::stream() << "Received a reply message with unexpected opcode: "
@@ -82,8 +73,6 @@ OpMsgRequest opMsgRequestFromAnyProtocol(const Message& unownedMessage) {
             return OpMsgRequest::parse(unownedMessage);
         case mongo::dbQuery:
             return opMsgRequestFromLegacyRequest(unownedMessage);
-        case mongo::dbCommand:
-            return opMsgRequestFromCommandRequest(unownedMessage);
         default:
             uasserted(ErrorCodes::UnsupportedFormat,
                       str::stream() << "Received a reply message with unexpected opcode: "
@@ -97,11 +86,8 @@ std::unique_ptr<ReplyBuilderInterface> makeReplyBuilder(Protocol protocol) {
             return stdx::make_unique<OpMsgReplyBuilder>();
         case Protocol::kOpQuery:
             return stdx::make_unique<LegacyReplyBuilder>();
-        case Protocol::kOpCommandV1:
-            return stdx::make_unique<CommandReplyBuilder>();
-        default:
-            MONGO_UNREACHABLE;
     }
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace rpc

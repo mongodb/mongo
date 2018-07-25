@@ -702,7 +702,7 @@ private:
 
     /**
      * The rpc protocol the remote server(s) support. We support 'opQueryOnly' by default unless
-     * we detect support for OP_COMMAND at connection time.
+     * we detect support for OP_MSG at connection time.
      */
     rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kOpQueryOnly};
 

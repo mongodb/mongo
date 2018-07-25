@@ -150,10 +150,10 @@ public:
     // -------------------
 
     // basic options
-    // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_COMMAND, etc.
+    // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_MSG, etc.
     NetworkOp networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
     // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
-    // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_COMMAND.
+    // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_MSG.
     // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
     LogicalOp logicalOp{LogicalOp::opInvalid};  // only set this through setNetworkOp_inlock()
     bool iscommand{false};
@@ -578,10 +578,10 @@ private:
     // The cumulative duration for which the timer has been paused.
     Microseconds _totalPausedDuration{0};
 
-    // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_COMMAND, etc.
+    // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_MSG, etc.
     NetworkOp _networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
     // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
-    // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_COMMAND.
+    // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_MSG.
     // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
     LogicalOp _logicalOp{LogicalOp::opInvalid};  // only set this through setNetworkOp_inlock()
 

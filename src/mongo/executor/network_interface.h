@@ -135,7 +135,7 @@ public:
     /**
      * Starts asynchronous execution of the command described by "request".
      *
-     * The request mutated to append request metadata to be sent in OP_Command messages.
+     * The request mutated to append request metadata to be merged into the request messages.
      *
      * Returns ErrorCodes::ShutdownInProgress if NetworkInterface::shutdown has already started
      * and Status::OK() otherwise. If it returns Status::OK(), then the onFinish argument will be

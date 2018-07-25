@@ -57,8 +57,6 @@ function getProfilerProtocolStringForCommand(conn) {
     const protocols = conn.getClientRPCProtocols();
     if ("all" === protocols || /Msg/.test(protocols))
         return "op_msg";
-    if (/Command/.test(protocols))
-        return "op_command";
     if (/Query/.test(protocols))
         return "op_query";
     doassert(`Unknown prototocol string ${protocols}`);

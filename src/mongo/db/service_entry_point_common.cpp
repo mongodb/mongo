@@ -1297,7 +1297,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         if (nsString.isCommand()) {
             isCommand = true;
         }
-    } else if (op == dbCommand || op == dbMsg) {
+    } else if (op == dbMsg) {
         isCommand = true;
     }
 
@@ -1316,7 +1316,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     bool forceLog = false;
 
     DbResponse dbresponse;
-    if (op == dbMsg || op == dbCommand || (op == dbQuery && isCommand)) {
+    if (op == dbMsg || (op == dbQuery && isCommand)) {
         dbresponse = receivedCommands(opCtx, m, behaviors);
     } else if (op == dbQuery) {
         invariant(!isCommand);
