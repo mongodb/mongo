@@ -108,8 +108,8 @@ const char kNaturalSortField[] = "$natural";
 const char QueryRequest::kFindCommandName[] = "find";
 const char QueryRequest::kShardVersionField[] = "shardVersion";
 
-QueryRequest::QueryRequest(NamespaceString nss) : _nss(std::move(nss)) {}
-QueryRequest::QueryRequest(CollectionUUID uuid) : _uuid(std::move(uuid)) {}
+QueryRequest::QueryRequest(NamespaceStringOrUUID nssOrUuid)
+    : _nss(nssOrUuid.nss() ? *nssOrUuid.nss() : NamespaceString()), _uuid(nssOrUuid.uuid()) {}
 
 void QueryRequest::refreshNSS(OperationContext* opCtx) {
     if (_uuid) {
@@ -394,7 +394,7 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(Namespace
     BSONElement first = cmdObj.firstElement();
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
         auto uuid = uassertStatusOK(UUID::parse(first));
-        auto qr = stdx::make_unique<QueryRequest>(uuid);
+        auto qr = stdx::make_unique<QueryRequest>(NamespaceStringOrUUID(nss.db().toString(), uuid));
         return parseFromFindCommand(std::move(qr), cmdObj, isExplain);
     } else {
         auto qr = stdx::make_unique<QueryRequest>(nss);

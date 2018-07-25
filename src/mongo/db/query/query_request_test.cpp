@@ -1332,7 +1332,7 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
     Collection coll(stdx::make_unique<CollectionMock>(nss));
     UUIDCatalog& catalog = UUIDCatalog::get(opCtx.get());
     catalog.onCreateCollection(opCtx.get(), &coll, uuid);
-    QueryRequest qr(uuid);
+    QueryRequest qr(NamespaceStringOrUUID("test", uuid));
     // Ensure a call to refreshNSS succeeds.
     qr.refreshNSS(opCtx.get());
     ASSERT_EQ(nss, qr.nss());

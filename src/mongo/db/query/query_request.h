@@ -53,9 +53,7 @@ public:
     static const char kFindCommandName[];
     static const char kShardVersionField[];
 
-    QueryRequest(NamespaceString nss);
-
-    QueryRequest(CollectionUUID uuid);
+    explicit QueryRequest(NamespaceStringOrUUID nss);
 
     /**
      * Returns a non-OK status if any property of the QR has a bad value (e.g. a negative skip
