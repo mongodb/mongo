@@ -1263,7 +1263,7 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
                 LOGGER.info(output)
             # Rename the rsync_dir only if it has a different name than new_rsync_dir.
             if ret == 0 and rsync_dir != new_rsync_dir:
-                LOGGER.info("Renaming directory {} to {}".format(rsync_dir, new_rsync_dir))
+                LOGGER.info("Renaming directory %s to %s", rsync_dir, new_rsync_dir)
                 os.rename(rsync_dir, new_rsync_dir)
 
         elif operation == "seed_docs":
