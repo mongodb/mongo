@@ -57,6 +57,13 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
     bool supportsRecoverToStableTimestamp) {
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
+    if (opCtx->getClient()->isInDirectClient()) {
+        uassert(50891,
+                "Invalid to set operation session info in a direct client",
+                !osi.getSessionId() && !osi.getTxnNumber() && !osi.getAutocommit() &&
+                    !osi.getStartTransaction());
+    }
+
     if (!requiresAuth) {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "This command is not supported in transactions",

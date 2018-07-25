@@ -368,6 +368,30 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IgnoresInfoIfNoCache
         true));
 }
 
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SendingInfoFailsInDirectClient) {
+    const std::vector<BSONObj> operationSessionParameters{
+        {BSON("lsid" << makeLogicalSessionIdForTest().toBSON())},
+        {BSON("txnNumber" << 1L)},
+        {BSON("autocommit" << true)},
+        {BSON("startTransaction" << true)}};
+
+
+    _opCtx->getClient()->setInDirectClient(true);
+
+    for (const auto& param : operationSessionParameters) {
+        BSONObjBuilder commandBuilder = BSON("count"
+                                             << "foo");
+        commandBuilder.appendElements(param);
+
+        ASSERT_THROWS_CODE(initializeOperationSessionInfo(
+                               _opCtx.get(), commandBuilder.obj(), true, true, true, true),
+                           AssertionException,
+                           50891);
+    }
+
+    _opCtx->getClient()->setInDirectClient(false);
+}
+
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTooLongName) {
     auto id = UUID::gen();
 
