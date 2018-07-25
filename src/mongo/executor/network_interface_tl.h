@@ -80,8 +80,12 @@ public:
 
 private:
     struct CommandState {
-        CommandState(RemoteCommandRequest request_, TaskExecutor::CallbackHandle cbHandle_)
-            : request(std::move(request_)), cbHandle(std::move(cbHandle_)) {}
+        CommandState(RemoteCommandRequest request_,
+                     TaskExecutor::CallbackHandle cbHandle_,
+                     Promise<RemoteCommandResponse> promise_)
+            : request(std::move(request_)),
+              cbHandle(std::move(cbHandle_)),
+              promise(std::move(promise_)) {}
 
         RemoteCommandRequest request;
         TaskExecutor::CallbackHandle cbHandle;
@@ -104,11 +108,11 @@ private:
 
         AtomicBool done;
         Promise<RemoteCommandResponse> promise;
-        Future<RemoteCommandResponse> mergedFuture = promise.getFuture();
     };
 
     void _eraseInUseConn(const TaskExecutor::CallbackHandle& handle);
     Future<RemoteCommandResponse> _onAcquireConn(std::shared_ptr<CommandState> state,
+                                                 Future<RemoteCommandResponse> future,
                                                  CommandState::ConnHandle conn,
                                                  const transport::BatonHandle& baton);
 

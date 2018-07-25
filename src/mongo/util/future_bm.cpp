@@ -65,9 +65,9 @@ void BM_futureIntReadyThen(benchmark::State& state) {
 
 NOINLINE_DECL Future<int> makeReadyFutWithPromise() {
     benchmark::ClobberMemory();
-    Promise<int> p;
-    p.emplaceValue(1);  // before getFuture().
-    return p.getFuture();
+    auto pf = makePromiseFuture<int>();
+    pf.promise.emplaceValue(1);
+    return std::move(pf.future);
 }
 
 void BM_futureIntReadyWithPromise(benchmark::State& state) {
@@ -83,27 +83,12 @@ void BM_futureIntReadyWithPromiseThen(benchmark::State& state) {
     }
 }
 
-NOINLINE_DECL Future<int> makeReadyFutWithPromise2() {
-    // This is the same as makeReadyFutWithPromise() except that this gets the Future first.
-    benchmark::ClobberMemory();
-    Promise<int> p;
-    auto fut = p.getFuture();
-    p.emplaceValue(1);  // after getFuture().
-    return fut;
-}
-
-void BM_futureIntReadyWithPromise2(benchmark::State& state) {
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(makeReadyFutWithPromise().then([](int i) { return i + 1; }).get());
-    }
-}
-
 void BM_futureIntDeferredThen(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Promise<int> p;
-        auto fut = p.getFuture().then([](int i) { return i + 1; });
-        p.emplaceValue(1);
+        auto pf = makePromiseFuture<int>();
+        auto fut = std::move(pf.future).then([](int i) { return i + 1; });
+        pf.promise.emplaceValue(1);
         benchmark::DoNotOptimize(std::move(fut).get());
     }
 }
@@ -111,9 +96,9 @@ void BM_futureIntDeferredThen(benchmark::State& state) {
 void BM_futureIntDeferredThenImmediate(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Promise<int> p;
-        auto fut = p.getFuture().then([](int i) { return Future<int>::makeReady(i + 1); });
-        p.emplaceValue(1);
+        auto pf = makePromiseFuture<int>();
+        auto fut = std::move(pf.future).then([](int i) { return Future<int>::makeReady(i + 1); });
+        pf.promise.emplaceValue(1);
         benchmark::DoNotOptimize(std::move(fut).get());
     }
 }
@@ -122,9 +107,9 @@ void BM_futureIntDeferredThenImmediate(benchmark::State& state) {
 void BM_futureIntDeferredThenReady(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Promise<int> p1;
-        auto fut = p1.getFuture().then([&](int i) { return makeReadyFutWithPromise(); });
-        p1.emplaceValue(1);
+        auto pf = makePromiseFuture<int>();
+        auto fut = std::move(pf.future).then([](int i) { return makeReadyFutWithPromise(); });
+        pf.promise.emplaceValue(1);
         benchmark::DoNotOptimize(std::move(fut).get());
     }
 }
@@ -132,11 +117,11 @@ void BM_futureIntDeferredThenReady(benchmark::State& state) {
 void BM_futureIntDoubleDeferredThen(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Promise<int> p1;
-        Promise<int> p2;
-        auto fut = p1.getFuture().then([&](int i) { return p2.getFuture(); });
-        p1.emplaceValue(1);
-        p2.emplaceValue(1);
+        auto pf1 = makePromiseFuture<int>();
+        auto pf2 = makePromiseFuture<int>();
+        auto fut = std::move(pf1.future).then([&](int i) { return std::move(pf2.future); });
+        pf1.promise.emplaceValue(1);
+        pf2.promise.emplaceValue(1);
         benchmark::DoNotOptimize(std::move(fut).get());
     }
 }
@@ -144,14 +129,15 @@ void BM_futureIntDoubleDeferredThen(benchmark::State& state) {
 void BM_futureInt3xDeferredThenNested(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Promise<int> p1;
-        Promise<int> p2;
-        Promise<int> p3;
-        auto fut = p1.getFuture().then(
-            [&](int i) { return p2.getFuture().then([&](int) { return p3.getFuture(); }); });
-        p1.emplaceValue(1);
-        p2.emplaceValue(1);
-        p3.emplaceValue(1);
+        auto pf1 = makePromiseFuture<int>();
+        auto pf2 = makePromiseFuture<int>();
+        auto pf3 = makePromiseFuture<int>();
+        auto fut = std::move(pf1.future).then([&](int i) {
+            return std::move(pf2.future).then([&](int) { return std::move(pf3.future); });
+        });
+        pf1.promise.emplaceValue(1);
+        pf2.promise.emplaceValue(1);
+        pf3.promise.emplaceValue(1);
         benchmark::DoNotOptimize(std::move(fut).get());
     }
 }
@@ -159,15 +145,15 @@ void BM_futureInt3xDeferredThenNested(benchmark::State& state) {
 void BM_futureInt3xDeferredThenChained(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Promise<int> p1;
-        Promise<int> p2;
-        Promise<int> p3;
-        auto fut = p1.getFuture().then([&](int i) { return p2.getFuture(); }).then([&](int i) {
-            return p3.getFuture();
-        });
-        p1.emplaceValue(1);
-        p2.emplaceValue(1);
-        p3.emplaceValue(1);
+        auto pf1 = makePromiseFuture<int>();
+        auto pf2 = makePromiseFuture<int>();
+        auto pf3 = makePromiseFuture<int>();
+        auto fut = std::move(pf1.future)
+                       .then([&](int i) { return std::move(pf2.future); })
+                       .then([&](int i) { return std::move(pf3.future); });
+        pf1.promise.emplaceValue(1);
+        pf2.promise.emplaceValue(1);
+        pf3.promise.emplaceValue(1);
         benchmark::DoNotOptimize(std::move(fut).get());
     }
 }
@@ -176,18 +162,19 @@ void BM_futureInt3xDeferredThenChained(benchmark::State& state) {
 void BM_futureInt4xDeferredThenNested(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Promise<int> p1;
-        Promise<int> p2;
-        Promise<int> p3;
-        Promise<int> p4;
-        auto fut = p1.getFuture().then([&](int i) {
-            return p2.getFuture().then(
-                [&](int) { return p3.getFuture().then([&](int) { return p4.getFuture(); }); });
+        auto pf1 = makePromiseFuture<int>();
+        auto pf2 = makePromiseFuture<int>();
+        auto pf3 = makePromiseFuture<int>();
+        auto pf4 = makePromiseFuture<int>();
+        auto fut = std::move(pf1.future).then([&](int i) {
+            return std::move(pf2.future).then([&](int) {
+                return std::move(pf3.future).then([&](int) { return std::move(pf4.future); });
+            });
         });
-        p1.emplaceValue(1);
-        p2.emplaceValue(1);
-        p3.emplaceValue(1);
-        p4.emplaceValue(1);
+        pf1.promise.emplaceValue(1);
+        pf2.promise.emplaceValue(1);
+        pf3.promise.emplaceValue(1);
+        pf4.promise.emplaceValue(1);
         benchmark::DoNotOptimize(std::move(fut).get());
     }
 }
@@ -195,18 +182,18 @@ void BM_futureInt4xDeferredThenNested(benchmark::State& state) {
 void BM_futureInt4xDeferredThenChained(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Promise<int> p1;
-        Promise<int> p2;
-        Promise<int> p3;
-        Promise<int> p4;
-        auto fut = p1.getFuture()  //
-                       .then([&](int i) { return p2.getFuture(); })
-                       .then([&](int i) { return p3.getFuture(); })
-                       .then([&](int i) { return p4.getFuture(); });
-        p1.emplaceValue(1);
-        p2.emplaceValue(1);
-        p3.emplaceValue(1);
-        p4.emplaceValue(1);
+        auto pf1 = makePromiseFuture<int>();
+        auto pf2 = makePromiseFuture<int>();
+        auto pf3 = makePromiseFuture<int>();
+        auto pf4 = makePromiseFuture<int>();
+        auto fut = std::move(pf1.future)  //
+                       .then([&](int i) { return std::move(pf2.future); })
+                       .then([&](int i) { return std::move(pf3.future); })
+                       .then([&](int i) { return std::move(pf4.future); });
+        pf1.promise.emplaceValue(1);
+        pf2.promise.emplaceValue(1);
+        pf3.promise.emplaceValue(1);
+        pf4.promise.emplaceValue(1);
         benchmark::DoNotOptimize(std::move(fut).get());
     }
 }
@@ -217,7 +204,6 @@ BENCHMARK(BM_futureIntReady);
 BENCHMARK(BM_futureIntReadyThen);
 BENCHMARK(BM_futureIntReadyWithPromise);
 BENCHMARK(BM_futureIntReadyWithPromiseThen);
-BENCHMARK(BM_futureIntReadyWithPromise2);
 BENCHMARK(BM_futureIntDeferredThen);
 BENCHMARK(BM_futureIntDeferredThenImmediate);
 BENCHMARK(BM_futureIntDeferredThenReady);

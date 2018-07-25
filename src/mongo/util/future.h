@@ -508,9 +508,7 @@ public:
 
     ~Promise() {
         if (MONGO_unlikely(sharedState)) {
-            if (haveExtractedFuture) {
-                sharedState->setError({ErrorCodes::BrokenPromise, "broken promise"});
-            }
+            sharedState->setError({ErrorCodes::BrokenPromise, "broken promise"});
         }
     }
 
@@ -576,25 +574,28 @@ public:
      */
     SharedPromise<T> share() noexcept;
 
-    /**
-     * Prefer using makePromiseFuture<T>() over constructing a promise and calling this method.
-     */
-    Future<T> getFuture() noexcept;
+    static auto makePromiseFutureImpl() {
+        struct PromiseAndFuture {
+            Promise<T> promise;
+            Future<T> future = promise.getFuture();
+        };
+        return PromiseAndFuture();
+    }
 
 private:
+    // This is not public because we found it frequently was involved in races.  The
+    // `makePromiseFuture<T>` API avoids those races entirely.
+    Future<T> getFuture() noexcept;
+
     friend class Future<void>;
 
     template <typename Func>
     void setImpl(Func&& doSet) noexcept {
-        invariant(!haveSetValue);
-        haveSetValue = true;
+        invariant(sharedState);
         doSet();
-        if (haveExtractedFuture)
-            sharedState.reset();
+        sharedState.reset();
     }
 
-    bool haveSetValue = false;
-    bool haveExtractedFuture = false;
     boost::intrusive_ptr<SharedState<T>> sharedState = make_intrusive<SharedState<T>>();
 };
 
@@ -1310,11 +1311,7 @@ auto makeReadyFutureWith(Func&& func) {
  */
 template <typename T>
 inline auto makePromiseFuture() {
-    struct PromiseAndFuture {
-        Promise<T> promise;
-        Future<T> future = promise.getFuture();
-    };
-    return PromiseAndFuture();
+    return Promise<T>::makePromiseFutureImpl();
 }
 
 /**
@@ -1349,23 +1346,13 @@ using FutureContinuationResult =
 
 template <typename T>
 inline Future<T> Promise<T>::getFuture() noexcept {
-    invariant(!haveExtractedFuture);
-    haveExtractedFuture = true;
-
-    if (!haveSetValue) {
-        sharedState->threadUnsafeIncRefCountTo(2);
-        return Future<T>(
-            boost::intrusive_ptr<SharedState<T>>(sharedState.get(), /*add ref*/ false));
-    }
-
-    // Let the Future steal our ref-count since we don't need it anymore.
-    return Future<T>(std::move(sharedState));
+    sharedState->threadUnsafeIncRefCountTo(2);
+    return Future<T>(boost::intrusive_ptr<SharedState<T>>(sharedState.get(), /*add ref*/ false));
 }
 
 template <typename T>
 inline SharedPromise<T> Promise<T>::share() noexcept {
-    invariant(haveExtractedFuture);
-    invariant(!haveSetValue);
+    invariant(sharedState);
     return SharedPromise<T>(std::make_shared<Promise<T>>(std::move(*this)));
 }
 

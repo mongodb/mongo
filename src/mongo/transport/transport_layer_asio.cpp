@@ -557,8 +557,14 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
                                                        Milliseconds timeout) {
 
     struct AsyncConnectState {
-        AsyncConnectState(HostAndPort peer, asio::io_context& context)
-            : socket(context), timeoutTimer(context), resolver(context), peer(std::move(peer)) {}
+        AsyncConnectState(HostAndPort peer,
+                          asio::io_context& context,
+                          Promise<SessionHandle> promise_)
+            : promise(std::move(promise_)),
+              socket(context),
+              timeoutTimer(context),
+              resolver(context),
+              peer(std::move(peer)) {}
 
         AtomicBool done{false};
         Promise<SessionHandle> promise;
@@ -573,8 +579,10 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
     };
 
     auto reactorImpl = checked_cast<ASIOReactor*>(reactor.get());
-    auto connector = std::make_shared<AsyncConnectState>(std::move(peer), *reactorImpl);
-    Future<SessionHandle> mergedFuture = connector->promise.getFuture();
+    auto pf = makePromiseFuture<SessionHandle>();
+    auto connector =
+        std::make_shared<AsyncConnectState>(std::move(peer), *reactorImpl, std::move(pf.promise));
+    Future<SessionHandle> mergedFuture = std::move(pf.future);
 
     if (connector->peer.host().empty()) {
         return Status{ErrorCodes::HostNotFound, "Hostname or IP address to connect to is empty"};

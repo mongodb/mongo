@@ -44,6 +44,8 @@ const auto kMaxTimerDuration = Milliseconds::max();
 struct TimeoutHandler {
     AtomicBool done;
     Promise<void> promise;
+
+    explicit TimeoutHandler(Promise<void> p) : promise(std::move(p)) {}
 };
 
 }  // namespace
@@ -111,8 +113,9 @@ void TLConnection::cancelTimeout() {
 void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
     auto anchor = shared_from_this();
 
-    auto handler = std::make_shared<TimeoutHandler>();
-    handler->promise.getFuture().getAsync(
+    auto pf = makePromiseFuture<void>();
+    auto handler = std::make_shared<TimeoutHandler>(std::move(pf.promise));
+    std::move(pf.future).getAsync(
         [ this, cb = std::move(cb) ](Status status) { cb(this, std::move(status)); });
 
     log() << "Connecting to " << _peer;
@@ -175,8 +178,9 @@ void TLConnection::resetToUnknown() {
 void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
     auto anchor = shared_from_this();
 
-    auto handler = std::make_shared<TimeoutHandler>();
-    handler->promise.getFuture().getAsync(
+    auto pf = makePromiseFuture<void>();
+    auto handler = std::make_shared<TimeoutHandler>(std::move(pf.promise));
+    std::move(pf.future).getAsync(
         [ this, cb = std::move(cb) ](Status status) { cb(this, status); });
 
     setTimeout(timeout, [this, handler] {
