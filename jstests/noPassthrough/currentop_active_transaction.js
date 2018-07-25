@@ -17,6 +17,12 @@
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert.commandWorked(testDB[collName].insert({x: 1}, {writeConcern: {w: "majority"}}));
 
+    // Run an operation prior to starting the transaction and save its operation time. We will use
+    // this later to assert that our subsequent transaction's readTimestamp is greater than or equal
+    // to this operation time.
+    const res = assert.commandWorked(testDB.runCommand({insert: collName, documents: [{x: 1}]}));
+    const operationTime = res.operationTime;
+
     // This will make the transaction hang.
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: 'setInterruptOnlyPlansCheckForInterruptHang', mode: 'alwaysOn'}));
@@ -57,6 +63,8 @@
     let currentOp = adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).toArray();
     let transactionDocument = currentOp[0].transaction;
     assert.eq(transactionDocument.parameters.autocommit, false);
+    assert.eq(transactionDocument.parameters.readConcern, {level: 'snapshot'});
+    assert.gte(transactionDocument.readTimestamp, operationTime);
     assert.gte(ISODate(transactionDocument.startWallClockTime), timeBeforeTransactionStarts);
     assert.gt(transactionDocument.timeOpenMicros,
               (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
