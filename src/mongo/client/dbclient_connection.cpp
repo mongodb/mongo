@@ -502,10 +502,8 @@ unsigned long long DBClientConnection::query(stdx::function<void(DBClientCursorB
                 n += i.n();
             }
 
-            if (c->getCursorId() == 0)
+            if (!c->more())
                 break;
-
-            c->exhaustReceiveMore();
         }
     } catch (std::exception&) {
         /* connection CANNOT be used anymore as more data may be on the way from the server.
