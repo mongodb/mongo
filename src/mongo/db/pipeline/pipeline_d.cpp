@@ -962,7 +962,7 @@ BSONObj PipelineD::MongoDInterface::_reportCurrentOpForClient(
 
     if (clientOpCtx) {
         if (auto opCtxSession = OperationContextSession::get(clientOpCtx)) {
-            opCtxSession->reportUnstashedState(&builder);
+            opCtxSession->reportUnstashedState(repl::ReadConcernArgs::get(clientOpCtx), &builder);
         }
 
         // Append lock stats before returning.

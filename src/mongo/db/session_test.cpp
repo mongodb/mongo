@@ -792,6 +792,9 @@ TEST_F(SessionTest, ReportStashedResources) {
     ASSERT_BSONOBJ_EQ(stashedState.getField("lsid").Obj(), sessionId.toBSON());
     ASSERT_EQ(parametersDocument.getField("txnNumber").numberLong(), txnNum);
     ASSERT_EQ(parametersDocument.getField("autocommit").boolean(), autocommit);
+    ASSERT_BSONELT_EQ(parametersDocument.getField("readConcern"),
+                      readConcernArgs.toBSON().getField("readConcern"));
+    ASSERT_GTE(transactionDocument.getField("readTimestamp").timestamp(), Timestamp(0, 0));
     ASSERT_GTE(
         dateFromISOString(transactionDocument.getField("startWallClockTime").valueStringData())
             .getValue(),
@@ -851,13 +854,16 @@ TEST_F(SessionTest, ReportUnstashedResources) {
 
     // Verify that the Session's report of its own unstashed state aligns with our expectations.
     BSONObjBuilder unstashedStateBuilder;
-    session.reportUnstashedState(&unstashedStateBuilder);
+    session.reportUnstashedState(repl::ReadConcernArgs::get(opCtx()), &unstashedStateBuilder);
     auto unstashedState = unstashedStateBuilder.obj();
     auto transactionDocument = unstashedState.getObjectField("transaction");
     auto parametersDocument = transactionDocument.getObjectField("parameters");
 
     ASSERT_EQ(parametersDocument.getField("txnNumber").numberLong(), txnNum);
     ASSERT_EQ(parametersDocument.getField("autocommit").boolean(), autocommit);
+    ASSERT_BSONELT_EQ(parametersDocument.getField("readConcern"),
+                      readConcernArgs.toBSON().getField("readConcern"));
+    ASSERT_GTE(transactionDocument.getField("readTimestamp").timestamp(), Timestamp(0, 0));
     ASSERT_GTE(
         dateFromISOString(transactionDocument.getField("startWallClockTime").valueStringData())
             .getValue(),
@@ -875,7 +881,7 @@ TEST_F(SessionTest, ReportUnstashedResources) {
 
     // With the resources stashed, verify that the Session reports an empty unstashed state.
     BSONObjBuilder builder;
-    session.reportUnstashedState(&builder);
+    session.reportUnstashedState(repl::ReadConcernArgs::get(opCtx()), &builder);
     ASSERT(builder.obj().isEmpty());
 }
 
@@ -905,7 +911,7 @@ TEST_F(SessionTest, ReportUnstashedResourcesForARetryableWrite) {
 
     // Verify that the Session's report of its own unstashed state aligns with our expectations.
     BSONObjBuilder unstashedStateBuilder;
-    session.reportUnstashedState(&unstashedStateBuilder);
+    session.reportUnstashedState(repl::ReadConcernArgs::get(opCtx()), &unstashedStateBuilder);
     ASSERT_BSONOBJ_EQ(unstashedStateBuilder.obj(), reportBuilder.obj());
 }
 

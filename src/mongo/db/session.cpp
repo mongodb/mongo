@@ -1155,7 +1155,8 @@ void Session::reportStashedState(BSONObjBuilder* builder) const {
                 getSessionId().serialize(&lsid);
             }
             BSONObjBuilder transactionBuilder;
-            _reportTransactionStats(ls, &transactionBuilder);
+            _reportTransactionStats(
+                ls, &transactionBuilder, _txnResourceStash->getReadConcernArgs());
             builder->append("transaction", transactionBuilder.obj());
             builder->append("waitingForLock", false);
             builder->append("active", false);
@@ -1164,17 +1165,20 @@ void Session::reportStashedState(BSONObjBuilder* builder) const {
     }
 }
 
-void Session::reportUnstashedState(BSONObjBuilder* builder) const {
+void Session::reportUnstashedState(repl::ReadConcernArgs readConcernArgs,
+                                   BSONObjBuilder* builder) const {
     stdx::lock_guard<stdx::mutex> ls(_mutex);
 
     if (!_txnResourceStash) {
         BSONObjBuilder transactionBuilder;
-        _reportTransactionStats(ls, &transactionBuilder);
+        _reportTransactionStats(ls, &transactionBuilder, readConcernArgs);
         builder->append("transaction", transactionBuilder.obj());
     }
 }
 
-void Session::_reportTransactionStats(WithLock wl, BSONObjBuilder* builder) const {
+void Session::_reportTransactionStats(WithLock wl,
+                                      BSONObjBuilder* builder,
+                                      repl::ReadConcernArgs readConcernArgs) const {
     BSONObjBuilder parametersBuilder(builder->subobjStart("parameters"));
     parametersBuilder.append("txnNumber", _activeTxnNumber);
 
@@ -1184,8 +1188,10 @@ void Session::_reportTransactionStats(WithLock wl, BSONObjBuilder* builder) cons
         return;
     }
     parametersBuilder.append("autocommit", _autocommit);
+    readConcernArgs.appendInfo(&parametersBuilder);
     parametersBuilder.done();
 
+    builder->append("readTimestamp", _speculativeTransactionReadOpTime.getTimestamp());
     builder->append("startWallClockTime",
                     dateToISOStringLocal(Date_t::fromMillisSinceEpoch(
                         _singleTransactionStats->getStartTime() / 1000)));

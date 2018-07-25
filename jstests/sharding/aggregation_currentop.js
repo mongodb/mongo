@@ -720,10 +720,14 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     // disabled, even with 'allUsers:false'.
     const session = shardAdminDB.getMongo().startSession();
 
+    // Run an operation prior to starting the transaction and save its operation time.
+    const sessionDB = session.getDatabase(shardTestDB.getName());
+    const res = assert.commandWorked(sessionDB.runCommand({insert: "test", documents: [{x: 1}]}));
+    const operationTime = res.operationTime;
+
     const timeBeforeTransactionStarts = new ISODate();
 
     // Start but do not complete a transaction.
-    const sessionDB = session.getDatabase(shardTestDB.getName());
     assert.commandWorked(sessionDB.runCommand({
         insert: "test",
         documents: [{_id: `txn-insert-no-auth`}],
@@ -758,6 +762,8 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
             .toArray();
     let transactionDocument = currentOp[0].transaction;
     assert.eq(transactionDocument.parameters.autocommit, false);
+    assert.eq(transactionDocument.parameters.readConcern, {level: "snapshot"});
+    assert.gte(transactionDocument.readTimestamp, operationTime);
     assert.gte(ISODate(transactionDocument.startWallClockTime), timeBeforeTransactionStarts);
     assert.gt(transactionDocument.timeOpenMicros,
               (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
