@@ -414,9 +414,8 @@ ExitCode _initAndListen(int listenPort) {
 
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
-    // TODO: Remove biggie from this list after implemented
-    bool canCallFCVSetIfCleanStartup = !storageGlobalParams.readOnly &&
-        (storageGlobalParams.engine != "devnull") && (storageGlobalParams.engine != "biggie");
+    bool canCallFCVSetIfCleanStartup =
+        !storageGlobalParams.readOnly && (storageGlobalParams.engine != "devnull");
     if (canCallFCVSetIfCleanStartup && !replSettings.usingReplSets()) {
         Lock::GlobalWrite lk(startupOpCtx.get());
         FeatureCompatibilityVersion::setIfCleanStartup(startupOpCtx.get(),

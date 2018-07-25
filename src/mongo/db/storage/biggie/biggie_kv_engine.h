@@ -45,7 +45,7 @@ class JournalListener;
  */
 class KVEngine : public ::mongo::KVEngine {
     std::shared_ptr<StringStore> _master = std::make_shared<StringStore>();
-    std::set<StringData> _idents;  // TODO : replace with a query to _master.
+    std::map<std::string, bool> _idents;  // TODO : replace with a query to _master.
     mutable stdx::mutex _masterLock;
 
 public:
@@ -73,16 +73,14 @@ public:
                                                                StringData ident,
                                                                const IndexDescriptor* desc);
 
-    virtual Status dropIdent(OperationContext* opCtx, StringData ident) {
-        return Status::OK();
-    }
+    virtual Status dropIdent(OperationContext* opCtx, StringData ident);
 
     virtual bool supportsDocLocking() const {
-        return false;  // TODO : do this later.
+        return true;
     }
 
     virtual bool supportsDirectoryPerDB() const {
-        return false;  // TODO : do this later.
+        return false;  // Not persistant so no Directories
     }
 
     virtual bool supportsCappedCollections() const {
@@ -106,8 +104,9 @@ public:
 
     virtual void setCachePressureForTest(int pressure) override;
 
+    // only called by KVDatabaseCatalogEntryBase::sizeOnDisk so return 0
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) {
-        return 1;  // TODO : implement.
+        return 0;
     }
 
     virtual Status repairIdent(OperationContext* opCtx, StringData ident) {
@@ -119,7 +118,11 @@ public:
     }
 
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const {
-        return std::vector<std::string>();
+        std::vector<std::string> idents;
+        for (const auto& i : _idents) {
+            idents.push_back(i.first);
+        }
+        return idents;
     }
 
     virtual void cleanShutdown(){};
@@ -136,7 +139,6 @@ public:
      * Used to replace the master branch of the store with an updated copy.
      * Appropriate lock must be taken externally.
      */
-    // TODO: should possibly check store version numbers before setting.
     void setMaster_inlock(std::unique_ptr<StringStore> newMaster);
 
     std::shared_ptr<StringStore> getMaster() const;

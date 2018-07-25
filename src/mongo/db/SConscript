@@ -1134,6 +1134,7 @@ env.Library(
         "stats/counters",
         "stats/serveronly_stats",
         "stats/top",
+        "storage/biggie/storage_biggie",
         "storage/devnull/storage_devnull",
         "storage/ephemeral_for_test/storage_ephemeral_for_test",
         "storage/storage_engine_lock_file",

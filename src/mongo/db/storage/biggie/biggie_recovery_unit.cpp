@@ -46,19 +46,22 @@ RecoveryUnit::RecoveryUnit(KVEngine* parentKVEngine, stdx::function<void()> cb)
 void RecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {}
 
 void RecoveryUnit::commitUnitOfWork() {
-    while (true) {
-        std::shared_ptr<StringStore> master = _KVEngine->getMaster();
-        try {
-            _workingCopy->merge3(*_mergeBase, *master);
-        } catch (const merge_conflict_exception&) {
-            throw WriteConflictException();
+    if (_dirty && _workingCopy) {
+        while (true) {
+            std::shared_ptr<StringStore> master = _KVEngine->getMaster();
+            try {
+                _workingCopy->merge3(*_mergeBase, *master);
+            } catch (const merge_conflict_exception&) {
+                throw WriteConflictException();
+            }
+            stdx::lock_guard<stdx::mutex> lkOnMaster(_KVEngine->getMasterLock());
+            if (_KVEngine->getMaster_inlock() == master) {
+                _KVEngine->setMaster_inlock(std::move(_workingCopy));
+                _mergeBase.reset();
+                break;
+            }
         }
-        stdx::lock_guard<stdx::mutex> lkOnMaster(_KVEngine->getMasterLock());
-        if (_KVEngine->getMaster_inlock() == master) {
-            _KVEngine->setMaster_inlock(std::move(_workingCopy));
-            _mergeBase.reset();
-            break;
-        }
+        _dirty = false;
     }
     try {
         for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
@@ -93,7 +96,7 @@ bool RecoveryUnit::waitUntilDurable() {
 void RecoveryUnit::abandonSnapshot() {
     _mergeBase.reset();
     _workingCopy.reset();
-    // TODO : check if we need to add something later.
+    _dirty = false;
 }
 
 void RecoveryUnit::registerChange(Change* change) {
@@ -110,9 +113,7 @@ bool RecoveryUnit::forkIfNeeded() {
     if (_mergeBase) {
         return false;
     }
-    // TODO : later on this needs to be changed to use their copy function.
     _mergeBase = _KVEngine->getMaster();
-    // TODO : later on this needs to be changed to use their copy function.
     _workingCopy = std::make_unique<StringStore>(*_mergeBase);
     return true;
 }

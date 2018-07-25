@@ -74,12 +74,7 @@ public:
     // Truncate is not required at the time of writing but will be when the truncate command is
     // created
     Status truncate(OperationContext* opCtx);
-    SortedDataInterface(const Ordering& ordering,
-                        bool isUnique,
-                        StringData ident,
-                        const std::string& collectionNamespace,
-                        const std::string& indexName,
-                        const BSONObj& keyPattern);
+    SortedDataInterface(const Ordering& ordering, bool isUnique, StringData ident);
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,
                                                        bool dupsAllowed) override;
     virtual StatusWith<SpecialFormatInserted> insert(OperationContext* opCtx,
@@ -189,8 +184,6 @@ private:
     std::string _KSForIdentEnd;
     // This stores whether or not the end position is inclusive.
     bool _isUnique;
-    // This stores whethert or not dups are allowed.
-    bool _dupsAllowed;
 };
 }  // namespace biggie
 }  // namespace mongo

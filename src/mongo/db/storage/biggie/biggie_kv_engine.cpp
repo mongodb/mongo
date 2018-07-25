@@ -57,8 +57,7 @@ Status KVEngine::createRecordStore(OperationContext* opCtx,
                                    StringData ns,
                                    StringData ident,
                                    const CollectionOptions& options) {
-    log() << "Creating Ident in KVEngine with ident: " << ident;
-    _idents.insert(ident);
+    _idents[ident.toString()] = true;
     return Status::OK();
 }
 
@@ -67,6 +66,7 @@ std::unique_ptr<::mongo::RecordStore> KVEngine::getRecordStore(OperationContext*
                                                                StringData ident,
                                                                const CollectionOptions& options) {
     // TODO: deal with options.
+    _idents[ident.toString()] = true;
     return std::make_unique<RecordStore>(ns, ident);
 }
 
@@ -75,7 +75,6 @@ void KVEngine::setMaster_inlock(std::unique_ptr<StringStore> newMaster) {
 }
 
 std::shared_ptr<StringStore> KVEngine::getMaster() const {
-    // TODO : later on this needs to be changed to use their copy function.
     stdx::lock_guard<stdx::mutex> lk(_masterLock);
     return _master;
 }
@@ -88,20 +87,35 @@ std::shared_ptr<StringStore> KVEngine::getMaster_inlock() const {
 Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
                                            StringData ident,
                                            const IndexDescriptor* desc) {
+    _idents[ident.toString()] = false;
     return Status::OK();  // I don't think we actually need to do anything here
 }
 
 mongo::SortedDataInterface* KVEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              StringData ident,
                                                              const IndexDescriptor* desc) {
-    return new SortedDataInterface(Ordering::make(desc->keyPattern()),
-                                   desc->unique(),
-                                   ident,
-                                   desc->parentNS(),
-                                   desc->indexName(),
-                                   desc->keyPattern());
+    _idents[ident.toString()] = false;
+    return new SortedDataInterface(Ordering::make(desc->keyPattern()), desc->unique(), ident);
 }
 
+Status KVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
+    Status dropStatus = Status::OK();
+    if (_idents.count(ident.toString()) > 0) {
+        // Check if the ident is a RecordStore or a SortedDataInterface then call the corresponding
+        // truncate. A true value in the map means it is a RecordStore, false a SortedDataInterface.
+        if (_idents[ident.toString()] == true) {  // ident is RecordStore.
+            CollectionOptions s;
+            auto rs = getRecordStore(opCtx, ""_sd, ident, s);
+            dropStatus = rs->truncate(opCtx);
+        } else {  // ident is SortedDataInterface.
+            auto sdi =
+                std::make_unique<SortedDataInterface>(Ordering::make(BSONObj()), true, ident);
+            dropStatus = sdi->truncate(opCtx);
+        }
+        _idents.erase(ident.toString());
+    }
+    return dropStatus;
+}
 
 class EmptyRecordCursor final : public SeekableRecordCursor {
 public:

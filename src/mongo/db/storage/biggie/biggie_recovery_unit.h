@@ -44,11 +44,9 @@ namespace biggie {
 class RecoveryUnit : public ::mongo::RecoveryUnit {
     stdx::function<void()> _waitUntilDurableCallback;
     // Official master is kept by KVEngine
-    // This KV Engine is an implementation of KVEngine in the Biggie namespace.
     KVEngine* _KVEngine;
-    // Constructed on first read/write, and destroyed upon abandonSnapshot, commit, or abort.
+    bool _dirty = false;  // Whether or not we have written to this _workingCopy.
     std::shared_ptr<StringStore> _mergeBase;
-    // Constructed with _mergeBase for now, could change later.
     std::unique_ptr<StringStore> _workingCopy;
 
 public:
@@ -71,6 +69,9 @@ public:
     // Biggie specific function declarations below.
     StringStore* getWorkingCopy() {
         return _workingCopy.get();
+    }
+    inline void makeDirty() {
+        _dirty = true;
     }
     /**
      * Checks if there already exists a current working copy and merge base; if not fetches

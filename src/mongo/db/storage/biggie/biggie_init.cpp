@@ -31,7 +31,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -64,13 +63,13 @@ public:
         return BSONObj();
     }
 };
-}  // namespace
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(BiggieEngineInit, ("ServiceContext"))
-(InitializerContext* context) {
-    registerStorageEngine(getGlobalServiceContext(),
-                          std::make_unique<BiggieStorageEngineFactory>());
-    return Status::OK();
-}
+
+ServiceContext::ConstructorActionRegisterer registerBiggie(
+    "RegisterBiggieEngine", [](ServiceContext* service) {
+        registerStorageEngine(service, std::make_unique<BiggieStorageEngineFactory>());
+    });
+
+}  // namespace
 }  // namespace biggie
 }  // namespace mongo

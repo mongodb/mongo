@@ -12860,6 +12860,28 @@ buildvariants:
 # storage engine buildvariants #
 ################################
 
+- name: rhel-62-64-bit-biggie
+  display_name: RHEL 6.2 (Biggie)
+  run_on:
+  - rhel62-small
+  batchtime: 1440 # 1 day
+  expansions: &rhel-62-64-bit-biggie-expansions
+    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    test_flags: --storageEngine=biggie  --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions,requires_fsync,requires_wiredtiger,requires_capped,requires_profiling
+    compile_flags: MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" 
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    scons_cache_scope: shared
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
+    tooltags: ""
+    build_mongoreplay: true
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel62-large
+  - name: jsCore 
+
 - name: enterprise-rhel-62-64-bit-inmem
   display_name: Enterprise RHEL 6.2 (inMemory)
   modules:
