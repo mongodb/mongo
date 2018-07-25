@@ -51,8 +51,14 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
     bool isReplSetMemberOrMongos,
     bool supportsDocLocking,
     bool supportsRecoverToStableTimestamp) {
+    auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
     if (!requiresAuth) {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                "This command is not supported in transactions",
+                !osi.getAutocommit());
+        uassert(
+            50884, "It is illegal to provide a txnNumber for this command", !osi.getTxnNumber());
         return boost::none;
     }
 
@@ -66,8 +72,6 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
             return boost::none;
         }
     }
-
-    auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
     if (osi.getSessionId()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());

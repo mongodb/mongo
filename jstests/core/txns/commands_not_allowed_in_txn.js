@@ -106,6 +106,10 @@
     //
 
     const nonSessionCommands = [
+        {isMaster: 1},
+        {buildInfo: 1},
+        {ping: 1},
+        {listCommands: 1},
         {create: "create_collection", writeConcern: {w: "majority"}},
         {drop: "drop_collection", writeConcern: {w: "majority"}},
         {
@@ -121,7 +125,7 @@
         setup();
         assert.commandFailedWithCode(
             sessionDb.runCommand(Object.assign({}, command, {txnNumber: NumberLong(++txnNumber)})),
-            50768);
+            [50768, 50884]);
     });
 
     //
