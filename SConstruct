@@ -3461,7 +3461,7 @@ def getSystemInstallName():
     # to the translation dictionary below.
     os_name_translations = {
         'windows': 'win32',
-        'macOS': 'osx'
+        'macOS': 'macos'
     }
     os_name = env.GetTargetOSName()
     os_name = os_name_translations.get(os_name, os_name)
