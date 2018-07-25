@@ -659,38 +659,31 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
     };
 
-    // Run _addShard command on the shard, which in turn inserts a shardIdentity document onto the
-    // shard and triggers initialization
-    LOG(2) << "going to run _addShard command on shard: " << shardType;
     AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
-    BSONObj passthroughFields;  // Needed for IDL toBSON method
-    auto addShardCmdBSON = addShardCmd.toBSON(passthroughFields);
 
-    // Run _addShard command
+    auto addShardCmdBSON = [&]() {
+        // In 4.2, use the _addShard command to add the shard, which in turn inserts a
+        // shardIdentity document into the shard and triggers sharding state initialization.
+        // In the unlikely scenario that there's a downgrade to 4.0 between the
+        // construction of this command object and the issuing of the command
+        // on the receiving shard, the user will receive a rather harmless
+        // CommandNotFound error for _addShard, and can simply retry.
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+            // Needed for IDL toBSON method
+            BSONObj passthroughFields;
+            return addShardCmd.toBSON(passthroughFields);
+        } else {
+            // To support backwards compatibility with v4.0 shards, insert a shardIdentity document
+            // directly.
+            return add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
+        }
+    }();
+
     auto addShardStatus = runCmdOnNewShard(addShardCmdBSON);
 
     if (!addShardStatus.isOK()) {
-        // TODO (SERVER-35552): Fix this to use an FCV check instead
-        // If the _addShard command is not found, that means the mongod for the shard we're adding
-        // is running on an older version, so we retry instead with the old method of inserting a
-        // shard identity document directly.
-        if (addShardStatus == ErrorCodes::CommandNotFound) {
-            // Insert a shardIdentity document onto the shard. This also triggers sharding
-            // initialization on the shard.
-            LOG(2) << AddShard::kCommandName
-                   << " command not found. going to insert shardIdentity document into "
-                      "shard: "
-                   << shardType;
-
-            auto idCommand = add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);
-            auto shardUpsertCmdStatus = runCmdOnNewShard(idCommand);
-
-            if (!shardUpsertCmdStatus.isOK()) {
-                return shardUpsertCmdStatus;
-            }
-        } else {
-            return addShardStatus;
-        }
+        return addShardStatus;
     }
 
     {
