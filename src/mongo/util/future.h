@@ -549,17 +549,23 @@ public:
 
     template <typename... Args>
     void emplaceValue(Args&&... args) noexcept {
-        setImpl([&] { _sharedState->emplaceValue(std::forward<Args>(args)...); });
+        setImpl([&](boost::intrusive_ptr<SharedState<T>>&& sharedState) {
+            sharedState->emplaceValue(std::forward<Args>(args)...);
+        });
     }
 
     void setError(Status status) noexcept {
         invariant(!status.isOK());
-        setImpl([&] { _sharedState->setError(std::move(status)); });
+        setImpl([&](boost::intrusive_ptr<SharedState<T>>&& sharedState) {
+            sharedState->setError(std::move(status));
+        });
     }
 
     // TODO rename to not XXXWith and handle void
     void setFromStatusWith(StatusWith<T> sw) noexcept {
-        setImpl([&] { _sharedState->setFromStatusWith(std::move(sw)); });
+        setImpl([&](boost::intrusive_ptr<SharedState<T>>&& sharedState) {
+            sharedState->setFromStatusWith(std::move(sw));
+        });
     }
 
     /**
@@ -592,8 +598,12 @@ private:
     template <typename Func>
     void setImpl(Func&& doSet) noexcept {
         invariant(_sharedState);
-        doSet();
-        _sharedState.reset();
+        // We keep `sharedState` as a stack local, to preserve ownership of the resource,
+        // in case the code in `doSet` unblocks a thread which winds up causing
+        // `~Promise` to be invoked.
+        auto sharedState = std::move(_sharedState);
+        doSet(std::move(sharedState));
+        // Note: `this` is potentially dead, at this point.
     }
 
     boost::intrusive_ptr<SharedState<T>> _sharedState = make_intrusive<SharedState<T>>();
@@ -1358,7 +1368,9 @@ inline SharedPromise<T> Promise<T>::share() noexcept {
 
 template <typename T>
 inline void Promise<T>::setFrom(Future<T>&& future) noexcept {
-    setImpl([&] { future.propagateResultTo(_sharedState.get()); });
+    setImpl([&](boost::intrusive_ptr<SharedState<T>>&& sharedState) {
+        future.propagateResultTo(sharedState.get());
+    });
 }
 
 template <typename T>
