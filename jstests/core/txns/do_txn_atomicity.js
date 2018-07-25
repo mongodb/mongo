@@ -9,7 +9,7 @@
     var txnNumber = 0;
 
     var t = db.doTxn;
-    t.drop();
+    t.drop({writeConcern: {w: "majority"}});
     assert.writeOK(t.insert({_id: 1}));
 
     // Operations including commands are not allowed and should be rejected completely.

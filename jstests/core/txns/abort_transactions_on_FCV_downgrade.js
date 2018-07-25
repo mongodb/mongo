@@ -8,7 +8,7 @@
     const collName = "abort_transactions_on_FCV_downgrade";
     const testDB = db.getSiblingDB(dbName);
     const adminDB = db.getSiblingDB("admin");
-    testDB[collName].drop();
+    testDB[collName].drop({writeConcern: {w: "majority"}});
 
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 

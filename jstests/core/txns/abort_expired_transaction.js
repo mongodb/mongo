@@ -12,7 +12,7 @@
     const ns = testDBName + "." + testCollName;
     const testDB = db.getSiblingDB(testDBName);
     const testColl = testDB[testCollName];
-    testColl.drop();
+    testColl.drop({writeConcern: {w: "majority"}});
 
     // Need the original 'transactionLifetimeLimitSeconds' value so that we can reset it back at the
     // end of the test.

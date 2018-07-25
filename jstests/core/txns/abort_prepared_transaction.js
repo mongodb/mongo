@@ -12,7 +12,7 @@
     const testDB = db.getSiblingDB(dbName);
     const testColl = testDB.getCollection(collName);
 
-    testColl.drop();
+    testColl.drop({writeConcern: {w: "majority"}});
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
     const session = db.getMongo().startSession({causalConsistency: false});

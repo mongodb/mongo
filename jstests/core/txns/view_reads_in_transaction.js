@@ -8,8 +8,8 @@
     const coll = testDB.getCollection("view_reads_in_transaction_data_coll");
     const view = testDB.getCollection("view_reads_in_transaction_actual_view");
 
-    coll.drop();
-    view.drop();
+    coll.drop({writeConcern: {w: "majority"}});
+    view.drop({writeConcern: {w: "majority"}});
 
     // Populate the backing collection.
     const testDoc = {_id: "kyle"};

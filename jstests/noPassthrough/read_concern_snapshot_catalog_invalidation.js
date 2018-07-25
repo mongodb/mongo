@@ -31,7 +31,7 @@
     }
 
     function testCommand(cmd, curOpFilter) {
-        coll.drop();
+        coll.drop({writeConcern: {w: "majority"}});
         assert.commandWorked(testDB.runCommand({
             createIndexes: kCollName,
             indexes:
