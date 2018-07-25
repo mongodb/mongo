@@ -4,6 +4,7 @@
  * update_inc_capped.js
  *
  * Executes the update_inc.js workload on a capped collection.
+ * @tags: [requires_capped]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
 load('jstests/concurrency/fsm_workloads/update_inc.js');            // for $config

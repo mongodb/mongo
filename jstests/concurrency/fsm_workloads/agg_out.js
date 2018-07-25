@@ -11,6 +11,8 @@
  *
  * Unfortunately, there aren't very many assertions we can make here, so this is mostly to test that
  * the server doesn't deadlock or crash.
+ *
+ * @tags: [requires_capped]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_base.js');             // for $config
