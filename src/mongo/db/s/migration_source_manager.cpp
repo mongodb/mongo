@@ -393,17 +393,40 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* txn
                            << redact(status)});
     }
 
-    // Do a best effort attempt to incrementally refresh the metadata. If this fails, just clear it
-    // up so that subsequent requests will try to do a full refresh.
-    ChunkVersion unusedShardVersion;
-    Status refreshStatus =
-        ShardingState::get(txn)->refreshMetadataNow(txn, getNss(), &unusedShardVersion);
+    // Because the CatalogCache's WithRefresh methods (on which forceShardFilteringMetadataRefresh
+    // depends) are not causally consistent, we need to perform up to two refresh rounds if refresh
+    // returns that the shard still owns the chunk
+    ChunkVersion collectionVersionAfterRefresh;
 
-    if (refreshStatus.isOK()) {
-        ScopedTransaction scopedXact(txn, MODE_IS);
-        AutoGetCollection autoColl(txn, getNss(), MODE_IS);
+    for (int retriesLeft = 1;; --retriesLeft) {
+        ChunkVersion unusedShardVersion;
+        Status refreshStatus =
+            ShardingState::get(txn)->refreshMetadataNow(txn, getNss(), &unusedShardVersion);
 
-        auto refreshedMetadata = CollectionShardingState::get(txn, getNss())->getMetadata();
+        // If the refresh fails, there is no way to confirm whether the migration commit actually
+        // went through or not. Because of that, the collection's metadata is reset to UNSHARDED so
+        // that subsequent versioned requests will get StaleShardVersion and will retry the refresh.
+        if (!refreshStatus.isOK()) {
+            ScopedTransaction scopedXact(txn, MODE_IX);
+            AutoGetCollection autoColl(txn, getNss(), MODE_IX, MODE_X);
+
+            CollectionShardingState::get(txn, getNss())->refreshMetadata(txn, nullptr);
+
+            log()
+                << "Failed to refresh metadata after a failed commit attempt. Metadata was cleared "
+                   "so it will get a full refresh when accessed again"
+                << causedBy(redact(refreshStatus));
+
+            return {migrationCommitStatus.code(),
+                    str::stream() << "Failed to refresh metadata after migration commit due to "
+                                  << refreshStatus.toString()};
+        }
+
+        auto refreshedMetadata = [&] {
+            ScopedTransaction scopedXact(txn, MODE_IS);
+            AutoGetCollection autoColl(txn, getNss(), MODE_IS);
+            return CollectionShardingState::get(txn, getNss())->getMetadata();
+        }();
 
         if (!refreshedMetadata) {
             return {ErrorCodes::NamespaceNotSharded,
@@ -412,45 +435,42 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* txn
                                   << migrationCommitStatus.toString()};
         }
 
-        if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
-            // This condition may only happen if the migration commit has failed for any reason
-            if (migrationCommitStatus.isOK()) {
-                severe() << "The migration commit succeeded, but the new chunk placement was not "
-                            "reflected after metadata refresh, which is an indication of an "
-                            "afterOpTime bug.";
-                severe() << "The current config server opTime is " << grid.configOpTime();
-                severe() << "The commit response contained:";
-                severe() << "  metadata: "
-                         << redact(commitChunkMigrationResponse.getValue().metadata.toString());
-                severe() << "  response: "
-                         << redact(commitChunkMigrationResponse.getValue().response.toString());
-
-                fassertFailed(50878);
-            }
-
-            return {migrationCommitStatus.code(),
-                    str::stream() << "Chunk move was not successful due to "
-                                  << migrationCommitStatus.reason()};
+        // If after a successful refresh the metadata indicates that the node still owns the chunk,
+        // we must do one more refresh in order to ensure that the previous refresh round didn't
+        // join an already active catalog cache refresh and missed its own commit
+        if (!refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
+            collectionVersionAfterRefresh = refreshedMetadata->getCollVersion();
+            break;
         }
 
-        // Migration succeeded
-        log() << "Migration succeeded and updated collection version to "
-              << refreshedMetadata->getCollVersion();
-    } else {
-        ScopedTransaction scopedXact(txn, MODE_IX);
-        AutoGetCollection autoColl(txn, getNss(), MODE_IX, MODE_X);
+        if (retriesLeft)
+            continue;
 
-        CollectionShardingState::get(txn, getNss())->refreshMetadata(txn, nullptr);
+        // This condition may only happen if the migration commit has failed for any reason
+        if (migrationCommitStatus.isOK()) {
+            severe() << "The migration commit succeeded, but the new chunk placement was not "
+                        "reflected after metadata refresh, which is an indication of an "
+                        "afterOpTime bug.";
+            severe() << "The current config server opTime is " << grid.configOpTime();
+            severe() << "The commit response contained:";
+            severe() << "  metadata: "
+                     << redact(commitChunkMigrationResponse.getValue().metadata.toString());
+            severe() << "  response: "
+                     << redact(commitChunkMigrationResponse.getValue().response.toString());
 
-        log() << "Failed to refresh metadata after a failed commit attempt. Metadata was cleared "
-                 "so it will get a full refresh when accessed again"
-              << causedBy(redact(refreshStatus));
+            fassertFailed(50878);
+        }
 
-        // We don't know whether migration succeeded or failed
         return {migrationCommitStatus.code(),
-                str::stream() << "Failed to refresh metadata after migration commit due to "
-                              << refreshStatus.toString()};
+                str::stream() << "Chunk move was not successful due to "
+                              << migrationCommitStatus.reason()};
     }
+
+    invariant(collectionVersionAfterRefresh.isSet());
+
+    // Migration succeeded
+    log() << "Migration succeeded and updated collection version to "
+          << collectionVersionAfterRefresh;
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
