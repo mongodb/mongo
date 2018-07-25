@@ -44,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
@@ -330,82 +331,6 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
     }
 }
 
-/**
- * For new collections which use hashed shard keys, we can can pre-split the range of possible
- * hashes into a large number of chunks, and distribute them evenly at creation time. Until we
- * design a better initialization scheme, the safest way to pre-split is to make one big chunk for
- * each shard and migrate them one at a time.
- *
- * Populates 'initSplits' with the split points to use on the primary shard to produce the initial
- * "big chunks."
- * Also populates 'allSplits' with the additional split points to use on the "big chunks" after the
- * "big chunks" have been spread evenly across shards through migrations.
- */
-void determinePresplittingPoints(OperationContext* opCtx,
-                                 int numShards,
-                                 bool isEmpty,
-                                 const BSONObj& proposedKey,
-                                 const ShardKeyPattern& shardKeyPattern,
-                                 const ShardsvrShardCollection& request,
-                                 std::vector<BSONObj>* initSplits,
-                                 std::vector<BSONObj>* allSplits) {
-    auto numChunks = request.getNumInitialChunks();
-
-    if (request.getInitialSplitPoints()) {
-        *initSplits = std::move(*request.getInitialSplitPoints());
-        return;
-    }
-
-    if (shardKeyPattern.isHashedPattern() && isEmpty) {
-        // If initial split points are not specified, only pre-split when using a hashed shard
-        // key and the collection is empty
-        if (numChunks <= 0) {
-            // default number of initial chunks
-            numChunks = 2 * numShards;
-        }
-
-        // hashes are signed, 64-bit ints. So we divide the range (-MIN long, +MAX long)
-        // into intervals of size (2^64/numChunks) and create split points at the
-        // boundaries.  The logic below ensures that initial chunks are all
-        // symmetric around 0.
-        long long intervalSize = (std::numeric_limits<long long>::max() / numChunks) * 2;
-        long long current = 0;
-
-        if (numChunks % 2 == 0) {
-            allSplits->push_back(BSON(proposedKey.firstElementFieldName() << current));
-            current += intervalSize;
-        } else {
-            current += intervalSize / 2;
-        }
-
-        for (int i = 0; i < (numChunks - 1) / 2; i++) {
-            allSplits->push_back(BSON(proposedKey.firstElementFieldName() << current));
-            allSplits->push_back(BSON(proposedKey.firstElementFieldName() << -current));
-            current += intervalSize;
-        }
-
-        sort(allSplits->begin(),
-             allSplits->end(),
-             SimpleBSONObjComparator::kInstance.makeLessThan());
-
-        // The initial splits define the "big chunks" that we will subdivide later.
-        int lastIndex = -1;
-        for (int i = 1; i < numShards; i++) {
-            if (lastIndex < (i * numChunks) / numShards - 1) {
-                lastIndex = (i * numChunks) / numShards - 1;
-                initSplits->push_back(allSplits->at(lastIndex));
-            }
-        }
-    } else if (numChunks > 0) {
-        uasserted(ErrorCodes::InvalidOptions,
-                  str::stream() << (!shardKeyPattern.isHashedPattern()
-                                        ? "numInitialChunks is not supported "
-                                          "when the shard key is not hashed."
-                                        : "numInitialChunks is not supported "
-                                          "when the collection is not empty."));
-    }
-}
-
 boost::optional<UUID> getUUIDFromPrimaryShard(OperationContext* opCtx, const NamespaceString& nss) {
     // Obtain the collection's UUID from the primary shard's listCollections response.
     DBDirectClient localClient(opCtx);
@@ -449,21 +374,32 @@ boost::optional<UUID> getUUIDFromPrimaryShard(OperationContext* opCtx, const Nam
  * Creates and writes to the config server the first chunks for a newly sharded collection. Returns
  * the version generated for the collection.
  */
-ChunkVersion createFirstChunks(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const ShardKeyPattern& shardKeyPattern,
-                               const ShardId& primaryShardId,
-                               const std::vector<BSONObj>& initPoints,
-                               const bool distributeInitialChunks) {
-    const KeyPattern keyPattern = shardKeyPattern.getKeyPattern();
-    DBDirectClient localClient(opCtx);
+InitialSplitPolicy::ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            const ShardKeyPattern& shardKeyPattern,
+                                                            const ShardId& primaryShardId,
+                                                            const std::vector<BSONObj>& initPoints,
+                                                            const bool distributeInitialChunks) {
+    const auto& keyPattern = shardKeyPattern.getKeyPattern();
 
     std::vector<BSONObj> splitPoints;
     std::vector<ShardId> shardIds;
 
     if (initPoints.empty()) {
         // If no split points were specified use the shard's data distribution to determine them
-        long long numObjects = localClient.count(nss.ns());
+        auto primaryShard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+
+        auto result = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+            nss.db().toString(),
+            BSON("count" << nss.coll()),
+            Shard::RetryPolicy::kIdempotent));
+
+        long long numObjects = 0;
+        uassertStatusOK(result.commandStatus);
+        uassertStatusOK(bsonExtractIntegerField(result.response, "n", &numObjects));
 
         // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
         // the splitVector command and affects the number of chunks returned, has been loaded.
@@ -506,40 +442,14 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
         }
     }
 
-    // This is the first chunk; start the versioning from scratch
-    const OID epoch = OID::gen();
-    ChunkVersion version(1, 0, epoch);
-
-    log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << nss
-          << " using new epoch " << version.epoch();
-
-    const auto validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
-
-    for (unsigned i = 0; i <= splitPoints.size(); i++) {
-        const BSONObj min = (i == 0) ? keyPattern.globalMin() : splitPoints[i - 1];
-        const BSONObj max = (i < splitPoints.size()) ? splitPoints[i] : keyPattern.globalMax();
-
-        // The correct version must be returned as part of this call so only increment for versions,
-        // which get written
-        if (i > 0) {
-            version.incMinor();
-        }
-
-        ChunkType chunk;
-        chunk.setNS(nss);
-        chunk.setMin(min);
-        chunk.setMax(max);
-        chunk.setVersion(version);
-
-        // It's possible there are no split points or fewer split points than total number of
-        // shards, and we need to be sure that at least one chunk is placed on the primary shard.
-        auto shardId = (i == 0) ? primaryShardId : shardIds[i % shardIds.size()];
-        chunk.setShard(shardId);
-
-        std::vector<ChunkHistory> initialHistory;
-        initialHistory.emplace_back(ChunkHistory(validAfter, shardId));
-        chunk.setHistory(std::move(initialHistory));
-
+    auto initialChunks = InitialSplitPolicy::generateShardCollectionInitialChunks(
+        nss,
+        shardKeyPattern,
+        primaryShardId,
+        LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
+        splitPoints,
+        shardIds);
+    for (const auto& chunk : initialChunks.chunks) {
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,
             ChunkType::ConfigNS,
@@ -547,7 +457,7 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
             ShardingCatalogClient::kMajorityWriteConcern));
     }
 
-    return version;
+    return initialChunks;
 }
 
 void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
@@ -612,16 +522,12 @@ void shardCollection(OperationContext* opCtx,
         }
         collectionDetail.append("primary", primaryShard->toString());
         collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
-        catalogClient
-            ->logChange(opCtx,
-                        "shardCollection.start",
-                        nss.ns(),
-                        collectionDetail.obj(),
-                        ShardingCatalogClient::kMajorityWriteConcern)
-            .transitional_ignore();
+        uassertStatusOK(catalogClient->logChange(opCtx,
+                                                 "shardCollection.start",
+                                                 nss.ns(),
+                                                 collectionDetail.obj(),
+                                                 ShardingCatalogClient::kMajorityWriteConcern));
     }
-
-    // const NamespaceString nss(ns);
 
     // Construct the collection default collator.
     std::unique_ptr<CollatorInterface> defaultCollator;
@@ -630,20 +536,16 @@ void shardCollection(OperationContext* opCtx,
                                               ->makeFromBSON(defaultCollation));
     }
 
-    const auto& collVersion = createFirstChunks(
+    const auto initialChunks = createFirstChunks(
         opCtx, nss, fieldsAndOrder, dbPrimaryShardId, initPoints, distributeInitialChunks);
 
     {
         CollectionType coll;
         coll.setNs(nss);
-        if (uuid) {
+        if (uuid)
             coll.setUUID(*uuid);
-        }
-        coll.setEpoch(collVersion.epoch());
-
-        // TODO(schwerin): The following isn't really a date, but is stored as one in-memory and in
-        // config.collections, as a historical oddity.
-        coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(collVersion.toLong()));
+        coll.setEpoch(initialChunks.collVersion().epoch());
+        coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(initialChunks.collVersion().toLong()));
         coll.setKeyPattern(fieldsAndOrder.toBSON());
         coll.setDefaultCollation(defaultCollator ? defaultCollator->getSpec().toBSON() : BSONObj());
         coll.setUnique(unique);
@@ -658,9 +560,9 @@ void shardCollection(OperationContext* opCtx,
         ->logChange(opCtx,
                     "shardCollection.end",
                     nss.ns(),
-                    BSON("version" << collVersion.toString()),
+                    BSON("version" << initialChunks.collVersion().toString()),
                     ShardingCatalogClient::kMajorityWriteConcern)
-        .transitional_ignore();
+        .ignore();
 }
 
 /**
@@ -704,22 +606,20 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-
         auto const shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
-        const auto shardsvrShardCollectionRequest = ShardsvrShardCollection::parse(
+        const auto request = ShardsvrShardCollection::parse(
             IDLParserErrorContext("_shardsvrShardCollection"), cmdObj);
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         // Take the collection critical section so that no writes can happen.
         CollectionCriticalSection critSec(opCtx, nss);
 
-        auto proposedKey(shardsvrShardCollectionRequest.getKey().getOwned());
+        auto proposedKey(request.getKey().getOwned());
         ShardKeyPattern shardKeyPattern(proposedKey);
 
-        validateShardKeyAgainstExistingIndexes(
-            opCtx, nss, proposedKey, shardKeyPattern, shardsvrShardCollectionRequest);
+        validateShardKeyAgainstExistingIndexes(opCtx, nss, proposedKey, shardKeyPattern, request);
 
         // read zone info
         auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -739,7 +639,7 @@ public:
         }
 
         boost::optional<UUID> uuid;
-        if (shardsvrShardCollectionRequest.getGetUUIDfromPrimaryShard()) {
+        if (request.getGetUUIDfromPrimaryShard()) {
             uuid = getUUIDFromPrimaryShard(opCtx, nss);
         } else {
             uuid = UUID::gen();
@@ -759,14 +659,18 @@ public:
         // them.
         std::vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
         std::vector<BSONObj> allSplits;   // all of the initial desired split points
-        determinePresplittingPoints(opCtx,
-                                    numShards,
-                                    isEmpty,
-                                    proposedKey,
-                                    shardKeyPattern,
-                                    shardsvrShardCollectionRequest,
-                                    &initSplits,
-                                    &allSplits);
+        if (request.getInitialSplitPoints()) {
+            initSplits = std::move(*request.getInitialSplitPoints());
+        } else {
+            InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
+                shardKeyPattern,
+                isEmpty,
+                numShards,
+                request.getNumInitialChunks(),
+                &initSplits,
+                &allSplits);
+        }
+
         result << "collectionsharded" << nss.ns();
         if (uuid) {
             result << "collectionUUID" << *uuid;
@@ -778,25 +682,21 @@ public:
 
         LOG(0) << "CMD: shardcollection: " << cmdObj;
 
-        audit::logShardCollection(Client::getCurrent(),
-                                  nss.ns(),
-                                  proposedKey,
-                                  shardsvrShardCollectionRequest.getUnique());
+        audit::logShardCollection(Client::getCurrent(), nss.ns(), proposedKey, request.getUnique());
 
         // The initial chunks are distributed evenly across shards only if the initial split
         // points were specified in the request, i.e., by mapReduce. Otherwise, all the initial
         // chunks are placed on the primary shard, and may be distributed across shards through
         // migrations (below) if using a hashed shard key.
-        const bool distributeInitialChunks =
-            shardsvrShardCollectionRequest.getInitialSplitPoints().is_initialized();
+        const bool distributeInitialChunks = bool(request.getInitialSplitPoints());
 
         // Step 6. Actually shard the collection.
         shardCollection(opCtx,
                         nss,
                         uuid,
                         shardKeyPattern,
-                        *shardsvrShardCollectionRequest.getCollation(),
-                        shardsvrShardCollectionRequest.getUnique(),
+                        *request.getCollation(),
+                        request.getUnique(),
                         initSplits,
                         distributeInitialChunks,
                         ShardingState::get(opCtx)->getShardName());

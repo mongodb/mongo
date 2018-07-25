@@ -496,7 +496,7 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
 
 void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationContext* opCtx,
                                                                    const NamespaceString& nss,
-                                                                   ShardId fromShardId) {
+                                                                   const ShardId& fromShardId) {
     auto fromShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromShardId));
 
