@@ -732,6 +732,27 @@ buildvariants:
     - name: bestbuy_agg
     - name: bestbuy_query
 
+- name: linux-standalone-audit
+  display_name: Linux Standalone Audit
+  batchtime: 10080 # 7 days
+  modules: *modules
+  expansions:
+    setup: standalone-audit
+    cluster: single
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-single"
+  depends_on:
+      - name: compile
+        variant: compile-linux-64-amzn
+  tasks: &standalonetasks
+    - name: industry_benchmarks
+    - name: crud_workloads
+    - name: smoke_test
+
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
   batchtime: 10080 # 7 days
