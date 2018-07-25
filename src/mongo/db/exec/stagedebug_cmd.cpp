@@ -300,8 +300,7 @@ public:
                 uassert(40223, str::stream() << "Can't find index: " << name.toString(), desc);
             }
 
-            IndexScanParams params;
-            params.descriptor = desc;
+            IndexScanParams params(opCtx, *desc);
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = stripFieldNames(nodeArgs["startKey"].Obj());
             params.bounds.endKey = stripFieldNames(nodeArgs["endKey"].Obj());

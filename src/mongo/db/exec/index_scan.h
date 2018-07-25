@@ -28,9 +28,8 @@
 
 #pragma once
 
-
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
@@ -41,23 +40,62 @@
 
 namespace mongo {
 
-class IndexAccessMethod;
-class IndexDescriptor;
 class WorkingSet;
 
+// TODO SERVER-35333: when we have a means of uniquely identifying each $** sub-index generated
+// during planning, 'indexName' should change to be the unique ID for the specific sub-index used in
+// this solution.
 struct IndexScanParams {
-    IndexScanParams() : descriptor(NULL), direction(1), doNotDedup(false), addKeyMetadata(false) {}
+    IndexScanParams(const IndexDescriptor& descriptor,
+                    std::string indexName,
+                    BSONObj keyPattern,
+                    MultikeyPaths multikeyPaths,
+                    bool multikey)
+        : accessMethod(descriptor.getIndexCatalog()->getIndex(&descriptor)),
+          name(std::move(indexName)),
+          keyPattern(std::move(keyPattern)),
+          multikeyPaths(std::move(multikeyPaths)),
+          isMultiKey(multikey),
+          isSparse(descriptor.isSparse()),
+          isUnique(descriptor.unique()),
+          isPartial(descriptor.isPartial()),
+          version(descriptor.version()),
+          collation(descriptor.infoObj()
+                        .getObjectField(IndexDescriptor::kCollationFieldName)
+                        .getOwned()) {
+        invariant(accessMethod);
+    }
 
-    const IndexDescriptor* descriptor;
+    IndexScanParams(OperationContext* opCtx, const IndexDescriptor& descriptor)
+        : IndexScanParams(descriptor,
+                          descriptor.indexName(),
+                          descriptor.keyPattern(),
+                          descriptor.getMultikeyPaths(opCtx),
+                          descriptor.isMultikey(opCtx)) {}
 
+    const IndexAccessMethod* accessMethod;
+    std::string name;
+
+    BSONObj keyPattern;
     IndexBounds bounds;
 
-    int direction;
+    MultikeyPaths multikeyPaths;
+    bool isMultiKey;
 
-    bool doNotDedup;
+    bool isSparse;
+    bool isUnique;
+    bool isPartial;
+
+    IndexDescriptor::IndexVersion version;
+
+    BSONObj collation;
+
+    int direction{1};
+
+    bool doNotDedup{false};
 
     // Do we want to add the key as metadata?
-    bool addKeyMetadata;
+    bool addKeyMetadata{false};
 };
 
 /**
@@ -87,7 +125,7 @@ public:
     };
 
     IndexScan(OperationContext* opCtx,
-              const IndexScanParams& params,
+              IndexScanParams params,
               WorkingSet* workingSet,
               const MatchExpression* filter);
 

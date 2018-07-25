@@ -28,9 +28,9 @@
 
 #pragma once
 
-
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
@@ -39,21 +39,60 @@
 
 namespace mongo {
 
-class IndexAccessMethod;
-class IndexDescriptor;
 class WorkingSet;
 
+// TODO SERVER-35333: when we have a means of uniquely identifying each $** sub-index generated
+// during planning, 'indexName' should change to be the unique ID for the specific sub-index used in
+// this solution.
 struct CountScanParams {
-    CountScanParams() : descriptor(NULL) {}
+    CountScanParams(const IndexDescriptor& descriptor,
+                    std::string indexName,
+                    BSONObj keyPattern,
+                    MultikeyPaths multikeyPaths,
+                    bool multikey)
+        : accessMethod(descriptor.getIndexCatalog()->getIndex(&descriptor)),
+          name(std::move(indexName)),
+          keyPattern(std::move(keyPattern)),
+          multikeyPaths(std::move(multikeyPaths)),
+          isMultiKey(multikey),
+          isSparse(descriptor.isSparse()),
+          isUnique(descriptor.unique()),
+          isPartial(descriptor.isPartial()),
+          version(descriptor.version()),
+          collation(descriptor.infoObj()
+                        .getObjectField(IndexDescriptor::kCollationFieldName)
+                        .getOwned()) {
+        invariant(accessMethod);
+    }
 
-    // What index are we traversing?
-    const IndexDescriptor* descriptor;
+    CountScanParams(OperationContext* opCtx, const IndexDescriptor& descriptor)
+        : CountScanParams(descriptor,
+                          descriptor.indexName(),
+                          descriptor.keyPattern(),
+                          descriptor.getMultikeyPaths(opCtx),
+                          descriptor.isMultikey(opCtx)) {}
+
+    const IndexAccessMethod* accessMethod;
+    std::string name;
+
+    BSONObj keyPattern;
+
+    MultikeyPaths multikeyPaths;
+    bool isMultiKey;
+
+    bool isSparse;
+    bool isUnique;
+    bool isPartial;
+
+    IndexDescriptor::IndexVersion version;
+
+    BSONObj collation;
 
     BSONObj startKey;
-    bool startKeyInclusive;
+    bool startKeyInclusive{true};
 
     BSONObj endKey;
-    bool endKeyInclusive;
+    bool endKeyInclusive{true};
 };
 
 /**
@@ -67,7 +106,7 @@ struct CountScanParams {
  */
 class CountScan final : public PlanStage {
 public:
-    CountScan(OperationContext* opCtx, const CountScanParams& params, WorkingSet* workingSet);
+    CountScan(OperationContext* opCtx, CountScanParams params, WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
@@ -91,8 +130,7 @@ private:
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;
 
-    // Index access.  Both pointers below are owned by Collection -> IndexCatalog.
-    const IndexDescriptor* _descriptor;
+    // Index access. The pointer below is owned by Collection -> IndexCatalog.
     const IndexAccessMethod* _iam;
 
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;

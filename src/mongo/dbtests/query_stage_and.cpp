@@ -81,6 +81,16 @@ public:
         return indexes[0];
     }
 
+    IndexScanParams makeIndexScanParams(OperationContext* opCtx,
+                                        const IndexDescriptor* descriptor) {
+        IndexScanParams params(opCtx, *descriptor);
+        params.bounds.isSimpleRange = true;
+        params.bounds.endKey = BSONObj();
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+        params.direction = 1;
+        return params;
+    }
+
     void getRecordIds(set<RecordId>* out, Collection* coll) {
         auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
@@ -189,21 +199,14 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
         // Foo <= 20.
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar >= 10.
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // 'ah' reads the first child into its hash table: foo=20, foo=19, ..., foo=0
@@ -283,18 +286,15 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
         // Foo <= 20 (descending).
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar <= 19 (descending).
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 19);
+        params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // First call to work reads the first result from the children. The first result for the
@@ -366,21 +366,15 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
         // Foo <= 20
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar >= 10
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
+        params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // foo == bar == baz, and foo<=20, bar>=10, so our values are:
@@ -421,21 +415,15 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll, 20 * big.size());
 
         // Foo <= 20
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1 << "big" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1 << "big" << 1), coll));
         params.bounds.startKey = BSON("" << 20 << "" << big);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar >= 10
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
+        params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Stage execution should fail.
@@ -474,21 +462,15 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll, 5 * big.size());
 
         // Foo <= 20
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar >= 10
-        params.descriptor = getIndex(BSON("bar" << 1 << "big" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1 << "big" << 1), coll));
         params.bounds.startKey = BSON("" << 10 << "" << big);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
+        params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // foo == bar == baz, and foo<=20, bar>=10, so our values are:
@@ -522,29 +504,20 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
         // Foo <= 20
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar >= 10
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // 5 <= baz <= 15
-        params.descriptor = getIndex(BSON("baz" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("baz" << 1), coll));
         params.bounds.startKey = BSON("" << 5);
         params.bounds.endKey = BSON("" << 15);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // foo == bar == baz, and foo<=20, bar>=10, 5<=baz<=15, so our values are:
@@ -589,29 +562,20 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll, 10 * big.size());
 
         // Foo <= 20
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar >= 10
-        params.descriptor = getIndex(BSON("bar" << 1 << "big" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1 << "big" << 1), coll));
         params.bounds.startKey = BSON("" << 10 << "" << big);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // 5 <= baz <= 15
-        params.descriptor = getIndex(BSON("baz" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("baz" << 1), coll));
         params.bounds.startKey = BSON("" << 5);
         params.bounds.endKey = BSON("" << 15);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Stage execution should fail.
@@ -643,21 +607,15 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
         // Foo <= 20
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar == 5.  Index scan should be eof.
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 5);
         params.bounds.endKey = BSON("" << 5);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         int count = 0;
@@ -706,17 +664,12 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
         // Foo >= 100
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 100);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar <= 100
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 100);
         // This is subtle and confusing.  We couldn't extract any keys from the elements with
         // 'foo' in them so we would normally index them with the "nothing found" key.  We don't
@@ -758,12 +711,8 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
         // Foo <= 20
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         IndexScan* firstScan = new IndexScan(&_opCtx, params, &ws, NULL);
 
@@ -773,11 +722,8 @@ public:
         ah->addChild(fetch);
 
         // Bar >= 10
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Check that the AndHash stage returns docs {foo: 10, bar: 10}
@@ -817,21 +763,14 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
         // Foo <= 20
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar >= 10
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 10);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         IndexScan* secondScan = new IndexScan(&_opCtx, params, &ws, NULL);
 
         // Second child of the AND_HASH stage is a Fetch. The NULL in the
@@ -1010,17 +949,15 @@ public:
         auto ah = make_unique<AndSortedStage>(&_opCtx, &ws, coll);
 
         // Scan over foo == 1.
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Scan over bar == 1.
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params.bounds.startKey = BSON("" << 1);
+        params.bounds.endKey = BSON("" << 1);
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Get the set of RecordIds in our collection to use later.
@@ -1129,21 +1066,21 @@ public:
         auto ah = make_unique<AndSortedStage>(&_opCtx, &ws, coll);
 
         // Scan over foo == 1
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // bar == 1
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params.bounds.startKey = BSON("" << 1);
+        params.bounds.endKey = BSON("" << 1);
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // baz == 1
-        params.descriptor = getIndex(BSON("baz" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("baz" << 1), coll));
+        params.bounds.startKey = BSON("" << 1);
+        params.bounds.endKey = BSON("" << 1);
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         ASSERT_EQUALS(50, countResults(ah.get()));
@@ -1174,21 +1111,15 @@ public:
         auto ah = make_unique<AndSortedStage>(&_opCtx, &ws, coll);
 
         // Foo == 7.  Should be EOF.
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 7);
         params.bounds.endKey = BSON("" << 7);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Bar == 20, not EOF.
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.bounds.endKey = BSON("" << 20);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         ASSERT_EQUALS(0, countResults(ah.get()));
@@ -1223,21 +1154,15 @@ public:
         auto ah = make_unique<AndSortedStage>(&_opCtx, &ws, coll);
 
         // foo == 7.
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 7);
         params.bounds.endKey = BSON("" << 7);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // bar == 20.
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 20);
         params.bounds.endKey = BSON("" << 20);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         ASSERT_EQUALS(0, countResults(ah.get()));
@@ -1268,17 +1193,13 @@ public:
         auto ah = make_unique<AndHashStage>(&_opCtx, &ws, coll);
 
         // Scan over foo == 1
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // Intersect with 7 <= bar < 10000
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
         params.bounds.startKey = BSON("" << 7);
         params.bounds.endKey = BSON("" << 10000);
         ah->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
@@ -1334,13 +1255,9 @@ public:
         unique_ptr<AndSortedStage> as = make_unique<AndSortedStage>(&_opCtx, &ws, coll);
 
         // Scan over foo == 1
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         IndexScan* firstScan = new IndexScan(&_opCtx, params, &ws, NULL);
 
         // First child of the AND_SORTED stage is a Fetch. The NULL in the
@@ -1349,7 +1266,9 @@ public:
         as->addChild(fetch);
 
         // bar == 1
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params.bounds.startKey = BSON("" << 1);
+        params.bounds.endKey = BSON("" << 1);
         as->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         for (int i = 0; i < 50; i++) {
@@ -1388,17 +1307,15 @@ public:
         unique_ptr<AndSortedStage> as = make_unique<AndSortedStage>(&_opCtx, &ws, coll);
 
         // Scan over foo == 1
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1), coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1), coll));
         params.bounds.startKey = BSON("" << 1);
         params.bounds.endKey = BSON("" << 1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
         as->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
 
         // bar == 1
-        params.descriptor = getIndex(BSON("bar" << 1), coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(BSON("bar" << 1), coll));
+        params.bounds.startKey = BSON("" << 1);
+        params.bounds.endKey = BSON("" << 1);
         IndexScan* secondScan = new IndexScan(&_opCtx, params, &ws, NULL);
 
         // Second child of the AND_SORTED stage is a Fetch. The NULL in the

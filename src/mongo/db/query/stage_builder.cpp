@@ -91,16 +91,22 @@ PlanStage* buildStages(OperationContext* opCtx,
                 return nullptr;
             }
 
-            IndexScanParams params;
-
-            params.descriptor =
+            auto descriptor =
                 collection->getIndexCatalog()->findIndexByName(opCtx, ixn->index.name);
-            invariant(params.descriptor);
+            invariant(descriptor);
+
+            // We use the node's internal name, keyPattern and multikey details here. For $**
+            // indexes, these may differ from the information recorded in the index's descriptor.
+            IndexScanParams params{*descriptor,
+                                   ixn->index.name,
+                                   ixn->index.keyPattern,
+                                   ixn->index.multikeyPaths,
+                                   ixn->index.multikey};
 
             params.bounds = ixn->bounds;
             params.direction = ixn->direction;
             params.addKeyMetadata = ixn->addKeyMetadata;
-            return new IndexScan(opCtx, params, ws, ixn->filter.get());
+            return new IndexScan(opCtx, std::move(params), ws, ixn->filter.get());
         }
         case STAGE_FETCH: {
             const FetchNode* fn = static_cast<const FetchNode*>(root);
@@ -324,17 +330,24 @@ PlanStage* buildStages(OperationContext* opCtx,
                 return nullptr;
             }
 
-            CountScanParams params;
-
-            params.descriptor =
+            auto descriptor =
                 collection->getIndexCatalog()->findIndexByName(opCtx, csn->index.name);
-            invariant(params.descriptor);
+            invariant(descriptor);
+
+            // We use the node's internal name, keyPattern and multikey details here. For $**
+            // indexes, these may differ from the information recorded in the index's descriptor.
+            CountScanParams params{*descriptor,
+                                   csn->index.name,
+                                   csn->index.keyPattern,
+                                   csn->index.multikeyPaths,
+                                   csn->index.multikey};
+
             params.startKey = csn->startKey;
             params.startKeyInclusive = csn->startKeyInclusive;
             params.endKey = csn->endKey;
             params.endKeyInclusive = csn->endKeyInclusive;
 
-            return new CountScan(opCtx, params, ws);
+            return new CountScan(opCtx, std::move(params), ws);
         }
         case STAGE_ENSURE_SORTED: {
             const EnsureSortedNode* esn = static_cast<const EnsureSortedNode*>(root);

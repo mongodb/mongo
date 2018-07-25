@@ -97,6 +97,11 @@ public:
         return indexes.empty() ? nullptr : indexes[0];
     }
 
+    CountScanParams makeCountScanParams(OperationContext* opCtx,
+                                        const IndexDescriptor* descriptor) {
+        return {opCtx, *descriptor};
+    }
+
     static const char* ns() {
         return "unittests.QueryStageCountScanScan";
     }
@@ -126,9 +131,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up the count stage
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
-        verify(params.descriptor);
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("a" << 1);
         params.startKeyInclusive = true;
         params.endKey = BSON("a" << 10);
@@ -159,8 +162,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up the count stage
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 3);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 7);
@@ -191,8 +193,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up the count stage
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 3);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 7);
@@ -219,8 +220,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count, and run
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 3);
@@ -248,8 +248,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count, and run
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 3);
@@ -278,8 +277,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count, and run
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 3);
@@ -309,8 +307,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count stage
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 6);
@@ -362,8 +359,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count stage
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 6);
@@ -418,8 +414,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count stage
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 6);
@@ -462,62 +457,6 @@ public:
 };
 
 //
-// Check that count performs correctly if an index becomes multikey
-// during a yield
-//
-class QueryStageCountScanBecomesMultiKeyDuringYield : public CountBase {
-public:
-    void run() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
-
-        // Insert documents, add index
-        for (int i = 0; i < 10; ++i) {
-            insert(BSON("a" << i));
-        }
-        addIndex(BSON("a" << 1));
-
-        // Set up count stage
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
-        params.startKey = BSON("" << 2);
-        params.startKeyInclusive = false;
-        params.endKey = BSON("" << 50);
-        params.endKeyInclusive = true;
-
-        WorkingSet ws;
-        CountScan count(&_opCtx, params, &ws);
-        WorkingSetID wsid;
-
-        int numCounted = 0;
-        PlanStage::StageState countState;
-
-        // Begin running the count
-        while (numCounted < 2) {
-            countState = count.work(&wsid);
-            if (PlanStage::ADVANCED == countState)
-                numCounted++;
-        }
-
-        // Prepare the cursor to yield
-        count.saveState();
-
-        // Insert a document with two values for 'a'
-        insert(BSON("a" << BSON_ARRAY(10 << 11)));
-
-        // Recover from yield
-        count.restoreState();
-
-        // finish counting
-        while (PlanStage::IS_EOF != countState) {
-            countState = count.work(&wsid);
-            if (PlanStage::ADVANCED == countState)
-                numCounted++;
-        }
-        ASSERT_EQUALS(8, numCounted);
-    }
-};
-
-//
 // Unused keys are not returned during iteration
 //
 class QueryStageCountScanUnusedKeys : public CountBase {
@@ -537,8 +476,7 @@ public:
         remove(BSON("a" << 1 << "b" << 4));
 
         // Ensure that count does not include unused keys
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 1);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 1);
@@ -570,8 +508,7 @@ public:
         remove(BSON("a" << 1 << "b" << 9));
 
         // Run count and check
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 0);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 2);
@@ -600,8 +537,7 @@ public:
         addIndex(BSON("a" << 1));
 
         // Set up count stage
-        CountScanParams params;
-        params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
+        auto params = makeCountScanParams(&_opCtx, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 1);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 1);
@@ -654,7 +590,6 @@ public:
         add<QueryStageCountScanNoChangeDuringYield>();
         add<QueryStageCountScanDeleteDuringYield>();
         add<QueryStageCountScanInsertNewDocsDuringYield>();
-        add<QueryStageCountScanBecomesMultiKeyDuringYield>();
         add<QueryStageCountScanUnusedKeys>();
     }
 };

@@ -33,6 +33,7 @@
 #include <set>
 #include <string>
 
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
@@ -42,7 +43,6 @@
 namespace mongo {
 
 class Collection;
-class IndexCatalog;
 class IndexCatalogEntry;
 class IndexCatalogEntryContainer;
 class OperationContext;

@@ -42,6 +42,8 @@ class IndexAccessMethod;
 class IndexDescriptor;
 class WorkingSet;
 
+// TODO SERVER-36517: keyPattern, indexName and multikeyPaths info should be provided explicitly
+// here and adopted by DistinctScan, rather than being resolved via the IndexDescriptor.
 struct DistinctParams {
     DistinctParams() : descriptor(NULL), direction(1), fieldNo(0) {}
 

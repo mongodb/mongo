@@ -75,6 +75,17 @@ public:
         return indexes.empty() ? nullptr : indexes[0];
     }
 
+    IndexScanParams makeIndexScanParams(OperationContext* opCtx,
+                                        const IndexDescriptor* descriptor) {
+        IndexScanParams params(opCtx, *descriptor);
+        params.bounds.isSimpleRange = true;
+        params.bounds.startKey = objWithMinKey(1);
+        params.bounds.endKey = objWithMaxKey(1);
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+        params.direction = 1;
+        return params;
+    }
+
     void insert(const BSONObj& obj) {
         _client.insert(ns(), obj);
     }
@@ -150,17 +161,11 @@ public:
         MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
-        IndexScanParams params;
-        params.descriptor = getIndex(firstIndex, coll);
-        params.bounds.isSimpleRange = true;
-        params.bounds.startKey = objWithMinKey(1);
-        params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
-        params.descriptor = getIndex(secondIndex, coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         unique_ptr<FetchStage> fetchStage =
@@ -221,17 +226,11 @@ public:
         MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
-        IndexScanParams params;
-        params.descriptor = getIndex(firstIndex, coll);
-        params.bounds.isSimpleRange = true;
-        params.bounds.startKey = objWithMinKey(1);
-        params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
-        params.descriptor = getIndex(secondIndex, coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
@@ -291,17 +290,11 @@ public:
         MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
-        IndexScanParams params;
-        params.descriptor = getIndex(firstIndex, coll);
-        params.bounds.isSimpleRange = true;
-        params.bounds.startKey = objWithMinKey(1);
-        params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
-        params.descriptor = getIndex(secondIndex, coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
@@ -363,18 +356,15 @@ public:
         MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
-        IndexScanParams params;
-        params.descriptor = getIndex(firstIndex, coll);
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        // This is the direction along the index.
-        params.direction = 1;
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
-        params.descriptor = getIndex(secondIndex, coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
+        params.bounds.startKey = objWithMaxKey(1);
+        params.bounds.endKey = objWithMinKey(1);
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
@@ -434,17 +424,11 @@ public:
         MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
-        IndexScanParams params;
-        params.descriptor = getIndex(firstIndex, coll);
-        params.bounds.isSimpleRange = true;
-        params.bounds.startKey = objWithMinKey(1);
-        params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:51 (EOF)
-        params.descriptor = getIndex(secondIndex, coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
         params.bounds.startKey = BSON("" << 51 << "" << MinKey);
         params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
@@ -489,13 +473,6 @@ public:
         msparams.pattern = BSON("foo" << 1);
         MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
-        IndexScanParams params;
-        params.bounds.isSimpleRange = true;
-        params.bounds.startKey = objWithMinKey(1);
-        params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
-
         int numIndices = 20;
         for (int i = 0; i < numIndices; ++i) {
             // 'a', 'b', ...
@@ -504,7 +481,7 @@ public:
 
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
-            params.descriptor = getIndex(indexSpec, coll);
+            auto params = makeIndexScanParams(&_opCtx, getIndex(indexSpec, coll));
             ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
         }
         unique_ptr<FetchStage> fetchStage =
@@ -548,13 +525,6 @@ public:
         msparams.pattern = BSON("foo" << 1);
         auto ms = make_unique<MergeSortStage>(&_opCtx, msparams, &ws, coll);
 
-        IndexScanParams params;
-        params.bounds.isSimpleRange = true;
-        params.bounds.startKey = objWithMinKey(1);
-        params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
-
         // Index 'a'+i has foo equal to 'i'.
 
         int numIndices = 20;
@@ -565,7 +535,7 @@ public:
 
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
-            params.descriptor = getIndex(indexSpec, coll);
+            auto params = makeIndexScanParams(&_opCtx, getIndex(indexSpec, coll));
             ms->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
         }
 
@@ -677,13 +647,9 @@ public:
 
         // First child scans [5, 10].
         {
-            IndexScanParams params;
-            params.descriptor = getIndex(BSON("a" << 1), coll);
-            params.bounds.isSimpleRange = true;
+            auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("a" << 1), coll));
             params.bounds.startKey = BSON("" << 5);
             params.bounds.endKey = BSON("" << 10);
-            params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-            params.direction = 1;
             auto fetchStage = stdx::make_unique<FetchStage>(
                 &_opCtx, &ws, new IndexScan(&_opCtx, params, &ws, nullptr), nullptr, coll);
             ms->addChild(fetchStage.release());
@@ -691,13 +657,9 @@ public:
 
         // Second child scans [4, 10].
         {
-            IndexScanParams params;
-            params.descriptor = getIndex(BSON("a" << 1), coll);
-            params.bounds.isSimpleRange = true;
+            auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("a" << 1), coll));
             params.bounds.startKey = BSON("" << 4);
             params.bounds.endKey = BSON("" << 10);
-            params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-            params.direction = 1;
             auto fetchStage = stdx::make_unique<FetchStage>(
                 &_opCtx, &ws, new IndexScan(&_opCtx, params, &ws, nullptr), nullptr, coll);
             ms->addChild(fetchStage.release());
@@ -778,17 +740,11 @@ public:
         MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
-        IndexScanParams params;
-        params.descriptor = getIndex(firstIndex, coll);
-        params.bounds.isSimpleRange = true;
-        params.bounds.startKey = objWithMinKey(1);
-        params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
-        params.descriptor = getIndex(secondIndex, coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         unique_ptr<FetchStage> fetchStage =
@@ -852,17 +808,11 @@ public:
         MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
-        IndexScanParams params;
-        params.descriptor = getIndex(firstIndex, coll);
-        params.bounds.isSimpleRange = true;
-        params.bounds.startKey = objWithMinKey(1);
-        params.bounds.endKey = objWithMaxKey(1);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
-        params.descriptor = getIndex(secondIndex, coll);
+        params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
         ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         unique_ptr<FetchStage> fetchStage =

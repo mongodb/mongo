@@ -141,13 +141,12 @@ public:
                                                                       int start,
                                                                       int end) {
         // Build the index scan stage.
-        IndexScanParams ixparams;
-        ixparams.descriptor = getIndex(db, indexSpec);
+        auto descriptor = getIndex(db, indexSpec);
+        IndexScanParams ixparams(&_opCtx, *descriptor);
         ixparams.bounds.isSimpleRange = true;
         ixparams.bounds.startKey = BSON("" << start);
         ixparams.bounds.endKey = BSON("" << end);
         ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        ixparams.direction = 1;
 
         const Collection* coll = db->getCollection(&_opCtx, nss);
 

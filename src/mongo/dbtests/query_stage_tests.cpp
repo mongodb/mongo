@@ -126,6 +126,16 @@ public:
         return indexes.empty() ? nullptr : indexes[0];
     }
 
+    IndexScanParams makeIndexScanParams(OperationContext* opCtx,
+                                        const IndexDescriptor* descriptor) {
+        IndexScanParams params(opCtx, *descriptor);
+        params.bounds.isSimpleRange = true;
+        params.bounds.endKey = BSONObj();
+        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+        params.direction = 1;
+        return params;
+    }
+
     static int numObj() {
         return 50;
     }
@@ -147,12 +157,8 @@ public:
 
     void run() {
         // foo <= 20
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1));
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1)));
         params.bounds.startKey = BSON("" << 20);
-        params.bounds.endKey = BSONObj();
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = -1;
 
         ASSERT_EQUALS(countResults(params), 21);
@@ -165,9 +171,7 @@ public:
 
     void run() {
         // 20 <= foo < 30
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1));
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1)));
         params.bounds.startKey = BSON("" << 20);
         params.bounds.endKey = BSON("" << 30);
         params.bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
@@ -183,13 +187,9 @@ public:
 
     void run() {
         // 20 <= foo <= 30
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1));
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1)));
         params.bounds.startKey = BSON("" << 20);
         params.bounds.endKey = BSON("" << 30);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
 
         ASSERT_EQUALS(countResults(params), 11);
     }
@@ -202,13 +202,9 @@ public:
     void run() {
         // 20 <= foo < 30
         // foo == 25
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1));
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1)));
         params.bounds.startKey = BSON("" << 20);
         params.bounds.endKey = BSON("" << 30);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
 
         ASSERT_EQUALS(countResults(params, BSON("foo" << 25)), 1);
     }
@@ -221,13 +217,9 @@ public:
     void run() {
         // 20 <= foo < 30
         // bar == 25 (not covered, should error.)
-        IndexScanParams params;
-        params.descriptor = getIndex(BSON("foo" << 1));
-        params.bounds.isSimpleRange = true;
+        auto params = makeIndexScanParams(&_opCtx, getIndex(BSON("foo" << 1)));
         params.bounds.startKey = BSON("" << 20);
         params.bounds.endKey = BSON("" << 30);
-        params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-        params.direction = 1;
 
         ASSERT_THROWS(countResults(params, BSON("baz" << 25)), AssertionException);
     }

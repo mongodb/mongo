@@ -31,7 +31,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -69,29 +69,28 @@ using stdx::make_unique;
 // static
 const char* CountScan::kStageType = "COUNT_SCAN";
 
-CountScan::CountScan(OperationContext* opCtx, const CountScanParams& params, WorkingSet* workingSet)
+// When building the CountScan stage we take the keyPattern, index name, and multikey details from
+// the CountScanParams rather than resolving them via the IndexDescriptor, since these may differ
+// from the descriptor's contents.
+CountScan::CountScan(OperationContext* opCtx, CountScanParams params, WorkingSet* workingSet)
     : PlanStage(kStageType, opCtx),
       _workingSet(workingSet),
-      _descriptor(params.descriptor),
-      _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
-      _shouldDedup(params.descriptor->isMultikey(opCtx)),
-      _params(params) {
-    _specificStats.keyPattern = _params.descriptor->keyPattern();
-    if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
-        invariant(collationElement.isABSONObj());
-        _specificStats.collation = collationElement.Obj().getOwned();
-    }
-    _specificStats.indexName = _params.descriptor->indexName();
-    _specificStats.isMultiKey = _params.descriptor->isMultikey(opCtx);
-    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(opCtx);
-    _specificStats.isUnique = _params.descriptor->unique();
-    _specificStats.isSparse = _params.descriptor->isSparse();
-    _specificStats.isPartial = _params.descriptor->isPartial();
-    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
+      _iam(params.accessMethod),
+      _shouldDedup(params.isMultiKey),
+      _params(std::move(params)) {
+    _specificStats.indexName = _params.name;
+    _specificStats.keyPattern = _params.keyPattern;
+    _specificStats.isMultiKey = _params.isMultiKey;
+    _specificStats.multiKeyPaths = _params.multikeyPaths;
+    _specificStats.isUnique = _params.isUnique;
+    _specificStats.isSparse = _params.isSparse;
+    _specificStats.isPartial = _params.isPartial;
+    _specificStats.indexVersion = static_cast<int>(_params.version);
+    _specificStats.collation = _params.collation.getOwned();
 
     // endKey must be after startKey in index order since we only do forward scans.
     dassert(_params.startKey.woCompare(_params.endKey,
-                                       Ordering::make(params.descriptor->keyPattern()),
+                                       Ordering::make(_params.keyPattern),
                                        /*compareFieldNames*/ false) <= 0);
 }
 
@@ -155,9 +154,6 @@ void CountScan::doSaveState() {
 void CountScan::doRestoreState() {
     if (_cursor)
         _cursor->restore();
-
-    // This can change during yielding.
-    _shouldDedup = _descriptor->isMultikey(getOpCtx());
 }
 
 void CountScan::doDetachFromOperationContext() {

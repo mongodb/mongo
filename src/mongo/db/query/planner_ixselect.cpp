@@ -72,7 +72,7 @@ void expandIndex(const IndexEntry& allPathsIndex,
 
     out->reserve(out->size() + projectedFields.size());
     for (auto&& fieldName : projectedFields) {
-        IndexEntry entry(BSON(fieldName << 1),
+        IndexEntry entry(BSON(fieldName << allPathsIndex.keyPattern.firstElement()),
                          IndexNames::ALLPATHS,
                          false,  // multikey (TODO SERVER-36109)
                          {},     // multikey paths
@@ -85,6 +85,7 @@ void expandIndex(const IndexEntry& allPathsIndex,
                          allPathsIndex.filterExpr,
                          allPathsIndex.infoObj,
                          allPathsIndex.collator);
+
         out->push_back(std::move(entry));
     }
 }
@@ -270,7 +271,7 @@ void QueryPlannerIXSelect::findRelevantIndices(const stdx::unordered_set<std::st
                                                std::vector<IndexEntry>* out) {
     for (auto&& entry : allIndices) {
         if (entry.type == INDEX_ALLPATHS) {
-            // Should only have one field of the form {"&**" : 1}.
+            // Should only have one field of the form {"$**" : 1}.
             invariant(entry.keyPattern.nFields() == 1);
             expandIndex(entry, fields, out);
             continue;
