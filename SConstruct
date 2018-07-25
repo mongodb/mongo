@@ -3079,7 +3079,7 @@ def doConfigure(myenv):
             print("Disabling http-client as libcurl was not found")
             http_client = "off"
     elif http_client == "on":
-        checkLibCurl(required=True)
+        checkHTTPLib(required=True)
 
     # Sanity check.
     # We know that http_client was explicitly disabled here,

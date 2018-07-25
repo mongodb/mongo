@@ -42,7 +42,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/http_client.h"
@@ -120,125 +119,114 @@ size_t ReadMemoryCallback(char* buffer, size_t size, size_t nitems, void* instre
     return ret;
 }
 
+struct CurlEasyCleanup {
+    void operator()(CURL* handle) {
+        if (handle) {
+            curl_easy_cleanup(handle);
+        }
+    }
+};
+using CurlHandle = std::unique_ptr<CURL, CurlEasyCleanup>;
+
+struct CurlSlistFreeAll {
+    void operator()(curl_slist* list) {
+        if (list) {
+            curl_slist_free_all(list);
+        }
+    }
+};
+using CurlSlist = std::unique_ptr<curl_slist, CurlSlistFreeAll>;
+
 class CurlHttpClient : public HttpClient {
 public:
-    explicit CurlHttpClient(std::unique_ptr<executor::ThreadPoolTaskExecutor> executor)
-        : _executor(std::move(executor)) {}
+    CurlHttpClient() {
+        // Initialize a base handle with common settings.
+        // Methods like requireHTTPS() will operate on this
+        // base handle.
+        _handle.reset(curl_easy_init());
+        uassert(ErrorCodes::InternalError, "Curl initialization failed", _handle);
+
+        curl_easy_setopt(_handle.get(), CURLOPT_CONNECTTIMEOUT, kConnectionTimeoutSeconds);
+        curl_easy_setopt(_handle.get(), CURLOPT_FOLLOWLOCATION, 0);
+        curl_easy_setopt(_handle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+        curl_easy_setopt(_handle.get(), CURLOPT_NOSIGNAL, 1);
+        curl_easy_setopt(_handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+        curl_easy_setopt(_handle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
+#if LIBCURL_VERSION_NUM > 0x072200
+        // Requires >= 7.34.0
+        curl_easy_setopt(_handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+#endif
+        curl_easy_setopt(_handle.get(), CURLOPT_TIMEOUT, kTotalRequestTimeoutSeconds);
+        curl_easy_setopt(_handle.get(), CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+
+        // TODO: CURLOPT_EXPECT_100_TIMEOUT_MS?
+        // TODO: consider making this configurable
+        // curl_easy_setopt(_handle.get(), CURLOPT_VERBOSE, 1);
+        // curl_easy_setopt(_handle.get(), CURLOPT_DEBUGFUNCTION , ???);
+    }
 
     ~CurlHttpClient() final = default;
 
-    Future<std::vector<uint8_t>> postAsync(StringData url,
-                                           std::shared_ptr<std::vector<std::uint8_t>> data) final {
-        auto pf = makePromiseFuture<std::vector<uint8_t>>();
-        std::string urlString(url.toString());
-
-        auto status =
-            _executor->scheduleWork([ shared_promise = pf.promise.share(), urlString, data ](
-                const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-                ConstDataRange cdr(reinterpret_cast<char*>(data->data()), data->size());
-                doPost(shared_promise, urlString, cdr);
-            });
-
-        uassertStatusOK(status);
-        return std::move(pf.future);
-    }
-
-private:
-    static void doPost(SharedPromise<std::vector<uint8_t>> shared_promise,
-                       const std::string& urlString,
-                       ConstDataRange cdr) {
-        try {
-            ConstDataRangeCursor cdrc(cdr);
-
-            std::unique_ptr<CURL, void (*)(CURL*)> myHandle(curl_easy_init(), curl_easy_cleanup);
-
-            if (!myHandle) {
-                shared_promise.setError({ErrorCodes::InternalError, "Curl initialization failed"});
-                return;
-            }
-
-            curl_easy_setopt(myHandle.get(), CURLOPT_URL, urlString.c_str());
-            curl_easy_setopt(myHandle.get(), CURLOPT_POST, 1);
-
-            // Allow http only if test commands are enabled
-            if (getTestCommandsEnabled()) {
-                curl_easy_setopt(
-                    myHandle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS | CURLPROTO_HTTP);
-            } else {
-                curl_easy_setopt(myHandle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
-            }
-
-            curl_easy_setopt(myHandle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-
-            DataBuilder dataBuilder(4096);
-
-            curl_easy_setopt(myHandle.get(), CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-            curl_easy_setopt(myHandle.get(), CURLOPT_WRITEDATA, &dataBuilder);
-
-            curl_easy_setopt(myHandle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
-            curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
-            curl_easy_setopt(myHandle.get(), CURLOPT_POSTFIELDSIZE, (long)cdrc.length());
-
-            // CURLOPT_EXPECT_100_TIMEOUT_MS??
-            curl_easy_setopt(myHandle.get(), CURLOPT_CONNECTTIMEOUT, kConnectionTimeoutSeconds);
-            curl_easy_setopt(myHandle.get(), CURLOPT_TIMEOUT, kTotalRequestTimeoutSeconds);
-
-#if LIBCURL_VERSION_NUM > 0x072200
-            // Requires >= 7.34.0
-            curl_easy_setopt(myHandle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-#endif
-            curl_easy_setopt(myHandle.get(), CURLOPT_FOLLOWLOCATION, 0);
-
-            curl_easy_setopt(myHandle.get(), CURLOPT_NOSIGNAL, 1);
-            // TODO: consider making this configurable            If server log level > 3
-            // curl_easy_setopt(myHandle.get(), CURLOPT_VERBOSE, 1);
-            // curl_easy_setopt(myHandle.get(), CURLOPT_DEBUGFUNCTION , ???);
-
-            curl_slist* chunk = nullptr;
-            chunk = curl_slist_append(chunk, "Content-Type: application/octet-stream");
-            chunk = curl_slist_append(chunk, "Accept: application/octet-stream");
-
-            // Send the empty expect because we do not need the server to respond with 100-Contine
-            chunk = curl_slist_append(chunk, "Expect:");
-
-            std::unique_ptr<curl_slist, void (*)(curl_slist*)> chunkHolder(chunk,
-                                                                           curl_slist_free_all);
-
-            curl_easy_setopt(myHandle.get(), CURLOPT_HTTPHEADER, chunk);
-
-            CURLcode result = curl_easy_perform(myHandle.get());
-            if (result != CURLE_OK) {
-                shared_promise.setError({ErrorCodes::OperationFailed,
-                                         str::stream() << "Bad HTTP response from API server: "
-                                                       << curl_easy_strerror(result)});
-                return;
-            }
-
-            long statusCode;
-            result = curl_easy_getinfo(myHandle.get(), CURLINFO_RESPONSE_CODE, &statusCode);
-            if (result != CURLE_OK) {
-                shared_promise.setError({ErrorCodes::OperationFailed,
-                                         str::stream() << "Unexpected error retrieving response: "
-                                                       << curl_easy_strerror(result)});
-                return;
-            }
-
-            if (statusCode != 200) {
-                shared_promise.setError(Status(
-                    ErrorCodes::OperationFailed,
-                    str::stream() << "Unexpected http status code from server: " << statusCode));
-                return;
-            }
-
-            auto d = dataBuilder.getCursor();
-            shared_promise.emplaceValue(std::vector<uint8_t>(d.data(), d.data() + d.length()));
-        } catch (...) {
-            shared_promise.setError(exceptionToStatus());
+    void allowInsecureHTTP(bool allow) final {
+        if (allow) {
+            curl_easy_setopt(_handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS | CURLPROTO_HTTP);
+        } else {
+            curl_easy_setopt(_handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
         }
     }
 
+    void setHeaders(const std::vector<std::string>& headers) final {
+        // Can't set on base handle because cURL doesn't deep-dup this field
+        // and we don't want it getting overwritten while another thread is using it.
+        _headers = headers;
+    }
+
+    std::vector<uint8_t> post(const std::string& url, ConstDataRange cdr) const final {
+        // Make a local copy of the base handle for this request.
+        CurlHandle myHandle(curl_easy_duphandle(_handle.get()));
+        uassert(ErrorCodes::InternalError, "Curl initialization failed", myHandle);
+
+        curl_easy_setopt(myHandle.get(), CURLOPT_URL, url.c_str());
+        curl_easy_setopt(myHandle.get(), CURLOPT_POST, 1);
+
+        DataBuilder dataBuilder(4096);
+        curl_easy_setopt(myHandle.get(), CURLOPT_WRITEDATA, &dataBuilder);
+
+        ConstDataRangeCursor cdrc(cdr);
+        curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
+        curl_easy_setopt(myHandle.get(), CURLOPT_POSTFIELDSIZE, (long)cdrc.length());
+
+        curl_slist* chunk = nullptr;
+        for (const auto& header : _headers) {
+            chunk = curl_slist_append(chunk, header.c_str());
+        }
+        curl_easy_setopt(myHandle.get(), CURLOPT_HTTPHEADER, chunk);
+        CurlSlist _headers(chunk);
+
+        CURLcode result = curl_easy_perform(myHandle.get());
+        uassert(ErrorCodes::OperationFailed,
+                str::stream() << "Bad HTTP response from API server: "
+                              << curl_easy_strerror(result),
+                result == CURLE_OK);
+
+        long statusCode;
+        result = curl_easy_getinfo(myHandle.get(), CURLINFO_RESPONSE_CODE, &statusCode);
+        uassert(ErrorCodes::OperationFailed,
+                str::stream() << "Unexpected error retrieving response: "
+                              << curl_easy_strerror(result),
+                result == CURLE_OK);
+
+        uassert(ErrorCodes::OperationFailed,
+                str::stream() << "Unexpected http status code from server: " << statusCode,
+                statusCode == 200);
+
+        auto response = dataBuilder.getCursor();
+        return std::vector<uint8_t>(response.data(), response.data() + response.length());
+    }
+
 private:
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> _executor{};
+    CurlHandle _handle;
+    std::vector<std::string> _headers;
 };
 
 }  // namespace
@@ -249,10 +237,9 @@ Status curlLibraryManager_initialize() {
     return curlLibraryManager.initialize();
 }
 
-std::unique_ptr<HttpClient> HttpClient::create(
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> executor) {
+std::unique_ptr<HttpClient> HttpClient::create() {
     uassertStatusOK(curlLibraryManager.initialize());
-    return std::make_unique<CurlHttpClient>(std::move(executor));
+    return std::make_unique<CurlHttpClient>();
 }
 
 }  // namespace mongo

@@ -26,57 +26,43 @@
  * then also delete it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <cstdint>
-#include <memory>
+#include "mongo/util/net/http_client.h"
+
+#include <string>
 #include <vector>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-constexpr uint64_t kConnectionTimeoutSeconds = 60L;
-constexpr uint64_t kTotalRequestTimeoutSeconds = 120L;
+Future<std::vector<uint8_t>> HttpClient::postAsync(
+    executor::ThreadPoolTaskExecutor* executor,
+    StringData url,
+    std::shared_ptr<std::vector<std::uint8_t>> data) const {
+    auto pf = makePromiseFuture<std::vector<uint8_t>>();
+    std::string urlString(url.toString());
 
-/**
- * Interface used to upload and receive binary payloads to HTTP servers.
- */
-class HttpClient {
-public:
-    virtual ~HttpClient() = default;
+    auto status = executor->scheduleWork([
+        shared_promise = pf.promise.share(),
+        urlString = std::move(urlString),
+        data = std::move(data),
+        this
+    ](const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
+        ConstDataRange cdr(reinterpret_cast<char*>(data->data()), data->size());
+        try {
+            auto result = this->post(urlString, cdr);
+            shared_promise.emplaceValue(result);
+        } catch (...) {
+            shared_promise.setError(exceptionToStatus());
+        }
+    });
 
-    /**
-     * Configure all future requests on this client to allow insecure http:// urls.
-     * By default, only https:// is allowed.
-     */
-    virtual void allowInsecureHTTP(bool allow) = 0;
-
-    /**
-     * Assign a set of headers for this request.
-     */
-    virtual void setHeaders(const std::vector<std::string>& headers) = 0;
-
-    /**
-     * Perform a POST request to specified URL.
-     */
-    virtual std::vector<uint8_t> post(const std::string& url, ConstDataRange data) const = 0;
-
-    /**
-     * Futurized helper for HttpClient::post().
-     */
-    Future<std::vector<uint8_t>> postAsync(executor::ThreadPoolTaskExecutor* executor,
-                                           StringData url,
-                                           std::shared_ptr<std::vector<std::uint8_t>> data) const;
-
-    /**
-     * Factory method provided by client implementation.
-     */
-    static std::unique_ptr<HttpClient> create();
-};
+    uassertStatusOK(status);
+    return std::move(pf.future);
+}
 
 }  // namespace mongo

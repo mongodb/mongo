@@ -94,10 +94,28 @@ public:
     }
 } exportedExportedFreeMonEndpointURL;
 
+auto makeTaskExecutor(ServiceContext* /*serviceContext*/) {
+    ThreadPool::Options tpOptions;
+    tpOptions.poolName = "freemon";
+    tpOptions.maxThreads = 2;
+    tpOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+    return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(tpOptions), executor::makeNetworkInterface("FreeMon"));
+}
 
 class FreeMonNetworkHttp : public FreeMonNetworkInterface {
 public:
-    explicit FreeMonNetworkHttp(std::unique_ptr<HttpClient> client) : _client(std::move(client)) {}
+    explicit FreeMonNetworkHttp(ServiceContext* serviceContext) {
+        _executor = makeTaskExecutor(serviceContext);
+        _executor->startup();
+        _client = HttpClient::create();
+        _client->allowInsecureHTTP(getTestCommandsEnabled());
+        _client->setHeaders({"Content-Type: application/octet-stream",
+                             "Accept: application/octet-stream",
+                             "Expect:"});
+    }
     ~FreeMonNetworkHttp() final = default;
 
     Future<FreeMonRegistrationResponse> sendRegistrationAsync(
@@ -107,7 +125,8 @@ public:
             reqObj.objdata(), reqObj.objdata() + reqObj.objsize());
 
         return _client
-            ->postAsync(exportedExportedFreeMonEndpointURL.getLocked() + "/register", data)
+            ->postAsync(
+                _executor.get(), exportedExportedFreeMonEndpointURL.getLocked() + "/register", data)
             .then([](std::vector<uint8_t> blob) {
 
                 if (blob.empty()) {
@@ -133,7 +152,9 @@ public:
         auto data = std::make_shared<std::vector<std::uint8_t>>(
             reqObj.objdata(), reqObj.objdata() + reqObj.objsize());
 
-        return _client->postAsync(exportedExportedFreeMonEndpointURL.getLocked() + "/metrics", data)
+        return _client
+            ->postAsync(
+                _executor.get(), exportedExportedFreeMonEndpointURL.getLocked() + "/metrics", data)
             .then([](std::vector<uint8_t> blob) {
 
                 if (blob.empty()) {
@@ -156,6 +177,7 @@ public:
 
 private:
     std::unique_ptr<HttpClient> _client;
+    std::unique_ptr<executor::ThreadPoolTaskExecutor> _executor;
 };
 
 /**
@@ -258,17 +280,6 @@ private:
 }  // namespace
 
 
-auto makeTaskExecutor(ServiceContext* /*serviceContext*/) {
-    ThreadPool::Options tpOptions;
-    tpOptions.poolName = "freemon";
-    tpOptions.maxThreads = 2;
-    tpOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
-    return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPool>(tpOptions), executor::makeNetworkInterface("FreeMon"));
-}
-
 void registerCollectors(FreeMonController* controller) {
     // These are collected only at registration
     //
@@ -330,18 +341,7 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
                 exportedExportedFreeMonEndpointURL.getLocked().compare(0, 5, "https") == 0);
     }
 
-    auto executor = makeTaskExecutor(serviceContext);
-
-    executor->startup();
-
-    auto http = HttpClient::create(std::move(executor));
-    if (http == nullptr) {
-        // HTTP init failed
-        return;
-    }
-
-    auto network =
-        std::unique_ptr<FreeMonNetworkInterface>(new FreeMonNetworkHttp(std::move(http)));
+    auto network = std::unique_ptr<FreeMonNetworkInterface>(new FreeMonNetworkHttp(serviceContext));
 
     auto controller = stdx::make_unique<FreeMonController>(std::move(network));
 

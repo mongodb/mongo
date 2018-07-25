@@ -45,7 +45,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/log.h"
@@ -128,53 +127,40 @@ StatusWith<ProcessedUrl> parseUrl(const std::wstring& url) {
 
 class WinHttpClient : public HttpClient {
 public:
-    explicit WinHttpClient(std::unique_ptr<executor::ThreadPoolTaskExecutor> executor)
-        : _executor(std::move(executor)) {}
     ~WinHttpClient() final = default;
 
-    Future<std::vector<uint8_t>> postAsync(StringData url,
-                                           std::shared_ptr<std::vector<std::uint8_t>> data) final {
-        auto urlString = url.toString();
-
-        auto pf = makePromiseFuture<std::vector<uint8_t>>();
-        uassertStatusOK(
-            _executor->scheduleWork([ shared_promise = pf.promise.share(), urlString, data ](
-                const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-                ConstDataRange cdr(reinterpret_cast<char*>(data->data()), data->size());
-                doPost(shared_promise, urlString, cdr);
-            }));
-
-        return std::move(pf.future);
+    void allowInsecureHTTP(bool allow) final {
+        _allowInsecureHTTP = allow;
     }
 
-private:
-    static void doPost(SharedPromise<std::vector<uint8_t>> shared_promise,
-                       const std::string& urlString,
-                       ConstDataRange cdr) try {
-        const auto setError = [&shared_promise](StringData reason) {
+    void setHeaders(const std::vector<std::string>& headers) final {
+        // 1. Concatenate all headers with \r\n line endings.
+        StringBuilder sb;
+        for (const auto& header : headers) {
+            sb << header << "\r\n";
+        }
+        auto header = sb.str();
+
+        // 2. Remove final \r\n delimiter.
+        if (header.size() >= 2) {
+            header.pop_back();
+            header.pop_back();
+        }
+
+        // 3. Expand to Windows Unicode wide string.
+        _headers = toNativeString(header.c_str());
+    }
+
+    std::vector<uint8_t> post(const std::string& urlString, ConstDataRange cdr) const final {
+        const auto uassertWithErrno = [](StringData reason, bool ok) {
             const auto msg = errnoWithDescription(GetLastError());
-            shared_promise.setError(
-                {ErrorCodes::OperationFailed, str::stream() << reason << ": " << msg});
+            uassert(ErrorCodes::OperationFailed, str::stream() << reason << ": " << msg, ok);
         };
 
         // Break down URL for handling below.
-        auto swUrl = parseUrl(toNativeString(urlString.c_str()));
-        if (!swUrl.isOK()) {
-            shared_promise.setError(swUrl.getStatus());
-            return;
-        }
-        auto url = std::move(swUrl.getValue());
-
-        if (!url.https && !getTestCommandsEnabled()) {
-            shared_promise.setError(
-                {ErrorCodes::BadValue, "Free Monitoring endpoint must be https://"});
-            return;
-        }
-        if (!url.username.empty() || !url.password.empty()) {
-            shared_promise.setError(
-                {ErrorCodes::BadValue, "Free Monitoring endpoint must not use authentication"});
-            return;
-        }
+        auto url = uassertStatusOK(parseUrl(toNativeString(urlString.c_str())));
+        uassert(
+            ErrorCodes::BadValue, "URL endpoint must be https://", url.https || _allowInsecureHTTP);
 
         // Cleanup handled in a guard rather than UniquePtrs to ensure order.
         HINTERNET session = nullptr, connect = nullptr, request = nullptr;
@@ -195,34 +181,27 @@ private:
             accessType = WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY;
         }
 
-        session = WinHttpOpen(L"MongoDB Free Monitoring Client/Windows",
+        session = WinHttpOpen(L"MongoDB HTTP Client/Windows",
                               accessType,
                               WINHTTP_NO_PROXY_NAME,
                               WINHTTP_NO_PROXY_BYPASS,
                               0);
-        if (!session) {
-            setError("Failed creating an HTTP session");
-            return;
-        }
+        uassertWithErrno("Failed creating an HTTP session", session);
 
         DWORD setting;
         DWORD settingLength = sizeof(setting);
         setting = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
-        if (!WinHttpSetOption(session, WINHTTP_OPTION_REDIRECT_POLICY, &setting, settingLength)) {
-            setError("Failed setting HTTP session option");
-            return;
-        }
-        if (!WinHttpSetTimeouts(
-                session, kResolveTimeout, kConnectTimeout, kSendTimeout, kReceiveTimeout)) {
-            setError("Failed setting HTTP timeout");
-            return;
-        }
+        uassertWithErrno(
+            "Failed setting HTTP session option",
+            WinHttpSetOption(session, WINHTTP_OPTION_REDIRECT_POLICY, &setting, settingLength));
+
+        uassertWithErrno(
+            "Failed setting HTTP timeout",
+            WinHttpSetTimeouts(
+                session, kResolveTimeout, kConnectTimeout, kSendTimeout, kReceiveTimeout));
 
         connect = WinHttpConnect(session, url.hostname.c_str(), url.port, 0);
-        if (!connect) {
-            setError("Failed connecting to remote host");
-            return;
-        }
+        uassertWithErrno("Failed connecting to remote host", connect);
 
         request = WinHttpOpenRequest(connect,
                                      L"POST",
@@ -231,94 +210,74 @@ private:
                                      WINHTTP_NO_REFERER,
                                      const_cast<LPCWSTR*>(kAcceptTypes),
                                      url.https ? WINHTTP_FLAG_SECURE : 0);
-        if (!request) {
-            setError("Failed initializing HTTP request");
-            return;
-        }
+        uassertWithErrno("Failed initializing HTTP request", request);
 
         if (!url.username.empty() || !url.password.empty()) {
-            if (!WinHttpSetCredentials(request,
-                                       WINHTTP_AUTH_TARGET_SERVER,
-                                       WINHTTP_AUTH_SCHEME_DIGEST,
-                                       url.username.c_str(),
-                                       url.password.c_str(),
-                                       0)) {
-                setError("Failed setting authentication credentials");
-                return;
-            }
+            auto result = WinHttpSetCredentials(request,
+                                                WINHTTP_AUTH_TARGET_SERVER,
+                                                WINHTTP_AUTH_SCHEME_DIGEST,
+                                                url.username.c_str(),
+                                                url.password.c_str(),
+                                                0);
+            uassertWithErrno("Failed setting authentication credentials", result);
         }
 
-        if (!WinHttpSendRequest(request,
-                                L"Content-type: application/octet-stream\r\n",
-                                -1L,
-                                const_cast<void*>(static_cast<const void*>(cdr.data())),
-                                cdr.length(),
-                                cdr.length(),
-                                0)) {
-            setError("Failed sending HTTP request");
-            return;
-        }
+        uassertWithErrno("Failed sending HTTP request",
+                         WinHttpSendRequest(request,
+                                            _headers.c_str(),
+                                            -1L,
+                                            const_cast<void*>(static_cast<const void*>(cdr.data())),
+                                            cdr.length(),
+                                            cdr.length(),
+                                            0));
 
-        if (!WinHttpReceiveResponse(request, nullptr)) {
-            setError("Failed receiving response from server");
-            return;
-        }
+        uassertWithErrno("Failed receiving response from server",
+                         WinHttpReceiveResponse(request, nullptr));
 
         DWORD statusCode = 0;
         DWORD statusCodeLength = sizeof(statusCode);
 
-        if (!WinHttpQueryHeaders(request,
-                                 WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                                 WINHTTP_HEADER_NAME_BY_INDEX,
-                                 &statusCode,
-                                 &statusCodeLength,
-                                 WINHTTP_NO_HEADER_INDEX)) {
-            setError("Error querying status from server");
-            return;
-        }
+        uassertWithErrno("Error querying status from server",
+                         WinHttpQueryHeaders(request,
+                                             WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                             WINHTTP_HEADER_NAME_BY_INDEX,
+                                             &statusCode,
+                                             &statusCodeLength,
+                                             WINHTTP_NO_HEADER_INDEX));
 
-        if (statusCode != 200) {
-            shared_promise.setError(
-                Status(ErrorCodes::OperationFailed,
-                       str::stream() << "Unexpected http status code from server: " << statusCode));
-            return;
-        }
+        uassert(ErrorCodes::OperationFailed,
+                str::stream() << "Unexpected http status code from server: " << statusCode,
+                statusCode == 200);
 
         // Marshal response into vector.
         std::vector<uint8_t> ret;
         auto sz = ret.size();
         for (;;) {
             DWORD len = 0;
-            if (!WinHttpQueryDataAvailable(request, &len)) {
-                setError("Failed receiving response data");
-                return;
-            }
+            uassertWithErrno("Failed receiving response data",
+                             WinHttpQueryDataAvailable(request, &len));
             if (!len) {
                 break;
             }
             ret.resize(sz + len);
-            if (!WinHttpReadData(request, ret.data() + sz, len, &len)) {
-                setError("Failed reading response data");
-                return;
-            }
+            uassertWithErrno("Failed reading response data",
+                             WinHttpReadData(request, ret.data() + sz, len, &len));
             sz += len;
         }
         ret.resize(sz);
 
-        shared_promise.emplaceValue(std::move(ret));
-    } catch (...) {
-        shared_promise.setError(exceptionToStatus());
+        return ret;
     }
 
 private:
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> _executor;
+    bool _allowInsecureHTTP = false;
+    std::wstring _headers;
 };
 
 }  // namespace
 
-std::unique_ptr<HttpClient> HttpClient::create(
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> executor) {
-    return std::make_unique<WinHttpClient>(std::move(executor));
+std::unique_ptr<HttpClient> HttpClient::create() {
+    return std::make_unique<WinHttpClient>();
 }
 
 }  // namespace mongo
