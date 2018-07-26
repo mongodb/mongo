@@ -206,6 +206,11 @@ Status addSSLServerOptions(moe::OptionSection* options) {
     options->addOptionChaining(
         "net.ssl.CAFile", "sslCAFile", moe::String, "Certificate Authority file for SSL");
 
+    options->addOptionChaining("net.ssl.clusterCAFile",
+                               "sslClusterCAFile",
+                               moe::String,
+                               "CA used for verifying remotes during outbound connections");
+
     options->addOptionChaining(
         "net.ssl.CRLFile", "sslCRLFile", moe::String, "Certificate Revocation List file for SSL");
 
@@ -420,6 +425,12 @@ Status storeSSLServerOptions(const moe::Environment& params) {
     if (params.count("net.ssl.CAFile")) {
         sslGlobalParams.sslCAFile =
             boost::filesystem::absolute(params["net.ssl.CAFile"].as<std::string>())
+                .generic_string();
+    }
+
+    if (params.count("net.ssl.clusterCAFile")) {
+        sslGlobalParams.sslClusterCAFile =
+            boost::filesystem::absolute(params["net.ssl.clusterCAFile"].as<std::string>())
                 .generic_string();
     }
 
