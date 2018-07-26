@@ -1782,7 +1782,7 @@ void ReplicationCoordinatorImpl::_handleTimePassing(
     // against other elections caused by events like election timeout, replSetStepUp etc.
     if (isV1ElectionProtocol()) {
         _startElectSelfIfEligibleV1(
-            TopologyCoordinator::StartElectionReason::kSingleNodeStepDownTimeout);
+            TopologyCoordinator::StartElectionReason::kSingleNodePromptElection);
         return;
     }
 
@@ -2131,11 +2131,12 @@ Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder
         return result.getStatus();
     }
 
-    if (TopologyCoordinator::PrepareFreezeResponseResult::kElectSelf == result.getValue()) {
-        // If we just unfroze and ended our stepdown period and we are a one node replica set,
-        // the topology coordinator will have gone into the candidate role to signal that we
-        // need to elect ourself.
-        _performPostMemberStateUpdateAction(kActionWinElection);
+    if (TopologyCoordinator::PrepareFreezeResponseResult::kSingleNodeSelfElect ==
+        result.getValue()) {
+        // For election protocol v1, call _startElectSelfIfEligibleV1 to avoid race
+        // against other elections caused by events like election timeout, replSetStepUp etc.
+        _startElectSelfIfEligibleV1(
+            TopologyCoordinator::StartElectionReason::kSingleNodePromptElection);
     }
 
     return Status::OK();
