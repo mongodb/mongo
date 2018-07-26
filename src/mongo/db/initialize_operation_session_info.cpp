@@ -26,6 +26,8 @@
  * then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/initialize_operation_session_info.h"
@@ -35,6 +37,7 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -63,21 +66,25 @@ Status initializeOperationSessionInfo(OperationContext* opCtx,
     bool isFCV36 = (serverGlobalParams.featureCompatibility.getVersion() ==
                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
 
-    if (osi.getSessionId()) {
-        if (!isFCV36) {
-            return SessionsCommandFCV34Status("Sessions");
-        }
-
+    // For the drivers it will look like the session is successfully added in FCV 3.4.
+    if (osi.getSessionId() && isFCV36) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
         opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
 
         LogicalSessionCache* lsc = LogicalSessionCache::get(opCtx->getServiceContext());
-        uassertStatusOK(lsc->vivify(opCtx, opCtx->getLogicalSessionId().get()));
+        auto vivifyStatus = lsc->vivify(opCtx, opCtx->getLogicalSessionId().get());
+        if (vivifyStatus != Status::OK()) {
+            return vivifyStatus;
+        }
     }
 
     if (osi.getTxnNumber()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
+
+        if (!isFCV36) {
+            return SessionsCommandFCV34Status("Retryable writes");
+        }
 
         if (!opCtx->getLogicalSessionId()) {
             return {ErrorCodes::IllegalOperation,
@@ -100,11 +107,11 @@ Status initializeOperationSessionInfo(OperationContext* opCtx,
             return {ErrorCodes::BadValue, "Transaction number cannot be negative"};
         }
 
-        if (!isFCV36) {
-            return SessionsCommandFCV34Status("Retryable writes");
-        }
-
         opCtx->setTxnNumber(*osi.getTxnNumber());
+    }
+
+    if (!isFCV36) {
+        log() << "Using sessions while not fully upgraded to FCV3.6";
     }
 
     return Status::OK();
