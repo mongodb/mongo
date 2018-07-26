@@ -1280,9 +1280,19 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
     WT_ITEM item;
     // Obtain the key from the record returned by search near.
     invariantWTOK(c->get_key(c, &item));
+
+    // Check if a prefix key already exists in the index.
     if (std::memcmp(prefixKey.getBuffer(), item.data, std::min(prefixKey.getSize(), item.size)) ==
-        0)
-        return true;
+        0) {
+        // It is OK if an identical index key(prefix key + RecordId) is already present in the
+        // index, this can happen during a background index build.
+        KeyString indexKey(keyStringVersion(), key, _ordering, id);
+        if (std::memcmp(indexKey.getBuffer(), item.data, std::min(indexKey.getSize(), item.size)) ==
+            0)
+            return false;  // already in index
+
+        return true;  // A key with identical prefix key but different RecordID is a duplicate key.
+    }
 
     int ret;
     if (cmp < 0) {
@@ -1429,21 +1439,17 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
     KeyString tableKey(keyStringVersion(), key, _ordering, id);
     WiredTigerItem keyItem(tableKey.getBuffer(), tableKey.getSize());
 
-    // Pre-check before inserting on a secondary. An entry with same prefix key is allowed but not
-    // with the exactly same table key.
-    if (dupsAllowed) {
-        setKey(c, keyItem.Get());
-        ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
-        if (ret == 0)
-            return dupKeyError(key);
-    }
-
     WiredTigerItem valueItem = tableKey.getTypeBits().isAllZeros()
         ? emptyItem
         : WiredTigerItem(tableKey.getTypeBits().getBuffer(), tableKey.getTypeBits().getSize());
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
     ret = WT_OP_CHECK(c->insert(c));
+
+    // It is possible that this key is already present during a concurrent background index build.
+    if (ret == WT_DUPLICATE_KEY)
+        return Status::OK();
+
     invariantWTOK(ret);
 
     return Status::OK();
