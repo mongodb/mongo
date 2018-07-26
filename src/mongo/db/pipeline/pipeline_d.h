@@ -32,11 +32,9 @@
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/mongo_process_common.h"
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
@@ -62,79 +60,6 @@ struct DepsTracker;
  */
 class PipelineD {
 public:
-    class MongoDInterface final : public MongoProcessCommon {
-    public:
-        MongoDInterface(OperationContext* opCtx);
-
-        void setOperationContext(OperationContext* opCtx) final;
-        DBClientBase* directClient() final;
-        bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
-        BSONObj insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       const NamespaceString& ns,
-                       const std::vector<BSONObj>& objs) final;
-        CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
-                                              const NamespaceString& ns) final;
-        void appendLatencyStats(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                bool includeHistograms,
-                                BSONObjBuilder* builder) const final;
-        Status appendStorageStats(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const BSONObj& param,
-                                  BSONObjBuilder* builder) const final;
-        Status appendRecordCount(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 BSONObjBuilder* builder) const final;
-        BSONObj getCollectionOptions(const NamespaceString& nss) final;
-        void renameIfOptionsAndIndexesHaveNotChanged(
-            OperationContext* opCtx,
-            const BSONObj& renameCommandObj,
-            const NamespaceString& targetNs,
-            const BSONObj& originalCollectionOptions,
-            const std::list<BSONObj>& originalIndexes) final;
-        StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
-            const std::vector<BSONObj>& rawPipeline,
-            const boost::intrusive_ptr<ExpressionContext>& expCtx,
-            const MakePipelineOptions opts = MakePipelineOptions{}) final;
-        Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            Pipeline* pipeline) final;
-        std::string getShardName(OperationContext* opCtx) const final;
-        std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(OperationContext* opCtx,
-                                                                         UUID uuid) const final;
-        boost::optional<Document> lookupSingleDocument(
-            const boost::intrusive_ptr<ExpressionContext>& expCtx,
-            const NamespaceString& nss,
-            UUID collectionUUID,
-            const Document& documentKey,
-            boost::optional<BSONObj> readConcern) final;
-        std::vector<GenericCursor> getCursors(
-            const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
-
-    protected:
-        BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
-                                          Client* client,
-                                          CurrentOpTruncateMode truncateOps) const final;
-
-        void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
-                                              CurrentOpUserMode userMode,
-                                              std::vector<BSONObj>* ops) const final;
-
-    private:
-        /**
-         * Looks up the collection default collator for the collection given by 'collectionUUID'. A
-         * collection's default collation is not allowed to change, so we cache the result to allow
-         * for quick lookups in the future. Looks up the collection by UUID, and returns 'nullptr'
-         * if the collection does not exist or if the collection's default collation is the simple
-         * collation.
-         */
-        std::unique_ptr<CollatorInterface> _getCollectionDefaultCollator(OperationContext* opCtx,
-                                                                         StringData dbName,
-                                                                         UUID collectionUUID);
-
-        DBDirectClient _client;
-        std::map<UUID, std::unique_ptr<const CollatorInterface>> _collatorCache;
-    };
-
     /**
      * If the first stage in the pipeline does not generate its own output documents, attaches a
      * cursor document source to the front of the pipeline which will output documents from the

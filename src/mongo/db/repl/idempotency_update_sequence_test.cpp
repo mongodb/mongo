@@ -126,8 +126,7 @@ TEST(UpdateGenTest, UpdatesHaveValidPaths) {
         FAIL(sb.str());
     }
 
-    std::set<std::string> argPaths;
-    updateArg.getFieldNames(argPaths);
+    auto argPaths = updateArg.getFieldNames<std::set<std::string>>();
     std::set<std::string> correctPaths{"a", "b", "a.0", "a.b", "b.0"};
     for (auto path : argPaths) {
         FieldRef pathRef(path);
@@ -165,8 +164,7 @@ TEST(UpdateGenTest, UpdatesAreNotAmbiguous) {
         sb << "The generated update is not a $set or $unset BSONObj: " << update;
         FAIL(sb.str());
     }
-    std::set<std::string> argPathsSet;
-    updateArg.getFieldNames(argPathsSet);
+    auto argPathsSet = updateArg.getFieldNames<std::set<std::string>>();
 
     std::vector<std::unique_ptr<FieldRef>> argPathsRefVec;
     FieldRefSet pathRefSet;
@@ -211,8 +209,7 @@ TEST(UpdateGenTest, UpdatesPreserveDepthConstraint) {
     setElem = update["$set"];
     BSONObj updateArg = setElem.Obj();
 
-    std::set<std::string> argPaths;
-    updateArg.getFieldNames(argPaths);
+    auto argPaths = updateArg.getFieldNames<std::set<std::string>>();
     for (auto path : argPaths) {
         auto pathDepth = getPathDepth_forTest(path);
         auto particularSetArgument = updateArg[path];

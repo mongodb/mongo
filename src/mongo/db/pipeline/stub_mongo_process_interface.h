@@ -57,9 +57,18 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                   const NamespaceString& ns,
-                   const std::vector<BSONObj>& objs) override {
+    void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                const NamespaceString& ns,
+                const std::vector<BSONObj>& objs) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                const NamespaceString& ns,
+                const std::vector<BSONObj>& queries,
+                const std::vector<BSONObj>& updates,
+                bool upsert,
+                bool multi) final {
         MONGO_UNREACHABLE;
     }
 

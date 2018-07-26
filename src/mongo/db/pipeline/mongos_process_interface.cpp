@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/commands/pipeline_s.h"
+#include "mongo/db/pipeline/mongos_process_interface.h"
 
 #include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -90,7 +90,7 @@ StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(
 
 }  // namespace
 
-boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
+boost::optional<Document> MongoSInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,
@@ -185,8 +185,9 @@ boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
     return (!batch.empty() ? Document(batch.front()) : boost::optional<Document>{});
 }
 
-BSONObj PipelineS::MongoSInterface::_reportCurrentOpForClient(
-    OperationContext* opCtx, Client* client, CurrentOpTruncateMode truncateOps) const {
+BSONObj MongoSInterface::_reportCurrentOpForClient(OperationContext* opCtx,
+                                                   Client* client,
+                                                   CurrentOpTruncateMode truncateOps) const {
     BSONObjBuilder builder;
 
     CurOp::reportCurrentOpForClient(
@@ -195,7 +196,7 @@ BSONObj PipelineS::MongoSInterface::_reportCurrentOpForClient(
     return builder.obj();
 }
 
-std::vector<GenericCursor> PipelineS::MongoSInterface::getCursors(
+std::vector<GenericCursor> MongoSInterface::getCursors(
     const intrusive_ptr<ExpressionContext>& expCtx) const {
     invariant(hasGlobalServiceContext());
     auto cursorManager = Grid::get(expCtx->opCtx->getServiceContext())->getCursorManager();

@@ -33,9 +33,10 @@
 namespace mongo {
 
 /**
- * Version of $out which writes directly to the output collection.
+ * Version of $out which performs inserts directly to the output collection, failing if there's a
+ * duplicate key.
  */
-class DocumentSourceOutInPlace final : public DocumentSourceOut {
+class DocumentSourceOutInPlace : public DocumentSourceOut {
 public:
     using DocumentSourceOut::DocumentSourceOut;
 
@@ -49,6 +50,25 @@ public:
     void initializeWriteNs() final{};
 
     void finalize() final{};
+};
+
+
+/**
+ * Version of $out which replaces the documents in the output collection that match the unique key,
+ * or inserts the document if there is no match.
+ */
+class DocumentSourceOutInPlaceReplace final : public DocumentSourceOutInPlace {
+public:
+    using DocumentSourceOutInPlace::DocumentSourceOutInPlace;
+
+    void spill(const BatchedObjects& batch) final {
+        // Set upsert to true and multi to false as there should be at most one document to update
+        // or insert.
+        constexpr auto upsert = true;
+        constexpr auto multi = false;
+        pExpCtx->mongoProcessInterface->update(
+            pExpCtx, getWriteNs(), batch.uniqueKeys, batch.objects, upsert, multi);
+    }
 };
 
 }  // namespace mongo

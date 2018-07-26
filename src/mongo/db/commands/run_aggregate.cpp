@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/mongod_process_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -490,7 +491,7 @@ Status runAggregate(OperationContext* opCtx,
             new ExpressionContext(opCtx,
                                   request,
                                   std::move(*collatorToUse),
-                                  std::make_shared<PipelineD::MongoDInterface>(opCtx),
+                                  std::make_shared<MongoDInterface>(opCtx),
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
                                   uuid));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";

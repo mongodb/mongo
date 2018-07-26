@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/mongos_process_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
@@ -59,7 +60,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
-#include "mongo/s/commands/pipeline_s.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
@@ -781,7 +781,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
     auto mergeCtx = new ExpressionContext(opCtx,
                                           request,
                                           std::move(collation),
-                                          std::make_shared<PipelineS::MongoSInterface>(),
+                                          std::make_shared<MongoSInterface>(),
                                           resolveInvolvedNamespaces(opCtx, litePipe),
                                           uuid);
 

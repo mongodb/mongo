@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_out_gen.h"
 #include "mongo/db/pipeline/document_source_out_in_place.h"
@@ -83,13 +84,6 @@ const char* DocumentSourceOut::getSourceName() const {
     return "$out";
 }
 
-void DocumentSourceOut::spill(const vector<BSONObj>& toInsert) {
-    BSONObj err = pExpCtx->mongoProcessInterface->insert(pExpCtx, getWriteNs(), toInsert);
-    uassert(16996,
-            str::stream() << "insert for $out failed: " << err,
-            DBClientBase::getLastErrorString(err).empty());
-}
-
 DocumentSource::GetNextResult DocumentSourceOut::getNext() {
     pExpCtx->checkForInterrupt();
 
@@ -103,24 +97,31 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
     }
 
     // Insert all documents into temp collection, batching to perform vectored inserts.
-    vector<BSONObj> bufferedObjects;
+    BatchedObjects batch;
     int bufferedBytes = 0;
 
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        BSONObj toInsert = nextInput.releaseDocument().toBson();
+        auto doc = nextInput.releaseDocument();
 
-        bufferedBytes += toInsert.objsize();
-        if (!bufferedObjects.empty() && (bufferedBytes > BSONObjMaxUserSize ||
-                                         bufferedObjects.size() >= write_ops::kMaxWriteBatchSize)) {
-            spill(bufferedObjects);
-            bufferedObjects.clear();
-            bufferedBytes = toInsert.objsize();
+        // Extract the unique key before converting the document to BSON.
+        auto uniqueKey = document_path_support::extractPathsFromDoc(doc, _uniqueKeyFields);
+        auto insertObj = doc.toBson();
+        uassert(50905,
+                str::stream() << "Failed to extract unique key from input document: " << insertObj,
+                uniqueKey.size() == _uniqueKeyFields.size());
+
+        bufferedBytes += insertObj.objsize();
+        if (!batch.empty() &&
+            (bufferedBytes > BSONObjMaxUserSize || batch.size() >= write_ops::kMaxWriteBatchSize)) {
+            spill(batch);
+            batch.clear();
+            bufferedBytes = insertObj.objsize();
         }
-        bufferedObjects.push_back(toInsert);
+        batch.emplace(std::move(insertObj), uniqueKey.toBson());
     }
-    if (!bufferedObjects.empty())
-        spill(bufferedObjects);
+    if (!batch.empty())
+        spill(batch);
 
     switch (nextInput.getStatus()) {
         case GetNextResult::ReturnStatus::kAdvanced: {
@@ -144,12 +145,12 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
 DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      WriteModeEnum mode,
-                                     boost::optional<Document> uniqueKey)
+                                     std::set<FieldPath> uniqueKey)
     : DocumentSource(expCtx),
       _done(false),
       _outputNs(outputNs),
       _mode(mode),
-      _uniqueKey(uniqueKey) {}
+      _uniqueKeyFields(std::move(uniqueKey)) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
@@ -164,22 +165,24 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
             readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern);
 
     auto mode = WriteModeEnum::kModeReplaceCollection;
-    boost::optional<Document> uniqueKey;
+    std::set<FieldPath> uniqueKey;
     NamespaceString outputNs;
     if (elem.type() == BSONType::String) {
         outputNs = NamespaceString(expCtx->ns.db().toString() + '.' + elem.str());
+        uniqueKey.emplace("_id");
     } else if (elem.type() == BSONType::Object) {
         auto spec =
             DocumentSourceOutSpec::parse(IDLParserErrorContext("$out"), elem.embeddedObject());
 
         mode = spec.getMode();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "$out is not currently supported with mode "
-                              << WriteMode_serializer(mode),
-                mode != WriteModeEnum::kModeReplaceDocuments);
 
-        if (auto uniqueKeyDoc = spec.getUniqueKey()) {
-            uniqueKey = Document{{uniqueKeyDoc.get()}};
+        // Convert unique key object to a vector of FieldPaths.
+        if (auto uniqueKeyObj = spec.getUniqueKey()) {
+            uniqueKey = uniqueKeyObj->getFieldNames<std::set<FieldPath>>();
+        } else {
+            // TODO SERVER-35954: If not present, build the unique key from the shard key of the
+            // output collection.
+            uniqueKey.emplace("_id");
         }
 
         // Retrieve the target database from the user command, otherwise use the namespace from the
@@ -203,6 +206,8 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
             return new DocumentSourceOutReplaceColl(outputNs, expCtx, mode, uniqueKey);
         case WriteModeEnum::kModeInsertDocuments:
             return new DocumentSourceOutInPlace(outputNs, expCtx, mode, uniqueKey);
+        case WriteModeEnum::kModeReplaceDocuments:
+            return new DocumentSourceOutInPlaceReplace(outputNs, expCtx, mode, uniqueKey);
         default:
             MONGO_UNREACHABLE;
     }
@@ -213,9 +218,11 @@ Value DocumentSourceOut::serialize(boost::optional<ExplainOptions::Verbosity> ex
         Document{{DocumentSourceOutSpec::kTargetCollectionFieldName, _outputNs.coll()},
                  {DocumentSourceOutSpec::kTargetDbFieldName, _outputNs.db()},
                  {DocumentSourceOutSpec::kModeFieldName, WriteMode_serializer(_mode)}});
-    if (_uniqueKey) {
-        serialized[DocumentSourceOutSpec::kUniqueKeyFieldName] = Value(_uniqueKey.get());
+    BSONObjBuilder uniqueKeyBob;
+    for (auto path : _uniqueKeyFields) {
+        uniqueKeyBob.append(path.fullPath(), 1);
     }
+    serialized[DocumentSourceOutSpec::kUniqueKeyFieldName] = Value(uniqueKeyBob.done());
     return Value(Document{{getSourceName(), serialized.freeze()}});
 }
 

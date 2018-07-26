@@ -686,8 +686,7 @@ boost::optional<BSONObj> DocumentSourceGroup::findRelevantInputSort() const {
         // for every permutation of group by (a, b, c), since we are guaranteed that documents with
         // the same value of (a, b, c) will be consecutive in the input stream, no matter what our
         // _id is.
-        std::set<std::string> fieldNames;
-        obj.getFieldNames(fieldNames);
+        auto fieldNames = obj.getFieldNames<std::set<std::string>>();
         if (fieldNames == deps.fields) {
             return obj;
         }

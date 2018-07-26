@@ -261,6 +261,41 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='mongo_process_common',
+    source=[
+        'mongo_process_common.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+    ]
+)
+
+env.Library(
+    target='mongod_process_interface',
+    source=[
+        'mongod_process_interface.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
+        '$BUILD_DIR/mongo/db/stats/top',
+        'mongo_process_common',
+    ]
+)
+
+env.Library(
+    target='mongos_process_interface',
+    source=[
+        'mongos_process_interface.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/query/async_results_merger',
+        '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
+        'mongo_process_common',
+    ]
+)
+
 pipelineeEnv = env.Clone()
 pipelineeEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 pipelineeEnv.Library(
@@ -310,7 +345,6 @@ pipelineeEnv.Library(
         "cluster_aggregation_planner.cpp",
         'document_source_tee_consumer.cpp',
         'document_source_unwind.cpp',
-        'mongo_process_common.cpp',
         'pipeline.cpp',
         'sequential_document_cache.cpp',
         'tee_buffer.cpp',
@@ -333,7 +367,6 @@ pipelineeEnv.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/sessions_collection',
-        '$BUILD_DIR/mongo/db/stats/top',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/s/is_mongos',

@@ -271,20 +271,6 @@ BSONElement BSONObj::getFieldUsingIndexNames(StringData fieldName, const BSONObj
     return BSONElement();
 }
 
-/* grab names of all the fields in this object */
-int BSONObj::getFieldNames(set<string>& fields) const {
-    int n = 0;
-    BSONObjIterator i(*this);
-    while (i.moreWithEOO()) {
-        BSONElement e = i.next();
-        if (e.eoo())
-            break;
-        fields.insert(e.fieldName());
-        n++;
-    }
-    return n;
-}
-
 /* note: addFields always adds _id even if not specified
    returns n added not counting _id unless requested.
 */

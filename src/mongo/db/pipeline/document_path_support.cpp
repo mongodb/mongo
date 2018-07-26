@@ -151,13 +151,5 @@ BSONObj documentToBsonWithPaths(const Document& input, const std::set<std::strin
     return outputBuilder.obj();
 }
 
-Document extractDocumentKeyFromDoc(const Document& doc, const std::vector<FieldPath>& paths) {
-    MutableDocument result;
-    for (auto& field : paths) {
-        result.addField(field.fullPath(), doc.getNestedField(field));
-    }
-    return result.freeze();
-}
-
 }  // namespace document_path_support
 }  // namespace mongo

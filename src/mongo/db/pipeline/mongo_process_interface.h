@@ -95,11 +95,22 @@ public:
     virtual bool isSharded(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     /**
-     * Inserts 'objs' into 'ns' and returns the "detailed" last error object.
+     * Inserts 'objs' into 'ns' and throws a UserException if the insert fails.
      */
-    virtual BSONObj insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           const NamespaceString& ns,
-                           const std::vector<BSONObj>& objs) = 0;
+    virtual void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        const NamespaceString& ns,
+                        const std::vector<BSONObj>& objs) = 0;
+
+    /**
+     * Updates the documents matching 'queries' with the objects 'updates'. Throws a UserException
+     * if any of the updates fail.
+     */
+    virtual void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        const NamespaceString& ns,
+                        const std::vector<BSONObj>& queries,
+                        const std::vector<BSONObj>& updates,
+                        bool upsert,
+                        bool multi) = 0;
 
     virtual CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                                   const NamespaceString& ns) = 0;

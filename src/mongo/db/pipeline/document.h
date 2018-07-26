@@ -500,8 +500,9 @@ public:
 
     /** Gets/Sets a nested field given a path.
      *
-     *  All fields along path are created as empty Documents if they don't exist
-     *  or are any other type.
+     *  All fields along path are created as empty Documents if they don't exist or are any other
+     * type. Does *not* traverse nested arrays when evaluating a nested path, instead returning
+     * Value() if the dotted field points to a nested object within an array.
      */
     MutableValue getNestedField(const FieldPath& dottedField);
     void setNestedField(const FieldPath& dottedField, const Value& val) {

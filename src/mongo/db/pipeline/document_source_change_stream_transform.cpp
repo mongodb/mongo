@@ -240,7 +240,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         case repl::OpTypeEnum::kInsert: {
             operationType = DocumentSourceChangeStream::kInsertOpType;
             fullDocument = input[repl::OplogEntry::kObjectFieldName];
-            documentKey = Value(document_path_support::extractDocumentKeyFromDoc(
+            documentKey = Value(document_path_support::extractPathsFromDoc(
                 fullDocument.getDocument(), documentKeyFields));
             break;
         }

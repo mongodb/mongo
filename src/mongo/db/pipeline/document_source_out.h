@@ -44,7 +44,7 @@ public:
     DocumentSourceOut(const NamespaceString& outputNs,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       WriteModeEnum mode,
-                      boost::optional<Document> uniqueKey);
+                      std::set<FieldPath> uniqueKey);
 
     virtual ~DocumentSourceOut() = default;
 
@@ -86,6 +86,44 @@ public:
     virtual void initializeWriteNs() = 0;
 
     /**
+     * Storage for a batch of BSON Objects to be inserted/updated to the write namespace. The
+     * extracted unique key values are also stored in a batch, used by $out with mode
+     * "replaceDocuments" as the query portion of the update.
+     *
+     */
+    struct BatchedObjects {
+        void emplace(BSONObj obj, BSONObj key) {
+            objects.emplace_back(std::move(obj));
+            uniqueKeys.emplace_back(std::move(key));
+        }
+
+        bool empty() const {
+            return objects.empty();
+        }
+
+        size_t size() const {
+            return objects.size();
+        }
+
+        void clear() {
+            objects.clear();
+            uniqueKeys.clear();
+        }
+
+        std::vector<BSONObj> objects;
+        // Store the unique keys as BSON objects instead of Documents for compatibility with the
+        // batch update command. (e.g. {q: <array of uniqueKeys>, u: <array of objects>})
+        std::vector<BSONObj> uniqueKeys;
+    };
+
+    /**
+     * Writes the documents in 'batch' to the write namespace.
+     */
+    virtual void spill(const BatchedObjects& batch) {
+        pExpCtx->mongoProcessInterface->insert(pExpCtx, getWriteNs(), batch.objects);
+    };
+
+    /**
      * Finalize the output collection, called when there are no more documents to write.
      */
     virtual void finalize() = 0;
@@ -94,17 +132,16 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    /**
-     * Inserts all of 'toInsert' into the collection returned from getWriteNs().
-     */
-    void spill(const std::vector<BSONObj>& toInsert);
-
     bool _initialized = false;
     bool _done = false;
 
     const NamespaceString _outputNs;
     WriteModeEnum _mode;
-    boost::optional<Document> _uniqueKey;
+
+    // Holds the unique key used for uniquely identifying documents. There must exist a unique index
+    // with this key pattern (up to order). Default is "_id" for unsharded collections, and "_id"
+    // plus the shard key for sharded collections.
+    std::set<FieldPath> _uniqueKeyFields;
 };
 
 }  // namespace mongo

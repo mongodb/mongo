@@ -66,8 +66,18 @@ BSONObj documentToBsonWithPaths(const Document&, const std::set<std::string>& pa
 
 /**
  * Extracts 'paths' from the input document to a flat document.
+ *
+ * This does *not* traverse arrays when extracting values from dotted paths. For example, the path
+ * "a.b" will not populate the result document if the input document is {a: [{b: 1}]}.
  */
-Document extractDocumentKeyFromDoc(const Document& doc, const std::vector<FieldPath>& paths);
+template <class Container>
+Document extractPathsFromDoc(const Document& doc, const Container& paths) {
+    MutableDocument result;
+    for (const auto& field : paths) {
+        result.addField(field.fullPath(), doc.getNestedField(field));
+    }
+    return result.freeze();
+}
 
 }  // namespace document_path_support
 }  // namespace mongo
