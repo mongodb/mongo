@@ -759,10 +759,14 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
         }
     }
 
-    const auto status =
-        params.sslCAFile.empty() ? _setupSystemCA(context) : _setupCA(context, params.sslCAFile);
-    if (!status.isOK())
+    std::string cafile = params.sslCAFile;
+    if (direction == ConnectionDirection::kIncoming && !params.sslClusterCAFile.empty()) {
+        cafile = params.sslClusterCAFile;
+    }
+    const auto status = cafile.empty() ? _setupSystemCA(context) : _setupCA(context, cafile);
+    if (!status.isOK()) {
         return status;
+    }
 
     if (!params.sslCRLFile.empty()) {
         if (!_setupCRL(context, params.sslCRLFile)) {

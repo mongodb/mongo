@@ -116,6 +116,14 @@ Status addSSLServerOptions(moe::OptionSection* options) {
                                {"net.ssl.CAFile"},
                                {"sslCAFile"});
 
+    options
+        ->addOptionChaining("net.tls.clusterCAFile",
+                            "tlsClusterCAFile",
+                            moe::String,
+                            "CA used for verifying remotes during outbound connections")
+        .requires("net.tls.clusterFile")
+        .requires("net.tls.CAFile");
+
     options->addOptionChaining("net.tls.CRLFile",
                                "tlsCRLFile",
                                moe::String,
@@ -252,6 +260,12 @@ Status storeSSLServerOptions(const moe::Environment& params) {
     if (params.count("net.tls.CAFile")) {
         sslGlobalParams.sslCAFile =
             boost::filesystem::absolute(params["net.tls.CAFile"].as<std::string>())
+                .generic_string();
+    }
+
+    if (params.count("net.tls.clusterCAFile")) {
+        sslGlobalParams.sslClusterCAFile =
+            boost::filesystem::absolute(params["net.tls.clusterCAFile"].as<std::string>())
                 .generic_string();
     }
 

@@ -1096,7 +1096,20 @@ private:
     bool _suppressNoCertificateWarning;
     asio::ssl::apple::Context _clientCtx;
     asio::ssl::apple::Context _serverCtx;
-    CFUniquePtr<::CFArrayRef> _ca;
+
+    /* _clientCA represents the CA to use when acting as a client
+     * and validating remotes during outbound connections.
+     * This comes from, in order, --tlsCAFile, or the system CA.
+     */
+    CFUniquePtr<::CFArrayRef> _clientCA;
+
+    /* _serverCA represents the CA to use when acting as a server
+     * and validating remotes during inbound connections.
+     * This comes from --tlsClusterCAFile, if available,
+     * otherwise it inherits from _clientCA.
+     */
+    CFUniquePtr<::CFArrayRef> _serverCA;
+
     SSLConfiguration _sslConfiguration;
 };
 
@@ -1124,8 +1137,8 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
 
     if (!params.sslCAFile.empty()) {
         auto ca = uassertStatusOK(loadPEM(params.sslCAFile, "", kLoadPEMStripKeys));
-        _ca = std::move(ca);
-        _sslConfiguration.hasCA = _ca && ::CFArrayGetCount(_ca.get());
+        _clientCA = std::move(ca);
+        _sslConfiguration.hasCA = _clientCA && ::CFArrayGetCount(_clientCA.get());
     }
 
     if (!params.sslCertificateSelector.empty() || !params.sslClusterCertificateSelector.empty()) {
@@ -1133,12 +1146,22 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
         _sslConfiguration.hasCA = true;
     }
 
-    if (!_ca) {
+    if (!_clientCA) {
         // No explicit CA was specified, use the Keychain CA explicitly on client connects,
         // even though we're going to pretend it doesn't exist on server.
         ::CFArrayRef certs = nullptr;
         uassertOSStatusOK(SecTrustCopyAnchorCertificates(&certs));
-        _ca.reset(certs);
+        _clientCA.reset(certs);
+    }
+
+    if (!params.sslClusterCAFile.empty()) {
+        auto ca = uassertStatusOK(loadPEM(params.sslClusterCAFile, "", kLoadPEMStripKeys));
+        _serverCA = std::move(ca);
+    } else {
+        // No inbound CA specified, share a reference with outbound CA.
+        auto ca = _clientCA.get();
+        ::CFRetain(ca);
+        _serverCA.reset(ca);
     }
 }
 
@@ -1325,8 +1348,12 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
         }
     }
 
-    if (_ca) {
-        auto status = ::SecTrustSetAnchorCertificates(cftrust.get(), _ca.get());
+    // When remoteHost is empty, it means we're handling an Inbound connection.
+    // In that case, we in a server role, so use the _serverCA,
+    // otherwise we're in a client role, so use that.
+    auto ca = remoteHost.empty() ? _serverCA.get() : _clientCA.get();
+    if (ca) {
+        auto status = ::SecTrustSetAnchorCertificates(cftrust.get(), ca);
         if (status == ::errSecSuccess) {
             status = ::SecTrustSetAnchorCertificatesOnly(cftrust.get(), true);
         }
