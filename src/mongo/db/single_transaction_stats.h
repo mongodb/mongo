@@ -39,22 +39,22 @@ namespace mongo {
  */
 class SingleTransactionStats {
 public:
-    /*
+    /**
      * Stores information about the last client to run a transaction operation.
      */
     struct LastClientInfo {
-        std::string client;
+        std::string clientHostAndPort;
         long long connectionId;
         BSONObj clientMetadata;
         std::string appName;
 
-        void update(Client* opCtxClient) {
-            if (opCtxClient->hasRemote()) {
-                client = opCtxClient->getRemote().toString();
+        void update(Client* client) {
+            if (client->hasRemote()) {
+                clientHostAndPort = client->getRemote().toString();
             }
-            connectionId = opCtxClient->getConnectionId();
+            connectionId = client->getConnectionId();
             if (const auto& metadata =
-                    ClientMetadataIsMasterState::get(opCtxClient).getClientMetadata()) {
+                    ClientMetadataIsMasterState::get(client).getClientMetadata()) {
                 clientMetadata = metadata.get().getDocument();
                 appName = metadata.get().getApplicationName().toString();
             }
@@ -135,11 +135,19 @@ public:
         return &_opDebug;
     }
 
-    /*
+    /**
      * Returns the LastClientInfo object stored in this SingleTransactionStats instance.
      */
-    LastClientInfo* getLastClientInfo() {
-        return &_lastClientInfo;
+    LastClientInfo getLastClientInfo() const {
+        return _lastClientInfo;
+    }
+
+    /**
+     * Updates the LastClientInfo object stored in this SingleTransactionStats instance with the
+     * given Client's information.
+     */
+    void updateLastClientInfo(Client* client) {
+        _lastClientInfo.update(client);
     }
 
 private:
