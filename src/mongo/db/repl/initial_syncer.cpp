@@ -407,10 +407,13 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
         return;
     }
 
-    // This is necessary to ensure that the oplog contains at least one visible document prior to
-    // setting an externally visible lastApplied.  That way if any other node attempts to read from
-    // this node's oplog, it won't appear empty.
-    _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+    // A node coming out of initial sync must guarantee at least one oplog document is visible
+    // such that others can sync from this node. Oplog visibility is not rigorously advanced
+    // during initial sync. Correct the visibility to match the initial sync time before
+    // transitioning to steady state replication.
+    const bool orderedCommit = true;
+    _storage->oplogDiskLocRegister(
+        opCtx, lastApplied.getValue().opTime.getTimestamp(), orderedCommit);
 
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
 
