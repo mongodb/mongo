@@ -525,7 +525,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     // returns that the shard still owns the chunk
     ChunkVersion collectionVersionAfterRefresh;
 
-    for (int retriesLeft = 2; retriesLeft > 0; --retriesLeft) {
+    for (int retriesLeft = 1;; --retriesLeft) {
         ChunkVersion unusedShardVersion;
         Status refreshStatus =
             ShardingState::get(opCtx)->refreshMetadataNow(opCtx, getNss(), &unusedShardVersion);
