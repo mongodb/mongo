@@ -98,8 +98,8 @@ std::ostream& operator<<(std::ostream& os,
     switch (result) {
         case TopologyCoordinator::PrepareFreezeResponseResult::kNoAction:
             return os << "no action";
-        case TopologyCoordinator::PrepareFreezeResponseResult::kElectSelf:
-            return os << "elect self";
+        case TopologyCoordinator::PrepareFreezeResponseResult::kSingleNodeSelfElect:
+            return os << "single node self elect";
     }
     MONGO_UNREACHABLE;
 }
@@ -1721,15 +1721,7 @@ TopologyCoordinator::prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder*
         _stepDownUntil = now;
         log() << "'unfreezing'";
         response->append("info", "unfreezing");
-
-        if (_isElectableNodeInSingleNodeReplicaSet()) {
-            // If we are a one-node replica set, we're the one member,
-            // we're electable, we're not in maintenance mode, and we are currently in followerMode
-            // SECONDARY, we must transition to candidate now that our stepdown period
-            // is no longer active, in leiu of heartbeats.
-            _role = Role::kCandidate;
-            return PrepareFreezeResponseResult::kElectSelf;
-        }
+        return PrepareFreezeResponseResult::kSingleNodeSelfElect;
     } else {
         if (secs == 1)
             response->append("warning", "you really want to freeze for only 1 second?");
