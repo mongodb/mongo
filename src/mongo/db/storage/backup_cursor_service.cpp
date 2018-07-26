@@ -39,6 +39,7 @@
 
 namespace mongo {
 namespace {
+
 const auto getBackupCursorService =
     ServiceContext::declareDecoration<std::unique_ptr<BackupCursorService>>();
 }  // namespace
@@ -55,18 +56,47 @@ void BackupCursorService::set(ServiceContext* service,
 
 void BackupCursorService::fsyncLock(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    uassert(50880,
+    uassert(50885, "The node is already fsyncLocked.", _state != kFsyncLocked);
+    uassert(50884,
             "The existing backup cursor must be closed before fsyncLock can succeed.",
-            !_cursorOpen);
+            _state != kBackupCursorOpened);
     uassertStatusOK(_storageEngine->beginBackup(opCtx));
-    _cursorOpen = true;
+    _state = kFsyncLocked;
 }
 
 void BackupCursorService::fsyncUnlock(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    uassert(50879, "There is no backup cursor to close with fsyncUnlock.", _cursorOpen);
+    uassert(50888, "The node is not fsyncLocked.", _state == kFsyncLocked);
     _storageEngine->endBackup(opCtx);
-    _cursorOpen = false;
+    _state = kInactive;
+}
+
+BackupCursorState BackupCursorService::openBackupCursor(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    uassert(50887, "The node is currently fsyncLocked.", _state != kFsyncLocked);
+    uassert(50886,
+            "The existing backup cursor must be closed before $backupCursor can succeed.",
+            _state != kBackupCursorOpened);
+    auto filesToBackup = uassertStatusOK(_storageEngine->beginNonBlockingBackup(opCtx));
+    _state = kBackupCursorOpened;
+    _openCursor = ++_cursorIdGenerator;
+    log() << "Opened backup cursor. ID: " << _openCursor.get();
+
+    return {_openCursor.get(), filesToBackup};
+}
+
+void BackupCursorService::closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    uassert(50880, "There is no backup cursor to close.", _state == kBackupCursorOpened);
+    uassert(50879,
+            str::stream() << "Can only close the running backup cursor. To close: " << cursorId
+                          << " Running: "
+                          << _openCursor.get(),
+            cursorId == _openCursor.get());
+    _storageEngine->endNonBlockingBackup(opCtx);
+    log() << "Closed backup cursor. ID: " << cursorId;
+    _state = kInactive;
+    _openCursor = boost::none;
 }
 
 }  // namespace mongo

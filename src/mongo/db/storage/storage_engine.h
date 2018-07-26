@@ -266,6 +266,15 @@ public:
         return;
     }
 
+    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine does not support a concurrent mode.");
+    }
+
+    virtual void endNonBlockingBackup(OperationContext* opCtx) {
+        return;
+    }
+
     /**
      * Recover as much data as possible from a potentially corrupt RecordStore.
      * This only recovers the record data, not indexes or anything else.

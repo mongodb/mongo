@@ -157,9 +157,14 @@ public:
 
     virtual int flushAllFiles(OperationContext* opCtx, bool sync);
 
-    virtual Status beginBackup(OperationContext* opCtx);
+    virtual Status beginBackup(OperationContext* opCtx) override;
 
-    virtual void endBackup(OperationContext* opCtx);
+    virtual void endBackup(OperationContext* opCtx) override;
+
+    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(
+        OperationContext* opCtx) override;
+
+    virtual void endNonBlockingBackup(OperationContext* opCtx) override;
 
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident);
 

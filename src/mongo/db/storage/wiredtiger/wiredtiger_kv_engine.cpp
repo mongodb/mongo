@@ -783,6 +783,47 @@ void WiredTigerKVEngine::endBackup(OperationContext* opCtx) {
     _backupSession.reset();
 }
 
+StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
+    OperationContext* opCtx) {
+    // This cursor will be freed by the backupSession being closed as the session is uncached
+    auto sessionRaii = stdx::make_unique<WiredTigerSession>(_conn);
+    WT_CURSOR* cursor = NULL;
+    WT_SESSION* session = sessionRaii->getSession();
+    int wtRet = WT_OP_CHECK(session->open_cursor(session, "backup:", NULL, NULL, &cursor));
+    if (wtRet != 0) {
+        return wtRCToStatus(wtRet);
+    }
+
+    std::vector<std::string> filesToCopy;
+
+    const char* filename;
+    while ((wtRet = cursor->next(cursor)) == 0) {
+        invariantWTOK(cursor->get_key(cursor, &filename));
+
+        std::string name(filename);
+
+        // WiredTiger backup cursors do not return path information for journal files. If a
+        // filename fits the pattern of a WT log file, add the journal directory to the file being
+        // returned.
+        const auto wiredTigerLogFilePrefix = "WiredTigerLog";
+        if (name.find(wiredTigerLogFilePrefix) == 0) {
+            // TODO SERVER-13455:replace `journal/` with the configurable journal path.
+            name = "journal/" + name;
+        }
+        filesToCopy.push_back(std::move(name));
+    }
+    if (wtRet != WT_NOTFOUND) {
+        return wtRCToStatus(wtRet, "Error opening backup cursor.");
+    }
+
+    _backupSession = std::move(sessionRaii);
+    return filesToCopy;
+}
+
+void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
+    _backupSession.reset();
+}
+
 void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
     if (!_sizeStorer)
         return;

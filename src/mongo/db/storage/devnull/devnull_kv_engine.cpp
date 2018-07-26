@@ -274,4 +274,10 @@ void DevNullKVEngine::setCachePressureForTest(int pressure) {
     _cachePressureForTest = pressure;
 }
 
+StatusWith<std::vector<std::string>> DevNullKVEngine::beginNonBlockingBackup(
+    OperationContext* opCtx) {
+    std::vector<std::string> filesToCopy = {"filename.wt"};
+    return filesToCopy;
+}
+
 }  // namespace mongo

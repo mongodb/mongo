@@ -28,7 +28,9 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 
@@ -40,6 +42,23 @@ class OperationContext;
 class ServiceContext;
 class StorageEngine;
 
+struct BackupCursorState {
+    std::uint64_t cursorId;
+    std::vector<std::string> filenames;
+};
+
+/**
+ * MongoDB exposes two separate client APIs for locking down files on disk for a file-system based
+ * backup that require only one pass of the data to complete. First is using the `fsync` command
+ * with `lock: true`. The second is using the `$backupCursor` aggregation stage. It does not make
+ * sense for both techniques to be concurrently engaged. This class will manage access to these
+ * resources such that their lifetimes do not overlap. More specifically, an `fsyncLock` mode can
+ * only be freed by `fsyncUnlock` and `openBackupCursor` by `closeBackupCursor`.
+ *
+ * Failure to comply is expected to be due to user error and this class is best situated to detect
+ * such errors. For this reason, callers should assume all method calls can only fail with
+ * uassert exceptions.
+ */
 class BackupCursorService {
     MONGO_DISALLOW_COPYING(BackupCursorService);
 
@@ -50,16 +69,50 @@ public:
 
     BackupCursorService(StorageEngine* storageEngine) : _storageEngine(storageEngine) {}
 
+    /**
+     * This method will uassert if `_state` is not `kInactive`. Otherwise, the method forwards to
+     * `StorageEngine::beginBackup`.
+     */
     void fsyncLock(OperationContext* opCtx);
 
+    /**
+     * This method will uassert if `_state` is not `kFsyncLocked`. Otherwise, the method forwards
+     * to `StorageEngine::endBackup`.
+     */
     void fsyncUnlock(OperationContext* opCtx);
+
+    /**
+     * This method will uassert if `_state` is not `kInactive`. Otherwise, the method forwards to
+     * `StorageEngine::beginNonBlockingBackup`.
+     *
+     * Returns a BackupCursorState. The structure's `cursorId` must be passed to
+     * `closeBackupCursor` to successfully exit this backup mode. `filenames` is a list of files
+     * relative to the server's `dbpath` that must be copied by the application to complete a
+     * backup.
+     */
+    BackupCursorState openBackupCursor(OperationContext* opCtx);
+
+    /**
+     * This method will uassert if `_state` is not `kBackupCursorOpened`, or the `cursorId` input
+     * is not the active backup cursor open known to `_openCursor`.
+     */
+    void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId);
 
 private:
     StorageEngine* _storageEngine;
 
+    enum State { kInactive, kFsyncLocked, kBackupCursorOpened };
+
     // This mutex serializes all access into this class.
     stdx::mutex _mutex;
-    bool _cursorOpen = false;
+    State _state = kInactive;
+    // When state is `kBackupCursorOpened`, _openCursor contains the cursorId of the active backup
+    // cursor. Otherwise it is boost::none.
+    boost::optional<std::uint64_t> _openCursor = boost::none;
+    // _cursorIdGenerator is incremented and returned each time a new backup cursor is
+    // opened. While `fsyncLock`ing a system does open a WT backup cursor, the terminology keeps
+    // the two separate here.
+    std::uint64_t _cursorIdGenerator = 0;
 };
 
 }  // namespace mongo

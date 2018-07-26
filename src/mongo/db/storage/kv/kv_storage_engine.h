@@ -109,6 +109,10 @@ public:
 
     virtual void endBackup(OperationContext* opCtx);
 
+    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx);
+
+    virtual void endNonBlockingBackup(OperationContext* opCtx);
+
     virtual bool isDurable() const;
 
     virtual bool isEphemeral() const;

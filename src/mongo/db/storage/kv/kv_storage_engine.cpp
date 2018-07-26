@@ -476,6 +476,15 @@ void KVStorageEngine::endBackup(OperationContext* opCtx) {
     _inBackupMode = false;
 }
 
+StatusWith<std::vector<std::string>> KVStorageEngine::beginNonBlockingBackup(
+    OperationContext* opCtx) {
+    return _engine->beginNonBlockingBackup(opCtx);
+}
+
+void KVStorageEngine::endNonBlockingBackup(OperationContext* opCtx) {
+    return _engine->endNonBlockingBackup(opCtx);
+}
+
 bool KVStorageEngine::isDurable() const {
     return _engine->isDurable();
 }
