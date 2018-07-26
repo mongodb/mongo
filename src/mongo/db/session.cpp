@@ -745,7 +745,7 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
     // with this Client's information. This is the last client that ran a transaction operation on
     // the Session.
-    _singleTransactionStats->getLastClientInfo()->update(opCtx->getClient());
+    _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
 }
 
 void Session::unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName) {
@@ -927,7 +927,7 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
 
     // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
     // with this Client's information.
-    _singleTransactionStats->getLastClientInfo()->update(opCtx->getClient());
+    _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
 }
 
 void Session::_abortTransaction(WithLock wl) {
@@ -1094,7 +1094,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk,
                     CurOp::get(opCtx)->debug().additiveMetrics);
                 // Update the LastClientInfo object stored in the SingleTransactionStats instance on
                 // the Session with this Client's information.
-                _singleTransactionStats->getLastClientInfo()->update(opCtx->getClient());
+                _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
             }
         }
         // We must clear the recovery unit and locker so any post-transaction writes can run without
@@ -1133,7 +1133,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk,
         CurOp::get(opCtx)->debug().additiveMetrics);
     // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
     // with this Client's information.
-    _singleTransactionStats->getLastClientInfo()->update(opCtx->getClient());
+    _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
 }
 
 BSONObj Session::reportStashedState() const {
@@ -1150,6 +1150,11 @@ void Session::reportStashedState(BSONObjBuilder* builder) const {
             invariant(_activeTxnNumber != kUninitializedTxnNumber);
             builder->append("host", getHostNameCachedAndPort());
             builder->append("desc", "inactive transaction");
+            auto lastClientInfo = _singleTransactionStats->getLastClientInfo();
+            builder->append("client", lastClientInfo.clientHostAndPort);
+            builder->append("connectionId", lastClientInfo.connectionId);
+            builder->append("appName", lastClientInfo.appName);
+            builder->append("clientMetadata", lastClientInfo.clientMetadata);
             {
                 BSONObjBuilder lsid(builder->subobjStart("lsid"));
                 getSessionId().serialize(&lsid);

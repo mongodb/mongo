@@ -762,6 +762,22 @@ TEST_F(SessionTest, ReportStashedResources) {
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
 
+    // Create a ClientMetadata object and set it on ClientMetadataIsMasterState.
+    BSONObjBuilder builder;
+    ASSERT_OK(ClientMetadata::serializePrivate("driverName",
+                                               "driverVersion",
+                                               "osType",
+                                               "osName",
+                                               "osArchitecture",
+                                               "osVersion",
+                                               "appName",
+                                               &builder));
+    auto obj = builder.obj();
+    auto clientMetadata = ClientMetadata::parse(obj["client"]);
+    auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx()->getClient());
+    clientMetadataIsMasterState.setClientMetadata(opCtx()->getClient(),
+                                                  std::move(clientMetadata.getValue()));
+
     session.beginOrContinueTxn(opCtx(), txnNum, autocommit, true, "testDB", "find");
 
     repl::ReadConcernArgs readConcernArgs;
@@ -799,14 +815,18 @@ TEST_F(SessionTest, ReportStashedResources) {
         dateFromISOString(transactionDocument.getField("startWallClockTime").valueStringData())
             .getValue(),
         startTime);
+    ASSERT_EQ(stashedState.getField("client").valueStringData().toString(), "");
+    ASSERT_EQ(stashedState.getField("connectionId").numberLong(), 0);
+    ASSERT_EQ(stashedState.getField("appName").valueStringData().toString(), "appName");
+    ASSERT_BSONOBJ_EQ(stashedState.getField("clientMetadata").Obj(), obj.getField("client").Obj());
+    ASSERT_EQ(stashedState.getField("waitingForLock").boolean(), false);
+    ASSERT_EQ(stashedState.getField("active").boolean(), false);
     // For the following time metrics, we are only verifying that the transaction sub-document is
     // being constructed correctly with proper types because we have other tests to verify that the
     // values are being tracked correctly.
     ASSERT_GTE(transactionDocument.getField("timeOpenMicros").numberLong(), 0);
     ASSERT_GTE(transactionDocument.getField("timeActiveMicros").numberLong(), 0);
     ASSERT_GTE(transactionDocument.getField("timeInactiveMicros").numberLong(), 0);
-    ASSERT_EQ(stashedState.getField("waitingForLock").boolean(), false);
-    ASSERT_EQ(stashedState.getField("active").boolean(), false);
 
     // Unset the read concern on the OperationContext. This is needed to unstash.
     repl::ReadConcernArgs::get(opCtx()) = repl::ReadConcernArgs();
@@ -2638,10 +2658,10 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponStash) {
     session.stashTransactionResources(opCtx());
 
     // LastClientInfo should have been set.
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->client, "");
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->connectionId, 0);
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->appName, "appName");
-    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo()->clientMetadata,
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().clientHostAndPort, "");
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().connectionId, 0);
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().appName, "appName");
+    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo().clientMetadata,
                       obj.getField("client").Obj());
 
     // Create another ClientMetadata object.
@@ -2654,8 +2674,8 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponStash) {
     session.stashTransactionResources(opCtx());
 
     // LastClientInfo's clientMetadata should have been updated to the new ClientMetadata object.
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->appName, "newAppName");
-    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo()->clientMetadata,
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().appName, "newAppName");
+    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo().clientMetadata,
                       newObj.getField("client").Obj());
 }
 
@@ -2682,10 +2702,10 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponCommit) {
     session.commitTransaction(opCtx(), boost::none);
 
     // LastClientInfo should have been set.
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->client, "");
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->connectionId, 0);
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->appName, "appName");
-    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo()->clientMetadata,
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().clientHostAndPort, "");
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().connectionId, 0);
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().appName, "appName");
+    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo().clientMetadata,
                       obj.getField("client").Obj());
 }
 
@@ -2711,10 +2731,10 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponAbort) {
     session.abortActiveTransaction(opCtx());
 
     // LastClientInfo should have been set.
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->client, "");
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->connectionId, 0);
-    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo()->appName, "appName");
-    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo()->clientMetadata,
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().clientHostAndPort, "");
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().connectionId, 0);
+    ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().appName, "appName");
+    ASSERT_BSONOBJ_EQ(session.getSingleTransactionStats()->getLastClientInfo().clientMetadata,
                       obj.getField("client").Obj());
 }
 
