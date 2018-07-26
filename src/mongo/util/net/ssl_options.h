@@ -50,6 +50,7 @@ struct SSLParams {
     std::string sslClusterFile;      // --sslInternalKeyFile
     std::string sslClusterPassword;  // --sslInternalKeyPassword
     std::string sslCAFile;           // --sslCAFile
+    std::string sslClusterCAFile;    // --sslClusterCAFile
     std::string sslCRLFile;          // --sslCRLFile
     std::string sslCipherConfig;     // --sslCipherConfig
     std::vector<Protocols> sslDisabledProtocols;  // --sslDisabledProtocols
