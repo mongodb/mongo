@@ -241,7 +241,9 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     WT_SESSION* s = _session->getSession();
     if (_timer) {
         const int transactionTime = _timer->millis();
-        if (transactionTime >= serverGlobalParams.slowMS) {
+        // `serverGlobalParams.slowMs` can be set to values <= 0. In those cases, give logging a
+        // break.
+        if (transactionTime >= std::max(1, serverGlobalParams.slowMS)) {
             LOG(kSlowTransactionSeverity) << "Slow WT transaction. Lifetime of SnapshotId "
                                           << _mySnapshotId << " was " << transactionTime << "ms";
         }
