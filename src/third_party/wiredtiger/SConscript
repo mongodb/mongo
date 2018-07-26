@@ -183,10 +183,8 @@ if useSnappy:
 
 # Use hardware by default on all platforms if available.
 # If not available at runtime, we fall back to software in some cases.
-#
-# On zSeries we may disable because SLES 11 kernel doe not support the instructions.
-if not (env['TARGET_ARCH'] == 's390x' and get_option("use-s390x-crc32") == "off"):
-    env.Append(CPPDEFINES=["HAVE_CRC32_HARDWARE"])
+if (get_option("use-s390x-crc32") == "off"):
+    env.Append(CPPDEFINES=["HAVE_NO_CRC32_HARDWARE"])
 
 cslib = env.Library(
     target="wiredtiger_checksum",
