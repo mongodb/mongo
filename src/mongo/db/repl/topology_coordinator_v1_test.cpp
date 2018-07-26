@@ -4672,6 +4672,103 @@ TEST_F(TopoCoordTest, StatusResponseAlwaysIncludesStringStatusFieldsForNonMember
     ASSERT_EQUALS("", rsStatus["infoMessage"].String());
 }
 
+class PrepareFreezeResponseTest : public TopoCoordTest {
+public:
+    virtual void setUp() {
+        TopoCoordTest::setUp();
+        updateConfig(BSON("_id"
+                          << "rs0"
+                          << "version"
+                          << 5
+                          << "protocolVersion"
+                          << 1
+                          << "members"
+                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                   << "host1:27017")
+                                        << BSON("_id" << 1 << "host"
+                                                      << "host2:27017"))),
+                     0);
+    }
+
+    std::pair<StatusWith<TopologyCoordinator::PrepareFreezeResponseResult>, BSONObj>
+    prepareFreezeResponse(int duration) {
+        BSONObjBuilder response;
+        startCapturingLogMessages();
+        auto result = getTopoCoord().prepareFreezeResponse(now()++, duration, &response);
+        stopCapturingLogMessages();
+        return std::make_pair(result, response.obj());
+    }
+};
+
+TEST_F(PrepareFreezeResponseTest, FreezeForOneSecondWhenToldToFreezeForZeroSeconds) {
+    auto result = prepareFreezeResponse(0);
+    ASSERT_EQUALS(TopologyCoordinator::PrepareFreezeResponseResult::kSingleNodeSelfElect,
+                  unittest::assertGet(result.first));
+    const auto& response = result.second;
+    ASSERT_EQUALS("unfreezing", response["info"].String());
+    ASSERT_EQUALS(1, countLogLinesContaining("'unfreezing'"));
+    // 1 instead of 0 because it assigns to "now" in this case
+    ASSERT_EQUALS(1LL, getTopoCoord().getStepDownTime().asInt64());
+}
+
+TEST_F(PrepareFreezeResponseTest, LogAMessageAndFreezeForOneSecondWhenToldToFreezeForOneSecond) {
+    auto result = prepareFreezeResponse(1);
+    ASSERT_EQUALS(TopologyCoordinator::PrepareFreezeResponseResult::kNoAction,
+                  unittest::assertGet(result.first));
+    const auto& response = result.second;
+    ASSERT_EQUALS("you really want to freeze for only 1 second?", response["warning"].String());
+    ASSERT_EQUALS(1, countLogLinesContaining("'freezing' for 1 seconds"));
+    // 1001 because "now" was incremented once during initialization + 1000 ms wait
+    ASSERT_EQUALS(1001LL, getTopoCoord().getStepDownTime().asInt64());
+}
+
+TEST_F(PrepareFreezeResponseTest, FreezeForTheSpecifiedDurationWhenToldToFreeze) {
+    auto result = prepareFreezeResponse(20);
+    ASSERT_EQUALS(TopologyCoordinator::PrepareFreezeResponseResult::kNoAction,
+                  unittest::assertGet(result.first));
+    const auto& response = result.second;
+    ASSERT_TRUE(response.isEmpty());
+    ASSERT_EQUALS(1, countLogLinesContaining("'freezing' for 20 seconds"));
+    // 20001 because "now" was incremented once during initialization + 20000 ms wait
+    ASSERT_EQUALS(20001LL, getTopoCoord().getStepDownTime().asInt64());
+}
+
+TEST_F(PrepareFreezeResponseTest, FreezeForOneSecondWhenToldToFreezeForZeroSecondsWhilePrimary) {
+    makeSelfPrimary();
+    auto result = prepareFreezeResponse(0);
+    ASSERT_EQUALS(ErrorCodes::NotSecondary, result.first);
+    const auto& response = result.second;
+    ASSERT_TRUE(response.isEmpty());
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(
+                      "cannot freeze node when primary or running for election. state: Primary"));
+    ASSERT_EQUALS(0LL, getTopoCoord().getStepDownTime().asInt64());
+}
+
+TEST_F(PrepareFreezeResponseTest, NodeDoesNotFreezeWhenToldToFreezeForOneSecondWhilePrimary) {
+    makeSelfPrimary();
+    auto result = prepareFreezeResponse(1);
+    ASSERT_EQUALS(ErrorCodes::NotSecondary, result.first);
+    const auto& response = result.second;
+    ASSERT_TRUE(response.isEmpty());
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(
+                      "cannot freeze node when primary or running for election. state: Primary"));
+    ASSERT_EQUALS(0LL, getTopoCoord().getStepDownTime().asInt64());
+}
+
+TEST_F(PrepareFreezeResponseTest, NodeDoesNotFreezeWhenToldToFreezeForSeveralSecondsWhilePrimary) {
+    makeSelfPrimary();
+    auto result = prepareFreezeResponse(20);
+    ASSERT_EQUALS(ErrorCodes::NotSecondary, result.first);
+    const auto& response = result.second;
+    ASSERT_TRUE(response.isEmpty());
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(
+                      "cannot freeze node when primary or running for election. state: Primary"));
+    ASSERT_EQUALS(0LL, getTopoCoord().getStepDownTime().asInt64());
+}
+
 TEST_F(HeartbeatResponseTestV1,
        ScheduleACatchupTakeoverWhenElectableAndReceiveHeartbeatFromPrimaryInCatchup) {
     updateConfig(BSON("_id"

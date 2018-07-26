@@ -4404,7 +4404,7 @@ TEST_F(TopoCoordTest,
     ASSERT(response.obj().isEmpty());
     BSONObjBuilder response2;
     ASSERT_EQUALS(
-        TopologyCoordinator::PrepareFreezeResponseResult::kElectSelf,
+        TopologyCoordinator::PrepareFreezeResponseResult::kSingleNodeSelfElect,
         unittest::assertGet(getTopoCoord().prepareFreezeResponse(now()++, 0, &response2)));
     ASSERT_EQUALS("unfreezing", response2.obj()["info"].String());
     ASSERT(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());

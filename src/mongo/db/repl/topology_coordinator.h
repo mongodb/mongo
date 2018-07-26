@@ -378,7 +378,7 @@ public:
     // Produce member data for the serverStatus command and diagnostic logging.
     void fillMemberData(BSONObjBuilder* result);
 
-    enum class PrepareFreezeResponseResult { kNoAction, kElectSelf };
+    enum class PrepareFreezeResponseResult { kNoAction, kSingleNodeSelfElect };
 
     /**
      * Produce a reply to a freeze request. Returns a PostMemberStateUpdateAction on success that
@@ -706,7 +706,7 @@ public:
         kPriorityTakeover,
         kStepUpRequest,
         kCatchupTakeover,
-        kSingleNodeStepDownTimeout
+        kSingleNodePromptElection
     };
 
     /**
