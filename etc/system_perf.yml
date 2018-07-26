@@ -361,8 +361,7 @@ tasks:
     - func: "run test"
     - func: "analyze"
       vars:
-        # Disabling --ycsb-throughput-analysis until BF-7153 fixed
-        # script_flags: --ycsb-throughput-analysis reports
+        script_flags: --ycsb-throughput-analysis reports
 
 - name: industry_benchmarks_secondary_reads
   priority: 5
