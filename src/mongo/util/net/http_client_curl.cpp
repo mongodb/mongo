@@ -83,15 +83,6 @@ private:
     bool _initialized = false;
 } curlLibraryManager;
 
-// curl_global_init() needs to run earlier than services like FreeMonitoring,
-// but may not run during global initialization.
-MONGO_INITIALIZER_GENERAL(HttpClientCurl,
-                          MONGO_NO_PREREQUISITES,
-                          ("BeginGeneralStartupOptionRegistration"))
-(InitializerContext* context) {
-    return curlLibraryManager.initialize();
-}
-
 /**
  * Receives data from the remote side.
  */
@@ -252,8 +243,15 @@ private:
 
 }  // namespace
 
+// Transitional API used by blockstore to trigger libcurl init
+// until it's been migrated to use the HTTPClient API.
+Status curlLibraryManager_initialize() {
+    return curlLibraryManager.initialize();
+}
+
 std::unique_ptr<HttpClient> HttpClient::create(
     std::unique_ptr<executor::ThreadPoolTaskExecutor> executor) {
+    uassertStatusOK(curlLibraryManager.initialize());
     return std::make_unique<CurlHttpClient>(std::move(executor));
 }
 
