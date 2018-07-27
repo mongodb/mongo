@@ -95,7 +95,14 @@ public:
                 "Transaction isn't in progress",
                 session->inMultiDocumentTransaction());
 
-        session->commitTransaction(opCtx, cmd.getCommitTimestamp());
+        auto optionalCommitTimestamp = cmd.getCommitTimestamp();
+        if (optionalCommitTimestamp) {
+            // commitPreparedTransaction will throw if the transaction is not prepared.
+            session->commitPreparedTransaction(opCtx, optionalCommitTimestamp.get());
+        } else {
+            // commitUnpreparedTransaction will throw if the transaction is prepared.
+            session->commitUnpreparedTransaction(opCtx);
+        }
 
         return true;
     }

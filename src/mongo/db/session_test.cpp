@@ -745,7 +745,7 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     ASSERT(opCtx()->getWriteUnitOfWork());
 
     // Commit the transaction. This allows us to release locks.
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 }
 
 TEST_F(SessionTest, ReportStashedResources) {
@@ -840,7 +840,7 @@ TEST_F(SessionTest, ReportStashedResources) {
     ASSERT(session.reportStashedState().isEmpty());
 
     // Commit the transaction. This allows us to release locks.
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 }
 
 TEST_F(SessionTest, ReportUnstashedResources) {
@@ -1057,7 +1057,7 @@ TEST_F(SessionTest, EmptyTransactionCommit) {
     session.unstashTransactionResources(opCtx(), "commitTransaction");
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
     session.stashTransactionResources(opCtx());
     ASSERT_TRUE(session.transactionIsCommitted());
 }
@@ -1084,7 +1084,7 @@ TEST_F(SessionTest, CommitTransactionSetsCommitTimestampOnPreparedTransaction) {
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
     session.prepareTransaction(opCtx());
-    session.commitTransaction(opCtx(), commitTimestamp);
+    session.commitPreparedTransaction(opCtx(), commitTimestamp);
 
     ASSERT_EQ(commitTimestamp, actualCommitTimestamp);
     // The recovery unit is reset on commit.
@@ -1108,7 +1108,7 @@ TEST_F(SessionTest, CommitTransactionWithCommitTimestampFailsOnUnpreparedTransac
     session.unstashTransactionResources(opCtx(), "commitTransaction");
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    ASSERT_THROWS_CODE(session.commitTransaction(opCtx(), commitTimestamp),
+    ASSERT_THROWS_CODE(session.commitPreparedTransaction(opCtx(), commitTimestamp),
                        AssertionException,
                        ErrorCodes::InvalidOptions);
 }
@@ -1133,7 +1133,7 @@ TEST_F(SessionTest, CommitTransactionDoesNotSetCommitTimestampOnUnpreparedTransa
     session.unstashTransactionResources(opCtx(), "commitTransaction");
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 
     ASSERT(opCtx()->recoveryUnit()->getCommitTimestamp().isNull());
     ASSERT(actualCommitTimestamp.isNull());
@@ -1156,7 +1156,7 @@ TEST_F(SessionTest, CommitTransactionWithoutCommitTimestampFailsOnPreparedTransa
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
     session.prepareTransaction(opCtx());
-    ASSERT_THROWS_CODE(session.commitTransaction(opCtx(), boost::none),
+    ASSERT_THROWS_CODE(session.commitUnpreparedTransaction(opCtx()),
                        AssertionException,
                        ErrorCodes::InvalidOptions);
 }
@@ -1174,7 +1174,7 @@ TEST_F(SessionTest, CommitTransactionWithNullCommitTimestampFailsOnPreparedTrans
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
     session.prepareTransaction(opCtx());
-    ASSERT_THROWS_CODE(session.commitTransaction(opCtx(), Timestamp()),
+    ASSERT_THROWS_CODE(session.commitPreparedTransaction(opCtx(), Timestamp()),
                        AssertionException,
                        ErrorCodes::InvalidOptions);
 }
@@ -1396,7 +1396,7 @@ TEST_F(SessionTest, ConcurrencyOfCommitTransactionAndAbort) {
     session.abortArbitraryTransaction();
 
     // An commitTransaction() after an abort should uassert.
-    ASSERT_THROWS_CODE(session.commitTransaction(opCtx(), boost::none),
+    ASSERT_THROWS_CODE(session.commitUnpreparedTransaction(opCtx()),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
@@ -1523,7 +1523,7 @@ TEST_F(SessionTest, KillSessionsDuringPreparedCommitDoesNotAbortTransaction) {
     };
 
     session.prepareTransaction(opCtx());
-    session.commitTransaction(opCtx(), commitTimestamp);
+    session.commitPreparedTransaction(opCtx(), commitTimestamp);
     ASSERT(_opObserver->transactionCommitted);
     ASSERT_FALSE(session.transactionIsAborted());
     ASSERT(session.transactionIsCommitted());
@@ -1554,7 +1554,7 @@ TEST_F(SessionTest, AbortDuringPreparedCommitDoesNotAbortTransaction) {
     };
 
     session.prepareTransaction(opCtx());
-    session.commitTransaction(opCtx(), commitTimestamp);
+    session.commitPreparedTransaction(opCtx(), commitTimestamp);
     ASSERT(_opObserver->transactionCommitted);
     ASSERT_FALSE(session.transactionIsAborted());
     ASSERT(session.transactionIsCommitted());
@@ -1577,7 +1577,7 @@ TEST_F(SessionTest, ThrowDuringPreparedOnTransactionCommitDoesNothing) {
     _opObserver->onTransactionCommitThrowsException = true;
 
     session.prepareTransaction(opCtx());
-    ASSERT_THROWS_CODE(session.commitTransaction(opCtx(), commitTimestamp),
+    ASSERT_THROWS_CODE(session.commitPreparedTransaction(opCtx(), commitTimestamp),
                        AssertionException,
                        ErrorCodes::OperationFailed);
     ASSERT_FALSE(_opObserver->transactionCommitted);
@@ -1607,7 +1607,7 @@ TEST_F(SessionTest, KillSessionsDuringUnpreparedCommitDoesNotAbortTransaction) {
         ASSERT_FALSE(session.transactionIsAborted());
     };
 
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
     ASSERT(_opObserver->transactionCommitted);
     ASSERT_FALSE(session.transactionIsAborted());
     ASSERT(session.transactionIsCommitted());
@@ -1635,7 +1635,7 @@ TEST_F(SessionTest, AbortDuringUnpreparedCommitDoesNotAbortTransaction) {
         ASSERT_FALSE(session.transactionIsAborted());
     };
 
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
     ASSERT(_opObserver->transactionCommitted);
     ASSERT_FALSE(session.transactionIsAborted());
     ASSERT(session.transactionIsCommitted());
@@ -1656,7 +1656,7 @@ TEST_F(SessionTest, ThrowDuringUnpreparedOnTransactionCommitDoesNothing) {
 
     _opObserver->onTransactionCommitThrowsException = true;
 
-    ASSERT_THROWS_CODE(session.commitTransaction(opCtx(), boost::none),
+    ASSERT_THROWS_CODE(session.commitUnpreparedTransaction(opCtx()),
                        AssertionException,
                        ErrorCodes::OperationFailed);
     ASSERT_FALSE(_opObserver->transactionCommitted);
@@ -1684,7 +1684,7 @@ TEST_F(SessionTest, ConcurrencyOfCommitTransactionAndMigration) {
 
     // An commitTransaction() after a migration that bumps the active transaction number should
     // uassert.
-    ASSERT_THROWS_CODE(session.commitTransaction(opCtx(), boost::none),
+    ASSERT_THROWS_CODE(session.commitUnpreparedTransaction(opCtx()),
                        AssertionException,
                        ErrorCodes::ConflictingOperationInProgress);
 }
@@ -1811,7 +1811,7 @@ TEST_F(SessionTest, IncrementTotalCommittedOnCommit) {
     unsigned long long beforeCommitCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalCommitted();
 
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 
     // Assert that the committed counter is incremented by 1.
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalCommitted(), beforeCommitCount + 1U);
@@ -1893,7 +1893,7 @@ TEST_F(SessionTest, TrackTotalOpenTransactionsWithCommit) {
     session.unstashTransactionResources(opCtx(), "insert");
 
     // Tests that committing a transaction decrements the open transactions counter by 1.
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(), beforeTransactionStart);
 }
 
@@ -1934,7 +1934,7 @@ TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithCommit) {
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
 
     // Tests that committing a transaction decrements the active counter only.
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
 }
@@ -2045,7 +2045,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponCom
     sleepmillis(10);
 
     unsigned long long timeBeforeTxnCommit = curTimeMicros64();
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
     unsigned long long timeAfterTxnCommit = curTimeMicros64();
 
     ASSERT_GTE(session.getSingleTransactionStats()->getDuration(curTimeMicros64()),
@@ -2106,7 +2106,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
     ASSERT_GT(session.getSingleTransactionStats()->getDuration(curTimeMicros64()),
               txnDurationAfterStart);
     sleepmillis(10);
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
     unsigned long long txnDurationAfterCommit =
         session.getSingleTransactionStats()->getDuration(curTimeMicros64());
 
@@ -2316,7 +2316,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldIncreaseUntilCommit) {
     // Time active should have increased again.
     ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(curTimeMicros64()),
               timeActiveSoFar);
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 
     // The transaction is no longer active, so time active should not have increased.
     timeActiveSoFar = session.getSingleTransactionStats()->getTimeActiveMicros(curTimeMicros64());
@@ -2440,7 +2440,7 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponC
     session.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 
     ASSERT(session.getSingleTransactionStats()->getOpDebug()->additiveMetrics.equals(
         additiveMetricsToCompare));
@@ -2604,7 +2604,7 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldIncreaseUntilCommit) {
     session.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 
     timeInactiveSoFar =
         session.getSingleTransactionStats()->getTimeInactiveMicros(curTimeMicros64());
@@ -2699,7 +2699,7 @@ TEST_F(TransactionsMetricsTest, LastClientInfoShouldUpdateUponCommit) {
     session.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 
     // LastClientInfo should have been set.
     ASSERT_EQ(session.getSingleTransactionStats()->getLastClientInfo().clientHostAndPort, "");
@@ -2872,7 +2872,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterCommit) {
     setupAdditiveMetrics(metricValue, opCtx());
 
     session.unstashTransactionResources(opCtx(), "commitTransaction");
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
@@ -2935,7 +2935,7 @@ DEATH_TEST_F(TransactionsMetricsTest, noLockerInfoStatsFails, "invariant") {
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "commitTransaction");
-    session.commitTransaction(opCtx(), boost::none);
+    session.commitUnpreparedTransaction(opCtx());
 
     session.transactionInfoForLog(nullptr);
 }

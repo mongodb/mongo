@@ -1023,49 +1023,58 @@ std::vector<repl::ReplOperation> Session::endTransactionAndRetrieveOperations(
     return std::move(_transactionOperations);
 }
 
-void Session::commitTransaction(OperationContext* opCtx,
-                                boost::optional<Timestamp> commitTimestamp) {
+void Session::commitUnpreparedTransaction(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+    uassert(ErrorCodes::InvalidOptions,
+            "commitTransaction must provide commitTimestamp to prepared transaction.",
+            !_txnState.isPrepared(lk));
 
     // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
     // and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    _commitTransaction(std::move(lk), opCtx, commitTimestamp);
-}
-
-void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk,
-                                 OperationContext* opCtx,
-                                 boost::optional<Timestamp> commitTimestamp) {
-    if (_txnState.isPrepared(lk)) {
-        uassert(ErrorCodes::InvalidOptions,
-                "commitTransaction on a prepared transaction expects a 'commitTimestamp'",
-                commitTimestamp);
-        uassert(ErrorCodes::InvalidOptions,
-                "'commitTimestamp' cannot be null",
-                !commitTimestamp->isNull());
-
-        _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithPrepare);
-        opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp.get());
-    } else {
-        uassert(ErrorCodes::InvalidOptions,
-                "commitTransaction on a non-prepared transaction cannot have a 'commitTimestamp'",
-                !commitTimestamp);
-        _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithoutPrepare);
-    }
+    _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithoutPrepare);
 
     // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
     // into the session.
     lk.unlock();
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
-    const bool wasPrepared = commitTimestamp != boost::none;
-    opObserver->onTransactionCommit(opCtx, wasPrepared);
+    opObserver->onTransactionCommit(opCtx, false /* wasPrepared */);
     lk.lock();
 
-    // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session
-    // kill and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+    _commitTransaction(std::move(lk), opCtx);
+}
+
+void Session::commitPreparedTransaction(OperationContext* opCtx, Timestamp commitTimestamp) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    uassert(ErrorCodes::InvalidOptions,
+            "commitTransaction cannot provide commitTimestamp to unprepared transaction.",
+            _txnState.isPrepared(lk));
+    uassert(
+        ErrorCodes::InvalidOptions, "'commitTimestamp' cannot be null", !commitTimestamp.isNull());
+
+    // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
+    // and migration, which do not check out the session.
+    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+
+    _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithPrepare);
+    opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
+
+    // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
+    // into the session.
+    lk.unlock();
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    invariant(opObserver);
+    opObserver->onTransactionCommit(opCtx, true /* wasPrepared */);
+    lk.lock();
+
+    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+    _commitTransaction(std::move(lk), opCtx);
+}
+
+void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx) {
 
     bool committed = false;
     ON_BLOCK_EXIT([this, &committed, opCtx]() {

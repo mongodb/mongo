@@ -282,10 +282,17 @@ public:
      * Commits the transaction, including committing the write unit of work and updating
      * transaction state.
      *
-     * If the transaction is prepared, a 'commitTimestamp' is expected, otherwise providing one will
-     * throw an exception.
+     * Throws an exception if the transaction is prepared.
      */
-    void commitTransaction(OperationContext* opCtx, boost::optional<Timestamp> commitTimestamp);
+    void commitUnpreparedTransaction(OperationContext* opCtx);
+
+    /**
+     * Commits the transaction, including committing the write unit of work and updating
+     * transaction state.
+     *
+     * Throws an exception if the transaction is not prepared or if the 'commitTimestamp' is null.
+     */
+    void commitPreparedTransaction(OperationContext* opCtx, Timestamp commitTimestamp);
 
     /**
      * Puts a transaction into a prepared state and returns the prepareTimestamp.
@@ -565,9 +572,7 @@ private:
     // 2) killSession, stepdown, transaction timeout and any thread that aborts the transaction
     // outside of session checkout. They can safely skip the committing transactions.
     // 3) Migration. Should be able to skip committing transactions.
-    void _commitTransaction(stdx::unique_lock<stdx::mutex> lk,
-                            OperationContext* opCtx,
-                            boost::optional<Timestamp> commitTimestamp);
+    void _commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx);
 
     const LogicalSessionId _sessionId;
 

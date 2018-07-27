@@ -2423,7 +2423,7 @@ public:
 
         session->unstashTransactionResources(_opCtx, "insert");
 
-        session->commitTransaction(_opCtx, boost::none);
+        session->commitUnpreparedTransaction(_opCtx);
 
         session->stashTransactionResources(_opCtx);
         {
@@ -2504,7 +2504,7 @@ public:
         }
         session->unstashTransactionResources(_opCtx, "insert");
 
-        session->commitTransaction(_opCtx, commitTimestamp);
+        session->commitPreparedTransaction(_opCtx, commitTimestamp);
 
         session->stashTransactionResources(_opCtx);
         {
