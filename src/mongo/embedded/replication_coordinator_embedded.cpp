@@ -364,10 +364,6 @@ void ReplicationCoordinatorEmbedded::prepareReplMetadata(const BSONObj&,
     UASSERT_NOT_IMPLEMENTED;
 }
 
-bool ReplicationCoordinatorEmbedded::isV1ElectionProtocol() const {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 bool ReplicationCoordinatorEmbedded::getWriteConcernMajorityShouldJournal() {
     UASSERT_NOT_IMPLEMENTED;
 }

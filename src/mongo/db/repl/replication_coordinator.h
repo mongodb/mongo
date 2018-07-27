@@ -697,11 +697,6 @@ public:
                                      BSONObjBuilder* builder) const = 0;
 
     /**
-     * Returns true if the V1 election protocol is being used and false otherwise.
-     */
-    virtual bool isV1ElectionProtocol() const = 0;
-
-    /**
      * Returns whether or not majority write concerns should implicitly journal, if j has not been
      * explicitly set.
      */

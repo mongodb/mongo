@@ -670,7 +670,7 @@ public:
         ReplSetHeartbeatResponse response;
         status = ReplicationCoordinator::get(opCtx)->processHeartbeatV1(args, &response);
         if (status.isOK())
-            response.addToBSON(&result, true);
+            response.addToBSON(&result);
 
         LOG_FOR_HEARTBEATS(2) << "Processed heartbeat from " << cmdObj.getStringField("from")
                               << " and generated response, " << response;

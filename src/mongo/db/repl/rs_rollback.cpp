@@ -934,9 +934,8 @@ Status _syncRollback(OperationContext* opCtx,
     log() << "Rollback common point is " << commonPoint;
 
     // Rollback common point should be >= the replication commit point.
-    invariant(!replCoord->isV1ElectionProtocol() ||
-              commonPoint.getTimestamp() >= lastCommittedOpTime.getTimestamp());
-    invariant(!replCoord->isV1ElectionProtocol() || commonPoint >= lastCommittedOpTime);
+    invariant(commonPoint.getTimestamp() >= lastCommittedOpTime.getTimestamp());
+    invariant(commonPoint >= lastCommittedOpTime);
 
     // Rollback common point should be >= the committed snapshot optime.
     invariant(commonPoint.getTimestamp() >= committedSnapshot.getTimestamp());

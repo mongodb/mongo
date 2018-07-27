@@ -231,14 +231,6 @@ Status waitForReadConcern(OperationContext* opCtx,
                     "node needs to be a replica set member to use read concern"};
         }
 
-        // Replica sets running pv0 do not support linearizable read concern until further testing
-        // is completed (SERVER-27025).
-        if (!replCoord->isV1ElectionProtocol()) {
-            return {
-                ErrorCodes::IncompatibleElectionProtocol,
-                "Replica sets running protocol version 0 do not support readConcern: linearizable"};
-        }
-
         if (readConcernArgs.getArgsOpTime()) {
             return {ErrorCodes::FailedToParse,
                     "afterOpTime not compatible with linearizable read concern"};
@@ -303,11 +295,6 @@ Status waitForReadConcern(OperationContext* opCtx,
             return {ErrorCodes::NotAReplicaSet,
                     "node needs to be a replica set member to use readConcern: snapshot"};
         }
-
-        if (!replCoord->isV1ElectionProtocol()) {
-            return {ErrorCodes::IncompatibleElectionProtocol,
-                    "Replica sets running protocol version 0 do not support readConcern: snapshot"};
-        }
         if (speculative) {
             session->setSpeculativeTransactionOpTimeToLastApplied(opCtx);
         }
@@ -325,11 +312,6 @@ Status waitForReadConcern(OperationContext* opCtx,
          readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) &&
         !speculative &&
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet) {
-        if (!replCoord->isV1ElectionProtocol()) {
-            return {ErrorCodes::IncompatibleElectionProtocol,
-                    str::stream() << "Replica sets running protocol version 0 do not support "
-                                     "majority committed reads"};
-        }
 
         const int debugLevel = serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 1 : 2;
 

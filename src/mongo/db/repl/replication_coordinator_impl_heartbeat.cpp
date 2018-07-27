@@ -95,7 +95,6 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
     const Date_t now = _replExecutor->now();
     BSONObj heartbeatObj;
     Milliseconds timeout(0);
-    invariant(isV1ElectionProtocol());
     const std::pair<ReplSetHeartbeatArgsV1, Milliseconds> hbRequest =
         _topCoord->prepareHeartbeatRequestV1(now, _settings.ourSetName(), target);
     heartbeatObj = hbRequest.first.toBSON();
@@ -661,10 +660,8 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
 
     _topCoord->restartHeartbeats();
 
-    if (isV1ElectionProtocol()) {
-        _topCoord->resetAllMemberTimeouts(_replExecutor->now());
-        _scheduleNextLivenessUpdate_inlock();
-    }
+    _topCoord->resetAllMemberTimeouts(_replExecutor->now());
+    _scheduleNextLivenessUpdate_inlock();
 }
 
 void ReplicationCoordinatorImpl::_handleLivenessTimeout(
@@ -675,9 +672,6 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
         _handleLivenessTimeoutCbh = CallbackHandle();
     }
     if (!cbData.status.isOK()) {
-        return;
-    }
-    if (!isV1ElectionProtocol()) {
         return;
     }
 
@@ -692,9 +686,6 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
 }
 
 void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
-    if (!isV1ElectionProtocol()) {
-        return;
-    }
     // Scan liveness table for earliest date; schedule a run at (that date plus election
     // timeout).
     Date_t earliestDate;
@@ -773,10 +764,6 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         return;
     }
 
-    if (!isV1ElectionProtocol()) {
-        return;
-    }
-
     if (!_memberState.secondary()) {
         return;
     }
@@ -803,9 +790,6 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
 
 void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
     TopologyCoordinator::StartElectionReason reason) {
-    if (!isV1ElectionProtocol()) {
-        return;
-    }
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     // If it is not a single node replica set, no need to start an election after stepdown timeout.
     if (reason == TopologyCoordinator::StartElectionReason::kSingleNodeStepDownTimeout &&

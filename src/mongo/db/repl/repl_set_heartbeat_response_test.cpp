@@ -57,7 +57,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(-1, hbResponse.getConfigVersion());
 
-    BSONObj hbResponseObj = hbResponse.toBSON(false);
+    BSONObj hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
 
@@ -77,7 +77,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
 
-    hbResponseObj = hbResponse.toBSON(false);
+    hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
@@ -99,7 +99,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
 
-    hbResponseObj = hbResponse.toBSON(false);
+    hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
@@ -123,7 +123,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
 
-    hbResponseObj = hbResponse.toBSON(false);
+    hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
@@ -149,7 +149,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
     ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
 
-    hbResponseObj = hbResponse.toBSON(false);
+    hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
@@ -159,7 +159,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
 
     initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
     ASSERT_EQUALS(Status::OK(), initializeResult);
-    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON(false).toString());
+    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 
     // set appliedOpTime
     hbResponse.setAppliedOpTime(OpTime(Timestamp(50), 0));
@@ -177,18 +177,18 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
     ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
 
-    hbResponseObj = hbResponse.toBSON(false);
+    hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"]["ts"].timestamp());
     ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
 
     initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
     ASSERT_EQUALS(Status::OK(), initializeResult);
-    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON(false).toString());
+    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 
     // set config
     ReplSetConfig config;
@@ -208,19 +208,19 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
 
-    hbResponseObj = hbResponse.toBSON(false);
+    hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"]["ts"].timestamp());
     ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
 
     initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
     ASSERT_EQUALS(Status::OK(), initializeResult);
-    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON(false).toString());
+    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 
     // set state
     hbResponse.setState(MemberState(MemberState::RS_SECONDARY));
@@ -241,20 +241,20 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
 
-    hbResponseObj = hbResponse.toBSON(false);
+    hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"]["ts"].timestamp());
     ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
     ASSERT_EQUALS(2, hbResponseObj["state"].numberLong());
 
     initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
     ASSERT_EQUALS(Status::OK(), initializeResult);
-    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON(false).toString());
+    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 
     // set syncingTo
     hbResponse.setSyncingTo(HostAndPort("syncTarget"));
@@ -275,13 +275,13 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
 
-    hbResponseObj = hbResponse.toBSON(false);
+    hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"]["ts"].timestamp());
     ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
     ASSERT_EQUALS(2, hbResponseObj["state"].numberLong());
@@ -289,7 +289,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
 
     initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
     ASSERT_EQUALS(Status::OK(), initializeResult);
-    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON(false).toString());
+    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 
     // set hbmsg
     hbResponse.setHbMsg("lub dub");
@@ -309,13 +309,13 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
 
-    hbResponseObj = hbResponse.toBSON(false);
+    hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
     ASSERT_EQUALS("lub dub", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"]["ts"].timestamp());
     ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
     ASSERT_EQUALS(2, hbResponseObj["state"].numberLong());
@@ -323,7 +323,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
 
     initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
     ASSERT_EQUALS(Status::OK(), initializeResult);
-    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON(false).toString());
+    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 }
 
 TEST(ReplSetHeartbeatResponse, InitializeWrongElectionTimeType) {

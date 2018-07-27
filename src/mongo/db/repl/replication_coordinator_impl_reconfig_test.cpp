@@ -333,7 +333,7 @@ TEST_F(ReplCoordTest,
     hbResp.setConfigVersion(5);
     BSONObjBuilder respObj;
     respObj << "ok" << 1;
-    hbResp.addToBSON(&respObj, false);
+    hbResp.addToBSON(&respObj);
     net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
     net->runReadyNetworkOperations();
     getNet()->exitNetwork();
@@ -492,7 +492,7 @@ TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithAComp
     hbResp.setConfigVersion(2);
     BSONObjBuilder respObj;
     respObj << "ok" << 1;
-    hbResp.addToBSON(&respObj, false);
+    hbResp.addToBSON(&respObj);
     net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
     net->runReadyNetworkOperations();
     getNet()->exitNetwork();
@@ -549,7 +549,7 @@ TEST_F(
     hbResp2.setState(MemberState::RS_SECONDARY);
     BSONObjBuilder respObj2;
     respObj2 << "ok" << 1;
-    hbResp2.addToBSON(&respObj2, false);
+    hbResp2.addToBSON(&respObj2);
     net->runUntil(net->now() + Seconds(10));  // run until we've sent a heartbeat request
     const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
     net->scheduleResponse(noi2, net->now(), makeResponseStatus(respObj2.obj()));
@@ -621,7 +621,7 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     hbResp.setState(MemberState::RS_SECONDARY);
     BSONObjBuilder respObj2;
     respObj2 << "ok" << 1;
-    hbResp.addToBSON(&respObj2, false);
+    hbResp.addToBSON(&respObj2);
     net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj2.obj()));
 
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));

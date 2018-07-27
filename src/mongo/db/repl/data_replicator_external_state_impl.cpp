@@ -82,9 +82,6 @@ executor::TaskExecutor* DataReplicatorExternalStateImpl::getTaskExecutor() const
 }
 
 OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOpTime() {
-    if (!_replicationCoordinator->isV1ElectionProtocol()) {
-        return {OpTime::kUninitializedTerm, OpTime()};
-    }
     return {_replicationCoordinator->getTerm(), _replicationCoordinator->getLastCommittedOpTime()};
 }
 

@@ -483,8 +483,7 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
     }
 }
 
-OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx,
-                                                                      bool isV1ElectionProtocol) {
+OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
 
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must be
@@ -498,16 +497,14 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
         opCtx, lastAppliedOpTime.getTimestamp());
 
-    if (isV1ElectionProtocol) {
-        writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
-            WriteUnitOfWork wuow(opCtx);
-            opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-                opCtx,
-                BSON("msg"
-                     << "new primary"));
-            wuow.commit();
-        });
-    }
+    writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+            opCtx,
+            BSON("msg"
+                 << "new primary"));
+        wuow.commit();
+    });
     const auto opTimeToReturn = fassert(28665, loadLastOpTime(opCtx));
 
     _shardingOnTransitionToPrimaryHook(opCtx);

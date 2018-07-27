@@ -63,7 +63,7 @@ const std::string kTimestampFieldName = "ts";
 
 }  // namespace
 
-void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder, bool isProtocolVersionV1) const {
+void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
     builder->append(kOkFieldName, 1.0);
     if (_electionTimeSet) {
         builder->appendDate(kElectionTimeFieldName,
@@ -95,18 +95,13 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder, bool isProtoco
         _durableOpTime.append(builder, kDurableOpTimeFieldName);
     }
     if (_appliedOpTimeSet) {
-        if (isProtocolVersionV1) {
-            _appliedOpTime.append(builder, kAppliedOpTimeFieldName);
-        } else {
-            builder->appendDate(kAppliedOpTimeFieldName,
-                                Date_t::fromMillisSinceEpoch(_appliedOpTime.getTimestamp().asLL()));
-        }
+        _appliedOpTime.append(builder, kAppliedOpTimeFieldName);
     }
 }
 
-BSONObj ReplSetHeartbeatResponse::toBSON(bool isProtocolVersionV1) const {
+BSONObj ReplSetHeartbeatResponse::toBSON() const {
     BSONObjBuilder builder;
-    addToBSON(&builder, isProtocolVersionV1);
+    addToBSON(&builder);
     return builder.obj();
 }
 

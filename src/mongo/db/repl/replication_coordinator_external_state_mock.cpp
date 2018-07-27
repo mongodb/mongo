@@ -262,8 +262,7 @@ void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val
 
 void ReplicationCoordinatorExternalStateMock::onDrainComplete(OperationContext* opCtx) {}
 
-OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationContext* opCtx,
-                                                                      bool isV1ElectionProtocol) {
+OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationContext* opCtx) {
     _lastOpTime = _firstOpTimeOfMyTerm;
     _firstOpTimeOfMyTerm = OpTime();
     return fassert(40297, _lastOpTime);

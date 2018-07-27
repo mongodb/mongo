@@ -258,8 +258,6 @@ public:
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response) override;
 
-    virtual bool isV1ElectionProtocol() const override;
-
     virtual bool getWriteConcernMajorityShouldJournal() override;
 
     virtual void summarizeAsHtml(ReplSetHtmlSummary* s) override;

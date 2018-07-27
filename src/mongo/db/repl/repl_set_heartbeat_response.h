@@ -57,18 +57,18 @@ public:
     /**
      * Appends all non-default values to "builder".
      */
-    void addToBSON(BSONObjBuilder* builder, bool isProtocolVersionV1) const;
+    void addToBSON(BSONObjBuilder* builder) const;
 
     /**
      * Returns a BSONObj consisting of all non-default values to "builder".
      */
-    BSONObj toBSON(bool isProtocolVersionV1) const;
+    BSONObj toBSON() const;
 
     /**
      * Returns toBSON().toString()
      */
     const std::string toString() const {
-        return toBSON(true).toString();
+        return toBSON().toString();
     }
 
     const std::string& getReplicaSetName() const {

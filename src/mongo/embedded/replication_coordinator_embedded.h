@@ -196,8 +196,6 @@ public:
     Status processHeartbeatV1(const repl::ReplSetHeartbeatArgsV1&,
                               repl::ReplSetHeartbeatResponse*) override;
 
-    bool isV1ElectionProtocol() const override;
-
     bool getWriteConcernMajorityShouldJournal() override;
 
     void summarizeAsHtml(repl::ReplSetHtmlSummary*) override;

@@ -240,7 +240,7 @@ void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             hbResp.setAppliedOpTime(OpTime(Timestamp(100, 2), 0));
             BSONObjBuilder respObj;
-            net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
+            net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;
@@ -343,7 +343,7 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
             hbResp.setAppliedOpTime(opTime);
             hbResp.setDurableOpTime(opTime);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
-            net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
+            net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
             net->scheduleResponse(noi,
                                   net->now(),
@@ -436,7 +436,7 @@ bool ReplCoordTest::consumeHeartbeatV1(const NetworkInterfaceMock::NetworkOperat
     hbResp.setConfigVersion(rsConfig.getConfigVersion());
     hbResp.setAppliedOpTime(lastApplied);
     BSONObjBuilder respObj;
-    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
     return true;
 }
 

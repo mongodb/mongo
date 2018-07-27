@@ -151,11 +151,7 @@ public:
         if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
             const repl::OpTime lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
             if (!lastOp.isNull()) {
-                if (replCoord->isV1ElectionProtocol()) {
-                    lastOp.append(&result, "lastOp");
-                } else {
-                    result.append("lastOp", lastOp.getTimestamp());
-                }
+                lastOp.append(&result, "lastOp");
             }
         }
 

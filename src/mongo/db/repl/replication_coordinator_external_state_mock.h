@@ -68,7 +68,7 @@ public:
     virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
     virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx);
     void onDrainComplete(OperationContext* opCtx) override;
-    OpTime onTransitionToPrimary(OperationContext* opCtx, bool isV1ElectionProtocol) override;
+    OpTime onTransitionToPrimary(OperationContext* opCtx) override;
     virtual void forwardSlaveProgress();
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
     virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);

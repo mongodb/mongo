@@ -382,10 +382,9 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     ASSERT_BSONOBJ_EQ(hbArgs.toBSON(), noi->getRequest().cmdObj);
     ReplSetHeartbeatResponse hbResp;
     hbResp.setConfigVersion(0);
-    getNet()->scheduleResponse(
-        noi,
-        startDate + Milliseconds(10),
-        RemoteCommandResponse(hbResp.toBSON(false), BSONObj(), Milliseconds(8)));
+    getNet()->scheduleResponse(noi,
+                               startDate + Milliseconds(10),
+                               RemoteCommandResponse(hbResp.toBSON(), BSONObj(), Milliseconds(8)));
     getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());
@@ -1354,7 +1353,7 @@ protected:
             hbResp.setDurableOpTime(desiredOpTime);
             BSONObjBuilder respObj;
             respObj << "ok" << 1;
-            hbResp.addToBSON(&respObj, false);
+            hbResp.addToBSON(&respObj);
             getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
         }
         while (getNet()->hasReadyRequests()) {
@@ -1863,7 +1862,7 @@ protected:
             hbResp.setAppliedOpTime(optimeResponse);
             BSONObjBuilder respObj;
             respObj << "ok" << 1;
-            hbResp.addToBSON(&respObj, false);
+            hbResp.addToBSON(&respObj);
             getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
             hbNum += 1;
         }
@@ -2166,7 +2165,7 @@ TEST_F(StepDownTest,
         hbResp.setConfigVersion(hbArgs.getConfigVersion());
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
-        hbResp.addToBSON(&respObj, false);
+        hbResp.addToBSON(&respObj);
         getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
     }
     while (getNet()->hasReadyRequests()) {
@@ -4488,7 +4487,7 @@ TEST_F(ReplCoordTest,
     hbResp.setConfigVersion(config.getConfigVersion());
     hbResp.setSetName(config.getReplSetName());
     hbResp.setState(MemberState::RS_SECONDARY);
-    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true), metadataObj));
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(), metadataObj));
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
@@ -4614,7 +4613,7 @@ TEST_F(ReplCoordTest, TermAndLastCommittedOpTimeUpdatedFromHeartbeatWhenArbiter)
     hbResp.setConfigVersion(config.getConfigVersion());
     hbResp.setSetName(config.getReplSetName());
     hbResp.setState(MemberState::RS_SECONDARY);
-    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true), metadataObj));
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(), metadataObj));
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
@@ -4788,7 +4787,7 @@ TEST_F(ReplCoordTest,
     hbResp.setConfigVersion(3);
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_SECONDARY);
-    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
@@ -4844,7 +4843,7 @@ TEST_F(ReplCoordTest,
     // Heartbeat response is scheduled with a delay so that we can be sure that
     // the election was rescheduled due to the heartbeat response.
     auto heartbeatWhen = net->now() + Seconds(1);
-    net->scheduleResponse(noi, heartbeatWhen, makeResponseStatus(hbResp.toBSON(true)));
+    net->scheduleResponse(noi, heartbeatWhen, makeResponseStatus(hbResp.toBSON()));
     net->runUntil(heartbeatWhen);
     ASSERT_EQUALS(heartbeatWhen, net->now());
     net->runReadyNetworkOperations();
@@ -4898,7 +4897,7 @@ TEST_F(ReplCoordTest,
     // Heartbeat response is scheduled with a delay so that we can be sure that
     // the election was rescheduled due to the heartbeat response.
     auto heartbeatWhen = net->now() + Seconds(1);
-    net->scheduleResponse(noi, heartbeatWhen, makeResponseStatus(hbResp.toBSON(true)));
+    net->scheduleResponse(noi, heartbeatWhen, makeResponseStatus(hbResp.toBSON()));
     net->runUntil(heartbeatWhen);
     ASSERT_EQUALS(heartbeatWhen, net->now());
     net->runReadyNetworkOperations();
@@ -4949,7 +4948,7 @@ TEST_F(ReplCoordTest,
     // Heartbeat response is scheduled with a delay so that we can be sure that
     // the election was rescheduled due to the heartbeat response.
     auto heartbeatWhen = net->now() + Seconds(1);
-    net->scheduleResponse(noi, heartbeatWhen, makeResponseStatus(hbResp.toBSON(true)));
+    net->scheduleResponse(noi, heartbeatWhen, makeResponseStatus(hbResp.toBSON()));
     net->runUntil(heartbeatWhen);
     ASSERT_EQUALS(heartbeatWhen, net->now());
     net->runReadyNetworkOperations();

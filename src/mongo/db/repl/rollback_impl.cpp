@@ -660,10 +660,8 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     log() << "Rollback common point is " << commonPointOpTime;
 
     // Rollback common point should be >= the replication commit point.
-    invariant(!_replicationCoordinator->isV1ElectionProtocol() ||
-              commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
-    invariant(!_replicationCoordinator->isV1ElectionProtocol() ||
-              commonPointOpTime >= lastCommittedOpTime);
+    invariant(commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
+    invariant(commonPointOpTime >= lastCommittedOpTime);
 
     // Rollback common point should be >= the committed snapshot optime.
     invariant(commonPointOpTime.getTimestamp() >= committedSnapshot.getTimestamp());

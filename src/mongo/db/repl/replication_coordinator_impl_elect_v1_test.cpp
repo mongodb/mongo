@@ -495,7 +495,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     hbResp2.setState(MemberState::RS_SECONDARY);
     net->runUntil(net->now() + Seconds(10));  // run until we've sent a heartbeat request
     const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
-    net->scheduleResponse(noi2, net->now(), makeResponseStatus(hbResp2.toBSON(true)));
+    net->scheduleResponse(noi2, net->now(), makeResponseStatus(hbResp2.toBSON()));
     net->runReadyNetworkOperations();
     getNet()->exitNetwork();
 
@@ -525,7 +525,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
             hbResp.setState(MemberState::RS_SECONDARY);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             BSONObjBuilder respObj;
-            net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
+            net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;
@@ -943,7 +943,7 @@ private:
             hbResp.setTerm(replCoord->getTerm());
             hbResp.setAppliedOpTime(otherNodesOpTime);
             hbResp.setDurableOpTime(otherNodesOpTime);
-            auto response = makeResponseStatus(hbResp.toBSON(replCoord->isV1ElectionProtocol()));
+            auto response = makeResponseStatus(hbResp.toBSON());
             net->scheduleResponse(noi, net->now(), response);
         }
     }
@@ -2110,7 +2110,7 @@ protected:
         hbResp.setConfigVersion(rsConfig.getConfigVersion());
         hbResp.setAppliedOpTime(opTime);
         hbResp.setDurableOpTime(opTime);
-        return makeResponseStatus(hbResp.toBSON(true));
+        return makeResponseStatus(hbResp.toBSON());
     }
 
     void simulateSuccessfulV1Voting() {

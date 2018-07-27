@@ -135,13 +135,12 @@ public:
      * state. See the call site in ReplicationCoordinatorImpl for details about when and how it is
      * called.
      *
-     * Among other things, this writes a message about our transition to primary to the oplog if
-     * isV1 and and returns the optime of that message. If !isV1, returns the optime of the last op
-     * in the oplog.
+     * Among other things, this writes a message about our transition to primary to the oplog and
+     * returns the optime of that message.
      *
      * Throws on errors.
      */
-    virtual OpTime onTransitionToPrimary(OperationContext* opCtx, bool isV1ElectionProtocol) = 0;
+    virtual OpTime onTransitionToPrimary(OperationContext* opCtx) = 0;
 
     /**
      * Simple wrapper around SyncSourceFeedback::forwardSlaveProgress.  Signals to the

@@ -102,10 +102,7 @@ BSONObj makeGetMoreCommandObject(const NamespaceString& nss,
 /**
  * Returns command metadata object suitable for tailing remote oplog.
  */
-BSONObj makeMetadataObject(bool isV1ElectionProtocol) {
-    if (!isV1ElectionProtocol)
-        return ReadPreferenceSetting::secondaryPreferredMetadata();
-
+BSONObj makeMetadataObject() {
     BSONObjBuilder metaBuilder;
     metaBuilder << rpc::kReplSetMetadataFieldName << 1;
     metaBuilder << rpc::kOplogQueryMetadataFieldName << 1;
@@ -332,7 +329,7 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
                            maxFetcherRestarts,
                            onShutdownCallbackFn,
                            "oplog fetcher"),
-      _metadataObject(makeMetadataObject(config.getProtocolVersion() == 1LL)),
+      _metadataObject(makeMetadataObject()),
       _requiredRBID(requiredRBID),
       _requireFresherSyncSource(requireFresherSyncSource),
       _dataReplicatorExternalState(dataReplicatorExternalState),

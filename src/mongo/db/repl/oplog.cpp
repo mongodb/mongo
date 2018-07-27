@@ -152,8 +152,7 @@ void _getNextOpTimes(OperationContext* opCtx,
     long long term = OpTime::kUninitializedTerm;
 
     // Fetch term out of the newOpMutex.
-    if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
-        replCoord->isV1ElectionProtocol()) {
+    if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet) {
         // Current term. If we're not a replset of pv=1, it remains kOldProtocolVersionTerm.
         term = replCoord->getTerm();
     }

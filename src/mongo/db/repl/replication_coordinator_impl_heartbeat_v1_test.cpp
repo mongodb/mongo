@@ -125,7 +125,7 @@ TEST_F(ReplCoordHBV1Test,
     hbResp.setConfig(rsConfig);
     BSONObjBuilder responseBuilder;
     responseBuilder << "ok" << 1;
-    hbResp.addToBSON(&responseBuilder, true);
+    hbResp.addToBSON(&responseBuilder);
     net->scheduleResponse(
         noi, startDate + Milliseconds(200), makeResponseStatus(responseBuilder.obj()));
     assertRunUntil(startDate + Milliseconds(200));
@@ -195,7 +195,7 @@ TEST_F(ReplCoordHBV1Test,
     hbResp.setConfig(rsConfig);
     BSONObjBuilder responseBuilder;
     responseBuilder << "ok" << 1;
-    hbResp.addToBSON(&responseBuilder, true);
+    hbResp.addToBSON(&responseBuilder);
     net->scheduleResponse(
         noi, startDate + Milliseconds(200), makeResponseStatus(responseBuilder.obj()));
     assertRunUntil(startDate + Milliseconds(200));
@@ -265,7 +265,7 @@ TEST_F(ReplCoordHBV1Test,
     hbResp.setConfig(rsConfig);
     BSONObjBuilder responseBuilder;
     responseBuilder << "ok" << 1;
-    hbResp.addToBSON(&responseBuilder, true);
+    hbResp.addToBSON(&responseBuilder);
     net->scheduleResponse(
         noi, startDate + Milliseconds(200), makeResponseStatus(responseBuilder.obj()));
     assertRunUntil(startDate + Milliseconds(2200));
@@ -376,7 +376,7 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
 
         BSONObjBuilder responseBuilder;
         responseBuilder << "ok" << 1;
-        hbResp.addToBSON(&responseBuilder, true);
+        hbResp.addToBSON(&responseBuilder);
 
         rpc::ReplSetMetadata metadata(
             opTime.getTerm(), opTime, opTime, rsConfig.getConfigVersion(), unexpectedId, 1, -1);
