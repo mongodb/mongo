@@ -36,6 +36,7 @@
 #include "mongo/db/s/implicit_create_collection.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
@@ -78,11 +79,13 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
                   << causedBy(redact(handleMismatchStatus));
     } else if (auto cannotImplicitCreateCollInfo =
                    status->extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-        auto handleCannotImplicitCreateStatus =
-            onCannotImplicitlyCreateCollection(_opCtx, cannotImplicitCreateCollInfo->getNss());
-        if (!handleCannotImplicitCreateStatus.isOK())
-            log() << "Failed to handle CannotImplicitlyCreateCollection exception"
-                  << causedBy(redact(handleCannotImplicitCreateStatus));
+        if (ShardingState::get(_opCtx)->enabled()) {
+            auto handleCannotImplicitCreateStatus =
+                onCannotImplicitlyCreateCollection(_opCtx, cannotImplicitCreateCollInfo->getNss());
+            if (!handleCannotImplicitCreateStatus.isOK())
+                log() << "Failed to handle CannotImplicitlyCreateCollection exception"
+                      << causedBy(redact(handleCannotImplicitCreateStatus));
+        }
     }
 }
 
