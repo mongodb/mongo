@@ -57,7 +57,7 @@ public:
 
 private:
     executor::TaskExecutor* _getExecutor() {
-        stdx::lock_guard<std::mutex> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (!_taskExecutor) {
             const std::string kExecName("CollectionRangeDeleter-TaskExecutor");
 
