@@ -150,24 +150,6 @@ functions:
         file: "src/tags.json"
         name: "perf"
     - command: shell.exec
-      # generate dashboard data
-      type : test
-      params:
-        working_dir: src
-        silent: true
-        script: |
-          set -o errexit
-          source ./venv/bin/activate
-          REFTAGS="3.4.13-Baseline 3.2.17-Baseline 3.0.15-Baseline 3.6.0-Baseline 3.6.1-Baseline 3.6.5-Baseline" # These are project specific
-          # Project Opts are  project specific, but don't match expansion from elsewhere.
-          # Note project_id performance doesn't match string perf used elsewhere for ${project}
-          PROJECT_OPTS="--overrideFile ../dsi/analysis/${branch_name}/perf_override.json --project_id performance"
-          python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $REFTAGS $PROJECT_OPTS --variant ${build_variant} --task ${task_name} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
-    - command: "json.send"
-      params:
-         name: "dashboard"
-         file: "src/dashboard.json"
-    - command: shell.exec
       type : test
       params:
         working_dir: src
