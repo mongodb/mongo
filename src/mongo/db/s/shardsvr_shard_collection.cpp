@@ -274,30 +274,19 @@ void createCollectionOrValidateExisting(OperationContext* opCtx,
 void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
                                           const BSONObj& proposedKey,
                                           const ShardKeyPattern& shardKeyPattern,
-                                          const std::vector<BSONObj>& tagDocList) {
-    for (const auto& tagDoc : tagDocList) {
-        auto tagParseStatus = TagsType::fromBSON(tagDoc);
-        uassertStatusOK(tagParseStatus);
-        const auto& parsedTagDoc = tagParseStatus.getValue();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "the min and max of the existing zone " << parsedTagDoc.getMinKey()
-                              << " -->> "
-                              << parsedTagDoc.getMaxKey()
-                              << " have non-matching number of keys",
-                parsedTagDoc.getMinKey().nFields() == parsedTagDoc.getMaxKey().nFields());
-
-        BSONObjIterator tagMinFields(parsedTagDoc.getMinKey());
-        BSONObjIterator tagMaxFields(parsedTagDoc.getMaxKey());
+                                          const std::vector<TagsType>& tags) {
+    for (const auto& tag : tags) {
+        BSONObjIterator tagMinFields(tag.getMinKey());
+        BSONObjIterator tagMaxFields(tag.getMaxKey());
         BSONObjIterator proposedFields(proposedKey);
 
         while (tagMinFields.more() && proposedFields.more()) {
             BSONElement tagMinKeyElement = tagMinFields.next();
             BSONElement tagMaxKeyElement = tagMaxFields.next();
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "the min and max of the existing zone "
-                                  << parsedTagDoc.getMinKey()
+                    str::stream() << "the min and max of the existing zone " << tag.getMinKey()
                                   << " -->> "
-                                  << parsedTagDoc.getMaxKey()
+                                  << tag.getMaxKey()
                                   << " have non-matching keys",
                     str::equals(tagMinKeyElement.fieldName(), tagMaxKeyElement.fieldName()));
 
@@ -309,9 +298,9 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "the proposed shard key " << proposedKey.toString()
                                   << " does not match with the shard key of the existing zone "
-                                  << parsedTagDoc.getMinKey()
+                                  << tag.getMinKey()
                                   << " -->> "
-                                  << parsedTagDoc.getMaxKey(),
+                                  << tag.getMaxKey(),
                     match);
 
             if (ShardKeyPattern::isHashedPatternEl(proposedKeyElement) &&
@@ -320,9 +309,9 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
                           str::stream() << "cannot do hash sharding with the proposed key "
                                         << proposedKey.toString()
                                         << " because there exists a zone "
-                                        << parsedTagDoc.getMinKey()
+                                        << tag.getMinKey()
                                         << " -->> "
-                                        << parsedTagDoc.getMaxKey()
+                                        << tag.getMaxKey()
                                         << " whose boundaries are not "
                                            "of type NumberLong");
             }
@@ -411,6 +400,7 @@ void shardCollection(OperationContext* opCtx,
                      const BSONObj& defaultCollation,
                      bool unique,
                      const std::vector<BSONObj>& splitPoints,
+                     const std::vector<TagsType>& tags,
                      const bool fromMapReduce,
                      const ShardId& dbPrimaryShardId,
                      const int numContiguousChunksPerShard) {
@@ -418,7 +408,8 @@ void shardCollection(OperationContext* opCtx,
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     const auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbPrimaryShardId));
-    const bool distributeChunks = fromMapReduce || fieldsAndOrder.isHashedPattern();
+    const bool distributeChunks =
+        fromMapReduce || fieldsAndOrder.isHashedPattern() || !tags.empty();
 
     // Fail if there are partially written chunks from a previous failed shardCollection.
     checkForExistingChunks(opCtx, nss);
@@ -453,6 +444,7 @@ void shardCollection(OperationContext* opCtx,
                                                      fieldsAndOrder,
                                                      dbPrimaryShardId,
                                                      splitPoints,
+                                                     tags,
                                                      distributeChunks,
                                                      numContiguousChunksPerShard);
 
@@ -527,6 +519,43 @@ void shardCollection(OperationContext* opCtx,
         .ignore();
 }
 
+std::vector<TagsType> getExistingTags(OperationContext* opCtx, const NamespaceString& nss) {
+    auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto tagStatus =
+        configServer->exhaustiveFindOnConfig(opCtx,
+                                             kConfigReadSelector,
+                                             repl::ReadConcernLevel::kMajorityReadConcern,
+                                             TagsType::ConfigNS,
+                                             BSON(TagsType::ns(nss.ns())),
+                                             BSONObj(),
+                                             0);
+    uassertStatusOK(tagStatus);
+
+    const auto& tagDocList = tagStatus.getValue().docs;
+    std::vector<TagsType> tags;
+    for (const auto& tagDoc : tagDocList) {
+        auto tagParseStatus = TagsType::fromBSON(tagDoc);
+        uassertStatusOK(tagParseStatus);
+        const auto& parsedTag = tagParseStatus.getValue();
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "the min and max of the existing zone " << parsedTag.getMinKey()
+                              << " -->> "
+                              << parsedTag.getMaxKey()
+                              << " have non-matching number of keys",
+                parsedTag.getMinKey().nFields() == parsedTag.getMaxKey().nFields());
+
+        const auto& rangeMin = parsedTag.getMinKey();
+        const auto& rangeMax = parsedTag.getMaxKey();
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "zone " << rangeMin << " -->> " << rangeMax
+                              << " has min greater than max",
+                rangeMin.woCompare(rangeMax) < 0);
+
+        tags.push_back(parsedTag);
+    }
+    return tags;
+}
+
 /**
  * Internal sharding command run on primary shard server to shard a collection.
  */
@@ -584,20 +613,10 @@ public:
         createCollectionOrValidateExisting(opCtx, nss, proposedKey, shardKeyPattern, request);
 
         // Read zone info
-        auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto tagStatus =
-            configServer->exhaustiveFindOnConfig(opCtx,
-                                                 kConfigReadSelector,
-                                                 repl::ReadConcernLevel::kMajorityReadConcern,
-                                                 TagsType::ConfigNS,
-                                                 BSON(TagsType::ns(nss.ns())),
-                                                 BSONObj(),
-                                                 0);
-        uassertStatusOK(tagStatus);
-        const auto& tagDocList = tagStatus.getValue().docs;
+        auto tags = getExistingTags(opCtx, nss);
 
-        if (!tagDocList.empty()) {
-            validateShardKeyAgainstExistingZones(opCtx, proposedKey, shardKeyPattern, tagDocList);
+        if (!tags.empty()) {
+            validateShardKeyAgainstExistingZones(opCtx, proposedKey, shardKeyPattern, tags);
         }
 
         boost::optional<UUID> uuid;
@@ -618,13 +637,17 @@ public:
         shardRegistry->getAllShardIds(opCtx, &shardIds);
         const int numShards = shardIds.size();
 
-        // SERVER-35794 TODO: Use zone info to determine which shards should have chunks placed on
-        // them.
-
         std::vector<BSONObj> initialSplitPoints;
         std::vector<BSONObj> finalSplitPoints;
+
         if (request.getInitialSplitPoints()) {
             finalSplitPoints = std::move(*request.getInitialSplitPoints());
+        } else if (!tags.empty()) {
+            // no need to find split points since we will create chunks based on
+            // the existing zones
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "found existing zones but the collection is not empty",
+                    isEmpty);
         } else {
             InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
                 shardKeyPattern,
@@ -662,6 +685,7 @@ public:
                         *request.getCollation(),
                         request.getUnique(),
                         finalSplitPoints,
+                        tags,
                         fromMapReduce,
                         ShardingState::get(opCtx)->shardId(),
                         numContiguousChunksPerShard);

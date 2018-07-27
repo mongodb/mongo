@@ -37,11 +37,75 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+/*
+ * Creates a chunk based on the given arguments, appends it to 'chunks', and
+ * increments the given chunk version
+ */
+void appendChunk(const NamespaceString& nss,
+                 const BSONObj& min,
+                 const BSONObj& max,
+                 ChunkVersion* version,
+                 const Timestamp& validAfter,
+                 const ShardId& shardId,
+                 std::vector<ChunkType>* chunks) {
+    chunks->emplace_back(nss, ChunkRange(min, max), *version, shardId);
+    auto& chunk = chunks->back();
+    chunk.setHistory({ChunkHistory(validAfter, shardId)});
+    version->incMinor();
+}
+
+/*
+ * Returns a map mapping each tag name to a vector of shard ids with that tag name
+ */
+StringMap<std::vector<ShardId>> getTagToShardIds(OperationContext* opCtx,
+                                                 const std::vector<TagsType>& tags) {
+    StringMap<std::vector<ShardId>> tagToShardIds;
+    if (tags.empty()) {
+        return tagToShardIds;
+    }
+
+    // get all docs in config.shards
+    auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto findShardsStatus =
+        configServer->exhaustiveFindOnConfig(opCtx,
+                                             ReadPreferenceSetting(ReadPreference::Nearest),
+                                             repl::ReadConcernLevel::kMajorityReadConcern,
+                                             ShardType::ConfigNS,
+                                             BSONObj(),
+                                             BSONObj(),
+                                             0);
+    uassertStatusOK(findShardsStatus);
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "cannot find any shard documents",
+            !findShardsStatus.getValue().docs.empty());
+
+    for (const auto& tag : tags) {
+        tagToShardIds[tag.getTag()] = {};
+    }
+
+    const auto& shardDocList = findShardsStatus.getValue().docs;
+
+    for (const auto& shardDoc : shardDocList) {
+        auto shardParseStatus = ShardType::fromBSON(shardDoc);
+        uassertStatusOK(shardParseStatus);
+        auto parsedShard = shardParseStatus.getValue();
+        for (const auto& tag : parsedShard.getTags()) {
+            auto it = tagToShardIds.find(tag);
+            if (it != tagToShardIds.end()) {
+                it->second.push_back(parsedShard.getName());
+            }
+        }
+    }
+
+    return tagToShardIds;
+}
 
 void InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
     const ShardKeyPattern& shardKeyPattern,
@@ -112,17 +176,11 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
     const ShardId& databasePrimaryShardId,
     const Timestamp& validAfter,
     const std::vector<BSONObj>& splitPoints,
-    const std::vector<ShardId>& shardIds,
+    const std::vector<ShardId>& allShardIds,
     const int numContiguousChunksPerShard) {
-    invariant(!shardIds.empty());
+    invariant(!allShardIds.empty());
 
     ChunkVersion version(1, 0, OID::gen());
-
-    const size_t numChunksToCreate = splitPoints.size() + 1;
-
-    log() << "Going to create " << numChunksToCreate << " chunk(s) for: " << nss
-          << " using new epoch " << version.epoch();
-
     const auto& keyPattern(shardKeyPattern.getKeyPattern());
 
     std::vector<ChunkType> chunks;
@@ -133,18 +191,65 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
 
         // It's possible there are no split points or fewer split points than total number of
         // shards, and we need to be sure that at least one chunk is placed on the primary shard
-        const ShardId shardId = (i == 0 && splitPoints.size() + 1 < shardIds.size())
+        const ShardId shardId = (i == 0 && splitPoints.size() + 1 < allShardIds.size())
             ? databasePrimaryShardId
-            : shardIds[(i / numContiguousChunksPerShard) % shardIds.size()];
+            : allShardIds[(i / numContiguousChunksPerShard) % allShardIds.size()];
 
-        // const ShardId shardId = shardIds[(i / numContiguousChunksPerShard) % shardIds.size()];
-
-        chunks.emplace_back(nss, ChunkRange(min, max), version, shardId);
-        auto& chunk = chunks.back();
-        chunk.setHistory({ChunkHistory(validAfter, shardId)});
-
-        version.incMinor();
+        appendChunk(nss, min, max, &version, validAfter, shardId, &chunks);
     }
+
+    log() << "Created " << chunks.size() << " chunk(s) for: " << nss << " using new epoch "
+          << version.epoch();
+
+    return {std::move(chunks)};
+}
+
+InitialSplitPolicy::ShardCollectionConfig
+InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
+    const NamespaceString& nss,
+    const ShardKeyPattern& shardKeyPattern,
+    const Timestamp& validAfter,
+    const std::vector<TagsType>& tags,
+    const StringMap<std::vector<ShardId>>& tagToShards,
+    const std::vector<ShardId>& allShardIds) {
+    invariant(!allShardIds.empty());
+
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "cannot find zone split points because no zone docs were found",
+            !tags.empty());
+
+    ChunkVersion version(1, 0, OID::gen());
+    const auto& keyPattern = shardKeyPattern.getKeyPattern();
+    auto lastChunkMax = keyPattern.globalMin();
+    int indx = 0;
+
+    std::vector<ChunkType> chunks;
+
+    for (const auto& tag : tags) {
+        if (tag.getMinKey().woCompare(lastChunkMax) > 0) {
+            // create a chunk for the hole between zones
+            const ShardId shardId = allShardIds[indx++ % allShardIds.size()];
+            appendChunk(nss, lastChunkMax, tag.getMinKey(), &version, validAfter, shardId, &chunks);
+        }
+        // create a chunk for the zone
+        appendChunk(nss,
+                    tag.getMinKey(),
+                    tag.getMaxKey(),
+                    &version,
+                    validAfter,
+                    tagToShards.find(tag.getTag())->second[0],
+                    &chunks);
+        lastChunkMax = tag.getMaxKey();
+    }
+    if (lastChunkMax.woCompare(keyPattern.globalMax()) < 0) {
+        // existing zones do not span to $maxKey so create a chunk for that
+        const ShardId shardId = allShardIds[indx++ % allShardIds.size()];
+        appendChunk(
+            nss, lastChunkMax, keyPattern.globalMax(), &version, validAfter, shardId, &chunks);
+    }
+
+    log() << "Created " << chunks.size() << " chunk(s) for: " << nss << " using new epoch "
+          << version.epoch();
 
     return {std::move(chunks)};
 }
@@ -155,6 +260,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::writeFirstChunksTo
     const ShardKeyPattern& shardKeyPattern,
     const ShardId& primaryShardId,
     const std::vector<BSONObj>& splitPoints,
+    const std::vector<TagsType>& tags,
     const bool distributeInitialChunks,
     const int numContiguousChunksPerShard) {
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
@@ -162,8 +268,9 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::writeFirstChunksTo
     std::vector<BSONObj> finalSplitPoints;
     std::vector<ShardId> shardIds;
 
-    if (splitPoints.empty()) {
-        // If no split points were specified use the shard's data distribution to determine them
+    if (splitPoints.empty() && tags.empty()) {
+        // If neither split points nor tags were specified use the shard's data distribution to
+        // determine them
         auto primaryShard =
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
 
@@ -219,14 +326,23 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::writeFirstChunksTo
         }
     }
 
-    auto initialChunks = InitialSplitPolicy::generateShardCollectionInitialChunks(
-        nss,
-        shardKeyPattern,
-        primaryShardId,
-        LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
-        finalSplitPoints,
-        shardIds,
-        numContiguousChunksPerShard);
+    const auto tagToShards = getTagToShardIds(opCtx, tags);
+    const Timestamp& validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "cannot generate initial chunks based on both split points and tags",
+            tags.empty() || finalSplitPoints.empty());
+
+    auto initialChunks = tags.empty()
+        ? InitialSplitPolicy::generateShardCollectionInitialChunks(nss,
+                                                                   shardKeyPattern,
+                                                                   primaryShardId,
+                                                                   validAfter,
+                                                                   finalSplitPoints,
+                                                                   shardIds,
+                                                                   numContiguousChunksPerShard)
+        : InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
+              nss, shardKeyPattern, validAfter, tags, tagToShards, shardIds);
     for (const auto& chunk : initialChunks.chunks) {
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,
