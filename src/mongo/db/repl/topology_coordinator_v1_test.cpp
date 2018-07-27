@@ -3695,7 +3695,14 @@ TEST_F(HeartbeatResponseTestV1, ReconfigBetweenHeartbeatRequestAndRepsonse) {
                  0);
 
     ReplSetHeartbeatResponse hb;
-    hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_PRIMARY), 0)
+    hb.initialize(BSON("ok" << 1 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+                            << "opTime"
+                            << OpTime(Timestamp(100, 0), 0).toBSON()
+                            << "v"
+                            << 1
+                            << "state"
+                            << MemberState::RS_PRIMARY),
+                  0)
         .transitional_ignore();
     hb.setDurableOpTime(lastOpTimeApplied);
     hb.setElectionTime(election.getTimestamp());

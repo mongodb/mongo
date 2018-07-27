@@ -332,6 +332,8 @@ TEST_F(ReplCoordTest,
     hbResp.setState(MemberState::RS_SECONDARY);
     hbResp.setConfigVersion(5);
     BSONObjBuilder respObj;
+    hbResp.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    hbResp.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
     respObj << "ok" << 1;
     hbResp.addToBSON(&respObj);
     net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
@@ -490,6 +492,8 @@ TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithAComp
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_SECONDARY);
     hbResp.setConfigVersion(2);
+    hbResp.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    hbResp.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
     BSONObjBuilder respObj;
     respObj << "ok" << 1;
     hbResp.addToBSON(&respObj);
@@ -547,6 +551,8 @@ TEST_F(
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");
     hbResp2.setState(MemberState::RS_SECONDARY);
+    hbResp2.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    hbResp2.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
     BSONObjBuilder respObj2;
     respObj2 << "ok" << 1;
     hbResp2.addToBSON(&respObj2);
@@ -619,6 +625,8 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     hbResp.setConfigVersion(4);
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    hbResp.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
     BSONObjBuilder respObj2;
     respObj2 << "ok" << 1;
     hbResp.addToBSON(&respObj2);

@@ -239,6 +239,7 @@ void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {
             hbResp.setState(MemberState::RS_SECONDARY);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             hbResp.setAppliedOpTime(OpTime(Timestamp(100, 2), 0));
+            hbResp.setDurableOpTime(OpTime(Timestamp(100, 2), 0));
             BSONObjBuilder respObj;
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else {
@@ -435,6 +436,7 @@ bool ReplCoordTest::consumeHeartbeatV1(const NetworkInterfaceMock::NetworkOperat
     hbResp.setState(MemberState::RS_SECONDARY);
     hbResp.setConfigVersion(rsConfig.getConfigVersion());
     hbResp.setAppliedOpTime(lastApplied);
+    hbResp.setDurableOpTime(lastApplied);
     BSONObjBuilder respObj;
     net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
     return true;

@@ -382,6 +382,8 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     ASSERT_BSONOBJ_EQ(hbArgs.toBSON(), noi->getRequest().cmdObj);
     ReplSetHeartbeatResponse hbResp;
     hbResp.setConfigVersion(0);
+    hbResp.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    hbResp.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
     getNet()->scheduleResponse(noi,
                                startDate + Milliseconds(10),
                                RemoteCommandResponse(hbResp.toBSON(), BSONObj(), Milliseconds(8)));
@@ -4787,6 +4789,8 @@ TEST_F(ReplCoordTest,
     hbResp.setConfigVersion(3);
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    hbResp.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
     net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
     net->runReadyNetworkOperations();
     net->exitNetwork();
@@ -4839,6 +4843,9 @@ TEST_F(ReplCoordTest,
     hbResp.setSetName("mySet");
     hbResp.setState(MemberState::RS_PRIMARY);
     hbResp.setTerm(replCoord->getTerm());
+    hbResp.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    hbResp.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
+    hbResp.setConfigVersion(1);
 
     // Heartbeat response is scheduled with a delay so that we can be sure that
     // the election was rescheduled due to the heartbeat response.

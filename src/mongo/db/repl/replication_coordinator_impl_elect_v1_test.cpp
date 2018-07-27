@@ -493,6 +493,8 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");
     hbResp2.setState(MemberState::RS_SECONDARY);
+    hbResp2.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    hbResp2.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
     net->runUntil(net->now() + Seconds(10));  // run until we've sent a heartbeat request
     const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
     net->scheduleResponse(noi2, net->now(), makeResponseStatus(hbResp2.toBSON()));
@@ -524,6 +526,8 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
             hbResp.setSetName(rsConfig.getReplSetName());
             hbResp.setState(MemberState::RS_SECONDARY);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
+            hbResp.setAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+            hbResp.setDurableOpTime(OpTime(Timestamp(100, 1), 0));
             BSONObjBuilder respObj;
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
         } else {
