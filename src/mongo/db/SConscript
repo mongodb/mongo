@@ -959,7 +959,6 @@ env.Library(
         'exec/fetch.cpp',
         'exec/geo_near.cpp',
         'exec/idhack.cpp',
-        'exec/index_iterator.cpp',
         'exec/index_scan.cpp',
         'exec/keep_mutations.cpp',
         'exec/limit.cpp',

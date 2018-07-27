@@ -46,7 +46,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/index_iterator.h"
 #include "mongo/db/exec/multi_iterator.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/working_set.h"
@@ -109,44 +108,16 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
         return {nullptr};
     }
 
-    // Attempt to get a random cursor from the RecordStore. If the RecordStore does not support
-    // random cursors, attempt to get one from the _id index.
-    std::unique_ptr<RecordCursor> rsRandCursor =
-        collection->getRecordStore()->getRandomCursor(opCtx);
+    // Attempt to get a random cursor from the RecordStore.
+    auto rsRandCursor = collection->getRecordStore()->getRandomCursor(opCtx);
+    if (!rsRandCursor) {
+        // The storage engine has no random cursor support.
+        return {nullptr};
+    }
 
     auto ws = stdx::make_unique<WorkingSet>();
-    std::unique_ptr<PlanStage> stage;
-
-    if (rsRandCursor) {
-        stage = stdx::make_unique<MultiIteratorStage>(opCtx, ws.get(), collection);
-        static_cast<MultiIteratorStage*>(stage.get())->addIterator(std::move(rsRandCursor));
-
-    } else {
-        auto indexCatalog = collection->getIndexCatalog();
-        auto indexDescriptor = indexCatalog->findIdIndex(opCtx);
-
-        if (!indexDescriptor) {
-            // There was no _id index.
-            return {nullptr};
-        }
-
-        IndexAccessMethod* idIam = indexCatalog->getIndex(indexDescriptor);
-        auto idxRandCursor = idIam->newRandomCursor(opCtx);
-
-        if (!idxRandCursor) {
-            // Storage engine does not support any type of random cursor.
-            return {nullptr};
-        }
-
-        auto idxIterator = stdx::make_unique<IndexIteratorStage>(opCtx,
-                                                                 ws.get(),
-                                                                 collection,
-                                                                 idIam,
-                                                                 indexDescriptor->keyPattern(),
-                                                                 std::move(idxRandCursor));
-        stage = stdx::make_unique<FetchStage>(
-            opCtx, ws.get(), idxIterator.release(), nullptr, collection);
-    }
+    auto stage = stdx::make_unique<MultiIteratorStage>(opCtx, ws.get(), collection);
+    stage->addIterator(std::move(rsRandCursor));
 
     {
         AutoGetCollectionForRead autoColl(opCtx, collection->ns());

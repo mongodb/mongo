@@ -359,7 +359,6 @@ PlanStage* buildStages(OperationContext* opCtx,
         case STAGE_EOF:
         case STAGE_GROUP:
         case STAGE_IDHACK:
-        case STAGE_INDEX_ITERATOR:
         case STAGE_MULTI_ITERATOR:
         case STAGE_MULTI_PLAN:
         case STAGE_PIPELINE_PROXY:

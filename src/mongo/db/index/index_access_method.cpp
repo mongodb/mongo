@@ -190,11 +190,6 @@ std::unique_ptr<SortedDataInterface::Cursor> IndexAccessMethod::newCursor(Operat
     return _newInterface->newCursor(opCtx, isForward);
 }
 
-std::unique_ptr<SortedDataInterface::Cursor> IndexAccessMethod::newRandomCursor(
-    OperationContext* opCtx) const {
-    return _newInterface->newRandomCursor(opCtx);
-}
-
 // Remove the provided doc from the index.
 Status IndexAccessMethod::remove(OperationContext* opCtx,
                                  const BSONObj& obj,
