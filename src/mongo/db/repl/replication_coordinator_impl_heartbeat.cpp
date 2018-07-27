@@ -608,7 +608,6 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(opCtx.get(), newConfig, myIndexValue);
     lk.unlock();
-    _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
 }
 

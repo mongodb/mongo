@@ -1009,13 +1009,6 @@ private:
     void _startElectSelfIfEligibleV1(TopologyCoordinator::StartElectionReason reason);
 
     /**
-     * Resets the term of last vote to 0 to prevent any node from voting for term 0.
-     */
-    void _resetElectionInfoOnProtocolVersionUpgrade(OperationContext* opCtx,
-                                                    const ReplSetConfig& oldConfig,
-                                                    const ReplSetConfig& newConfig);
-
-    /**
      * Schedules work to be run no sooner than 'when' and returns handle to callback.
      * If work cannot be scheduled due to shutdown, returns empty handle.
      * All other non-shutdown scheduling failures will abort the process.

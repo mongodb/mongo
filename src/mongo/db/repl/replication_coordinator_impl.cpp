@@ -2320,7 +2320,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     _dropAllSnapshots_inlock();
 
     lk.unlock();
-    _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
     _replExecutor->signalEvent(finishedEvent);
 }
@@ -3425,21 +3424,6 @@ void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
     if (_electionDryRunFinishedEvent.isValid()) {
         _replExecutor->waitForEvent(_electionDryRunFinishedEvent);
     }
-}
-
-void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
-    OperationContext* opCtx, const ReplSetConfig& oldConfig, const ReplSetConfig& newConfig) {
-
-    // On protocol version upgrade, reset last vote as if I just learned the term 0 from other
-    // nodes.
-    if (!oldConfig.isInitialized() ||
-        oldConfig.getProtocolVersion() >= newConfig.getProtocolVersion()) {
-        return;
-    }
-    invariant(newConfig.getProtocolVersion() == 1);
-
-    const LastVote lastVote{OpTime::kInitialTerm, -1};
-    fassert(40445, _externalState->storeLocalLastVoteDocument(opCtx, lastVote));
 }
 
 CallbackHandle ReplicationCoordinatorImpl::_scheduleWorkAt(Date_t when, const CallbackFn& work) {
