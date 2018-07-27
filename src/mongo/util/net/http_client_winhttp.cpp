@@ -151,14 +151,25 @@ public:
         _headers = toNativeString(header.c_str());
     }
 
-    std::vector<uint8_t> post(const std::string& urlString, ConstDataRange cdr) const final {
+    DataBuilder post(StringData url, ConstDataRange cdr) const final {
+        return doRequest(
+            L"POST", url, const_cast<void*>(static_cast<const void*>(cdr.data())), cdr.length());
+    }
+
+    DataBuilder get(StringData url) const final {
+        return doRequest(L"GET", url, nullptr, 0);
+    }
+
+private:
+    DataBuilder doRequest(LPCWSTR method, StringData urlSD, LPVOID data, DWORD data_len) const {
         const auto uassertWithErrno = [](StringData reason, bool ok) {
             const auto msg = errnoWithDescription(GetLastError());
             uassert(ErrorCodes::OperationFailed, str::stream() << reason << ": " << msg, ok);
         };
 
         // Break down URL for handling below.
-        auto url = uassertStatusOK(parseUrl(toNativeString(urlString.c_str())));
+        const auto urlString = toNativeString(urlSD.toString().c_str());
+        auto url = uassertStatusOK(parseUrl(urlString));
         uassert(
             ErrorCodes::BadValue, "URL endpoint must be https://", url.https || _allowInsecureHTTP);
 
@@ -204,7 +215,7 @@ public:
         uassertWithErrno("Failed connecting to remote host", connect);
 
         request = WinHttpOpenRequest(connect,
-                                     L"POST",
+                                     method,
                                      (url.path + url.query).c_str(),
                                      nullptr,
                                      WINHTTP_NO_REFERER,
@@ -222,14 +233,9 @@ public:
             uassertWithErrno("Failed setting authentication credentials", result);
         }
 
-        uassertWithErrno("Failed sending HTTP request",
-                         WinHttpSendRequest(request,
-                                            _headers.c_str(),
-                                            -1L,
-                                            const_cast<void*>(static_cast<const void*>(cdr.data())),
-                                            cdr.length(),
-                                            cdr.length(),
-                                            0));
+        uassertWithErrno(
+            "Failed sending HTTP request",
+            WinHttpSendRequest(request, _headers.c_str(), -1L, data, data_len, data_len, 0));
 
         uassertWithErrno("Failed receiving response from server",
                          WinHttpReceiveResponse(request, nullptr));
@@ -249,9 +255,8 @@ public:
                 str::stream() << "Unexpected http status code from server: " << statusCode,
                 statusCode == 200);
 
-        // Marshal response into vector.
-        std::vector<uint8_t> ret;
-        auto sz = ret.size();
+        std::vector<char> buffer;
+        DataBuilder ret(4096);
         for (;;) {
             DWORD len = 0;
             uassertWithErrno("Failed receiving response data",
@@ -259,12 +264,14 @@ public:
             if (!len) {
                 break;
             }
-            ret.resize(sz + len);
+
+            buffer.resize(len);
             uassertWithErrno("Failed reading response data",
-                             WinHttpReadData(request, ret.data() + sz, len, &len));
-            sz += len;
+                             WinHttpReadData(request, buffer.data(), len, &len));
+
+            ConstDataRange cdr(buffer.data(), len);
+            ret.writeAndAdvance(cdr);
         }
-        ret.resize(sz);
 
         return ret;
     }

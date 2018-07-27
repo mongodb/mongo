@@ -127,14 +127,15 @@ public:
         return _client
             ->postAsync(
                 _executor.get(), exportedExportedFreeMonEndpointURL.getLocked() + "/register", data)
-            .then([](std::vector<uint8_t> blob) {
+            .then([](DataBuilder&& blob) {
 
-                if (blob.empty()) {
+                if (!blob.size()) {
                     uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
                 }
 
-                ConstDataRange cdr(reinterpret_cast<char*>(blob.data()), blob.size());
-
+                auto blobSize = blob.size();
+                auto blobData = blob.release();
+                ConstDataRange cdr(blobData.get(), blobSize);
                 auto swDoc = cdr.read<Validated<BSONObj>>();
                 uassertStatusOK(swDoc.getStatus());
 
@@ -155,13 +156,15 @@ public:
         return _client
             ->postAsync(
                 _executor.get(), exportedExportedFreeMonEndpointURL.getLocked() + "/metrics", data)
-            .then([](std::vector<uint8_t> blob) {
+            .then([](DataBuilder&& blob) {
 
-                if (blob.empty()) {
+                if (!blob.size()) {
                     uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
                 }
 
-                ConstDataRange cdr(reinterpret_cast<char*>(blob.data()), blob.size());
+                auto blobSize = blob.size();
+                auto blobData = blob.release();
+                ConstDataRange cdr(blobData.get(), blobSize);
 
                 auto swDoc = cdr.read<Validated<BSONObj>>();
                 uassertStatusOK(swDoc.getStatus());

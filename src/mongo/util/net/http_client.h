@@ -32,6 +32,7 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -64,14 +65,24 @@ public:
     /**
      * Perform a POST request to specified URL.
      */
-    virtual std::vector<uint8_t> post(const std::string& url, ConstDataRange data) const = 0;
+    virtual DataBuilder post(StringData url, ConstDataRange data) const = 0;
 
     /**
      * Futurized helper for HttpClient::post().
      */
-    Future<std::vector<uint8_t>> postAsync(executor::ThreadPoolTaskExecutor* executor,
-                                           StringData url,
-                                           std::shared_ptr<std::vector<std::uint8_t>> data) const;
+    Future<DataBuilder> postAsync(executor::ThreadPoolTaskExecutor* executor,
+                                  StringData url,
+                                  std::shared_ptr<std::vector<std::uint8_t>> data) const;
+
+    /**
+     * Perform a GET request from the specified URL.
+     */
+    virtual DataBuilder get(StringData url) const = 0;
+
+    /**
+     * Futurized helpr for HttpClient::get().
+     */
+    Future<DataBuilder> getAsync(executor::ThreadPoolTaskExecutor* executor, StringData url) const;
 
     /**
      * Factory method provided by client implementation.

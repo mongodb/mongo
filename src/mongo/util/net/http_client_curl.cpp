@@ -151,7 +151,6 @@ public:
         curl_easy_setopt(_handle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         curl_easy_setopt(_handle.get(), CURLOPT_NOSIGNAL, 1);
         curl_easy_setopt(_handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
-        curl_easy_setopt(_handle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
 #if LIBCURL_VERSION_NUM > 0x072200
         // Requires >= 7.34.0
         curl_easy_setopt(_handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
@@ -181,36 +180,52 @@ public:
         _headers = headers;
     }
 
-    std::vector<uint8_t> post(const std::string& url, ConstDataRange cdr) const final {
+    DataBuilder get(StringData url) const final {
         // Make a local copy of the base handle for this request.
         CurlHandle myHandle(curl_easy_duphandle(_handle.get()));
         uassert(ErrorCodes::InternalError, "Curl initialization failed", myHandle);
 
-        curl_easy_setopt(myHandle.get(), CURLOPT_URL, url.c_str());
+        return doRequest(myHandle.get(), url);
+    }
+
+    DataBuilder post(StringData url, ConstDataRange cdr) const final {
+        // Make a local copy of the base handle for this request.
+        CurlHandle myHandle(curl_easy_duphandle(_handle.get()));
+        uassert(ErrorCodes::InternalError, "Curl initialization failed", myHandle);
+
         curl_easy_setopt(myHandle.get(), CURLOPT_POST, 1);
 
-        DataBuilder dataBuilder(4096);
-        curl_easy_setopt(myHandle.get(), CURLOPT_WRITEDATA, &dataBuilder);
-
         ConstDataRangeCursor cdrc(cdr);
+        curl_easy_setopt(myHandle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
         curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
         curl_easy_setopt(myHandle.get(), CURLOPT_POSTFIELDSIZE, (long)cdrc.length());
+
+        return doRequest(myHandle.get(), url);
+    }
+
+private:
+    DataBuilder doRequest(CURL* handle, StringData url) const {
+        const auto urlString = url.toString();
+        curl_easy_setopt(handle, CURLOPT_URL, urlString.c_str());
+
+        DataBuilder dataBuilder(4096);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, &dataBuilder);
 
         curl_slist* chunk = nullptr;
         for (const auto& header : _headers) {
             chunk = curl_slist_append(chunk, header.c_str());
         }
-        curl_easy_setopt(myHandle.get(), CURLOPT_HTTPHEADER, chunk);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, chunk);
         CurlSlist _headers(chunk);
 
-        CURLcode result = curl_easy_perform(myHandle.get());
+        CURLcode result = curl_easy_perform(handle);
         uassert(ErrorCodes::OperationFailed,
                 str::stream() << "Bad HTTP response from API server: "
                               << curl_easy_strerror(result),
                 result == CURLE_OK);
 
         long statusCode;
-        result = curl_easy_getinfo(myHandle.get(), CURLINFO_RESPONSE_CODE, &statusCode);
+        result = curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &statusCode);
         uassert(ErrorCodes::OperationFailed,
                 str::stream() << "Unexpected error retrieving response: "
                               << curl_easy_strerror(result),
@@ -220,8 +235,7 @@ public:
                 str::stream() << "Unexpected http status code from server: " << statusCode,
                 statusCode == 200);
 
-        auto response = dataBuilder.getCursor();
-        return std::vector<uint8_t>(response.data(), response.data() + response.length());
+        return dataBuilder;
     }
 
 private:

@@ -39,11 +39,10 @@
 
 namespace mongo {
 
-Future<std::vector<uint8_t>> HttpClient::postAsync(
-    executor::ThreadPoolTaskExecutor* executor,
-    StringData url,
-    std::shared_ptr<std::vector<std::uint8_t>> data) const {
-    auto pf = makePromiseFuture<std::vector<uint8_t>>();
+Future<DataBuilder> HttpClient::postAsync(executor::ThreadPoolTaskExecutor* executor,
+                                          StringData url,
+                                          std::shared_ptr<std::vector<std::uint8_t>> data) const {
+    auto pf = makePromiseFuture<DataBuilder>();
     std::string urlString(url.toString());
 
     auto status = executor->scheduleWork([
@@ -55,7 +54,26 @@ Future<std::vector<uint8_t>> HttpClient::postAsync(
         ConstDataRange cdr(reinterpret_cast<char*>(data->data()), data->size());
         try {
             auto result = this->post(urlString, cdr);
-            shared_promise.emplaceValue(result);
+            shared_promise.emplaceValue(std::move(result));
+        } catch (...) {
+            shared_promise.setError(exceptionToStatus());
+        }
+    });
+
+    uassertStatusOK(status);
+    return std::move(pf.future);
+}
+
+Future<DataBuilder> HttpClient::getAsync(executor::ThreadPoolTaskExecutor* executor,
+                                         StringData url) const {
+    auto pf = makePromiseFuture<DataBuilder>();
+    std::string urlString(url.toString());
+
+    auto status = executor->scheduleWork([ shared_promise = pf.promise.share(), urlString, this ](
+        const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
+        try {
+            auto result = this->get(urlString);
+            shared_promise.emplaceValue(std::move(result));
         } catch (...) {
             shared_promise.setError(exceptionToStatus());
         }
