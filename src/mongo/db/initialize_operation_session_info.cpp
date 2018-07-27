@@ -38,16 +38,6 @@
 
 namespace mongo {
 
-// Allows multi-document transactions to run with the 'inMemory' storage engine. This flag should
-// ONLY be used for testing purposes. Production systems should not run transactions on the
-// 'inMemory' storage engines until "rollback to a timestamp" is supported on the 'inMemory' storage
-// engine (see SERVER-34165).
-//
-// TODO: inMemory now supports 'rollback to a timestamp', which consequently allows transactions
-// with inMemory. This parameter now has no effect. Update this comment when inMemory transaction
-// testing is turned on and transactions become officially supported (SERVER-36023).
-MONGO_EXPORT_SERVER_PARAMETER(enableInMemoryTransactions, bool, false);
-
 boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
     OperationContext* opCtx,
     const BSONObj& requestBody,
