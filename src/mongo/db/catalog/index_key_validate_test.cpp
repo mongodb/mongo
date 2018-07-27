@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -44,6 +45,31 @@ namespace {
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 using index_key_validate::validateKeyPattern;
+
+/**
+ * Helper class to ensure proper FCV & test commands enabled.
+ * TODO: Remove test command enabling/disabling in SERVER-36198
+ */
+class TestCommandQueryKnobGuard {
+
+public:
+    TestCommandQueryKnobGuard() {
+        _prevEnabled = getTestCommandsEnabled();
+        setTestCommandsEnabled(true);
+
+        _prevKnobEnabled = internalQueryAllowAllPathsIndexes.load();
+        internalQueryAllowAllPathsIndexes.store(true);
+    }
+
+    ~TestCommandQueryKnobGuard() {
+        setTestCommandsEnabled(_prevEnabled);
+        internalQueryAllowAllPathsIndexes.store(_prevKnobEnabled);
+    }
+
+private:
+    bool _prevEnabled;
+    bool _prevKnobEnabled;
+};
 
 TEST(IndexKeyValidateTest, KeyElementValueOfSmallPositiveIntSucceeds) {
     for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
@@ -237,77 +263,61 @@ TEST(IndexKeyValidateTest, KeyElementNameTextSucceedsOnTextIndex) {
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameAllPathsSucceedsOnSubPath) {
-    const bool temp = getTestCommandsEnabled();
-    setTestCommandsEnabled(true);
+    TestCommandQueryKnobGuard guard;
     ASSERT_OK(validateKeyPattern(BSON("a.$**" << 1), IndexVersion::kV2));
-    setTestCommandsEnabled(temp);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameAllPathsSucceeds) {
-    const bool temp = getTestCommandsEnabled();
-    setTestCommandsEnabled(true);
+    TestCommandQueryKnobGuard guard;
     ASSERT_OK(validateKeyPattern(BSON("$**" << 1), IndexVersion::kV2));
-    setTestCommandsEnabled(temp);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnRepeat) {
-    const bool temp = getTestCommandsEnabled();
-    setTestCommandsEnabled(true);
+    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**.$**" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
-    setTestCommandsEnabled(temp);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnSubPathRepeat) {
-    const bool temp = getTestCommandsEnabled();
-    setTestCommandsEnabled(true);
+    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("a.$**.$**" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
-    setTestCommandsEnabled(temp);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnCompound) {
-    const bool temp = getTestCommandsEnabled();
-    setTestCommandsEnabled(true);
+    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**" << 1 << "a" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
-    setTestCommandsEnabled(temp);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsOnIncorrectValue) {
-    const bool temp = getTestCommandsEnabled();
-    setTestCommandsEnabled(true);
+    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**" << false), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
-    setTestCommandsEnabled(temp);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsWhenValueIsPluginNameWithInvalidKeyName) {
     // TODO: Remove test command enabling/disabling in SERVER-36198
-    const bool temp = getTestCommandsEnabled();
-    setTestCommandsEnabled(true);
+    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("a"
                                           << "allPaths"),
                                      IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
-    setTestCommandsEnabled(temp);
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameAllPathsFailsWhenValueIsPluginNameWithValidKeyName) {
     // TODO: Remove test command enabling/disabling in SERVER-36198
-    const bool temp = getTestCommandsEnabled();
-    setTestCommandsEnabled(true);
+    TestCommandQueryKnobGuard guard;
     auto status = validateKeyPattern(BSON("$**"
                                           << "allPaths"),
                                      IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
-    setTestCommandsEnabled(temp);
 }
 
 }  // namespace

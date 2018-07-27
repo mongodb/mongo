@@ -40,6 +40,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
@@ -67,15 +68,21 @@ public:
         // TODO: Remove test command enabling/disabling in SERVER-36198
         _prevEnabled = getTestCommandsEnabled();
         setTestCommandsEnabled(true);
+
+        // TODO: Remove knob enabling/disabling in SERVER-36198.
+        _prevKnobEnabled = internalQueryAllowAllPathsIndexes.load();
+        internalQueryAllowAllPathsIndexes.store(true);
     }
 
     ~TestCommandFcvGuard() {
         serverGlobalParams.featureCompatibility.setVersion(_prevVersion);
         setTestCommandsEnabled(_prevEnabled);
+        internalQueryAllowAllPathsIndexes.store(_prevKnobEnabled);
     }
 
 private:
     bool _prevEnabled;
+    bool _prevKnobEnabled;
     ServerGlobalParams::FeatureCompatibility::Version _prevVersion;
 };
 

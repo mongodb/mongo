@@ -45,6 +45,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
@@ -116,6 +117,13 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
         if (!IndexNames::isKnownName(pluginName))
             return Status(
                 code, mongoutils::str::stream() << "Unknown index plugin '" << pluginName << '\'');
+    }
+
+    if (pluginName == IndexNames::ALLPATHS && !internalQueryAllowAllPathsIndexes.load()) {
+        // TODO: SERVER-36198 remove this check once AllPaths indexes are complete.
+        return Status(
+            ErrorCodes::NotImplemented,
+            "Cannot use an allPaths index without enabling internalQueryAllowAllPathsIndexes");
     }
 
     BSONObjIterator it(key);
