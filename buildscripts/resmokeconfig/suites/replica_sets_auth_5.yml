@@ -25,7 +25,6 @@ selector:
   - jstests/replsets/last_op_visible.js
   - jstests/replsets/sessions_collection_auto_healing.js
   - jstests/replsets/maintenance2.js
-  - jstests/replsets/copydb.js
   - jstests/replsets/sized_zero_capped.js
   - jstests/replsets/initial_sync_document_validation.js
   - jstests/replsets/commands_that_write_accept_wc.js

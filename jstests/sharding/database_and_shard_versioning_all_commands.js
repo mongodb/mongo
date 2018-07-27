@@ -6,19 +6,12 @@
     'use strict';
 
     load('jstests/libs/profiler.js');
+    load('jstests/sharding/libs/last_stable_mongos_commands.js');
     const dbName = "test";
     const collName = "foo";
     const ns = dbName + "." + collName;
 
     const SHARD_VERSION_UNSHARDED = [Timestamp(0, 0), ObjectId("000000000000000000000000")];
-
-    // These commands exist in the 4.0 mongo shell, so we must define a test case in mixed version
-    // suites. However, a check exists in this test that asserts that every command tested exists
-    // on mongos. In an all-4.2 environment, these commands won't exist. To increase test coverage,
-    // and allow us to run on same- and mixed-version suites, we will allow these commands to have
-    // a test defined without always existing on the mongos being used.
-    const fcv40OnlyCommands =
-        ['abortTransaction', 'commitTransaction', 'eval', 'geoNear', 'group', 'reIndex'];
 
     function validateTestCase(testCase) {
         assert(testCase.skip || testCase.command,
@@ -115,7 +108,6 @@
                 assert(mongosConn.getDB(dbName).getCollection(collName).drop());
             }
         },
-        copydb: {skip: "not allowed through mongos"},
         count: {
             sendsDbVersion: true,
             sendsShardVersion: true,
@@ -207,7 +199,6 @@
         echo: {skip: "does not forward command to primary shard"},
         enableSharding: {skip: "does not forward command to primary shard"},
         endSessions: {skip: "goes through the cluster write path"},
-        eval: {skip: "must define test coverage for 4.0 backwards compatibility"},
         explain: {skip: "TODO SERVER-31226"},
         features: {skip: "executes locally on mongos (not sent to any remote node)"},
         filemd5: {
@@ -227,7 +218,6 @@
         },
         flushRouterConfig: {skip: "executes locally on mongos (not sent to any remote node)"},
         fsync: {skip: "broadcast to all shards"},
-        geoNear: {skip: "must define test coverage for 4.0 backwards compatibility"},
         getCmdLineOpts: {skip: "executes locally on mongos (not sent to any remote node)"},
         getDiagnosticData: {skip: "executes locally on mongos (not sent to any remote node)"},
         getLastError: {skip: "does not forward command to primary shard"},
@@ -241,7 +231,6 @@
         grantPrivilegesToRole: {skip: "always targets the config server"},
         grantRolesToRole: {skip: "always targets the config server"},
         grantRolesToUser: {skip: "always targets the config server"},
-        group: {skip: "must define test coverage for 4.0 backwards compatibility"},
         hostInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
         insert: {
             sendsDbVersion: false,
@@ -361,7 +350,6 @@
         refreshLogicalSessionCacheNow: {skip: "goes through the cluster write path"},
         refreshSessions: {skip: "executes locally on mongos (not sent to any remote node)"},
         refreshSessionsInternal: {skip: "executes locally on mongos (not sent to any remote node)"},
-        reIndex: {skip: "must define test coverage for 4.0 backwards compatibility"},
         removeShard: {skip: "not on a user database"},
         removeShardFromZone: {skip: "not on a user database"},
         renameCollection: {
@@ -431,6 +419,10 @@
         },
         whatsmyuri: {skip: "executes locally on mongos (not sent to any remote node)"},
     };
+
+    commandsRemovedFromMongosIn42.forEach(function(cmd) {
+        testCases[cmd] = {skip: "must define test coverage for 4.0 backwards compatibility"};
+    });
 
     class AllCommandsTestRunner {
         constructor() {
@@ -548,7 +540,15 @@
             // After iterating through all the existing commands, ensure there were no additional
             // test cases that did not correspond to any mongos command.
             for (let key of Object.keys(testCases)) {
-                if (fcv40OnlyCommands.includes(key)) {
+                // We have defined real test cases for commands added in 4.2 so that the test cases
+                // are exercised in the regular suites, but because these test cases can't run in
+                // the last stable suite, we skip processing them here to avoid failing the below
+                // assertion. We have defined "skip" test cases for commands removed in 4.2 so the
+                // test case is defined in last stable suites (in which these commands still exist
+                // on the mongos), but these test cases won't be run in regular suites, so we skip
+                // processing them below as well.
+                if (commandsAddedToMongosIn42.includes(key) ||
+                    commandsRemovedFromMongosIn42.includes(key)) {
                     continue;
                 }
                 assert(testCases[key].validated || testCases[key].conditional,

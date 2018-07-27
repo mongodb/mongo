@@ -95,9 +95,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             to: st.shard0.shardName  // Arbitrary shard.
         });
         assert.commandFailedWithCode(res, authorizeErrorCode, "moveChunk");
-        assert.commandFailedWithCode(mongo.getDB("test").copyDatabase("admin", "admin2"),
-                                     authorizeErrorCode,
-                                     "copyDatabase");
         // Create collection
         assert.commandFailedWithCode(
             mongo.getDB("test").createCollection("log", {capped: true, size: 5242880, max: 5000}),

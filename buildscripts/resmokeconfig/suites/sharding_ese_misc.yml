@@ -323,7 +323,6 @@ selector:
   - jstests/sharding/replication_with_undefined_shard_key.js
   - jstests/sharding/min_optime_recovery_on_failed_move_chunk_commit.js
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
-  - jstests/sharding/copydb_from_mongos.js
   - jstests/sharding/max_time_ms_sharded_new_commands.js
   - jstests/sharding/sessions_collection_auto_healing.js
   - jstests/sharding/major_version_check.js
@@ -345,7 +344,6 @@ selector:
   - jstests/sharding/version2.js
   - jstests/sharding/split_against_shard_with_invalid_split_points.js
   - jstests/sharding/add_shard_to_zone.js
-  - jstests/sharding/auth_copydb.js
   - jstests/sharding/auth_no_config_primary.js
   - jstests/sharding/balancer_shell_commands.js
   - jstests/sharding/remove_shard_from_zone.js

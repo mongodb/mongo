@@ -125,7 +125,6 @@ selector:
   - jstests/replsets/last_op_visible.js
   - jstests/replsets/sessions_collection_auto_healing.js
   - jstests/replsets/maintenance2.js
-  - jstests/replsets/copydb.js
   - jstests/replsets/sized_zero_capped.js
   - jstests/replsets/initial_sync_document_validation.js
   - jstests/replsets/commands_that_write_accept_wc.js
@@ -221,7 +220,6 @@ selector:
   - jstests/replsets/initiate_prohibits_w0.js
   - jstests/replsets/single_server_majority.js
   - jstests/replsets/rslib.js
-  - jstests/replsets/cloneDb.js
   - jstests/replsets/two_nodes_priority_take_over.js
   - jstests/replsets/initial_sync_cloner_dups.js
   - jstests/replsets/find_and_modify_wc.js

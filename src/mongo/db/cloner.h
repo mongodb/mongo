@@ -58,7 +58,7 @@ public:
     /**
      * Copies an entire database from the specified host.
      * clonedColls: when not-null, the function will return with this populated with a list of
-     *              the collections that were cloned.  This is for the user-facing clone command.
+     *              the collections that were cloned.
      * collectionsToClone: When opts.createCollections is false, this list reflects the collections
      *              that are cloned.  When opts.createCollections is true, this parameter is
      *              ignored and the collection list is fetched from the remote via _conn.

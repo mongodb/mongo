@@ -54,11 +54,8 @@ var assertCannotRunCommands = function(mongo) {
     assert.throws(function() {
         mongo.getDB("test").createUser({user: username, pwd: password, roles: ['readWrite']});
     });
-    // DB operations
-    var authorizeErrorCode = 13;
-    assert.commandFailedWithCode(
-        mongo.getDB("test").copyDatabase("admin", "admin2"), authorizeErrorCode, "copyDatabase");
     // Create collection
+    var authorizeErrorCode = 13;
     assert.commandFailedWithCode(
         mongo.getDB("test").createCollection("log", {capped: true, size: 5242880, max: 5000}),
         authorizeErrorCode,

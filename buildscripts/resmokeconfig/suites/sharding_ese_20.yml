@@ -25,7 +25,6 @@ selector:
   - jstests/sharding/version2.js
   - jstests/sharding/split_against_shard_with_invalid_split_points.js
   - jstests/sharding/add_shard_to_zone.js
-  - jstests/sharding/auth_copydb.js
   - jstests/sharding/auth_no_config_primary.js
   - jstests/sharding/balancer_shell_commands.js
   - jstests/sharding/remove_shard_from_zone.js

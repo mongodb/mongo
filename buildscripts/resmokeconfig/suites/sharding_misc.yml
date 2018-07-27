@@ -332,7 +332,6 @@ selector:
   - jstests/sharding/server_status.js
   - jstests/sharding/ssv_config_check.js
   - jstests/sharding/update_zone_key_range.js
-  - jstests/sharding/copydb_from_mongos.js
   - jstests/sharding/auth2.js
   - jstests/sharding/change_stream_update_lookup_collation.js
   - jstests/sharding/mongos_query_comment.js
@@ -342,7 +341,6 @@ selector:
   - jstests/sharding/authwhere.js
   - jstests/sharding/authmr.js
   - jstests/sharding/sessions_collection_auto_healing.js
-  - jstests/sharding/auth_copydb.js
   - jstests/sharding/read_does_not_create_namespaces.js
   - jstests/sharding/ismaster.js
   - jstests/sharding/balancer_shell_commands.js

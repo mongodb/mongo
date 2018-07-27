@@ -233,13 +233,6 @@
     assertFailsWithInvalidNamespacesForField(
         "to", {renameCollection: "test.b", to: ""}, isFullyQualified, isAdminCommand);
 
-    // Test copydb fails with an invalid fromdb name.
-    assertFailsWithInvalidNamespacesForField(
-        "fromdb", {copydb: 1, fromdb: "", todb: "b"}, isNotFullyQualified, isAdminCommand);
-    // Test copydb fails with an invalid todb name.
-    assertFailsWithInvalidNamespacesForField(
-        "todb", {copydb: 1, fromdb: "a", todb: ""}, isNotFullyQualified, isAdminCommand);
-
     // Test drop fails with an invalid collection name.
     assertFailsWithInvalidNamespacesForField(
         "drop", {drop: ""}, isNotFullyQualified, isNotAdminCommand);

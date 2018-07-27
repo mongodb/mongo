@@ -33,7 +33,6 @@ selector:
   - jstests/sharding/replication_with_undefined_shard_key.js
   - jstests/sharding/min_optime_recovery_on_failed_move_chunk_commit.js
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
-  - jstests/sharding/copydb_from_mongos.js
   - jstests/sharding/max_time_ms_sharded_new_commands.js
   - jstests/sharding/sessions_collection_auto_healing.js
   - jstests/sharding/major_version_check.js

@@ -1899,41 +1899,6 @@
         assert.eq(8, coll.findOne({_id: "foo"}).x);
     }
 
-    // Test that the collections created with the "copydb" command inherit the default collation of
-    // the corresponding collection.
-    {
-        const sourceDB = db.getSiblingDB("collation");
-        const destDB = db.getSiblingDB("collation_cloned");
-
-        sourceDB.dropDatabase();
-        destDB.dropDatabase();
-
-        // Create a collection with a non-simple default collation.
-        assert.commandWorked(
-            sourceDB.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}));
-        var sourceCollectionInfos = sourceDB.getCollectionInfos({name: coll.getName()});
-
-        assert.writeOK(sourceDB[coll.getName()].insert({_id: "FOO"}));
-        assert.writeOK(sourceDB[coll.getName()].insert({_id: "bar"}));
-        assert.eq([{_id: "FOO"}],
-                  sourceDB[coll.getName()].find({_id: "foo"}).toArray(),
-                  "query should have performed a case-insensitive match");
-
-        assert.commandWorked(
-            sourceDB.adminCommand({copydb: 1, fromdb: sourceDB.getName(), todb: destDB.getName()}));
-        var destCollectionInfos = destDB.getCollectionInfos({name: coll.getName()});
-
-        // The namespace for the _id index will differ since the source and destination collections
-        // are in different databases. Same for UUID.
-        delete sourceCollectionInfos[0].idIndex.ns;
-        delete sourceCollectionInfos[0].info.uuid;
-        delete destCollectionInfos[0].idIndex.ns;
-        delete destCollectionInfos[0].info.uuid;
-
-        assert.eq(sourceCollectionInfos, destCollectionInfos);
-        assert.eq([{_id: "FOO"}], destDB[coll.getName()].find({_id: "foo"}).toArray());
-    }
-
     // Test that the collection created with the "cloneCollectionAsCapped" command inherits the
     // default collation of the corresponding collection. We skip running this command in a sharded
     // cluster because it isn't supported by mongos.

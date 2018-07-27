@@ -426,7 +426,6 @@ public:
      * real delete.
      * 'loc' key to uniquely identify a record in a collection.
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     * 'cappedOK' if true, allows deletes on capped collections (Cloner::copyDB uses this).
      * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
      * will not be logged.
      */

@@ -52,7 +52,6 @@ selector:
   - jstests/replsets/initiate_prohibits_w0.js
   - jstests/replsets/single_server_majority.js
   - jstests/replsets/rslib.js
-  - jstests/replsets/cloneDb.js
   - jstests/replsets/two_nodes_priority_take_over.js
   - jstests/replsets/initial_sync_cloner_dups.js
   - jstests/replsets/find_and_modify_wc.js

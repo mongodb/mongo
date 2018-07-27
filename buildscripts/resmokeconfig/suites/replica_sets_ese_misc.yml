@@ -98,7 +98,6 @@ selector:
   - jstests/replsets/initial_sync_oplog_rollover.js
   - jstests/replsets/rollback_drop_database.js
   - jstests/replsets/auth_no_pri.js
-  - jstests/replsets/cloneDb.js
   - jstests/replsets/slave_delay_clean_shutdown.js
   - jstests/replsets/rollback_drop_index_after_rename.js
   - jstests/replsets/reconfig.js
@@ -119,7 +118,6 @@ selector:
   - jstests/replsets/sessions_collection_auto_healing.js
   - jstests/replsets/get_replication_info_helper.js
   - jstests/replsets/maintenance2.js
-  - jstests/replsets/copydb.js
   - jstests/replsets/read_committed_lookup.js
   - jstests/replsets/initial_sync_update_missing_doc1.js
   - jstests/replsets/commands_that_write_accept_wc.js

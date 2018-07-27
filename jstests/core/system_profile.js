@@ -68,14 +68,3 @@ assert.commandWorked(testDB.dropDatabase());
 assert.commandWorked(testDB.createCollection("foo"));
 assert.commandFailed(testDB.adminCommand(
     {renameCollection: testDB.foo.getFullName(), to: testDB.system.profile.getFullName()}));
-
-// Copying a database containing "system.profile" should succeed.  The "system.profile" collection
-// should not be copied.
-assert.commandWorked(testDB.dropDatabase());
-assert.commandWorked(testDB.createCollection("foo"));
-assert.commandWorked(testDB.createCollection("system.profile"));
-assert.commandWorked(testDBCopy.dropDatabase());
-assert.commandWorked(
-    testDB.adminCommand({copydb: 1, fromdb: testDB.getName(), todb: testDBCopy.getName()}));
-assert(testDBCopy.foo.exists());
-assert.isnull(testDBCopy.system.profile.exists());

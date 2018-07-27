@@ -91,7 +91,6 @@ env.Library(
 env.Library(
     target="core",
     source=[
-        "copydb_common.cpp",
         "fail_point_cmd.cpp",
         "find_and_modify_common.cpp",
         "generic.cpp",
@@ -277,11 +276,9 @@ env.Library(
     target="mongod",
     source=[
         "apply_ops_cmd.cpp",
-        "clone.cpp",
         "clone_collection.cpp",
         "collection_to_capped.cpp",
         "compact.cpp",
-        "copydb.cpp",
         "copydb_start_commands.cpp",
         "cpuload.cpp",
         "dbcheck.cpp",

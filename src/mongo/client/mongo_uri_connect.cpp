@@ -81,24 +81,6 @@ BSONObj parseAuthMechanismProperties(const std::string& propStr) {
     return bob.obj();
 }
 
-std::string authKeyCopyDBMongoCR(const std::string& username,
-                                 const std::string& password,
-                                 const std::string& nonce) {
-    md5digest d;
-    std::string passwordDigest = createPasswordDigest(username, password);
-    {
-        md5_state_t st;
-        md5_init(&st);
-        md5_append(&st, reinterpret_cast<const md5_byte_t*>(nonce.c_str()), nonce.size());
-        md5_append(&st, reinterpret_cast<const md5_byte_t*>(username.data()), username.length());
-        md5_append(&st,
-                   reinterpret_cast<const md5_byte_t*>(passwordDigest.c_str()),
-                   passwordDigest.size());
-        md5_finish(&st, d);
-    }
-    return digestToString(d);
-}
-
 }  // namespace
 
 BSONObj MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {

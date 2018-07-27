@@ -424,31 +424,6 @@ public:
         return res;
     }
 
-    /** Copy database from one server or name to another server or name.
-
-       Generally, you should dropDatabase() first as otherwise the copied information will MERGE
-       into whatever data is already present in this database.
-
-       For security reasons this function only works when you are authorized to access the "admin"
-       db.  However, if you have access to said db, you can copy any database from one place to
-       another.
-       TODO: this needs enhancement to be more flexible in terms of security.
-
-       This method provides a way to "rename" a database by copying it to a new db name and
-       location.  The copy is "repaired" and compacted.
-
-       fromdb   database name from which to copy.
-       todb     database name to copy to.
-       fromhost hostname of the database (and optionally, ":port") from which to
-                copy the data.  copies from self if "".
-
-       returns true if successful
-    */
-    bool copyDatabase(const std::string& fromdb,
-                      const std::string& todb,
-                      const std::string& fromhost = "",
-                      BSONObj* info = 0);
-
     /** validate a collection, checking for errors and reporting back statistics.
         this operation is slow and blocking.
      */

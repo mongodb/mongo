@@ -465,7 +465,8 @@ var DB;
     };
 
     /**
-      Clone database on another server to here.
+      Clone database on another server to here. This functionality was removed as of MongoDB 4.2.
+      The shell helper is kept to maintain compatibility with previous versions of MongoDB.
       <p>
       Generally, you should dropDatabase() first as otherwise the cloned information will MERGE
       into whatever data is already present in this database.  (That is however a valid way to use
@@ -481,7 +482,7 @@ var DB;
      */
     DB.prototype.cloneDatabase = function(from) {
         print(
-            "WARNING: db.cloneDatabase is deprecated. See http://dochub.mongodb.org/core/copydb-clone-deprecation");
+            "WARNING: db.cloneDatabase will only function with MongoDB 4.0 and below. See http://dochub.mongodb.org/core/4.2-copydb-clone");
         assert(isString(from) && from.length);
         return this._dbCommand({clone: from});
     };
@@ -512,7 +513,9 @@ var DB;
     };
 
     /**
-      Copy database from one server or name to another server or name.
+      Copy database from one server or name to another server or name. This functionality was
+      removed as of MongoDB 4.2. The shell helper is kept to maintain compatibility with previous
+      versions of MongoDB.
 
       Generally, you should dropDatabase() first as otherwise the copied information will MERGE
       into whatever data is already present in this database (and you will get duplicate objects
@@ -534,7 +537,7 @@ var DB;
     DB.prototype.copyDatabase = function(
         fromdb, todb, fromhost, username, password, mechanism, slaveOk) {
         print(
-            "WARNING: db.copyDatabase is deprecated. See http://dochub.mongodb.org/core/copydb-clone-deprecation");
+            "WARNING: db.copyDatabase will only function with MongoDB 4.0 and below. See http://dochub.mongodb.org/core/4.2-copydb-clone");
         assert(isString(fromdb) && fromdb.length);
         assert(isString(todb) && todb.length);
         fromhost = fromhost || "";
@@ -596,9 +599,10 @@ var DB;
         print(
             "\tdb.aggregate([pipeline], {options}) - performs a collectionless aggregation on this database; returns a cursor");
         print("\tdb.auth(username, password)");
-        print("\tdb.cloneDatabase(fromhost) - deprecated");
+        print("\tdb.cloneDatabase(fromhost) - will only function with MongoDB 4.0 and below");
         print("\tdb.commandHelp(name) returns the help for the command");
-        print("\tdb.copyDatabase(fromdb, todb, fromhost) - deprecated");
+        print(
+            "\tdb.copyDatabase(fromdb, todb, fromhost) - will only function with MongoDB 4.0 and below");
         print("\tdb.createCollection(name, {size: ..., capped: ..., max: ...})");
         print("\tdb.createView(name, viewOn, [{$operator: {...}}, ...], {viewOptions})");
         print("\tdb.createUser(userDocument)");

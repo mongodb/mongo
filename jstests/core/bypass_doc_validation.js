@@ -5,7 +5,6 @@
  *
  * - aggregation with $out
  * - applyOps (when not sharded)
- * - copyDb
  * - doTxn (when not sharded)
  * - findAndModify
  * - insert
@@ -85,19 +84,6 @@
         coll.aggregate(pipeline, {bypassDocumentValidation: true});
         assert.eq(1, outputColl.count({aggregation: 1}));
 
-        // Test the copyDb command.
-        const copyDbName = dbName + '_copy';
-        const copyDb = myDb.getSiblingDB(copyDbName);
-        assert.commandWorked(copyDb.dropDatabase());
-        let res = db.adminCommand(
-            {copydb: 1, fromdb: dbName, todb: copyDbName, bypassDocumentValidation: false});
-        assertFailsValidation(res);
-        assert.eq(0, copyDb[collName].count());
-        assert.commandWorked(copyDb.dropDatabase());
-        assert.commandWorked(db.adminCommand(
-            {copydb: 1, fromdb: dbName, todb: copyDbName, bypassDocumentValidation: true}));
-        assert.eq(coll.count(), db.getSiblingDB(copyDbName)[collName].count());
-
         // Test the findAndModify command.
         assert.throws(function() {
             coll.findAndModify(
@@ -114,7 +100,7 @@
         const reduce = function() {
             return 'mapReduce';
         };
-        res = myDb.runCommand({
+        let res = myDb.runCommand({
             mapReduce: collName,
             map: map,
             reduce: reduce,

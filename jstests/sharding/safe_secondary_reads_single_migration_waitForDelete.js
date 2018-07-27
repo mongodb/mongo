@@ -20,6 +20,7 @@
     "use strict";
 
     load('jstests/libs/profiler.js');
+    load('jstests/sharding/libs/last_stable_mongos_commands.js');
 
     let db = "test";
     let coll = "foo";
@@ -106,7 +107,6 @@
         connPoolSync: {skip: "does not return user data"},
         connectionStatus: {skip: "does not return user data"},
         convertToCapped: {skip: "primary only"},
-        copydb: {skip: "primary only"},
         copydbsaslstart: {skip: "primary only"},
         count: {
             setUp: function(mongosConn) {
@@ -154,7 +154,6 @@
         emptycapped: {skip: "primary only"},
         enableSharding: {skip: "primary only"},
         endSessions: {skip: "does not return user data"},
-        eval: {skip: "must define test coverage for 4.0 backwards compatibility"},
         explain: {skip: "TODO SERVER-30068"},
         features: {skip: "does not return user data"},
         filemd5: {skip: "does not return user data"},
@@ -175,7 +174,6 @@
         forceerror: {skip: "does not return user data"},
         fsync: {skip: "does not return user data"},
         fsyncUnlock: {skip: "does not return user data"},
-        geoNear: {skip: "must define test coverage for 4.0 backwards compatibility"},
         geoSearch: {skip: "not supported in mongos"},
         getCmdLineOpts: {skip: "does not return user data"},
         getDiagnosticData: {skip: "does not return user data"},
@@ -191,7 +189,6 @@
         grantPrivilegesToRole: {skip: "primary only"},
         grantRolesToRole: {skip: "primary only"},
         grantRolesToUser: {skip: "primary only"},
-        group: {skip: "must define test coverage for 4.0 backwards compatibility"},
         handshake: {skip: "does not return user data"},
         hostInfo: {skip: "does not return user data"},
         insert: {skip: "primary only"},
@@ -253,7 +250,6 @@
         refreshLogicalSessionCacheNow: {skip: "does not return user data"},
         refreshSessions: {skip: "does not return user data"},
         refreshSessionsInternal: {skip: "does not return user data"},
-        reIndex: {skip: "does not return user data"},
         removeShard: {skip: "primary only"},
         removeShardFromZone: {skip: "primary only"},
         renameCollection: {skip: "primary only"},
@@ -311,6 +307,10 @@
         validate: {skip: "does not return user data"},
         whatsmyuri: {skip: "does not return user data"}
     };
+
+    commandsRemovedFromMongosIn42.forEach(function(cmd) {
+        testCases[cmd] = {skip: "must define test coverage for 4.0 backwards compatibility"};
+    });
 
     // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
     let rsOpts = {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]};

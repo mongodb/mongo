@@ -44,7 +44,6 @@ selector:
   - jstests/replsets/initial_sync_oplog_rollover.js
   - jstests/replsets/rollback_drop_database.js
   - jstests/replsets/auth_no_pri.js
-  - jstests/replsets/cloneDb.js
   - jstests/replsets/slave_delay_clean_shutdown.js
   - jstests/replsets/rollback_drop_index_after_rename.js
   - jstests/replsets/reconfig.js

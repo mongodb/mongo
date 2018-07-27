@@ -131,7 +131,6 @@
             skip: "Tested in views/views_sharded.js",
         },
         clearLog: {skip: isUnrelated},
-        clone: {skip: "Tested in replsets/cloneDb.js"},
         cloneCollection: {skip: "Tested in noPassthroughWithMongod/clonecollection.js"},
         cloneCollectionAsCapped: {
             command: {cloneCollectionAsCapped: "view", toCollection: "testcapped", size: 10240},
@@ -147,7 +146,6 @@
         connectionStatus: {skip: isUnrelated},
         convertToCapped: {command: {convertToCapped: "view", size: 12345}, expectFailure: true},
         coordinateCommitTransaction: {skip: isUnrelated},
-        copydb: {skip: "Tested in replsets/copydb.js"},
         copydbsaslstart: {skip: isUnrelated},
         count: {command: {count: "view"}},
         cpuload: {skip: isAnInternalCommand},

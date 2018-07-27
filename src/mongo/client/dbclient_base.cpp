@@ -560,21 +560,6 @@ bool DBClientBase::createCollection(
     return runCommand(db.c_str(), b.done(), *info);
 }
 
-bool DBClientBase::copyDatabase(const string& fromdb,
-                                const string& todb,
-                                const string& fromhost,
-                                BSONObj* info) {
-    BSONObj o;
-    if (info == 0)
-        info = &o;
-    BSONObjBuilder b;
-    b.append("copydb", 1);
-    b.append("fromhost", fromhost);
-    b.append("fromdb", fromdb);
-    b.append("todb", todb);
-    return runCommand("admin", b.done(), *info);
-}
-
 list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& filter) {
     list<BSONObj> infos;
 

@@ -37,7 +37,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -231,107 +230,6 @@ public:
     }
 
 } renameCollectionCmd;
-
-class CopyDBCmd : public BasicCommand {
-public:
-    CopyDBCmd() : BasicCommand("copydb") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
-    }
-
-    bool adminOnly() const override {
-        return true;
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        const auto todbElt = cmdObj["todb"];
-        uassert(ErrorCodes::InvalidNamespace,
-                "'todb' must be of type String",
-                todbElt.type() == BSONType::String);
-        const std::string todb = todbElt.str();
-        uassert(ErrorCodes::InvalidNamespace,
-                "Invalid todb argument",
-                NamespaceString::validDBName(todb, NamespaceString::DollarInDbNameBehavior::Allow));
-
-        auto toDbInfo = uassertStatusOK(createShardDatabase(opCtx, todb));
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot copy to a sharded database",
-                !toDbInfo.shardingEnabled());
-
-        const auto copyDbCmdObj = cmdObj["fromhost"] ? cmdObj : [&] {
-            const auto fromDbElt = cmdObj["fromdb"];
-            uassert(ErrorCodes::InvalidNamespace,
-                    "'fromdb' must be of type String",
-                    fromDbElt.type() == BSONType::String);
-            const std::string fromdb = fromDbElt.str();
-            uassert(ErrorCodes::InvalidNamespace,
-                    "invalid fromdb argument",
-                    NamespaceString::validDBName(fromdb,
-                                                 NamespaceString::DollarInDbNameBehavior::Allow));
-
-            auto fromDbInfo = uassertStatusOK(createShardDatabase(opCtx, fromdb));
-            uassert(ErrorCodes::IllegalOperation,
-                    "Cannot copy from a sharded database",
-                    !fromDbInfo.shardingEnabled());
-
-            // If the source and destination are the same, there is no need to attach the 'fromhost'
-            // field since the copy is entirely local to the node
-            if (fromDbInfo.primaryId() == toDbInfo.primaryId()) {
-                return cmdObj;
-            }
-
-            BSONObjBuilder copyDbCmdObjBuilder;
-
-            // Copy everything but the "fromhost" parameter
-            BSONForEach(e, cmdObj) {
-                if (strcmp(e.fieldName(), "fromhost")) {
-                    copyDbCmdObjBuilder.append(e);
-                }
-            }
-
-            // Append "fromhost" as the database's primary
-            {
-                const auto shard = uassertStatusOK(
-                    Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromDbInfo.primaryId()));
-                copyDbCmdObjBuilder.append("fromhost", shard->getConnString().toString());
-            }
-
-            return copyDbCmdObjBuilder.obj();
-        }();
-
-        // copyDb creates multiple collections and should handle collection creation differently
-        auto response = executeCommandAgainstDatabasePrimary(
-            opCtx,
-            NamespaceString::kAdminDb,
-            toDbInfo,
-            appendAllowImplicitCreate(
-                CommandHelpers::filterCommandRequestForPassthrough(copyDbCmdObj), true),
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kNoRetry);
-
-        const auto cmdResponse = uassertStatusOK(std::move(response.swResponse));
-        const auto status = getStatusFromCommandResult(cmdResponse.data);
-
-        result.appendElementsUnique(
-            CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data));
-        return status.isOK();
-    }
-
-} clusterCopyDBCmd;
 
 class ConvertToCappedCmd : public BasicCommand {
 public:

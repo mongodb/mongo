@@ -65,7 +65,6 @@
         "collMod",
         "commitTransaction",
         "convertToCapped",
-        "copydb",
         "create",
         "createIndexes",
         "createRole",
