@@ -159,6 +159,12 @@ executor:
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
+        logComponentVerbosity:
+          replication:
+            heartbeats: 2
+            rollback: 2
+          storage:
+            recovery: 2
     all_nodes_electable: true
     num_nodes: 3
     replset_config_options:
