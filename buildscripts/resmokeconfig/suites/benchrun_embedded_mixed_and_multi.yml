@@ -1,0 +1,10 @@
+test_kind: benchrun_embedded_test
+
+selector:
+  roots:
+    - benchrun_embedded/**/mixed*.json
+    - benchrun_embedded/**/multi*.json
+
+executor:
+  hooks:
+  - class: CombineBenchrunEmbeddedResults

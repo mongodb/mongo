@@ -112,6 +112,10 @@ def _make_parser():  # pylint: disable=too-many-statements
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
                             " i.e. JSON with support for single quoted and unquoted keys."))
 
+    parser.add_option("--mongoebench", dest="mongoebench_executable", metavar="PATH",
+                      help=("The path to the mongoebench (benchrun embedded) executable for"
+                            " resmoke.py to use."))
+
     parser.add_option("--mongos", dest="mongos_executable", metavar="PATH",
                       help="The path to the mongos executable for resmoke.py to use.")
 
@@ -256,31 +260,33 @@ def _make_parser():  # pylint: disable=too-many-statements
     evergreen_options.add_option("--versionId", dest="version_id", metavar="VERSION_ID",
                                  help="Sets the version ID of the task.")
 
-    benchmark_options = optparse.OptionGroup(parser, title="Benchmark test options",
-                                             description="Options for running Benchmark tests")
+    benchmark_options = optparse.OptionGroup(
+        parser, title="Benchmark/Benchrun test options",
+        description="Options for running Benchmark/Benchrun tests")
 
     parser.add_option_group(benchmark_options)
 
     benchmark_options.add_option("--benchmarkFilter", type="string", dest="benchmark_filter",
                                  metavar="BENCHMARK_FILTER",
-                                 help="Regex to filter benchmark tests to run.")
+                                 help="Regex to filter Google benchmark tests to run.")
 
     benchmark_options.add_option("--benchmarkListTests", dest="benchmark_list_tests",
                                  action="store_true", metavar="BENCHMARK_LIST_TESTS",
-                                 help="Lists all benchmark test configurations in each test file.")
+                                 help=("Lists all Google benchmark test configurations in each"
+                                       " test file."))
 
     benchmark_min_time_help = (
-        "Minimum time to run each benchmark test for. Use this option instead of "
+        "Minimum time to run each benchmark/benchrun test for. Use this option instead of "
         "--benchmarkRepetitions to make a test run for a longer or shorter duration.")
     benchmark_options.add_option("--benchmarkMinTimeSecs", type="int",
                                  dest="benchmark_min_time_secs", metavar="BENCHMARK_MIN_TIME",
                                  help=benchmark_min_time_help)
 
     benchmark_repetitions_help = (
-        "Set --benchmarkRepetitions=1 if you'd like to run the benchmark tests only once. By "
-        "default, each test is run multiple times to provide statistics on the variance between "
-        "runs; use --benchmarkMinTimeSecs if you'd like to run a test for a longer or shorter "
-        "duration.")
+        "Set --benchmarkRepetitions=1 if you'd like to run the benchmark/benchrun tests only once."
+        " By default, each test is run multiple times to provide statistics on the variance"
+        " between runs; use --benchmarkMinTimeSecs if you'd like to run a test for a longer or"
+        " shorter duration.")
     benchmark_options.add_option("--benchmarkRepetitions", type="int", dest="benchmark_repetitions",
                                  metavar="BENCHMARK_REPETITIONS", help=benchmark_repetitions_help)
 
@@ -361,6 +367,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
     _config.MONGOD_SET_PARAMETERS = config.pop("mongod_set_parameters")
+    _config.MONGOEBENCH_EXECUTABLE = _expand_user(config.pop("mongoebench_executable"))
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
     _config.MONGOS_SET_PARAMETERS = config.pop("mongos_set_parameters")
     _config.NO_JOURNAL = config.pop("no_journal")

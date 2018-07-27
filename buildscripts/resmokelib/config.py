@@ -26,6 +26,7 @@ MONGO_RUNNER_SUBDIR = "mongorunner"
 # Default path for where to look for executables.
 DEFAULT_DBTEST_EXECUTABLE = os.path.join(os.curdir, "dbtest")
 DEFAULT_MONGO_EXECUTABLE = os.path.join(os.curdir, "mongo")
+DEFAULT_MONGOEBENCH_EXECUTABLE = os.path.join(os.curdir, "mongoebench")
 DEFAULT_MONGOD_EXECUTABLE = os.path.join(os.curdir, "mongod")
 DEFAULT_MONGOS_EXECUTABLE = os.path.join(os.curdir, "mongos")
 
@@ -53,6 +54,7 @@ DEFAULTS = {
     "mongo_executable": None,
     "mongod_executable": None,
     "mongod_set_parameters": None,
+    "mongoebench_executable": None,
     "mongos_executable": None,
     "mongos_set_parameters": None,
     "no_journal": False,
@@ -270,6 +272,9 @@ MONGOD_EXECUTABLE = None
 # The --setParameter options passed to mongod.
 MONGOD_SET_PARAMETERS = None
 
+# The path to the mongoebench executable used by resmoke.py.
+MONGOEBENCH_EXECUTABLE = None
+
 # The path to the mongos executable used by resmoke.py.
 MONGOS_EXECUTABLE = None
 
@@ -372,4 +377,5 @@ DEFAULT_INTEGRATION_TEST_LIST = "build/integration_tests.txt"
 # External files or executables, used as suite selectors, that are created during the build and
 # therefore might not be available when creating a test membership map.
 EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST, DEFAULT_UNIT_TEST_LIST,
-                            DEFAULT_INTEGRATION_TEST_LIST, DEFAULT_DBTEST_EXECUTABLE)
+                            DEFAULT_INTEGRATION_TEST_LIST, DEFAULT_DBTEST_EXECUTABLE,
+                            DEFAULT_MONGOEBENCH_EXECUTABLE)

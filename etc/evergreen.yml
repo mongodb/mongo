@@ -175,6 +175,18 @@ variables:
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path}
   mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}'\"
 
+- &benchrun_embedded
+  name: benchrun_embedded
+  execution_tasks:
+  - benchrun_embedded_aggregation
+  - benchrun_embedded_commands
+  - benchrun_embedded_insert
+  - benchrun_embedded_misc
+  - benchrun_embedded_mixed_and_multi
+  - benchrun_embedded_queries
+  - benchrun_embedded_remove
+  - benchrun_embedded_update
+
 - &replica_sets_auth
   name: replica_sets_auth
   execution_tasks:
@@ -774,6 +786,15 @@ functions:
       bucket: mciuploads
       extract_to: src
 
+  "fetch benchmark embedded files" : &fetch_benchrun_embedded_files
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/benchrun_embedded/benchrun_json_files.tgz
+      bucket: mciuploads
+      extract_to: src/benchrun_embedded
+
   "get buildnumber" : &get_buildnumber
     command: keyval.inc
     params:
@@ -1219,6 +1240,13 @@ functions:
   - *get_buildnumber
   - *set_up_credentials
   - *fetch_benchmarks
+
+  "do benchmark embedded setup" :
+  - *git_get_project
+  - *fetch_artifacts
+  - *get_buildnumber
+  - *set_up_credentials
+  - *fetch_benchrun_embedded_files
 
   "set up virtualenv" :
     command: shell.exec
@@ -3201,6 +3229,7 @@ test_lifecycle_excluded_tasks:
 - aggregation_fuzzer*
 - burn_in_tests
 - compile*
+- benchmarks*
 - dbtest*
 - idl_tests
 - integration*
@@ -3861,6 +3890,86 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=benchmarks_sharding
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
+- <<: *task_template
+  name: benchrun_embedded_aggregation
+  commands:
+  - func: "do benchmark embedded setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchrun_embedded_aggregation
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
+- <<: *task_template
+  name: benchrun_embedded_commands
+  commands:
+  - func: "do benchmark embedded setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchrun_embedded_commands
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
+- <<: *task_template
+  name: benchrun_embedded_insert
+  commands:
+  - func: "do benchmark embedded setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchrun_embedded_insert
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
+- <<: *task_template
+  name: benchrun_embedded_misc
+  commands:
+  - func: "do benchmark embedded setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchrun_embedded_misc
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
+- <<: *task_template
+  name: benchrun_embedded_mixed_and_multi
+  commands:
+  - func: "do benchmark embedded setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchrun_embedded_mixed_and_multi
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
+- <<: *task_template
+  name: benchrun_embedded_queries
+  commands:
+  - func: "do benchmark embedded setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchrun_embedded_queries
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
+- <<: *task_template
+  name: benchrun_embedded_remove
+  commands:
+  - func: "do benchmark embedded setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchrun_embedded_remove
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
+- <<: *task_template
+  name: benchrun_embedded_update
+  commands:
+  - func: "do benchmark embedded setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchrun_embedded_update
       run_multiple_jobs: false
   - func: "send benchmark results"
 
@@ -12532,6 +12641,7 @@ buildvariants:
     build_mongoreplay: true
     additional_targets: mongoebench mongoed
   display_tasks:
+  - *benchrun_embedded
   - *dbtest
   - *unittests
   tasks:
@@ -12543,6 +12653,31 @@ buildvariants:
   - name: aggregation_facet_unwind_passthrough
   - name: auth
   - name: concurrency
+  - name: benchrun_embedded_aggregation
+    distros:
+    - centos6-perf
+  - name: benchrun_embedded_commands
+    distros:
+    - centos6-perf
+  - name: benchrun_embedded_insert
+    distros:
+    - centos6-perf
+  - name: benchrun_embedded_misc
+    distros:
+    - centos6-perf
+  - name: benchrun_embedded_mixed_and_multi
+    distros:
+    - centos6-perf
+  - name: benchrun_embedded_queries
+    distros:
+    - centos6-perf
+  - name: benchrun_embedded_remove
+    distros:
+    - centos6-perf
+  - name: benchrun_embedded_update
+    distros:
+    - centos6-perf
+  - name: dbtest
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth

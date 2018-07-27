@@ -676,6 +676,7 @@ _SELECTOR_REGISTRY = {
     "cpp_integration_test": (_CppTestSelectorConfig, _CppTestSelector),
     "cpp_unit_test": (_CppTestSelectorConfig, _CppTestSelector),
     "benchmark_test": (_CppTestSelectorConfig, _CppTestSelector),
+    "benchrun_embedded_test": (_JsonTestSelectorConfig, _Selector),
     "db_test": (_DbTestSelectorConfig, _DbTestSelector),
     "fsm_workload_test": (_JSTestSelectorConfig, _JSTestSelector),
     "parallel_fsm_workload_test": (_MultiJSTestSelectorConfig, _MultiJSTestSelector),
@@ -693,8 +694,7 @@ def filter_tests(test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FI
     """Filter the tests according to a specified configuration.
 
     Args:
-        test_kind: the test kind, one of 'cpp_integration_test', 'cpp_unit_test', 'db_test',
-            'json_schema_test', 'js_test'.
+        test_kind: the test kind, from _SELECTOR_REGISTRY.
         selector_config: a dict containing the selector configuration.
         test_file_explorer: the TestFileExplorer to use. Using a TestFileExplorer other than
         the default one should not be needed except for mocking purposes.
