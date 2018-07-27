@@ -125,7 +125,7 @@
         setup();
         assert.commandFailedWithCode(
             sessionDb.runCommand(Object.assign({}, command, {txnNumber: NumberLong(++txnNumber)})),
-            [50768, 50884]);
+            [50768, 50889]);
     });
 
     //

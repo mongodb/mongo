@@ -58,7 +58,7 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
                 "This command is not supported in transactions",
                 !osi.getAutocommit());
         uassert(
-            50884, "It is illegal to provide a txnNumber for this command", !osi.getTxnNumber());
+            50889, "It is illegal to provide a txnNumber for this command", !osi.getTxnNumber());
         return boost::none;
     }
 
