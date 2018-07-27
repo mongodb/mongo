@@ -30,20 +30,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog/index_create.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/s/migration_destination_manager.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/s/request_types/clone_collection_options_from_primary_shard_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/log.h"
@@ -63,11 +53,15 @@ public:
             auto primaryShardId = ShardId(request().getPrimaryShard().toString());
             MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                 opCtx, ns(), primaryShardId);
+
+            // At the time this command is invoked, the config server primary has already written
+            // the collection's routing metadata, so sync from the config server
+            forceShardFilteringMetadataRefresh(opCtx, ns());
         }
 
     private:
         bool supportsWriteConcern() const override {
-            return false;
+            return true;
         }
 
         NamespaceString ns() const override {
@@ -93,7 +87,7 @@ public:
     }
 
     bool adminOnly() const override {
-        return true;
+        return false;
     }
 } CloneCollectionOptionsFromPrimaryShardCmd;
 

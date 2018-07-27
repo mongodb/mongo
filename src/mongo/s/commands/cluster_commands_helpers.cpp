@@ -151,9 +151,8 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     return requests;
 }
 
-/**
- * Throws StaleConfigException if any remote returns a stale shardVersion error.
- */
+}  // namespace
+
 std::vector<AsyncRequestsSender::Response> gatherResponses(
     OperationContext* opCtx,
     StringData dbName,
@@ -231,8 +230,6 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
 
     return responses;
 }
-
-}  // namespace
 
 BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version) {
     BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));

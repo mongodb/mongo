@@ -68,9 +68,19 @@ public:
     };
 
     /**
-     * Produces the the initial chunks that need to be written for a collection which is being
+     * Produces the initial chunks that need to be written for a collection which is being
      * newly-sharded. The function performs some basic validation of the input parameters, but there
      * is no checking whether the collection contains any data or not.
+     *
+     * Chunks are assigned to a shard in a round-robin fashion, numContiguousChunksPerShard (k)
+     * chunks at a time. For example, the first k chunks are assigned to the first available shard,
+     * and the next k chunks are assigned to the second available shard and so on.
+     * numContiguousChunksPerShard should only be > 1 when we do not pre-split the range
+     * into larger chunks and then split the resulting chunks on the destination shards as in
+     * configSvrShardCollection, thus should be equal the number of final split points + 1 divided
+     * by the number of initial split points + 1. It serves to preserve the ordering/contigousness
+     * of chunks when split by shardSvrShardCollection so that its yields the exact same shard
+     * assignments as configSvrShardCollection.
      */
     static ShardCollectionConfig generateShardCollectionInitialChunks(
         const NamespaceString& nss,
@@ -78,7 +88,21 @@ public:
         const ShardId& databasePrimaryShardId,
         const Timestamp& validAfter,
         const std::vector<BSONObj>& splitPoints,
-        const std::vector<ShardId>& shardIds);
+        const std::vector<ShardId>& shardIds,
+        const int numContiguousChunksPerShard = 1);
+
+    /**
+     * Creates and writes to the config server the first chunks for a newly sharded collection.
+     * Returns the created chunks.
+     */
+    static ShardCollectionConfig writeFirstChunksToConfig(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ShardKeyPattern& shardKeyPattern,
+        const ShardId& primaryShardId,
+        const std::vector<BSONObj>& splitPoints,
+        const bool distributeInitialChunks,
+        const int numContiguousChunksPerShard = 1);
 };
 
 }  // namespace mongo

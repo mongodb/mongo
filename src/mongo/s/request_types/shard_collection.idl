@@ -104,7 +104,7 @@ structs:
                 type: uuid
                 description: "The UUID of the collection that just got sharded."
                 optional: true
-                
+
     ShardsvrShardCollection:
         description: "The internal shardCollection command on a primary shard"
         strict: false
@@ -148,11 +148,7 @@ structs:
                 type: uuid
                 description: "The UUID of the collection that just got sharded."
                 optional: true
-            allSplits:
-                type: array<object>
-                description: "All split points."
-                optional: false
-                
+
     ConfigsvrCommitShardCollection:
         description: "The internal commitShardCollection command on the config server"
         strict: false

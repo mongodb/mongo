@@ -440,8 +440,8 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
 /**
  * Migrates the initial "big chunks" from the primary shard to spread them evenly across the shards.
  *
- * If 'allSplits' is not empty, additionally splits each "big chunk" into smaller chunks using the
- * points in 'allSplits.'
+ * If 'finalSplitPoints' is not empty, additionally splits each "big chunk" into smaller chunks
+ * using the points in 'finalSplitPoints.'
  */
 void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
                                          const NamespaceString& nss,
@@ -449,7 +449,7 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
                                          const std::vector<ShardId>& shardIds,
                                          bool isEmpty,
                                          const ShardKeyPattern& shardKeyPattern,
-                                         const std::vector<BSONObj>& allSplits) {
+                                         const std::vector<BSONObj>& finalSplitPoints) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     if (!shardKeyPattern.isHashedPattern()) {
@@ -505,7 +505,7 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
         }
     }
 
-    if (allSplits.empty()) {
+    if (finalSplitPoints.empty()) {
         return;
     }
 
@@ -517,14 +517,14 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
             routingInfo.cm());
     chunkManager = routingInfo.cm();
 
-    // Subdivide the big chunks by splitting at each of the points in "allSplits"
+    // Subdivide the big chunks by splitting at each of the points in "finalSplitPoints"
     // that we haven't already split by.
     boost::optional<Chunk> currentChunk(
-        chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[0]));
+        chunkManager->findIntersectingChunkWithSimpleCollation(finalSplitPoints[0]));
 
     std::vector<BSONObj> subSplits;
-    for (unsigned i = 0; i <= allSplits.size(); i++) {
-        if (i == allSplits.size() || !currentChunk->containsKey(allSplits[i])) {
+    for (unsigned i = 0; i <= finalSplitPoints.size(); i++) {
+        if (i == finalSplitPoints.size() || !currentChunk->containsKey(finalSplitPoints[i])) {
             if (!subSplits.empty()) {
                 auto splitStatus = shardutil::splitChunkAtMultiplePoints(
                     opCtx,
@@ -543,12 +543,12 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
                 subSplits.clear();
             }
 
-            if (i < allSplits.size()) {
+            if (i < finalSplitPoints.size()) {
                 currentChunk.emplace(
-                    chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[i]));
+                    chunkManager->findIntersectingChunkWithSimpleCollation(finalSplitPoints[i]));
             }
         } else {
-            BSONObj splitPoint(allSplits[i]);
+            BSONObj splitPoint(finalSplitPoints[i]);
 
             // Do not split on the boundaries
             if (currentChunk->getMin().woCompare(splitPoint) == 0) {
@@ -791,22 +791,12 @@ public:
                 result << "collectionUUID" << *uuid;
             }
 
-            // Make sure the cached metadata for the collection knows that we are now sharded
-            catalogCache->invalidateShardedCollection(nss);
-
-            // Free the distlocks to allow the splits and migrations below to proceed.
-            collDistLock.reset();
-            dbDistLock.reset();
-            lk.unlock();
-
-            // Step 7. Migrate initial chunks to distribute them across shards.
-            migrateAndFurtherSplitInitialChunks(opCtx,
-                                                nss,
-                                                numShards,
-                                                shardIds,
-                                                isEmpty,
-                                                shardKeyPattern,
-                                                std::move(shardCollResponse.getAllSplits()));
+            auto routingInfo =
+                uassertStatusOK(catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "Collection was successfully written as sharded but got dropped before it "
+                    "could be evenly distributed",
+                    routingInfo.cm());
 
             return true;
         }
@@ -823,18 +813,18 @@ public:
         }
 
         // Step 5.
-        std::vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
-        std::vector<BSONObj> allSplits;   // all of the initial desired split points
+        std::vector<BSONObj> initialSplitPoints;  // there will be at most numShards-1 of these
+        std::vector<BSONObj> finalSplitPoints;    // all of the desired split points
         if (request.getInitialSplitPoints()) {
-            initSplits = std::move(*request.getInitialSplitPoints());
+            initialSplitPoints = std::move(*request.getInitialSplitPoints());
         } else {
             InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
                 shardKeyPattern,
                 isEmpty,
                 numShards,
                 request.getNumInitialChunks(),
-                &initSplits,
-                &allSplits);
+                &initialSplitPoints,
+                &finalSplitPoints);
         }
 
         LOG(0) << "CMD: shardcollection: " << cmdObj;
@@ -854,7 +844,7 @@ public:
                                         shardKeyPattern,
                                         *request.getCollation(),
                                         request.getUnique(),
-                                        initSplits,
+                                        initialSplitPoints,
                                         distributeInitialChunks,
                                         primaryShardId);
         result << "collectionsharded" << nss.ns();
@@ -871,7 +861,7 @@ public:
 
         // Step 7. Migrate initial chunks to distribute them across shards.
         migrateAndFurtherSplitInitialChunks(
-            opCtx, nss, numShards, shardIds, isEmpty, shardKeyPattern, allSplits);
+            opCtx, nss, numShards, shardIds, isEmpty, shardKeyPattern, finalSplitPoints);
 
         return true;
     }

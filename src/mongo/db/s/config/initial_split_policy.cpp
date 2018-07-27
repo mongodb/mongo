@@ -32,6 +32,13 @@
 
 #include "mongo/db/s/config/initial_split_policy.h"
 
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -105,7 +112,8 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
     const ShardId& databasePrimaryShardId,
     const Timestamp& validAfter,
     const std::vector<BSONObj>& splitPoints,
-    const std::vector<ShardId>& shardIds) {
+    const std::vector<ShardId>& shardIds,
+    const int numContiguousChunksPerShard) {
     invariant(!shardIds.empty());
 
     ChunkVersion version(1, 0, OID::gen());
@@ -125,7 +133,11 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
 
         // It's possible there are no split points or fewer split points than total number of
         // shards, and we need to be sure that at least one chunk is placed on the primary shard
-        const ShardId shardId = (i == 0) ? databasePrimaryShardId : shardIds[i % shardIds.size()];
+        const ShardId shardId = (i == 0 && splitPoints.size() + 1 < shardIds.size())
+            ? databasePrimaryShardId
+            : shardIds[(i / numContiguousChunksPerShard) % shardIds.size()];
+
+        // const ShardId shardId = shardIds[(i / numContiguousChunksPerShard) % shardIds.size()];
 
         chunks.emplace_back(nss, ChunkRange(min, max), version, shardId);
         auto& chunk = chunks.back();
@@ -135,6 +147,95 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
     }
 
     return {std::move(chunks)};
+}
+
+InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::writeFirstChunksToConfig(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardKeyPattern& shardKeyPattern,
+    const ShardId& primaryShardId,
+    const std::vector<BSONObj>& splitPoints,
+    const bool distributeInitialChunks,
+    const int numContiguousChunksPerShard) {
+    const auto& keyPattern = shardKeyPattern.getKeyPattern();
+
+    std::vector<BSONObj> finalSplitPoints;
+    std::vector<ShardId> shardIds;
+
+    if (splitPoints.empty()) {
+        // If no split points were specified use the shard's data distribution to determine them
+        auto primaryShard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+
+        auto result = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+            nss.db().toString(),
+            BSON("count" << nss.coll()),
+            Shard::RetryPolicy::kIdempotent));
+
+        long long numObjects = 0;
+        uassertStatusOK(result.commandStatus);
+        uassertStatusOK(bsonExtractIntegerField(result.response, "n", &numObjects));
+
+        // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
+        // the splitVector command and affects the number of chunks returned, has been loaded.
+        uassertStatusOK(Grid::get(opCtx)->getBalancerConfiguration()->refreshAndCheck(opCtx));
+
+        if (numObjects > 0) {
+            finalSplitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
+                opCtx,
+                primaryShardId,
+                nss,
+                shardKeyPattern,
+                ChunkRange(keyPattern.globalMin(), keyPattern.globalMax()),
+                Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
+                0));
+        }
+
+        // If docs already exist for the collection, must use primary shard,
+        // otherwise defer to passed-in distribution option.
+        if (numObjects == 0 && distributeInitialChunks) {
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
+        } else {
+            shardIds.push_back(primaryShardId);
+        }
+    } else {
+        // Make sure points are unique and ordered
+        auto orderedPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+
+        for (const auto& splitPoint : splitPoints) {
+            orderedPts.insert(splitPoint);
+        }
+
+        for (const auto& splitPoint : orderedPts) {
+            finalSplitPoints.push_back(splitPoint);
+        }
+
+        if (distributeInitialChunks) {
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
+        } else {
+            shardIds.push_back(primaryShardId);
+        }
+    }
+
+    auto initialChunks = InitialSplitPolicy::generateShardCollectionInitialChunks(
+        nss,
+        shardKeyPattern,
+        primaryShardId,
+        LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
+        finalSplitPoints,
+        shardIds,
+        numContiguousChunksPerShard);
+    for (const auto& chunk : initialChunks.chunks) {
+        uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
+            opCtx,
+            ChunkType::ConfigNS,
+            chunk.toConfigBSON(),
+            ShardingCatalogClient::kMajorityWriteConcern));
+    }
+
+    return initialChunks;
 }
 
 }  // namespace mongo

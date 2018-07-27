@@ -48,6 +48,20 @@ namespace mongo {
 void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,
                                           const BSONElement& wcErrorElem,
                                           BSONObjBuilder& responseBuilder);
+
+/**
+ * Dispatches all the specified requests in parallel and waits until all complete, returning a
+ * vector of the same size and positions as that of 'requests'.
+ *
+ * Throws StaleConfigException if any remote returns a stale shardVersion error.
+ */
+std::vector<AsyncRequestsSender::Response> gatherResponses(
+    OperationContext* opCtx,
+    StringData dbName,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    const std::vector<AsyncRequestsSender::Request>& requests);
+
 /**
  * Returns a copy of 'cmdObj' with 'version' appended.
  */
