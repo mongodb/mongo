@@ -37,6 +37,7 @@
 #include <cmath>
 #include <type_traits>
 
+#include "mongo/base/data_cursor.h"
 #include "mongo/base/data_view.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/strnlen.h"
@@ -2135,35 +2136,62 @@ int KeyString::compare(const KeyString& other) const {
     return a < b ? -1 : 1;
 }
 
+uint32_t KeyString::TypeBits::readSizeFromBuffer(BufReader* reader) {
+    const uint8_t firstByte = reader->peek<uint8_t>();
+
+    // Case 2: all bits in one byte; no size byte.
+    if (firstByte > 0 && firstByte < 0x80) {
+        return 1;
+    }
+
+    // Skip the indicator byte.
+    reader->skip(1);
+
+    // Case 3: <= 127 bytes; use one size byte.
+    if (firstByte > 0x80) {
+        return firstByte & 0x7f;
+    }
+
+    // Case 4: > 127 bytes; needs 4 size bytes.
+    if (firstByte == 0x80) {
+        // The next 4 bytes represent the size in little endian order.
+        uint32_t s = reader->read<LittleEndian<uint32_t>>();
+        uassert(50910, "Invalid overlong encoding.", s > kMaxBytesForShortEncoding);
+        return s;
+    }
+
+    // Case 1: all zeros.
+    dassert(firstByte == 0);
+    return 0;
+}
+
+void KeyString::TypeBits::setRawSize(uint32_t size) {
+    // Grow the data buffer if needed.
+    if (size > getDataBufferLen()) {
+        _buf.grow(size - getDataBufferLen());
+    }
+
+    if (size > kMaxBytesForShortEncoding) {
+        DataCursor(_buf.buf())
+            .writeAndAdvance<uint8_t>(0x80)
+            .writeAndAdvance<LittleEndian<uint32_t>>(size);
+    } else {
+        DataView(getDataBuffer() - 1).write<uint8_t>(0x80 | size);
+    }
+}
+
 void KeyString::TypeBits::resetFromBuffer(BufReader* reader) {
-    if (!reader->remaining()) {
+    reset();
+
+    if (!reader->remaining())
         // This means AllZeros state was encoded as an empty buffer.
-        reset();
         return;
-    }
 
-    const uint8_t firstByte = readType<uint8_t>(reader, false);
-    if (firstByte & 0x80) {
-        // firstByte is the size byte.
-        _isAllZeros = false;  // it wouldn't be encoded like this if it was.
-
-        _buf[0] = firstByte;
-        const uint8_t remainingBytes = getSizeByte();
-        memcpy(_buf + 1, reader->skip(remainingBytes), remainingBytes);
-        return;
-    }
-
-    // In remaining cases, firstByte is the only byte.
-
-    if (firstByte == 0) {
-        // This means AllZeros state was encoded as a single 0 byte.
-        reset();
-        return;
-    }
-
-    _isAllZeros = false;
-    setSizeByte(1);
-    _buf[1] = firstByte;
+    uint32_t size = readSizeFromBuffer(reader);
+    if (size > 0)
+        _isAllZeros = false;
+    setRawSize(size);
+    memcpy(getDataBuffer(), reader->skip(size), size);
 }
 
 void KeyString::TypeBits::appendBit(uint8_t oneOrZero) {
@@ -2172,13 +2200,13 @@ void KeyString::TypeBits::appendBit(uint8_t oneOrZero) {
     if (oneOrZero == 1)
         _isAllZeros = false;
 
-    const uint8_t byte = (_curBit / 8) + 1;
+    const uint32_t byte = _curBit / 8;
     const uint8_t offsetInByte = _curBit % 8;
     if (offsetInByte == 0) {
-        setSizeByte(byte);
-        _buf[byte] = oneOrZero;  // zeros bits 1-7
+        setRawSize(byte + 1);
+        getDataBuffer()[byte] = oneOrZero;  // zeros bits 1-7
     } else {
-        _buf[byte] |= (oneOrZero << offsetInByte);
+        getDataBuffer()[byte] |= (oneOrZero << offsetInByte);
     }
 
     _curBit++;
@@ -2234,13 +2262,13 @@ uint8_t KeyString::TypeBits::Reader::readBit() {
     if (_typeBits._isAllZeros)
         return 0;
 
-    const uint8_t byte = (_curBit / 8) + 1;
+    const uint32_t byte = _curBit / 8;
     const uint8_t offsetInByte = _curBit % 8;
     _curBit++;
 
-    uassert(50615, "Invalid size byte.", byte <= _typeBits.getSizeByte());
+    uassert(50615, "Invalid size byte(s).", byte < _typeBits.getDataBufferLen());
 
-    return (_typeBits._buf[byte] & (1 << offsetInByte)) ? 1 : 0;
+    return (_typeBits.getDataBuffer()[byte] & (1 << offsetInByte)) ? 1 : 0;
 }
 
 uint8_t KeyString::TypeBits::Reader::readZero() {

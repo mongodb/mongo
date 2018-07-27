@@ -96,6 +96,112 @@ protected:
     KeyString::Version version;
 };
 
+template <typename T>
+void checkSizeWhileAppendingTypeBits(int numOfBitsUsedForType, T&& appendBitsFunc) {
+    KeyString::TypeBits typeBits(KeyString::Version::V1);
+    const int kItems = 10000;  // Pick an arbitrary large number.
+    for (int i = 0; i < kItems; i++) {
+        appendBitsFunc(typeBits);
+        size_t currentRawSize = ((i + 1) * numOfBitsUsedForType - 1) / 8 + 1;
+        size_t currentSize = currentRawSize;
+        if (currentRawSize > KeyString::TypeBits::kMaxBytesForShortEncoding) {
+            // Case 4: plus 1 signal byte + 4 size bytes.
+            currentSize += 5;
+            ASSERT(typeBits.isLongEncoding());
+        } else {
+            ASSERT(!typeBits.isLongEncoding());
+            if (currentRawSize == 1 && !(typeBits.getBuffer()[0] & 0x80)) {  // Case 2
+                currentSize = 1;
+            } else {
+                // Case 3: plus 1 size byte.
+                currentSize += 1;
+            }
+        }
+        ASSERT_EQ(typeBits.getSize(), currentSize);
+    }
+}
+
+TEST(TypeBitsTest, AppendSymbol) {
+    checkSizeWhileAppendingTypeBits(
+        1, [](KeyString::TypeBits& typeBits) -> void { typeBits.appendSymbol(); });
+}
+TEST(TypeBitsTest, AppendString) {
+    // The typeBits should be all zeros, so numOfBitsUsedForType is set to 0 for
+    // passing the test although it technically uses 1 bit.
+    checkSizeWhileAppendingTypeBits(
+        0, [](KeyString::TypeBits& typeBits) -> void { typeBits.appendString(); });
+}
+TEST(typebitstest, appendDouble) {
+    checkSizeWhileAppendingTypeBits(
+        2, [](KeyString::TypeBits& typeBits) -> void { typeBits.appendNumberDouble(); });
+}
+TEST(TypeBitsTest, AppendNumberLong) {
+    checkSizeWhileAppendingTypeBits(
+        2, [](KeyString::TypeBits& typeBits) -> void { typeBits.appendNumberLong(); });
+}
+TEST(TypeBitsTest, AppendNumberInt) {
+    // The typeBits should be all zeros, so numOfBitsUsedForType is set to 0 for
+    // passing the test although it technically uses 2 bits.
+    checkSizeWhileAppendingTypeBits(
+        0, [](KeyString::TypeBits& typeBits) -> void { typeBits.appendNumberInt(); });
+}
+TEST(TypeBitsTest, AppendNumberDecimal) {
+    checkSizeWhileAppendingTypeBits(
+        2, [](KeyString::TypeBits& typeBits) -> void { typeBits.appendNumberDecimal(); });
+}
+TEST(TypeBitsTest, AppendLongZero) {
+    checkSizeWhileAppendingTypeBits(2, [](KeyString::TypeBits& typeBits) -> void {
+        typeBits.appendZero(KeyString::TypeBits::kLong);
+    });
+}
+TEST(TypeBitsTest, AppendDecimalZero) {
+    checkSizeWhileAppendingTypeBits(12 + 5, [](KeyString::TypeBits& typeBits) -> void {
+        typeBits.appendDecimalZero(KeyString::TypeBits::kDecimalZero1xxx);
+    });
+}
+TEST(TypeBitsTest, AppendDecimalExponent) {
+    checkSizeWhileAppendingTypeBits(
+        KeyString::TypeBits::kStoredDecimalExponentBits,
+        [](KeyString::TypeBits& typeBits) -> void { typeBits.appendDecimalExponent(1); });
+}
+
+TEST(TypeBitsTest, UninitializedTypeBits) {
+    KeyString::TypeBits typeBits(KeyString::Version::V1);
+    ASSERT_EQ(typeBits.getSize(), 1u);
+    ASSERT_EQ(typeBits.getBuffer()[0], 0);
+    ASSERT(typeBits.isAllZeros());
+}
+
+TEST(TypeBitsTest, AllZerosTypeBits) {
+    {
+        std::string emptyBuffer = "";
+        BufReader reader(emptyBuffer.c_str(), 0);
+        KeyString::TypeBits typeBits =
+            KeyString::TypeBits::fromBuffer(KeyString::Version::V1, &reader);
+        ASSERT_EQ(typeBits.getSize(), 1u);
+        ASSERT_EQ(typeBits.getBuffer()[0], 0);
+        ASSERT(typeBits.isAllZeros());
+    }
+
+    {
+        std::string allZerosBuffer = "0000000000000000";
+        BufReader reader(allZerosBuffer.c_str(), 0);
+        KeyString::TypeBits typeBits =
+            KeyString::TypeBits::fromBuffer(KeyString::Version::V1, &reader);
+        ASSERT_EQ(typeBits.getSize(), 1u);
+        ASSERT_EQ(typeBits.getBuffer()[0], 0);
+        ASSERT(typeBits.isAllZeros());
+    }
+}
+
+TEST(TypeBitsTest, AppendLotsOfZeroTypeBits) {
+    KeyString::TypeBits typeBits(KeyString::Version::V1);
+    for (int i = 0; i < 100000; i++) {
+        typeBits.appendString();
+    }
+    // TypeBits should still be in short encoding format.
+    ASSERT(!typeBits.isLongEncoding());
+}
 
 TEST_F(KeyStringTest, Simple1) {
     BSONObj a = BSON("" << 5);
@@ -1171,21 +1277,80 @@ TEST_F(KeyStringTest, RecordIds) {
     }
 }
 
-TEST_F(KeyStringTest, KeyWithTooManyTypeBitsCausesUassert) {
+TEST_F(KeyStringTest, KeyWithLotsOfTypeBits) {
     BSONObj obj;
     {
         BSONObjBuilder builder;
         {
+            int kArrSize = 54321;
             BSONArrayBuilder array(builder.subarrayStart("x"));
             auto zero = BSON("" << 0.0);
-            for (int i = 0; i < 1016; i++)
+            for (int i = 0; i < kArrSize; i++)
                 array.append(zero.firstElement());
         }
 
-        obj = builder.obj();
+        obj = BSON("" << builder.obj());
     }
-    KeyString key(version);
-    ASSERT_THROWS_CODE(key.resetToKey(obj, ONE_ASCENDING), DBException, ErrorCodes::KeyTooLong);
+    ROUNDTRIP(version, obj);
+}
+
+BSONObj buildKeyWhichWillHaveNByteOfTypeBits(size_t n, bool allZeros) {
+    int numItems = n * 8 / 2 /* kInt/kDouble needs two bits */;
+
+    BSONObj obj;
+    BSONArrayBuilder array;
+    for (int i = 0; i < numItems; i++)
+        if (allZeros)
+            array.append(123); /* kInt uses 00 */
+        else
+            array.append(1.2); /* kDouble uses 10 */
+
+    obj = BSON("" << array.arr());
+    return obj;
+}
+
+void checkKeyWithNByteOfTypeBits(KeyString::Version version, size_t n, bool allZeros) {
+    const BSONObj orig = buildKeyWhichWillHaveNByteOfTypeBits(n, allZeros);
+    const KeyString ks(version, orig, ALL_ASCENDING);
+    const size_t typeBitsSize = ks.getTypeBits().getSize();
+    if (n == 1 || allZeros) {
+        // Case 1&2
+        // Case 2: Since we use kDouble, TypeBits="01010101" when n=1. The size
+        // is thus 1.
+        ASSERT_EQ(1u, typeBitsSize);
+    } else if (n <= 127) {
+        // Case 3
+        ASSERT_EQ(n + 1, typeBitsSize);
+    } else {
+        // Case 4
+        ASSERT_EQ(n + 5, typeBitsSize);
+    }
+    const BSONObj converted = toBsonAndCheckKeySize(ks, ALL_ASCENDING);
+    ASSERT_BSONOBJ_EQ(converted, orig);
+    ASSERT(converted.binaryEqual(orig));
+
+    // Also test TypeBits::fromBuffer()
+    BufReader bufReader(ks.getTypeBits().getBuffer(), typeBitsSize);
+    KeyString::TypeBits newTypeBits = KeyString::TypeBits::fromBuffer(version, &bufReader);
+    ASSERT_EQ(toHex(newTypeBits.getBuffer(), newTypeBits.getSize()),
+              toHex(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize()));
+}
+
+TEST_F(KeyStringTest, KeysWithNBytesTypeBits) {
+    checkKeyWithNByteOfTypeBits(version, 0, false);
+    checkKeyWithNByteOfTypeBits(version, 1, false);
+    checkKeyWithNByteOfTypeBits(version, 1, true);
+    checkKeyWithNByteOfTypeBits(version, 127, false);
+    checkKeyWithNByteOfTypeBits(version, 127, true);
+    checkKeyWithNByteOfTypeBits(version, 128, false);
+    checkKeyWithNByteOfTypeBits(version, 128, true);
+    checkKeyWithNByteOfTypeBits(version, 129, false);
+    checkKeyWithNByteOfTypeBits(version, 129, true);
+}
+
+TEST_F(KeyStringTest, VeryLargeString) {
+    BSONObj obj = BSON("" << std::string(123456, 'x'));
+    ROUNDTRIP(version, obj);
 }
 
 TEST_F(KeyStringTest, ToBsonSafeShouldNotTerminate) {
@@ -1266,29 +1431,37 @@ TEST_F(KeyStringTest, InvalidDecimalContinuation) {
 
 TEST_F(KeyStringTest, RandomizedInputsForToBsonSafe) {
     std::mt19937 gen(newSeed());
-    std::uniform_int_distribution<> randomByte(std::numeric_limits<unsigned char>::min(),
-                                               std::numeric_limits<unsigned char>::max());
+    std::uniform_int_distribution<uint32_t> randomNum(std::numeric_limits<uint32_t>::min(),
+                                                      std::numeric_limits<uint32_t>::max());
+    std::uniform_int_distribution<uint8_t> randomByte(std::numeric_limits<uint8_t>::min(),
+                                                      std::numeric_limits<uint8_t>::max());
 
     const auto interestingElements = getInterestingElements(KeyString::Version::V1);
     for (auto elem : interestingElements) {
         const KeyString ks(KeyString::Version::V1, elem, ALL_ASCENDING);
 
-        char* ksBuffer = (char*)ks.getBuffer();
-        char* typeBits = (char*)ks.getTypeBits().getBuffer();
+        auto ksBuffer = SharedBuffer::allocate(ks.getSize());
+        memcpy(ksBuffer.get(), ks.getBuffer(), ks.getSize());
+        auto tbBuffer = SharedBuffer::allocate(ks.getTypeBits().getSize());
+        memcpy(tbBuffer.get(), ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize());
 
         // Select a random byte to change, except for the first byte as it will likely become an
         // invalid CType and not test anything interesting.
-        auto offset = randomByte(gen);
+        auto offset = randomNum(gen) % (ks.getSize() - 1);
         auto newValue = randomByte(gen);
-        ksBuffer[offset % ks.getSize() + 1] = newValue;
+        ksBuffer.get()[offset + 1] = newValue;
 
         // Ditto for the type bits buffer.
-        offset = randomByte(gen);
+        offset = randomNum(gen) % ks.getTypeBits().getSize();
         newValue = randomByte(gen);
-        typeBits[offset % ks.getTypeBits().getSize() + 1] = newValue;
+        tbBuffer.get()[offset] = newValue;
+
+        // Build the new TypeBits.
+        BufReader reader(tbBuffer.get(), ks.getTypeBits().getSize());
 
         try {
-            KeyString::toBsonSafe(ksBuffer, ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
+            auto newTypeBits = KeyString::TypeBits::fromBuffer(KeyString::Version::V1, &reader);
+            KeyString::toBsonSafe(ksBuffer.get(), ks.getSize(), ALL_ASCENDING, newTypeBits);
         } catch (const AssertionException&) {
             // The expectation is that the randomized buffer is likely an invalid KeyString,
             // however attempting to decode it should fail gracefully.
@@ -1296,7 +1469,8 @@ TEST_F(KeyStringTest, RandomizedInputsForToBsonSafe) {
 
         // Retest with descending.
         try {
-            KeyString::toBsonSafe(ksBuffer, ks.getSize(), ONE_DESCENDING, ks.getTypeBits());
+            auto newTypeBits = KeyString::TypeBits::fromBuffer(KeyString::Version::V1, &reader);
+            KeyString::toBsonSafe(ksBuffer.get(), ks.getSize(), ONE_DESCENDING, newTypeBits);
         } catch (const AssertionException&) {
             // The expectation is that the randomized buffer is likely an invalid KeyString,
             // however attempting to decode it should fail gracefully.
