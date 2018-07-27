@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <!-- header for use with make_vcxproj.py
-    
-     Note that once you generate the vcxproj file, if you change it in visual studio, when it 
+
+     Note that once you generate the vcxproj file, if you change it in visual studio, when it
      writes it back out you will use the comments and semi-neat formatting below.
 -->
 
@@ -16,14 +16,6 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Win2008PlusDebug|x64">
-      <Configuration>Win2008PlusDebug</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Win2008PlusRelease|x64">
-      <Configuration>Win2008PlusRelease</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
   </ItemGroup>
 
   <PropertyGroup Label="Globals">
@@ -31,14 +23,14 @@
     <RootNamespace>mongod</RootNamespace>
     <PlatformToolset>v140</PlatformToolset>
     <!-- <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid> -->
-    <Keyword>Win32Proj</Keyword>
+    <Keyword>MakeFileProj</Keyword>
     <RootNamespace>%_TARGET_%</RootNamespace>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
 
   <PropertyGroup Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>Makefile</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
 
@@ -51,14 +43,8 @@
   <PropertyGroup>
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
     <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
-    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
-    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
-    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</LinkIncremental>
-    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
-    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">false</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
-    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">false</LinkIncremental>
     <CodeAnalysisRuleSet >AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
 
@@ -67,7 +53,7 @@
     <ClCompile>
       <ObjectFileName>Build/%(RelativeDir)/</ObjectFileName>
       <AdditionalIncludeDirectories>%AdditionalIncludeDirectories%</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>    
+      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4290;4355;4800;4267;4244;4351</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>No</MinimalRebuild>
@@ -85,7 +71,7 @@
   </ItemDefinitionGroup>
 
   <!-- DEBUG -->
-  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug' Or '(Configuration)'=='Win2008PlusDebug'">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -96,7 +82,7 @@
   </ItemDefinitionGroup>
 
  <!-- RELEASE -->
-  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' Or '(Configuration)'=='Win2008PlusRelease'">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -111,13 +97,26 @@
     </ClCompile>
   </ItemDefinitionGroup>
 
+  <!-- 4.0 - change to a Makefile project to allow invocation of external build system -->
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <NMakeBuildCommandLine>ninja.exe -k 0 core</NMakeBuildCommandLine>
+    <NMakeOutput>mongod.exe</NMakeOutput>
+    <NMakeCleanCommandLine>ninja.exe -t clean</NMakeCleanCommandLine>
+    <NMakeReBuildCommandLine>not_supported</NMakeReBuildCommandLine>
+    <NMakePreprocessorDefinitions>MONGO_SSL;WIN32;_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <NMakeIncludeSearchPath>$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <NMakeBuildCommandLine>ninja.exe -k 0 core</NMakeBuildCommandLine>
+    <NMakeOutput>mongod.exe</NMakeOutput>
+    <NMakeCleanCommandLine>ninja.exe -t clean</NMakeCleanCommandLine>
+    <NMakeReBuildCommandLine>not_supported</NMakeReBuildCommandLine>
+    <NMakePreprocessorDefinitions>not_supported;WIN32;NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <NMakeIncludeSearchPath>$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
+  </PropertyGroup>
 
    <!-- SPECIFICS -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">
-  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">
   </ItemDefinitionGroup>
