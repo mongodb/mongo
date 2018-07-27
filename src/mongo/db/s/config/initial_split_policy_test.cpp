@@ -79,8 +79,8 @@ void checkCalculatedHashedSplitPoints(bool isHashed,
                                                                      numInitialChunks,
                                                                      &initialSplitPoints,
                                                                      &finalSplitPoints);
-    assertBSONObjVectorsAreEqual(initialSplitPoints, *expectedInitialSplitPoints);
-    assertBSONObjVectorsAreEqual(finalSplitPoints, *expectedFinalSplitPoints);
+    assertBSONObjVectorsAreEqual(*expectedInitialSplitPoints, initialSplitPoints);
+    assertBSONObjVectorsAreEqual(*expectedFinalSplitPoints, finalSplitPoints);
 }
 
 TEST(CalculateHashedSplitPointsTest, EmptyCollectionMoreChunksThanShards) {
@@ -128,6 +128,14 @@ TEST(CalculateHashedSplitPointsTest, NotHashedWithInitialSplitsFails) {
 
 class GenerateInitialSplitChunksTest : public unittest::Test {
 public:
+    const std::vector<BSONObj>& hashedChunkBounds() {
+        return _hashedChunkBounds;
+    }
+
+    const std::vector<BSONObj>& hashedSplitPoints() {
+        return _splitPoints;
+    }
+
     ChunkType makeChunk(const BSONObj min, const BSONObj max, const ShardId shardId) {
         ChunkVersion version(1, 0, OID::gen());
         ChunkType chunk(_nss, ChunkRange(min, max), version, shardId);
@@ -155,6 +163,14 @@ private:
     const ShardKeyPattern _shardKeyPattern = makeShardKeyPattern(true);
     const std::vector<ShardId> _shardIds = {ShardId("testShard0"), ShardId("testShard1")};
     const Timestamp _timeStamp{Date_t::now()};
+    const KeyPattern& keyPattern = shardKeyPattern().getKeyPattern();
+    const std::vector<BSONObj> _hashedChunkBounds = {keyPattern.globalMin(),
+                                                     BSON("x" << -4611686018427387902LL),
+                                                     BSON("x" << 0),
+                                                     BSON("x" << 4611686018427387902LL),
+                                                     keyPattern.globalMax()};
+    const std::vector<BSONObj> _splitPoints{_hashedChunkBounds.begin() + 1,
+                                            _hashedChunkBounds.end() - 1};
 };
 
 TEST_F(GenerateInitialSplitChunksTest, NoSplitPoints) {
@@ -170,22 +186,34 @@ TEST_F(GenerateInitialSplitChunksTest, NoSplitPoints) {
 }
 
 TEST_F(GenerateInitialSplitChunksTest, SplitPointsMoreThanAvailableShards) {
-    const auto& keyPattern = shardKeyPattern().getKeyPattern();
-    const std::vector<BSONObj> expectedChunkBounds = {keyPattern.globalMin(),
-                                                      BSON("x" << -4611686018427387902LL),
-                                                      BSON("x" << 0),
-                                                      BSON("x" << 4611686018427387902LL),
-                                                      keyPattern.globalMax()};
-    const std::vector<BSONObj> splitPoints(expectedChunkBounds.begin() + 1,
-                                           expectedChunkBounds.end() - 1);
     const auto shardCollectionConfig = InitialSplitPolicy::generateShardCollectionInitialChunks(
-        nss(), shardKeyPattern(), shardIds()[0], timeStamp(), splitPoints, shardIds());
+        nss(), shardKeyPattern(), shardIds()[0], timeStamp(), hashedSplitPoints(), shardIds());
 
-    ASSERT_EQ(splitPoints.size() + 1, shardCollectionConfig.chunks.size());
-    for (unsigned long i = 0; i < expectedChunkBounds.size() - 1; ++i) {
-        // chunks should be distributed in a round-robin manner
-        const auto expectedChunk = makeChunk(
-            expectedChunkBounds[i], expectedChunkBounds[i + 1], shardIds()[i % shardIds().size()]);
+    ASSERT_EQ(hashedSplitPoints().size() + 1, shardCollectionConfig.chunks.size());
+
+    // chunks should be distributed in a round-robin manner
+    const std::vector<ShardId> expectedShardIds = {
+        ShardId("testShard0"), ShardId("testShard1"), ShardId("testShard0"), ShardId("testShard1")};
+    for (unsigned long i = 0; i < hashedChunkBounds().size() - 1; ++i) {
+        const auto expectedChunk =
+            makeChunk(hashedChunkBounds()[i], hashedChunkBounds()[i + 1], expectedShardIds[i]);
+        ASSERT_BSONOBJ_EQ(expectedChunk.toShardBSON().removeField("lastmod"),
+                          shardCollectionConfig.chunks[i].toShardBSON().removeField("lastmod"));
+    }
+}
+
+TEST_F(GenerateInitialSplitChunksTest, SplitPointsNumContiguousChunksPerShardsGreaterThanOne) {
+    const auto shardCollectionConfig = InitialSplitPolicy::generateShardCollectionInitialChunks(
+        nss(), shardKeyPattern(), shardIds()[0], timeStamp(), hashedSplitPoints(), shardIds(), 2);
+
+    ASSERT_EQ(hashedSplitPoints().size() + 1, shardCollectionConfig.chunks.size());
+
+    // chunks should be distributed in a round-robin manner two chunks at a time
+    const std::vector<ShardId> expectedShardIds = {
+        ShardId("testShard0"), ShardId("testShard0"), ShardId("testShard1"), ShardId("testShard1")};
+    for (unsigned long i = 0; i < hashedChunkBounds().size() - 1; ++i) {
+        const auto expectedChunk =
+            makeChunk(hashedChunkBounds()[i], hashedChunkBounds()[i + 1], expectedShardIds[i]);
         ASSERT_BSONOBJ_EQ(expectedChunk.toShardBSON().removeField("lastmod"),
                           shardCollectionConfig.chunks[i].toShardBSON().removeField("lastmod"));
     }

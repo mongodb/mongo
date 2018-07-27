@@ -130,96 +130,6 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
 
 }  // namespace
 
-/**
- * Creates and writes to the config server the first chunks for a newly sharded collection. Returns
- * the version generated for the collection.
- */
-InitialSplitPolicy::ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
-                                                            const NamespaceString& nss,
-                                                            const ShardKeyPattern& shardKeyPattern,
-                                                            const ShardId& primaryShardId,
-                                                            const std::vector<BSONObj>& initPoints,
-                                                            const bool distributeInitialChunks) {
-    const auto& keyPattern = shardKeyPattern.getKeyPattern();
-
-    std::vector<BSONObj> splitPoints;
-    std::vector<ShardId> shardIds;
-
-    if (initPoints.empty()) {
-        // If no split points were specified use the shard's data distribution to determine them
-        auto primaryShard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
-
-        auto result = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-            nss.db().toString(),
-            BSON("count" << nss.coll()),
-            Shard::RetryPolicy::kIdempotent));
-
-        long long numObjects = 0;
-        uassertStatusOK(result.commandStatus);
-        uassertStatusOK(bsonExtractIntegerField(result.response, "n", &numObjects));
-
-        // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
-        // the splitVector command and affects the number of chunks returned, has been loaded.
-        uassertStatusOK(Grid::get(opCtx)->getBalancerConfiguration()->refreshAndCheck(opCtx));
-
-        if (numObjects > 0) {
-            splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
-                opCtx,
-                primaryShardId,
-                nss,
-                shardKeyPattern,
-                ChunkRange(keyPattern.globalMin(), keyPattern.globalMax()),
-                Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-                0));
-        }
-
-        // If docs already exist for the collection, must use primary shard,
-        // otherwise defer to passed-in distribution option.
-        if (numObjects == 0 && distributeInitialChunks) {
-            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
-        } else {
-            shardIds.push_back(primaryShardId);
-        }
-    } else {
-        // Make sure points are unique and ordered
-        auto orderedPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-
-        for (const auto& initPoint : initPoints) {
-            orderedPts.insert(initPoint);
-        }
-
-        for (const auto& initPoint : orderedPts) {
-            splitPoints.push_back(initPoint);
-        }
-
-        if (distributeInitialChunks) {
-            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
-        } else {
-            shardIds.push_back(primaryShardId);
-        }
-    }
-
-    auto initialChunks = InitialSplitPolicy::generateShardCollectionInitialChunks(
-        nss,
-        shardKeyPattern,
-        primaryShardId,
-        LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
-        splitPoints,
-        shardIds);
-    for (const auto& chunk : initialChunks.chunks) {
-        uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
-            opCtx,
-            ChunkType::ConfigNS,
-            chunk.toConfigBSON(),
-            ShardingCatalogClient::kMajorityWriteConcern));
-    }
-
-    return initialChunks;
-}
-
 void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
     BSONObjBuilder countBuilder;
     countBuilder.append("count", ChunkType::ConfigNS.coll());
@@ -455,7 +365,7 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                              const ShardKeyPattern& fieldsAndOrder,
                                              const BSONObj& defaultCollation,
                                              bool unique,
-                                             const vector<BSONObj>& initPoints,
+                                             const vector<BSONObj>& splitPoints,
                                              const bool distributeInitialChunks,
                                              const ShardId& dbPrimaryShardId) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
@@ -475,7 +385,7 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
             uuid->appendToBuilder(&collectionDetail, "uuid");
         }
         collectionDetail.append("primary", primaryShard->toString());
-        collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
+        collectionDetail.append("numChunks", static_cast<int>(splitPoints.size() + 1));
         uassertStatusOK(catalogClient->logChange(opCtx,
                                                  "shardCollection.start",
                                                  nss.ns(),
@@ -490,8 +400,8 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                               ->makeFromBSON(defaultCollation));
     }
 
-    const auto initialChunks = createFirstChunks(
-        opCtx, nss, fieldsAndOrder, dbPrimaryShardId, initPoints, distributeInitialChunks);
+    const auto initialChunks = InitialSplitPolicy::writeFirstChunksToConfig(
+        opCtx, nss, fieldsAndOrder, dbPrimaryShardId, splitPoints, distributeInitialChunks);
 
     {
         CollectionType coll;
