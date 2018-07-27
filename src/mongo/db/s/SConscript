@@ -181,12 +181,12 @@ env.Library(
 env.Library(
     target='balancer',
     source=[
-        'balancer/balancer_chunk_selection_policy_impl.cpp',
-        'balancer/balancer_chunk_selection_policy.cpp',
-        'balancer/balancer_policy.cpp',
         'balancer/balancer.cpp',
-        'balancer/cluster_statistics_impl.cpp',
+        'balancer/balancer_chunk_selection_policy.cpp',
+        'balancer/balancer_chunk_selection_policy_impl.cpp',
+        'balancer/balancer_policy.cpp',
         'balancer/cluster_statistics.cpp',
+        'balancer/cluster_statistics_impl.cpp',
         'balancer/migration_manager.cpp',
         'balancer/scoped_migration_request.cpp',
         'balancer/type_migration.cpp',
@@ -223,14 +223,13 @@ env.Library(
     target='sharding_catalog_manager',
     source=[
         'add_shard_util.cpp',
-        'config/initial_split_policy.cpp',
-        'config/namespace_serializer.cpp',
         'config/sharding_catalog_manager_chunk_operations.cpp',
         'config/sharding_catalog_manager_collection_operations.cpp',
+        'config/sharding_catalog_manager.cpp',
         'config/sharding_catalog_manager_database_operations.cpp',
         'config/sharding_catalog_manager_shard_operations.cpp',
         'config/sharding_catalog_manager_zone_operations.cpp',
-        'config/sharding_catalog_manager.cpp',
+        'config/namespace_serializer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/audit',
@@ -420,7 +419,6 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='sharding_catalog_manager_test',
     source=[
-        'config/initial_split_policy_test.cpp',
         'config/sharding_catalog_manager_add_shard_test.cpp',
         'config/sharding_catalog_manager_add_shard_to_zone_test.cpp',
         'config/sharding_catalog_manager_assign_key_range_to_zone_test.cpp',

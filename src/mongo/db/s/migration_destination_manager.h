@@ -134,7 +134,7 @@ public:
      */
     static void cloneCollectionIndexesAndOptions(OperationContext* opCtx,
                                                  const NamespaceString& nss,
-                                                 const ShardId& fromShardId);
+                                                 ShardId fromShardId);
 
 private:
     /**
