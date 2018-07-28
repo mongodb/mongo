@@ -82,9 +82,6 @@ public:
         return _electionTimeSet;
     }
     Timestamp getElectionTime() const;
-    const std::string& getHbMsg() const {
-        return _hbmsg;
-    }
     const HostAndPort& getSyncingTo() const {
         return _syncingTo;
     }
@@ -132,13 +129,6 @@ public:
     void setElectionTime(Timestamp time) {
         _electionTimeSet = true;
         _electionTime = time;
-    }
-
-    /**
-     * Sets _hbmsg to "hbmsg".
-     */
-    void setHbMsg(std::string hbmsg) {
-        _hbmsg = hbmsg;
     }
 
     /**
@@ -194,7 +184,6 @@ private:
 
     int _configVersion = -1;
     std::string _setName;
-    std::string _hbmsg;
     HostAndPort _syncingTo;
 
     bool _configSet = false;

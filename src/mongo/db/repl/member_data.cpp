@@ -55,6 +55,7 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
     _lastUpdate = now;
     _lastUpdateStale = false;
     _updatedSinceRestart = true;
+    _lastHeartbeatMessage.clear();
 
     if (!hbResponse.hasState()) {
         hbResponse.setState(MemberState::RS_UNKNOWN);
@@ -84,6 +85,7 @@ void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) 
     _lastHeartbeat = now;
     _authIssue = false;
     _updatedSinceRestart = true;
+    _lastHeartbeatMessage = heartbeatMessage;
 
     if (_lastResponse.getState() != MemberState::RS_DOWN) {
         log() << "Member " << _hostAndPort.toString() << " is now in state RS_DOWN" << rsLog;
@@ -93,7 +95,6 @@ void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) 
     _lastResponse.setState(MemberState::RS_DOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTime(OpTime());
-    _lastResponse.setHbMsg(heartbeatMessage);
     _lastResponse.setSyncingTo(HostAndPort());
 
     // The _lastAppliedOpTime/_lastDurableOpTime fields don't get cleared merely by missing a
@@ -106,6 +107,7 @@ void MemberData::setAuthIssue(Date_t now) {
     _lastHeartbeat = now;
     _authIssue = true;
     _updatedSinceRestart = true;
+    _lastHeartbeatMessage.clear();
 
     if (_lastResponse.getState() != MemberState::RS_UNKNOWN) {
         log() << "Member " << _hostAndPort.toString()
@@ -116,7 +118,6 @@ void MemberData::setAuthIssue(Date_t now) {
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTime(OpTime());
-    _lastResponse.setHbMsg("");
     _lastResponse.setSyncingTo(HostAndPort());
 }
 

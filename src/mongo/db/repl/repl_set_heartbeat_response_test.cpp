@@ -44,7 +44,7 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
 }
 
 TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
-    int fieldsSet = 2;
+    int fieldsSet = 1;
     ReplSetHeartbeatResponse hbResponse;
     ReplSetHeartbeatResponse hbResponseObjRoundTripChecker;
     ASSERT_EQUALS(false, hbResponse.hasState());
@@ -53,13 +53,11 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(false, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(false, hbResponse.hasConfig());
     ASSERT_EQUALS("", hbResponse.getReplicaSetName());
-    ASSERT_EQUALS("", hbResponse.getHbMsg());
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(-1, hbResponse.getConfigVersion());
 
     BSONObj hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
-    ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
 
     Status initializeResult = Status::OK();
     ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toString());
@@ -97,7 +95,6 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("rs0", hbResponse.getReplicaSetName());
     ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
                   hbResponse.getState().toString());
-    ASSERT_EQUALS("", hbResponse.getHbMsg());
     ASSERT_EQUALS(HostAndPort("syncTarget"), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
@@ -108,41 +105,6 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     hbResponseObj = hbResponse.toBSON();
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
     ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
-    ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
-    ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-    ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"]["ts"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
-    ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
-    ASSERT_EQUALS(2, hbResponseObj["state"].numberLong());
-    ASSERT_EQUALS("syncTarget:27017", hbResponseObj["syncingTo"].String());
-
-    initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
-    ASSERT_EQUALS(Status::OK(), initializeResult);
-    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
-
-    // set hbmsg
-    hbResponse.setHbMsg("lub dub");
-    ASSERT_EQUALS(true, hbResponse.hasState());
-    ASSERT_EQUALS(true, hbResponse.hasElectionTime());
-    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
-    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
-    ASSERT_EQUALS(true, hbResponse.hasConfig());
-    ASSERT_EQUALS("rs0", hbResponse.getReplicaSetName());
-    ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
-                  hbResponse.getState().toString());
-    ASSERT_EQUALS("lub dub", hbResponse.getHbMsg());
-    ASSERT_EQUALS(HostAndPort("syncTarget"), hbResponse.getSyncingTo());
-    ASSERT_EQUALS(1, hbResponse.getConfigVersion());
-    ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
-    ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
-
-    hbResponseObj = hbResponse.toBSON();
-    ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
-    ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
-    ASSERT_EQUALS("lub dub", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
     ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"]["ts"].timestamp());
@@ -275,23 +237,6 @@ TEST(ReplSetHeartbeatResponse, InitializeReplSetNameWrongType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"set\" field in response to replSetHeartbeat to "
-        "have type String, but found int",
-        result.reason());
-}
-
-TEST(ReplSetHeartbeatResponse, InitializeHeartbeatMeessageWrongType) {
-    ReplSetHeartbeatResponse hbResponse;
-    BSONObj initializerObj =
-        BSON("ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "opTime"
-                  << OpTime(Timestamp(100, 0), 0).toBSON()
-                  << "v"
-                  << 2  // needs a version to get this far in initialize()
-                  << "hbmsg"
-                  << 4);
-    Status result = hbResponse.initialize(initializerObj, 0);
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
-    ASSERT_EQUALS(
-        "Expected \"hbmsg\" field in response to replSetHeartbeat to "
         "have type String, but found int",
         result.reason());
 }

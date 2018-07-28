@@ -802,8 +802,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
         }
     } else {
         ReplSetHeartbeatResponse hbr = std::move(hbResponse.getValue());
-        LOG(3) << "setUpValues: heartbeat response good for member _id:" << member.getId()
-               << ", msg:  " << hbr.getHbMsg();
+        LOG(3) << "setUpValues: heartbeat response good for member _id:" << member.getId();
         advancedOpTime = hbData.setUpValues(now, std::move(hbr));
     }
 
@@ -1358,7 +1357,6 @@ void TopologyCoordinator::setCurrentPrimary_forTest(int primaryIndex,
             hbResponse.setElectionTime(electionTime);
             hbResponse.setAppliedOpTime(_memberData.at(primaryIndex).getHeartbeatAppliedOpTime());
             hbResponse.setSyncingTo(HostAndPort());
-            hbResponse.setHbMsg("");
             _memberData.at(primaryIndex)
                 .setUpValues(_memberData.at(primaryIndex).getLastHeartbeat(),
                              std::move(hbResponse));

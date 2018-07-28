@@ -50,7 +50,6 @@ namespace {
 const std::string kConfigFieldName = "config";
 const std::string kConfigVersionFieldName = "v";
 const std::string kElectionTimeFieldName = "electionTime";
-const std::string kHbMessageFieldName = "hbmsg";
 const std::string kMemberStateFieldName = "state";
 const std::string kOkFieldName = "ok";
 const std::string kDurableOpTimeFieldName = "durableOpTime";
@@ -78,7 +77,6 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
     if (_configVersion != -1) {
         *builder << kConfigVersionFieldName << _configVersion;
     }
-    *builder << kHbMessageFieldName << _hbmsg;
     if (!_setName.empty()) {
         *builder << kReplSetFieldName << _setName;
     }
@@ -195,19 +193,6 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
                                     << typeName(configVersionElement.type()));
     }
     _configVersion = configVersionElement.numberInt();
-
-    const BSONElement hbMsgElement = doc[kHbMessageFieldName];
-    if (hbMsgElement.eoo()) {
-        _hbmsg.clear();
-    } else if (hbMsgElement.type() != String) {
-        return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "Expected \"" << kHbMessageFieldName
-                                    << "\" field in response to replSetHeartbeat to have "
-                                       "type String, but found "
-                                    << typeName(hbMsgElement.type()));
-    } else {
-        _hbmsg = hbMsgElement.String();
-    }
 
     const BSONElement syncingToElement = doc[kSyncSourceFieldName];
     if (syncingToElement.eoo()) {

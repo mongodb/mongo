@@ -1593,7 +1593,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     hb.setConfigVersion(1);
     hb.setState(MemberState::RS_SECONDARY);
     hb.setElectionTime(electionTime);
-    hb.setHbMsg("READY");
     hb.setDurableOpTime(oplogDurable);
     hb.setAppliedOpTime(oplogProgress);
     StatusWith<ReplSetHeartbeatResponse> hbResponseGood = StatusWith<ReplSetHeartbeatResponse>(hb);
@@ -1706,7 +1705,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
                   member1Status["optimeDate"].Date());
     ASSERT_EQUALS(heartbeatTime, member1Status["lastHeartbeat"].date());
     ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].date());
-    ASSERT_EQUALS("READY", member1Status["lastHeartbeatMessage"].str());
+    ASSERT_EQUALS("", member1Status["lastHeartbeatMessage"].str());
     ASSERT_FALSE(member1Status.hasField("lastStableRecoveryTimestamp"));
     ASSERT_FALSE(member1Status.hasField("lastStableCheckpointTimestamp"));
     ASSERT_FALSE(member1Status.hasField("electionTime"));
