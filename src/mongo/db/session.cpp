@@ -326,8 +326,8 @@ void Session::refreshFromStorageIfNeeded(OperationContext* opCtx) {
                     // transition table for other callers.
                     _txnState.transitionTo(
                         ul,
-                        TransitionTable::State::kCommitted,
-                        TransitionTable::TransitionValidation::kRelaxTransitionValidation);
+                        TransactionState::kCommitted,
+                        TransactionState::TransitionValidation::kRelaxTransitionValidation);
                 }
             }
 
@@ -596,7 +596,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
 
         _setActiveTxn(wl, txnNumber);
         _autocommit = false;
-        _txnState.transitionTo(wl, TransitionTable::State::kInProgress);
+        _txnState.transitionTo(wl, TransactionState::kInProgress);
         // Tracks various transactions metrics.
         _singleTransactionStats = SingleTransactionStats();
         _singleTransactionStats->setStartTime(curTimeMicros64());
@@ -610,7 +610,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
         invariant(startTransaction == boost::none);
         _setActiveTxn(wl, txnNumber);
         _autocommit = true;
-        _txnState.transitionTo(wl, TransitionTable::State::kNone);
+        _txnState.transitionTo(wl, TransactionState::kNone);
         // SingleTransactionStats are only for multi-document transactions.
         _singleTransactionStats = boost::none;
     }
@@ -856,7 +856,7 @@ Timestamp Session::prepareTransaction(OperationContext* opCtx) {
     // session kill and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    _txnState.transitionTo(lk, TransitionTable::State::kPrepared);
+    _txnState.transitionTo(lk, TransactionState::kPrepared);
 
     // We need to unlock the session to run the opObserver onTransactionPrepare, which calls back
     // into the session.
@@ -941,7 +941,7 @@ void Session::_abortTransaction(WithLock wl) {
     _txnResourceStash = boost::none;
     _transactionOperationBytes = 0;
     _transactionOperations.clear();
-    _txnState.transitionTo(wl, TransitionTable::State::kAborted);
+    _txnState.transitionTo(wl, TransactionState::kAborted);
     _speculativeTransactionReadOpTime = repl::OpTime();
     ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
     if (!_txnState.isNone(wl)) {
@@ -973,7 +973,7 @@ void Session::_setActiveTxn(WithLock wl, TxnNumber txnNumber) {
     _activeTxnNumber = txnNumber;
     _activeTxnCommittedStatements.clear();
     _hasIncompleteHistory = false;
-    _txnState.transitionTo(wl, TransitionTable::State::kNone);
+    _txnState.transitionTo(wl, TransactionState::kNone);
     _singleTransactionStats = boost::none;
     _speculativeTransactionReadOpTime = repl::OpTime();
     _multikeyPathInfo.clear();
@@ -1033,7 +1033,7 @@ void Session::commitUnpreparedTransaction(OperationContext* opCtx) {
     // and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithoutPrepare);
+    _txnState.transitionTo(lk, TransactionState::kCommittingWithoutPrepare);
 
     // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
     // into the session.
@@ -1059,7 +1059,7 @@ void Session::commitPreparedTransaction(OperationContext* opCtx, Timestamp commi
     // and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithPrepare);
+    _txnState.transitionTo(lk, TransactionState::kCommittingWithPrepare);
     opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
 
     // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
@@ -1086,7 +1086,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
 
             // Make sure the transaction didn't change because of chunk migration.
             if (opCtx->getTxnNumber() == _activeTxnNumber) {
-                _txnState.transitionTo(lk, TransitionTable::State::kAborted);
+                _txnState.transitionTo(lk, TransactionState::kAborted);
                 ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
                 // After the transaction has been aborted, we must update the end time and mark it
                 // as inactive.
@@ -1126,7 +1126,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     if (_speculativeTransactionReadOpTime > clientInfo.getLastOp()) {
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
-    _txnState.transitionTo(lk, TransitionTable::State::kCommitted);
+    _txnState.transitionTo(lk, TransactionState::kCommitted);
     ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
     // After the transaction has been committed, we must update the end time and mark it as
     // inactive.
@@ -1466,81 +1466,81 @@ boost::optional<repl::OplogEntry> Session::createMatchingTransactionTableUpdate(
         );
 }
 
-std::string Session::TransitionTable::toString(State state) {
+std::string Session::TransactionState::toString(StateFlag state) {
     switch (state) {
-        case Session::TransitionTable::State::kNone:
+        case Session::TransactionState::kNone:
             return "TxnState::None";
-        case Session::TransitionTable::State::kInProgress:
+        case Session::TransactionState::kInProgress:
             return "TxnState::InProgress";
-        case Session::TransitionTable::State::kPrepared:
+        case Session::TransactionState::kPrepared:
             return "TxnState::Prepared";
-        case Session::TransitionTable::State::kCommittingWithoutPrepare:
+        case Session::TransactionState::kCommittingWithoutPrepare:
             return "TxnState::CommittingWithoutPrepare";
-        case Session::TransitionTable::State::kCommittingWithPrepare:
+        case Session::TransactionState::kCommittingWithPrepare:
             return "TxnState::CommittingWithPrepare";
-        case Session::TransitionTable::State::kCommitted:
+        case Session::TransactionState::kCommitted:
             return "TxnState::Committed";
-        case Session::TransitionTable::State::kAborted:
+        case Session::TransactionState::kAborted:
             return "TxnState::Aborted";
     }
     MONGO_UNREACHABLE;
 }
 
-bool Session::TransitionTable::_isLegalTransition(State oldState, State newState) {
+bool Session::TransactionState::_isLegalTransition(StateFlag oldState, StateFlag newState) {
     switch (oldState) {
-        case State::kNone:
+        case kNone:
             switch (newState) {
-                case State::kNone:
-                case State::kInProgress:
+                case kNone:
+                case kInProgress:
                     return true;
                 default:
                     return false;
             }
             MONGO_UNREACHABLE;
-        case State::kInProgress:
+        case kInProgress:
             switch (newState) {
-                case State::kNone:
-                case State::kPrepared:
-                case State::kCommittingWithoutPrepare:
-                case State::kAborted:
+                case kNone:
+                case kPrepared:
+                case kCommittingWithoutPrepare:
+                case kAborted:
                     return true;
                 default:
                     return false;
             }
             MONGO_UNREACHABLE;
-        case State::kPrepared:
+        case kPrepared:
             switch (newState) {
-                case State::kCommittingWithPrepare:
-                case State::kAborted:
+                case kCommittingWithPrepare:
+                case kAborted:
                     return true;
                 default:
                     return false;
             }
             MONGO_UNREACHABLE;
-        case State::kCommittingWithPrepare:
-        case State::kCommittingWithoutPrepare:
+        case kCommittingWithPrepare:
+        case kCommittingWithoutPrepare:
             switch (newState) {
-                case State::kNone:
-                case State::kCommitted:
-                case State::kAborted:
+                case kNone:
+                case kCommitted:
+                case kAborted:
                     return true;
                 default:
                     return false;
             }
             MONGO_UNREACHABLE;
-        case State::kCommitted:
+        case kCommitted:
             switch (newState) {
-                case State::kNone:
-                case State::kInProgress:
+                case kNone:
+                case kInProgress:
                     return true;
                 default:
                     return false;
             }
             MONGO_UNREACHABLE;
-        case State::kAborted:
+        case kAborted:
             switch (newState) {
-                case State::kNone:
-                case State::kInProgress:
+                case kNone:
+                case kInProgress:
                     return true;
                 default:
                     return false;
@@ -1550,12 +1550,12 @@ bool Session::TransitionTable::_isLegalTransition(State oldState, State newState
     MONGO_UNREACHABLE;
 }
 
-void Session::TransitionTable::transitionTo(WithLock,
-                                            State newState,
-                                            TransitionValidation shouldValidate) {
+void Session::TransactionState::transitionTo(WithLock,
+                                             StateFlag newState,
+                                             TransitionValidation shouldValidate) {
 
     if (shouldValidate == TransitionValidation::kValidateTransition) {
-        invariant(TransitionTable::_isLegalTransition(_state, newState),
+        invariant(TransactionState::_isLegalTransition(_state, newState),
                   str::stream() << "Current state: " << toString(_state)
                                 << ", Illegal attempted next state: "
                                 << toString(newState));

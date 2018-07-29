@@ -424,12 +424,12 @@ public:
 
     void transitionToPreparedforTest() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _txnState.transitionTo(lk, TransitionTable::State::kPrepared);
+        _txnState.transitionTo(lk, TransactionState::kPrepared);
     }
 
     void transitionToCommittingforTest() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _txnState.transitionTo(lk, TransitionTable::State::kCommittingWithoutPrepare);
+        _txnState.transitionTo(lk, TransactionState::kCommittingWithoutPrepare);
     }
 
 private:
@@ -481,16 +481,16 @@ private:
      * kPrepared, the transaction is not allowed to abort outside of an 'abortTransaction' command.
      * At this point, aborting the transaction must log an 'abortTransaction' oplog entry.
      */
-    class TransitionTable {
+    class TransactionState {
     public:
-        enum class State {
-            kNone,
-            kInProgress,
-            kPrepared,
-            kCommittingWithoutPrepare,
-            kCommittingWithPrepare,
-            kCommitted,
-            kAborted
+        enum StateFlag {
+            kNone = 1 << 0,
+            kInProgress = 1 << 1,
+            kPrepared = 1 << 2,
+            kCommittingWithoutPrepare = 1 << 3,
+            kCommittingWithPrepare = 1 << 4,
+            kCommitted = 1 << 5,
+            kAborted = 1 << 6
         };
 
         /**
@@ -500,58 +500,58 @@ private:
         enum class TransitionValidation { kValidateTransition, kRelaxTransitionValidation };
         void transitionTo(
             WithLock,
-            State newState,
+            StateFlag newState,
             TransitionValidation shouldValidate = TransitionValidation::kValidateTransition);
 
         bool inMultiDocumentTransaction(WithLock) const {
-            return _state == State::kInProgress || _state == State::kPrepared;
+            return _state == kInProgress || _state == kPrepared;
         }
 
         bool isNone(WithLock) const {
-            return _state == State::kNone;
+            return _state == kNone;
         }
 
         bool isInProgress(WithLock) const {
-            return _state == State::kInProgress;
+            return _state == kInProgress;
         }
 
         bool isPrepared(WithLock) const {
-            return _state == State::kPrepared;
+            return _state == kPrepared;
         }
 
         bool isCommittingWithoutPrepare(WithLock) const {
-            return _state == State::kCommittingWithoutPrepare;
+            return _state == kCommittingWithoutPrepare;
         }
 
         bool isCommittingWithPrepare(WithLock) const {
-            return _state == State::kCommittingWithPrepare;
+            return _state == kCommittingWithPrepare;
         }
 
         bool isCommitted(WithLock) const {
-            return _state == State::kCommitted;
+            return _state == kCommitted;
         }
 
         bool isAborted(WithLock) const {
-            return _state == State::kAborted;
+            return _state == kAborted;
         }
 
         std::string toString() const {
             return toString(_state);
         }
 
-        static std::string toString(State state);
+        static std::string toString(StateFlag state);
 
     private:
-        static bool _isLegalTransition(State oldState, State newState);
+        static bool _isLegalTransition(StateFlag oldState, StateFlag newState);
 
-        State _state = State::kNone;
+        StateFlag _state = kNone;
     };
 
-    friend std::ostream& operator<<(std::ostream& s, TransitionTable txnState) {
+    friend std::ostream& operator<<(std::ostream& s, TransactionState txnState) {
         return (s << txnState.toString());
     }
 
-    friend StringBuilder& operator<<(StringBuilder& s, TransitionTable txnState) {
+    friend StringBuilder& operator<<(StringBuilder& s, TransactionState txnState) {
         return (s << txnState.toString());
     }
 
@@ -608,7 +608,7 @@ private:
     boost::optional<TxnResources> _txnResourceStash;
 
     // Maintains the transaction state and the transition table for legal state transitions.
-    TransitionTable _txnState;
+    TransactionState _txnState;
 
     // Holds oplog data for operations which have been applied in the current multi-document
     // transaction.  Not used for retryable writes.
