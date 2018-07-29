@@ -577,16 +577,13 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         }
     }
 
-    long long term = OpTime::kUninitializedTerm;
-    if (localConfig.getProtocolVersion() == 1) {
-        // Restore the current term according to the terms of last oplog entry and last vote.
-        // The initial term of OpTime() is 0.
-        term = lastOpTime.getTerm();
-        if (lastVoteStatus.isOK()) {
-            long long lastVoteTerm = lastVoteStatus.getValue().getTerm();
-            if (term < lastVoteTerm) {
-                term = lastVoteTerm;
-            }
+    // Restore the current term according to the terms of last oplog entry and last vote.
+    // The initial term of OpTime() is 0.
+    long long term = lastOpTime.getTerm();
+    if (lastVoteStatus.isOK()) {
+        long long lastVoteTerm = lastVoteStatus.getValue().getTerm();
+        if (term < lastVoteTerm) {
+            term = lastVoteTerm;
         }
     }
 
@@ -2380,10 +2377,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     // In pv1, the TopologyCoordinator has not set the term yet. It will be set to kInitialTerm if
     // the initiate succeeds so we pass that here.
     status = checkQuorumForInitiate(
-        _replExecutor.get(),
-        newConfig,
-        myIndex.getValue(),
-        newConfig.getProtocolVersion() == 1 ? OpTime::kInitialTerm : OpTime::kUninitializedTerm);
+        _replExecutor.get(), newConfig, myIndex.getValue(), OpTime::kInitialTerm);
 
     if (!status.isOK()) {
         error() << "replSetInitiate failed; " << status;
@@ -2749,6 +2743,7 @@ ReplicationCoordinatorImpl::PostMemberStateUpdateAction
 ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
                                                        const ReplSetConfig& newConfig,
                                                        int myIndex) {
+    invariant(newConfig.getProtocolVersion() == 1);
     invariant(_settings.usingReplSets());
     _cancelHeartbeats_inlock();
     _setConfigState_inlock(kConfigSteady);
@@ -2761,17 +2756,6 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
     const ReplSetConfig oldConfig = _rsConfig;
     _rsConfig = newConfig;
     _protVersion.store(_rsConfig.getProtocolVersion());
-
-    // Warn if this config has protocol version 0
-    if (newConfig.getProtocolVersion() == 0 &&
-        (!oldConfig.isInitialized() || oldConfig.getProtocolVersion() == 1)) {
-        log() << startupWarningsLog;
-        log() << "** WARNING: This replica set was configured with protocol version 0."
-              << startupWarningsLog;
-        log() << "**          This protocol version is deprecated and subject to be removed "
-              << startupWarningsLog;
-        log() << "**          in a future version." << startupWarningsLog;
-    }
 
     // Warn if running --nojournal and writeConcernMajorityJournalDefault = false
     StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
@@ -2813,24 +2797,6 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
         _startHeartbeats_inlock();
     }
     _updateLastCommittedOpTime_inlock();
-
-    // Set election id if we're primary.
-    if (oldConfig.isInitialized() && _memberState.primary()) {
-        if (oldConfig.getProtocolVersion() > newConfig.getProtocolVersion()) {
-            // Downgrade
-            invariant(newConfig.getProtocolVersion() == 0);
-            _electionId = OID::gen();
-            auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
-            _topCoord->setElectionInfo(_electionId, ts);
-        } else if (oldConfig.getProtocolVersion() < newConfig.getProtocolVersion()) {
-            // Upgrade
-            invariant(newConfig.getProtocolVersion() == 1);
-            invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
-            _electionId = OID::fromTerm(_topCoord->getTerm());
-            auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
-            _topCoord->setElectionInfo(_electionId, ts);
-        }
-    }
 
     return action;
 }

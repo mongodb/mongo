@@ -279,8 +279,8 @@ TEST_F(ReplCoordHBV1Test,
     responseBuilder << "ok" << 1;
     hbResp.addToBSON(&responseBuilder);
     net->scheduleResponse(
-        noi, startDate + Milliseconds(200), makeResponseStatus(responseBuilder.obj()));
-    assertRunUntil(startDate + Milliseconds(2200));
+        noi, startDate + Milliseconds(50), makeResponseStatus(responseBuilder.obj()));
+    assertRunUntil(startDate + Milliseconds(550));
 
     // Because the new config is stored using an out-of-band thread, we need to perform some
     // extra synchronization to let the executor finish the heartbeat reconfig.  We know that

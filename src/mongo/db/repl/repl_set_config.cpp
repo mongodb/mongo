@@ -166,19 +166,9 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg, bool forInitiate, OID defa
     // Parse protocol version
     //
     status = bsonExtractIntegerField(cfg, kProtocolVersionFieldName, &_protocolVersion);
-    if (!status.isOK()) {
-        if (status != ErrorCodes::NoSuchKey) {
-            return status;
-        }
-        if (forInitiate) {
-            // Default protocolVersion to 1 when initiating a new set.
-            _protocolVersion = 1;
-        }
-        // If protocolVersion field is missing but this *isn't* for an initiate, leave
-        // _protocolVersion at it's default of 0 for now.  It will error later on, during
-        // validate().
-        // TODO(spencer): Remove this after 4.0, when we no longer need mixed-version support
-        // with versions that don't always include the protocolVersion field.
+    // If 'protocolVersion' field is missing for initiate, then _protocolVersion defaults to 1.
+    if (!(status.isOK() || (status == ErrorCodes::NoSuchKey && forInitiate))) {
+        return status;
     }
 
     //

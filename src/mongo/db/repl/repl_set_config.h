@@ -311,7 +311,7 @@ public:
      * Gets the protocol version for this configuration.
      *
      * The protocol version number currently determines what election protocol is used by the
-     * cluster; 0 is the default and indicates the old 3.0 election protocol.
+     * cluster; 1 is the default.
      */
     long long getProtocolVersion() const {
         return _protocolVersion;
@@ -396,7 +396,7 @@ private:
     int _totalVotingMembers = 0;
     ReplSetTagConfig _tagConfig;
     StringMap<ReplSetTagPattern> _customWriteConcernModes;
-    long long _protocolVersion = 0;
+    long long _protocolVersion = 1;
     bool _configServer = false;
     OID _replicaSetId;
     ConnectionString _connectionString;
