@@ -86,14 +86,14 @@ void checkCalculatedHashedSplitPoints(bool isHashed,
 TEST(CalculateHashedSplitPointsTest, EmptyCollectionMoreChunksThanShards) {
     const std::vector<BSONObj> expectedInitialSplitPoints = {BSON("x" << 0)};
     const std::vector<BSONObj> expectedFinalSplitPoints = {
-        BSON("x" << -4611686018427387902), BSON("x" << 0), BSON("x" << 4611686018427387902)};
+        BSON("x" << -4611686018427387902LL), BSON("x" << 0), BSON("x" << 4611686018427387902LL)};
     checkCalculatedHashedSplitPoints(
         true, true, 2, 4, &expectedInitialSplitPoints, &expectedFinalSplitPoints);
 }
 
 TEST(CalculateHashedSplitPointsTest, EmptyCollectionChunksEqualToShards) {
-    const std::vector<BSONObj> expectedSplitPoints = {BSON("x" << -3074457345618258602),
-                                                      BSON("x" << 3074457345618258602)};
+    const std::vector<BSONObj> expectedSplitPoints = {BSON("x" << -3074457345618258602LL),
+                                                      BSON("x" << 3074457345618258602LL)};
     checkCalculatedHashedSplitPoints(true, true, 3, 3, &expectedSplitPoints, &expectedSplitPoints);
 }
 
@@ -105,7 +105,7 @@ TEST(CalculateHashedSplitPointsTest, EmptyCollectionHashedWithInitialSplitsRetur
 TEST(CalculateHashedSplitPointsTest, EmptyCollectionNumInitialChunksZero) {
     const std::vector<BSONObj> expectedInitialSplitPoints = {BSON("x" << 0)};
     const std::vector<BSONObj> expectedFinalSplitPoints = {
-        BSON("x" << -4611686018427387902), BSON("x" << 0), BSON("x" << 4611686018427387902)};
+        BSON("x" << -4611686018427387902LL), BSON("x" << 0), BSON("x" << 4611686018427387902LL)};
     checkCalculatedHashedSplitPoints(
         true, true, 2, 0, &expectedInitialSplitPoints, &expectedFinalSplitPoints);
 }
@@ -172,9 +172,9 @@ TEST_F(GenerateInitialSplitChunksTest, NoSplitPoints) {
 TEST_F(GenerateInitialSplitChunksTest, SplitPointsMoreThanAvailableShards) {
     const auto& keyPattern = shardKeyPattern().getKeyPattern();
     const std::vector<BSONObj> expectedChunkBounds = {keyPattern.globalMin(),
-                                                      BSON("x" << -4611686018427387902),
+                                                      BSON("x" << -4611686018427387902LL),
                                                       BSON("x" << 0),
-                                                      BSON("x" << 4611686018427387902),
+                                                      BSON("x" << 4611686018427387902LL),
                                                       keyPattern.globalMax()};
     const std::vector<BSONObj> splitPoints(expectedChunkBounds.begin() + 1,
                                            expectedChunkBounds.end() - 1);
