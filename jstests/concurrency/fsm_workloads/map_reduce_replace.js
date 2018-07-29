@@ -10,8 +10,6 @@
  *
  * Uses the "replace" action to overwrite the entire contents of the
  * collection.
- *
- * @tags: [SERVER-35473]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
 load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config

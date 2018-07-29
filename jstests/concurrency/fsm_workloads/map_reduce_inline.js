@@ -8,8 +8,6 @@
  * counts of the 'value' field in memory.
  *
  * Used as the base workload for the other map-reduce workloads.
- *
- * @tags: [SERVER-35473]
  */
 var $config = (function() {
 

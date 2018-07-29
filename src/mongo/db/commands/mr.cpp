@@ -1158,56 +1158,61 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
     verify(statusWithCQ.isOK());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    auto exec = uassertStatusOK(getExecutor(_opCtx,
-                                            ctx->getCollection(),
-                                            std::move(cq),
-                                            PlanExecutor::YIELD_AUTO,
-                                            QueryPlannerParams::NO_TABLE_SCAN));
+    // The following anonymous block makes sure to destroy the executor prior to the
+    // finalReduce(all) call. This is important to clear the cursors being held by the
+    // storage engine.
+    {
+        auto exec = uassertStatusOK(getExecutor(_opCtx,
+                                                ctx->getCollection(),
+                                                std::move(cq),
+                                                PlanExecutor::YIELD_AUTO,
+                                                QueryPlannerParams::NO_TABLE_SCAN));
 
-    // Make sure the PlanExecutor is destroyed while holding a collection lock.
-    ON_BLOCK_EXIT([&exec, &ctx, opCtx, this] {
-        if (!ctx) {
-            AutoGetCollection autoColl(opCtx, _config.incLong, MODE_IS);
-            exec.reset();
-        }
-    });
-
-    // iterate over all sorted objects
-    BSONObj o;
-    PlanExecutor::ExecState state;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&o, NULL))) {
-        o = o.getOwned();  // we will be accessing outside of the lock
-        pm.hit();
-
-        if (dps::compareObjectsAccordingToSort(o, prev, sortKey) == 0) {
-            // object is same as previous, add to array
-            all.push_back(o);
-            if (pm->hits() % 100 == 0) {
-                _opCtx->checkForInterrupt();
+        // Make sure the PlanExecutor is destroyed while holding a collection lock.
+        ON_BLOCK_EXIT([&exec, &ctx, opCtx, this] {
+            if (!ctx) {
+                AutoGetCollection autoColl(opCtx, _config.incLong, MODE_IS);
+                exec.reset();
             }
-            continue;
+        });
+
+        // iterate over all sorted objects
+        BSONObj o;
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&o, NULL))) {
+            o = o.getOwned();  // we will be accessing outside of the lock
+            pm.hit();
+
+            if (dps::compareObjectsAccordingToSort(o, prev, sortKey) == 0) {
+                // object is same as previous, add to array
+                all.push_back(o);
+                if (pm->hits() % 100 == 0) {
+                    _opCtx->checkForInterrupt();
+                }
+                continue;
+            }
+
+            exec->saveState();
+
+            ctx.reset();
+
+            // reduce a finalize array
+            finalReduce(all);
+            ctx.emplace(_opCtx, _config.incLong);
+
+            all.clear();
+            prev = o;
+            all.push_back(o);
+
+            _opCtx->checkForInterrupt();
+            uassertStatusOK(exec->restoreState());
         }
 
-        exec->saveState();
-
-        ctx.reset();
-
-        // reduce a finalize array
-        finalReduce(all);
-        ctx.emplace(_opCtx, _config.incLong);
-
-        all.clear();
-        prev = o;
-        all.push_back(o);
-
-        _opCtx->checkForInterrupt();
-        uassertStatusOK(exec->restoreState());
+        uassert(34428,
+                "Plan executor error during mapReduce command: " +
+                    WorkingSetCommon::toStatusString(o),
+                PlanExecutor::IS_EOF == state);
     }
-
-    uassert(34428,
-            "Plan executor error during mapReduce command: " + WorkingSetCommon::toStatusString(o),
-            PlanExecutor::IS_EOF == state);
-
     ctx.reset();
 
     // reduce and finalize last array

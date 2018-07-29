@@ -12,8 +12,6 @@
  * of the output collection.
  *
  * Specifies nonAtomic=true.
- *
- * @tags: [SERVER-35473]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
 load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config

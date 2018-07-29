@@ -11,8 +11,6 @@
  *
  * This workload serves as a regression test for SERVER-6757, SERVER-15087,
  * and SERVER-15842.
- *
- * @tags: [SERVER-35473]
  */
 var $config = (function() {
 

@@ -4517,7 +4517,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --mongod=./mongoed --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_background_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication,requires_capped,requires_profiling,requires_javascript,requires_fsync
+      resmoke_args: --suites=core --mongod=./mongoed --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_background_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication,requires_capped,requires_profiling,requires_javascript,requires_fsync,requires_compact
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -12296,8 +12296,8 @@ buildvariants:
     # mobile storage engine.
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
-      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-35473
+      --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling,requires_compact
+      --excludeWithAnyTags=SERVER-32709,SERVER-32869
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --mobile-se=on
@@ -12348,8 +12348,8 @@ buildvariants:
   expansions:
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
-      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-35473
+      --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling,requires_compact
+      --excludeWithAnyTags=SERVER-32709,SERVER-32869
     compile_flags: >-
         -j$(grep -c ^processor /proc/cpuinfo)
         --mobile-se=on
@@ -12426,8 +12426,8 @@ buildvariants:
     # mobile storage engine.
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling
-      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-35473
+      --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling,requires_compact
+      --excludeWithAnyTags=SERVER-32709,SERVER-32869
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
