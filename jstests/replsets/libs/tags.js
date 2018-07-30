@@ -68,7 +68,6 @@ var TagsTest = function(options) {
                 {
                   _id: 1,
                   host: nodes[1],
-                  priority: 2,
                   tags: {
                       server: '1',
                       dc: 'ny',
@@ -79,7 +78,6 @@ var TagsTest = function(options) {
                 {
                   _id: 2,
                   host: nodes[2],
-                  priority: 3,
                   tags: {
                       server: '2',
                       dc: 'ny',
@@ -136,6 +134,7 @@ var TagsTest = function(options) {
 
         reconfig(replTest, replSetConfig);
 
+        assert.soonNoExcept(() => replTest.nodes[2].adminCommand({replSetStepUp: 1}).ok);
         replTest.waitForState(replTest.nodes[2], ReplSetTest.State.PRIMARY);
         replTest.awaitReplication();
 
@@ -154,12 +153,20 @@ var TagsTest = function(options) {
                 expectedWritableNodesCount || expectedNodesAgreeOnPrimary.length;
             jsTestLog('ensurePrimary - Node ' + nodeId + ' (' + replTest.nodes[nodeId].host +
                       ') should be primary.');
+
+            // Wait until the desired node steps up as primary and can accept writes.
+            assert.soonNoExcept(() => assert.commandWorked(
+                                    replTest.nodes[nodeId].adminCommand({replSetStepUp: 1})));
+            assert.soon(() => replTest.getPrimary() === replTest.nodes[nodeId]);
+            let primary = replTest.nodes[nodeId];
+
+            // Wait until nodes know about the new primary.
             replTest.awaitNodesAgreeOnPrimary(
                 replTest.kDefaultTimeoutMS, expectedNodesAgreeOnPrimary, nodeId);
             jsTestLog('ensurePrimary - Nodes ' + tojson(expectedNodesAgreeOnPrimary) +
                       ' agree that ' + nodeId + ' (' + replTest.nodes[nodeId].host +
                       ') should be primary.');
-            primary = replTest.getPrimary();
+
             if (options.forceWriteMode) {
                 primary.forceWriteMode(options.forceWriteMode);
             }
@@ -174,7 +181,7 @@ var TagsTest = function(options) {
             return primary;
         };
 
-        // 2 should eventually stage a priority takeover from the primary.
+        // Make sure node 2 becomes primary.
         var primary = ensurePrimary(2, replTest.nodes);
 
         jsTestLog('primary is now 2');
@@ -271,9 +278,8 @@ var TagsTest = function(options) {
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
-        jsTestLog('Bringing down current primary node 2 ' + primary.host +
-                  ' to allow next higher priority node 1 ' + replTest.nodes[1].host +
-                  ' to become primary.');
+        jsTestLog('Bringing down current primary node 2 ' + primary.host + ' to allow node 1 ' +
+                  replTest.nodes[1].host + ' to become primary.');
 
         conns[1].reconnect(conns[3]);
         conns[2].disconnect(conns[0]);
@@ -281,7 +287,7 @@ var TagsTest = function(options) {
         jsTestLog('partitions: [0-1] [2] [1-3-4] ' +
                   '(all secondaries except down node 2 can replicate from new primary node 1)');
 
-        // Node 1 with slightly higher priority will take over.
+        // Node 1 should take over.
         jsTestLog('1 must become primary here because otherwise the other members will take too ' +
                   'long timing out their old sync threads');
         primary = ensurePrimary(1, replTest.nodes.slice(0, 2), 4);
