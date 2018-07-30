@@ -36,15 +36,16 @@
 
 namespace mongo {
 
-boost::optional<ChunkSplitStateDriver> ChunkSplitStateDriver::tryInitiateSplit(
+std::shared_ptr<ChunkSplitStateDriver> ChunkSplitStateDriver::tryInitiateSplit(
     std::shared_ptr<ChunkWritesTracker> writesTracker) {
+    invariant(writesTracker);
     bool acquiredSplitLock = writesTracker->acquireSplitLock();
     return acquiredSplitLock
-        ? boost::optional<ChunkSplitStateDriver>(ChunkSplitStateDriver(writesTracker))
-        : boost::none;
+        ? std::shared_ptr<ChunkSplitStateDriver>(new ChunkSplitStateDriver(writesTracker))
+        : nullptr;
 }
 
-ChunkSplitStateDriver::ChunkSplitStateDriver(ChunkSplitStateDriver&& source) {
+ChunkSplitStateDriver::ChunkSplitStateDriver(ChunkSplitStateDriver&& source) noexcept {
     _writesTracker = source._writesTracker;
     source._writesTracker.reset();
 

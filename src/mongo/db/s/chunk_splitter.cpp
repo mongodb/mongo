@@ -260,7 +260,7 @@ void ChunkSplitter::onStepDown() {
     // TODO: Re-enable this log when auto split is actively running on shards.
 }
 
-void ChunkSplitter::trySplitting(ChunkSplitStateDriver chunkSplitStateDriver,
+void ChunkSplitter::trySplitting(std::shared_ptr<ChunkSplitStateDriver> chunkSplitStateDriver,
                                  const NamespaceString& nss,
                                  const BSONObj& min,
                                  const BSONObj& max,
@@ -268,13 +268,14 @@ void ChunkSplitter::trySplitting(ChunkSplitStateDriver chunkSplitStateDriver,
     if (!_isPrimary) {
         return;
     }
+
     uassertStatusOK(_threadPool.schedule(
-        [ this, &chunkSplitStateDriver, nss, min, max, dataWritten ]() noexcept {
-            _runAutosplit(std::move(chunkSplitStateDriver), nss, min, max, dataWritten);
+        [ this, csd = std::move(chunkSplitStateDriver), nss, min, max, dataWritten ]() noexcept {
+            _runAutosplit(csd, nss, min, max, dataWritten);
         }));
 }
 
-void ChunkSplitter::_runAutosplit(ChunkSplitStateDriver chunkSplitStateDriver,
+void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSplitStateDriver,
                                   const NamespaceString& nss,
                                   const BSONObj& min,
                                   const BSONObj& max,
@@ -310,7 +311,7 @@ void ChunkSplitter::_runAutosplit(ChunkSplitStateDriver chunkSplitStateDriver,
                << " dataWritten since last check: " << dataWritten
                << " maxChunkSizeBytes: " << maxChunkSizeBytes;
 
-        chunkSplitStateDriver.prepareSplit();
+        chunkSplitStateDriver->prepareSplit();
         auto splitPoints = uassertStatusOK(splitVector(opCtx.get(),
                                                        nss,
                                                        shardKeyPattern.toBSON(),
@@ -364,7 +365,7 @@ void ChunkSplitter::_runAutosplit(ChunkSplitStateDriver chunkSplitStateDriver,
                                                    cm->getVersion(),
                                                    ChunkRange(min, max),
                                                    splitPoints));
-        chunkSplitStateDriver.commitSplit();
+        chunkSplitStateDriver->commitSplit();
 
         const bool shouldBalance = isAutoBalanceEnabled(opCtx.get(), nss, balancerConfig);
 

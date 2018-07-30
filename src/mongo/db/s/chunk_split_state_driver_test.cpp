@@ -44,23 +44,22 @@ public:
         _writesTracker = std::make_shared<ChunkWritesTracker>();
         uint64_t bytesToAdd{4};
         _writesTracker->addBytesWritten(bytesToAdd);
-        _splitDriver = std::make_unique<boost::optional<ChunkSplitStateDriver>>(
-            ChunkSplitStateDriver::tryInitiateSplit(_writesTracker));
+        _splitDriver = ChunkSplitStateDriver::tryInitiateSplit(_writesTracker);
     }
 
     void tearDown() override {}
 
-    virtual ChunkWritesTracker& writesTracker() {
+    ChunkWritesTracker& writesTracker() {
         return *_writesTracker;
     }
 
-    virtual boost::optional<ChunkSplitStateDriver>& splitDriver() {
-        return *_splitDriver;
+    std::shared_ptr<ChunkSplitStateDriver>& splitDriver() {
+        return _splitDriver;
     }
 
 protected:
     std::shared_ptr<ChunkWritesTracker> _writesTracker;
-    std::unique_ptr<boost::optional<ChunkSplitStateDriver>> _splitDriver;
+    std::shared_ptr<ChunkSplitStateDriver> _splitDriver;
 };
 
 class ChunkSplitStateDriverTest : public ChunkSplitStateDriverTestNoTeardown {
@@ -76,8 +75,7 @@ TEST(ChunkSplitStateDriverTest, InitiateSplitLeavesBytesWrittenUnchanged) {
     uint64_t bytesInTrackerBeforeSplit{4};
     writesTracker->addBytesWritten(bytesInTrackerBeforeSplit);
 
-    auto splitDriver = std::make_unique<boost::optional<ChunkSplitStateDriver>>(
-        ChunkSplitStateDriver::tryInitiateSplit(writesTracker));
+    auto splitDriver = ChunkSplitStateDriver::tryInitiateSplit(writesTracker);
 
     ASSERT_EQ(writesTracker->getBytesWritten(), bytesInTrackerBeforeSplit);
 }
@@ -147,15 +145,14 @@ DEATH_TEST_F(ChunkSplitStateDriverTest,
 }
 
 TEST(ChunkSplitStateDriverTest, PrepareErrorsWhenChunkWritesTrackerNoLongerExists) {
-    std::unique_ptr<boost::optional<ChunkSplitStateDriver>> splitDriver;
+    std::shared_ptr<ChunkSplitStateDriver> splitDriver;
     {
         auto writesTracker = std::make_shared<ChunkWritesTracker>();
         uint64_t bytesToAdd{4};
         writesTracker->addBytesWritten(bytesToAdd);
-        splitDriver = std::make_unique<boost::optional<ChunkSplitStateDriver>>(
-            ChunkSplitStateDriver::tryInitiateSplit(writesTracker));
+        splitDriver = ChunkSplitStateDriver::tryInitiateSplit(writesTracker);
     }
-    ASSERT_THROWS(splitDriver->get().prepareSplit(), AssertionException);
+    ASSERT_THROWS(splitDriver->prepareSplit(), AssertionException);
 }
 
 }  // namespace mongo

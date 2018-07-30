@@ -165,6 +165,7 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
     // Note that we can assume the simple collation, because shard keys do not support non-simple
     // collations.
     auto chunk = chunkManager.findIntersectingChunkWithSimpleCollation(shardKey);
+
     auto chunkWritesTracker = chunk.getWritesTracker();
     chunkWritesTracker->addBytesWritten(dataWritten);
 
@@ -174,11 +175,9 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
         auto chunkSplitStateDriver = ChunkSplitStateDriver::tryInitiateSplit(chunkWritesTracker);
         if (chunkSplitStateDriver) {
             // TODO (SERVER-9287): Enable the following to trigger chunk splitting
-            // ChunkSplitter::get(opCtx).trySplitting(std::move(chunkSplitStateDriver.get()),
-            //                                       nss,
-            //                                       chunk.getMin(),
-            //                                       chunk.getMax(),
-            //                                       dataWritten);
+            // ChunkSplitter::get(opCtx).trySplitting(
+            //     std::move(chunkSplitStateDriver), nss, chunk.getMin(), chunk.getMax(),
+            //     dataWritten);
         }
     }
 }
