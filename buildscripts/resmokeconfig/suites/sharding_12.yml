@@ -23,7 +23,6 @@ selector:
   - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
   - jstests/sharding/after_cluster_time.js
   - jstests/sharding/shard5.js
-  - jstests/sharding/conf_server_write_concern_metadata.js
   - jstests/sharding/idhack_sharded.js
   - jstests/sharding/split_large_key.js
   - jstests/sharding/find_getmore_cmd.js

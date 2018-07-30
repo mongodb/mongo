@@ -538,6 +538,7 @@
         updateZoneKeyRange: {skip: isUnrelated},
         usersInfo: {skip: isUnrelated},
         validate: {command: {validate: "view"}, expectFailure: true},
+        waitForOngoingChunkSplits: {skip: isUnrelated},
         whatsmyuri: {skip: isUnrelated}
     };
 

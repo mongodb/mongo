@@ -8,6 +8,7 @@
  */
 (function() {
     'use strict';
+    load('jstests/sharding/autosplit_include.js');
 
     var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
@@ -74,6 +75,8 @@
 
         st.printShardingStatus(true);
         printjson(coll.stats());
+
+        waitForOngoingChunkSplits(st);
 
         // Check that all chunks (except the two extreme chunks)
         // have been split at least once + 1 extra chunk as reload buffer

@@ -28,7 +28,6 @@ selector:
   - jstests/sharding/tag_range.js
   - jstests/sharding/refresh_sessions.js
   - jstests/sharding/mongos_no_detect_sharding.js
-  - jstests/sharding/conf_server_write_concern_metadata.js
   - jstests/sharding/fts_score_sort_sharded.js
   - jstests/sharding/addshard_idempotent.js
   - jstests/sharding/movechunk_with_noMoveParanoia.js

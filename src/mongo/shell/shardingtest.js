@@ -431,6 +431,12 @@ var ShardingTest = function(params) {
         throw _getErrorWithCode(res, "command " + tojson(cmd) + " failed: " + tojson(res));
     };
 
+    this.forEachConnection = function(fn) {
+        this._connections.forEach(function(conn) {
+            fn(conn);
+        });
+    };
+
     this.printChangeLog = function() {
         this.config.changelog.find().forEach(function(z) {
             var msg = z.server + "\t" + z.time + "\t" + z.what;

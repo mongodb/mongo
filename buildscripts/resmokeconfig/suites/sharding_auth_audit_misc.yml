@@ -269,7 +269,6 @@ selector:
   - jstests/sharding/refresh_sessions.js
   - jstests/sharding/mongos_no_detect_sharding.js
   - jstests/sharding/mr_noscripting.js
-  - jstests/sharding/conf_server_write_concern_metadata.js
   - jstests/sharding/fts_score_sort_sharded.js
   - jstests/sharding/addshard_idempotent.js
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js

@@ -3,6 +3,7 @@
  */
 (function() {
     'use strict';
+    load('jstests/sharding/autosplit_include.js');
 
     var st = new ShardingTest({shards: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
@@ -17,8 +18,9 @@
 
     assert.eq(1, configDB.chunks.find({"ns": "test.insert"}).itcount());
 
-    // Note: Estimated 'chunk size' tracked by mongos is initialized with a random value so
-    // we are going to be conservative.
+    // This should result in a little over 3MB inserted into the chunk, so with
+    // a max chunk size of 1MB we'd expect the autosplitter to split this into
+    // at least 3 chunks
     for (var x = 0; x < 3100; x++) {
         assert.writeOK(testDB.runCommand({
             insert: 'insert',
@@ -27,6 +29,8 @@
             writeConcern: {w: 1}
         }));
     }
+
+    waitForOngoingChunkSplits(st);
 
     // Inserted batch is a multiple of the chunkSize, expect the chunks to split into
     // more than 2.
@@ -49,6 +53,8 @@
         }));
     }
 
+    waitForOngoingChunkSplits(st);
+
     assert.gt(configDB.chunks.find({"ns": "test.update"}).itcount(), 1);
     testDB.dropDatabase();
 
@@ -67,6 +73,11 @@
             writeConcern: {w: 1}
         }));
     }
+
+    // If we are autosplitting (which we shouldn't be), we want to wait until
+    // it's finished, otherwise we could falsely think no autosplitting was
+    // done when really it was just in progress.
+    waitForOngoingChunkSplits(st);
 
     assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
     testDB.dropDatabase();
@@ -91,6 +102,8 @@
             {insert: 'insert', documents: docs, ordered: false, writeConcern: {w: 1}}));
     }
 
+    waitForOngoingChunkSplits(st);
+
     assert.gt(configDB.chunks.find({"ns": "test.insert"}).itcount(), 1);
     testDB.dropDatabase();
 
@@ -112,6 +125,8 @@
         assert.writeOK(testDB.runCommand(
             {update: 'update', updates: docs, ordered: false, writeConcern: {w: 1}}));
     }
+
+    waitForOngoingChunkSplits(st);
 
     assert.gt(configDB.chunks.find({"ns": "test.update"}).itcount(), 1);
     testDB.dropDatabase();
@@ -138,6 +153,11 @@
             writeConcern: {w: 1}
         }));
     }
+
+    // If we are autosplitting (which we shouldn't be), we want to wait until
+    // it's finished, otherwise we could falsely think no autosplitting was
+    // done when really it was just in progress.
+    waitForOngoingChunkSplits(st);
 
     assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
 

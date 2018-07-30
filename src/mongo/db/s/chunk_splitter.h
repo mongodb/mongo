@@ -75,6 +75,12 @@ public:
     void onStepDown();
 
     /**
+     * Blocks until all chunk split tasks in the underlying thread pool have
+     * completed (that is, until the thread pool is idle)
+     */
+    void waitForIdle();
+
+    /**
      * Schedules an autosplit task. This function throws on scheduling failure.
      */
     void trySplitting(std::shared_ptr<ChunkSplitStateDriver> chunkSplitStateDriver,

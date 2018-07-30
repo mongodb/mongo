@@ -32,7 +32,6 @@ selector:
   - jstests/sharding/move_chunk_open_cursors.js
   - jstests/sharding/time_zone_info_mongos.js
   - jstests/sharding/agg_sort.js
-  - jstests/sharding/conf_server_write_concern_metadata.js
   - jstests/sharding/error_during_agg_getmore.js
   - jstests/sharding/cleanup_orphaned.js
   - jstests/sharding/remove3.js

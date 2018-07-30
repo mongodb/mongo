@@ -38,6 +38,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/chunk_split_state_driver.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/split_chunk.h"
 #include "mongo/db/s/split_vector.h"
@@ -244,8 +245,7 @@ void ChunkSplitter::onStepUp() {
     }
     _isPrimary = true;
 
-    // log() << "The ChunkSplitter has started and will accept autosplit tasks.";
-    // TODO: Re-enable this log line when auto split is actively running on shards.
+    log() << "The ChunkSplitter has started and will accept autosplit tasks.";
 }
 
 void ChunkSplitter::onStepDown() {
@@ -255,9 +255,12 @@ void ChunkSplitter::onStepDown() {
     }
     _isPrimary = false;
 
-    // log() << "The ChunkSplitter has stopped and will no longer run new autosplit tasks. Any "
-    //       << "autosplit tasks that have already started will be allowed to finish.";
-    // TODO: Re-enable this log when auto split is actively running on shards.
+    log() << "The ChunkSplitter has stopped and will no longer run new autosplit tasks. Any "
+          << "autosplit tasks that have already started will be allowed to finish.";
+}
+
+void ChunkSplitter::waitForIdle() {
+    _threadPool.waitForIdle();
 }
 
 void ChunkSplitter::trySplitting(std::shared_ptr<ChunkSplitStateDriver> chunkSplitStateDriver,
@@ -268,7 +271,6 @@ void ChunkSplitter::trySplitting(std::shared_ptr<ChunkSplitStateDriver> chunkSpl
     if (!_isPrimary) {
         return;
     }
-
     uassertStatusOK(_threadPool.schedule(
         [ this, csd = std::move(chunkSplitStateDriver), nss, min, max, dataWritten ]() noexcept {
             _runAutosplit(csd, nss, min, max, dataWritten);
@@ -324,6 +326,9 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                                                        maxChunkSizeBytes));
 
         if (splitPoints.size() <= 1) {
+            LOG(1)
+                << "ChunkSplitter attempted split but not enough split points were found for chunk "
+                << redact(chunk.toString());
             // No split points means there isn't enough data to split on; 1 split point means we
             // have between half the chunk size to full chunk size so there is no need to split yet
             return;
@@ -374,6 +379,13 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
               << ")"
               << (topChunkMinKey.isEmpty() ? "" : " (top chunk migration suggested" +
                           (std::string)(shouldBalance ? ")" : ", but no migrations allowed)"));
+
+        // Because the ShardServerOpObserver uses the metadata from the CSS for tracking incoming
+        // writes, if we split a chunk but do not force a CSS refresh, subsequent inserts will see
+        // stale metadata and so will not trigger a chunk split. If we force metadata refresh here,
+        // we can limit the amount of time that the op observer is tracking writes on the parent
+        // chunk rather than on its child chunks.
+        forceShardFilteringMetadataRefresh(opCtx.get(), nss, false);
 
         // Balance the resulting chunks if the autobalance option is enabled and if we split at the
         // first or last chunk on the collection as part of top chunk optimization.

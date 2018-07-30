@@ -1,9 +1,12 @@
 /**
  * This test confirms that after sharding a collection with some pre-existing data,
  * the resulting chunks aren't auto-split too aggressively.
+ *
+ * @tags: [requires_persistence]
  */
 (function() {
     'use strict';
+    load('jstests/sharding/autosplit_include.js');
 
     var s = new ShardingTest({
         name: "shard_existing_coll_chunk_count",
@@ -72,6 +75,8 @@
             limit += stage.numDocsToInsert;
             for (; i < limit; i++) {
                 coll.insert({i, pad});
+
+                waitForOngoingChunkSplits(s);
             }
 
             // Confirm number of chunks for this stage.
@@ -124,12 +129,13 @@
         ],
     });
 
-    // Lower chunksize to 1MB, and restart the mongos for it to take.
+    // Lower chunksize to 1MB, and restart the mongod for it to take.
     assert.writeOK(
         s.getDB("config").getCollection("settings").update({_id: "chunksize"}, {$set: {value: 1}}, {
             upsert: true
         }));
-    s.restartMongos(0);
+
+    s.restartShardRS(0);
 
     // Original problematic case, scaled down to smaller chunksize.
     runCase({

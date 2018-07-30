@@ -232,7 +232,8 @@ void ClusterWriter::write(OperationContext* opCtx,
             BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
         }
 
-        splitIfNeeded(opCtx, request.getNS(), targeterStats);
+        // TODO Re-enable for mixed-version scenarios
+        // splitIfNeeded(opCtx, request.getNS(), targeterStats);
     }
 }
 

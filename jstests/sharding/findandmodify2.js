@@ -1,5 +1,6 @@
 (function() {
     'use strict';
+    load('jstests/sharding/autosplit_include.js');
 
     var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
@@ -74,18 +75,26 @@
 
     print("---------- Update via findAndModify...");
     via_fam();
+    waitForOngoingChunkSplits(s);
+
     print("---------- Done.");
 
     print("---------- Upsert via findAndModify...");
     via_fam_upsert();
+    waitForOngoingChunkSplits(s);
+
     print("---------- Done.");
 
     print("---------- Basic update...");
     via_update();
+    waitForOngoingChunkSplits(s);
+
     print("---------- Done.");
 
     print("---------- Basic update with upsert...");
     via_update_upsert();
+    waitForOngoingChunkSplits(s);
+
     print("---------- Done.");
 
     print("---------- Printing chunks:");

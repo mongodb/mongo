@@ -259,7 +259,6 @@ selector:
   - jstests/sharding/implicit_db_creation.js
   - jstests/sharding/presplit.js
   - jstests/sharding/SERVER-7379.js
-  - jstests/sharding/conf_server_write_concern_metadata.js
   - jstests/sharding/addshard_idempotent.js
   - jstests/sharding/tag_range.js
   - jstests/sharding/remove1.js

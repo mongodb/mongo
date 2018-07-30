@@ -3,6 +3,8 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [resource_intensive]
  */
+load('jstests/sharding/autosplit_include.js');
+
 function shardSetup(shardConfig, dbName, collName) {
     var st = new ShardingTest(shardConfig);
     var db = st.getDB(dbName);
@@ -86,6 +88,8 @@ function runTest(test) {
     do {
         var doc = {x: xval, val: largeStr};
         coll.insert(doc);
+        waitForOngoingChunkSplits(st);
+
         xval += test.inserts.inc;
     } while (getNumberOfChunks(configDB) <= numChunks);
 
