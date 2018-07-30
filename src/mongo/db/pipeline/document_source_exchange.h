@@ -31,6 +31,7 @@
 #include <deque>
 #include <vector>
 
+#include "mongo/bson/ordering.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange_gen.h"
 #include "mongo/stdx/condition_variable.h"
@@ -54,6 +55,11 @@ class Exchange : public RefCountable {
      */
     static std::vector<size_t> extractConsumerIds(
         const boost::optional<std::vector<std::int32_t>>& consumerIds, size_t nConsumers);
+
+    /**
+     * Extract the order description from the key.
+     */
+    static Ordering extractOrdering(const BSONObj& obj);
 
 public:
     explicit Exchange(const ExchangeSpec& spec);
@@ -94,6 +100,8 @@ private:
 
     // A pattern for extracting a key from a document used by range and hash policies.
     const BSONObj _keyPattern;
+
+    const Ordering _ordering;
 
     // Range boundaries. The boundaries are ordered and must cover the whole domain, e.g.
     // [Min, -200, 0, 200, Max] partitions the domain into 4 ranges (i.e. 1 less than number of
