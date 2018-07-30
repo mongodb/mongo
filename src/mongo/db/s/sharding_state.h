@@ -117,12 +117,6 @@ public:
     void shutDown(OperationContext* opCtx);
 
     /**
-     * Updates the ShardRegistry's stored notion of the config server optime based on the
-     * ConfigServerMetadata decoration attached to the OperationContext.
-     */
-    Status updateConfigServerOpTimeFromMetadata(OperationContext* opCtx);
-
-    /**
      * Updates the config server field of the shardIdentity document with the given connection
      * string.
      *

@@ -30,11 +30,14 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
+#include "mongo/db/s/sharding_config_optime_gossip.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -47,11 +50,10 @@ repl::OpTime ShardingEgressMetadataHookForMongod::_getConfigServerOpTime() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return repl::ReplicationCoordinator::get(_serviceContext)
             ->getCurrentCommittedSnapshotOpTime();
-    } else {
-        // TODO uncomment as part of SERVER-22663
-        // invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-        return Grid::get(_serviceContext)->configOpTime();
     }
+
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+    return Grid::get(_serviceContext)->configOpTime();
 }
 
 Status ShardingEgressMetadataHookForMongod::_advanceConfigOptimeFromShard(
@@ -59,7 +61,29 @@ Status ShardingEgressMetadataHookForMongod::_advanceConfigOptimeFromShard(
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
     }
+
     return ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(shardId, metadataObj);
+}
+
+void advanceConfigOptimeFromRequestMetadata(OperationContext* opCtx) {
+    auto const shardingState = ShardingState::get(opCtx);
+
+    if (!shardingState->enabled()) {
+        // Nothing to do if sharding state has not been initialized
+        return;
+    }
+
+    boost::optional<repl::OpTime> opTime = rpc::ConfigServerMetadata::get(opCtx).getOpTime();
+    if (!opTime)
+        return;
+
+    uassert(ErrorCodes::Unauthorized,
+            "Unauthorized to update config opTime",
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                   ActionType::internal));
+
+    Grid::get(opCtx)->advanceConfigOpTime(*opTime);
 }
 
 }  // namespace rpc

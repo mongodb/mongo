@@ -35,7 +35,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
@@ -51,7 +50,6 @@
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache_loader.h"
@@ -163,26 +161,6 @@ void ShardingState::shutDown(OperationContext* opCtx) {
         Grid::get(opCtx)->getExecutorPool()->shutdownAndJoin();
         Grid::get(opCtx)->catalogClient()->shutDown(opCtx);
     }
-}
-
-Status ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* opCtx) {
-    if (!enabled()) {
-        // Nothing to do if sharding state has not been initialized.
-        return Status::OK();
-    }
-
-    boost::optional<repl::OpTime> opTime = rpc::ConfigServerMetadata::get(opCtx).getOpTime();
-    if (opTime) {
-        if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                    ActionType::internal)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized to update config opTime");
-        }
-
-        Grid::get(opCtx)->advanceConfigOpTime(*opTime);
-    }
-
-    return Status::OK();
 }
 
 void ShardingState::setGlobalInitMethodForTest(GlobalInitFunc func) {

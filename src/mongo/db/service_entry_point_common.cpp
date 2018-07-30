@@ -68,6 +68,7 @@
 #include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharded_connection_info.h"
+#include "mongo/db/s/sharding_config_optime_gossip.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/session_catalog.h"
@@ -851,7 +852,7 @@ void execCommandDatabase(OperationContext* opCtx,
             }
 
             // Handle config optime information that may have been sent along with the command.
-            uassertStatusOK(shardingState->updateConfigServerOpTimeFromMetadata(opCtx));
+            rpc::advanceConfigOptimeFromRequestMetadata(opCtx);
         }
 
         oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);

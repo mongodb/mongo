@@ -42,7 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
-#include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
+#include "mongo/db/s/sharding_config_optime_gossip.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"

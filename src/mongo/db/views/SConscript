@@ -12,7 +12,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/views/views',
-        '$BUILD_DIR/mongo/db/s/sharding',
     ],
 )
 

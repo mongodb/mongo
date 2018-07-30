@@ -57,6 +57,8 @@ env.Library(
         'shard_metadata_util.cpp',
         'shard_server_catalog_cache_loader.cpp',
         'shard_server_op_observer.cpp',
+        'sharding_config_optime_gossip.cpp',
+        'sharding_initialization_mongod.cpp',
         'sharding_state_recovery.cpp',
         'sharding_statistics.cpp',
         'split_chunk.cpp',
@@ -162,8 +164,6 @@ env.Library(
 env.Library(
     target='sharding',
     source=[
-        'sharding_egress_metadata_hook_for_mongod.cpp',
-        'sharding_initialization_mongod.cpp',
         'sharding_state.cpp',
     ],
     LIBDEPS=[
