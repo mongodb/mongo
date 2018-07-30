@@ -371,7 +371,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IgnoresInfoIfNoCache
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SendingInfoFailsInDirectClient) {
     const std::vector<BSONObj> operationSessionParameters{
         {BSON("lsid" << makeLogicalSessionIdForTest().toBSON())},
-        {BSON("txnNumber" << 1L)},
+        {BSON("txnNumber" << 1LL)},
         {BSON("autocommit" << true)},
         {BSON("startTransaction" << true)}};
 
