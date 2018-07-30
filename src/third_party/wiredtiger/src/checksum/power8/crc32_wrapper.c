@@ -1,7 +1,13 @@
-#if defined(__powerpc64__)
 #include <inttypes.h>
 #include <stddef.h>
 
+/*
+ * The checksum code doesn't include WiredTiger configuration or include files.
+ * This means the HAVE_NO_CRC32_HARDWARE #define isn't configurable as part of
+ * standalone WiredTiger configuration, there's no way to turn off the checksum
+ * hardware.
+ */
+#if defined(__powerpc64__) && !defined(HAVE_NO_CRC32_HARDWARE)
 #define CRC_TABLE
 #include "crc32_constants.h"
 
@@ -69,7 +75,6 @@ out:
 
 	return crc;
 }
-#endif
 
 /*
  * __wt_checksum_hw --
@@ -80,6 +85,7 @@ __wt_checksum_hw(const void *chunk, size_t len)
 {
 	return (crc32_vpmsum(0, chunk, len));
 }
+#endif
 
 extern uint32_t __wt_checksum_sw(const void *chunk, size_t len);
 #if defined(__GNUC__)
@@ -95,7 +101,7 @@ extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
  */
 uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 {
-#if defined(__powerpc64__)
+#if defined(__powerpc64__) && !defined(HAVE_NO_CRC32_HARDWARE)
 	return (__wt_checksum_hw);
 #else
 	return (__wt_checksum_sw);

@@ -247,7 +247,7 @@ __txn_op_apply(
 			stop = cursor;
 			break;
 
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE_ERR(session, mode);
 		}
 
 		/* Set the keys. */
@@ -264,7 +264,7 @@ __txn_op_apply(
 		WT_ERR(ret);
 		break;
 
-	WT_ILLEGAL_VALUE_ERR(session);
+	WT_ILLEGAL_VALUE_ERR(session, optype);
 	}
 
 	/* Reset the cursor so it doesn't block eviction. */
@@ -630,7 +630,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * Clear this out.  We no longer need it and it could have been
 	 * re-allocated when scanning the files.
 	 */
-	metafile = NULL;
+	WT_NOT_READ(metafile, NULL);
 
 	/*
 	 * We no longer need the metadata cursor: close it to avoid pinning any
@@ -659,7 +659,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 		if (F_ISSET(conn, WT_CONN_READONLY))
 			WT_ERR_MSG(session, WT_RUN_RECOVERY,
 			    "Read-only database needs recovery");
-		WT_ERR(WT_RUN_RECOVERY);
+		WT_ERR_MSG(session, WT_RUN_RECOVERY, "Database needs recovery");
 	}
 
 	if (F_ISSET(conn, WT_CONN_READONLY)) {

@@ -342,7 +342,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 
 		FLD_CLR(cache->pool_flags, WT_CACHE_POOL_RUN);
 		__wt_cond_signal(session, cp->cache_pool_cond);
-		WT_TRET(__wt_thread_join(session, cache->cp_tid));
+		WT_TRET(__wt_thread_join(session, &cache->cp_tid));
 
 		wt_session = &cache->cp_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));

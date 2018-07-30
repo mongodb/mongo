@@ -1770,7 +1770,8 @@ __slvg_row_trk_update_start(
 	 * would have discarded it, we wouldn't be here.  Therefore, this test
 	 * is safe.  (But, it never hurts to check.)
 	 */
-	WT_ERR_TEST(!found, WT_ERROR);
+	if (!found)
+		WT_ERR_MSG(session, WT_ERROR, "expected on-page key not found");
 	WT_ERR(__slvg_key_copy(session, &trk->row_start, key));
 
 	/*

@@ -308,10 +308,6 @@ typedef void wt_timestamp_t;
 	__wt_page_swap_func(session, held, want, flags)
 #endif
 
-/* Called on unexpected code path: locate the failure. */
-#define	__wt_illegal_value(session, msg)				\
-	__wt_illegal_value_func(session, msg, __func__, __LINE__)
-
 /* Random number generator state. */
 union __wt_rand_state {
 	uint64_t v;

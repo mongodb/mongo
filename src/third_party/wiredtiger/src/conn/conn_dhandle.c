@@ -143,7 +143,8 @@ __wt_conn_dhandle_alloc(
 		dhandle = &table->iface;
 		dhandle->type = WT_DHANDLE_TYPE_TABLE;
 	} else
-		return (__wt_illegal_value(session, NULL));
+		WT_PANIC_RET(session, EINVAL,
+		    "illegal handle allocation URI %s", uri);
 
 	/* Btree handles keep their data separate from the interface. */
 	if (dhandle->type == WT_DHANDLE_TYPE_BTREE) {

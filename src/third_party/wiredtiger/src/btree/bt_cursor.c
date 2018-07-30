@@ -915,16 +915,16 @@ __curfile_update_check(WT_CURSOR_BTREE *cbt)
 int
 __wt_btcur_insert_check(WT_CURSOR_BTREE *cbt)
 {
-	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	uint64_t yield_count, sleep_usecs;
 
 	cursor = &cbt->iface;
-	btree = cbt->btree;
 	session = (WT_SESSION_IMPL *)cursor->session;
 	yield_count = sleep_usecs = 0;
+
+	WT_ASSERT(session, cbt->btree->type == BTREE_ROW);
 
 	/*
 	 * The pinned page goes away if we do a search, get a local copy of any
@@ -936,14 +936,10 @@ __wt_btcur_insert_check(WT_CURSOR_BTREE *cbt)
 	__cursor_novalue(cursor);
 
 retry:	WT_ERR(__cursor_func_init(cbt, true));
+	WT_ERR(__cursor_row_search(session, cbt, NULL, true));
 
-	if (btree->type == BTREE_ROW) {
-		WT_ERR(__cursor_row_search(session, cbt, NULL, true));
-
-		/* Just check for conflicts. */
-		ret = __curfile_update_check(cbt);
-	} else
-		WT_ERR(__wt_illegal_value(session, NULL));
+	/* Just check for conflicts. */
+	ret = __curfile_update_check(cbt);
 
 err:	if (ret == WT_RESTART) {
 		__cursor_restart(session, &yield_count, &sleep_usecs);
@@ -1305,8 +1301,8 @@ done:		switch (modify_type) {
 			/*
 			 * WT_CURSOR.update returns a key and a value.
 			 */
-			WT_TRET(__cursor_kv_return(
-			    session, cbt, cbt->modify_update));
+			ret = __cursor_kv_return(
+			    session, cbt, cbt->modify_update);
 			break;
 		case WT_UPDATE_RESERVE:
 			/*
@@ -1319,13 +1315,11 @@ done:		switch (modify_type) {
 			 * WT_CURSOR.modify has already created the return value
 			 * and our job is to leave it untouched.
 			 */
-			WT_TRET(__wt_key_return(session, cbt));
+			ret = __wt_key_return(session, cbt);
 			break;
 		case WT_UPDATE_BIRTHMARK:
 		case WT_UPDATE_TOMBSTONE:
-		default:
-			WT_TRET(__wt_illegal_value(session, NULL));
-			break;
+		WT_ILLEGAL_VALUE(session, modify_type);
 		}
 	}
 

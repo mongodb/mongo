@@ -207,7 +207,7 @@ wts_ops(int lastrun)
 			case TINFO_COMPLETE:
 				tinfo->state = TINFO_JOINED;
 				testutil_check(
-				    __wt_thread_join(NULL, tinfo->tid));
+				    __wt_thread_join(NULL, &tinfo->tid));
 				break;
 			case TINFO_JOINED:
 				break;
@@ -252,17 +252,17 @@ wts_ops(int lastrun)
 	/* Wait for the other threads. */
 	g.workers_finished = true;
 	if (g.c_alter)
-		testutil_check(__wt_thread_join(NULL, alter_tid));
+		testutil_check(__wt_thread_join(NULL, &alter_tid));
 	if (g.c_backups)
-		testutil_check(__wt_thread_join(NULL, backup_tid));
+		testutil_check(__wt_thread_join(NULL, &backup_tid));
 	if (g.c_checkpoint_flag == CHECKPOINT_ON)
-		testutil_check(__wt_thread_join(NULL, checkpoint_tid));
+		testutil_check(__wt_thread_join(NULL, &checkpoint_tid));
 	if (g.c_compact)
-		testutil_check(__wt_thread_join(NULL, compact_tid));
+		testutil_check(__wt_thread_join(NULL, &compact_tid));
 	if (!SINGLETHREADED && g.c_long_running_txn)
-		testutil_check(__wt_thread_join(NULL, lrt_tid));
+		testutil_check(__wt_thread_join(NULL, &lrt_tid));
 	if (g.c_txn_timestamps)
-		testutil_check(__wt_thread_join(NULL, timestamp_tid));
+		testutil_check(__wt_thread_join(NULL, &timestamp_tid));
 	g.workers_finished = false;
 
 	if (g.logging != 0) {

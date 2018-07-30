@@ -97,7 +97,6 @@ main(int argc, char *argv[])
 			return (usage());
 		}
 	argc -= __wt_optind;
-	argv += __wt_optind;
 	if (argc != 0)
 		return (usage());
 

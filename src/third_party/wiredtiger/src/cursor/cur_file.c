@@ -724,8 +724,7 @@ err:		/*
 		 * Our caller expects to release the data handle if we fail.
 		 * Disconnect it from the cursor before closing.
 		 */
-		if (session->dhandle != NULL)
-			__wt_cursor_dhandle_decr_use(session);
+		__wt_cursor_dhandle_decr_use(session);
 		cbt->btree = NULL;
 		WT_TRET(__curfile_close(cursor));
 		*cursorp = NULL;

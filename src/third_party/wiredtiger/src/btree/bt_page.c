@@ -57,7 +57,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		 */
 		size += alloc_entries * sizeof(WT_ROW);
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE(session, type);
 	}
 
 	WT_RET(__wt_calloc(session, 1, size, &page));
@@ -112,7 +112,7 @@ err:			if ((pindex = WT_INTL_INDEX_GET_SAFE(page)) != NULL) {
 		    NULL : (WT_ROW *)((uint8_t *)page + sizeof(WT_PAGE));
 		page->entries = alloc_entries;
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE(session, type);
 	}
 
 	/* Increment the cache statistics. */
@@ -186,7 +186,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 			WT_RET(__inmem_row_leaf_entries(
 			    session, dsk, &alloc_entries));
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE(session, dsk->type);
 	}
 
 	/* Allocate and initialize a new WT_PAGE. */
@@ -222,7 +222,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	case WT_PAGE_ROW_LEAF:
 		WT_ERR(__inmem_row_leaf(session, page));
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
+	WT_ILLEGAL_VALUE_ERR(session, page->type);
 	}
 
 	/* Update the page's cache statistics. */
@@ -503,7 +503,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			ref->addr = cell;
 			++refp;
 			break;
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE_ERR(session, unpack->type);
 		}
 	}
 
@@ -556,7 +556,7 @@ __inmem_row_leaf_entries(
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
 			break;
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE(session, unpack->type);
 		}
 	}
 
@@ -614,7 +614,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		case WT_CELL_VALUE_OVFL:
 			break;
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE(session, unpack->type);
 		}
 	}
 

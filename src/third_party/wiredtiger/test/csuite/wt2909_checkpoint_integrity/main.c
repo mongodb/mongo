@@ -445,9 +445,9 @@ run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *status)
 }
 
 /*
-* subtest_error_handler --
-*     Error event handler.
-*/
+ * subtest_error_handler --
+ *     Error event handler.
+ */
 static int
 subtest_error_handler(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, int error, const char *message)

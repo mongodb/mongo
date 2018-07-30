@@ -287,7 +287,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 		case WT_CELL_ADDR_LEAF_NO:
 			addr->type = WT_ADDR_LEAF_NO;
 			break;
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE_ERR(session, unpack.raw);
 		}
 		if (__wt_atomic_cas_ptr(&ref->addr, ref_addr, addr))
 			addr = NULL;
@@ -1513,7 +1513,7 @@ __split_multi_inmem(
 			WT_ERR(__wt_row_modify(session,
 			    &cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
 			break;
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE_ERR(session, orig->type);
 		}
 	}
 

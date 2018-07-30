@@ -104,7 +104,6 @@ main(int argc, char *argv[])
 		default:
 			usage();
 		}
-	argc -= __wt_optind;
 	argv += __wt_optind;
 
 	/* Initialize the global RNG. */

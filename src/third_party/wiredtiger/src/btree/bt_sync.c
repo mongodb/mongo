@@ -354,7 +354,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		break;
 	case WT_SYNC_CLOSE:
 	case WT_SYNC_DISCARD:
-		WT_ERR(__wt_illegal_value(session, NULL));
+		WT_ERR(__wt_illegal_value(session, syncop));
 		break;
 	}
 

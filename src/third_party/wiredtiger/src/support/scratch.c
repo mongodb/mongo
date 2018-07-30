@@ -179,7 +179,7 @@ __wt_buf_set_printable_format(WT_SESSION_IMPL *session,
 			    session, buf, "%s%" PRIu64, sep, pv.u.u));
 			sep = ",";
 			break;
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE_ERR(session, pv.type);
 		}
 	}
 	WT_ERR_NOTFOUND_OK(ret);
@@ -189,7 +189,7 @@ err:	__wt_scr_free(session, &tmp);
 		return ((const char *)buf->data);
 
 	retp = "failed to create printable output";
-	__wt_err(session, ret, "%s: %s", __func__, retp);
+	__wt_err(session, ret, "%s", retp);
 	return (retp);
 }
 

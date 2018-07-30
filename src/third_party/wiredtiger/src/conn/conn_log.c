@@ -1178,12 +1178,12 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	}
 	if (conn->log_tid_set) {
 		__wt_cond_signal(session, conn->log_cond);
-		WT_TRET(__wt_thread_join(session, conn->log_tid));
+		WT_TRET(__wt_thread_join(session, &conn->log_tid));
 		conn->log_tid_set = false;
 	}
 	if (conn->log_file_tid_set) {
 		__wt_cond_signal(session, conn->log_file_cond);
-		WT_TRET(__wt_thread_join(session, conn->log_file_tid));
+		WT_TRET(__wt_thread_join(session, &conn->log_file_tid));
 		conn->log_file_tid_set = false;
 	}
 	if (conn->log_file_session != NULL) {
@@ -1193,7 +1193,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	}
 	if (conn->log_wrlsn_tid_set) {
 		__wt_cond_signal(session, conn->log_wrlsn_cond);
-		WT_TRET(__wt_thread_join(session, conn->log_wrlsn_tid));
+		WT_TRET(__wt_thread_join(session, &conn->log_wrlsn_tid));
 		conn->log_wrlsn_tid_set = false;
 	}
 	if (conn->log_wrlsn_session != NULL) {

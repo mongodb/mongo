@@ -115,7 +115,7 @@ rw_start(u_int readers, u_int writers)
 
 	/* Wait for the threads. */
 	for (i = 0; i < readers + writers; ++i)
-		testutil_check(__wt_thread_join(NULL, tids[i]));
+		testutil_check(__wt_thread_join(NULL, &tids[i]));
 
 	(void)gettimeofday(&stop, NULL);
 	seconds = (stop.tv_sec - start.tv_sec) +

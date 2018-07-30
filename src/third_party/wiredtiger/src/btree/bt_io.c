@@ -153,10 +153,10 @@ corrupt:	if (ret == 0)
 			ret = WT_ERROR;
 		if (!F_ISSET(btree, WT_BTREE_VERIFY) &&
 		    !F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)) {
-			__wt_err(session, ret, "%s", fail_msg);
 			WT_TRET(bm->corrupt(bm, session, addr, addr_size));
-			WT_TRET(
-			    __wt_illegal_value(session, btree->dhandle->name));
+			WT_PANIC_ERR(session, ret,
+			    "%s: fatal read error: %s",
+			    btree->dhandle->name, fail_msg);
 		}
 	}
 

@@ -43,13 +43,13 @@ import wiredtiger, wttest
 
 def corrupt(fname, truncate, offset, writeit):
     with open(fname, 'r+') as log:
-        if truncate:
-            log.truncate()
         if offset:
             if offset < 0:  # Negative offset means seek to the end
                 log.seek(0, 2)
             else:
                 log.seek(offset)
+        if truncate:
+            log.truncate()
         if writeit:
             log.write(writeit)
 
@@ -62,6 +62,8 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
             os.remove(fname))),
         ('truncate', dict(kind='truncate', f=lambda fname:
             corrupt(fname, True, 0, None))),
+        ('truncate-middle', dict(kind='truncate-middle', f=lambda fname:
+            corrupt(fname, True, 1024 * 25, None))),
         ('zero-begin', dict(kind='zero', f=lambda fname:
             corrupt(fname, False, 0, '\0' * 4096))),
         ('zero-trunc', dict(kind='zero', f=lambda fname:
@@ -150,12 +152,6 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         # At any rate, we consider this particular corruption to be benign.
         if self.kind == 'zero-end':
             return False
-
-        # NOTE:
-        # If garbage is added to an otherwise valid log file, the invalid
-        # portion is effectively 'skipped over'.
-        if self.kind == 'garbage-end':
-            return False
         return True
 
     def show_logs(self, homedir, msg):
@@ -218,20 +214,39 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         if self.corruptpos2 != 0:
             self.f(self.log_number_to_file_name(homedir, self.corruptpos2))
 
-    # Return true iff the log has been damaged in a way that
-    # is not detected as a corruption.
-    # This includes:
+    def corrupt_last_file(self):
+        return self.corruptpos == self.record_to_logfile(self.nrecords)
+
+    # Corruption past the last written record in a log file can sometimes
+    # be detected. In our test case, the last log file has zero or one large
+    # 60K record written into it, but it is presized to 100K.  Corruption
+    # at the end of this file creates a hole, and the corruption starts
+    # a new log record, where it can be detected as phony.  Similarly,
+    # corruption in the "middle" of the last file (actually the 25K point)
+    # can be detected if there aren't any of the insert records in the file.
+    def corrupt_hole_in_last_file(self):
+        return self.corrupt_last_file() and \
+            ((self.kind == 'garbage-middle' and self.nrecords % 2 == 0) or \
+             self.kind == 'garbage-end')
+
+    # Return true iff the log has been damaged in a way that is not detected
+    # as a corruption.  WiredTiger must be lenient about damage in any log
+    # file, because a partial log record written just before a crash is in
+    # most cases indistinguishable from a corruption.  If the beginning of
+    # the file is mangled, that is always an unexpected corruption. Situations
+    # where we cannot reliably detect corruption include:
     #  - removal of the last log
-    #  - corruption in the middle of a log file.
+    #  - certain corruptions at the beginning of a log record (adding garbage
+    #      at the end of a log file can trigger this).
     def log_corrupt_but_valid(self):
-        # NOTE:
-        # Currently, corruption in the middle of a log file is not yet
-        # detected.
-        if self.kind == 'garbage-middle':
+        if self.corrupt_last_file() and self.kind == 'removal':
             return True
-        if self.corruptpos == self.record_to_logfile(self.nrecords):
-            if self.kind == 'removal':
-                return True
+        # Certain corruptions in the last file can be detected.
+        if self.corrupt_hole_in_last_file():
+            return False
+        if self.kind == 'truncate-middle' or \
+           self.kind == 'garbage-end':
+            return True
         return False
 
     # For this test, at least, salvage identifies and fixes all
@@ -247,7 +262,12 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
     def recovered_records(self):
         if not self.corrupted() or self.chkpt > self.corruptpos:
             return self.nrecords
-        return self.logfile_to_record(self.corruptpos)
+        if self.kind == 'garbage-end':
+            # All records in the corrupt file will be found.
+            found = self.logfile_to_record(self.corruptpos + 1)
+        else:
+            found = self.logfile_to_record(self.corruptpos)
+        return min(found, self.nrecords)
 
     def test_corrupt_log(self):
         ''' Corrupt the log and restart with different kinds of recovery '''

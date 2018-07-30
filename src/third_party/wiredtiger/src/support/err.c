@@ -547,16 +547,13 @@ __wt_panic(WT_SESSION_IMPL *session)
  */
 int
 __wt_illegal_value_func(
-    WT_SESSION_IMPL *session, const char *tag, const char *file, int line)
+    WT_SESSION_IMPL *session, uintmax_t v, const char *func, int line)
     WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
-	__wt_errx(session, "%s%s%s: (%s, %d)",
-	    tag == NULL ? "" : tag,
-	    tag == NULL ? "" : ": ",
-	    "encountered an illegal file format or internal value",
-	    file, line);
-
+	__wt_err_func(session, EINVAL,
+	    func, line, "%s: 0x%" PRIxMAX,
+	    "encountered an illegal file format or internal value", v);
 	return (__wt_panic(session));
 }
 

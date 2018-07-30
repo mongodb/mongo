@@ -171,7 +171,6 @@ main(int argc, char *argv[])
 			usage();
 		}
 	argc -= __wt_optind;
-	argv += __wt_optind;
 	if (argc != 0)
 		usage();
 

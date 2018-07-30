@@ -103,7 +103,7 @@ __thread_group_shrink(
 
 		if (thread == NULL)
 			continue;
-		WT_TRET(__wt_thread_join(session, thread->tid));
+		WT_TRET(__wt_thread_join(session, &thread->tid));
 		__wt_cond_destroy(session, &thread->pause_cond);
 	}
 	__wt_writelock(session, &group->lock);

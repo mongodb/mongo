@@ -201,7 +201,7 @@ fill_db(uint32_t nth)
 	 * it is killed.
 	 */
 	for (i = 0; i < nth; ++i)
-		testutil_check(__wt_thread_join(NULL, thr[i]));
+		testutil_check(__wt_thread_join(NULL, &thr[i]));
 	/*
 	 * NOTREACHED
 	 */
@@ -280,7 +280,6 @@ main(int argc, char *argv[])
 			usage();
 		}
 	argc -= __wt_optind;
-	argv += __wt_optind;
 	if (argc != 0)
 		usage();
 

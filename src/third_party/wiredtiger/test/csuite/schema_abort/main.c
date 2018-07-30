@@ -44,9 +44,7 @@ static char home[1024];			/* Program working dir */
  * 3. A table that is not logged and involved in timestamps.  This simulates
  * a typical collection file.
  *
- * We also create a fourth table that is not logged and not involved directly
- * in timestamps to store the stable timestamp.  That way we can know what the
- * latest stable timestamp is on checkpoint.
+ * We also have most threads perform schema operations such as create/drop.
  *
  * We also create several files that are not WiredTiger tables.  The checkpoint
  * thread creates a file indicating that a checkpoint has completed.  The parent
@@ -57,26 +55,27 @@ static char home[1024];			/* Program working dir */
  * inserted and it records the timestamp that was used for that insertion.
  */
 #define	INVALID_KEY	UINT64_MAX
-#define	MAX_CKPT_INVL	5	/* Maximum interval between checkpoints */
+#define	MAX_CKPT_INVL	2	/* Maximum interval between checkpoints */
 #define	MAX_TH		12
 #define	MAX_TIME	40
 #define	MAX_VAL		1024
 #define	MIN_TH		5
 #define	MIN_TIME	10
-#define	PREPARE_FREQ	5
-#define	PREPARE_YIELD	(PREPARE_FREQ * 10)
+#define	PREPARE_FREQ    5
+#define	PREPARE_YIELD   PREPARE_FREQ * 10
 #define	RECORDS_FILE	"records-%" PRIu32
 #define	STABLE_PERIOD	100
 
-static const char * table_pfx = "table";
-static const char * const uri_local = "local";
-static const char * const uri_oplog = "oplog";
-static const char * const uri_collection = "collection";
+static const char * const uri = "table:wt";
+static const char * const uri_local = "table:local";
+static const char * const uri_oplog = "table:oplog";
+static const char * const uri_collection = "table:collection";
 
 static const char * const ckpt_file = "checkpoint_done";
 
-static bool compat, inmem, use_ts;
+static bool compat, inmem, stable_set, use_ts, use_txn;
 static volatile uint64_t global_ts = 1;
+static volatile uint64_t uid = 1;
 static volatile uint64_t th_ts[MAX_TH];
 
 #define	ENV_CONFIG_COMPAT	",compatibility=(release=\"2.9\")"
@@ -101,7 +100,7 @@ typedef struct {
 	uint32_t info;
 } THREAD_DATA;
 
-static void handler(int)
+static void sig_handler(int)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -109,8 +108,340 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-h dir] [-T threads] [-t time] [-Cmvz]\n", progname);
+	    "usage: %s [-h dir] [-T threads] [-t time] [-Cmvxz]\n", progname);
 	exit(EXIT_FAILURE);
+}
+
+static const char * const config = NULL;
+
+/*
+ * subtest_error_handler --
+ *     Error event handler.
+ */
+static int
+subtest_error_handler(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, int error, const char *message)
+{
+	(void)(handler);
+	(void)(session);
+	(void)(error);
+
+	/* Filter out errors about bulk load usage - they are annoying */
+	if (strstr(message, "bulk-load is only supported on newly") == NULL)
+		fprintf(stderr, "%s", message);
+	return (0);
+}
+
+static WT_EVENT_HANDLER event_handler = {
+	subtest_error_handler,
+	NULL,   /* Message handler */
+	NULL,   /* Progress handler */
+	NULL    /* Close handler */
+};
+
+/*
+ * The following are various schema-related functions to have some threads
+ * performing during the test. The goal is to make sure that after a random
+ * abort, the database is left in a recoverable state. Yield during the
+ * schema operations to increase chance of abort during them.
+ *
+ * TODO: Currently only verifies insert data, it would be ideal to modify the
+ * schema operations so that we can verify the state of the schema too.
+ */
+
+static void
+dump_ts(uint64_t nth)
+{
+	uint64_t i;
+
+	for (i = 0; i < nth; ++i)
+		fprintf(stderr, "THREAD %" PRIu64 ": ts: %" PRIu64 "\n",
+		    i, th_ts[i]);
+}
+
+/*
+ * test_bulk --
+ *	Test creating a bulk cursor.
+ */
+static void
+test_bulk(THREAD_DATA *td)
+{
+	WT_CURSOR *c;
+	WT_SESSION *session;
+	int ret;
+	bool create;
+
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
+	create = false;
+	if ((ret = session->create(session, uri, config)) != 0)
+		if (ret != EEXIST && ret != EBUSY)
+			testutil_die(ret, "session.create");
+
+	if (ret == 0) {
+		create = true;
+		if ((ret = session->open_cursor(
+		    session, uri, NULL, "bulk", &c)) == 0) {
+			__wt_yield();
+			testutil_check(c->close(c));
+		} else if (ret != ENOENT && ret != EBUSY && ret != EINVAL)
+			testutil_die(ret, "session.open_cursor bulk");
+	}
+
+	if (use_txn) {
+		/* If create fails, rollback else will commit.*/
+		if (!create)
+			ret = session->rollback_transaction(session, NULL);
+		else
+			ret = session->commit_transaction(session, NULL);
+
+		if (ret == EINVAL) {
+			fprintf(stderr, "BULK: EINVAL on %s. ABORT\n",
+			    create ? "commit" : "rollback");
+			testutil_die(ret, "session.commit bulk");
+		}
+	}
+	testutil_check(session->close(session, NULL));
+}
+
+/*
+ * test_bulk_unique --
+ *	Test creating a bulk cursor with a unique name.
+ */
+static void
+test_bulk_unique(THREAD_DATA *td, int force)
+{
+	WT_CURSOR *c;
+	WT_SESSION *session;
+	uint64_t my_uid;
+	int ret;
+	char new_uri[64];
+
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+
+	/* Generate a unique object name. */
+	my_uid = __wt_atomic_addv64(&uid, 1);
+	testutil_check(__wt_snprintf(
+	    new_uri, sizeof(new_uri), "%s.%u", uri, my_uid));
+
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
+	testutil_check(session->create(session, new_uri, config));
+
+	__wt_yield();
+	/*
+	 * Opening a bulk cursor may have raced with a forced checkpoint
+	 * which created a checkpoint of the empty file, and triggers an EINVAL.
+	 */
+	if ((ret = session->open_cursor(
+	    session, new_uri, NULL, "bulk", &c)) == 0)
+		testutil_check(c->close(c));
+	else if (ret != EINVAL)
+		testutil_die(ret,
+		    "session.open_cursor bulk unique: %s, new_uri");
+
+	while ((ret = session->drop(
+	    session, new_uri, force ? "force" : NULL)) != 0)
+		if (ret != EBUSY)
+			testutil_die(ret, "session.drop: %s", new_uri);
+
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit bulk unique");
+	testutil_check(session->close(session, NULL));
+}
+
+/*
+ * test_cursor --
+ *	Open a cursor on a data source.
+ */
+static void
+test_cursor(THREAD_DATA *td)
+{
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
+	int ret;
+
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
+	if ((ret =
+	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0) {
+		if (ret != ENOENT && ret != EBUSY)
+			testutil_die(ret, "session.open_cursor");
+	} else {
+		__wt_yield();
+		testutil_check(cursor->close(cursor));
+	}
+
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit cursor");
+	testutil_check(session->close(session, NULL));
+}
+
+/*
+ * test_create --
+ *	Create a table.
+ */
+static void
+test_create(THREAD_DATA *td)
+{
+	WT_SESSION *session;
+	int ret;
+
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
+	if ((ret = session->create(session, uri, config)) != 0)
+		if (ret != EEXIST && ret != EBUSY)
+			testutil_die(ret, "session.create");
+	__wt_yield();
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit create");
+	testutil_check(session->close(session, NULL));
+}
+
+/*
+ * test_create_unique --
+ *	Create a uniquely named table.
+ */
+static void
+test_create_unique(THREAD_DATA *td, int force)
+{
+	WT_SESSION *session;
+	uint64_t my_uid;
+	int ret;
+	char new_uri[64];
+
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+
+	/* Generate a unique object name. */
+	my_uid = __wt_atomic_addv64(&uid, 1);
+	testutil_check(__wt_snprintf(
+	    new_uri, sizeof(new_uri), "%s.%u", uri, my_uid));
+
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
+	testutil_check(session->create(session, new_uri, config));
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit create unique");
+
+	__wt_yield();
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
+	while ((ret = session->drop(
+	    session, new_uri, force ? "force" : NULL)) != 0)
+		if (ret != EBUSY)
+			testutil_die(ret, "session.drop: %s", new_uri);
+	if (use_txn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0 &&
+	    ret != EINVAL)
+		testutil_die(ret, "session.commit create unique");
+
+	testutil_check(session->close(session, NULL));
+}
+
+/*
+ * test_drop --
+ *	Test dropping a table.
+ */
+static void
+test_drop(THREAD_DATA *td, int force)
+{
+	WT_SESSION *session;
+	int ret;
+
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+
+	if (use_txn)
+		testutil_check(session->begin_transaction(session, NULL));
+	if ((ret = session->drop(session, uri, force ? "force" : NULL)) != 0)
+		if (ret != ENOENT && ret != EBUSY)
+			testutil_die(ret, "session.drop");
+
+	if (use_txn) {
+		/*
+		 * As the operations are being performed concurrently,
+		 * return value can be ENOENT or EBUSY will set
+		 * error to transaction opened by session. In these
+		 * cases the transaction has to be aborted.
+		 */
+		if (ret != ENOENT && ret != EBUSY)
+			ret = session->commit_transaction(session, NULL);
+		else
+			ret = session->rollback_transaction(session, NULL);
+		if (ret == EINVAL)
+			testutil_die(ret, "session.commit drop");
+	}
+	testutil_check(session->close(session, NULL));
+}
+
+/*
+ * test_rebalance --
+ *	Rebalance a tree.
+ */
+static void
+test_rebalance(THREAD_DATA *td)
+{
+	WT_SESSION *session;
+	int ret;
+
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+
+	if ((ret = session->rebalance(session, uri, NULL)) != 0)
+		if (ret != ENOENT && ret != EBUSY)
+			testutil_die(ret, "session.rebalance");
+
+	testutil_check(session->close(session, NULL));
+}
+
+/*
+ * test_upgrade --
+ *	Upgrade a tree.
+ */
+static void
+test_upgrade(THREAD_DATA *td)
+{
+	WT_SESSION *session;
+	int ret;
+
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+
+	if ((ret = session->upgrade(session, uri, NULL)) != 0)
+		if (ret != ENOENT && ret != EBUSY)
+			testutil_die(ret, "session.upgrade");
+
+	testutil_check(session->close(session, NULL));
+}
+
+/*
+ * test_verify --
+ *	Verify a tree.
+ */
+static void
+test_verify(THREAD_DATA *td)
+{
+	WT_SESSION *session;
+	int ret;
+
+	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
+
+	if ((ret = session->verify(session, uri, NULL)) != 0)
+		if (ret != ENOENT && ret != EBUSY)
+			testutil_die(ret, "session.verify");
+
+	testutil_check(session->close(session, NULL));
 }
 
 /*
@@ -168,6 +499,11 @@ thread_ts_run(void *arg)
 			testutil_check(
 			    td->conn->set_timestamp(td->conn, tscfg));
 			last_ts = oldest_ts;
+			if (!stable_set) {
+				stable_set = true;
+				printf("SET STABLE: %" PRIx64 " %" PRIu64 "\n",
+				    oldest_ts, oldest_ts);
+			}
 		} else
 ts_wait:		__wt_sleep(0, 1000);
 	}
@@ -181,15 +517,15 @@ ts_wait:		__wt_sleep(0, 1000);
 static WT_THREAD_RET
 thread_ckpt_run(void *arg)
 {
+	struct timespec now, start;
 	FILE *fp;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	THREAD_DATA *td;
-	uint64_t stable;
+	uint64_t ts;
 	uint32_t sleep_time;
 	int i;
 	bool first_ckpt;
-	char buf[128];
 
 	__wt_random_init(&rnd);
 
@@ -200,20 +536,21 @@ thread_ckpt_run(void *arg)
 	(void)unlink(ckpt_file);
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 	first_ckpt = true;
+	ts = 0;
+	__wt_epoch(NULL, &start);
 	for (i = 0; ;++i) {
 		sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
 		sleep(sleep_time);
+		if (use_ts)
+			ts = global_ts;
 		/*
 		 * Since this is the default, send in this string even if
 		 * running without timestamps.
 		 */
 		testutil_check(session->checkpoint(
 		    session, "use_timestamp=true"));
-		testutil_check(td->conn->query_timestamp(
-		    td->conn, buf, "get=last_checkpoint"));
-		testutil_assert(sscanf(buf, "%" SCNx64, &stable) == 1);
-		printf("Checkpoint %d complete at stable %"
-		    PRIu64 ".\n", i, stable);
+		printf("Checkpoint %d complete.  Minimum ts %" PRIu64 "\n",
+		    i, ts);
 		fflush(stdout);
 		/*
 		 * Create the checkpoint file so that the parent process knows
@@ -224,6 +561,20 @@ thread_ckpt_run(void *arg)
 			testutil_checksys((fp = fopen(ckpt_file, "w")) == NULL);
 			first_ckpt = false;
 			testutil_checksys(fclose(fp) != 0);
+		}
+
+		__wt_epoch(NULL, &now);
+		printf("CKPT: stable_set %d, time %" PRIu64 "\n",
+		    stable_set, WT_TIMEDIFF_SEC(now, start));
+		if (use_ts && !stable_set && WT_TIMEDIFF_SEC(now, start) > 2) {
+			fprintf(stderr,
+			    "After 2 seconds ckpt stable still not set\n");
+			/*
+			 * For the checkpoint thread the info contains the
+			 * number of threads.
+			 */
+			dump_ts(td->info);
+			abort();
 		}
 	}
 	/* NOTREACHED */
@@ -244,7 +595,7 @@ thread_run(void *arg)
 	THREAD_DATA *td;
 	uint64_t i, stable_ts;
 	char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
-	char kname[64], tscfg[64], uri[128];
+	char kname[64], tscfg[64];
 	bool use_prep;
 
 	__wt_random_init(&rnd);
@@ -284,25 +635,19 @@ thread_run(void *arg)
 	/*
 	 * Open a cursor to each table.
 	 */
-	testutil_check(__wt_snprintf(
-	    uri, sizeof(uri), "%s:%s", table_pfx, uri_collection));
 	testutil_check(session->open_cursor(session,
-	    uri, NULL, NULL, &cur_coll));
-	testutil_check(__wt_snprintf(
-	    uri, sizeof(uri), "%s:%s", table_pfx, uri_local));
+	    uri_collection, NULL, NULL, &cur_coll));
 	testutil_check(session->open_cursor(session,
-	    uri, NULL, NULL, &cur_local));
-	testutil_check(__wt_snprintf(
-	    uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog));
+	    uri_local, NULL, NULL, &cur_local));
 	oplog_session = NULL;
 	if (use_prep) {
 		testutil_check(td->conn->open_session(
 		    td->conn, NULL, NULL, &oplog_session));
 		testutil_check(session->open_cursor(oplog_session,
-		    uri, NULL, NULL, &cur_oplog));
+		    uri_oplog, NULL, NULL, &cur_oplog));
 	} else
 		testutil_check(session->open_cursor(session,
-		    uri, NULL, NULL, &cur_oplog));
+		    uri_oplog, NULL, NULL, &cur_oplog));
 
 	/*
 	 * Write our portion of the key space until we're killed.
@@ -311,6 +656,44 @@ thread_run(void *arg)
 	    td->info, td->start);
 	stable_ts = 0;
 	for (i = td->start;; ++i) {
+		/*
+		 * Allow some threads to skip schema operations so that they
+		 * are generating sufficient dirty data.
+		 */
+		if (td->info != 0 && td->info != 1)
+			/*
+			 * Do a schema operation about 50% of the time by having
+			 * a case for only about half the possible mod values.
+			 */
+			switch (__wt_random(&rnd) % 20) {
+			case 0:
+				test_bulk(td);
+				break;
+			case 1:
+				test_bulk_unique(td, __wt_random(&rnd) & 1);
+				break;
+			case 2:
+				test_create(td);
+				break;
+			case 3:
+				test_create_unique(td, __wt_random(&rnd) & 1);
+				break;
+			case 4:
+				test_cursor(td);
+				break;
+			case 5:
+				test_drop(td, __wt_random(&rnd) & 1);
+				break;
+			case 6:
+				test_rebalance(td);
+				break;
+			case 7:
+				test_upgrade(td);
+				break;
+			case 8:
+				test_verify(td);
+				break;
+			}
 		if (use_ts)
 			stable_ts = __wt_atomic_addv64(&global_ts, 1);
 		testutil_check(__wt_snprintf(
@@ -414,10 +797,11 @@ run_workload(uint32_t nth)
 	THREAD_DATA *td;
 	wt_thread_t *thr;
 	uint32_t ckpt_id, i, ts_id;
-	char envconf[512], uri[128];
+	char envconf[512];
 
 	thr = dcalloc(nth+2, sizeof(*thr));
 	td = dcalloc(nth+2, sizeof(THREAD_DATA));
+	stable_set = false;
 	if (chdir(home) != 0)
 		testutil_die(errno, "Child chdir: %s", home);
 	if (inmem)
@@ -427,23 +811,17 @@ run_workload(uint32_t nth)
 	if (compat)
 		strcat(envconf, ENV_CONFIG_COMPAT);
 
-	testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
+	testutil_check(wiredtiger_open(NULL, &event_handler, envconf, &conn));
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	/*
 	 * Create all the tables.
 	 */
-	testutil_check(__wt_snprintf(
-	    uri, sizeof(uri), "%s:%s", table_pfx, uri_collection));
-	testutil_check(session->create(session, uri,
+	testutil_check(session->create(session, uri_collection,
 		"key_format=S,value_format=u,log=(enabled=false)"));
-	testutil_check(__wt_snprintf(
-	    uri, sizeof(uri), "%s:%s", table_pfx, uri_local));
 	testutil_check(session->create(session,
-	    uri, "key_format=S,value_format=u"));
-	testutil_check(__wt_snprintf(
-	    uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog));
+	    uri_local, "key_format=S,value_format=u"));
 	testutil_check(session->create(session,
-	    uri, "key_format=S,value_format=u"));
+	    uri_oplog, "key_format=S,value_format=u"));
 	/*
 	 * Don't log the stable timestamp table so that we know what timestamp
 	 * was stored at the checkpoint.
@@ -540,7 +918,7 @@ print_missing(REPORT *r, const char *fname, const char *msg)
  * Signal handler to catch if the child died unexpectedly.
  */
 static void
-handler(int sig)
+sig_handler(int sig)
 {
 	pid_t pid;
 
@@ -567,11 +945,15 @@ main(int argc, char *argv[])
 	pid_t pid;
 	uint64_t absent_coll, absent_local, absent_oplog, count, key, last_key;
 	uint64_t stable_fp, stable_val;
-	uint32_t i, nth, timeout;
-	int ch, status, ret;
+	uint32_t i;
+	int ret;
+	char fname[64], kname[64];
+	bool fatal;
+	uint32_t nth, timeout;
+	int ch, status;
 	const char *working_dir;
-	char buf[512], fname[64], kname[64], statname[1024];
-	bool fatal, rand_th, rand_time, verify_only;
+	char buf[512], statname[1024];
+	bool rand_th, rand_time, verify_only;
 
 	/* We have nothing to do if this is not a timestamp build */
 	if (!timestamp_build())
@@ -581,22 +963,24 @@ main(int argc, char *argv[])
 
 	compat = inmem = false;
 	use_ts = true;
+	/*
+	 * Setting this to false forces us to use internal library code.
+	 * Allow an override but default to using that code.
+	 */
+	use_txn = false;
 	nth = MIN_TH;
 	rand_th = rand_time = true;
 	timeout = MIN_TIME;
 	verify_only = false;
-	working_dir = "WT_TEST.timestamp-abort";
+	working_dir = "WT_TEST.schema-abort";
 
-	while ((ch = __wt_getopt(progname, argc, argv, "Ch:LmT:t:vz")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "Ch:mT:t:vxz")) != EOF)
 		switch (ch) {
 		case 'C':
 			compat = true;
 			break;
 		case 'h':
 			working_dir = __wt_optarg;
-			break;
-		case 'L':
-			table_pfx = "lsm";
 			break;
 		case 'm':
 			inmem = true;
@@ -612,6 +996,9 @@ main(int argc, char *argv[])
 		case 'v':
 			verify_only = true;
 			break;
+		case 'x':
+			use_txn = true;
+			break;
 		case 'z':
 			use_ts = false;
 			break;
@@ -619,6 +1006,7 @@ main(int argc, char *argv[])
 			usage();
 		}
 	argc -= __wt_optind;
+	argv += __wt_optind;
 	if (argc != 0)
 		usage();
 
@@ -666,7 +1054,7 @@ main(int argc, char *argv[])
 		 * exist after recovery runs.
 		 */
 		memset(&sa, 0, sizeof(sa));
-		sa.sa_handler = handler;
+		sa.sa_handler = sig_handler;
 		testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
 		testutil_checksys((pid = fork()) < 0);
 
@@ -724,23 +1112,18 @@ main(int argc, char *argv[])
 	/*
 	 * Open the connection which forces recovery to be run.
 	 */
-	testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn));
+	testutil_check(wiredtiger_open(
+	    NULL, &event_handler, ENV_CONFIG_REC, &conn));
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	/*
 	 * Open a cursor on all the tables.
 	 */
-	testutil_check(__wt_snprintf(
-	    buf, sizeof(buf), "%s:%s", table_pfx, uri_collection));
 	testutil_check(session->open_cursor(session,
-	    buf, NULL, NULL, &cur_coll));
-	testutil_check(__wt_snprintf(
-	    buf, sizeof(buf), "%s:%s", table_pfx, uri_local));
+	    uri_collection, NULL, NULL, &cur_coll));
 	testutil_check(session->open_cursor(session,
-	    buf, NULL, NULL, &cur_local));
-	testutil_check(__wt_snprintf(
-	    buf, sizeof(buf), "%s:%s", table_pfx, uri_oplog));
+	    uri_local, NULL, NULL, &cur_local));
 	testutil_check(session->open_cursor(session,
-	    buf, NULL, NULL, &cur_oplog));
+	    uri_oplog, NULL, NULL, &cur_oplog));
 
 	/*
 	 * Find the biggest stable timestamp value that was saved.
@@ -749,7 +1132,7 @@ main(int argc, char *argv[])
 	if (use_ts) {
 		testutil_check(
 		    conn->query_timestamp(conn, buf, "get=recovery"));
-		testutil_assert(sscanf(buf, "%" SCNx64, &stable_val) == 1);
+		sscanf(buf, "%" SCNx64, &stable_val);
 		printf("Got stable_val %" PRIu64 "\n", stable_val);
 	}
 

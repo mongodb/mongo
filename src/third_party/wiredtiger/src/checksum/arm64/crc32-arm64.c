@@ -29,7 +29,13 @@
 #include <inttypes.h>
 #include <stddef.h>
 
-#if defined(__linux__)
+/*
+ * The checksum code doesn't include WiredTiger configuration or include files.
+ * This means the HAVE_NO_CRC32_HARDWARE #define isn't configurable as part of
+ * standalone WiredTiger configuration, there's no way to turn off the checksum
+ * hardware.
+ */
+#if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
 #include <asm/hwcap.h>
 #include <sys/auxv.h>
 
@@ -99,13 +105,12 @@ extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
  */
 uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 {
-#if defined(__linux__)
+#if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
 	unsigned long caps = getauxval(AT_HWCAP);
 
 	if (caps & HWCAP_CRC32)
 		return (__wt_checksum_hw);
 	return (__wt_checksum_sw);
-
 #else
 	return (__wt_checksum_sw);
 #endif

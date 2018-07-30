@@ -657,7 +657,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 				key->size = WT_INSERT_KEY_SIZE(list->ins);
 			}
 			break;
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE_ERR(session, page->type);
 		}
 
 		/*
@@ -699,7 +699,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 			case WT_UPDATE_TOMBSTONE:
 				las_value.size = 0;
 				break;
-			WT_ILLEGAL_VALUE_ERR(session);
+			WT_ILLEGAL_VALUE_ERR(session, upd->type);
 			}
 
 			cursor->set_key(cursor,
