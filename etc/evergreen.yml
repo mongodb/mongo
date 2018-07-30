@@ -3436,7 +3436,7 @@ tasks:
           set -o errexit
           set -o verbose
 
-          tar cfvz ./embedded-sdk.tgz ./mongo-embedded-sdk-${version}
+          tar cfvz embedded-sdk.tgz mongo-embedded-sdk-${version}
 
     # Upload it so we can download from EVG.
     - command: s3.put
@@ -3457,6 +3457,31 @@ tasks:
       vars:
         targets: install-mobile-test
         task_compile_flags: *embedded_sdk_compile_flags
+
+- name: embedded_sdk_tests_s3_put
+  commands:
+    # Not using archive.targz_pack here because I can't get it to work.
+    - command: shell.exec
+      params:
+        working_dir: "src/build"
+        script: |
+          set -o errexit
+          set -o verbose
+
+          tar cfvz embedded-sdk-tests.tgz mongo-embedded-sdk-${version}
+
+    # Upload it so we can download from EVG.
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/embedded-sdk-tests.tgz"
+        remote_file: ${project}/embedded-sdk-test/${build_variant}/${revision}/${version}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "Embedded SDK Tests Tar Archive"
 
 - name: embedded_sdk_run_tests
   commands:
@@ -3519,6 +3544,22 @@ tasks:
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk.tgz"
         remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+
+- name: embedded_sdk_tests_s3_put_latest
+  commands:
+    # A second put, this time to -latest, to give devs a reasonable
+    # way to get the most recent build.
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/embedded-sdk-tests.tgz"
+        remote_file: ${project}/embedded-sdk-test/${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -7138,8 +7179,10 @@ task_groups:
   - "embedded_sdk_install_dev"
   - "embedded_sdk_s3_put"
   - "embedded_sdk_install_tests"
+  - "embedded_sdk_tests_s3_put"
   - "embedded_sdk_run_tests"
   - "embedded_sdk_s3_put_latest"
+  - "embedded_sdk_tests_s3_put_latest"
 
 #######################################
 #               Modules               #
