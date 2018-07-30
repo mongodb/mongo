@@ -4,22 +4,24 @@
     "use strict";
 
     load("jstests/libs/analyze_plan.js");  // For aggPlan functions.
-
-    const pipeline = [{$match: {state: "OH"}}, {$sort: {pop: -1}}, {$limit: 10}];
+    Random.setRandomSeed();
 
     const conn = MongoRunner.runMongod({});
-    assert.neq(conn, null, `Mongod failed to start up.`);
+    assert.neq(conn, null, "Mongod failed to start up.");
     const testDb = conn.getDB("test");
     const coll = testDb.agg_opt;
 
+    const pops = new Set();
     for (let i = 0; i < 25; ++i) {
-        assert.commandWorked(coll.insert({
-            _id: i,
-            city: "Cleveland",
-            pop: Math.floor(Math.random() * 100000) + 100,
-            state: "OH"
-        }));
+        let pop;
+        do {
+            pop = Random.randInt(100000);
+        } while (pops.has(pop));
+
+        assert.commandWorked(coll.insert({_id: i, city: "Cleveland", pop: pop, state: "OH"}));
     }
+
+    const pipeline = [{$match: {state: "OH"}}, {$sort: {pop: -1}}, {$limit: 10}];
 
     const enabledPlan = coll.explain().aggregate(pipeline);
     // Test that sort and the limit were combined.
@@ -27,10 +29,9 @@
     assert.eq(aggPlanHasStage(enabledPlan, "$sort"), true);
     assert.eq(enabledPlan.stages.length, 2);
 
-    const enabledResult = coll.aggregate(pipeline);
+    const enabledResult = coll.aggregate(pipeline).toArray();
 
-    // Enable a failpoint that will cause pipeline optimizations to be skipped. Test that the
-    // pipeline isn't modified after it's specified.
+    // Enable a failpoint that will cause pipeline optimizations to be skipped.
     assert.commandWorked(
         testDb.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}));
 
@@ -40,7 +41,7 @@
     assert.eq(aggPlanHasStage(disabledPlan, "$sort"), true);
     assert.eq(disabledPlan.stages.length, 3);
 
-    const disabledResult = coll.aggregate(pipeline);
+    const disabledResult = coll.aggregate(pipeline).toArray();
 
     // Test that the result is the same with and without optimizations enabled.
     assert.eq(enabledResult, disabledResult);
