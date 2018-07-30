@@ -39,7 +39,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_shard_collection.h"
@@ -97,8 +97,12 @@ public:
         : _opCtx(opCtx), _shardIdentity(std::move(shardIdentity)) {}
 
     void commit(boost::optional<Timestamp>) override {
-        fassertNoTrace(
-            40071, ShardingState::get(_opCtx)->initializeFromShardIdentity(_opCtx, _shardIdentity));
+        try {
+            ShardingInitializationMongoD::get(_opCtx)->initializeFromShardIdentity(_opCtx,
+                                                                                   _shardIdentity);
+        } catch (const AssertionException& ex) {
+            fassertFailedWithStatus(40071, ex.toStatus());
+        }
     }
 
     void rollback() override {}

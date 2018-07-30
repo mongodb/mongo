@@ -73,7 +73,7 @@
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -784,8 +784,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         const auto configsvrConnStr =
             Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
-        auto status = ShardingState::get(opCtx)->updateShardIdentityConfigString(
-            opCtx, configsvrConnStr.toString());
+        auto status = ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(
+            opCtx, configsvrConnStr);
         if (!status.isOK()) {
             warning() << "error encountered while trying to update config connection string to "
                       << configsvrConnStr << causedBy(status);

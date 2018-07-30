@@ -113,9 +113,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/shard_server_op_observer.h"
-#include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -524,9 +522,8 @@ ExitCode _initAndListen(int listenPort) {
     serviceContext->setPeriodicRunner(std::move(runner));
 
     // This function may take the global lock.
-    auto shardingInitialized =
-        uassertStatusOK(ShardingState::get(startupOpCtx.get())
-                            ->initializeShardingAwarenessIfNeeded(startupOpCtx.get()));
+    auto shardingInitialized = ShardingInitializationMongoD::get(startupOpCtx.get())
+                                   ->initializeShardingAwarenessIfNeeded(startupOpCtx.get());
     if (shardingInitialized) {
         waitForShardRegistryReload(startupOpCtx.get()).transitional_ignore();
     }
@@ -553,10 +550,9 @@ ExitCode _initAndListen(int listenPort) {
                 uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            uassertStatusOK(
-                initializeGlobalShardingStateForMongod(startupOpCtx.get(),
-                                                       ConnectionString::forLocal(),
-                                                       kDistLockProcessIdForConfigServer));
+            initializeGlobalShardingStateForMongoD(startupOpCtx.get(),
+                                                   ConnectionString::forLocal(),
+                                                   kDistLockProcessIdForConfigServer);
 
             Balancer::create(startupOpCtx->getServiceContext());
 
@@ -883,7 +879,7 @@ void shutdownTask() {
         // is building an index.
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
 
-        ShardingState::get(serviceContext)->shutDown(opCtx);
+        ShardingInitializationMongoD::get(serviceContext)->shutDown(opCtx);
 
         // Destroy all stashed transaction resources, in order to release locks.
         SessionKiller::Matcher matcherAllSessions(
