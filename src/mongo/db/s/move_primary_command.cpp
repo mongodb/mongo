@@ -151,7 +151,7 @@ private:
     static void _runImpl(OperationContext* opCtx,
                          const ShardMovePrimary movePrimaryRequest,
                          const StringData dbname) {
-        ShardId fromShardId = ShardingState::get(opCtx)->getShardName();
+        ShardId fromShardId = ShardingState::get(opCtx)->shardId();
         ShardId toShardId = movePrimaryRequest.getTo().toString();
 
         MovePrimarySourceManager movePrimarySourceManager(

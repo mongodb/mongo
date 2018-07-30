@@ -28,36 +28,25 @@
 
 #pragma once
 
-#include <iostream>
+#include <ostream>
 #include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 
-
 namespace mongo {
-
-class NamespaceString;
 
 /**
  *  Representation of a shard identifier.
  */
 class ShardId {
 public:
-    friend std::ostream& operator<<(std::ostream&, const ShardId&);
-
     ShardId() = default;
-
-    // Note that this c-tor allows the implicit conversion from std::string
     ShardId(std::string shardId) : _shardId(std::move(shardId)) {}
 
-    // Implicit StringData conversion
-    operator StringData();
-
-    bool operator==(const ShardId&) const;
-    bool operator!=(const ShardId&) const;
-    bool operator==(const std::string&) const;
-    bool operator!=(const std::string&) const;
+    operator StringData() const {
+        return StringData(_shardId);
+    }
 
     template <size_t N>
     bool operator==(const char (&val)[N]) const {
@@ -69,21 +58,20 @@ public:
         return (strncmp(val, _shardId.data(), N) != 0);
     }
 
-    // The operator<  is needed to do proper comparison in a std::map
-    bool operator<(const ShardId&) const;
+    const std::string& toString() const {
+        return _shardId;
+    }
 
-    const std::string& toString() const;
+    /**
+     *  Returns true if _shardId is not empty. Subject to include more validations in the future.
+     */
+    bool isValid() const;
 
     /**
      * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
      * lexicographical order.
      */
     int compare(const ShardId& other) const;
-
-    /**
-     *  Returns true if _shardId is not empty. Subject to include more validations in the future.
-     */
-    bool isValid() const;
 
     /**
      * Functor compatible with std::hash for std::unordered_{map,set}
@@ -95,6 +83,22 @@ public:
 private:
     std::string _shardId;
 };
+
+inline bool operator==(const ShardId& lhs, const ShardId& rhs) {
+    return lhs.compare(rhs) == 0;
+}
+
+inline bool operator!=(const ShardId& lhs, const ShardId& rhs) {
+    return !(lhs == rhs);
+}
+
+inline bool operator<(const ShardId& lhs, const ShardId& rhs) {
+    return lhs.compare(rhs) < 0;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const ShardId& shardId) {
+    return os << shardId.toString();
+}
 
 template <typename Allocator>
 StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& stream,

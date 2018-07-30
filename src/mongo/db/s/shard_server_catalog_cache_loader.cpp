@@ -277,7 +277,7 @@ void forcePrimaryCollectionRefreshAndWaitForReplication(OperationContext* opCtx,
     invariant(shardingState->enabled());
 
     auto selfShard = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->getShardName()));
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->shardId()));
 
     auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
         opCtx,
@@ -302,7 +302,7 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
     invariant(shardingState->enabled());
 
     auto selfShard = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->getShardName()));
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->shardId()));
 
     auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
         opCtx,

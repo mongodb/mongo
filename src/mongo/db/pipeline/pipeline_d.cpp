@@ -822,7 +822,7 @@ Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
 
 std::string PipelineD::MongoDInterface::getShardName(OperationContext* opCtx) const {
     if (ShardingState::get(opCtx)->enabled()) {
-        return ShardingState::get(opCtx)->getShardName();
+        return ShardingState::get(opCtx)->shardId().toString();
     }
 
     return std::string();

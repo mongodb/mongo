@@ -30,52 +30,14 @@
 
 #include "mongo/platform/basic.h"
 
-#include <functional>
-#include <string.h>
-
-#include "mongo/base/status_with.h"
 #include "mongo/s/shard_id.h"
+
+#include <functional>
 
 namespace mongo {
 
-using std::string;
-using std::ostream;
-
-bool ShardId::operator==(const ShardId& other) const {
-    return (this->_shardId == other._shardId);
-}
-
-bool ShardId::operator!=(const ShardId& other) const {
-    return !(*this == other);
-}
-
-bool ShardId::operator==(const string& other) const {
-    return (this->_shardId == other);
-}
-
-bool ShardId::operator!=(const string& other) const {
-    return !(*this == other);
-}
-
-ShardId::operator StringData() {
-    return StringData(_shardId.data(), _shardId.size());
-}
-
-const string& ShardId::toString() const {
-    return _shardId;
-}
-
 bool ShardId::isValid() const {
     return !_shardId.empty();
-}
-
-ostream& operator<<(ostream& os, const ShardId& shardId) {
-    os << shardId._shardId;
-    return os;
-}
-
-bool ShardId::operator<(const ShardId& other) const {
-    return _shardId < other._shardId;
 }
 
 int ShardId::compare(const ShardId& other) const {
@@ -85,4 +47,5 @@ int ShardId::compare(const ShardId& other) const {
 std::size_t ShardId::Hasher::operator()(const ShardId& shardId) const {
     return std::hash<std::string>()(shardId._shardId);
 }
+
 }  // namespace mongo

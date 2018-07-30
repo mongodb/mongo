@@ -1773,10 +1773,10 @@ public:
             if (auto cm = outRoutingInfoStatus.getValue().cm()) {
                 // Fetch result from other shards 1 chunk at a time. It would be better to do just
                 // one big $or query, but then the sorting would not be efficient.
-                const string shardName = ShardingState::get(opCtx)->getShardName();
+                const auto shardId = ShardingState::get(opCtx)->shardId();
 
                 for (const auto& chunk : cm->chunks()) {
-                    if (chunk.getShardId() == shardName) {
+                    if (chunk.getShardId() == shardId) {
                         chunks.push_back(chunk);
                     }
                 }

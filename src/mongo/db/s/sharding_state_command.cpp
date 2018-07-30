@@ -34,7 +34,9 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -68,8 +70,20 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        ShardingState::get(opCtx)->appendInfo(opCtx, result);
-        CollectionShardingState::report(opCtx, &result);
+        auto const shardingState = ShardingState::get(opCtx);
+        const bool isEnabled = shardingState->enabled();
+        result.appendBool("enabled", isEnabled);
+
+        if (isEnabled) {
+            auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+            result.append("configServer",
+                          shardRegistry->getConfigServerConnectionString().toString());
+            result.append("shardName", shardingState->shardId());
+            result.append("clusterId", shardingState->clusterId());
+
+            CollectionShardingState::report(opCtx, &result);
+        }
+
         return true;
     }
 

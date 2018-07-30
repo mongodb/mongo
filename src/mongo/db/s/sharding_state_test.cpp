@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_impl.h"
@@ -40,19 +41,99 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/s/sharding_mongod_test_fixture.h"
 
 namespace mongo {
 namespace {
 
-using executor::RemoteCommandRequest;
+const std::string kShardName("TestShard");
 
-const std::string kShardName("a");
+class ShardingInitializationOpObserverTest : public ShardServerTestFixture {
+public:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+
+        // NOTE: this assumes that globalInit will always be called on the same thread as the main
+        // test thread
+        ShardingState::get(operationContext())
+            ->setGlobalInitMethodForTest(
+                [this](OperationContext*, const ConnectionString&, StringData) {
+                    _initCallCount++;
+                    return Status::OK();
+                });
+    }
+
+    int getInitCallCount() const {
+        return _initCallCount;
+    }
+
+private:
+    int _initCallCount = 0;
+};
+
+TEST_F(ShardingInitializationOpObserverTest, GlobalInitGetsCalledAfterWriteCommits) {
+    ShardIdentityType shardIdentity;
+    shardIdentity.setConfigsvrConnectionString(
+        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+    shardIdentity.setShardName(kShardName);
+    shardIdentity.setClusterId(OID::gen());
+
+    DBDirectClient client(operationContext());
+    client.insert("admin.system.version", shardIdentity.toShardIdentityDocument());
+    ASSERT_EQ(1, getInitCallCount());
+}
+
+TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetCalledIfWriteAborts) {
+    ShardIdentityType shardIdentity;
+    shardIdentity.setConfigsvrConnectionString(
+        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+    shardIdentity.setShardName(kShardName);
+    shardIdentity.setClusterId(OID::gen());
+
+    // This part of the test ensures that the collection exists for the AutoGetCollection below to
+    // find and also validates that the initializer does not get called for non-sharding documents
+    DBDirectClient client(operationContext());
+    client.insert("admin.system.version", BSON("_id" << 1));
+    ASSERT_EQ(0, getInitCallCount());
+
+    {
+        AutoGetCollection autoColl(
+            operationContext(), NamespaceString("admin.system.version"), MODE_IX);
+
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(autoColl.getCollection()->insertDocument(
+            operationContext(), shardIdentity.toShardIdentityDocument(), {}));
+        ASSERT_EQ(0, getInitCallCount());
+    }
+
+    ASSERT_EQ(0, getInitCallCount());
+}
+
+TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetsCalledIfNSIsNotForShardIdentity) {
+    ShardIdentityType shardIdentity;
+    shardIdentity.setConfigsvrConnectionString(
+        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+    shardIdentity.setShardName(kShardName);
+    shardIdentity.setClusterId(OID::gen());
+
+    DBDirectClient client(operationContext());
+    client.insert("admin.user", shardIdentity.toShardIdentityDocument());
+    ASSERT_EQ(0, getInitCallCount());
+}
+
+TEST_F(ShardingInitializationOpObserverTest, OnInsertOpThrowWithIncompleteShardIdentityDocument) {
+    DBDirectClient client(operationContext());
+    client.insert("admin.system.version",
+                  BSON("_id" << ShardIdentityType::IdName << ShardIdentity::kShardNameFieldName
+                             << kShardName));
+    ASSERT(!client.getLastError().empty());
+}
+
 
 class ShardingStateTest : public ShardingMongodTestFixture {
 protected:
@@ -162,7 +243,7 @@ TEST_F(ShardingStateTest, ValidShardIdentitySucceeds) {
 
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
     ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ(kShardName, shardingState()->getShardName());
+    ASSERT_EQ(kShardName, shardingState()->shardId());
     ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
 }
 
@@ -230,7 +311,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity2));
 
     ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ(kShardName, shardingState()->getShardName());
+    ASSERT_EQ(kShardName, shardingState()->shardId());
     ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
 }
 
@@ -261,7 +342,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity2));
 
     ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ(kShardName, shardingState()->getShardName());
+    ASSERT_EQ(kShardName, shardingState()->shardId());
     ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
 }
 
@@ -440,7 +521,6 @@ TEST_F(ShardingStateTest,
         shardingState()->initializeShardingAwarenessIfNeeded(operationContext());
     ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, swShardingInitialized.getStatus().code());
 }
-
 
 TEST_F(ShardingStateTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndShardServerAndValidShardIdentity) {

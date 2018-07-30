@@ -160,7 +160,7 @@ public:
 
         // Validate shardName parameter.
         const auto shardName = cmdObj["shard"].str();
-        const auto storedShardName = shardingState->getShardName();
+        const auto storedShardName = shardingState->shardId().toString();
         uassert(ErrorCodes::BadValue,
                 str::stream() << "received shardName " << shardName
                               << " which differs from stored shardName "

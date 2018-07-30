@@ -29,13 +29,11 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -86,12 +84,6 @@ public:
     bool enabled() const;
 
     /**
-     * Force-sets the initialization state to InitializationState::kInitialized, for testing
-     * purposes. Note that this function should ONLY be used for testing purposes.
-     */
-    void setEnabledForTest(const std::string& shardName);
-
-    /**
      * Returns Status::OK if the ShardingState is enabled; if not, returns an error describing
      * whether the ShardingState is just not yet initialized, or if this shard is not running with
      * --shardsvr at all.
@@ -101,17 +93,23 @@ public:
      */
     Status canAcceptShardedCommands() const;
 
-    std::string getShardName();
+    /**
+     * Returns the shard id to which this node belongs. May only be called if 'enabled()' above
+     * returns true.
+     */
+    ShardId shardId();
 
     /**
-     * Initializes the sharding state of this server from the shard identity document argument
-     * and sets secondary or primary state information on the catalog cache loader.
-     *
-     * Note: caller must hold a global/database lock! Needed in order to stably check for
-     * replica set state (primary, secondary, standalone).
+     * Returns the cluster id of the cluster to which this node belongs. May only be called if
+     * 'enabled()' above returns true.
      */
-    Status initializeFromShardIdentity(OperationContext* opCtx,
-                                       const ShardIdentityType& shardIdentity);
+    OID clusterId();
+
+    /**
+     * Returns true if this node is a shard and if the currently runnint operation must engage the
+     * sharding subsystem (i.e., perform version checking, orphan filtering, etc).
+     */
+    bool needCollectionMetadata(OperationContext* opCtx, const std::string& ns);
 
     /**
      * Shuts down sharding machinery on the shard.
@@ -124,10 +122,6 @@ public:
      */
     Status updateConfigServerOpTimeFromMetadata(OperationContext* opCtx);
 
-    void appendInfo(OperationContext* opCtx, BSONObjBuilder& b);
-
-    bool needCollectionMetadata(OperationContext* opCtx, const std::string& ns);
-
     /**
      * Updates the config server field of the shardIdentity document with the given connection
      * string.
@@ -136,12 +130,6 @@ public:
      */
     Status updateShardIdentityConfigString(OperationContext* opCtx,
                                            const std::string& newConnectionString);
-
-    /**
-     * For testing only. Mock the initialization method used by initializeFromConfigConnString and
-     * initializeFromShardIdentity after all checks are performed.
-     */
-    void setGlobalInitMethodForTest(GlobalInitFunc func);
 
     /**
      * If started with --shardsvr, initializes sharding awareness from the shardIdentity document
@@ -157,6 +145,27 @@ public:
      * Note: this function briefly takes the global lock to determine primary/secondary state.
      */
     StatusWith<bool> initializeShardingAwarenessIfNeeded(OperationContext* opCtx);
+
+    /**
+     * Initializes the sharding state of this server from the shard identity document argument
+     * and sets secondary or primary state information on the catalog cache loader.
+     *
+     * NOTE: This must be called under at least Global IX lock in order for the replica set member
+     * state to be stable (primary/secondary).
+     */
+    Status initializeFromShardIdentity(OperationContext* opCtx,
+                                       const ShardIdentityType& shardIdentity);
+
+    /**
+     * For testing only. Mock the initialization method used by initializeFromConfigConnString and
+     * initializeFromShardIdentity after all checks are performed.
+     */
+    void setGlobalInitMethodForTest(GlobalInitFunc func);
+
+    /**
+     * For testing only. Force-sets the initialization state to InitializationState::kInitialized.
+     */
+    void setEnabledForTest(const std::string& shardName);
 
 private:
     // Progress of the sharding state initialization
@@ -185,6 +194,9 @@ private:
      */
     void _setInitializationState(InitializationState newState);
 
+    // Function for initializing the external sharding state components not owned here.
+    GlobalInitFunc _globalInit;
+
     // Protects state below
     stdx::mutex _mutex;
 
@@ -194,17 +206,11 @@ private:
     // Only valid if _initializationState is kError. Contains the reason for initialization failure.
     Status _initializationStatus;
 
-    // Signaled when ::initialize finishes.
-    stdx::condition_variable _initializationFinishedCondition;
-
     // Sets the shard name for this host (comes through setShardVersion)
-    std::string _shardName;
+    ShardId _shardId;
 
     // The id for the cluster this shard belongs to.
     OID _clusterId;
-
-    // Function for initializing the external sharding state components not owned here.
-    GlobalInitFunc _globalInit;
 };
 
 }  // namespace mongo

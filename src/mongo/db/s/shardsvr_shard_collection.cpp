@@ -663,7 +663,7 @@ public:
                         request.getUnique(),
                         finalSplitPoints,
                         fromMapReduce,
-                        ShardingState::get(opCtx)->getShardName(),
+                        ShardingState::get(opCtx)->shardId(),
                         numContiguousChunksPerShard);
 
         return true;

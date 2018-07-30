@@ -154,7 +154,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     }
 
     std::unique_ptr<CollectionMetadata> newCollectionMetadata =
-        stdx::make_unique<CollectionMetadata>(cm, shardingState->getShardName());
+        stdx::make_unique<CollectionMetadata>(cm, shardingState->shardId());
 
     css->refreshMetadata(opCtx, std::move(newCollectionMetadata));
 

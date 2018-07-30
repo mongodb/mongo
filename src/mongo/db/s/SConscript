@@ -356,6 +356,7 @@ env.CppUnitTest(
         'migration_chunk_cloner_source_legacy_test.cpp',
         'migration_destination_manager_test.cpp',
         'namespace_metadata_change_notifications_test.cpp',
+        'shard_metadata_util_test.cpp',
         'shard_server_catalog_cache_loader_test.cpp',
         'sharding_state_test.cpp',
         'split_vector_test.cpp',
@@ -373,7 +374,7 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='collection_sharding_state_test',
+    target='collection_sharding_runtime_test',
     source=[
         'collection_metadata_filtering_test.cpp',
         'collection_metadata_test.cpp',
@@ -389,18 +390,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
-    ],
-)
-
-env.CppUnitTest(
-    target='shard_metadata_util_test',
-    source=[
-        'shard_metadata_util_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
-        'sharding',
     ],
 )
 
