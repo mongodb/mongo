@@ -344,7 +344,7 @@ TEST(QueryPlannerIXSelectTest, ElemMatchGeoShouldNotUseBtreeIndex) {
     auto idxEntry = IndexEntry(BSON("a" << 1));
     indices.push_back(idxEntry);
     std::set<size_t> expectedIndices;
-    testRateIndices(R"({a: {$elemMatch: {$geoWithin: {$geometry: {type: 'Polygon', 
+    testRateIndices(R"({a: {$elemMatch: {$geoWithin: {$geometry: {type: 'Polygon',
                       coordinates: [[[0,0],[0,1],[1,0],[0,0]]]}}}}})",
                     "",
                     kSimpleCollator,
@@ -1039,6 +1039,14 @@ IndexEntry makeIndexEntry(BSONObj keyPattern, MultikeyPaths multiKeyPaths) {
     return entry;
 }
 
+IndexEntry makeIndexEntryWithInfoObj(BSONObj keyPattern,
+                                     MultikeyPaths multiKeyPaths,
+                                     BSONObj infoObj) {
+    IndexEntry entry = makeIndexEntry(keyPattern, multiKeyPaths);
+    entry.infoObj = infoObj;
+    return entry;
+}
+
 TEST(QueryPlannerIXSelectTest, InternalExprEqCannotUseMultiKeyIndex) {
     IndexEntry entry = makeIndexEntry(BSON("a" << 1), {{0U}});
     std::vector<IndexEntry> indices;
@@ -1293,11 +1301,6 @@ TEST(QueryPlannerIXSelectTest, ExpandAllPathsIndices) {
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 
     const auto allPathsIndexWithSubpath = makeIndexEntry(BSON("a.b.$**" << 1), {});
-    // TODO SERVER-35902: Remove this.
-    ASSERT_THROWS_CODE(
-        QueryPlannerIXSelect::findRelevantIndices(fields, {allPathsIndexWithSubpath}, &result),
-        DBException,
-        ErrorCodes::NotImplemented);
 }
 
 TEST(QueryPlannerIXSelectTest, ExpandAllPathsIndicesInPresenceOfOtherIndices) {
@@ -1367,13 +1370,111 @@ TEST(QueryPlannerIXSelectTest, AllPathsIndicesExpandedEntryHasCorrectProperties)
         // AllPaths indices are always sparse.
         ASSERT_TRUE(ie.sparse);
 
-        // They are never unique.
+        // AllPaths indexes are never unique.
         ASSERT_FALSE(ie.unique);
 
         // TODO SERVER-35333: Check that the name of the generated IndexEntry is different from the
         // original IndexEntry.
         ASSERT_EQ(ie.name, allPathsIndexEntry.name);
     }
+}
+
+TEST(QueryPlannerIXSelectTest, AllPathsIndicesExcludeNonMatchingKeySubpath) {
+    auto allPathsIndexEntry = makeIndexEntry(BSON("subpath.$**" << 1), {});
+
+    stdx::unordered_set<string> fields = {"abc", "def", "subpath.abc", "subpath.def", "subpath"};
+    std::vector<IndexEntry> result;
+
+    QueryPlannerIXSelect::findRelevantIndices(fields, {allPathsIndexEntry}, &result);
+    std::vector<BSONObj> expectedKeyPatterns = {
+        BSON("subpath.abc" << 1), BSON("subpath.def" << 1), BSON("subpath" << 1)};
+    ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
+}
+
+TEST(QueryPlannerIXSelectTest, AllPathsIndicesExcludeNonMatchingPathsWithInclusionProjection) {
+    auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
+        BSON("$**" << 1), {}, BSON("starPathsTempName" << BSON("abc" << 1 << "subpath.abc" << 1)));
+
+    stdx::unordered_set<string> fields = {"abc", "def", "subpath.abc", "subpath.def", "subpath"};
+    std::vector<IndexEntry> result;
+
+    QueryPlannerIXSelect::findRelevantIndices(fields, {allPathsIndexEntry}, &result);
+    std::vector<BSONObj> expectedKeyPatterns = {BSON("abc" << 1), BSON("subpath.abc" << 1)};
+    ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
+}
+
+TEST(QueryPlannerIXSelectTest, AllPathsIndicesExcludeNonMatchingPathsWithExclusionProjection) {
+    auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
+        BSON("$**" << 1), {}, BSON("starPathsTempName" << BSON("abc" << 0 << "subpath.abc" << 0)));
+
+    stdx::unordered_set<string> fields = {"abc", "def", "subpath.abc", "subpath.def", "subpath"};
+    std::vector<IndexEntry> result;
+
+    QueryPlannerIXSelect::findRelevantIndices(fields, {allPathsIndexEntry}, &result);
+    std::vector<BSONObj> expectedKeyPatterns = {
+        BSON("def" << 1), BSON("subpath.def" << 1), BSON("subpath" << 1)};
+    ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
+}
+
+TEST(QueryPlannerIXSelectTest, AllPathsIndicesWithInclusionProjectionAllowIdExclusion) {
+    auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
+        BSON("$**" << 1),
+        {},
+        BSON("starPathsTempName" << BSON("_id" << 0 << "abc" << 1 << "subpath.abc" << 1)));
+
+    stdx::unordered_set<string> fields = {
+        "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
+    std::vector<IndexEntry> result;
+
+    QueryPlannerIXSelect::findRelevantIndices(fields, {allPathsIndexEntry}, &result);
+    std::vector<BSONObj> expectedKeyPatterns = {BSON("abc" << 1), BSON("subpath.abc" << 1)};
+    ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
+}
+
+TEST(QueryPlannerIXSelectTest, AllPathsIndicesWithInclusionProjectionAllowIdInclusion) {
+    auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
+        BSON("$**" << 1),
+        {},
+        BSON("starPathsTempName" << BSON("_id" << 1 << "abc" << 1 << "subpath.abc" << 1)));
+
+    stdx::unordered_set<string> fields = {
+        "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
+    std::vector<IndexEntry> result;
+
+    QueryPlannerIXSelect::findRelevantIndices(fields, {allPathsIndexEntry}, &result);
+    std::vector<BSONObj> expectedKeyPatterns = {
+        BSON("_id" << 1), BSON("abc" << 1), BSON("subpath.abc" << 1)};
+    ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
+}
+
+TEST(QueryPlannerIXSelectTest, AllPathsIndicesWithExclusionProjectionAllowIdInclusion) {
+    auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
+        BSON("$**" << 1),
+        {},
+        BSON("starPathsTempName" << BSON("_id" << 1 << "abc" << 0 << "subpath.abc" << 0)));
+
+    stdx::unordered_set<string> fields = {
+        "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
+    std::vector<IndexEntry> result;
+
+    QueryPlannerIXSelect::findRelevantIndices(fields, {allPathsIndexEntry}, &result);
+    std::vector<BSONObj> expectedKeyPatterns = {
+        BSON("_id" << 1), BSON("def" << 1), BSON("subpath.def" << 1), BSON("subpath" << 1)};
+    ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
+}
+
+TEST(QueryPlannerIXSelectTest, AllPathsIndicesIncludeMatchingInternalNodes) {
+    auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
+        BSON("$**" << 1), {}, BSON("starPathsTempName" << BSON("_id" << 1 << "subpath" << 1)));
+
+    stdx::unordered_set<string> fields = {
+        "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
+    std::vector<IndexEntry> result;
+
+    QueryPlannerIXSelect::findRelevantIndices(fields, {allPathsIndexEntry}, &result);
+    std::vector<BSONObj> expectedKeyPatterns = {
+        BSON("_id" << 1), BSON("subpath.abc" << 1), BSON("subpath.def" << 1), BSON("subpath" << 1)};
+    ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
 }  // namespace

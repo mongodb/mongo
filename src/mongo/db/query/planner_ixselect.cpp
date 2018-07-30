@@ -34,6 +34,7 @@
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/geo/hash.h"
+#include "mongo/db/index/all_paths_key_generator.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -64,15 +65,13 @@ void expandIndex(const IndexEntry& allPathsIndex,
                  vector<IndexEntry>* out) {
     invariant(out);
 
-    // TODO SERVER-35902: For now indexAllPaths indices cannot supply a projection.
+    const auto projExec = AllPathsKeyGenerator::createProjectionExec(
+        allPathsIndex.keyPattern, allPathsIndex.infoObj.getObjectField("starPathsTempName"));
 
-    out->reserve(out->size() + fields.size());
-    for (auto&& fieldName : fields) {
-        // TODO: This needs to change in SERVER-35902.
-        if (fieldName == "_id") {
-            continue;
-        }
+    const auto projectedFields = projExec->applyProjectionToFields(fields);
 
+    out->reserve(out->size() + projectedFields.size());
+    for (auto&& fieldName : projectedFields) {
         IndexEntry entry(BSON(fieldName << 1),
                          IndexNames::ALLPATHS,
                          false,  // multikey (TODO SERVER-36109)
@@ -86,8 +85,6 @@ void expandIndex(const IndexEntry& allPathsIndex,
                          allPathsIndex.filterExpr,
                          allPathsIndex.infoObj,
                          allPathsIndex.collator);
-
-
         out->push_back(std::move(entry));
     }
 }
@@ -274,16 +271,6 @@ void QueryPlannerIXSelect::findRelevantIndices(const stdx::unordered_set<std::st
     for (auto&& entry : allIndices) {
         if (entry.type == INDEX_ALLPATHS) {
             // Should only have one field of the form {"&**" : 1}.
-            // TODO SERVER-35902: This code assumes the allPaths index only indexes the root,
-            // and not a subpath (e.g. {"a.b.$**": 1}).
-            uassert(ErrorCodes::NotImplemented,
-                    "Not yet implemented: expanding allPaths indexes for an index which indexes an "
-                    "entire subpath",
-                    entry.keyPattern.firstElement().fieldNameStringData() == "$**");
-            uassert(ErrorCodes::NotImplemented,
-                    "Do not support starPathsTempName yet",
-                    entry.infoObj["starPathsTempName"].eoo());
-
             invariant(entry.keyPattern.nFields() == 1);
             expandIndex(entry, fields, out);
             continue;

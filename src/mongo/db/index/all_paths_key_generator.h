@@ -43,6 +43,10 @@ class AllPathsKeyGenerator {
 public:
     static constexpr StringData kSubtreeSuffix = ".$**"_sd;
 
+    /**
+     * Returns an owned ProjectionExecAgg as defined by the 'keyPattern' and 'pathProjection' and
+     * created with the parameter necessary for allPaths key generation.
+    */
     static std::unique_ptr<ProjectionExecAgg> createProjectionExec(const BSONObj& keyPattern,
                                                                    const BSONObj& pathProjection);
 

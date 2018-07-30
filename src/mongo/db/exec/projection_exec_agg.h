@@ -74,6 +74,9 @@ public:
 
     BSONObj applyProjection(BSONObj inputDoc) const;
 
+    stdx::unordered_set<std::string> applyProjectionToFields(
+        const stdx::unordered_set<std::string>& fields) const;
+
 private:
     /**
      * ProjectionExecAgg::ProjectionExecutor wraps all agg-specific calls, and is forward-declared

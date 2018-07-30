@@ -80,10 +80,30 @@ public:
     }
 
     BSONObj applyProjection(BSONObj inputDoc) const {
-        return _projection->applyTransformation(Document{inputDoc}).toBson();
+        return applyTransformation(Document{inputDoc}).toBson();
+    }
+
+    stdx::unordered_set<std::string> applyProjectionToFields(
+        const stdx::unordered_set<std::string>& fields) const {
+        stdx::unordered_set<std::string> out;
+
+        for (const auto& field : fields) {
+            MutableDocument doc;
+            const FieldPath f = FieldPath(field);
+            doc.setNestedField(f, Value(1.0));
+            const Document transformedDoc = applyTransformation(doc.freeze());
+            if (!(transformedDoc.getNestedField(f).missing()))
+                out.insert(field);
+        }
+
+        return out;
     }
 
 private:
+    Document applyTransformation(Document inputDoc) const {
+        return _projection->applyTransformation(inputDoc);
+    }
+
     std::unique_ptr<ParsedAggregationProjection> _projection;
 };
 
@@ -110,4 +130,10 @@ ProjectionExecAgg::ProjectionType ProjectionExecAgg::getType() const {
 BSONObj ProjectionExecAgg::applyProjection(BSONObj inputDoc) const {
     return _exec->applyProjection(inputDoc);
 }
+
+stdx::unordered_set<std::string> ProjectionExecAgg::applyProjectionToFields(
+    const stdx::unordered_set<std::string>& fields) const {
+    return _exec->applyProjectionToFields(fields);
+}
+
 }  // namespace mongo
