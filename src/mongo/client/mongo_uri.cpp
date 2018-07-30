@@ -298,7 +298,7 @@ bool MongoURI::isMongoURI(StringData uri) {
 }
 
 std::string MongoURI::redact(StringData url) {
-    uassert(50891, "String passed to MongoURI::redact wasn't a MongoURI", isMongoURI(url));
+    uassert(50892, "String passed to MongoURI::redact wasn't a MongoURI", isMongoURI(url));
     URIParts parts(url);
     std::ostringstream out;
 
