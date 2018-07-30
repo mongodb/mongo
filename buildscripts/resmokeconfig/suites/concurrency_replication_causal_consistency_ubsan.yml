@@ -59,12 +59,6 @@ executor:
         # TODO SERVER-35156: Remove the following line to disable the periodic
         # no-op writer.
         writePeriodicNoops: 1
-        logComponentVerbosity:
-          replication:
-            heartbeats: 2
-            rollback: 2
-          storage:
-            recovery: 2
     num_nodes: 5
     # We give each of the nodes a vote in a 5-node replica set so that the
     # secondaries have different beliefs about the majority commit point
