@@ -384,11 +384,20 @@ public:
     GetResult get(const CanonicalQuery& query) const;
 
     /**
-     * Determine whether or not the cache should be used. If it shouldn't be used because the cache
-     * entry exists but is inactive, log a message. Returns nullptr if the cache should not be
-     * used, and a CachedSolution otherwise.
+     * Look up the cached data access for the provided PlanCacheKey. Circumvents the recalculation
+     * of a plan cache key.
+     *
+     * The return value will provide the "state" of the cache entry, as well as the CachedSolution
+     * for the query (if there is one).
      */
-    std::unique_ptr<CachedSolution> getCacheEntryIfCacheable(const CanonicalQuery& cq) const;
+    GetResult get(const PlanCacheKey& query) const;
+
+    /**
+     * If the cache entry exists and is active, return a CachedSolution. If the cache entry is
+     * inactive, log a message and return a nullptr. If no cache entry exists, return a nullptr.
+     */
+    std::unique_ptr<CachedSolution> getCacheEntryIfActive(const PlanCacheKey& key) const;
+
 
     /**
      * When the CachedPlanStage runs a plan out of the cache, we want to record data about the

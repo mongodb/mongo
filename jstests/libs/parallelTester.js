@@ -264,6 +264,7 @@ if (typeof _threadInject != "undefined") {
             parallelFilesDir + "/profile_list_indexes.js",
             parallelFilesDir + "/profile_mapreduce.js",
             parallelFilesDir + "/profile_no_such_db.js",
+            parallelFilesDir + "/profile_query_hash.js",
             parallelFilesDir + "/profile_repair_cursor.js",
             parallelFilesDir + "/profile_sampling.js",
             parallelFilesDir + "/profile_update.js",

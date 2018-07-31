@@ -111,6 +111,11 @@ inline std::string toHexLower(const void* inRaw, int len) {
     return out.str();
 }
 
+/**
+ * Returns the hex value with a fixed width of 8 chatacters.
+ */
+std::string unsignedIntToFixedLengthHex(uint32_t val);
+
 /* @return a dump of the buffer as hex byte ascii output */
 std::string hexdump(const char* data, unsigned len);
 }

@@ -194,6 +194,13 @@ TEST(StringUtilsTest, VariousConversions) {
                   integerToHex(std::numeric_limits<long long>::min()));
 }
 
+TEST(StringUtilsTest, unsignedFixedLengthHex) {
+    ASSERT_EQUALS(unsignedIntToFixedLengthHex(std::numeric_limits<uint32_t>::max()),
+                  std::string("FFFFFFFF"));
+    ASSERT_EQUALS(unsignedIntToFixedLengthHex(0), std::string("00000000"));
+    ASSERT_EQUALS(unsignedIntToFixedLengthHex(123), std::string("0000007B"));
+}
+
 TEST(StringUtilsTest, CanParseZero) {
     boost::optional<size_t> result = parseUnsignedBase10Integer("0");
     ASSERT(result && *result == 0);

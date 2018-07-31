@@ -90,6 +90,11 @@ std::string integerToHex<unsigned long long>(unsigned long long val) {
     return integerToHexDef(val);
 }
 
+std::string unsignedIntToFixedLengthHex(uint32_t val) {
+    char buf[9];
+    invariant(snprintf(buf, 9, "%08X", val) == 8);
+    return std::string(buf, 8);
+}
 
 std::string hexdump(const char* data, unsigned len) {
     verify(len < 1000000);

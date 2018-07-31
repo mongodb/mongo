@@ -180,6 +180,8 @@ public:
 
     BSONObj execStats;  // Owned here.
 
+    boost::optional<uint32_t> queryHash;
+
     // Details of any error (whether from an exception or a command returning failure).
     Status errInfo = Status::OK();
 

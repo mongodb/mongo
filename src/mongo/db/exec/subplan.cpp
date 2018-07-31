@@ -133,13 +133,20 @@ Status SubplanStage::planSubqueries() {
         // Plan the i-th child. We might be able to find a plan for the i-th child in the plan
         // cache. If there's no cached plan, then we generate and rank plans using the MPS.
         const auto* planCache = _collection->infoCache()->getPlanCache();
-        if (auto cachedSol = planCache->getCacheEntryIfCacheable(*branchResult->canonicalQuery)) {
-            // We have a CachedSolution. Store it for later.
-            LOG(5) << "Subplanner: cached plan found for child " << i << " of "
-                   << _orExpression->numChildren();
 
-            branchResult->cachedSolution = std::move(cachedSol);
-        } else {
+        // Populate branchResult->cachedSolution if an active cachedSolution entry exists.
+        if (planCache->shouldCacheQuery(*branchResult->canonicalQuery)) {
+            auto planCacheKey = planCache->computeKey(*branchResult->canonicalQuery);
+            if (auto cachedSol = planCache->getCacheEntryIfActive(planCacheKey)) {
+                // We have a CachedSolution. Store it for later.
+                LOG(5) << "Subplanner: cached plan found for child " << i << " of "
+                       << _orExpression->numChildren();
+
+                branchResult->cachedSolution = std::move(cachedSol);
+            }
+        }
+
+        if (!branchResult->cachedSolution) {
             // No CachedSolution found. We'll have to plan from scratch.
             LOG(5) << "Subplanner: planning child " << i << " of " << _orExpression->numChildren();
 

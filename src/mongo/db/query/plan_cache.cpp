@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -563,19 +564,11 @@ PlanCache::PlanCache(const std::string& ns) : _cache(internalQueryCacheSize.load
 
 PlanCache::~PlanCache() {}
 
-/*
- * Determine whether or not the cache should be used. If it shouldn't be used because the cache
- * entry exists but is inactive, log a message.
- */
-std::unique_ptr<CachedSolution> PlanCache::getCacheEntryIfCacheable(
-    const CanonicalQuery& cq) const {
-    if (!PlanCache::shouldCacheQuery(cq)) {
-        return nullptr;
-    }
+std::unique_ptr<CachedSolution> PlanCache::getCacheEntryIfActive(const PlanCacheKey& key) const {
 
-    PlanCache::GetResult res = get(cq);
+    PlanCache::GetResult res = get(key);
     if (res.state == PlanCache::CacheEntryState::kPresentInactive) {
-        LOG(2) << "Not using cached entry for " << redact(cq.toStringShort())
+        LOG(2) << "Not using cached entry for " << redact(res.cachedSolution->toString())
                << " since it is inactive";
         return nullptr;
     }
@@ -895,7 +888,10 @@ void PlanCache::deactivate(const CanonicalQuery& query) {
 
 PlanCache::GetResult PlanCache::get(const CanonicalQuery& query) const {
     PlanCacheKey key = computeKey(query);
+    return get(key);
+}
 
+PlanCache::GetResult PlanCache::get(const PlanCacheKey& key) const {
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
     PlanCacheEntry* entry = nullptr;
     Status cacheStatus = _cache.get(key, &entry);

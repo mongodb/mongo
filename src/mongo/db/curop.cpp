@@ -34,6 +34,8 @@
 
 #include "mongo/db/curop.h"
 
+#include <iomanip>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/client.h"
@@ -45,6 +47,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/stringutils.h"
@@ -571,6 +574,9 @@ string OpDebug::report(Client* client,
     s << " numYields:" << curop.numYields();
     OPDEBUG_TOSTRING_HELP(nreturned);
 
+    if (queryHash) {
+        s << " queryHash:" << unsignedIntToFixedLengthHex(*queryHash);
+    }
     if (!errInfo.isOK()) {
         s << " ok:" << 0;
         if (!errInfo.reason().empty()) {
@@ -651,6 +657,10 @@ void OpDebug::append(const CurOp& curop,
 
     b.appendNumber("numYield", curop.numYields());
     OPDEBUG_APPEND_NUMBER(nreturned);
+
+    if (queryHash) {
+        b.append("queryHash", unsignedIntToFixedLengthHex(*queryHash));
+    }
 
     {
         BSONObjBuilder locks(b.subobjStart("locks"));
