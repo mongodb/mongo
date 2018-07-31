@@ -27,8 +27,6 @@
 
 #include "mongo/db/auth/user_set.h"
 
-#include <algorithm>
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -42,8 +40,7 @@ class UserSetNameIteratorImpl : public UserNameIterator::Impl {
     MONGO_DISALLOW_COPYING(UserSetNameIteratorImpl);
 
 public:
-    UserSetNameIteratorImpl(const UserSet::const_iterator& begin,
-                            const UserSet::const_iterator& end)
+    UserSetNameIteratorImpl(const UserSet::iterator& begin, const UserSet::iterator& end)
         : _curr(begin), _end(end) {}
     virtual ~UserSetNameIteratorImpl() {}
     virtual bool more() const {
@@ -60,58 +57,78 @@ public:
     }
 
 private:
-    UserSet::const_iterator _curr;
-    UserSet::const_iterator _end;
+    UserSet::iterator _curr;
+    UserSet::iterator _end;
 };
 }  // namespace
 
-void UserSet::add(UserHandle user) {
-    auto it = std::find_if(_users.begin(), _users.end(), [&](const auto& storedUser) {
-        return user->getName().getDB() == storedUser->getName().getDB();
-    });
-    if (it == _users.end()) {
-        _users.push_back(std::move(user));
+UserSet::UserSet() : _users(), _usersEnd(_users.end()) {}
+UserSet::~UserSet() {}
+
+User* UserSet::add(User* user) {
+    for (mutable_iterator it = mbegin(); it != mend(); ++it) {
+        User* current = *it;
+        if (current->getName().getDB() == user->getName().getDB()) {
+            // There can be only one user per database.
+            *it = user;
+            return current;
+        }
+    }
+    if (_usersEnd == _users.end()) {
+        _users.push_back(user);
+        _usersEnd = _users.end();
     } else {
-        *it = std::move(user);
+        *_usersEnd = user;
+        ++_usersEnd;
     }
+    return NULL;
 }
 
-void UserSet::removeByDBName(StringData dbname) {
-    auto it = std::find_if(_users.begin(), _users.end(), [&](const auto& user) {
-        return user->getName().getDB() == dbname;
-    });
-    if (it != _users.end()) {
-        _users.erase(it);
+User* UserSet::removeByDBName(StringData dbname) {
+    for (iterator it = begin(); it != end(); ++it) {
+        User* current = *it;
+        if (current->getName().getDB() == dbname) {
+            return removeAt(it);
+        }
     }
+    return NULL;
 }
 
-void UserSet::replaceAt(iterator it, UserHandle replacement) {
-    *it = std::move(replacement);
+User* UserSet::replaceAt(iterator it, User* replacement) {
+    size_t offset = it - begin();
+    User* old = _users[offset];
+    _users[offset] = replacement;
+    return old;
 }
 
-void UserSet::removeAt(iterator it) {
-    _users.erase(it);
+User* UserSet::removeAt(iterator it) {
+    size_t offset = it - begin();
+    User* old = _users[offset];
+    --_usersEnd;
+    _users[offset] = *_usersEnd;
+    *_usersEnd = NULL;
+    return old;
 }
 
-UserHandle UserSet::lookup(const UserName& name) const {
-    auto it = std::find_if(_users.begin(), _users.end(), [&](const auto& user) {
-        invariant(user);
-        return user->getName() == name;
-    });
-
-    return (it != _users.end()) ? *it : nullptr;
+User* UserSet::lookup(const UserName& name) const {
+    User* user = lookupByDBName(name.getDB());
+    if (user && user->getName() == name) {
+        return user;
+    }
+    return NULL;
 }
 
-UserHandle UserSet::lookupByDBName(StringData dbname) const {
-    auto it = std::find_if(_users.begin(), _users.end(), [&](const auto& user) {
-        invariant(user);
-        return user->getName().getDB() == dbname;
-    });
-    return (it != _users.end()) ? *it : nullptr;
+User* UserSet::lookupByDBName(StringData dbname) const {
+    for (iterator it = begin(); it != end(); ++it) {
+        User* current = *it;
+        if (current->getName().getDB() == dbname) {
+            return current;
+        }
+    }
+    return NULL;
 }
 
 UserNameIterator UserSet::getNames() const {
-    return UserNameIterator(
-        std::make_unique<UserSetNameIteratorImpl>(_users.cbegin(), _users.cend()));
+    return UserNameIterator(std::make_unique<UserSetNameIteratorImpl>(begin(), end()));
 }
 }  // namespace mongo

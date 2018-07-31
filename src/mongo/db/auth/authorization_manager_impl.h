@@ -52,7 +52,6 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/invalidating_lru_cache.h"
 
 namespace mongo {
 class AuthorizationSession;
@@ -116,7 +115,11 @@ public:
                                     bool showBuiltinRoles,
                                     std::vector<BSONObj>* result) override;
 
-    StatusWith<UserHandle> acquireUser(OperationContext* opCtx, const UserName& userName) override;
+    Status acquireUser(OperationContext* opCtx,
+                       const UserName& userName,
+                       User** acquiredUser) override;
+
+    void releaseUser(User* user) override;
 
     void invalidateUserByName(const UserName& user) override;
 
@@ -133,8 +136,6 @@ public:
                const NamespaceString& nss,
                const BSONObj& obj,
                const BSONObj* patt) override;
-
-    std::vector<CachedUserInfo> getUserCacheInfo() const override;
 
 private:
     /**
@@ -214,17 +215,13 @@ private:
      * has a reference count - the AuthorizationManager must not delete a User object in the
      * cache unless its reference count is zero.
      */
-    struct UserCacheInvalidator {
-        void operator()(User* user);
-    };
-
-    InvalidatingLRUCache<UserName, User, UserCacheInvalidator> _userCache;
+    stdx::unordered_map<UserName, User*> _userCache;
 
     /**
      * Current generation of cached data.  Updated every time part of the cache gets
      * invalidated.  Protected by CacheGuard.
      */
-    OID _fetchGeneration;
+    OID _cacheGeneration;
 
     /**
      * True if there is an update to the _userCache in progress, and that update is currently in

@@ -71,7 +71,6 @@
 "killAnySession",
 "killCursors",
 "killop",
-"listCachedAndActiveUsers",
 "listCollections",
 "listCursors",
 "listDatabases",

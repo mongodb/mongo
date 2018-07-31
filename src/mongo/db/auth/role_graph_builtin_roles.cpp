@@ -362,9 +362,7 @@ void addUserAdminAnyDbPrivileges(PrivilegeVector* privileges) {
         Privilege(ResourcePattern::forClusterResource(), ActionType::invalidateUserCache));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forClusterResource(), ActionType::viewUser));
-    Privilege::addPrivilegeToPrivilegeVector(
-        privileges,
-        Privilege(ResourcePattern::forAnyNormalResource(), ActionType::listCachedAndActiveUsers));
+
 
     ActionSet readRoleAndIndexActions;
     readRoleAndIndexActions += readRoleActions;

@@ -92,13 +92,47 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
         isMongos);
 }
 
+/** Deleter for User*.
+ * Will release a User* back to its owning AuthorizationManager on destruction.
+ * If a borrowing UserSet and the iterator it uses to store the User* is provided, this
+ * deleter will release the User* from the set if the iterator still points to the deleting User*.
+ */
+class UserReleaser {
+public:
+    explicit UserReleaser(AuthorizationManager* owner) : _owner(owner), _borrower(nullptr) {}
+    UserReleaser(AuthorizationManager* owner, UserSet* borrower, UserSet::iterator borrowerIt)
+        : _owner(owner), _borrower(borrower), _it(borrowerIt) {}
+
+    void operator()(User* user) {
+        // Remove the user from the borrower if it hasn't already been swapped out.
+        if (_borrower && *_it == user) {
+            fassert(40546, _borrower->removeAt(_it) == user);
+        }
+        _owner->releaseUser(user);
+    }
+
+protected:
+    AuthorizationManager* _owner;
+    UserSet* _borrower;
+    UserSet::iterator _it;
+};
+/** Holder for User*s. If this Holder falls out of scope while holding a User*, it will release
+ * the User* from its AuthorizationManager, and extract it from a UserSet if the set still contains
+ * it. Use this object to guard User*s which will need to be destroyed in the event of an exception.
+ */
+using UserHolder = std::unique_ptr<User, UserReleaser>;
+
 }  // namespace
 
 AuthorizationSessionImpl::AuthorizationSessionImpl(
     std::unique_ptr<AuthzSessionExternalState> externalState, InstallMockForTestingOrAuthImpl)
     : _externalState(std::move(externalState)), _impersonationFlag(false) {}
 
-AuthorizationSessionImpl::~AuthorizationSessionImpl() {}
+AuthorizationSessionImpl::~AuthorizationSessionImpl() {
+    for (auto& user : _authenticatedUsers) {
+        getAuthorizationManager().releaseUser(user);
+    }
+}
 
 AuthorizationManager& AuthorizationSessionImpl::getAuthorizationManager() {
     return _externalState->getAuthorizationManager();
@@ -111,15 +145,16 @@ void AuthorizationSessionImpl::startRequest(OperationContext* opCtx) {
 
 Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
                                                      const UserName& userName) {
+    User* user;
     AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
-    auto swUser = authzManager->acquireUser(opCtx, userName);
-    if (!swUser.isOK()) {
-        return swUser.getStatus();
+    Status status = authzManager->acquireUser(opCtx, userName, &user);
+    if (!status.isOK()) {
+        return status;
     }
 
-    auto user = std::move(swUser.getValue());
+    UserHolder userHolder(user, UserReleaser(authzManager));
 
-    const auto& restrictionSet = user->getRestrictions();
+    const auto& restrictionSet = userHolder->getRestrictions();
     if (opCtx->getClient() == nullptr) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "Unable to evaluate restrictions, OperationContext has no Client");
@@ -133,7 +168,9 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
         return AuthorizationManager::authenticationFailedStatus;
     }
 
-    _authenticatedUsers.add(std::move(user));
+    // Calling add() on the UserSet may return a user that was replaced because it was from the
+    // same database.
+    userHolder.reset(_authenticatedUsers.add(userHolder.release()));
 
     // If there are any users and roles in the impersonation data, clear it out.
     clearImpersonatedUserData();
@@ -143,7 +180,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
 }
 
 User* AuthorizationSessionImpl::lookupUser(const UserName& name) {
-    return _authenticatedUsers.lookup(name).get();
+    return _authenticatedUsers.lookup(name);
 }
 
 User* AuthorizationSessionImpl::getSingleUser() {
@@ -163,7 +200,10 @@ User* AuthorizationSessionImpl::getSingleUser() {
 }
 
 void AuthorizationSessionImpl::logoutDatabase(StringData dbname) {
-    _authenticatedUsers.removeByDBName(dbname);
+    User* removedUser = _authenticatedUsers.removeByDBName(dbname);
+    if (removedUser) {
+        getAuthorizationManager().releaseUser(removedUser);
+    }
     clearImpersonatedUserData();
     _buildAuthenticatedRolesVector();
 }
@@ -601,7 +641,7 @@ bool AuthorizationSessionImpl::isAuthorizedToCreateRole(
     // The user may create a role if the localhost exception is enabled, and they already own the
     // role. This implies they have obtained the role through an external authorization mechanism.
     if (_externalState->shouldAllowLocalhost()) {
-        for (const auto& user : _authenticatedUsers) {
+        for (const User* const user : _authenticatedUsers) {
             if (user->hasRole(args.roleName)) {
                 return true;
             }
@@ -773,27 +813,25 @@ bool AuthorizationSessionImpl::isAuthenticated() {
 void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
     AuthorizationManager& authMan = getAuthorizationManager();
     UserSet::iterator it = _authenticatedUsers.begin();
-
     while (it != _authenticatedUsers.end()) {
-        auto& user = *it;
-        if (!user->isValid()) {
-            // The user is invalid, so make sure that we erase it from _authenticateUsers at the
-            // end of this block.
-            auto removeGuard = MakeGuard([&] { _authenticatedUsers.removeAt(it++); });
+        User* user = *it;
 
+        if (!user->isValid()) {
             // Make a good faith effort to acquire an up-to-date user object, since the one
             // we've cached is marked "out-of-date."
             UserName name = user->getName();
-            UserHandle updatedUser;
+            User* updatedUser;
 
-            auto swUser = authMan.acquireUser(opCtx, name);
-            auto& status = swUser.getStatus();
+            Status status = authMan.acquireUser(opCtx, name, &updatedUser);
             switch (status.code()) {
                 case ErrorCodes::OK: {
-                    updatedUser = std::move(swUser.getValue());
+
+                    // Verify the updated user object's authentication restrictions.
+                    UserHolder userHolder(user, UserReleaser(&authMan, &_authenticatedUsers, it));
+                    UserHolder updatedUserHolder(updatedUser, UserReleaser(&authMan));
                     try {
                         const auto& restrictionSet =
-                            updatedUser->getRestrictions();  // Owned by updatedUser
+                            updatedUserHolder->getRestrictions();  // Owned by updatedUser
                         invariant(opCtx->getClient());
                         Status restrictionStatus = restrictionSet.validate(
                             RestrictionEnvironment::get(*opCtx->getClient()));
@@ -813,19 +851,24 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                     }
 
                     // Success! Replace the old User object with the updated one.
-                    removeGuard.Dismiss();
-                    _authenticatedUsers.replaceAt(it, std::move(updatedUser));
+                    fassert(17067,
+                            _authenticatedUsers.replaceAt(it, updatedUserHolder.release()) ==
+                                userHolder.get());
                     LOG(1) << "Updated session cache of user information for " << name;
                     break;
                 }
                 case ErrorCodes::UserNotFound: {
                     // User does not exist anymore; remove it from _authenticatedUsers.
+                    fassert(17068, _authenticatedUsers.removeAt(it) == user);
+                    authMan.releaseUser(user);
                     log() << "Removed deleted user " << name
                           << " from session cache of user information.";
                     continue;  // No need to advance "it" in this case.
                 }
                 case ErrorCodes::UnsupportedFormat: {
                     // An auth subsystem has explicitly indicated a failure.
+                    fassert(40555, _authenticatedUsers.removeAt(it) == user);
+                    authMan.releaseUser(user);
                     log() << "Removed user " << name
                           << " from session cache of user information because of refresh failure:"
                           << " '" << status << "'.";
@@ -837,7 +880,6 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                     warning() << "Could not fetch updated user privilege information for " << name
                               << "; continuing to use old information.  Reason is "
                               << redact(status);
-                    removeGuard.Dismiss();
                     break;
             }
         }
@@ -913,7 +955,7 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnResource(const Resource
         buildResourceSearchList(resource, resourceSearchList.data());
 
     for (int i = 0; i < resourceSearchListLength; ++i) {
-        for (const auto& user : _authenticatedUsers) {
+        for (const User* user : _authenticatedUsers) {
             if (user->hasActionsForResource(resourceSearchList[i])) {
                 return true;
             }
@@ -947,14 +989,15 @@ bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privil
         }
     }
 
-    for (const auto& user : _authenticatedUsers) {
+    for (UserSet::iterator it = _authenticatedUsers.begin(); it != _authenticatedUsers.end();
+         ++it) {
+        User* user = *it;
         for (int i = 0; i < resourceSearchListLength; ++i) {
             ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);
             unmetRequirements.removeAllActionsFromSet(userActions);
 
-            if (unmetRequirements.empty()) {
+            if (unmetRequirements.empty())
                 return true;
-            }
         }
     }
 

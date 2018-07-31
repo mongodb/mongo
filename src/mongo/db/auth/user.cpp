@@ -51,7 +51,12 @@ SHA256Block computeDigest(const UserName& name) {
 
 }  // namespace
 
-User::User(const UserName& name) : _name(name), _digest(computeDigest(_name)) {}
+User::User(const UserName& name)
+    : _name(name), _digest(computeDigest(_name)), _refCount(0), _isValid(1) {}
+
+User::~User() {
+    dassert(_refCount == 0);
+}
 
 template <>
 User::SCRAMCredentials<SHA1Block>& User::CredentialData::scram<SHA1Block>() {
@@ -88,9 +93,12 @@ const User::CredentialData& User::getCredentials() const {
 }
 
 bool User::isValid() const {
-    return _isValid.loadRelaxed();
+    return _isValid.loadRelaxed() == 1;
 }
 
+uint32_t User::getRefCount() const {
+    return _refCount;
+}
 
 const ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
     stdx::unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
@@ -162,8 +170,16 @@ void User::setRestrictions(RestrictionDocuments restrictions)& {
     _restrictions = std::move(restrictions);
 }
 
-void User::_invalidate() {
-    _isValid.store(false);
+void User::invalidate() {
+    _isValid.store(0);
 }
 
+void User::incrementRefCount() {
+    ++_refCount;
+}
+
+void User::decrementRefCount() {
+    dassert(_refCount > 0);
+    --_refCount;
+}
 }  // namespace mongo

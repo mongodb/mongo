@@ -148,11 +148,11 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
                                                                              << "admin"))),
                                                      BSONObj()));
 
-    auto swu = authzManager->acquireUser(opCtx.get(), UserName("v2read", "test"));
-    ASSERT_OK(swu.getStatus());
-    auto v2read = std::move(swu.getValue());
+    User* v2read;
+    ASSERT_OK(authzManager->acquireUser(opCtx.get(), UserName("v2read", "test"), &v2read));
     ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
     ASSERT(v2read->isValid());
+    ASSERT_EQUALS(1U, v2read->getRefCount());
     RoleNameIterator roles = v2read->getRoles();
     ASSERT_EQUALS(RoleName("read", "test"), roles.next());
     ASSERT_FALSE(roles.more());
@@ -160,12 +160,13 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     auto testDBPrivilege = privilegeMap[ResourcePattern::forDatabaseName("test")];
     ASSERT(testDBPrivilege.getActions().contains(ActionType::find));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+    authzManager->releaseUser(v2read);
 
-    swu = authzManager->acquireUser(opCtx.get(), UserName("v2cluster", "admin"));
-    ASSERT_OK(swu.getStatus());
-    auto v2cluster = std::move(swu.getValue());
+    User* v2cluster;
+    ASSERT_OK(authzManager->acquireUser(opCtx.get(), UserName("v2cluster", "admin"), &v2cluster));
     ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
     ASSERT(v2cluster->isValid());
+    ASSERT_EQUALS(1U, v2cluster->getRefCount());
     RoleNameIterator clusterRoles = v2cluster->getRoles();
     ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
     ASSERT_FALSE(clusterRoles.more());
@@ -173,6 +174,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     auto clusterPrivilege = privilegeMap[ResourcePattern::forClusterResource()];
     ASSERT(clusterPrivilege.getActions().contains(ActionType::serverStatus));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+    authzManager->releaseUser(v2cluster);
 }
 
 #ifdef MONGO_CONFIG_SSL
@@ -181,9 +183,9 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
         session,
         SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("readWrite", "test")}));
 
-    auto swu = authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"));
-    ASSERT_OK(swu.getStatus());
-    auto x509User = std::move(swu.getValue());
+    User* x509User;
+    ASSERT_OK(
+        authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"), &x509User));
     ASSERT(x509User->isValid());
 
     stdx::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
@@ -200,6 +202,9 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     auto privilegeIt = privileges.find(ResourcePattern::forDatabaseName("test"));
     ASSERT(privilegeIt != privileges.end());
     ASSERT(privilegeIt->second.includesAction(ActionType::insert));
+
+
+    authzManager->releaseUser(x509User);
 }
 #endif
 
@@ -208,15 +213,17 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
         session,
         SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("write", "test")}));
 
+    User* x509User;
     ASSERT_NOT_OK(
-        authzManager->acquireUser(opCtx.get(), UserName("CN=10gen.com", "$external")).getStatus());
+        authzManager->acquireUser(opCtx.get(), UserName("CN=10gen.com", "$external"), &x509User));
 }
 
 TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
     setX509PeerInfo(session, {});
 
-    ASSERT_NOT_OK(authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"))
-                      .getStatus());
+    User* x509User;
+    ASSERT_NOT_OK(
+        authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"), &x509User));
 }
 
 /**
@@ -313,11 +320,11 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
                                                          << "insert")))),
         BSONObj()));
 
-    auto swu = authzManager->acquireUser(opCtx.get(), UserName("myUser", "test"));
-    ASSERT_OK(swu.getStatus());
-    auto myUser = std::move(swu.getValue());
+    User* myUser;
+    ASSERT_OK(authzManager->acquireUser(opCtx.get(), UserName("myUser", "test"), &myUser));
     ASSERT_EQUALS(UserName("myUser", "test"), myUser->getName());
     ASSERT(myUser->isValid());
+    ASSERT_EQUALS(1U, myUser->getRefCount());
     RoleNameIterator roles = myUser->getRoles();
     ASSERT_EQUALS(RoleName("myRole", "test"), roles.next());
     ASSERT_FALSE(roles.more());
@@ -329,6 +336,9 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
     actions.removeAction(ActionType::find);
     actions.removeAction(ActionType::insert);
     ASSERT(actions.empty());
+
+    // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+    authzManager->releaseUser(myUser);
 }
 
 // These tests ensure that the AuthorizationManager registers a

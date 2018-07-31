@@ -76,6 +76,6 @@ public:
     void revokeAllPrivileges();
 
 private:
-    std::vector<UserHandle> _testUsers;
+    std::vector<std::unique_ptr<User>> _testUsers;
 };
 }  // namespace mongo
