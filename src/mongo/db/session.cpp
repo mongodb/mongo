@@ -1106,6 +1106,10 @@ void Session::_reportTransactionStats(WithLock wl,
         durationCount<Microseconds>(_singleTransactionStats->getTimeInactiveMicros(curTime));
     builder->append("timeActiveMicros", timeActive);
     builder->append("timeInactiveMicros", timeInactive);
+
+    if (_transactionExpireDate) {
+        builder->append("expiryTime", dateToISOStringLocal(*_transactionExpireDate));
+    }
 }
 
 void Session::_checkValid(WithLock) const {
