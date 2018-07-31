@@ -725,6 +725,12 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     const res = assert.commandWorked(sessionDB.runCommand({insert: "test", documents: [{x: 1}]}));
     const operationTime = res.operationTime;
 
+    // Set and save the transaction's lifetime. We will use this later to assert that our
+    // transaction's expiry time is equal to its start time + lifetime.
+    const transactionLifeTime = 10;
+    assert.commandWorked(sessionDB.adminCommand(
+        {setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
+
     const timeBeforeTransactionStarts = new ISODate();
 
     // Start but do not complete a transaction.
@@ -769,6 +775,9 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
               (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
     assert.gte(transactionDocument.timeActiveMicros, 0);
     assert.gte(transactionDocument.timeInactiveMicros, 0);
+    assert.eq(
+        ISODate(transactionDocument.expiryTime).getTime(),
+        ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000);
 
     // Allow the transactions to complete and close the session.
     assert.commandWorked(sessionDB.adminCommand({

@@ -23,6 +23,12 @@
     const res = assert.commandWorked(testDB.runCommand({insert: collName, documents: [{x: 1}]}));
     const operationTime = res.operationTime;
 
+    // Set and save the transaction's lifetime. We will use this later to assert that our
+    // transaction's expiry time is equal to its start time + lifetime.
+    const transactionLifeTime = 10;
+    assert.commandWorked(testDB.adminCommand(
+        {setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
+
     // This will make the transaction hang.
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: 'setInterruptOnlyPlansCheckForInterruptHang', mode: 'alwaysOn'}));
@@ -70,6 +76,9 @@
               (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
     assert.gte(transactionDocument.timeActiveMicros, 0);
     assert.gte(transactionDocument.timeInactiveMicros, 0);
+    assert.eq(
+        ISODate(transactionDocument.expiryTime).getTime(),
+        ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000);
 
     // Now the transaction can proceed.
     assert.commandWorked(testDB.adminCommand(
