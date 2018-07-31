@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -913,17 +914,7 @@ void Session::_abortActiveTransaction(OperationContext* opCtx,
                                       TransactionState::StateSet expectedStates) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    // Only abort the transaction in session if it's in expected states.
-    // When the state of active transaction on session is not expected, it means another
-    // thread has already aborted the transaction on session.
-    if (_txnState.isInSet(lock, expectedStates)) {
-        invariant(opCtx->getTxnNumber() == _activeTxnNumber);
-        _abortTransactionOnSession(lock);
-    }
-
-    // Clean up the transaction resources on opCtx even if the transaction on session has been
-    // aborted.
-    _cleanUpTxnResourceOnOpCtx(opCtx);
+    invariant(!_txnResourceStash);
 
     if (!_txnState.isNone(lock)) {
         // Add the latest operation stats to the aggregate OpDebug object stored in the
@@ -935,11 +926,37 @@ void Session::_abortActiveTransaction(OperationContext* opCtx,
         // Session with this Client's information.
         _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
     }
+
+    // Only abort the transaction in session if it's in expected states.
+    // When the state of active transaction on session is not expected, it means another
+    // thread has already aborted the transaction on session.
+    if (_txnState.isInSet(lock, expectedStates)) {
+        invariant(opCtx->getTxnNumber() == _activeTxnNumber);
+        _abortTransactionOnSession(lock);
+    }
+
+    // Log the transaction if its duration is longer than the slowMS command threshold.
+    _logSlowTransaction(
+        lock, &(opCtx->lockState()->getLockerInfo())->stats, TransactionState::kAborted);
+
+    // Clean up the transaction resources on opCtx even if the transaction on session has been
+    // aborted.
+    _cleanUpTxnResourceOnOpCtx(lock, opCtx);
 }
 
 void Session::_abortTransactionOnSession(WithLock wl) {
+    if (!_txnState.isNone(wl)) {
+        _singleTransactionStats->setEndTime(curTimeMicros64());
+        // The transaction has aborted, so we mark it as inactive.
+        if (_singleTransactionStats->isActive()) {
+            _singleTransactionStats->setInactive(curTimeMicros64());
+        }
+    }
+
     if (_txnResourceStash) {
         // The transaction is stashed, so we abort the inactive transaction on session.
+        _logSlowTransaction(
+            wl, &(_txnResourceStash->locker()->getLockerInfo())->stats, TransactionState::kAborted);
         _txnResourceStash = boost::none;
         ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
     } else {
@@ -954,16 +971,9 @@ void Session::_abortTransactionOnSession(WithLock wl) {
     _speculativeTransactionReadOpTime = repl::OpTime();
     ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
-    if (!_txnState.isNone(wl)) {
-        _singleTransactionStats->setEndTime(curTimeMicros64());
-        // The transaction has aborted, so we mark it as inactive.
-        if (_singleTransactionStats->isActive()) {
-            _singleTransactionStats->setInactive(curTimeMicros64());
-        }
-    }
 }
 
-void Session::_cleanUpTxnResourceOnOpCtx(OperationContext* opCtx) {
+void Session::_cleanUpTxnResourceOnOpCtx(WithLock wl, OperationContext* opCtx) {
     // Reset the WUOW. We should be able to abort empty transactions that don't have WUOW.
     if (opCtx->getWriteUnitOfWork()) {
         opCtx->setWriteUnitOfWork(nullptr);
@@ -1117,10 +1127,6 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     }
     _txnState.transitionTo(lk, TransactionState::kCommitted);
 
-    // We must clear the recovery unit and locker so any post-transaction writes can run without
-    // transactional settings such as a read timestamp.
-    _cleanUpTxnResourceOnOpCtx(opCtx);
-
     ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
     // After the transaction has been committed, we must update the end time and mark it as
     // inactive.
@@ -1137,6 +1143,14 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
     // with this Client's information.
     _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
+
+    // Log the transaction if its duration is longer than the slowMS command threshold.
+    _logSlowTransaction(
+        lk, &(opCtx->lockState()->getLockerInfo())->stats, TransactionState::kCommitted);
+
+    // We must clear the recovery unit and locker so any post-transaction writes can run without
+    // transactional settings such as a read timestamp.
+    _cleanUpTxnResourceOnOpCtx(lk, opCtx);
 }
 
 BSONObj Session::reportStashedState() const {
@@ -1219,12 +1233,11 @@ void Session::_reportTransactionStats(WithLock wl,
     }
 }
 
-std::string Session::transactionInfoForLog(const SingleThreadedLockStats* lockStats) {
-    // Need to lock because this function checks the state of _txnState.
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-
+std::string Session::_transactionInfoForLog(const SingleThreadedLockStats* lockStats,
+                                            TransactionState::StateFlag terminationCause) {
     invariant(lockStats);
-    invariant(_txnState.isCommitted(lg) || _txnState.isAborted(lg));
+    invariant(terminationCause == TransactionState::kCommitted ||
+              terminationCause == TransactionState::kAborted);
 
     StringBuilder s;
 
@@ -1242,8 +1255,9 @@ std::string Session::transactionInfoForLog(const SingleThreadedLockStats* lockSt
 
     s << _singleTransactionStats->getOpDebug()->additiveMetrics.report();
 
-    std::string terminationCause = _txnState.isCommitted(lg) ? "committed" : "aborted";
-    s << " terminationCause:" << terminationCause;
+    std::string terminationCauseString =
+        terminationCause == TransactionState::kCommitted ? "committed" : "aborted";
+    s << " terminationCause:" << terminationCauseString;
 
     auto curTime = curTimeMicros64();
     s << " timeActiveMicros:"
@@ -1265,6 +1279,20 @@ std::string Session::transactionInfoForLog(const SingleThreadedLockStats* lockSt
       << Milliseconds{static_cast<long long>(_singleTransactionStats->getDuration(curTime)) / 1000};
 
     return s.str();
+}
+
+void Session::_logSlowTransaction(WithLock wl,
+                                  const SingleThreadedLockStats* lockStats,
+                                  TransactionState::StateFlag terminationCause) {
+    // Only log multi-document transactions.
+    if (!_txnState.isNone(wl)) {
+        // Log the transaction if its duration is longer than the slowMS command threshold.
+        if (_singleTransactionStats->getDuration(curTimeMicros64()) >
+            serverGlobalParams.slowMS * 1000ULL) {
+            log(logger::LogComponent::kCommand)
+                << _transactionInfoForLog(lockStats, terminationCause);
+        }
+    }
 }
 
 void Session::_checkValid(WithLock) const {

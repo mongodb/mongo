@@ -377,6 +377,12 @@ public:
         return _speculativeTransactionReadOpTime;
     }
 
+    const Locker* getTxnResourceStashLockerForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        invariant(_txnResourceStash);
+        return _txnResourceStash->locker();
+    }
+
     /**
      * If this session is holding stashed locks in _txnResourceStash, reports the current state of
      * the session using the provided builder. Locks the session object's mutex while running.
@@ -396,13 +402,13 @@ public:
      */
     BSONObj reportStashedState() const;
 
-    /**
-     * This method returns a string with information about a slow transaction. The format of the
-     * logging string produced should match the format used for slow operation logging. A
-     * transaction must be completed (committed or aborted) and a valid LockStats reference must be
-     * passed in order for this method to be called.
-     */
-    std::string transactionInfoForLog(const SingleThreadedLockStats* lockStats);
+    std::string transactionInfoForLogForTest(const SingleThreadedLockStats* lockStats,
+                                             bool committed) {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        TransactionState::StateFlag terminationCause =
+            committed ? TransactionState::kCommitted : TransactionState::kAborted;
+        return _transactionInfoForLog(lockStats, terminationCause);
+    }
 
     void addMultikeyPathInfo(MultikeyPathInfo info) {
         _multikeyPathInfo.push_back(std::move(info));
@@ -572,7 +578,7 @@ private:
     void _abortTransactionOnSession(WithLock);
 
     // Clean up the transaction resources unstashed on operation context.
-    void _cleanUpTxnResourceOnOpCtx(OperationContext* opCtx);
+    void _cleanUpTxnResourceOnOpCtx(WithLock wl, OperationContext *opCtx);
 
     // Committing a transaction first changes its state to "Committing*" and writes to the oplog,
     // then it changes the state to "Committed".
@@ -603,6 +609,19 @@ private:
     // Set to true if incomplete history is detected. For example, when the oplog to a write was
     // truncated because it was too old.
     bool _hasIncompleteHistory{false};
+
+    // Logs the transaction information if it has run slower than the global parameter slowMS. The
+    // transaction must be committed or aborted when this function is called.
+    void _logSlowTransaction(WithLock wl,
+                             const SingleThreadedLockStats* lockStats,
+                             TransactionState::StateFlag terminationCause);
+
+    // This method returns a string with information about a slow transaction. The format of the
+    // logging string produced should match the format used for slow operation logging. A
+    // transaction must be completed (committed or aborted) and a valid LockStats reference must be
+    // passed in order for this method to be called.
+    std::string _transactionInfoForLog(const SingleThreadedLockStats* lockStats,
+                                       TransactionState::StateFlag terminationCause);
 
     // Reports transaction stats for both active and inactive transactions using the provided
     // builder.

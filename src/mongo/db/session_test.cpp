@@ -38,6 +38,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
@@ -2884,9 +2885,8 @@ void buildTimeActiveInactiveString(StringBuilder* sb,
 
     // Add time inactive micros to string.
     (*sb) << " timeInactiveMicros:"
-          << session->getSingleTransactionStats()->getDuration(curTime) -
-            durationCount<Microseconds>(
-                 session->getSingleTransactionStats()->getTimeActiveMicros(curTime));
+          << durationCount<Microseconds>(
+                 session->getSingleTransactionStats()->getTimeInactiveMicros(curTime));
 }
 
 
@@ -2947,7 +2947,7 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
 }
 }  // namespace
 
-TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterCommit) {
+TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
@@ -2966,14 +2966,15 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterCommit) {
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
-    std::string testTransactionInfo = session.transactionInfoForLog(&lockerInfo->stats);
+    std::string testTransactionInfo =
+        session.transactionInfoForLogForTest(&lockerInfo->stats, true);
 
     std::string expectedTransactionInfo =
         buildTransactionInfoString(opCtx(), &session, "committed", sessionId, txnNum, metricValue);
     ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
 }
 
-TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterAbort) {
+TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
@@ -2992,29 +2993,15 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterAbort) {
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
-    std::string testTransactionInfo = session.transactionInfoForLog(&lockerInfo->stats);
+    std::string testTransactionInfo =
+        session.transactionInfoForLogForTest(&lockerInfo->stats, false);
 
     std::string expectedTransactionInfo =
         buildTransactionInfoString(opCtx(), &session, "aborted", sessionId, txnNum, metricValue);
     ASSERT_EQ(testTransactionInfo, expectedTransactionInfo);
 }
 
-DEATH_TEST_F(TransactionsMetricsTest, UnterminatedLogTransactionInfoFails, "invariant") {
-    const auto sessionId = makeLogicalSessionIdForTest();
-    Session session(sessionId);
-    session.refreshFromStorageIfNeeded(opCtx());
-
-    const TxnNumber txnNum = 1;
-    opCtx()->setLogicalSessionId(sessionId);
-    opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
-
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
-    ASSERT(lockerInfo);
-    session.transactionInfoForLog(&lockerInfo->stats);
-}
-
-DEATH_TEST_F(TransactionsMetricsTest, noLockerInfoStatsFails, "invariant") {
+DEATH_TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogWithNoLockerInfoStats, "invariant") {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
@@ -3027,7 +3014,97 @@ DEATH_TEST_F(TransactionsMetricsTest, noLockerInfoStatsFails, "invariant") {
     session.unstashTransactionResources(opCtx(), "commitTransaction");
     session.commitUnpreparedTransaction(opCtx());
 
-    session.transactionInfoForLog(nullptr);
+    session.transactionInfoForLogForTest(nullptr, true);
+}
+
+TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
+    // Initialize SingleTransactionStats AdditiveMetrics objects.
+    const int metricValue = 1;
+    setupAdditiveMetrics(metricValue, opCtx());
+
+    session.unstashTransactionResources(opCtx(), "commitTransaction");
+
+    serverGlobalParams.slowMS = 10;
+    sleepmillis(serverGlobalParams.slowMS + 1);
+
+    startCapturingLogMessages();
+    session.commitUnpreparedTransaction(opCtx());
+    stopCapturingLogMessages();
+
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    ASSERT(lockerInfo);
+    std::string expectedTransactionInfo =
+        session.transactionInfoForLogForTest(&lockerInfo->stats, true);
+    ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
+}
+
+TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "abortTransaction");
+    // Initialize SingleTransactionStats AdditiveMetrics objects.
+    const int metricValue = 1;
+    setupAdditiveMetrics(metricValue, opCtx());
+
+    session.unstashTransactionResources(opCtx(), "abortTransaction");
+
+    serverGlobalParams.slowMS = 10;
+    sleepmillis(serverGlobalParams.slowMS + 1);
+
+    startCapturingLogMessages();
+    session.abortActiveTransaction(opCtx());
+    stopCapturingLogMessages();
+
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    ASSERT(lockerInfo);
+    std::string expectedTransactionInfo =
+        session.transactionInfoForLogForTest(&lockerInfo->stats, false);
+    ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
+}
+
+TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "abortTransaction");
+    // Initialize SingleTransactionStats AdditiveMetrics objects.
+    const int metricValue = 1;
+    setupAdditiveMetrics(metricValue, opCtx());
+
+    session.unstashTransactionResources(opCtx(), "insert");
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    session.stashTransactionResources(opCtx());
+    const auto txnResourceStashLocker = session.getTxnResourceStashLockerForTest();
+    ASSERT(txnResourceStashLocker);
+    const auto lockerInfo = txnResourceStashLocker->getLockerInfo();
+
+    serverGlobalParams.slowMS = 10;
+    sleepmillis(serverGlobalParams.slowMS + 1);
+
+    startCapturingLogMessages();
+    session.abortArbitraryTransaction();
+    stopCapturingLogMessages();
+
+    std::string expectedTransactionInfo =
+        session.transactionInfoForLogForTest(&lockerInfo->stats, false);
+    ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
 
 }  // namespace
