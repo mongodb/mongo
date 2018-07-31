@@ -62,7 +62,7 @@ public:
      */
     bool allows(const IndexEntry& entry) const {
         return indexKeyPatterns.find(entry.keyPattern) != indexKeyPatterns.end() ||
-            indexNames.find(entry.name) != indexNames.end();
+            indexNames.find(entry.identifier.catalogName) != indexNames.end();
     }
 
     // These are the index key patterns and names that

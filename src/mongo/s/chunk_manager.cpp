@@ -280,7 +280,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
                           MultikeyPaths{},
                           false /* sparse */,
                           false /* unique */,
-                          "shardkey",
+                          IndexEntry::Identifier{"shardkey"},
                           NULL /* filterExpr */,
                           BSONObj(),
                           NULL /* collator */);

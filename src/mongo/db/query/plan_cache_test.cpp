@@ -835,17 +835,28 @@ protected:
         // The first false means not multikey.
         // The second false means not sparse.
         // The NULL means no filter expression.
-        params.indices.push_back(
-            IndexEntry(keyPattern, multikey, false, false, indexName, NULL, BSONObj()));
+        params.indices.push_back(IndexEntry(keyPattern,
+                                            multikey,
+                                            false,
+                                            false,
+                                            IndexEntry::Identifier{indexName},
+                                            NULL,
+                                            BSONObj()));
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey, bool sparse) {
-        params.indices.push_back(
-            IndexEntry(keyPattern, multikey, sparse, false, indexName, NULL, BSONObj()));
+        params.indices.push_back(IndexEntry(keyPattern,
+                                            multikey,
+                                            sparse,
+                                            false,
+                                            IndexEntry::Identifier{indexName},
+                                            NULL,
+                                            BSONObj()));
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, CollatorInterface* collator) {
-        IndexEntry entry(keyPattern, false, false, false, indexName, NULL, BSONObj());
+        IndexEntry entry(
+            keyPattern, false, false, false, IndexEntry::Identifier{indexName}, NULL, BSONObj());
         entry.collator = collator;
         params.indices.push_back(entry);
     }
@@ -1257,6 +1268,41 @@ TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
     runQuery(query);
     assertPlanCacheRecoversSolution(query,
                                     "{fetch: {node: {ixscan: {pattern: {a: '2dsphere', b: 1}}}}}");
+}
+
+// $** index
+TEST_F(CachePlanSelectionTest, AllPathsIxScan) {
+    params.indices.push_back(IndexEntry(BSON("$**" << 1),
+                                        IndexNames::ALLPATHS,
+                                        false,  // multikey
+                                        {},     // multikey paths
+                                        true,   // sparse
+                                        false,  // unique
+                                        IndexEntry::Identifier{"anIndex"},
+                                        nullptr,
+                                        BSONObj(),
+                                        nullptr));
+    BSONObj query = fromjson("{a: 1, b: 1}");
+    runQuery(query);
+
+    const auto kPlanA =
+        "{fetch: {node: {ixscan: "
+        "{bounds: {$_path: [['a', 'a', true, true]], a: [[1, 1, true, true]]},"
+        "pattern: {$_path: 1, a:1}}}}}";
+
+    const auto kPlanB =
+        "{fetch: {node: {ixscan: "
+        "{bounds: {$_path: [['b', 'b', true, true]], b: [[1, 1, true, true]]},"
+        "pattern: {$_path: 1, b:1}}}}}";
+
+    assertPlanCacheRecoversSolution(query, kPlanA);
+    assertPlanCacheRecoversSolution(query, kPlanB);
+
+    // Query with fields in a different order, so that index entry expansion results in the list of
+    // indexes being in a different order. Should still yield the same plans.
+    BSONObj queryOtherDir = fromjson("{b: 1, a: 1}");
+    assertPlanCacheRecoversSolution(query, kPlanA);
+    assertPlanCacheRecoversSolution(query, kPlanB);
 }
 
 //
@@ -1818,11 +1864,11 @@ TEST(PlanCacheTest, ComputeKeyRegexDependsOnFlags) {
 TEST(PlanCacheTest, ComputeKeySparseIndex) {
     PlanCache planCache;
     planCache.notifyOfIndexEntries({IndexEntry(BSON("a" << 1),
-                                               false,    // multikey
-                                               true,     // sparse
-                                               false,    // unique
-                                               "",       // name
-                                               nullptr,  // filterExpr
+                                               false,                       // multikey
+                                               true,                        // sparse
+                                               false,                       // unique
+                                               IndexEntry::Identifier{""},  // name
+                                               nullptr,                     // filterExpr
                                                BSONObj())});
 
     unique_ptr<CanonicalQuery> cqEqNumber(canonicalize("{a: 0}}"));
@@ -1846,10 +1892,10 @@ TEST(PlanCacheTest, ComputeKeyPartialIndex) {
 
     PlanCache planCache;
     planCache.notifyOfIndexEntries({IndexEntry(BSON("a" << 1),
-                                               false,  // multikey
-                                               false,  // sparse
-                                               false,  // unique
-                                               "",     // name
+                                               false,                       // multikey
+                                               false,                       // sparse
+                                               false,                       // unique
+                                               IndexEntry::Identifier{""},  // name
                                                filterExpr.get(),
                                                BSONObj())});
 
@@ -1870,11 +1916,11 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
 
     PlanCache planCache;
     IndexEntry entry(BSON("a" << 1),
-                     false,    // multikey
-                     false,    // sparse
-                     false,    // unique
-                     "",       // name
-                     nullptr,  // filterExpr
+                     false,                       // multikey
+                     false,                       // sparse
+                     false,                       // unique
+                     IndexEntry::Identifier{""},  // name
+                     nullptr,                     // filterExpr
                      BSONObj());
     entry.collator = &collator;
     planCache.notifyOfIndexEntries({entry});
@@ -1917,6 +1963,68 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
     // the index.
     ASSERT_EQ(planCache.computeKey(*inNoStrings),
               planCache.computeKey(*inContainsStringHasCollation));
+}
+
+TEST(PlanCacheTest, ComputeKeyAllPathsIndex) {
+    PlanCache planCache;
+    IndexEntry entry(BSON("a.$**" << 1),
+                     false,                       // multikey
+                     false,                       // sparse
+                     false,                       // unique
+                     IndexEntry::Identifier{""},  // name
+                     nullptr,                     // filterExpr
+                     BSONObj());
+    planCache.notifyOfIndexEntries({entry});
+
+    // Used to check that two queries have the same shape when no indexes are present.
+    PlanCache planCacheWithNoIndexes;
+
+    // Compatible with index.
+    unique_ptr<CanonicalQuery> usesPathWithScalar(canonicalize("{a: 'abcdef'}"));
+    unique_ptr<CanonicalQuery> usesPathWithEmptyArray(canonicalize("{a: []}"));
+
+    // Not compatible with index.
+    unique_ptr<CanonicalQuery> usesPathWithObject(canonicalize("{a: {b: 'abc'}}"));
+    unique_ptr<CanonicalQuery> usesPathWithArray(canonicalize("{a: [1, 2]}"));
+    unique_ptr<CanonicalQuery> usesPathWithArrayContainingObject(canonicalize("{a: [1, {b: 1}]}"));
+    unique_ptr<CanonicalQuery> usesPathWithEmptyObject(canonicalize("{a: {}}"));
+    unique_ptr<CanonicalQuery> doesNotUsePath(canonicalize("{b: 1234}"));
+
+    // Check that the queries which are compatible with the index have the same key.
+    ASSERT_EQ(planCache.computeKey(*usesPathWithScalar),
+              planCache.computeKey(*usesPathWithEmptyArray));
+
+    // Check that the queries which have the same path as the index, but aren't supported, have
+    // different keys.
+    ASSERT_EQ(planCacheWithNoIndexes.computeKey(*usesPathWithScalar),
+              planCacheWithNoIndexes.computeKey(*usesPathWithObject));
+    ASSERT_NE(planCache.computeKey(*usesPathWithScalar), planCache.computeKey(*usesPathWithObject));
+
+    ASSERT_EQ(planCache.computeKey(*usesPathWithObject), planCache.computeKey(*usesPathWithArray));
+    ASSERT_EQ(planCache.computeKey(*usesPathWithObject),
+              planCache.computeKey(*usesPathWithArrayContainingObject));
+    ASSERT_EQ(planCache.computeKey(*usesPathWithObject),
+              planCache.computeKey(*usesPathWithEmptyObject));
+
+    // The query on 'b' should have a completely different plan cache key (both with and without an
+    // allPaths index).
+    ASSERT_NE(planCacheWithNoIndexes.computeKey(*usesPathWithScalar),
+              planCacheWithNoIndexes.computeKey(*doesNotUsePath));
+    ASSERT_NE(planCache.computeKey(*usesPathWithScalar), planCache.computeKey(*doesNotUsePath));
+    ASSERT_NE(planCacheWithNoIndexes.computeKey(*usesPathWithObject),
+              planCacheWithNoIndexes.computeKey(*doesNotUsePath));
+    ASSERT_NE(planCache.computeKey(*usesPathWithObject), planCache.computeKey(*doesNotUsePath));
+
+    // More complex queries with similar shapes. This is to ensure that plan cache key encoding
+    // correctly traverses the expression tree.
+    auto orQueryAllowed = canonicalize("{$or: [{a: 3}, {a: {$gt: [1,2]}}]}");
+    // Same shape except 'a' is compared to an object.
+    auto orQueryNotAllowed = canonicalize("{$or: [{a: {someobject: 1}}, {a: {$gt: [1,2]}}]}");
+    // The two queries should have the same shape when no indexes are present, but different shapes
+    // when a $** index is present.
+    ASSERT_EQ(planCacheWithNoIndexes.computeKey(*orQueryAllowed),
+              planCacheWithNoIndexes.computeKey(*orQueryNotAllowed));
+    ASSERT_NE(planCache.computeKey(*orQueryAllowed), planCache.computeKey(*orQueryNotAllowed));
 }
 
 }  // namespace

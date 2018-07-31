@@ -42,9 +42,6 @@ namespace mongo {
 
 class WorkingSet;
 
-// TODO SERVER-35333: when we have a means of uniquely identifying each $** sub-index generated
-// during planning, 'indexName' should change to be the unique ID for the specific sub-index used in
-// this solution.
 struct IndexScanParams {
     IndexScanParams(const IndexDescriptor& descriptor,
                     std::string indexName,

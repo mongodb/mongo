@@ -1102,7 +1102,7 @@ TEST(IndexBoundsBuilderTest, ExistsTrueSparse) {
                                       false,  // multikey
                                       true,   // sparse
                                       false,  // unique
-                                      "exists_true_sparse",
+                                      IndexEntry::Identifier{"exists_true_sparse"},
                                       nullptr,  // filterExpr
                                       BSONObj());
     BSONObj obj = fromjson("{a: {$exists: true}}");

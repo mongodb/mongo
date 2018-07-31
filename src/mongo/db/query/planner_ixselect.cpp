@@ -56,7 +56,7 @@ std::size_t numPathComponents(StringData path) {
 }
 
 /**
- * Given a single allPaths index, and a set of fields which are being queried, create 'mock'
+ * Given a single allPaths index, and a set of fields which are being queried, create a virtual
  * IndexEntry for each of the appropriate fields.
  */
 void expandIndex(const IndexEntry& allPathsIndex,
@@ -77,10 +77,7 @@ void expandIndex(const IndexEntry& allPathsIndex,
                          {},     // multikey paths
                          true,   // sparse
                          false,  // unique
-                         // TODO: SERVER-35333: for plan caching to work, each IndexEntry must have
-                         // a unique name. We violate that requirement here by giving each
-                         // "expanded" index the same name. This must be fixed.
-                         allPathsIndex.name,
+                         {allPathsIndex.identifier.catalogName, fieldName},
                          allPathsIndex.filterExpr,
                          allPathsIndex.infoObj,
                          allPathsIndex.collator);
@@ -265,24 +262,37 @@ void QueryPlannerIXSelect::getFields(const MatchExpression* node,
     }
 }
 
+void QueryPlannerIXSelect::getFields(const MatchExpression* node,
+                                     stdx::unordered_set<string>* out) {
+    getFields(node, "", out);
+}
+
 // static
 void QueryPlannerIXSelect::findRelevantIndices(const stdx::unordered_set<std::string>& fields,
                                                const std::vector<IndexEntry>& allIndices,
                                                std::vector<IndexEntry>* out) {
     for (auto&& entry : allIndices) {
-        if (entry.type == INDEX_ALLPATHS) {
-            // Should only have one field of the form {"$**" : 1}.
-            invariant(entry.keyPattern.nFields() == 1);
-            expandIndex(entry, fields, out);
-            continue;
-        }
-
         BSONObjIterator it(entry.keyPattern);
         BSONElement elt = it.next();
         if (fields.end() != fields.find(elt.fieldName())) {
             out->push_back(entry);
         }
     }
+}
+
+std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(
+    const stdx::unordered_set<std::string>& fields, const std::vector<IndexEntry>& allIndexes) {
+    std::vector<IndexEntry> out;
+    for (auto&& entry : allIndexes) {
+        if (entry.type == IndexType::INDEX_ALLPATHS) {
+            // Should only have one field of the form {"path.$**" : 1} or {"$**" : 1}.
+            invariant(entry.keyPattern.nFields() == 1);
+            expandIndex(entry, fields, &out);
+        } else {
+            out.push_back(entry);
+        }
+    }
+    return out;
 }
 
 // static

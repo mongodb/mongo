@@ -426,8 +426,13 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
 
     // Create a plan cache. Add an index so that indexability is included in the plan cache keys.
     PlanCache planCache;
-    planCache.notifyOfIndexEntries(
-        {IndexEntry(fromjson("{a: 1}"), false, false, false, "index_name", NULL, BSONObj())});
+    planCache.notifyOfIndexEntries({IndexEntry(fromjson("{a: 1}"),
+                                               false,
+                                               false,
+                                               false,
+                                               IndexEntry::Identifier{"index_name"},
+                                               NULL,
+                                               BSONObj())});
 
     // Inject query shapes with and without collation into plan cache.
     addQueryShapeToPlanCache(
@@ -494,17 +499,27 @@ TEST(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
 
 TEST(IndexFilterCommandsTest, SetFilterAcceptsIndexNames) {
     CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
-    IndexEntry collatedIndex(
-        fromjson("{a: 1}"), false, false, false, "a_1:rev", nullptr, BSONObj());
+    IndexEntry collatedIndex(fromjson("{a: 1}"),
+                             false,
+                             false,
+                             false,
+                             IndexEntry::Identifier{"a_1:rev"},
+                             nullptr,
+                             BSONObj());
     collatedIndex.collator = &reverseCollator;
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     QuerySettings querySettings;
 
     PlanCache planCache;
-    planCache.notifyOfIndexEntries(
-        {IndexEntry(fromjson("{a: 1}"), false, false, false, "a_1", nullptr, BSONObj()),
-         collatedIndex});
+    planCache.notifyOfIndexEntries({IndexEntry(fromjson("{a: 1}"),
+                                               false,
+                                               false,
+                                               false,
+                                               IndexEntry::Identifier{"a_1"},
+                                               nullptr,
+                                               BSONObj()),
+                                    collatedIndex});
 
     addQueryShapeToPlanCache(opCtx.get(), &planCache, "{a: 2}", "{}", "{}", "{}");
     ASSERT_TRUE(planCacheContains(opCtx.get(), planCache, "{a: 2}", "{}", "{}", "{}"));

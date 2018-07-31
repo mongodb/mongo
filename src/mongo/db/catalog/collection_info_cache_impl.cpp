@@ -143,7 +143,7 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
         const MatchExpression* filter = entry->getFilterExpression();
         if (filter) {
             stdx::unordered_set<std::string> paths;
-            QueryPlannerIXSelect::getFields(filter, "", &paths);
+            QueryPlannerIXSelect::getFields(filter, &paths);
             for (auto it = paths.begin(); it != paths.end(); ++it) {
                 _indexedPaths.addPath(*it);
             }
@@ -207,7 +207,7 @@ void CollectionInfoCacheImpl::updatePlanCacheIndexEntries(OperationContext* opCt
                                   ice->getMultikeyPaths(opCtx),
                                   desc->isSparse(),
                                   desc->unique(),
-                                  desc->indexName(),
+                                  IndexEntry::Identifier{desc->indexName()},
                                   ice->getFilterExpression(),
                                   desc->infoObj(),
                                   ice->getCollator());

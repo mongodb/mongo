@@ -89,17 +89,22 @@ public:
         return applyTransformation(Document{inputDoc}).toBson();
     }
 
+    bool applyProjectionToOneField(StringData field) const {
+        MutableDocument doc;
+        const FieldPath f{field};
+        doc.setNestedField(f, Value(1.0));
+        const Document transformedDoc = applyTransformation(doc.freeze());
+        return !transformedDoc.getNestedField(f).missing();
+    }
+
     stdx::unordered_set<std::string> applyProjectionToFields(
         const stdx::unordered_set<std::string>& fields) const {
         stdx::unordered_set<std::string> out;
 
         for (const auto& field : fields) {
-            MutableDocument doc;
-            const FieldPath f = FieldPath(field);
-            doc.setNestedField(f, Value(1.0));
-            const Document transformedDoc = applyTransformation(doc.freeze());
-            if (!(transformedDoc.getNestedField(f).missing()))
+            if (applyProjectionToOneField(field)) {
                 out.insert(field);
+            }
         }
 
         return out;
@@ -135,6 +140,10 @@ ProjectionExecAgg::ProjectionType ProjectionExecAgg::getType() const {
 
 BSONObj ProjectionExecAgg::applyProjection(BSONObj inputDoc) const {
     return _exec->applyProjection(inputDoc);
+}
+
+bool ProjectionExecAgg::applyProjectionToOneField(StringData field) const {
+    return _exec->applyProjectionToOneField(field);
 }
 
 stdx::unordered_set<std::string> ProjectionExecAgg::applyProjectionToFields(

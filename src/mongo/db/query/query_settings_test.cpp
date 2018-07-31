@@ -48,8 +48,20 @@ namespace {
 TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
     SimpleBSONObjComparator bsonCmp;
     AllowedIndicesFilter filter(bsonCmp.makeBSONObjSet({fromjson("{a:1}")}), {"a_1"});
-    IndexEntry a_idx(fromjson("{a:1, b:1}"), false, false, false, "a_1", nullptr, BSONObj());
-    IndexEntry ab_idx(fromjson("{a:1, b:1}"), false, false, false, "a_1:2", nullptr, BSONObj());
+    IndexEntry a_idx(fromjson("{a:1, b:1}"),
+                     false,
+                     false,
+                     false,
+                     IndexEntry::Identifier{"a_1"},
+                     nullptr,
+                     BSONObj());
+    IndexEntry ab_idx(fromjson("{a:1, b:1}"),
+                      false,
+                      false,
+                      false,
+                      IndexEntry::Identifier{"a_1:2"},
+                      nullptr,
+                      BSONObj());
 
     ASSERT_TRUE(filter.allows(a_idx));
     ASSERT_FALSE(filter.allows(ab_idx));
@@ -58,8 +70,15 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
 TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByKeyPattern) {
     SimpleBSONObjComparator bsonCmp;
     AllowedIndicesFilter filter(bsonCmp.makeBSONObjSet({fromjson("{a:1}")}), {"a"});
-    IndexEntry a_idx(fromjson("{a:1}"), false, false, false, "foo", nullptr, BSONObj());
-    IndexEntry ab_idx(fromjson("{a:1, b:1}"), false, false, false, "bar", nullptr, BSONObj());
+    IndexEntry a_idx(
+        fromjson("{a:1}"), false, false, false, IndexEntry::Identifier{"foo"}, nullptr, BSONObj());
+    IndexEntry ab_idx(fromjson("{a:1, b:1}"),
+                      false,
+                      false,
+                      false,
+                      IndexEntry::Identifier{"bar"},
+                      nullptr,
+                      BSONObj());
 
     ASSERT_TRUE(filter.allows(a_idx));
     ASSERT_FALSE(filter.allows(ab_idx));

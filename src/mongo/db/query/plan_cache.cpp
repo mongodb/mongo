@@ -49,7 +49,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
@@ -310,6 +309,37 @@ void encodeGeoNearMatchExpression(const GeoNearMatchExpression* tree, StringBuil
     }
 }
 
+void encodeIndexabilityForDiscriminators(const MatchExpression* tree,
+                                         const IndexToDiscriminatorMap& discriminators,
+                                         StringBuilder* keyBuilder) {
+    for (auto&& indexAndDiscriminatorPair : discriminators) {
+        *keyBuilder << indexAndDiscriminatorPair.second.isMatchCompatibleWithIndex(tree);
+    }
+}
+
+void encodeIndexability(const MatchExpression* tree,
+                        const PlanCacheIndexabilityState& indexabilityState,
+                        StringBuilder* keyBuilder) {
+    if (tree->path().empty()) {
+        return;
+    }
+
+    const IndexToDiscriminatorMap& discriminators =
+        indexabilityState.getDiscriminators(tree->path());
+    IndexToDiscriminatorMap allPathsDiscriminators =
+        indexabilityState.buildAllPathsDiscriminators(tree->path());
+    if (discriminators.empty() && allPathsDiscriminators.empty()) {
+        return;
+    }
+
+    *keyBuilder << kEncodeDiscriminatorsBegin;
+    // For each discriminator on this path, append the character '0' or '1'.
+    encodeIndexabilityForDiscriminators(tree, discriminators, keyBuilder);
+    encodeIndexabilityForDiscriminators(tree, allPathsDiscriminators, keyBuilder);
+
+    *keyBuilder << kEncodeDiscriminatorsEnd;
+}
+
 }  // namespace
 
 //
@@ -493,7 +523,7 @@ std::string PlanCacheIndexTree::toString(int indents) const {
     } else {
         result << std::string(3 * indents, '-') << "Leaf ";
         if (NULL != entry.get()) {
-            result << entry->name << ", pos: " << index_pos << ", can combine? "
+            result << entry->identifier << ", pos: " << index_pos << ", can combine? "
                    << canCombineBounds;
         }
         for (const auto& orPushdown : orPushdowns) {
@@ -506,7 +536,7 @@ std::string PlanCacheIndexTree::toString(int indents) const {
                 firstPosition = false;
                 result << position;
             }
-            result << ": " << orPushdown.indexName << ", pos: " << orPushdown.position
+            result << ": " << orPushdown.indexEntryId << " pos: " << orPushdown.position
                    << ", can combine? " << orPushdown.canCombineBounds << ". ";
         }
         result << '\n';
@@ -601,17 +631,7 @@ void PlanCache::encodeKeyForMatch(const MatchExpression* tree, StringBuilder* ke
         encodeUserString(flags, keyBuilder);
     }
 
-    // Encode indexability.
-    const IndexToDiscriminatorMap& discriminators =
-        _indexabilityState.getDiscriminators(tree->path());
-    if (!discriminators.empty()) {
-        *keyBuilder << kEncodeDiscriminatorsBegin;
-        // For each discriminator on this path, append the character '0' or '1'.
-        for (auto&& indexAndDiscriminatorPair : discriminators) {
-            *keyBuilder << indexAndDiscriminatorPair.second.isMatchCompatibleWithIndex(tree);
-        }
-        *keyBuilder << kEncodeDiscriminatorsEnd;
-    }
+    encodeIndexability(tree, _indexabilityState, keyBuilder);
 
     // Traverse child nodes.
     // Enclose children in [].

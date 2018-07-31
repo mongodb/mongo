@@ -46,9 +46,14 @@ public:
     /**
      * Return all the fields in the tree rooted at 'node' that we can use an index on
      * in order to answer the query.
+     */
+    static void getFields(const MatchExpression* node, stdx::unordered_set<std::string>* out);
+
+    /**
+     * Similar to other getFields() method, but with 'prefix' argument which is a path prefix to be
+     * prepended to any fields mentioned in predicates encountered.
      *
-     * The 'prefix' argument is a path prefix to be prepended to any fields mentioned in
-     * predicates encountered.  Some array operators specify a path prefix.
+     * Public for testing.
      */
     static void getFields(const MatchExpression* node,
                           std::string prefix,
@@ -133,6 +138,13 @@ public:
     static void stripUnneededAssignments(MatchExpression* node,
                                          const std::vector<IndexEntry>& indices);
 
+    /**
+     * Given a list of IndexEntries and fields used by a query's match expression, return a list
+     * "expanded" indexes (where the $** indexes in the given list have been expanded).
+     */
+    static std::vector<IndexEntry> expandIndexes(const stdx::unordered_set<std::string>& fields,
+                                                 const std::vector<IndexEntry>& allIndexes);
+
 private:
     /**
      * Used to keep track of if any $elemMatch predicates were encountered when walking a
@@ -160,6 +172,7 @@ private:
                              const std::vector<IndexEntry>& indices,
                              const CollatorInterface* collator,
                              const ElemMatchContext& elemMatchContext);
+
     /**
      * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
      * invalid assignments to text indexes.

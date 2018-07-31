@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/exec/projection_exec_agg.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/string_map.h"
 
@@ -89,10 +90,16 @@ public:
      * Returns a map from index name to discriminator for each index associated with 'path'.
      * Returns an empty set if no discriminators are registered for 'path'.
      *
-     * The object returned by reference is valid until the next call to updateDiscriminators()
-     * or until destruction of 'this', whichever is first.
+     * The object returned by reference is valid until the next call to updateDiscriminators() or
+     * until destruction of 'this', whichever is first.
      */
     const IndexToDiscriminatorMap& getDiscriminators(StringData path) const;
+
+    /**
+     * Construct an IndexToDiscriminator map for the given path, only for the allPaths indexes
+     * which have been included in the indexability state.
+     */
+    IndexToDiscriminatorMap buildAllPathsDiscriminators(StringData path) const;
 
     /**
      * Clears discriminators for all paths, and regenerate them from 'indexEntries'.
@@ -100,6 +107,31 @@ public:
     void updateDiscriminators(const std::vector<IndexEntry>& indexEntries);
 
 private:
+    using PathDiscriminatorsMap = StringMap<IndexToDiscriminatorMap>;
+
+    /**
+     * A $** index may index an infinite number of fields. We cannot just store a discriminator for
+     * every possible field that it indexes, so we have to maintain some special context about the
+     * index.
+     */
+    struct AllPathsIndexDiscriminatorContext {
+        AllPathsIndexDiscriminatorContext(std::unique_ptr<ProjectionExecAgg> proj,
+                                          std::string name,
+                                          const MatchExpression* filter,
+                                          const CollatorInterface* coll)
+            : projectionExec(std::move(proj)),
+              catalogName(std::move(name)),
+              filterExpr(filter),
+              collator(coll) {}
+
+        std::unique_ptr<ProjectionExecAgg> projectionExec;
+        std::string catalogName;
+
+        // These are owned by the catalog.
+        const MatchExpression* filterExpr;  // For partial indexes.
+        const CollatorInterface* collator;
+    };
+
     /**
      * Adds sparse index discriminators for the sparse index with the given key pattern to
      * '_pathDiscriminatorsMap'.
@@ -136,10 +168,16 @@ private:
                                const CollatorInterface* collator);
 
     /**
-     * PathDiscriminatorsMap is a map from field path to index name to IndexabilityDiscriminator.
+     * Adds special state for a $** index. When the discriminators are retrieved for a certain
+     * path, appropriate discriminators for the allPaths index will be included if it includes the
+     * given path.
      */
-    using PathDiscriminatorsMap = StringMap<IndexToDiscriminatorMap>;
+    void processAllPathsIndex(const IndexEntry& ie);
+
+    // PathDiscriminatorsMap is a map from field path to index name to IndexabilityDiscriminator.
     PathDiscriminatorsMap _pathDiscriminatorsMap;
+
+    std::vector<AllPathsIndexDiscriminatorContext> _allPathsIndexDiscriminators;
 };
 
 }  // namespace mongo

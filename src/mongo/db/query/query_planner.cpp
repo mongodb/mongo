@@ -38,6 +38,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/index/all_paths_key_generator.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -314,11 +315,6 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
             return Status(ErrorCodes::BadValue, "can't cache '2d' index");
         }
 
-        // TODO SERVER-35333: AllPaths indexes cannot currently be cached.
-        if (relevantIndices[itag->index].type == IndexType::INDEX_ALLPATHS) {
-            return Status(ErrorCodes::BadValue, "can't cache 'allPaths' index");
-        }
-
         IndexEntry* ientry = new IndexEntry(relevantIndices[itag->index]);
         indexTree->entry.reset(ientry);
         indexTree->index_pos = itag->pos;
@@ -334,11 +330,6 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
                 return Status(ErrorCodes::BadValue, "can't cache '2d' index");
             }
 
-            // TODO SERVER-35333: AllPaths indexes cannot currently be cached.
-            if (relevantIndices[itag->index].type == IndexType::INDEX_ALLPATHS) {
-                return Status(ErrorCodes::BadValue, "can't cache 'allPaths' index");
-            }
-
             std::unique_ptr<IndexEntry> indexEntry =
                 stdx::make_unique<IndexEntry>(relevantIndices[itag->index]);
             indexTree->entry.reset(indexEntry.release());
@@ -347,12 +338,11 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
         }
 
         for (const auto& dest : orPushdownTag->getDestinations()) {
-            PlanCacheIndexTree::OrPushdown orPushdown;
-            orPushdown.route = dest.route;
             IndexTag* indexTag = static_cast<IndexTag*>(dest.tagData.get());
-            orPushdown.indexName = relevantIndices[indexTag->index].name;
-            orPushdown.position = indexTag->pos;
-            orPushdown.canCombineBounds = indexTag->canCombineBounds;
+            PlanCacheIndexTree::OrPushdown orPushdown{relevantIndices[indexTag->index].identifier,
+                                                      indexTag->pos,
+                                                      indexTag->canCombineBounds,
+                                                      dest.route};
             indexTree->orPushdowns.push_back(std::move(orPushdown));
         }
     }
@@ -372,7 +362,7 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
 // static
 Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
                                          const PlanCacheIndexTree* const indexTree,
-                                         const map<StringData, size_t>& indexMap) {
+                                         const map<IndexEntry::Identifier, size_t>& indexMap) {
     if (NULL == filter) {
         return Status(ErrorCodes::BadValue, "Cannot tag tree: filter is NULL.");
     }
@@ -404,11 +394,10 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
         filter->setTag(new OrPushdownTag());
         OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(filter->getTag());
         for (const auto& orPushdown : indexTree->orPushdowns) {
-            auto index = indexMap.find(orPushdown.indexName);
+            auto index = indexMap.find(orPushdown.indexEntryId);
             if (index == indexMap.end()) {
                 return Status(ErrorCodes::BadValue,
-                              str::stream() << "Did not find index with name: "
-                                            << orPushdown.indexName);
+                              str::stream() << "Did not find index: " << orPushdown.indexEntryId);
             }
             OrPushdownTag::Destination dest;
             dest.route = orPushdown.route;
@@ -419,10 +408,10 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
     }
 
     if (indexTree->entry.get()) {
-        map<StringData, size_t>::const_iterator got = indexMap.find(indexTree->entry->name);
+        const auto got = indexMap.find(indexTree->entry->identifier);
         if (got == indexMap.end()) {
             mongoutils::str::stream ss;
-            ss << "Did not find index with name: " << indexTree->entry->name;
+            ss << "Did not find index with name: " << indexTree->entry->identifier.catalogName;
             return Status(ErrorCodes::BadValue, ss);
         }
         if (filter->getTag()) {
@@ -483,14 +472,19 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
            << redact(clone->toString()) << "Cache data:" << endl
            << redact(winnerCacheData.toString());
 
+    stdx::unordered_set<string> fields;
+    QueryPlannerIXSelect::getFields(query.root(), &fields);
+    std::vector<IndexEntry> expandedIndexes =
+        QueryPlannerIXSelect::expandIndexes(fields, params.indices);
+
     // Map from index name to index number.
-    // TODO: can we assume that the index numbering has the same lifetime
-    // as the cache state?
-    map<StringData, size_t> indexMap;
-    for (size_t i = 0; i < params.indices.size(); ++i) {
-        const IndexEntry& ie = params.indices[i];
-        indexMap[ie.name] = i;
-        LOG(5) << "Index " << i << ": " << ie.name;
+    map<IndexEntry::Identifier, size_t> indexMap;
+    for (size_t i = 0; i < expandedIndexes.size(); ++i) {
+        const IndexEntry& ie = expandedIndexes[i];
+        const auto insertionRes = indexMap.insert(std::make_pair(ie.identifier, i));
+        // Be sure the key was not already in the map.
+        invariant(insertionRes.second);
+        LOG(5) << "Index " << i << ": " << ie.identifier;
     }
 
     Status s = tagAccordingToCache(clone.get(), winnerCacheData.tree.get(), indexMap);
@@ -505,7 +499,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
 
     // Use the cached index assignments to build solnRoot.
     std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
-        query, std::move(clone), params.indices, params));
+        query, std::move(clone), expandedIndexes, params));
 
     if (!solnRoot) {
         return Status(ErrorCodes::BadValue,
@@ -582,12 +576,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // Figure out what fields we care about.
     stdx::unordered_set<string> fields;
-    QueryPlannerIXSelect::getFields(query.root(), "", &fields);
+    QueryPlannerIXSelect::getFields(query.root(), &fields);
 
     for (stdx::unordered_set<string>::const_iterator it = fields.begin(); it != fields.end();
          ++it) {
         LOG(5) << "Predicate over field '" << *it << "'";
     }
+
+    vector<IndexEntry> expandedIndexes =
+        QueryPlannerIXSelect::expandIndexes(fields, params.indices);
 
     // Filter our indices so we only look at indices that are over our predicates.
     vector<IndexEntry> relevantIndices;
@@ -604,14 +601,14 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     boost::optional<size_t> hintIndexNumber;
 
     if (hintIndex.isEmpty()) {
-        QueryPlannerIXSelect::findRelevantIndices(fields, params.indices, &relevantIndices);
+        QueryPlannerIXSelect::findRelevantIndices(fields, expandedIndexes, &relevantIndices);
     } else {
         // Sigh.  If the hint is specified it might be using the index name.
         BSONElement firstHintElt = hintIndex.firstElement();
         if (str::equals("$hint", firstHintElt.fieldName()) && String == firstHintElt.type()) {
             string hintName = firstHintElt.String();
             for (size_t i = 0; i < params.indices.size(); ++i) {
-                if (params.indices[i].name == hintName) {
+                if (params.indices[i].identifier.catalogName == hintName) {
                     LOG(5) << "Hint by name specified, restricting indices to "
                            << params.indices[i].keyPattern.toString();
                     relevantIndices.clear();

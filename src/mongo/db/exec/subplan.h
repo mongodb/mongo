@@ -196,7 +196,7 @@ private:
     std::vector<std::unique_ptr<BranchPlanningResult>> _branchResults;
 
     // We need this to extract cache-friendly index data from the index assignments.
-    std::map<StringData, size_t> _indexMap;
+    std::map<IndexEntry::Identifier, size_t> _indexMap;
 };
 
 }  // namespace mongo

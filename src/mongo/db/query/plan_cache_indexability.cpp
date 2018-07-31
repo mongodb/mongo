@@ -32,6 +32,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/index/all_paths_key_generator.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_internal_expr_eq.h"
@@ -44,22 +45,92 @@
 
 namespace mongo {
 
+namespace {
+
+bool canUseAllPathsIndex(BSONElement elt, MatchExpression::MatchType matchType) {
+    if (elt.type() == BSONType::Object) {
+        return false;
+    }
+
+    if (elt.type() == BSONType::Array) {
+        // We only support equality to empty array.
+        return elt.embeddedObject().isEmpty() && matchType == MatchExpression::EQ;
+    }
+
+    return true;
+}
+
+bool supportedByAllPathsIndex(const MatchExpression* queryExpr) {
+    if (ComparisonMatchExpression::isComparisonMatchExpression(queryExpr)) {
+        const ComparisonMatchExpression* cmpExpr =
+            static_cast<const ComparisonMatchExpression*>(queryExpr);
+
+        return canUseAllPathsIndex(cmpExpr->getData(), cmpExpr->matchType());
+    } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
+        const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
+
+        return std::all_of(
+            queryExprIn->getEqualities().begin(),
+            queryExprIn->getEqualities().end(),
+            [](const BSONElement& elt) { return canUseAllPathsIndex(elt, MatchExpression::EQ); });
+    }
+
+    return true;
+};
+
+bool supportedBySparseIndex(const MatchExpression* queryExpr) {
+    if (queryExpr->matchType() == MatchExpression::EQ) {
+        const auto* queryExprEquality = static_cast<const EqualityMatchExpression*>(queryExpr);
+        return !queryExprEquality->getData().isNull();
+    } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
+        const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
+        return !queryExprIn->hasNull();
+    } else {
+        return true;
+    }
+};
+
+IndexabilityDiscriminator getPartialIndexDiscriminator(const MatchExpression* filterExpr) {
+    return [filterExpr](const MatchExpression* queryExpr) {
+        return expression::isSubsetOf(queryExpr, filterExpr);
+    };
+}
+
+IndexabilityDiscriminator getCollatedIndexDiscriminator(const CollatorInterface* collator) {
+    return [collator](const MatchExpression* queryExpr) {
+        if (const auto* queryExprComparison =
+                dynamic_cast<const ComparisonMatchExpressionBase*>(queryExpr)) {
+            const bool collatorsMatch =
+                CollatorInterface::collatorsMatch(queryExprComparison->getCollator(), collator);
+            const bool isCollatableType =
+                CollationIndexKey::isCollatableType(queryExprComparison->getData().type());
+            return collatorsMatch || !isCollatableType;
+        }
+
+        if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
+            const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
+            if (CollatorInterface::collatorsMatch(queryExprIn->getCollator(), collator)) {
+                return true;
+            }
+            for (const auto& equality : queryExprIn->getEqualities()) {
+                if (CollationIndexKey::isCollatableType(equality.type())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // The predicate never compares strings so it is not affected by collation.
+        return true;
+    };
+}
+}
+
 void PlanCacheIndexabilityState::processSparseIndex(const std::string& indexName,
                                                     const BSONObj& keyPattern) {
     for (BSONElement elem : keyPattern) {
         _pathDiscriminatorsMap[elem.fieldNameStringData()][indexName].addDiscriminator(
-            [](const MatchExpression* queryExpr) {
-                if (queryExpr->matchType() == MatchExpression::EQ) {
-                    const auto* queryExprEquality =
-                        static_cast<const EqualityMatchExpression*>(queryExpr);
-                    return !queryExprEquality->getData().isNull();
-                } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
-                    const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
-                    return !queryExprIn->hasNull();
-                } else {
-                    return true;
-                }
-            });
+            supportedBySparseIndex);
     }
 }
 
@@ -71,43 +142,27 @@ void PlanCacheIndexabilityState::processPartialIndex(const std::string& indexNam
     }
     if (filterExpr->getCategory() != MatchExpression::MatchCategory::kLogical) {
         _pathDiscriminatorsMap[filterExpr->path()][indexName].addDiscriminator(
-            [filterExpr](const MatchExpression* queryExpr) {
-                return expression::isSubsetOf(queryExpr, filterExpr);
-            });
+            getPartialIndexDiscriminator(filterExpr));
     }
+}
+
+void PlanCacheIndexabilityState::processAllPathsIndex(const IndexEntry& ie) {
+    invariant(ie.type == IndexType::INDEX_ALLPATHS);
+
+    _allPathsIndexDiscriminators.emplace_back(
+        AllPathsKeyGenerator::createProjectionExec(ie.keyPattern,
+                                                   ie.infoObj.getObjectField("starPathsTempName")),
+        ie.identifier.catalogName,
+        ie.filterExpr,
+        ie.collator);
 }
 
 void PlanCacheIndexabilityState::processIndexCollation(const std::string& indexName,
                                                        const BSONObj& keyPattern,
                                                        const CollatorInterface* collator) {
     for (BSONElement elem : keyPattern) {
-        _pathDiscriminatorsMap[elem.fieldNameStringData()][indexName].addDiscriminator([collator](
-            const MatchExpression* queryExpr) {
-            if (const auto* queryExprComparison =
-                    dynamic_cast<const ComparisonMatchExpressionBase*>(queryExpr)) {
-                const bool collatorsMatch =
-                    CollatorInterface::collatorsMatch(queryExprComparison->getCollator(), collator);
-                const bool isCollatableType =
-                    CollationIndexKey::isCollatableType(queryExprComparison->getData().type());
-                return collatorsMatch || !isCollatableType;
-            }
-
-            if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
-                const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
-                if (CollatorInterface::collatorsMatch(queryExprIn->getCollator(), collator)) {
-                    return true;
-                }
-                for (const auto& equality : queryExprIn->getEqualities()) {
-                    if (CollationIndexKey::isCollatableType(equality.type())) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-
-            // The predicate never compares strings so it is not affected by collation.
-            return true;
-        });
+        _pathDiscriminatorsMap[elem.fieldNameStringData()][indexName].addDiscriminator(
+            getCollatedIndexDiscriminator(collator));
     }
 }
 
@@ -124,17 +179,43 @@ const IndexToDiscriminatorMap& PlanCacheIndexabilityState::getDiscriminators(
     return it->second;
 }
 
+IndexToDiscriminatorMap PlanCacheIndexabilityState::buildAllPathsDiscriminators(
+    StringData path) const {
+
+    IndexToDiscriminatorMap ret;
+    for (auto&& allPathsDiscriminator : _allPathsIndexDiscriminators) {
+        if (allPathsDiscriminator.projectionExec->applyProjectionToOneField(path)) {
+            CompositeIndexabilityDiscriminator& cid = ret[allPathsDiscriminator.catalogName];
+
+            cid.addDiscriminator(supportedByAllPathsIndex);
+            cid.addDiscriminator(supportedBySparseIndex);
+            cid.addDiscriminator(getCollatedIndexDiscriminator(allPathsDiscriminator.collator));
+            if (allPathsDiscriminator.filterExpr) {
+                cid.addDiscriminator(
+                    getPartialIndexDiscriminator(allPathsDiscriminator.filterExpr));
+            }
+        }
+    }
+    return ret;
+}
+
 void PlanCacheIndexabilityState::updateDiscriminators(const std::vector<IndexEntry>& indexEntries) {
     _pathDiscriminatorsMap = PathDiscriminatorsMap();
 
     for (const IndexEntry& idx : indexEntries) {
+        if (idx.type == IndexType::INDEX_ALLPATHS) {
+            processAllPathsIndex(idx);
+            continue;
+        }
+
         if (idx.sparse) {
-            processSparseIndex(idx.name, idx.keyPattern);
+            processSparseIndex(idx.identifier.catalogName, idx.keyPattern);
         }
         if (idx.filterExpr) {
-            processPartialIndex(idx.name, idx.filterExpr);
+            processPartialIndex(idx.identifier.catalogName, idx.filterExpr);
         }
-        processIndexCollation(idx.name, idx.keyPattern, idx.collator);
+
+        processIndexCollation(idx.identifier.catalogName, idx.keyPattern, idx.collator);
     }
 }
 

@@ -91,18 +91,17 @@ PlanStage* buildStages(OperationContext* opCtx,
                 return nullptr;
             }
 
-            auto descriptor =
-                collection->getIndexCatalog()->findIndexByName(opCtx, ixn->index.name);
+            auto descriptor = collection->getIndexCatalog()->findIndexByName(
+                opCtx, ixn->index.identifier.catalogName);
             invariant(descriptor);
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
             // indexes, these may differ from the information recorded in the index's descriptor.
             IndexScanParams params{*descriptor,
-                                   ixn->index.name,
+                                   ixn->index.identifier.catalogName,
                                    ixn->index.keyPattern,
                                    ixn->index.multikeyPaths,
                                    ixn->index.multikey};
-
             params.bounds = ixn->bounds;
             params.direction = ixn->direction;
             params.addKeyMetadata = ixn->addKeyMetadata;
@@ -246,8 +245,8 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            IndexDescriptor* twoDIndex =
-                collection->getIndexCatalog()->findIndexByName(opCtx, node->index.name);
+            IndexDescriptor* twoDIndex = collection->getIndexCatalog()->findIndexByName(
+                opCtx, node->index.identifier.catalogName);
             invariant(twoDIndex);
 
             GeoNear2DStage* nearStage =
@@ -265,16 +264,16 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            IndexDescriptor* s2Index =
-                collection->getIndexCatalog()->findIndexByName(opCtx, node->index.name);
+            IndexDescriptor* s2Index = collection->getIndexCatalog()->findIndexByName(
+                opCtx, node->index.identifier.catalogName);
             invariant(s2Index);
 
             return new GeoNear2DSphereStage(params, opCtx, ws, collection, s2Index);
         }
         case STAGE_TEXT: {
             const TextNode* node = static_cast<const TextNode*>(root);
-            IndexDescriptor* desc =
-                collection->getIndexCatalog()->findIndexByName(opCtx, node->index.name);
+            IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(
+                opCtx, node->index.identifier.catalogName);
             invariant(desc);
             const FTSAccessMethod* fam =
                 static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
@@ -314,8 +313,8 @@ PlanStage* buildStages(OperationContext* opCtx,
 
             DistinctParams params;
 
-            params.descriptor =
-                collection->getIndexCatalog()->findIndexByName(opCtx, dn->index.name);
+            params.descriptor = collection->getIndexCatalog()->findIndexByName(
+                opCtx, dn->index.identifier.catalogName);
             invariant(params.descriptor);
             params.direction = dn->direction;
             params.bounds = dn->bounds;
@@ -330,14 +329,14 @@ PlanStage* buildStages(OperationContext* opCtx,
                 return nullptr;
             }
 
-            auto descriptor =
-                collection->getIndexCatalog()->findIndexByName(opCtx, csn->index.name);
+            auto descriptor = collection->getIndexCatalog()->findIndexByName(
+                opCtx, csn->index.identifier.catalogName);
             invariant(descriptor);
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
             // indexes, these may differ from the information recorded in the index's descriptor.
             CountScanParams params{*descriptor,
-                                   csn->index.name,
+                                   csn->index.identifier.catalogName,
                                    csn->index.keyPattern,
                                    csn->index.multikeyPaths,
                                    csn->index.multikey};

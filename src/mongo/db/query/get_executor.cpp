@@ -136,7 +136,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
                                                     ice->getMultikeyPaths(opCtx),
                                                     desc->isSparse(),
                                                     desc->unique(),
-                                                    desc->indexName(),
+                                                    IndexEntry::Identifier{desc->indexName()},
                                                     ice->getFilterExpression(),
                                                     desc->infoObj(),
                                                     ice->getCollator()));
@@ -1447,7 +1447,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
                                                        ice->getMultikeyPaths(opCtx),
                                                        desc->isSparse(),
                                                        desc->unique(),
-                                                       desc->indexName(),
+                                                       IndexEntry::Identifier{desc->indexName()},
                                                        ice->getFilterExpression(),
                                                        desc->infoObj(),
                                                        ice->getCollator()));

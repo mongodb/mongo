@@ -4296,7 +4296,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     std::unique_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
     indexTree->setIndexEntry(IndexEntry(BSON("a" << 1), "a_1"));
 
-    std::map<StringData, size_t> indexMap;
+    std::map<IndexEntry::Identifier, size_t> indexMap;
 
     // Null filter.
     Status s = QueryPlanner::tagAccordingToCache(NULL, indexTree.get(), indexMap);
@@ -4311,7 +4311,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     ASSERT_NOT_OK(s);
 
     // Index found once added to the map.
-    indexMap["a_1"_sd] = 0;
+    indexMap[IndexEntry::Identifier{"a_1"}] = 0;
     s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
     ASSERT_OK(s);
 
