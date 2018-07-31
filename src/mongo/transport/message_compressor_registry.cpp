@@ -43,7 +43,7 @@
 namespace mongo {
 namespace {
 const auto kDisabledConfigValue = "disabled"_sd;
-const auto kDefaultConfigValue = "snappy"_sd;
+const auto kDefaultConfigValue = "snappy,zlib"_sd;
 }  // namespace
 
 StringData getMessageCompressorName(MessageCompressor id) {
