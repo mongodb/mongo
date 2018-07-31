@@ -1491,6 +1491,27 @@ TEST_F(SessionTest, ConcurrencyOfPrepareTransactionAndAbort) {
     ASSERT(session.transactionIsAborted());
 }
 
+TEST_F(SessionTest, ConcurrencyOfPrepareTransactionAndCommit) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 26;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "prepareTransaction");
+
+    session.unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    session.commitUnpreparedTransaction(opCtx());
+
+    // A prepareTransaction() after a commit should uassert.
+    ASSERT_THROWS_CODE(
+        session.prepareTransaction(opCtx()), AssertionException, ErrorCodes::TransactionCommitted);
+    ASSERT_FALSE(_opObserver->transactionPrepared);
+    ASSERT(session.transactionIsCommitted());
+}
+
 TEST_F(SessionTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);

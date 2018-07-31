@@ -856,6 +856,10 @@ Timestamp Session::prepareTransaction(OperationContext* opCtx) {
     // session kill and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
+    uassert(ErrorCodes::TransactionCommitted,
+            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been committed.",
+            !_txnState.isCommitted(lk));
+
     _txnState.transitionTo(lk, TransactionState::kPrepared);
 
     // We need to unlock the session to run the opObserver onTransactionPrepare, which calls back

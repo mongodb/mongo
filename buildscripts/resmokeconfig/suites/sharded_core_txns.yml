@@ -71,6 +71,7 @@ selector:
   - jstests/core/txns/multi_statement_transaction.js
   - jstests/core/txns/multi_update_in_transaction.js
   - jstests/core/txns/no_implicit_collection_creation_in_txn.js
+  - jstests/core/txns/prepare_committed_transaction.js
   - jstests/core/txns/read_own_multikey_writes.js
   - jstests/core/txns/repeatable_reads_in_transaction.js
   - jstests/core/txns/shell_prompt_in_transaction.js
