@@ -347,6 +347,27 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTooLongName) {
     ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), AssertionException);
 }
 
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SendingInfoFailsInDirectClient) {
+    const std::vector<BSONObj> operationSessionParameters{
+        {BSON("lsid" << makeLogicalSessionIdForTest().toBSON())}, {BSON("txnNumber" << 1LL)}};
+
+
+    _opCtx->getClient()->setInDirectClient(true);
+
+    for (const auto& param : operationSessionParameters) {
+        BSONObjBuilder commandBuilder = BSON("count"
+                                             << "foo");
+        commandBuilder.appendElements(param);
+
+        ASSERT_THROWS_CODE(uassertStatusOK(initializeOperationSessionInfo(
+                               _opCtx.get(), commandBuilder.obj(), true, true, true)),
+                           AssertionException,
+                           ErrorCodes::InvalidOptions);
+    }
+
+    _opCtx->getClient()->setInDirectClient(false);
+}
+
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IncompatibleFCV) {
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);

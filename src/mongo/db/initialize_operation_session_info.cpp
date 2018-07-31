@@ -46,6 +46,14 @@ Status initializeOperationSessionInfo(OperationContext* opCtx,
                                       bool requiresAuth,
                                       bool isReplSetMemberOrMongos,
                                       bool supportsDocLocking) {
+
+    auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
+
+    if (opCtx->getClient()->isInDirectClient() && (osi.getSessionId() || osi.getTxnNumber())) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "Invalid to set operation session info in a direct client");
+    }
+
     if (!requiresAuth) {
         return Status::OK();
     }
@@ -60,8 +68,6 @@ Status initializeOperationSessionInfo(OperationContext* opCtx,
             return Status::OK();
         }
     }
-
-    auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
     bool isFCV36 = (serverGlobalParams.featureCompatibility.getVersion() ==
                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
