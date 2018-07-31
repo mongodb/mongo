@@ -159,6 +159,17 @@ env.CppUnitTest(
     ]
 )
 
+env.Library(
+    target='cluster_command_test_fixture',
+    source=[
+        'cluster_command_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'cluster_commands',
+        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+    ]
+)
+
 env.CppUnitTest(
     target="cluster_aggregate_test",
     source=[
@@ -166,8 +177,21 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'cluster_commands',
+        'cluster_command_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/saslauth',
-        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+    ],
+)
+
+env.CppUnitTest(
+    target="cluster_distinct_test",
+    source=[
+        "cluster_distinct_test.cpp",
+    ],
+    LIBDEPS=[
+        'cluster_commands',
+        'cluster_command_test_fixture',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/saslauth',
     ],
 )
