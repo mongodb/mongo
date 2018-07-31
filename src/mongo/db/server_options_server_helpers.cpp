@@ -88,6 +88,13 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
             "config", "config,f", moe::String, "configuration file specifying additional options")
         .setSources(moe::SourceAllLegacy);
 
+    options
+        ->addOptionChaining("outputConfig",
+                            "outputConfig",
+                            moe::Switch,
+                            "Display the resolved configuration and exit")
+        .setSources(moe::SourceCommandLine)
+        .hidden();
 
     options
         ->addOptionChaining(

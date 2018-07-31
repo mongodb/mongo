@@ -211,6 +211,11 @@ public:
      */
     BSONObj toBSON() const;
 
+    /**
+     * Produce serialized YAML.
+     */
+    std::string toYAML() const;
+
     /* Debugging */
     void dump() const;
 

@@ -28,6 +28,7 @@
 #include "mongo/util/options_parser/environment.h"
 
 #include <iostream>
+#include <yaml-cpp/yaml.h>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/jsobj.h"
@@ -357,6 +358,54 @@ Status valueMapToBSON(const std::map<Key, Value>& params,
     }
     return Status::OK();
 }
+
+void buildYAMLNode(YAML::Emitter& out, const BSONObj& in, bool isMap = true) {
+    if (isMap) {
+        out << YAML::BeginMap;
+    } else {
+        out << YAML::BeginSeq;
+    }
+
+    for (const auto& elem : in) {
+        if (isMap) {
+            out << YAML::Key << elem.fieldName();
+            out << YAML::Value;
+        }
+        switch (elem.type()) {
+            case BSONType::Bool:
+                out << elem.Bool();
+                break;
+            case BSONType::NumberInt:
+                out << elem.Int();
+                break;
+            case BSONType::NumberLong:
+                out << elem.Long();
+                break;
+            case BSONType::NumberDouble:
+                out << elem.Double();
+                break;
+            case BSONType::String:
+                out << elem.String();
+                break;
+            case BSONType::Array:
+                buildYAMLNode(out, elem.Obj(), false);
+                break;
+            case BSONType::Object:
+                buildYAMLNode(out, elem.Obj(), true);
+                break;
+            default:
+                // Other types should not be produced by MOE.
+                uasserted(ErrorCodes::BadValue,
+                          str::stream() << "Invalid type encountered in config: " << elem.type());
+        }
+    }
+
+    if (isMap) {
+        out << YAML::EndMap;
+    } else {
+        out << YAML::EndSeq;
+    }
+}
 }  // namespace
 
 BSONObj Environment::toBSON() const {
@@ -366,6 +415,13 @@ BSONObj Environment::toBSON() const {
         return BSONObj();
     }
     return builder.obj();
+}
+
+std::string Environment::toYAML() const {
+    auto bson = toBSON();
+    YAML::Emitter root;
+    buildYAMLNode(root, bson);
+    return root.c_str();
 }
 
 }  // namespace optionenvironment

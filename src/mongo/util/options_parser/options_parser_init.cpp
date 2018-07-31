@@ -49,6 +49,17 @@ MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
         quickExit(EXIT_BADOPTIONS);
     }
+    if (startupOptionsParsed.count("outputConfig")) {
+        bool output = false;
+        auto status = startupOptionsParsed.get(Key("outputConfig"), &output);
+        if (!status.isOK()) {
+            return status;
+        }
+        if (output) {
+            std::cout << startupOptionsParsed.toYAML() << std::endl;
+            quickExit(EXIT_CLEAN);
+        }
+    }
     return Status::OK();
 }
 
