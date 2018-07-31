@@ -370,5 +370,143 @@ TEST_F(RouterSessionRuntimeStateTest, CannotSpecifyReadConcernAfterFirstStatemen
         ErrorCodes::InvalidOptions);
 }
 
+TEST_F(RouterSessionRuntimeStateTest, UpconvertToSnapshotIfNoReadConcernLevelGiven) {
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+
+    TxnNumber txnNum{3};
+    RouterSessionRuntimeState sessionState({});
+    sessionState.checkOut();
+    sessionState.beginOrContinueTxn(operationContext(), txnNum, true /* startTransaction */);
+
+    BSONObj expectedNewObj = BSON("insert"
+                                  << "test"
+                                  << "startTransaction"
+                                  << true
+                                  << "readConcern"
+                                  << BSON("level"
+                                          << "snapshot")
+                                  << "coordinator"
+                                  << true
+                                  << "autocommit"
+                                  << false
+                                  << "txnNumber"
+                                  << txnNum);
+
+    ShardId shard1("a");
+    auto& participant = sessionState.getOrCreateParticipant(shard1);
+    auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                           << "test"));
+    ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+}
+
+TEST_F(RouterSessionRuntimeStateTest,
+       UpconvertToSnapshotIfNoReadConcernLevelButHasAfterClusterTime) {
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(LogicalTime(Timestamp(10, 1)), boost::none);
+
+    TxnNumber txnNum{3};
+    RouterSessionRuntimeState sessionState({});
+    sessionState.checkOut();
+    sessionState.beginOrContinueTxn(operationContext(), txnNum, true /* startTransaction */);
+
+    BSONObj expectedNewObj = BSON("insert"
+                                  << "test"
+                                  << "startTransaction"
+                                  << true
+                                  << "readConcern"
+                                  << BSON("level"
+                                          << "snapshot"
+                                          // TODO SERVER-36237: afterClusterTime should be replaced
+                                          // by an atClusterTime at least as large.
+                                          << "afterClusterTime"
+                                          << Timestamp(10, 1))
+                                  << "coordinator"
+                                  << true
+                                  << "autocommit"
+                                  << false
+                                  << "txnNumber"
+                                  << txnNum);
+
+    ShardId shard1("a");
+    auto& participant = sessionState.getOrCreateParticipant(shard1);
+    auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                           << "test"));
+    ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+}
+
+TEST_F(RouterSessionRuntimeStateTest, CannotUpconvertIfLevelOtherThanSnapshotWasGiven) {
+    auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
+                              repl::ReadConcernLevel::kMajorityReadConcern,
+                              repl::ReadConcernLevel::kLinearizableReadConcern,
+                              repl::ReadConcernLevel::kAvailableReadConcern};
+
+    for (auto readConcernLevel : readConcernLevels) {
+        repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(readConcernLevel);
+
+        TxnNumber txnNum{3};
+        RouterSessionRuntimeState sessionState({});
+        sessionState.checkOut();
+        ASSERT_THROWS_CODE(sessionState.beginOrContinueTxn(
+                               operationContext(), txnNum, true /* startTransaction */),
+                           DBException,
+                           ErrorCodes::InvalidOptions);
+    }
+}
+
+TEST_F(RouterSessionRuntimeStateTest,
+       CannotUpconvertIfLevelOtherThanSnapshotWasGivenWithAfterClusterTime) {
+    auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
+                              repl::ReadConcernLevel::kMajorityReadConcern,
+                              repl::ReadConcernLevel::kLinearizableReadConcern,
+                              repl::ReadConcernLevel::kAvailableReadConcern};
+
+    for (auto readConcernLevel : readConcernLevels) {
+        repl::ReadConcernArgs::get(operationContext()) =
+            repl::ReadConcernArgs(LogicalTime(Timestamp(10, 1)), readConcernLevel);
+
+        TxnNumber txnNum{3};
+        RouterSessionRuntimeState sessionState({});
+        sessionState.checkOut();
+        ASSERT_THROWS_CODE(sessionState.beginOrContinueTxn(
+                               operationContext(), txnNum, true /* startTransaction */),
+                           DBException,
+                           ErrorCodes::InvalidOptions);
+    }
+}
+
+TEST_F(RouterSessionRuntimeStateTest, CannotUpconvertWithAfterOpTime) {
+    auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
+                              repl::ReadConcernLevel::kMajorityReadConcern,
+                              repl::ReadConcernLevel::kLinearizableReadConcern,
+                              repl::ReadConcernLevel::kAvailableReadConcern};
+
+    for (auto readConcernLevel : readConcernLevels) {
+        repl::ReadConcernArgs::get(operationContext()) =
+            repl::ReadConcernArgs(repl::OpTime(Timestamp(10, 1), 2), readConcernLevel);
+
+        TxnNumber txnNum{3};
+        RouterSessionRuntimeState sessionState({});
+        sessionState.checkOut();
+        ASSERT_THROWS_CODE(sessionState.beginOrContinueTxn(
+                               operationContext(), txnNum, true /* startTransaction */),
+                           DBException,
+                           ErrorCodes::InvalidOptions);
+    }
+
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(repl::OpTime(Timestamp(10, 1), 2), boost::none);
+
+    {
+
+        TxnNumber txnNum{3};
+        RouterSessionRuntimeState sessionState({});
+        sessionState.checkOut();
+        ASSERT_THROWS_CODE(sessionState.beginOrContinueTxn(
+                               operationContext(), txnNum, true /* startTransaction */),
+                           DBException,
+                           ErrorCodes::InvalidOptions);
+    }
+}
+
 }  // unnamed namespace
 }  // namespace mongo

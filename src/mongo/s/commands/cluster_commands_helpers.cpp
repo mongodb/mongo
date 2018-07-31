@@ -539,6 +539,15 @@ BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
                     readConcernBob.append(elem);
                 }
             }
+
+            // TODO SERVER-36237: When running a transaction with upconverted readConcern, this
+            // method may be called without a real readConcern object. Once atClusterTime selection
+            // and usage have been integrated with the RouterSession, the readConcern object should
+            // always have the correct level here and this can be removed.
+            if (!readConcernBob.hasField(repl::ReadConcernArgs::kLevelFieldName)) {
+                readConcernBob.append(repl::ReadConcernArgs::kLevelFieldName, "snapshot");
+            }
+
             readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
                                   atClusterTime.asTimestamp());
         } else {
@@ -558,6 +567,14 @@ BSONObj appendAtClusterTimeToReadConcern(BSONObj readConcernObj, LogicalTime atC
         if (elem.fieldNameStringData() != repl::ReadConcernArgs::kAfterClusterTimeFieldName) {
             readConcernBob.append(elem);
         }
+    }
+
+    // TODO SERVER-36237: When running a transaction with upconverted readConcern, this method may
+    // be called without a real readConcern object. Once atClusterTime selection and usage have been
+    // integrated with the RouterSession, the readConcern object should always have the correct
+    // level here and this can be removed.
+    if (!readConcernBob.hasField(repl::ReadConcernArgs::kLevelFieldName)) {
+        readConcernBob.append(repl::ReadConcernArgs::kLevelFieldName, "snapshot");
     }
 
     readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,

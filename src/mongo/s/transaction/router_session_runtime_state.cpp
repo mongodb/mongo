@@ -35,6 +35,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -112,14 +113,18 @@ bool isTransactionCommand(const BSONObj& cmd) {
 
 void appendReadConcernForTxn(BSONObjBuilder* bob, repl::ReadConcernArgs readConcernArgs) {
     // Check for an existing read concern. The first statement in a transaction may already have
-    // one.
+    // one, in which case its level should always match the level of the transaction's readConcern.
     if (bob->hasField(repl::ReadConcernArgs::kReadConcernFieldName)) {
-        // TODO SERVER-36237: For commands that support atClusterTime, mongos will attach an
-        // atClusterTime to the readConcern, without updating the read concern decoration. Once the
-        // router session tracks atClusterTime, it can verify that the sent readConcern matches that
-        // on the decoration.
+        repl::ReadConcernArgs existingReadConcernArgs;
+        dassert(existingReadConcernArgs.initialize(bob->asTempObj()));
+        dassert(existingReadConcernArgs.getLevel() == readConcernArgs.getLevel());
+
+        // TODO SERVER-36237: Attach atClusterTime to outgoing requests.
+
         return;
     }
+
+    // TODO SERVER-36237: Attach atClusterTime to outgoing requests.
 
     readConcernArgs.appendInfo(bob);
 }
@@ -248,10 +253,15 @@ void RouterSessionRuntimeState::beginOrContinueTxn(OperationContext* opCtx,
                 txnNumber > _txnNumber);
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        // TODO SERVER-36240: Determine readConcern upconverting behavior on mongos.
-        uassert(ErrorCodes::InvalidOptions,
-                "The first command in a transaction must specify a readConcern",
-                !readConcernArgs.isEmpty());
+        if (!readConcernArgs.hasLevel()) {
+            // Transactions started without a readConcern level will use snapshot as the default.
+            uassertStatusOK(readConcernArgs.upconvertReadConcernLevelToSnapshot());
+        } else {
+            uassert(ErrorCodes::InvalidOptions,
+                    "The first command in a transaction cannot specify a readConcern level other "
+                    "than snapshot",
+                    readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
+        }
         _readConcernArgs = readConcernArgs;
     } else {
         // TODO: figure out what to do with recovery

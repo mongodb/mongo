@@ -15,11 +15,15 @@ selector:
   - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
 
   # Prepare is not a command on mongos.
-  - jstests/core/txns/empty_prepare.js
-  - jstests/core/txns/prepare_conflict.js
   - jstests/core/txns/abort_prepared_transaction.js
   - jstests/core/txns/commit_prepared_transaction.js
   - jstests/core/txns/commit_prepared_transaction_errors.js
+  - jstests/core/txns/empty_prepare.js
+  - jstests/core/txns/prepare_committed_transaction.js
+  - jstests/core/txns/prepare_conflict.js
+
+  # Mongos doesn't upconvert from local or majority level readConcern to snapshot.
+  - jstests/core/txns/upconvert_read_concern.js
 
   # Implicitly creates a database through a collection rename, which does not work in a sharded
   # cluster.
@@ -48,9 +52,6 @@ selector:
   # TODO SERVER-35708 Mongos does not attach errorLabels on command response.
   - jstests/core/txns/multi_statement_transaction_abort.js
 
-  # TODO SERVER-36057: Mongos doesn't validate autocommit / startTransaction fields.
-  - jstests/core/txns/upconvert_read_concern.js
-
   # TODO SERVER-35825: Mongos should only allow readConcern on writes that start transactions.
   - jstests/core/txns/no_read_concern_snapshot_outside_txn.js
 
@@ -58,27 +59,6 @@ selector:
   - jstests/core/txns/view_reads_in_transaction.js
   - jstests/core/txns/list_collections_not_blocked_by_txn.js
   - jstests/core/txns/statement_ids_accepted.js
-
-  # TODO SERVER-36240: Rely on readConcern being upconverted to snapshot.
-  - jstests/core/txns/ban_tailable_cursor.js
-  - jstests/core/txns/concurrent_drops_and_creates.js
-  - jstests/core/txns/find_and_modify_in_transaction.js
-  - jstests/core/txns/kill_cursors_in_transaction.js
-  - jstests/core/txns/kill_sessions_kills_transaction.js
-  - jstests/core/txns/kill_transaction_cursors_after_commit.js
-  - jstests/core/txns/kill_txn_cursor.js
-  - jstests/core/txns/multi_delete_in_transaction.js
-  - jstests/core/txns/multi_statement_transaction.js
-  - jstests/core/txns/multi_update_in_transaction.js
-  - jstests/core/txns/no_implicit_collection_creation_in_txn.js
-  - jstests/core/txns/prepare_committed_transaction.js
-  - jstests/core/txns/read_own_multikey_writes.js
-  - jstests/core/txns/repeatable_reads_in_transaction.js
-  - jstests/core/txns/shell_prompt_in_transaction.js
-  - jstests/core/txns/start_transaction_with_read.js
-  - jstests/core/txns/transaction_error_handling.js
-  - jstests/core/txns/transactions_write_conflicts.js
-  - jstests/core/txns/transactions_write_conflicts_unique_indexes.js
 executor:
   archive:
     hooks:
