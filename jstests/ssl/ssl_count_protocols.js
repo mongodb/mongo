@@ -8,7 +8,12 @@
 
     function runTestWithoutSubset(client) {
         let disabledProtocols = ["TLS1_0", "TLS1_1", "TLS1_2"];
-        let expectedCounts = [0, 0, 1];
+        let expectedCounts = [0, 0, 0];
+        let clientIndex = 2;
+        if (getBuildInfo().buildEnvironment.target_os === "osx") {
+            clientIndex = 0;
+        }
+        expectedCounts[clientIndex] = 1;
         var index = disabledProtocols.indexOf(client);
         disabledProtocols.splice(index, 1);
         expectedCounts[index] += 1;
@@ -49,7 +54,10 @@
     }
 
     runTestWithoutSubset("TLS1_0");
-    runTestWithoutSubset("TLS1_1");
-    runTestWithoutSubset("TLS1_2");
 
+    // OpenSSL 0.9.8 on macOS only supports TLS 1.0
+    if (getBuildInfo().buildEnvironment.target_os !== "osx") {
+        runTestWithoutSubset("TLS1_1");
+        runTestWithoutSubset("TLS1_2");
+    }
 })();
