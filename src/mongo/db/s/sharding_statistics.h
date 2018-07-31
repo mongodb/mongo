@@ -41,20 +41,36 @@ class ServiceContext;
  */
 struct ShardingStatistics {
     // Counts how many times threads hit stale config exception (which is what triggers metadata
-    // refreshes)
+    // refreshes).
     AtomicInt64 countStaleConfigErrors{0};
 
-    // Cumulative, always-increasing counter of how many chunks did this node start donating
-    // (whether they succeeded or not)
+    // Cumulative, always-increasing counter of how many chunks this node has started to donate
+    // (whether they succeeded or not).
     AtomicInt64 countDonorMoveChunkStarted{0};
 
     // Cumulative, always-increasing counter of how much time the entire move chunk operation took
-    // (excluding range deletion)
+    // (excluding range deletion).
     AtomicInt64 totalDonorMoveChunkTimeMillis{0};
 
     // Cumulative, always-increasing counter of how much time the clone phase took on the donor
-    // node, before it was appropriate to enter the critical section
+    // node, before it was appropriate to enter the critical section.
     AtomicInt64 totalDonorChunkCloneTimeMillis{0};
+
+    // Cumulative, always-increasing counter of how many documents have been cloned on the
+    // recipient node.
+    AtomicInt64 countDocsClonedOnRecipient{0};
+
+    // Cumulative, always-increasing counter of how many documents have been cloned on the donor
+    // node.
+    AtomicInt64 countDocsClonedOnDonor{0};
+
+    // Cumulative, always-increasing counter of how many documents have been deleted on the donor
+    // node by the rangeDeleter.
+    AtomicInt64 countDocsDeletedOnDonor{0};
+
+    // Cumulative, always-increasing counter of how many chunks this node started to receive
+    // (whether the receiving succeeded or not)
+    AtomicInt64 countRecipientMoveChunkStarted{0};
 
     // Cumulative, always-increasing counter of how much time the critical section's commit phase
     // took (this is the period of time when all operations on the collection are blocked, not just

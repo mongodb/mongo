@@ -58,6 +58,8 @@ selector:
   - jstests/sharding/resume_change_stream.js
   - jstests/sharding/resume_change_stream_from_stale_mongos.js
   - jstests/sharding/resume_change_stream_on_subset_of_shards.js
+  # Enable if SERVER-20865 is backported or 4.2 becomes last-stable
+  - jstests/sharding/sharding_statistics_server_status.js
 executor:
   config:
     shell_options:

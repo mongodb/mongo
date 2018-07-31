@@ -51,6 +51,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -364,6 +365,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
 
     _sessionMigration =
         stdx::make_unique<SessionCatalogMigrationDestination>(_fromShard, *_sessionId);
+    ShardingStatistics::get(opCtx).countRecipientMoveChunkStarted.addAndFetch(1);
 
     _migrateThreadHandle = stdx::thread([this]() { _migrateThread(); });
 
@@ -790,6 +792,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
             {
                 stdx::lock_guard<stdx::mutex> statsLock(_mutex);
                 _numCloned += batchNumCloned;
+                ShardingStatistics::get(opCtx).countDocsClonedOnRecipient.addAndFetch(
+                    batchNumCloned);
                 _clonedBytes += batchClonedBytes;
             }
             if (_writeConcern.shouldWaitForOtherNodes()) {

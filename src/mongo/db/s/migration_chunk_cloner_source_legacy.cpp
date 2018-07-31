@@ -42,6 +42,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_request.h"
@@ -466,6 +467,7 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
             }
 
             arrBuilder->append(doc.value());
+            ShardingStatistics::get(opCtx).countDocsClonedOnDonor.addAndFetch(1);
         }
     }
 
