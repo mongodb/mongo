@@ -330,7 +330,7 @@ void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& do
     }
 }
 
-Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
+Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
     invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
 
     // Refrain from persisting any multikey updates as a result from building the index. Instead,
@@ -400,16 +400,11 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
             Status ret = insert(objToIndex.value(), loc);
             if (_buildInBackground)
                 exec->saveState();
-            if (ret.isOK()) {
-                wunit.commit();
-            } else if (dupsOut && ret.code() == ErrorCodes::DuplicateKey) {
-                // If dupsOut is non-null, we should only fail the specific insert that
-                // led to a DuplicateKey rather than the whole index build.
-                dupsOut->insert(loc);
-            } else {
+            if (!ret.isOK()) {
                 // Fail the index build hard.
                 return ret;
             }
+            wunit.commit();
             if (_buildInBackground) {
                 auto restoreStatus = exec->restoreState();  // Handles any WCEs internally.
                 if (!restoreStatus.isOK()) {
@@ -467,7 +462,7 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
 
     progress->finished();
 
-    Status ret = doneInserting(dupsOut);
+    Status ret = doneInserting();
     if (!ret.isOK())
         return ret;
 

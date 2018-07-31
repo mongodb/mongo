@@ -124,15 +124,13 @@ public:
      * This is a simplified replacement for insert and doneInserting. Do not call this if you
      * are calling either of them.
      *
-     * If dupsOut is passed as non-NULL, violators of uniqueness constraints will be added to
-     * the set rather than failing the build. Documents added to this set are not indexed, so
-     * callers MUST either fail this index build or delete the documents from the collection.
+     * Will fail if violators of uniqueness constraints exist.
      *
      * Can throw an exception if interrupted.
      *
      * Must not be called inside of a WriteUnitOfWork.
      */
-    Status insertAllDocumentsInCollection(std::set<RecordId>* dupsOut = nullptr) override;
+    Status insertAllDocumentsInCollection() override;
 
     /**
      * Call this after init() for each document in the collection.

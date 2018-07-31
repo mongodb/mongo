@@ -76,7 +76,7 @@ public:
 
         virtual StatusWith<std::vector<BSONObj>> init(const BSONObj& spec) = 0;
 
-        virtual Status insertAllDocumentsInCollection(std::set<RecordId>* dupsOut = NULL) = 0;
+        virtual Status insertAllDocumentsInCollection() = 0;
 
         virtual Status insert(const BSONObj& wholeDocument, const RecordId& loc) = 0;
 
@@ -189,16 +189,14 @@ public:
      * This is a simplified replacement for insert and doneInserting. Do not call this if you
      * are calling either of them.
      *
-     * If dupsOut is passed as non-NULL, violators of uniqueness constraints will be added to
-     * the set rather than failing the build. Documents added to this set are not indexed, so
-     * callers MUST either fail this index build or delete the documents from the collection.
+     * Will fail if violators of uniqueness constraints exist.
      *
      * Can throw an exception if interrupted.
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    inline Status insertAllDocumentsInCollection(std::set<RecordId>* const dupsOut = nullptr) {
-        return this->_impl().insertAllDocumentsInCollection(dupsOut);
+    inline Status insertAllDocumentsInCollection() {
+        return this->_impl().insertAllDocumentsInCollection();
     }
 
     /**

@@ -207,69 +207,6 @@ public:
     }
 };
 
-/** Index creation fills a passed-in set of dups rather than failing. */
-template <bool background>
-class InsertBuildFillDups : public IndexBuildBase {
-public:
-    void run() {
-        // Create a new collection.
-        Database* db = _ctx.db();
-        Collection* coll;
-        RecordId loc1;
-        RecordId loc2;
-        {
-            WriteUnitOfWork wunit(&_opCtx);
-            db->dropCollection(&_opCtx, _ns).transitional_ignore();
-            coll = db->createCollection(&_opCtx, _ns);
-
-            OpDebug* const nullOpDebug = nullptr;
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << 1 << "a"
-                                                                      << "dup")),
-                                           nullOpDebug,
-                                           true));
-            ASSERT_OK(coll->insertDocument(&_opCtx,
-                                           InsertStatement(BSON("_id" << 2 << "a"
-                                                                      << "dup")),
-                                           nullOpDebug,
-                                           true));
-            wunit.commit();
-        }
-
-        MultiIndexBlock indexer(&_opCtx, coll);
-        indexer.allowBackgroundBuilding();
-        indexer.allowInterruption();
-        // indexer.ignoreUniqueConstraint(); // not calling this
-
-        const BSONObj spec = BSON("name"
-                                  << "a"
-                                  << "ns"
-                                  << coll->ns().ns()
-                                  << "key"
-                                  << BSON("a" << 1)
-                                  << "v"
-                                  << static_cast<int>(kIndexVersion)
-                                  << "unique"
-                                  << true
-                                  << "background"
-                                  << background);
-
-        ASSERT_OK(indexer.init(spec).getStatus());
-
-        std::set<RecordId> dups;
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(&dups));
-
-        // either loc1 or loc2 should be in dups but not both.
-        ASSERT_EQUALS(dups.size(), 1U);
-        for (auto recordId : dups) {
-            ASSERT_NOT_EQUALS(recordId, RecordId());
-            BSONObj obj = coll->docFor(&_opCtx, recordId).value();
-            int id = obj["_id"].Int();
-            ASSERT(id == 1 || id == 2);
-        }
-    }
-};
-
 /** Index creation is killed if mayInterrupt is true. */
 class InsertBuildIndexInterrupt : public IndexBuildBase {
 public:
@@ -828,8 +765,6 @@ public:
         }
         add<InsertBuildEnforceUnique<true>>();
         add<InsertBuildEnforceUnique<false>>();
-        add<InsertBuildFillDups<true>>();
-        add<InsertBuildFillDups<false>>();
         add<InsertBuildIndexInterrupt>();
         add<InsertBuildIndexInterruptDisallowed>();
         add<InsertBuildIdIndexInterrupt>();
