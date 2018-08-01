@@ -1,9 +1,16 @@
 // @tags: [does_not_support_stepdowns, requires_non_retryable_writes, requires_fastcount]
 
-// SERVER-16497: Check that failIndexKeyTooLong setting works
+// TODO SERVER-36386: Remove this test
 (function() {
     "use strict";
 
+    load("jstests/libs/feature_compatibility_version.js");
+
+    // Start the node with FCV 4.0
+    let conn = MongoRunner.runMongod({binVersion: "latest", cleanData: true});
+    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
+
+    var db = conn.getDB('test');
     var t = db.index_bigkeys_nofail;
     t.drop();
     var res = db.getSiblingDB('admin').runCommand({setParameter: 1, failIndexKeyTooLong: true});
@@ -52,4 +59,6 @@
     // Explicitly drop the collection to avoid failures in post-test hooks that run dbHash and
     // validate commands.
     t.drop();
+
+    MongoRunner.stopMongod(conn);
 }());

@@ -33,8 +33,6 @@ selector:
   - jstests/core/fsync.js  # uses fsync.
   - jstests/core/geo_haystack*.js  # geoSearch.
   - jstests/core/geo_update_btree2.js  # notablescan.
-  - jstests/core/index_bigkeys_nofail.js  # failIndexKeyTooLong.
-  - jstests/core/index_bigkeys_validation.js  # failIndexKeyTooLong.
   - jstests/core/index_id_options.js  # "local" database.
   - jstests/core/index9.js  # "local" database.
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.

@@ -42,12 +42,12 @@
 
 namespace mongo {
 
-extern AtomicBool failIndexKeyTooLong;
-
 class BSONObjBuilder;
 class MatchExpression;
 class UpdateTicket;
 struct InsertDeleteOptions;
+
+bool failIndexKeyTooLongParam();
 
 /**
  * An IndexAccessMethod is the interface through which all the mutation, lookup, and

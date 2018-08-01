@@ -78,7 +78,19 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
 }
 
 }  // namespace
+
+// TODO SERVER-36386: Remove the server parameter
 MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
+
+// TODO SERVER-36386: Remove the server parameter
+bool failIndexKeyTooLongParam() {
+    // Always return true in FCV 4.2 although FCV 4.2 actually never needs to
+    // check this value because there shouldn't be any KeyTooLong errors in FCV 4.2.
+    if (serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42)
+        return true;
+    return failIndexKeyTooLong.load();
+}
 
 class BtreeExternalSortComparison {
 public:
@@ -110,7 +122,7 @@ bool IndexAccessMethod::ignoreKeyTooLong(OperationContext* opCtx) {
     const auto shouldRelaxConstraints =
         repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(
             opCtx, NamespaceString(_btreeState->ns()));
-    return shouldRelaxConstraints || !failIndexKeyTooLong.load();
+    return shouldRelaxConstraints || !failIndexKeyTooLongParam();
 }
 
 // Find the keys for obj, put them in the tree pointing to loc

@@ -222,7 +222,7 @@ void RecordStoreValidateAdaptor::validateIndexKeyCount(IndexDescriptor* idx,
     auto totalKeys = numLongKeys + numIndexedKeys;
 
     bool hasTooFewKeys = false;
-    bool noErrorOnTooFewKeys = !failIndexKeyTooLong.load() && (_level != kValidateFull);
+    bool noErrorOnTooFewKeys = !failIndexKeyTooLongParam() && (_level != kValidateFull);
 
     if (idx->isIdIndex() && totalKeys != numRecs) {
         hasTooFewKeys = totalKeys < numRecs ? true : hasTooFewKeys;
