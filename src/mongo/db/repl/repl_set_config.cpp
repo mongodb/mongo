@@ -65,6 +65,7 @@ const Milliseconds ReplSetConfig::kDefaultElectionTimeoutPeriod(10000);
 const Milliseconds ReplSetConfig::kDefaultCatchUpTimeoutPeriod(kInfiniteCatchUpTimeout);
 const bool ReplSetConfig::kDefaultChainingAllowed(true);
 const Milliseconds ReplSetConfig::kDefaultCatchUpTakeoverDelay(30000);
+const std::string ReplSetConfig::kRepairedFieldName = "repaired";
 
 namespace {
 
@@ -107,6 +108,11 @@ Status ReplSetConfig::initializeForInitiate(const BSONObj& cfg) {
 Status ReplSetConfig::_initialize(const BSONObj& cfg, bool forInitiate, OID defaultReplicaSetId) {
     _isInitialized = false;
     _members.clear();
+
+    if (cfg.hasField(kRepairedFieldName)) {
+        return {ErrorCodes::RepairedReplicaSetNode, "Replicated data has been repaired"};
+    }
+
     Status status =
         bsonCheckOnlyHasFields("replica set configuration", cfg, kLegalConfigTopFieldNames);
     if (!status.isOK())

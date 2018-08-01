@@ -199,6 +199,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         'storage_engine_lock_file',
+        'storage_repair_observer',
         'storage_engine_metadata',
         'storage_options',
     ],
@@ -246,6 +247,38 @@ env.Library(
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
     ],
 )
+
+env.Library(
+    target='storage_repair_observer',
+    source=[
+        'storage_repair_observer.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
+    ],
+)
+
+env.CppUnitTest(
+    target='storage_repair_observer_test',
+    source=[
+        'storage_repair_observer_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repair_database',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/executor/network_interface_mock',
+        'storage_repair_observer',
+    ],
+)
+
 
 env.Library(
     target='backup_cursor_service',

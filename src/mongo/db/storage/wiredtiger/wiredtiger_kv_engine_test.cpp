@@ -168,7 +168,8 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     ASSERT(!boost::filesystem::exists(tmpFile));
 
 #ifdef _WIN32
-    ASSERT_NOT_OK(_engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options));
+    auto status = _engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options);
+    ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
 #else
     // Move the data file out of the way so the ident can be dropped. This not permitted on Windows
     // because the file cannot be moved while it is open. The implementation for orphan recovery is
@@ -184,7 +185,8 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     boost::filesystem::rename(tmpFile, *dataFilePath, err);
     ASSERT(!err) << err.message();
 
-    ASSERT_OK(_engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options));
+    auto status = _engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options);
+    ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code());
 #endif
 }
 
@@ -220,7 +222,8 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesFailGracefull
     ASSERT_OK(_engine->dropIdent(opCtxPtr.get(), ident));
 
 #ifdef _WIN32
-    ASSERT_NOT_OK(_engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options));
+    auto status = _engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options);
+    ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
 #else
     // The ident may not get immediately dropped, so ensure it is completely gone.
     boost::system::error_code err;

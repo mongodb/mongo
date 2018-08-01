@@ -494,6 +494,16 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     ReplSetConfig localConfig;
     status = localConfig.initialize(cfg.getValue());
     if (!status.isOK()) {
+        if (status.code() == ErrorCodes::RepairedReplicaSetNode) {
+            severe()
+                << "This instance has been repaired and may contain modified replicated data that "
+                   "would not match other replica set members. To see your repaired data, start "
+                   "mongod without the --replSet option. When you are finished recovering your "
+                   "data and would like to perform a complete re-sync, please refer to the "
+                   "documentation here: "
+                   "https://docs.mongodb.com/manual/tutorial/resync-replica-set-member/";
+            fassertFailedNoTrace(50923);
+        }
         error() << "Locally stored replica set configuration does not parse; See "
                    "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
                    "for information on how to recover from this. Got \""

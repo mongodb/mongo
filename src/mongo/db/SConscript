@@ -921,6 +921,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/catalog/index_create',
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
+        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/repl/oplog',
     ],
 )
@@ -1149,6 +1150,7 @@ env.Library(
         'repair_database',
         'repl/drop_pending_collection_reaper',
         'repl/repl_settings',
+        'storage/storage_repair_observer',
     ],
 )
 

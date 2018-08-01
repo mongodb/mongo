@@ -45,6 +45,7 @@
 #include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/unclean_shutdown.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -147,6 +148,16 @@ public:
 class KVStorageEngineRepairTest : public KVStorageEngineTest {
 public:
     KVStorageEngineRepairTest() : KVStorageEngineTest(RepairAction::kRepair) {}
+
+    void tearDown() {
+        auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
+        ASSERT(repairObserver->isDone());
+
+        unittest::log() << "Modifications: ";
+        for (const auto& mod : repairObserver->getModifications()) {
+            unittest::log() << "  " << mod;
+        }
+    }
 };
 
 TEST_F(KVStorageEngineTest, ReconcileIdentsTest) {
@@ -284,6 +295,8 @@ TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphans) {
 
     ASSERT(identExists(opCtx.get(), swIdentName.getValue()));
     ASSERT(collectionExists(opCtx.get(), collNs));
+    StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
+    ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 
 TEST_F(KVStorageEngineRepairTest, ReconcileSucceeds) {
@@ -302,6 +315,8 @@ TEST_F(KVStorageEngineRepairTest, ReconcileSucceeds) {
 
     ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
     ASSERT(collectionExists(opCtx.get(), collNs));
+    StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
+    ASSERT_EQ(0U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 
 TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
@@ -325,6 +340,9 @@ TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
 
     ASSERT(identExists(opCtx.get(), swIdentName.getValue()));
     ASSERT(collectionExists(opCtx.get(), orphanNs));
+
+    StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get());
+    ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 
 TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphans) {

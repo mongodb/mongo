@@ -55,6 +55,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
     ],
 )
 
@@ -155,6 +156,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test_core',
+        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         'kv_engine',
         'kv_engine_mock',
     ],

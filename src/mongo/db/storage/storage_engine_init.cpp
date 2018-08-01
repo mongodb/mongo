@@ -41,6 +41,7 @@
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/unclean_shutdown.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
@@ -68,6 +69,22 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
     }
 
     const std::string dbpath = storageGlobalParams.dbpath;
+
+    if (!storageGlobalParams.readOnly) {
+        StorageRepairObserver::set(service, std::make_unique<StorageRepairObserver>(dbpath));
+        auto repairObserver = StorageRepairObserver::get(service);
+
+        if (storageGlobalParams.repair) {
+            repairObserver->onRepairStarted();
+        } else if (repairObserver->isIncomplete()) {
+            severe()
+                << "An incomplete repair has been detected! This is likely because a repair "
+                   "operation unexpectedly failed before completing. MongoDB will not start up "
+                   "again without --repair.";
+            fassertFailedNoTrace(50922);
+        }
+    }
+
     if (auto existingStorageEngine = StorageEngineMetadata::getStorageEngineForPath(dbpath)) {
         if (*existingStorageEngine == "mmapv1" ||
             (storageGlobalParams.engineSetByUser && storageGlobalParams.engine == "mmapv1")) {

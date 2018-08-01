@@ -50,7 +50,9 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/version.h"
@@ -63,6 +65,11 @@ namespace mongo {
 
 using logger::LogComponent;
 using std::endl;
+
+// Exit after repair has started, but before data is repaired.
+MONGO_FAIL_POINT_DEFINE(exitBeforeDataRepair);
+// Exit after repairing data, but before the replica set configuration is invalidated.
+MONGO_FAIL_POINT_DEFINE(exitBeforeRepairInvalidatesConfig);
 
 namespace {
 
@@ -180,22 +187,12 @@ const NamespaceString startupLogCollectionName("local.startup_log");
 const NamespaceString kSystemReplSetCollection("local.system.replset");
 
 /**
- * Checks if this server was started without --replset but has a config in local.system.replset
- * (meaning that this is probably a replica set member started in stand-alone mode).
- *
- * @returns the number of documents in local.system.replset or 0 if this was started with
- *          --replset.
+ * Returns 'true' if this server has a configuration document in local.system.replset.
  */
-unsigned long long checkIfReplMissingFromCommandLine(OperationContext* opCtx) {
-    // This is helpful for the query below to work as you can't open files when readlocked
+bool hasReplSetConfigDoc(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
-    if (!repl::ReplicationCoordinator::get(getGlobalServiceContext())
-             ->getSettings()
-             .usingReplSets()) {
-        DBDirectClient c(opCtx);
-        return c.count(kSystemReplSetCollection.ns());
-    }
-    return 0;
+    BSONObj config;
+    return Helpers::getSingleton(opCtx, kSystemReplSetCollection.ns().c_str(), config);
 }
 
 /**
@@ -284,10 +281,7 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
  * represents whether there are non-local databases.
  */
 StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
-    LOG(1) << "enter repairDatabases (to check pdfile version #)";
-
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
-
     Lock::GlobalWrite lk(opCtx);
 
     std::vector<std::string> dbNames;
@@ -304,9 +298,15 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     // Repair all databases first, so that we do not try to open them if they are in bad shape
     if (storageGlobalParams.repair) {
         invariant(!storageGlobalParams.readOnly);
+
+        if (MONGO_FAIL_POINT(exitBeforeDataRepair)) {
+            log() << "Exiting because 'exitBeforeDataRepair' fail point was set.";
+            quickExit(EXIT_ABRUPT);
+        }
+
         for (const auto& dbName : dbNames) {
             LOG(1) << "    Repairing database: " << dbName;
-            fassert(18506, repairDatabase(opCtx, storageEngine, dbName));
+            fassertNoTrace(18506, repairDatabase(opCtx, storageEngine, dbName));
         }
 
         // All collections must have UUIDs before restoring the FCV document to a version that
@@ -344,14 +344,36 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     }
 
     if (!storageGlobalParams.readOnly) {
-        // We open the "local" database before calling checkIfReplMissingFromCommandLine() to
-        // ensure the in-memory catalog entries for the 'kSystemReplSetCollection' collection have
-        // been populated if the collection exists. If the "local" database didn't exist at this
-        // point yet, then it will be created. If the mongod is running in a read-only mode, then
-        // it is fine to not open the "local" database and populate the catalog entries because we
-        // won't attempt to drop the temporary collections anyway.
+        // We open the "local" database before calling hasReplSetConfigDoc() to ensure the in-memory
+        // catalog entries for the 'kSystemReplSetCollection' collection have been populated if the
+        // collection exists. If the "local" database didn't exist at this point yet, then it will
+        // be created. If the mongod is running in a read-only mode, then it is fine to not open the
+        // "local" database and populate the catalog entries because we won't attempt to drop the
+        // temporary collections anyway.
         Lock::DBLock dbLock(opCtx, kSystemReplSetCollection.db(), MODE_X);
         DatabaseHolder::getDatabaseHolder().openDb(opCtx, kSystemReplSetCollection.db());
+    }
+
+    if (storageGlobalParams.repair) {
+        if (MONGO_FAIL_POINT(exitBeforeRepairInvalidatesConfig)) {
+            log() << "Exiting because 'exitBeforeRepairInvalidatesConfig' fail point was set.";
+            quickExit(EXIT_ABRUPT);
+        }
+        // This must be done after opening the "local" database as it modifies the replica set
+        // config.
+        auto repairObserver = StorageRepairObserver::get(opCtx->getServiceContext());
+        repairObserver->onRepairDone(opCtx);
+        if (repairObserver->isDataModified()) {
+            warning() << "Modifications made by repair:";
+            const auto& mods = repairObserver->getModifications();
+            for (const auto& mod : mods) {
+                warning() << "  " << mod;
+            }
+            if (hasReplSetConfigDoc(opCtx)) {
+                warning() << "WARNING: Repair may have modified replicated data. This node will no "
+                             "longer be able to join a replica set without a full re-sync";
+            }
+        }
     }
 
     const repl::ReplSettings& replSettings =
@@ -362,7 +384,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     // to. The local DB is special because it is not replicated.  See SERVER-10927 for more
     // details.
     const bool shouldClearNonLocalTmpCollections =
-        !(checkIfReplMissingFromCommandLine(opCtx) || replSettings.usingReplSets());
+        !(hasReplSetConfigDoc(opCtx) || replSettings.usingReplSets());
 
     // To check whether a featureCompatibilityVersion document exists.
     bool fcvDocumentExists = false;

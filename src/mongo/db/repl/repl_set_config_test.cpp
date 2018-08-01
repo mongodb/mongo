@@ -901,6 +901,22 @@ TEST(ReplSetConfig, ParseFailsWithNonExistentGetLastErrorModesConstraintTag) {
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
 }
 
+TEST(ReplSetConfig, ParseFailsWithRepairField) {
+    ReplSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "repaired"
+                                           << true
+                                           << "version"
+                                           << 1
+                                           << "protocolVersion"
+                                           << 1
+                                           << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345"))));
+    ASSERT_EQUALS(ErrorCodes::RepairedReplicaSetNode, status);
+}
+
 TEST(ReplSetConfig, ValidateFailsWithBadProtocolVersion) {
     ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
