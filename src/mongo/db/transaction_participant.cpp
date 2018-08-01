@@ -43,6 +43,7 @@
 #include "mongo/db/session.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/fill_locker_info.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
@@ -693,17 +694,19 @@ void TransactionParticipant::_commitTransaction(stdx::unique_lock<stdx::mutex> l
 
     _txnState.transitionTo(lk, TransactionState::kCommitted);
 
-    ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
-
     // After the transaction has been committed, we must update the end time and mark it as
     // inactive.
-    _singleTransactionStats.setEndTime(curTimeMicros64());
+    const auto now = curTimeMicros64();
+    _singleTransactionStats.setEndTime(now);
     if (_singleTransactionStats.isActive()) {
-        _singleTransactionStats.setInactive(curTimeMicros64());
+        _singleTransactionStats.setInactive(now);
     }
 
+    ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
     ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
+    Top::get(getGlobalServiceContext())
+        .incrementGlobalTransactionLatencyStats(_singleTransactionStats.getDuration(now));
 
     // Add the latest operation stats to the aggregate OpDebug object stored in the
     // SingleTransactionStats instance on the Session.
@@ -790,11 +793,12 @@ void TransactionParticipant::_abortActiveTransaction(OperationContext* opCtx,
 }
 
 void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
+    const auto now = curTimeMicros64();
     if (!_txnState.isNone(wl)) {
-        _singleTransactionStats.setEndTime(curTimeMicros64());
+        _singleTransactionStats.setEndTime(now);
         // The transaction has aborted, so we mark it as inactive.
         if (_singleTransactionStats.isActive()) {
-            _singleTransactionStats.setInactive(curTimeMicros64());
+            _singleTransactionStats.setInactive(now);
         }
     }
 
@@ -822,6 +826,9 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
 
     ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
+
+    Top::get(getGlobalServiceContext())
+        .incrementGlobalTransactionLatencyStats(_singleTransactionStats.getDuration(now));
 }
 
 void TransactionParticipant::_cleanUpTxnResourceOnOpCtx(WithLock wl, OperationContext* opCtx) {

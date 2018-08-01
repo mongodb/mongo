@@ -220,6 +220,11 @@ void Top::appendGlobalLatencyStats(bool includeHistograms, BSONObjBuilder* build
     _globalHistogramStats.append(includeHistograms, builder);
 }
 
+void Top::incrementGlobalTransactionLatencyStats(uint64_t latency) {
+    stdx::lock_guard<SimpleMutex> guard(_lock);
+    _globalHistogramStats.increment(latency, Command::ReadWriteType::kTransaction);
+}
+
 void Top::_incrementHistogram(OperationContext* opCtx,
                               long long latency,
                               OperationLatencyHistogram* histogram,
