@@ -859,8 +859,17 @@ void execCommandDatabase(OperationContext* opCtx,
         oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);
         ScopedOperationCompletionShardingActions operationCompletionShardingActions(opCtx);
 
-        // Can throw
-        opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
+        // This may trigger the maxTimeAlwaysTimeOut failpoint.
+        auto status = opCtx->checkForInterruptNoAssert();
+
+        // We still proceed if the primary stepped down, but accept other kinds of interruptions.
+        // We defer to individual commands to allow themselves to be interruptible by stepdowns,
+        // since commands like 'voteRequest' should conversely continue executing.
+        if (status != ErrorCodes::PrimarySteppedDown &&
+            status != ErrorCodes::InterruptedDueToStepDown) {
+            uassertStatusOK(status);
+        }
+
 
         CurOp::get(opCtx)->ensureStarted();
 
