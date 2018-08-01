@@ -32,7 +32,7 @@ tasks:
       local_file: cloud_nightly.json
       remote_file: cloud-nightly/${task_id}
       content_type: application/json
-      display_name: generated_tasks
+      display_name: "Generated tasks (cloud_nightly.json)"
       permissions: private
   - command: generate.tasks
     params:
