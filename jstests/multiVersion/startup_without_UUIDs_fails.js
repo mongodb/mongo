@@ -55,6 +55,12 @@
     assert.commandWorked(connection.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
     MongoRunner.stopMongod(connection);
 
+    jsTest.log("Asserting a v4.0 --repair should correct the previously incomplete repair.");
+
+    returnCode =
+        runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);
+    assert.eq(returnCode, 0);
+
     jsTest.log("Now, finally, a v4.0 binary should start up on the FCV 3.6 data files");
 
     connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest", noCleanData: true});

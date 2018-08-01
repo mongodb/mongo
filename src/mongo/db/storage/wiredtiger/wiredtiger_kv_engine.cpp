@@ -775,12 +775,17 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
             return wtRCToStatus(rc);
         }
         log() << "Successfully re-created " << uri << ".";
-        return Status::OK();
+        return {ErrorCodes::DataModifiedByRepair,
+                str::stream() << "Re-created empty data file for " << uri};
     }
 
     // TODO need to cleanup the sizeStorer cache after salvaging.
     log() << "Verify failed on uri " << uri << ". Running a salvage operation.";
-    return wtRCToStatus(session->salvage(session, uri, NULL), "Salvage failed:");
+    auto status = wtRCToStatus(session->salvage(session, uri, NULL), "Salvage failed:");
+    if (status.isOK()) {
+        return {ErrorCodes::DataModifiedByRepair, str::stream() << "Salvaged data for " << uri};
+    }
+    return status;
 }
 
 int WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
@@ -929,7 +934,12 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
 
     WiredTigerSession sessionWrapper(_conn);
     WT_SESSION* session = sessionWrapper.getSession();
-    return wtRCToStatus(session->salvage(session, _uri(ident).c_str(), NULL), "Salvage failed: ");
+    status = wtRCToStatus(session->salvage(session, _uri(ident).c_str(), NULL), "Salvage failed: ");
+    if (status.isOK()) {
+        return {ErrorCodes::DataModifiedByRepair,
+                str::stream() << "Salvaged data for ident " << ident};
+    }
+    return status;
 #endif
 }
 

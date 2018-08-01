@@ -57,6 +57,10 @@ public:
     static const std::string kVersionFieldName;
     static const std::string kMajorityWriteConcernModeName;
 
+    // If this field is present, a repair operation potentially modified replicated data. This
+    // should never be included in a valid configuration document.
+    static const std::string kRepairedFieldName;
+
     static const size_t kMaxMembers = 50;
     static const size_t kMaxVotingMembers = 7;
     static const Milliseconds kInfiniteCatchUpTimeout;
