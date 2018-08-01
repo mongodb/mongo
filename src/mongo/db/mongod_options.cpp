@@ -146,13 +146,25 @@ Status addMongodOptions(moe::OptionSection* options) {
 #ifdef _WIN32
     boost::filesystem::path currentPath = boost::filesystem::current_path();
 
-    std::string defaultPath = currentPath.root_name().string() + storageGlobalParams.kDefaultDbPath;
+    std::string defaultDbPath =
+        currentPath.root_name().string() + std::string(storageGlobalParams.kDefaultDbPath);
     storage_options.addOptionChaining("storage.dbPath",
                                       "dbpath",
                                       moe::String,
                                       std::string("directory for datafiles - defaults to ") +
                                           storageGlobalParams.kDefaultDbPath + " which is " +
-                                          defaultPath + " based on the current working drive");
+                                          defaultDbPath + " based on the current working drive");
+
+    std::string defaultJournalPath = std::string(storageGlobalParams.kDefaultDbPath) +
+        std::string(storageGlobalParams.kDefaultDbJournalSubdir);
+    std::string defaultJournalPathWindows =
+        defaultDbPath + storageGlobalParams.kDefaultDbJournalSubdir;
+    storage_options.addOptionChaining(
+        "storage.journalPath",
+        "journalPath",
+        moe::String,
+        std::string("directory for journal files - defaults to ") + defaultJournalPath +
+            " which is " + defaultJournalPathWindows + " based on the current working drive");
 
 #else
     storage_options.addOptionChaining("storage.dbPath",
@@ -160,6 +172,13 @@ Status addMongodOptions(moe::OptionSection* options) {
                                       moe::String,
                                       std::string("directory for datafiles - defaults to ") +
                                           storageGlobalParams.kDefaultDbPath);
+
+    storage_options.addOptionChaining(
+        "storage.journalPath",
+        "journalPath",
+        moe::String,
+        std::string("directory for journal files - defaults to <dbpath>/") +
+            storageGlobalParams.kDefaultDbJournalSubdir);
 
 #endif
     storage_options.addOptionChaining("storage.directoryPerDB",
@@ -483,6 +502,12 @@ Status validateMongodOptions(const moe::Environment& params) {
     }
 
     if ((params.count("nodur") || params.count("nojournal")) &&
+        params.count("storage.journalPath")) {
+        return Status(ErrorCodes::BadValue,
+                      "Can't specify both --journalPath and --nojournal options.");
+    }
+
+    if ((params.count("nodur") || params.count("nojournal")) &&
         (params.count("dur") || params.count("journal"))) {
         return Status(ErrorCodes::BadValue,
                       "Can't specify both --journal and --nojournal options.");
@@ -753,10 +778,19 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.dbpath = params["storage.dbPath"].as<std::string>();
         if (params.count("processManagement.fork") && storageGlobalParams.dbpath[0] != '/') {
             // we need to change dbpath if we fork since we change
-            // cwd to "/"
-            // fork only exists on *nix
-            // so '/' is safe
+            // cwd to "/". Fork only exists on *nix so '/' is safe.
             storageGlobalParams.dbpath = serverGlobalParams.cwd + "/" + storageGlobalParams.dbpath;
+        }
+    }
+
+    if (params.count("storage.journalPath")) {
+        storageGlobalParams.journalPath = params["storage.journalPath"].as<std::string>();
+        storageGlobalParams.journalPathSetByUser = true;
+        if (params.count("processManagement.fork") && storageGlobalParams.journalPath[0] != '/') {
+            // we need to change journalpath if we fork since we change
+            // cwd to "/". Fork only exists on *nix so '/' is safe.
+            storageGlobalParams.journalPath =
+                serverGlobalParams.cwd + "/" + storageGlobalParams.journalPath;
         }
     }
 #ifdef _WIN32
@@ -765,6 +799,13 @@ Status storeMongodOptions(const moe::Environment& params) {
         // size() check is for the unlikely possibility of --dbpath "/"
         storageGlobalParams.dbpath =
             storageGlobalParams.dbpath.erase(storageGlobalParams.dbpath.size() - 1);
+    }
+
+    if (storageGlobalParams.journalPath.size() > 1 &&
+        storageGlobalParams.journalPath[storageGlobalParams.journalPath.size() - 1] == '/') {
+        // size() check is for the unlikely possibility of --journalPath "/"
+        storageGlobalParams.journalPath =
+            storageGlobalParams.journalPath.erase(storageGlobalParams.journalPath.size() - 1);
     }
 #endif
 
@@ -972,14 +1013,33 @@ Status storeMongodOptions(const moe::Environment& params) {
                       "****");
     }
 
+    // set journal path to be dbpath/journal if it is not already explicitly set.
+    if (!storageGlobalParams.journalPathSetByUser) {
+        auto path = boost::filesystem::path(storageGlobalParams.dbpath);
+        path /= storageGlobalParams.kDefaultDbJournalSubdir;
+        storageGlobalParams.journalPath = path.string();
+    }
+
 #ifdef _WIN32
-    // If dbPath is a default value, prepend with drive name so log entries are explicit
-    // We must resolve the dbpath before it stored in repairPath in the default case.
+    // If dbPath and/or journalPath are default values, prepend with drive name so log entries are
+    // explicit. We must resolve the dbpath before it stored in repairPath in the default case.
     if (storageGlobalParams.dbpath == storageGlobalParams.kDefaultDbPath ||
         storageGlobalParams.dbpath == storageGlobalParams.kDefaultConfigDbPath) {
-        boost::filesystem::path currentPath = boost::filesystem::current_path();
+        auto currentPath = boost::filesystem::current_path();
         storageGlobalParams.dbpath = currentPath.root_name().string() + storageGlobalParams.dbpath;
+
+        // The journal path will need the drive name if and only if the default db path is used, and
+        // no journal path is passed by the user.
+        if (!storageGlobalParams.journalPathSetByUser) {
+            storageGlobalParams.journalPath =
+                currentPath.root_name().string() + storageGlobalParams.journalPath;
+        }
     }
+
+    // The journal path passed to wired tiger must ONLY contain forward slashes.
+    auto path = boost::filesystem::path(storageGlobalParams.journalPath);
+    storageGlobalParams.journalPath = path.generic_string();
+
 #endif
 
     // Check if we are 32 bit and have not explicitly specified any journaling options

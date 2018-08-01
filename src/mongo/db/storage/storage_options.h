@@ -64,6 +64,16 @@ struct StorageGlobalParams {
     // The directory where the mongod instance stores its data.
     std::string dbpath;
 
+    // --journalPath
+    // Default journal sub-directory under the <dbpath> directory.
+    static const char* kDefaultDbJournalSubdir;
+
+    // The directory where the mongod instance stores its journaling data.
+    std::string journalPath;
+
+    // True if --journalPath was passed on the command line, and false otherwise.
+    bool journalPathSetByUser;
+
     // --upgrade
     // Upgrades the on-disk data format of the files specified by the --dbpath to the
     // latest version, if needed.

@@ -73,8 +73,10 @@ public:
 
     WiredTigerHarnessHelper(StringData extraStrings)
         : _dbpath("wt_test"),
+          _journalPath("wt_test_journal"),
           _engine(kWiredTigerEngineName,
                   _dbpath.path(),
+                  _journalPath.path(),
                   &_cs,
                   extraStrings.toString(),
                   1,
@@ -187,6 +189,7 @@ public:
 
 private:
     unittest::TempDir _dbpath;
+    unittest::TempDir _journalPath;
     ClockSourceMock _cs;
 
     WiredTigerKVEngine _engine;

@@ -35,6 +35,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
 
@@ -104,8 +105,15 @@ public:
     Status write() const;
 
     /**
-     * Validates a single field in the storage engine options. Currently, only boolean fields are
-     * supported. If the 'fieldName' does not exist in the 'storage.bson' file and a
+     * Validates the journalPath field only if the durability flag is set, otherwise it just returns
+     * Status::OK. If it does not exist in the 'storage.bson' file, then any journalPath works,
+     * otherwise the passed in path must match the one in 'storage.bson' file.
+     */
+    Status validateJournalPath(const StorageGlobalParams& params) const;
+
+    /**
+     * Validates a single field in the storage engine options. Currently, only boolean fields
+     * are supported. If the 'fieldName' does not exist in the 'storage.bson' file and a
      * 'defaultValue' is passed in, the 'expectedValue' must match the 'defaultValue'.
      */
     template <typename T>

@@ -447,6 +447,7 @@ stdx::function<bool(StringData)> initRsOplogBackgroundThreadCallback = [](String
 
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        const std::string& path,
+                                       const std::string& journalPath,
                                        ClockSource* cs,
                                        const std::string& extraOpenOptions,
                                        size_t cacheSizeMB,
@@ -458,19 +459,20 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
       _oplogManager(stdx::make_unique<WiredTigerOplogManager>()),
       _canonicalName(canonicalName),
       _path(path),
+      _journalPath(journalPath),
       _sizeStorerSyncTracker(cs, 100000, Seconds(60)),
       _durable(durable),
       _ephemeral(ephemeral),
       _inRepairMode(repair),
       _readOnly(readOnly) {
-    boost::filesystem::path journalPath = path;
-    journalPath /= "journal";
+    boost::filesystem::path boostJournalPath = _journalPath;
     if (_durable) {
-        if (!boost::filesystem::exists(journalPath)) {
+        if (!boost::filesystem::exists(boostJournalPath)) {
             try {
-                boost::filesystem::create_directory(journalPath);
-            } catch (std::exception& e) {
-                log() << "error creating journal dir " << journalPath.string() << ' ' << e.what();
+                boost::filesystem::create_directories(boostJournalPath);
+            } catch (const std::exception& e) {
+                error() << "error creating journal dir " << boostJournalPath.string() << ' '
+                        << e.what();
                 throw;
             }
         }
@@ -493,9 +495,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     // The setting may have a later setting override it if not using the journal.  We make it
     // unconditional here because even nojournal may need this setting if it is a transition
     // from using the journal.
+
+    // If we're readOnly skip all WAL-related settings.
     if (!_readOnly) {
-        // If we're readOnly skip all WAL-related settings.
-        ss << "log=(enabled=true,archive=true,path=journal,compressor=";
+        ss << "log=(enabled=true,archive=true,path=\"" << _journalPath << "\",compressor=";
         ss << wiredTigerGlobalOptions.journalCompressor << "),";
         ss << "file_manager=(close_idle_time=100000),";  //~28 hours, will put better fix in 3.1.x
         ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
@@ -518,7 +521,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         // If we started without the journal, but previously used the journal then open with the
         // WT log enabled to perform any unclean shutdown recovery and then close and reopen in
         // the normal path without the journal.
-        if (boost::filesystem::exists(journalPath)) {
+        if (boost::filesystem::exists(boostJournalPath)) {
             string config = ss.str();
             log() << "Detected WT journal files.  Running recovery from last checkpoint.";
             log() << "journal to nojournal transition config: " << config;
@@ -533,9 +536,10 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             invariantWTOK(_conn->close(_conn, NULL));
             // After successful recovery, remove the journal directory.
             try {
-                boost::filesystem::remove_all(journalPath);
+                boost::filesystem::remove_all(boostJournalPath);
             } catch (std::exception& e) {
-                error() << "error removing journal dir " << journalPath.string() << ' ' << e.what();
+                error() << "error removing journal dir " << boostJournalPath.string() << ' '
+                        << e.what();
                 throw;
             }
         }
@@ -844,8 +848,7 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
 
         auto filePath = dbPath;
         if (name.find(wiredTigerLogFilePrefix) == 0) {
-            // TODO SERVER-13455:replace `journal/` with the configurable journal path.
-            filePath /= boost::filesystem::path("journal");
+            filePath = boost::filesystem::path(_journalPath);
         }
         filePath /= name;
 

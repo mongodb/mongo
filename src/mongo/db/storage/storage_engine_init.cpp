@@ -172,6 +172,15 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
     // Validate options in metadata against current startup options.
     if (metadata.get()) {
         uassertStatusOK(factory->validateMetadata(*metadata, storageGlobalParams));
+
+        // If '--nojournal' is given and there is a journalPath on the metadata, update the params
+        // filepath to ensure WT cleans up the journal directory. Otherwise if no file path exists
+        // in the metadata, leave it as is.
+        BSONObj metaDataOptions = metadata->getStorageEngineOptions();
+        BSONElement journalPathElement = metaDataOptions.getField("journalPath");
+        if (!storageGlobalParams.dur && !journalPathElement.eoo()) {
+            storageGlobalParams.journalPath = journalPathElement.String();
+        }
     }
 
     ScopeGuard guard = MakeGuard([&] {
@@ -195,9 +204,14 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
         invariant(!storageGlobalParams.readOnly);
         metadata.reset(new StorageEngineMetadata(storageGlobalParams.dbpath));
         metadata->setStorageEngine(factory->getCanonicalName().toString());
-        metadata->setStorageEngineOptions(factory->createMetadataOptions(storageGlobalParams));
-        uassertStatusOK(metadata->write());
     }
+
+    // Update the existing metadata file if journalPath was changed. If journalPath existed but
+    // mongod is started with --nojournal, then journalPath is removed from the metadata file.
+    // If journalPath did not exist, and mongod is started with a specific journal path, then it
+    // is added.
+    metadata->setStorageEngineOptions(factory->createMetadataOptions(storageGlobalParams));
+    uassertStatusOK(metadata->write());
 
     guard.Dismiss();
 

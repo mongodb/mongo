@@ -44,6 +44,8 @@ void StorageGlobalParams::reset() {
     engine = "wiredTiger";
     engineSetByUser = false;
     dbpath = kDefaultDbPath;
+    journalPath = std::string(kDefaultDbPath) + std::string(kDefaultDbJournalSubdir);
+    journalPathSetByUser = false;
     upgrade = false;
     repair = false;
 
@@ -60,14 +62,16 @@ void StorageGlobalParams::reset() {
 StorageGlobalParams storageGlobalParams;
 
 /**
- * The directory where the mongod instance stores its data.
+ * The directories where the mongod instance stores its data and journaling files.
  */
 #ifdef _WIN32
 const char* StorageGlobalParams::kDefaultDbPath = "\\data\\db\\";
 const char* StorageGlobalParams::kDefaultConfigDbPath = "\\data\\configdb\\";
+const char* StorageGlobalParams::kDefaultDbJournalSubdir = "journal\\";
 #else
 const char* StorageGlobalParams::kDefaultDbPath = "/data/db";
 const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
+const char* StorageGlobalParams::kDefaultDbJournalSubdir = "/journal";
 #endif
 
 const int StorageGlobalParams::kMaxJournalCommitIntervalMs = 500;

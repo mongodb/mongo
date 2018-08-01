@@ -72,8 +72,10 @@ class PrefixedWiredTigerHarnessHelper final : public RecordStoreHarnessHelper {
 public:
     PrefixedWiredTigerHarnessHelper()
         : _dbpath("wt_test"),
+          _journalPath("wt_test_journal"),
           _engine(new WiredTigerKVEngine(kWiredTigerEngineName,
                                          _dbpath.path(),
+                                         _journalPath.path(),
                                          _cs.get(),
                                          "",
                                          1,
@@ -87,7 +89,8 @@ public:
                 getGlobalServiceContext(), repl::ReplSettings())));
     }
 
-    PrefixedWiredTigerHarnessHelper(StringData extraStrings) : _dbpath("wt_test") {}
+    PrefixedWiredTigerHarnessHelper(StringData extraStrings)
+        : _dbpath("wt_test"), _journalPath("wt_test_journal") {}
 
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
         return newNonCappedRecordStore("a.b");
@@ -190,6 +193,7 @@ public:
 
 private:
     unittest::TempDir _dbpath;
+    unittest::TempDir _journalPath;
     const std::unique_ptr<ClockSource> _cs = stdx::make_unique<ClockSourceMock>();
 
     std::unique_ptr<WiredTigerKVEngine> _engine;
