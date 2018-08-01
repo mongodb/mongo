@@ -83,6 +83,8 @@ public:
 
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     MergingLogic mergingLogic() final;
+    bool canRunInParallelBeforeOut(
+        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final;
 
     /**
      * Write out a Document whose contents are the sort key pattern.

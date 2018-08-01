@@ -119,6 +119,10 @@ public:
         return _catalogClient.get();
     }
 
+    /**
+     * Can return nullptr. For example, if this is a mongod that is not a shard server. This is
+     * always present on mongos after startup.
+     */
     CatalogCache* catalogCache() const {
         return _catalogCache.get();
     }

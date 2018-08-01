@@ -1970,6 +1970,16 @@ intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
+bool ExpressionFieldPath::representsPath(const std::string& dottedPath) const {
+    if (_variable != Variables::kRootId || _fieldPath.getPathLength() == 1) {
+        // This variable refers to the entire document, or refers to a sub-field of something
+        // besides the root document. Either way we can't prove that it represents the path given by
+        // 'dottedPath'.
+        return false;
+    }
+    return _fieldPath.tail().fullPath() == dottedPath;
+}
+
 void ExpressionFieldPath::_doAddDependencies(DepsTracker* deps) const {
     if (_variable == Variables::kRootId) {  // includes CURRENT when it is equivalent to ROOT.
         if (_fieldPath.getPathLength() == 1) {

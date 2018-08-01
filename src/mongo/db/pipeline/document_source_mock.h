@@ -89,6 +89,13 @@ public:
         return this;
     }
 
+    /**
+     * This stage does not modify anything.
+     */
+    GetModPathsReturn getModifiedPaths() const override {
+        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+    }
+
     // Return documents from front of queue.
     std::deque<GetNextResult> queue;
 

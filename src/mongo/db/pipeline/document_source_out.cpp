@@ -165,18 +165,11 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
     MONGO_UNREACHABLE;
 }
 
-DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
-                                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     WriteModeEnum mode,
-                                     std::set<FieldPath> uniqueKey)
-    : DocumentSource(expCtx),
-      _done(false),
-      _outputNs(outputNs),
-      _mode(mode),
-      _uniqueKeyFields(std::move(uniqueKey)) {}
-
-intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
+    NamespaceString outputNs,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    WriteModeEnum mode,
+    std::set<FieldPath> uniqueKey) {
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "$out cannot be used in a transaction",
@@ -186,6 +179,45 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     uassert(ErrorCodes::InvalidOptions,
             "$out cannot be used with a 'majority' read concern level",
             readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern);
+
+    // Although we perform a check for "replaceCollection" mode with a sharded output collection
+    // during lite parsing, we need to do it here as well in case mongos is stale or the command is
+    // sent directly to the shard.
+    uassert(17017,
+            str::stream() << "$out with mode " << WriteMode_serializer(mode)
+                          << " is not supported to an existing *sharded* output collection.",
+            !(mode == WriteModeEnum::kModeReplaceCollection &&
+              expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, outputNs)));
+
+    uassert(17385, "Can't $out to special collection: " + outputNs.coll(), !outputNs.isSpecial());
+
+    switch (mode) {
+        case WriteModeEnum::kModeReplaceCollection:
+            return new DocumentSourceOutReplaceColl(
+                std::move(outputNs), expCtx, mode, std::move(uniqueKey));
+        case WriteModeEnum::kModeInsertDocuments:
+            return new DocumentSourceOutInPlace(
+                std::move(outputNs), expCtx, mode, std::move(uniqueKey));
+        case WriteModeEnum::kModeReplaceDocuments:
+            return new DocumentSourceOutInPlaceReplace(
+                std::move(outputNs), expCtx, mode, std::move(uniqueKey));
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+DocumentSourceOut::DocumentSourceOut(NamespaceString outputNs,
+                                     const intrusive_ptr<ExpressionContext>& expCtx,
+                                     WriteModeEnum mode,
+                                     std::set<FieldPath> uniqueKey)
+    : DocumentSource(expCtx),
+      _done(false),
+      _outputNs(std::move(outputNs)),
+      _mode(mode),
+      _uniqueKeyFields(std::move(uniqueKey)) {}
+
+intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
 
     auto mode = WriteModeEnum::kModeReplaceCollection;
     std::set<FieldPath> uniqueKey;
@@ -221,27 +253,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
                                 << typeName(elem.type()));
     }
 
-    // Although we perform a check for "replaceCollection" mode with a sharded output collection
-    // during lite parsing, we need to do it here as well in case mongos is stale or the command is
-    // sent directly to the shard.
-    uassert(17017,
-            str::stream() << "$out with mode " << WriteMode_serializer(mode)
-                          << " is not supported to an existing *sharded* output collection.",
-            !(mode == WriteModeEnum::kModeReplaceCollection &&
-              expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, outputNs)));
-
-    uassert(17385, "Can't $out to special collection: " + outputNs.coll(), !outputNs.isSpecial());
-
-    switch (mode) {
-        case WriteModeEnum::kModeReplaceCollection:
-            return new DocumentSourceOutReplaceColl(outputNs, expCtx, mode, uniqueKey);
-        case WriteModeEnum::kModeInsertDocuments:
-            return new DocumentSourceOutInPlace(outputNs, expCtx, mode, uniqueKey);
-        case WriteModeEnum::kModeReplaceDocuments:
-            return new DocumentSourceOutInPlaceReplace(outputNs, expCtx, mode, uniqueKey);
-        default:
-            MONGO_UNREACHABLE;
-    }
+    return create(std::move(outputNs), expCtx, mode, std::move(uniqueKey));
 }
 
 Value DocumentSourceOut::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {

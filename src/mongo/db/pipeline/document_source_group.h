@@ -43,13 +43,13 @@ public:
     using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
-    // Virtuals from DocumentSource.
     boost::intrusive_ptr<DocumentSource> optimize() final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetNextResult getNext() final;
     const char* getSourceName() const final;
     BSONObjSet getOutputSorts() final;
+    GetModPathsReturn getModifiedPaths() const final;
 
     /**
      * Convenience method for creating a new $group stage. If maxMemoryUsageBytes is boost::none,
@@ -88,6 +88,14 @@ public:
     void setIdExpression(const boost::intrusive_ptr<Expression> idExpression);
 
     /**
+     * Returns true if this $group stage represents a 'global' $group which is merging together
+     * results from earlier partial groups.
+     */
+    bool doingMerge() const {
+        return _doingMerge;
+    }
+
+    /**
      * Tell this source if it is doing a merge from shards. Defaults to false.
      */
     void setDoingMerge(bool doingMerge) {
@@ -98,14 +106,16 @@ public:
         return _streaming;
     }
 
-    // Virtuals for NeedsMergerDocumentSource.
-    boost::intrusive_ptr<DocumentSource> getShardSource() final;
-    MergingLogic mergingLogic() final;
-
     /**
      * Returns true if this $group stage used disk during execution and false otherwise.
      */
     bool usedDisk() final;
+
+    // Virtuals for NeedsMergerDocumentSource.
+    boost::intrusive_ptr<DocumentSource> getShardSource() final;
+    MergingLogic mergingLogic() final;
+    bool canRunInParallelBeforeOut(
+        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final;
 
 protected:
     void doDispose() final;
@@ -161,9 +171,14 @@ private:
      */
     Value expandId(const Value& val);
 
-    bool _usedDisk;  // Keeps track of whether this $group spilled to disk.
+    /**
+     * Returns true if 'dottedPath' is one of the group keys present in '_idExpressions'.
+     */
+    bool pathIncludedInGroupKeys(const std::string& dottedPath) const;
+
     std::vector<AccumulationStatement> _accumulatedFields;
 
+    bool _usedDisk;  // Keeps track of whether this $group spilled to disk.
     bool _doingMerge;
     size_t _memoryUsageBytes = 0;
     size_t _maxMemoryUsageBytes;

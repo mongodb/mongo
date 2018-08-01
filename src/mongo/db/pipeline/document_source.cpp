@@ -1,30 +1,30 @@
 /**
-*    Copyright (C) 2011 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2011 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #include "mongo/platform/basic.h"
 
@@ -160,6 +160,52 @@ splitMatchByModifiedFields(const boost::intrusive_ptr<DocumentSourceMatch>& matc
     return match->splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
 }
 
+/**
+ * If 'pathOfInterest' or some path prefix of 'pathOfInterest' is renamed, returns the new name for
+ * 'pathOfInterest', otherwise returns boost::none.
+ * For example, if 'renamedPaths' is {"c.d", "c"}, and 'pathOfInterest' is "c.d.f", returns "c.f".
+ */
+boost::optional<std::string> findNewName(const StringMap<std::string>& renamedPaths,
+                                         std::string pathOfInterest) {
+    FieldPath fullPathOfInterest(pathOfInterest);
+    StringBuilder toLookup;
+    std::size_t pathIndex = 0;
+    while (pathIndex < fullPathOfInterest.getPathLength()) {
+        if (pathIndex != 0) {
+            toLookup << ".";
+        }
+        toLookup << fullPathOfInterest.getFieldName(pathIndex++);
+
+        auto it = renamedPaths.find(toLookup.stringData());
+        if (it != renamedPaths.end()) {
+            const auto& newPathOfPrefix = it->second;
+            // We found a rename! Note this might be a rename of the prefix of the path, so we have
+            // to add back on the suffix that was unchanged.
+            StringBuilder renamedPath;
+            renamedPath << newPathOfPrefix;
+            while (pathIndex < fullPathOfInterest.getPathLength()) {
+                renamedPath << "." << fullPathOfInterest.getFieldName(pathIndex++);
+            }
+            return {renamedPath.str()};
+        }
+    }
+    return boost::none;
+}
+
+StringMap<std::string> computeNewNamesAssumingAnyPathsNotRenamedAreUnmodified(
+    const StringMap<std::string>& renamedPaths, const std::set<std::string>& pathsOfInterest) {
+    StringMap<std::string> renameOut;
+    for (auto&& ofInterest : pathsOfInterest) {
+        if (auto newName = findNewName(renamedPaths, ofInterest)) {
+            renameOut[ofInterest] = *newName;
+        } else {
+            // This path was not renamed, assume it was unchanged and map it to itself.
+            renameOut[ofInterest] = ofInterest;
+        }
+    }
+    return renameOut;
+}
+
 }  // namespace
 
 Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
@@ -200,6 +246,53 @@ Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
         }
     }
     return doOptimizeAt(itr, container);
+}
+
+boost::optional<StringMap<std::string>> DocumentSource::renamedPaths(
+    const std::set<std::string>& pathsOfInterest) const {
+    auto modifiedPathsRet = this->getModifiedPaths();
+    switch (modifiedPathsRet.type) {
+        case DocumentSource::GetModPathsReturn::Type::kNotSupported:
+        case DocumentSource::GetModPathsReturn::Type::kAllPaths:
+            return boost::none;
+        case DocumentSource::GetModPathsReturn::Type::kFiniteSet: {
+            for (auto&& modified : modifiedPathsRet.paths) {
+                for (auto&& ofInterest : pathsOfInterest) {
+                    // Any overlap of the path means the path of interest is not preserved. For
+                    // example, if the path of interest is "a.b", then a modified path of "a",
+                    // "a.b", or "a.b.c" would all signal that "a.b" is not preserved.
+                    if (ofInterest == modified ||
+                        expression::isPathPrefixOf(ofInterest, modified) ||
+                        expression::isPathPrefixOf(modified, ofInterest)) {
+                        // This stage modifies at least one of the fields which the caller is
+                        // interested in, bail out.
+                        return boost::none;
+                    }
+                }
+            }
+
+            // None of the paths of interest were modified, construct the result map, mapping
+            // the names after this stage to the names before this stage.
+            return computeNewNamesAssumingAnyPathsNotRenamedAreUnmodified(modifiedPathsRet.renames,
+                                                                          pathsOfInterest);
+        }
+        case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
+            auto preservedPaths = modifiedPathsRet.paths;
+            for (auto&& rename : modifiedPathsRet.renames) {
+                // For the purposes of checking which paths are modified, consider renames to
+                // preserve the path. We'll circle back later to figure out the new name if
+                // appropriate.
+                preservedPaths.insert(rename.first);
+            }
+            auto modifiedPaths = extractModifiedDependencies(pathsOfInterest, preservedPaths);
+            if (modifiedPaths.empty()) {
+                return computeNewNamesAssumingAnyPathsNotRenamedAreUnmodified(
+                    modifiedPathsRet.renames, pathsOfInterest);
+            }
+            return boost::none;
+        }
+    }
+    MONGO_UNREACHABLE;
 }
 
 void DocumentSource::serializeToArray(vector<Value>& array,
@@ -258,4 +351,4 @@ BSONObjSet DocumentSource::truncateSortSet(const BSONObjSet& sorts,
 
     return out;
 }
-}
+}  // namespace mongo

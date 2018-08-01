@@ -628,6 +628,14 @@ public:
     }
 
     /**
+     * Given 'currentNames' which describes a set of paths which the caller is interested in,
+     * returns boost::none if any of those paths are modified by this stage, or a mapping from
+     * their old name to their new name if they are preserved but possibly renamed by this stage.
+     */
+    boost::optional<StringMap<std::string>> renamedPaths(
+        const std::set<std::string>& currentNames) const;
+
+    /**
      * Get the dependencies this operation needs to do its job. If overridden, subclasses must add
      * all paths needed to apply their transformation to 'deps->fields', and call
      * 'deps->setNeedsMetadata()' to indicate what metadata (e.g. text score), if any, is required.
@@ -730,6 +738,16 @@ public:
      * mergingLogic() to return a pointer to the same object as getShardSource().
      */
     virtual MergingLogic mergingLogic() = 0;
+
+    /**
+     * Returns true if it would be correct to execute this stage in parallel across the shards in
+     * cases where the final stage is an $out. For example, a $group stage which is just merging the
+     * groups from the shards can be run in parallel since it will preserve the shard key.
+     */
+    virtual bool canRunInParallelBeforeOut(
+        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
+        return false;
+    }
 
 protected:
     // It is invalid to delete through a NeedsMergerDocumentSource-typed pointer.

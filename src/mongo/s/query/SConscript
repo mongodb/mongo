@@ -41,6 +41,7 @@ env.CppUnitTest(
     target="cluster_aggregate_test",
     source=[
         "cluster_aggregate_test.cpp",
+        "cluster_aggregation_planner_test.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -57,10 +58,9 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'cluster_query',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/keys_collection_client_sharded',
-        '$BUILD_DIR/mongo/s/commands/cluster_commands',
         '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+        '$BUILD_DIR/mongo/s/commands/cluster_commands',
     ],
 )
 

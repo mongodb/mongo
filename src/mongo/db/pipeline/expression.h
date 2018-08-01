@@ -1108,6 +1108,12 @@ public:
         const std::string& raw,
         const VariablesParseState& vps);
 
+    /**
+     * Returns true if this expression logically represents the path 'dottedPath'. For example, if
+     * 'dottedPath' is 'a.b' and this FieldPath is '$$CURRENT.a.b', returns true.
+     */
+    bool representsPath(const std::string& dottedPath) const;
+
     const FieldPath& getFieldPath() const {
         return _fieldPath;
     }

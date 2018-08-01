@@ -1,30 +1,30 @@
 /**
-*    Copyright (C) 2011 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2011 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #include "mongo/platform/basic.h"
 
@@ -43,8 +43,8 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::shared_ptr;
 using std::pair;
+using std::shared_ptr;
 using std::vector;
 
 REGISTER_DOCUMENT_SOURCE(group,
@@ -239,6 +239,25 @@ DepsTracker::State DocumentSourceGroup::getDependencies(DepsTracker* deps) const
     }
 
     return DepsTracker::State::EXHAUSTIVE_ALL;
+}
+
+DocumentSource::GetModPathsReturn DocumentSourceGroup::getModifiedPaths() const {
+    // We preserve none of the fields, but any fields referenced as part of the group key are
+    // logically just renamed.
+    StringMap<std::string> renames;
+    for (std::size_t i = 0; i < _idExpressions.size(); ++i) {
+        auto idExp = _idExpressions[i];
+        auto pathToPutResultOfExpression =
+            _idFieldNames.empty() ? "_id" : "_id." + _idFieldNames[i];
+        auto computedPaths = idExp->getComputedPaths(pathToPutResultOfExpression);
+        for (auto&& rename : computedPaths.renames) {
+            renames[rename.first] = rename.second;
+        }
+    }
+
+    return {DocumentSource::GetModPathsReturn::Type::kAllExcept,
+            std::set<std::string>{},  // No fields are preserved.
+            std::move(renames)};
 }
 
 intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
@@ -859,6 +878,42 @@ NeedsMergerDocumentSource::MergingLogic DocumentSourceGroup::mergingLogic() {
     }
 
     return {mergingGroup};
+}
+
+bool DocumentSourceGroup::pathIncludedInGroupKeys(const std::string& dottedPath) const {
+    return std::any_of(
+        _idExpressions.begin(), _idExpressions.end(), [&dottedPath](const auto& exp) {
+            if (auto fieldExp = dynamic_cast<ExpressionFieldPath*>(exp.get())) {
+                if (fieldExp->representsPath(dottedPath)) {
+                    return true;
+                }
+            }
+            return false;
+        });
+}
+
+bool DocumentSourceGroup::canRunInParallelBeforeOut(
+    const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
+    if (_doingMerge) {
+        return true;  // This is fine.
+    }
+
+    // Certain $group stages are allowed to execute on each exchange consumer. In order to
+    // guarantee each consumer will only group together data from its own shard, the $group must
+    // group on a superset of the shard key.
+    for (auto&& currentPathOfShardKey : nameOfShardKeyFieldsUponEntryToStage) {
+        if (!pathIncludedInGroupKeys(currentPathOfShardKey)) {
+            // This requires an exact path match, but as a future optimization certain path
+            // prefixes should be okay. For example, if the shard key path is "a.b", and we're
+            // grouping by "a", then each group of "a" is strictly more specific than "a.b", so
+            // we can deduce that grouping by "a" will not need to group together documents
+            // across different values of the shard key field "a.b", and thus as long as any
+            // other shard key fields are similarly preserved will not need to consume a merged
+            // stream to perform the group.
+            return false;
+        }
+    }
+    return true;
 }
 }  // namespace mongo
 

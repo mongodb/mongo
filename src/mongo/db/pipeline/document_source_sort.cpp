@@ -513,6 +513,17 @@ NeedsMergerDocumentSource::MergingLogic DocumentSourceSort::mergingLogic() {
     return {_limitSrc ? DocumentSourceLimit::create(pExpCtx, _limitSrc->getLimit()) : nullptr,
             sortKeyPattern(SortKeySerialization::kForSortKeyMerging).toBson()};
 }
+
+bool DocumentSourceSort::canRunInParallelBeforeOut(
+    const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
+    // This is an interesting special case. If there are no further stages which require merging the
+    // streams into one, a $sort should not require it. This is only the case because the sort order
+    // doesn't matter for a pipeline ending with a $out stage. We may encounter it here as an
+    // intermediate stage before a final $group with a $sort, which would make sense. Should we
+    // extend our analysis to detect if an exchange is appropriate in a general pipeline, a $sort
+    // would generally require merging the streams before producing output.
+    return false;
+}
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"

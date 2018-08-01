@@ -160,9 +160,9 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
     return routingInfo->cm();
 }
 
-void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss) {
+void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string shardId) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        DatabaseType db(nss.db().toString(), {"0"}, true, databaseVersion::makeNew());
+        DatabaseType db(nss.db().toString(), {shardId}, true, databaseVersion::makeNew());
         return std::vector<BSONObj>{db.toBSON()};
     }());
 }

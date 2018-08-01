@@ -153,7 +153,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'cluster_commands',
         'cluster_command_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/saslauth',
     ],
 )

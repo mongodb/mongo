@@ -84,7 +84,7 @@ protected:
     /**
      * Mocks network responses for loading a sharded database and collection from the config server.
      */
-    void expectGetDatabase(NamespaceString nss);
+    void expectGetDatabase(NamespaceString nss, std::string primaryShard = "0");
     void expectGetCollection(NamespaceString nss,
                              OID epoch,
                              const ShardKeyPattern& shardKeyPattern);
