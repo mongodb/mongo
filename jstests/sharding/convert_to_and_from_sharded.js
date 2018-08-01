@@ -4,8 +4,9 @@
  * @tags: [requires_persistence]
  */
 (function() {
-
     "use strict";
+
+    load("jstests/libs/feature_compatibility_version.js");
 
     var NUM_NODES = 3;
 
@@ -34,6 +35,18 @@
     replShard.initiate();
 
     var priConn = replShard.getPrimary();
+
+    // Initialized replica sets with data on them will report themselves as the latest FCV of the
+    // binary that they are running. This poses a problem when this test is run in the mixed version
+    // suite because mongos will be 'last-stable', but if this node is started with the latest
+    // binaries, it will report itself as the 'latest' FCV, which would cause mongos to refuse to
+    // connect to it and shutdown.
+    //
+    // In order to work around this, in the mixed version suite, be pessimistic and always set this
+    // node to the 'last-stable' FCV
+    if (jsTestOptions().shardMixedBinVersions) {
+        assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    }
 
     assert.writeOK(priConn.getDB('test').unsharded.insert({_id: 'marker'}));
     checkBasicCRUD(priConn.getDB('test').unsharded);
@@ -112,5 +125,4 @@
     checkBasicCRUD(priConn.getDB('test').sharded);
 
     replShard.stopSet();
-
 })();
