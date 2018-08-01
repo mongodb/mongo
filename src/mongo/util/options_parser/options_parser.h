@@ -33,9 +33,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace optionenvironment {
+
+constexpr Seconds kDefaultConfigExpandTimeout{30};
 
 class Environment;
 class OptionSection;
@@ -119,6 +122,15 @@ public:
                          const std::map<std::string, std::string>& env,
                          Environment*);
 
+    /**
+     * Flags controlling whether or not __rest and/or __exec directives in a
+     * config file should be expanded via HttpClient/shellExec.
+     */
+    struct ConfigExpand {
+        bool rest = false;
+        Seconds timeout = kDefaultConfigExpandTimeout;
+    };
+
 private:
     /** Handles parsing of the command line and adds the results to the given Environment */
     Status parseCommandLine(const OptionSection&,
@@ -131,7 +143,10 @@ private:
 
     /** Handles parsing of either YAML or INI config and adds the results to the given Environment
      */
-    Status parseConfigFile(const OptionSection&, const std::string& argv, Environment*);
+    Status parseConfigFile(const OptionSection&,
+                           const std::string& argv,
+                           Environment*,
+                           const ConfigExpand& configExpand);
 
     /** Gets defaults from the OptionSection and adds them to the given Environment */
     Status addDefaultValues(const OptionSection&, Environment*);

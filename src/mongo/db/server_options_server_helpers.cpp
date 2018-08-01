@@ -56,6 +56,7 @@
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 using std::endl;
@@ -93,6 +94,25 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                             "outputConfig",
                             moe::Switch,
                             "Display the resolved configuration and exit")
+        .setSources(moe::SourceCommandLine)
+        .hidden();
+
+    options
+        ->addOptionChaining("configExpand",
+                            "configExpand",
+                            moe::String,
+                            "Process expansion directives in config file (none, rest)")
+        .setSources(moe::SourceCommandLine);
+
+    options
+        ->addOptionChaining(
+            "configExpandTimeoutSecs",
+            "configExpandTimeoutSecs",
+            moe::Int,
+            str::stream() << "Maximum number of seconds to wait for a single "
+                             "configuration expansion to resolve (default: "
+                          << durationCount<Seconds>(optionenvironment::kDefaultConfigExpandTimeout)
+                          << " secs)")
         .setSources(moe::SourceCommandLine)
         .hidden();
 

@@ -162,6 +162,9 @@ if http_client == "off":
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
         ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        ],
     )
 else:
     env.Library(

@@ -7,20 +7,29 @@ env = env.Clone()
 optsEnv = env.Clone()
 optsEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
 
-optsEnv.Library('options_parser', ['environment.cpp',
-                               'value.cpp',
-                               'constraints.cpp',
-                               'option_section.cpp',
-                               'option_description.cpp',
-                               'options_parser.cpp',
-                               'startup_option_init.cpp',
-                               'startup_options.cpp',
-                               ],
-                              LIBDEPS=['$BUILD_DIR/mongo/base',
-                                       '$BUILD_DIR/third_party/shim_boost',
-                                       '$BUILD_DIR/third_party/shim_yaml',
-                                       '$BUILD_DIR/third_party/shim_pcrecpp'
-                              ])
+optsEnv.Library(
+    target='options_parser',
+    source=[
+        'constraints.cpp',
+        'environment.cpp',
+        'option_description.cpp',
+        'option_section.cpp',
+        'options_parser.cpp',
+        'startup_option_init.cpp',
+        'startup_options.cpp',
+        'value.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_yaml',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/net/http_client',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/third_party/shim_boost',
+        '$BUILD_DIR/third_party/shim_pcrecpp',
+    ],
+)
 
 # This library contains the initializers to run option parsing.  This is separated into its own
 # library because some code that is shared between many different binaries needs to link against the

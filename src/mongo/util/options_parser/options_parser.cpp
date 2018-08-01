@@ -41,8 +41,10 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/http_client.h"
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
@@ -239,6 +241,250 @@ bool OptionIsStringMap(const std::vector<OptionDescription>& options_vector, con
     return false;
 }
 
+Status parseYAMLConfigFile(const std::string&, YAML::Node*);
+/* Searches a YAML node for configuration expansion directives such as:
+ * __rest: https://example.com/path?query=val
+ *
+ * and optionally the fields `type` and `trim`.
+ *
+ * If the field pairing `trim: whitespace` is present,
+ * then the process() method will have standard ctype spaces removed from
+ * both the front end end of the returned value.
+ *
+ * If the field pairing `type: yaml` is present (valid only the top-level node)
+ * then the process() method will parse any string provided to it as YAML.
+ * If the field is not present, or is set to `string`, then process will
+ * encapsulate any provided string in a YAML String Node.
+ *
+ * If no configuration expansion directive is found, the constructor will
+ * uassert with ErrorCodes::NoSuchKey.
+ */
+class ConfigExpandNode {
+public:
+    ConfigExpandNode(const YAML::Node& node,
+                     const std::string& nodePath,
+                     const OptionsParser::ConfigExpand& configExpand) {
+        invariant(node.IsMap());
+
+        auto nodeName = nodePath;
+        auto prefix = nodePath;
+        if (nodePath.empty()) {
+            nodeName = "Top-level config node";
+        } else {
+            prefix += '.';
+        }
+
+        const auto getStringField = [&node, &prefix](const std::string& fieldName,
+                                                     bool allowed) -> StatusWith<std::string> {
+            try {
+                const auto& strField = node[fieldName];
+                if (!strField.IsDefined()) {
+                    return {ErrorCodes::NoSuchKey, "Not a configuration expansion block"};
+                }
+                if (!allowed) {
+                    return {ErrorCodes::BadValue,
+                            str::stream() << prefix << fieldName
+                                          << " support has not been enabled"};
+                }
+                if (!strField.IsScalar()) {
+                    return {ErrorCodes::BadValue,
+                            str::stream() << prefix << fieldName << " must be a string"};
+                }
+                return strField.Scalar();
+            } catch (const YAML::InvalidNode&) {
+                // Not this kind of expansion block.
+                return {ErrorCodes::NoSuchKey, "Not a configuration expansion block"};
+            }
+        };
+
+        _expansion = ExpansionType::kRest;
+        _action = uassertStatusOK(getStringField("__rest", configExpand.rest));
+
+        // Parse optional fields, keeping track of how many we've handled.
+        // If there are additional (unknown) fields beyond that, raise an error.
+        size_t numVisitedFields = 1;
+
+        auto swType = getStringField("type", true);
+        if (swType.isOK()) {
+            ++numVisitedFields;
+            auto typeField = std::move(swType.getValue());
+            if (typeField == "string") {
+                _type = ContentType::kString;
+            } else if (typeField == "yaml") {
+                _type = ContentType::kYAML;
+            } else {
+                uasserted(ErrorCodes::BadValue,
+                          str::stream() << prefix << "type must be either 'string' or 'yaml'");
+            }
+        } else if (swType.getStatus().code() != ErrorCodes::NoSuchKey) {
+            uassertStatusOK(swType.getStatus());
+        }  // else not specified, assume string.
+
+        auto swTrim = getStringField("trim", true);
+        if (swTrim.isOK()) {
+            ++numVisitedFields;
+            auto trimField = std::move(swTrim.getValue());
+            if (trimField == "none") {
+                _trim = Trim::kNone;
+            } else if (trimField == "whitespace") {
+                _trim = Trim::kWhitespace;
+            } else {
+                uasserted(ErrorCodes::BadValue,
+                          str::stream() << prefix << "trim must be either 'whitespace' or 'none'");
+            }
+        } else if (swTrim.getStatus().code() != ErrorCodes::NoSuchKey) {
+            uassertStatusOK(swTrim.getStatus());
+        }  // else not specified, assume none.
+
+        uassert(ErrorCodes::BadValue,
+                str::stream() << nodeName << " expansion block must contain only '"
+                              << getExpansionName()
+                              << "', and optionally 'type' and/or 'trim' fields",
+                node.size() == numVisitedFields);
+
+        uassert(ErrorCodes::BadValue,
+                "Specifying `type: yaml` is only permitted in top-level expansions",
+                nodePath.empty() || (_type == ContentType::kString));
+    }
+
+    std::string getExpansionName() const {
+        return "__rest";
+    }
+
+    bool isRestExpansion() const {
+        return true;
+    }
+
+    std::string getAction() const {
+        return _action;
+    }
+
+    /**
+     * Optionally trim whitespace from the result of an expansion,
+     * and either wrap it as a YAML string node, or process it as a
+     * YAML blob.
+     */
+    YAML::Node process(std::string str) const {
+        if (_trim == Trim::kWhitespace) {
+            size_t start = 0;
+            size_t end = str.size();
+            while ((start < end) && std::isspace(str[start])) {
+                ++start;
+            }
+            while ((start < end) && std::isspace(str[end - 1])) {
+                --end;
+            }
+            if ((start > 0) || (end < str.size())) {
+                str = str.substr(start, end - start);
+            }
+        }
+
+        if (_type == ContentType::kString) {
+            return YAML::Node(str);
+        }
+
+        invariant(_type == ContentType::kYAML);
+        YAML::Node newNode;
+        const auto status = parseYAMLConfigFile(str, &newNode);
+        if (!status.isOK()) {
+            uasserted(status.code(),
+                      str::stream() << "Failed processing output of " << getExpansionName()
+                                    << " block for config file: "
+                                    << status.reason());
+        }
+
+        return newNode;
+    }
+
+private:
+    // The type of expansion represented.
+    enum class ExpansionType {
+        kRest,
+    };
+    ExpansionType _expansion = ExpansionType::kRest;
+
+    // Whether this expansion represents a single value, or structured YAML.
+    enum class ContentType {
+        kString,
+        kYAML,
+    };
+    ContentType _type = ContentType::kString;
+
+    // Whether the result of the expansion action should be trimmed for whitespace.
+    enum class Trim {
+        kNone,
+        kWhitespace,
+    };
+    Trim _trim = Trim::kNone;
+
+    std::string _action;
+};
+
+std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
+
+    auto client = HttpClient::create();
+    uassert(
+        ErrorCodes::OperationFailed, "No HTTP Client available in this build of MongoDB", client);
+
+    // Expect https:// URLs unless we can be sure we're talking to localhost.
+    if (!url.startsWith("https://")) {
+        uassert(ErrorCodes::BadValue,
+                "__rest configuration expansion only supports http/https",
+                url.startsWith("http://"));
+        const auto start = strlen("http://");
+        auto end = url.find('/', start);
+        if (end == std::string::npos) {
+            end = url.size();
+        }
+        HostAndPort hp(url.substr(start, end - start));
+        client->allowInsecureHTTP(hp.isLocalHost());
+    }
+
+    client->setConnectTimeout(timeout);
+    client->setTimeout(timeout);
+
+    std::string output;
+    auto dataBuilder = client->get(url);
+    const auto sz = dataBuilder.size();
+    output.resize(sz);
+    std::copy_n(dataBuilder.release().get(), sz, &output[0]);
+
+    return output;
+}
+
+/* Attempts to parse configuration expansion directives from a config block.
+ *
+ * If a __rest configuration expansion directive is found,
+ * mongo::HttpClient will be invoked to fetch the resource via GET request.
+ *
+ * See the comment for class ConfigExpandNode for more details.
+ */
+StatusWith<YAML::Node> runYAMLExpansion(const YAML::Node& node,
+                                        const std::string& nodePath,
+                                        const OptionsParser::ConfigExpand& configExpand) try {
+    invariant(node.IsMap());
+    ConfigExpandNode expansion(node, nodePath, configExpand);
+
+    auto nodeName = nodePath;
+    auto prefix = nodePath;
+    if (nodePath.empty()) {
+        nodeName = "Top-level config node";
+    } else {
+        prefix += '.';
+    }
+
+    log() << "Processing " << expansion.getExpansionName() << " config expansion for: " << nodeName;
+    const auto action = expansion.getAction();
+    LOG(2) << prefix << expansion.getExpansionName() << ": " << action;
+
+    invariant(expansion.isRestExpansion());
+    auto output = runYAMLRestExpansion(action, configExpand.timeout);
+
+    return expansion.process(std::move(output));
+} catch (...) {
+    return exceptionToStatus();
+}
+
 // Convert a YAML::Node to a Value.  See comments at the beginning of this section.
 // 'canonicalKey' holds the dotted name that should be used in the result Environment.
 // This ensures that both canonical and deprecated dotted names in the configuration
@@ -247,7 +493,8 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                        const std::vector<OptionDescription>& options_vector,
                        const Key& key,
                        Key* canonicalKey,
-                       Value* value) {
+                       Value* value,
+                       const OptionsParser::ConfigExpand& configExpand) {
     bool isRegistered = false;
 
     // The logic below should ensure that we don't use this uninitialized, but we need to
@@ -324,20 +571,48 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
             return Status(ErrorCodes::BadValue, sb.str());
         }
         StringMap_t stringMap;
+
+        const auto addPair = [&stringMap, &key](std::string elemKey, const YAML::Node& elemVal) {
+            if (elemVal.IsSequence() || elemVal.IsMap()) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                                  << key
+                                  << " has a map with non scalar values, which is not allowed");
+            }
+
+            if (stringMap.count(elemKey) > 0) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "String Map Option: " << key
+                                            << " has duplicate keys in YAML Config: "
+                                            << elemKey);
+            }
+
+            stringMap[std::move(elemKey)] = elemVal.Scalar();
+            return Status::OK();
+        };
+
         for (YAML::const_iterator it = YAMLNode.begin(); it != YAMLNode.end(); ++it) {
-            if (it->second.IsSequence() || it->second.IsMap()) {
-                StringBuilder sb;
-                sb << "Option: " << key
-                   << " has a map with non scalar values, which is not allowed";
-                return Status(ErrorCodes::BadValue, sb.str());
+            auto elementKey = it->first.Scalar();
+            const auto& elementVal = it->second;
+
+            if (elementVal.IsMap()) {
+                auto swExpansion = runYAMLExpansion(
+                    elementVal, str::stream() << key << "." << elementKey, configExpand);
+                if (swExpansion.isOK()) {
+                    const auto status = addPair(elementKey, swExpansion.getValue());
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                    continue;
+                } else if (swExpansion.getStatus().code() != ErrorCodes::NoSuchKey) {
+                    return swExpansion.getStatus();
+                }  // else not an expansion block.
             }
-            if (stringMap.count(it->first.Scalar()) > 0) {
-                StringBuilder sb;
-                sb << "String Map Option: " << key
-                   << " has duplicate keys in YAML Config: " << it->first.Scalar();
-                return Status(ErrorCodes::BadValue, sb.str());
+
+            const auto status = addPair(std::move(elementKey), elementVal);
+            if (!status.isOK()) {
+                return status;
             }
-            stringMap[it->first.Scalar()] = it->second.Scalar();
         }
         *value = Value(stringMap);
         return Status::OK();
@@ -486,7 +761,8 @@ Status addBoostVariablesToEnvironment(const po::variables_map& vm,
 Status addYAMLNodesToEnvironment(const YAML::Node& root,
                                  const OptionSection& options,
                                  const std::string parentPath,
-                                 Environment* environment) {
+                                 Environment* environment,
+                                 const OptionsParser::ConfigExpand& configExpand) {
     std::vector<OptionDescription> options_vector;
     Status ret = options.getAllOptions(&options_vector);
     if (!ret.isOK()) {
@@ -496,6 +772,20 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
     // Don't return an error on empty config files
     if (root.IsNull()) {
         return Status::OK();
+    }
+
+    if (root.IsMap()) {
+        auto swExpansion = runYAMLExpansion(root, parentPath, configExpand);
+        if (swExpansion.isOK()) {
+            // Expanded fine, but disallow recursion.
+            return addYAMLNodesToEnvironment(swExpansion.getValue(),
+                                             options,
+                                             parentPath,
+                                             environment,
+                                             OptionsParser::ConfigExpand());
+        } else if (swExpansion.getStatus().code() != ErrorCodes::NoSuchKey) {
+            return swExpansion.getStatus();
+        }  // else not an expansion block.
     }
 
     if (!root.IsMap() && parentPath.empty()) {
@@ -525,16 +815,30 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
             }
         }
 
+        // Avoid potential double-expand in YAMLNodeToValue by clearing configExpand per-element.
+        auto expand = configExpand;
+
+        if (YAMLNode.IsMap()) {
+            auto swExpansion = runYAMLExpansion(YAMLNode, dottedName, expand);
+            if (swExpansion.isOK()) {
+                YAMLNode = std::move(swExpansion.getValue());
+                expand = OptionsParser::ConfigExpand();
+            } else if (swExpansion.getStatus().code() != ErrorCodes::NoSuchKey) {
+                return swExpansion.getStatus();
+            }  // else not an expansion block.
+        }
+
         if (YAMLNode.IsMap() && !OptionIsStringMap(options_vector, dottedName)) {
-            Status ret = addYAMLNodesToEnvironment(YAMLNode, options, dottedName, environment);
+            Status ret =
+                addYAMLNodesToEnvironment(YAMLNode, options, dottedName, environment, expand);
             if (!ret.isOK()) {
                 return ret;
             }
         } else {
             Key canonicalKey;
             Value optionValue;
-            Status ret =
-                YAMLNodeToValue(YAMLNode, options_vector, dottedName, &canonicalKey, &optionValue);
+            Status ret = YAMLNodeToValue(
+                YAMLNode, options_vector, dottedName, &canonicalKey, &optionValue, expand);
             if (!ret.isOK()) {
                 return ret;
             }
@@ -1151,6 +1455,55 @@ StatusWith<std::vector<std::string>> transformImplictOptions(
 
 }  // namespace
 
+StatusWith<OptionsParser::ConfigExpand> parseConfigExpand(const Environment& cli) {
+    OptionsParser::ConfigExpand ret;
+
+    if (!cli.count("configExpand")) {
+        return ret;
+    }
+
+    Value expand_value;
+    auto status = cli.get(Key("configExpand"), &expand_value);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto expand = expand_value.as<std::string>();
+    if (expand == "none") {
+        return ret;
+    }
+
+    Value timeout_value;
+    status = cli.get(Key("configExpandTimeoutSecs"), &timeout_value);
+    if (status.isOK()) {
+        auto timeout = timeout_value.as<int>();
+        if (timeout <= 0) {
+            return {ErrorCodes::BadValue, "Invalid value for configExpandTimeoutSecs"};
+        }
+        ret.timeout = Seconds{timeout};
+    }
+
+    StringData expandSD(expand);
+    while (!expandSD.empty()) {
+        StringData elem;
+        auto comma = expandSD.find(',');
+        if (comma == std::string::npos) {
+            elem = expandSD;
+            expandSD = StringData();
+        } else {
+            elem = expandSD.substr(0, comma);
+            expandSD = expandSD.substr(comma + 1);
+        }
+        if (elem == "rest") {
+            ret.rest = true;
+        } else {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Invalid value for --configExpand: '" << elem << "'"};
+        }
+    }
+    return ret;
+}
+
 /**
  * Run the OptionsParser
  *
@@ -1189,6 +1542,7 @@ Status OptionsParser::run(const OptionSection& options,
     if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
         return ret;
     }
+
     // "config" exists in our environment
     else if (ret.isOK()) {
         // Environment::get returns a bad status if config was not set
@@ -1204,7 +1558,13 @@ Status OptionsParser::run(const OptionSection& options,
             return ret;
         }
 
-        ret = parseConfigFile(options, config_file, &configEnvironment);
+        auto swExpand = parseConfigExpand(commandLineEnvironment);
+        if (!swExpand.isOK()) {
+            return swExpand.getStatus();
+        }
+        auto configExpand = std::move(swExpand.getValue());
+
+        ret = parseConfigFile(options, config_file, &configEnvironment, configExpand);
         if (!ret.isOK()) {
             return ret;
         }
@@ -1273,7 +1633,7 @@ Status OptionsParser::runConfigFile(
     }
 
     // Add values from the provided config file
-    ret = parseConfigFile(options, config, configEnvironment);
+    ret = parseConfigFile(options, config, configEnvironment, ConfigExpand());
     if (!ret.isOK()) {
         return ret;
     }
@@ -1289,7 +1649,8 @@ Status OptionsParser::runConfigFile(
 
 Status OptionsParser::parseConfigFile(const OptionSection& options,
                                       const std::string& config_file,
-                                      Environment* configEnvironment) {
+                                      Environment* configEnvironment,
+                                      const ConfigExpand& configExpand) {
     YAML::Node YAMLConfig;
     Status ret = parseYAMLConfigFile(config_file, &YAMLConfig);
     if (!ret.isOK()) {
@@ -1298,7 +1659,7 @@ Status OptionsParser::parseConfigFile(const OptionSection& options,
 
     // Check if YAML parsing was successful, if not try to read as INI
     if (isYAMLConfig(YAMLConfig)) {
-        ret = addYAMLNodesToEnvironment(YAMLConfig, options, "", configEnvironment);
+        ret = addYAMLNodesToEnvironment(YAMLConfig, options, "", configEnvironment, configExpand);
         if (!ret.isOK()) {
             return ret;
         }

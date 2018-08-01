@@ -146,16 +146,16 @@ public:
         _handle.reset(curl_easy_init());
         uassert(ErrorCodes::InternalError, "Curl initialization failed", _handle);
 
-        curl_easy_setopt(_handle.get(), CURLOPT_CONNECTTIMEOUT, kConnectionTimeoutSeconds);
+        curl_easy_setopt(_handle.get(), CURLOPT_CONNECTTIMEOUT, longSeconds(kConnectionTimeout));
         curl_easy_setopt(_handle.get(), CURLOPT_FOLLOWLOCATION, 0);
         curl_easy_setopt(_handle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         curl_easy_setopt(_handle.get(), CURLOPT_NOSIGNAL, 1);
         curl_easy_setopt(_handle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+        curl_easy_setopt(_handle.get(), CURLOPT_TIMEOUT, longSeconds(kTotalRequestTimeout));
 #if LIBCURL_VERSION_NUM > 0x072200
         // Requires >= 7.34.0
         curl_easy_setopt(_handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 #endif
-        curl_easy_setopt(_handle.get(), CURLOPT_TIMEOUT, kTotalRequestTimeoutSeconds);
         curl_easy_setopt(_handle.get(), CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 
         // TODO: CURLOPT_EXPECT_100_TIMEOUT_MS?
@@ -178,6 +178,14 @@ public:
         // Can't set on base handle because cURL doesn't deep-dup this field
         // and we don't want it getting overwritten while another thread is using it.
         _headers = headers;
+    }
+
+    void setTimeout(Seconds timeout) final {
+        curl_easy_setopt(_handle.get(), CURLOPT_TIMEOUT, longSeconds(timeout));
+    }
+
+    void setConnectTimeout(Seconds timeout) final {
+        curl_easy_setopt(_handle.get(), CURLOPT_CONNECTTIMEOUT, longSeconds(timeout));
     }
 
     DataBuilder get(StringData url) const final {
@@ -204,6 +212,14 @@ public:
     }
 
 private:
+    /**
+     * Helper for use with curl_easy_setopt which takes a vararg list,
+     * and expects a long, not the long long durationCount() returns.
+     */
+    long longSeconds(Seconds tm) {
+        return static_cast<long>(durationCount<Seconds>(tm));
+    }
+
     DataBuilder doRequest(CURL* handle, StringData url) const {
         const auto urlString = url.toString();
         curl_easy_setopt(handle, CURLOPT_URL, urlString.c_str());

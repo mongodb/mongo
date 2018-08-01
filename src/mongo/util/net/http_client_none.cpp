@@ -31,7 +31,7 @@
 
 namespace mongo {
 
-std::unique_ptr<HttpClient> HttpClient::create(std::unique_ptr<executor::ThreadPoolTaskExecutor>) {
+std::unique_ptr<HttpClient> HttpClient::create() {
     return nullptr;
 }
 

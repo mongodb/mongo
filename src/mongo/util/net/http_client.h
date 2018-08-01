@@ -37,12 +37,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
 
-constexpr uint64_t kConnectionTimeoutSeconds = 60L;
-constexpr uint64_t kTotalRequestTimeoutSeconds = 120L;
+constexpr Seconds kConnectionTimeout{60};
+constexpr Seconds kTotalRequestTimeout{120};
 
 /**
  * Interface used to upload and receive binary payloads to HTTP servers.
@@ -61,6 +62,18 @@ public:
      * Assign a set of headers for this request.
      */
     virtual void setHeaders(const std::vector<std::string>& headers) = 0;
+
+    /**
+     * Sets the maximum time to wait during the connection phase.
+     * `0` indicates no timeout.
+     */
+    virtual void setConnectTimeout(Seconds timeout) = 0;
+
+    /**
+     * Sets the maximum time to wait for the total request.
+     * `0` indicates no timeout.
+     */
+    virtual void setTimeout(Seconds timeout) = 0;
 
     /**
      * Perform a POST request to specified URL.

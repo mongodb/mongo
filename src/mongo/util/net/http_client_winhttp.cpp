@@ -56,11 +56,6 @@
 namespace mongo {
 namespace {
 
-const DWORD kResolveTimeout = 60 * 1000;
-const DWORD kConnectTimeout = 60 * 1000;
-const DWORD kSendTimeout = 120 * 1000;
-const DWORD kReceiveTimeout = 120 * 1000;
-
 const LPCWSTR kAcceptTypes[] = {
     L"application/octet-stream", nullptr,
 };
@@ -151,6 +146,14 @@ public:
         _headers = toNativeString(header.c_str());
     }
 
+    void setConnectTimeout(Seconds timeout) final {
+        _connectTimeout = timeout;
+    }
+
+    void setTimeout(Seconds timeout) final {
+        _timeout = timeout;
+    }
+
     DataBuilder post(StringData url, ConstDataRange cdr) const final {
         return doRequest(
             L"POST", url, const_cast<void*>(static_cast<const void*>(cdr.data())), cdr.length());
@@ -206,10 +209,11 @@ private:
             "Failed setting HTTP session option",
             WinHttpSetOption(session, WINHTTP_OPTION_REDIRECT_POLICY, &setting, settingLength));
 
-        uassertWithErrno(
-            "Failed setting HTTP timeout",
-            WinHttpSetTimeouts(
-                session, kResolveTimeout, kConnectTimeout, kSendTimeout, kReceiveTimeout));
+        DWORD connectTimeout = durationCount<Milliseconds>(_connectTimeout);
+        DWORD totalTimeout = durationCount<Milliseconds>(_timeout);
+        uassertWithErrno("Failed setting HTTP timeout",
+                         WinHttpSetTimeouts(
+                             session, connectTimeout, connectTimeout, totalTimeout, totalTimeout));
 
         connect = WinHttpConnect(session, url.hostname.c_str(), url.port, 0);
         uassertWithErrno("Failed connecting to remote host", connect);
@@ -279,6 +283,8 @@ private:
 private:
     bool _allowInsecureHTTP = false;
     std::wstring _headers;
+    Seconds _connectTimeout = kConnectionTimeout;
+    Seconds _timeout = kTotalRequestTimeout;
 };
 
 }  // namespace
