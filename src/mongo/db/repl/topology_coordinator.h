@@ -311,10 +311,10 @@ public:
                                       ReplSetHeartbeatResponse* response);
 
     struct ReplSetStatusArgs {
-        Date_t now;
-        unsigned selfUptime;
-        const OpTime& readConcernMajorityOpTime;
-        const BSONObj& initialSyncStatus;
+        const Date_t now;
+        const unsigned selfUptime;
+        const OpTime readConcernMajorityOpTime;
+        const BSONObj initialSyncStatus;
 
         // boost::none if the storage engine does not support RTT, or if it does but does not
         // persist data to necessitate taking checkpoints. Timestamp::min() if a checkpoint is yet
