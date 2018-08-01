@@ -81,7 +81,7 @@ public:
         auto ret = std::shared_ptr<Value>(value.release(), _makeDeleterWithLock(key, _generation));
         bool inserted;
         std::tie(std::ignore, inserted) = _active.emplace(key, ret);
-        fassert(50893, inserted);
+        fassert(50902, inserted);
         return ret;
     }
 
@@ -164,7 +164,7 @@ public:
         bool inserted;
         std::tie(std::ignore, inserted) = _active.emplace(key, ret);
 
-        fassert(50894, inserted);
+        fassert(50903, inserted);
         return ret;
     }
 
