@@ -3,9 +3,10 @@
  * be created).
  */
 
-var st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 load("jstests/sharding/movechunk_include.js");
-setupMoveChunkTest(st);
+
+// Passing no shardOptions to test default moveParanoia
+var st = setupMoveChunkTest({});
 
 var shards = [st.shard0, st.shard1];
 for (i in shards) {

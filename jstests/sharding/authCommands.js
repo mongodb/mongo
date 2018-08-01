@@ -21,8 +21,7 @@
     var st = new ShardingTest({
         shards: 2,
         rs: {oplogSize: 10, useHostname: false},
-        other:
-            {keyFile: 'jstests/libs/key1', useHostname: false, chunkSize: 2, enableAutoSplit: true},
+        other: {keyFile: 'jstests/libs/key1', useHostname: false, chunkSize: 2},
     });
 
     var mongos = st.s;
@@ -70,13 +69,15 @@
         str += str;
     }
 
-    var bulk = testDB.foo.initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
+        var bulk = testDB.foo.initializeUnorderedBulkOp();
         for (var j = 0; j < 10; j++) {
             bulk.insert({i: i, j: j, str: str});
         }
+        assert.writeOK(bulk.execute({w: "majority"}));
+        // Split the chunk we just inserted so that we have something to balance.
+        assert.commandWorked(st.splitFind("test.foo", {i: i, j: 0}));
     }
-    assert.writeOK(bulk.execute({w: "majority"}));
 
     assert.eq(expectedDocs, testDB.foo.count());
 

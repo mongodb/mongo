@@ -108,6 +108,12 @@ function mixedShardTest(options1, options2, shouldSucceed) {
     try {
         // Start ShardingTest with enableBalancer because ShardingTest attempts to turn
         // off the balancer otherwise, which it will not be authorized to do if auth is enabled.
+        //
+        // Also, the autosplitter will be turned on automatically with 'enableBalancer: true'. We
+        // then want to disable the autosplitter, but cannot do so here with 'enableAutoSplit:
+        // false' because ShardingTest will attempt to call disableAutoSplit(), which it will not be
+        // authorized to do if auth is enabled.
+        //
         // Once SERVER-14017 is fixed the "enableBalancer" line can be removed.
         // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
         var st = new ShardingTest({
@@ -124,6 +130,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         authSucceeded = true;
 
         st.stopBalancer();
+        st.disableAutoSplit();
 
         // Test that $lookup works because it causes outgoing connections to be opened
         testShardedLookup(st);
@@ -149,6 +156,9 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         }
         assert.writeOK(bulk.execute());
         assert.eq(128, db1.col.count(), "error retrieving documents from cluster");
+
+        // Split chunk to make it small enough to move
+        assert.commandWorked(st.splitFind("test.col", {_id: 0}));
 
         // Test shards talking to each other
         r = st.getDB('test').adminCommand(

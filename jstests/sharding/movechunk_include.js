@@ -1,4 +1,13 @@
-function setupMoveChunkTest(st) {
+function setupMoveChunkTest(shardOptions) {
+    var st = new ShardingTest({
+        shards: 2,
+        mongos: 1,
+        other: {
+            chunkSize: 1,
+            shardOptions: shardOptions,
+        }
+    });
+
     // Stop Balancer
     st.stopBalancer();
 
@@ -25,6 +34,11 @@ function setupMoveChunkTest(st) {
     }
     assert.writeOK(bulk.execute());
 
+    // Make sure there are chunks to move
+    for (var i = 0; i < 10; ++i) {
+        assert.commandWorked(st.splitFind("test.foo", {_id: i}));
+    }
+
     var stats = st.chunkCounts("foo");
     var to = "";
     for (shard in stats) {
@@ -41,4 +55,5 @@ function setupMoveChunkTest(st) {
         _waitForDelete: true
     });  // some tests need this...
     assert(result, "movechunk failed: " + tojson(result));
+    return st;
 }
