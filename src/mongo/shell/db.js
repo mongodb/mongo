@@ -1919,6 +1919,12 @@ var DB;
 
     DB.prototype.enableFreeMonitoring = function() {
         'use strict';
+        const isMaster = this.isMaster();
+        if (isMaster.ismaster == false) {
+            print("ERROR: db.enableFreeMonitoring() may only be run on a primary");
+            return;
+        }
+
         assert.commandWorked(this.adminCommand({setFreeMonitoring: 1, action: 'enable'}));
 
         const cmd = this.adminCommand({getFreeMonitoringStatus: 1});
