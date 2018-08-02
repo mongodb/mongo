@@ -588,6 +588,18 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     }
 
     auto opCtx = cc().makeOperationContext();
+    auto consistency = DataConsistency::Inconsistent;
+    if (!lastOpTime.isNull()) {
+
+        // If we have an oplog, it is still possible that our data is not in a consistent state. For
+        // example, if we are starting up after a crash following a post-rollback RECOVERING state.
+        // To detect this, we see if our last optime is >= the 'minValid' optime, which
+        // should be persistent across node crashes.
+        OpTime minValid = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx.get());
+        consistency =
+            (lastOpTime >= minValid) ? DataConsistency::Consistent : DataConsistency::Inconsistent;
+    }
+
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
@@ -596,15 +608,6 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     // Set our last applied and durable optimes to the top of the oplog, if we have one.
     if (!lastOpTime.isNull()) {
         bool isRollbackAllowed = false;
-
-        // If we have an oplog, it is still possible that our data is not in a consistent state. For
-        // example, if we are starting up after a crash following a post-rollback RECOVERING state.
-        // To detect this, we see if our last optime is >= the 'minValid' optime, which
-        // should be persistent across node crashes.
-        OpTime minValid = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx.get());
-        auto consistency =
-            (lastOpTime >= minValid) ? DataConsistency::Consistent : DataConsistency::Inconsistent;
-
         _setMyLastAppliedOpTime_inlock(lastOpTime, isRollbackAllowed, consistency);
         _setMyLastDurableOpTime_inlock(lastOpTime, isRollbackAllowed);
         _reportUpstream_inlock(std::move(lock));  // unlocks _mutex.
