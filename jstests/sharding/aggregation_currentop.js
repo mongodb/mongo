@@ -759,8 +759,11 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     let transactionDocument = currentOp[0].transaction;
     assert.eq(transactionDocument.parameters.autocommit, false);
     assert.gte(ISODate(transactionDocument.startWallClockTime), timeBeforeTransactionStarts);
-    assert.gt(transactionDocument.timeOpenMicros,
-              (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
+    // We round timeOpenMicros up to the nearest multiple of 1000 to avoid occasional assertion
+    // failures caused by timeOpenMicros having microsecond precision while
+    // timeBeforeCurrentOp/timeAfterTransactionStarts only have millisecond precision.
+    assert.gte(Math.ceil(transactionDocument.timeOpenMicros / 1000) * 1000,
+               (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
     assert.gte(transactionDocument.timeActiveMicros, 0);
     assert.gte(transactionDocument.timeInactiveMicros, 0);
 
