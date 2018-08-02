@@ -164,6 +164,17 @@ selector:
   # Checks for an exact number of matching entries in the profiler, which will fail if a command
   # gets retried due to a stepdown.
   - jstests/sharding/database_and_shard_versioning_all_commands.js
+  # Calls removeShard/removeshard which is not idempotent and these tests expect it to be run an exact number of times
+  - jstests/sharding/addshard5.js
+  - jstests/sharding/auth_add_shard.js
+  - jstests/sharding/remove3.js
+  - jstests/sharding/authCommands.js
+  #  - jstests/sharding/addshard2.js
+  #  - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
+  #  - jstests/sharding/convert_to_and_from_sharded.js
+  #  - jstests/sharding/names.js
+  #  - jstests/sharding/remove1.js
+  #  - jstests/sharding/remove2.js
 
 executor:
   config:
