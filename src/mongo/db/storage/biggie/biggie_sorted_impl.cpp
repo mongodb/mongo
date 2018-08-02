@@ -393,17 +393,15 @@ Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx,
         return Status::OK();
     }
 
-    if (!_dupsAllowed) {
-        std::string workingCopyLowerBound = combineKeyAndRID(key, RecordId::min(), _prefix, _order);
-        auto lowerBoundIterator = workingCopy->lower_bound(workingCopyLowerBound);
+    std::string workingCopyLowerBound = combineKeyAndRID(key, RecordId::min(), _prefix, _order);
+    auto lowerBoundIterator = workingCopy->lower_bound(workingCopyLowerBound);
 
-        if (lowerBoundIterator != workingCopy->end() &&
-            lowerBoundIterator->first != workingCopyCheckKey &&
-            lowerBoundIterator->first.compare(_KSForIdentEnd) < 0 &&
-            lowerBoundIterator->first.compare(
-                combineKeyAndRID(key, RecordId::max(), _prefix, _order)) <= 0) {
-            return dupKeyError(key);
-        }
+    if (lowerBoundIterator != workingCopy->end() &&
+        lowerBoundIterator->first != workingCopyCheckKey &&
+        lowerBoundIterator->first.compare(_KSForIdentEnd) < 0 &&
+        lowerBoundIterator->first.compare(
+            combineKeyAndRID(key, RecordId::max(), _prefix, _order)) <= 0) {
+        return dupKeyError(key);
     }
     return Status::OK();
 }
