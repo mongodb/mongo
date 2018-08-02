@@ -5,6 +5,7 @@
 // the servers being used.
 const commandsRemovedFromMongosIn42 = [
     'copydb',
+    'copydbsaslstart',
     'eval',
     'geoNear',
     'group',

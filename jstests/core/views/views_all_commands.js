@@ -146,7 +146,6 @@
         connectionStatus: {skip: isUnrelated},
         convertToCapped: {command: {convertToCapped: "view", size: 12345}, expectFailure: true},
         coordinateCommitTransaction: {skip: isUnrelated},
-        copydbsaslstart: {skip: isUnrelated},
         count: {command: {count: "view"}},
         cpuload: {skip: isAnInternalCommand},
         create: {skip: "tested in views/views_creation.js"},

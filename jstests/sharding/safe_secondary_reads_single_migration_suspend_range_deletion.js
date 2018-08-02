@@ -119,7 +119,6 @@
         connPoolSync: {skip: "does not return user data"},
         connectionStatus: {skip: "does not return user data"},
         convertToCapped: {skip: "primary only"},
-        copydbsaslstart: {skip: "primary only"},
         count: {
             setUp: function(mongosConn) {
                 assert.writeOK(mongosConn.getCollection(nss).insert({x: 1}));

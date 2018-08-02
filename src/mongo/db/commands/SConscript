@@ -279,7 +279,6 @@ env.Library(
         "clone_collection.cpp",
         "collection_to_capped.cpp",
         "compact.cpp",
-        "copydb_start_commands.cpp",
         "cpuload.cpp",
         "dbcheck.cpp",
         "dbcommands_d.cpp",
