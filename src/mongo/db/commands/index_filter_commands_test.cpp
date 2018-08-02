@@ -167,13 +167,11 @@ bool planCacheContains(OperationContext* opCtx,
     unique_ptr<CanonicalQuery> inputQuery = std::move(statusWithInputQuery.getValue());
 
     // Retrieve cache entries from plan cache.
-    vector<PlanCacheEntry*> entries = planCache.getAllEntries();
+    auto entries = planCache.getAllEntries();
 
     // Search keys.
     bool found = false;
-    for (vector<PlanCacheEntry*>::const_iterator i = entries.begin(); i != entries.end(); i++) {
-        PlanCacheEntry* entry = *i;
-
+    for (auto&& entry : entries) {
         // Canonicalizing query shape in cache entry to get cache key.
         // Alternatively, we could add key to PlanCacheEntry but that would be used in one place
         // only.
@@ -189,8 +187,6 @@ bool planCacheContains(OperationContext* opCtx,
         if (planCache.computeKey(*currentQuery) == planCache.computeKey(*inputQuery)) {
             found = true;
         }
-        // Release resources for cache entry after extracting key.
-        delete entry;
     }
     return found;
 }

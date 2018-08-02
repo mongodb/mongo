@@ -1002,7 +1002,9 @@ protected:
         qs.cacheData.reset(soln.cacheData->clone());
         std::vector<QuerySolution*> solutions;
         solutions.push_back(&qs);
-        PlanCacheEntry entry(solutions, createDecision(1U).release());
+
+        uint32_t queryHash = PlanCache::computeQueryHash(ck);
+        PlanCacheEntry entry(solutions, createDecision(1U).release(), queryHash);
         CachedSolution cachedSoln(ck, entry);
 
         auto statusWithQs = QueryPlanner::planFromCache(*scopedCq, params, cachedSoln);

@@ -24,8 +24,8 @@
         return res.shapes;
     }
 
-    // Attempting to retrieve cache information on non-existent collection is not an error
-    // and should return an empty array of query shapes.
+    // Attempting to retrieve cache information on non-existent collection is not an error and
+    // should return an empty array of query shapes.
     const missingCollection = db.jstests_query_cache_missing;
     missingCollection.drop();
     assert.eq(0,
@@ -46,19 +46,26 @@
               t.find({a: 1, b: 1}, {_id: 1, a: 1}).sort({a: -1}).itcount(),
               'unexpected document count');
 
-    // We now expect the two indices to be compared and a cache entry to exist.
-    // Retrieve query shapes from the test collection
-    // Number of shapes should match queries executed by multi-plan runner.
+    // We now expect the two indices to be compared and a cache entry to exist.  Retrieve query
+    // shapes from the test collection Number of shapes should match queries executed by multi-plan
+    // runner.
     let shapes = getShapes();
     assert.eq(1, shapes.length, 'unexpected number of shapes in planCacheListQueryShapes result');
+    // Since the queryHash is computed in the server, we filter it out when matching query shapes
+    // here.
+    let filteredShape0 = shapes[0];
+    delete filteredShape0.queryHash;
     assert.eq({query: {a: 1, b: 1}, sort: {a: -1}, projection: {_id: 1, a: 1}},
-              shapes[0],
+              filteredShape0,
               'unexpected query shape returned from planCacheListQueryShapes');
 
     // Running a different query shape should cause another entry to be cached.
     assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
     shapes = getShapes();
     assert.eq(2, shapes.length, 'unexpected number of shapes in planCacheListQueryShapes result');
+
+    // Check that each shape has a unique queryHash.
+    assert.neq(shapes[0]["queryHash"], shapes[1]["queryHash"]);
 
     // Check that queries with different regex options have distinct shapes.
 

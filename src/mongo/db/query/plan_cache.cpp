@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
@@ -392,8 +393,9 @@ CachedSolution::~CachedSolution() {
 //
 
 PlanCacheEntry::PlanCacheEntry(const std::vector<QuerySolution*>& solutions,
-                               PlanRankingDecision* why)
-    : plannerData(solutions.size()), decision(why) {
+                               PlanRankingDecision* why,
+                               uint32_t queryHash)
+    : plannerData(solutions.size()), queryHash(queryHash), decision(why) {
     invariant(why);
 
     // The caller of this constructor is responsible for ensuring
@@ -424,7 +426,7 @@ PlanCacheEntry* PlanCacheEntry::clone() const {
         solutions.push_back(std::move(qs));
     }
     PlanCacheEntry* entry = new PlanCacheEntry(
-        transitional_tools_do_not_use::unspool_vector(solutions), decision->clone());
+        transitional_tools_do_not_use::unspool_vector(solutions), decision->clone(), queryHash);
 
     // Copy query shape.
     entry->query = query.getOwned();
@@ -835,7 +837,8 @@ Status PlanCache::set(const CanonicalQuery& query,
         isNewEntryActive = newState.shouldBeActive;
     }
 
-    auto newEntry = std::make_unique<PlanCacheEntry>(solns, why.release());
+    uint32_t queryHash = computeQueryHash(key);
+    auto newEntry = std::make_unique<PlanCacheEntry>(solns, why.release(), queryHash);
     const QueryRequest& qr = query.getQueryRequest();
     newEntry->query = qr.getFilter().getOwned();
     newEntry->sort = qr.getSort().getOwned();
@@ -845,7 +848,6 @@ Status PlanCache::set(const CanonicalQuery& query,
         newEntry->collation = query.getCollator()->getSpec().toBSON();
     }
     newEntry->timeOfCreation = now;
-
 
     // Strip projections on $-prefixed fields, as these are added by internal callers of the query
     // system and are not considered part of the user projection.
@@ -947,6 +949,10 @@ PlanCacheKey PlanCache::computeKey(const CanonicalQuery& cq) const {
     return keyBuilder.str();
 }
 
+uint32_t PlanCache::computeQueryHash(const PlanCacheKey& key) {
+    return SimpleStringDataComparator::kInstance.hash(key);
+}
+
 StatusWith<std::unique_ptr<PlanCacheEntry>> PlanCache::getEntry(const CanonicalQuery& query) const {
     PlanCacheKey key = computeKey(query);
 
@@ -961,13 +967,13 @@ StatusWith<std::unique_ptr<PlanCacheEntry>> PlanCache::getEntry(const CanonicalQ
     return std::unique_ptr<PlanCacheEntry>(entry->clone());
 }
 
-std::vector<PlanCacheEntry*> PlanCache::getAllEntries() const {
+std::vector<std::unique_ptr<PlanCacheEntry>> PlanCache::getAllEntries() const {
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
-    std::vector<PlanCacheEntry*> entries;
-    typedef std::list<std::pair<PlanCacheKey, PlanCacheEntry*>>::const_iterator ConstIterator;
-    for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
-        PlanCacheEntry* entry = i->second;
-        entries.push_back(entry->clone());
+    std::vector<std::unique_ptr<PlanCacheEntry>> entries;
+
+    for (auto&& cacheEntry : _cache) {
+        auto entry = cacheEntry.second;
+        entries.push_back(std::unique_ptr<PlanCacheEntry>(entry->clone()));
     }
 
     return entries;

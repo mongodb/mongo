@@ -237,7 +237,9 @@ public:
      * Grabs any planner-specific data required from the solutions.
      * Takes ownership of the PlanRankingDecision that placed the plan in the cache.
      */
-    PlanCacheEntry(const std::vector<QuerySolution*>& solutions, PlanRankingDecision* why);
+    PlanCacheEntry(const std::vector<QuerySolution*>& solutions,
+                   PlanRankingDecision* why,
+                   uint32_t queryHash);
 
     ~PlanCacheEntry();
 
@@ -268,6 +270,10 @@ public:
     BSONObj projection;
     BSONObj collation;
     Date_t timeOfCreation;
+
+    // Hash of the PlanCacheKey. Intended as an identifier for the query shape in logs and other
+    // diagnostic output.
+    uint32_t queryHash;
 
     //
     // Performance stats
@@ -437,6 +443,12 @@ public:
     PlanCacheKey computeKey(const CanonicalQuery&) const;
 
     /**
+     * Returns a hash of the plan cache key. This hash may not be stable between different versions
+     * of the server.
+     */
+    static uint32_t computeQueryHash(const PlanCacheKey& key);
+
+    /**
      * Returns a copy of a cache entry.
      * Used by planCacheListPlans to display plan details.
      *
@@ -446,11 +458,9 @@ public:
 
     /**
      * Returns a vector of all cache entries.
-     * Caller owns the result vector and is responsible for cleaning up
-     * the cache entry copies.
      * Used by planCacheListQueryShapes and index_filter_commands_test.cpp.
      */
-    std::vector<PlanCacheEntry*> getAllEntries() const;
+    std::vector<std::unique_ptr<PlanCacheEntry>> getAllEntries() const;
 
     /**
      * Returns number of entries in cache. Includes inactive entries.

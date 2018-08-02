@@ -23,8 +23,7 @@
     }
 
     // Assert that timeOfCreation exists in the cache entry. The difference between the current time
-    // and
-    // the time a plan was cached should not be larger than an hour.
+    // and the time a plan was cached should not be larger than an hour.
     function checkTimeOfCreation(query, sort, projection, date) {
         let key = {query: query, sort: sort, projection: projection};
         let res = t.runCommand('planCacheListPlans', key);
@@ -37,14 +36,14 @@
                    'timeOfCreation value is incorrect');
     }
 
-    t.save({a: 1, b: 1});
-    t.save({a: 1, b: 2});
-    t.save({a: 1, b: 2});
-    t.save({a: 2, b: 2});
+    assert.commandWorked(t.save({a: 1, b: 1}));
+    assert.commandWorked(t.save({a: 1, b: 2}));
+    assert.commandWorked(t.save({a: 1, b: 2}));
+    assert.commandWorked(t.save({a: 2, b: 2}));
 
     // We need two indices so that the MultiPlanRunner is executed.
-    t.ensureIndex({a: 1});
-    t.ensureIndex({a: 1, b: 1});
+    assert.commandWorked(t.ensureIndex({a: 1}));
+    assert.commandWorked(t.ensureIndex({a: 1, b: 1}));
 
     // Invalid key should be an error.
     assert.eq([],
@@ -68,24 +67,31 @@
     let plans = entry.plans;
     assert.eq(2, plans.length, 'unexpected number of plans cached for query');
 
-    // Print every plan
+    // Print every plan.
     // Plan details/feedback verified separately in section after Query Plan Revision tests.
     print('planCacheListPlans result:');
     for (let i = 0; i < plans.length; i++) {
         print('plan ' + i + ': ' + tojson(plans[i]));
     }
 
+    // Test the queryHash property by comparing entries for two different query shapes.
+    assert.eq(0, t.find({a: 132}).sort({b: -1, a: 1}).itcount(), 'unexpected document count');
+    let entryNewShape = getPlansForCacheEntry({a: 123}, {b: -1, a: 1}, {});
+    assert.eq(entry.hasOwnProperty("queryHash"), true);
+    assert.eq(entryNewShape.hasOwnProperty("queryHash"), true);
+    assert.neq(entry["queryHash"], entryNewShape["queryHash"]);
+
     //
     // Tests for plan reason and feedback in planCacheListPlans
     //
 
-    // Generate more plans for test query by adding indexes (compound and sparse).
-    // This will also clear the plan cache.
-    t.ensureIndex({a: -1}, {sparse: true});
-    t.ensureIndex({a: 1, b: 1});
+    // Generate more plans for test query by adding indexes (compound and sparse).  This will also
+    // clear the plan cache.
+    assert.commandWorked(t.ensureIndex({a: -1}, {sparse: true}));
+    assert.commandWorked(t.ensureIndex({a: 1, b: 1}));
 
-    // Implementation note: feedback stats is calculated after 20 executions.
-    // See PlanCacheEntry::kMaxFeedback.
+    // Implementation note: feedback stats is calculated after 20 executions. See
+    // PlanCacheEntry::kMaxFeedback.
     let numExecutions = 100;
     for (let i = 0; i < numExecutions; i++) {
         assert.eq(0, t.find({a: 3, b: 3}, {_id: 0, a: 1}).sort({a: -1}).itcount(), 'query failed');

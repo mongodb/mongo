@@ -33,7 +33,9 @@
     // The query shape should have been added.
     var shapes = coll.getPlanCache().listQueryShapes();
     assert.eq(1, shapes.length, 'unexpected cache size after running query');
-    assert.eq(shapes[0],
+    let filteredShape0 = shapes[0];
+    delete filteredShape0.queryHash;
+    assert.eq(filteredShape0,
               {
                 query: {a: 'foo', b: 5},
                 sort: {},

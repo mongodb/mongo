@@ -46,6 +46,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -246,11 +247,10 @@ Status PlanCacheListQueryShapes::list(const PlanCache& planCache, BSONObjBuilder
     invariant(bob);
 
     // Fetch all cached solutions from plan cache.
-    vector<PlanCacheEntry*> solutions = planCache.getAllEntries();
+    auto entries = planCache.getAllEntries();
 
     BSONArrayBuilder arrayBuilder(bob->subarrayStart("shapes"));
-    for (vector<PlanCacheEntry*>::const_iterator i = solutions.begin(); i != solutions.end(); i++) {
-        PlanCacheEntry* entry = *i;
+    for (auto&& entry : entries) {
         invariant(entry);
 
         BSONObjBuilder shapeBuilder(arrayBuilder.subobjStart());
@@ -260,10 +260,8 @@ Status PlanCacheListQueryShapes::list(const PlanCache& planCache, BSONObjBuilder
         if (!entry->collation.isEmpty()) {
             shapeBuilder.append("collation", entry->collation);
         }
+        shapeBuilder.append("queryHash", unsignedIntToFixedLengthHex(entry->queryHash));
         shapeBuilder.doneFast();
-
-        // Release resources for cached solution after extracting query shape.
-        delete entry;
     }
     arrayBuilder.doneFast();
 
@@ -440,7 +438,7 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
 
     // Append the time the entry was inserted into the plan cache.
     bob->append("timeOfCreation", entry->timeOfCreation);
-
+    bob->append("queryHash", unsignedIntToFixedLengthHex(entry->queryHash));
     // Append whether or not the entry is active.
     bob->append("isActive", entry->isActive);
     bob->append("works", static_cast<long long>(entry->works));
