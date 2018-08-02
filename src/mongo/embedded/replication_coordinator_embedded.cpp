@@ -32,6 +32,7 @@
 
 #include "mongo/embedded/replication_coordinator_embedded.h"
 
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/embedded/not_implemented.h"
 
@@ -208,7 +209,16 @@ OpTime ReplicationCoordinatorEmbedded::getMyLastDurableOpTime() const {
 }
 
 Status ReplicationCoordinatorEmbedded::waitUntilOpTimeForRead(OperationContext*,
-                                                              const ReadConcernArgs&) {
+                                                              const ReadConcernArgs& readConcern) {
+    // nothing to wait for
+    auto level = readConcern.getLevel();
+    if ((level == ReadConcernLevel::kLocalReadConcern ||
+         level == ReadConcernLevel::kAvailableReadConcern) &&
+        (!readConcern.getArgsAfterClusterTime() && !readConcern.getArgsOpTime() &&
+         !readConcern.getArgsAtClusterTime())) {
+        return Status::OK();
+    }
+
     UASSERT_NOT_IMPLEMENTED;
 }
 
