@@ -54,6 +54,8 @@
 namespace mongo {
 namespace index_key_validate {
 
+std::function<void(std::set<StringData>&)> filterAllowedIndexFieldNames;
+
 using std::string;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
@@ -64,7 +66,7 @@ namespace {
 // specification.
 MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 
-static const std::set<StringData> allowedFieldNames = {
+static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::k2dIndexMaxFieldName,
     IndexDescriptor::k2dIndexBitsFieldName,
     IndexDescriptor::k2dIndexMaxFieldName,
@@ -598,6 +600,13 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
     }
     return indexSpec;
 }
+
+GlobalInitializerRegisterer filterAllowedIndexFieldNamesInitializer(
+    "FilterAllowedIndexFieldNames", [](InitializerContext* service) {
+        if (filterAllowedIndexFieldNames)
+            filterAllowedIndexFieldNames(allowedFieldNames);
+        return Status::OK();
+    });
 
 }  // namespace index_key_validate
 }  // namespace mongo

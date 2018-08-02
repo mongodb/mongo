@@ -36,6 +36,7 @@
 #include "mongo/config.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/health_log.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -114,6 +115,19 @@ MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
     setLockedForWritingImpl([]() { return false; });
     return Status::OK();
 }
+
+GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
+    "FilterAllowedIndexFieldNamesEmbedded",
+    {},
+    {"FilterAllowedIndexFieldNames"},
+    [](InitializerContext* service) {
+        index_key_validate::filterAllowedIndexFieldNames =
+            [](std::set<StringData>& allowedIndexFieldNames) {
+                allowedIndexFieldNames.erase(IndexDescriptor::kBackgroundFieldName);
+                allowedIndexFieldNames.erase(IndexDescriptor::kExpireAfterSecondsFieldName);
+            };
+        return Status::OK();
+    });
 }  // namespace
 
 using logger::LogComponent;

@@ -1,9 +1,16 @@
-// Cannot implicitly shard accessed collections because of collection existing when none
-// expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_non_retryable_commands]
-
-// Basic js tests for the collMod command.
-// Test setting the usePowerOf2Sizes flag, and modifying TTL indexes.
+/**
+ * Basic js tests for the collMod command.
+ * Test setting the usePowerOf2Sizes flag, and modifying TTL indexes.
+ *
+ * @tags: [
+ *  # Cannot implicitly shard accessed collections because of collection existing when none
+ *  # expected.
+ *  assumes_no_implicit_collection_creation_after_drop,
+ *
+ *  requires_non_retryable_commands,
+ *  requires_ttl_index,
+ * ]
+ */
 
 function debug(x) {
     // printjson( x );

@@ -269,6 +269,32 @@ TEST_F(MongodbCAPITest, CreateBackgroundIndex) {
     ASSERT(output.getField("ok").numberDouble() != 1.0);
 }
 
+TEST_F(MongodbCAPITest, CreateTTLIndex) {
+    // create the client object
+    auto client = createClient();
+
+    // craft the createIndexes message
+    mongo::BSONObj inputObj = mongo::fromjson(
+        R"raw_delimiter({
+            createIndexes: 'items',
+            indexes: 
+            [
+                {
+                    key: {
+                        task: 1
+                    },
+                    name: 'task_ttl',
+                    expireAfterSeconds: 36000
+                }
+            ]
+        })raw_delimiter");
+    auto inputOpMsg = mongo::OpMsgRequest::fromDBAndBody("ttl_index_db", inputObj);
+    auto output = performRpc(client, inputOpMsg);
+
+    ASSERT(output.hasField("ok"));
+    ASSERT(output.getField("ok").numberDouble() != 1.0);
+}
+
 TEST_F(MongodbCAPITest, TrimMemory) {
     // create the client object
     auto client = createClient();

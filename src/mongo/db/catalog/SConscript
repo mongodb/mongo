@@ -239,16 +239,6 @@ env.Library(
 )
 
 env.Library(
-    target='index_create_impl_servers',
-    source=[
-        'index_create_impl_servers.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        'catalog_impl',
-    ],
-)
-
-env.Library(
     target='catalog_impl',
     source=[
         "catalog_control.cpp",
