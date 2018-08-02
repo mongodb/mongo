@@ -578,7 +578,7 @@ private:
     void _abortTransactionOnSession(WithLock);
 
     // Clean up the transaction resources unstashed on operation context.
-    void _cleanUpTxnResourceOnOpCtx(WithLock wl, OperationContext* opCtx);
+    void _cleanUpTxnResourceOnOpCtx(OperationContext* opCtx);
 
     // Committing a transaction first changes its state to "Committing*" and writes to the oplog,
     // then it changes the state to "Committed".

@@ -941,7 +941,7 @@ void Session::_abortActiveTransaction(OperationContext* opCtx,
 
     // Clean up the transaction resources on opCtx even if the transaction on session has been
     // aborted.
-    _cleanUpTxnResourceOnOpCtx(lock, opCtx);
+    _cleanUpTxnResourceOnOpCtx(opCtx);
 }
 
 void Session::_abortTransactionOnSession(WithLock wl) {
@@ -973,7 +973,7 @@ void Session::_abortTransactionOnSession(WithLock wl) {
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
 }
 
-void Session::_cleanUpTxnResourceOnOpCtx(WithLock wl, OperationContext* opCtx) {
+void Session::_cleanUpTxnResourceOnOpCtx(OperationContext* opCtx) {
     // Reset the WUOW. We should be able to abort empty transactions that don't have WUOW.
     if (opCtx->getWriteUnitOfWork()) {
         opCtx->setWriteUnitOfWork(nullptr);
@@ -1150,7 +1150,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
 
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
-    _cleanUpTxnResourceOnOpCtx(lk, opCtx);
+    _cleanUpTxnResourceOnOpCtx(opCtx);
 }
 
 BSONObj Session::reportStashedState() const {
