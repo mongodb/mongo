@@ -32,6 +32,7 @@
 
 #include "mongo/embedded/service_entry_point_embedded.h"
 
+#include "mongo/db/read_concern.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/embedded/not_implemented.h"
 #include "mongo/embedded/periodic_runner_embedded.h"
@@ -44,18 +45,37 @@ public:
         return false;
     }
 
-    void waitForReadConcern(OperationContext*,
-                            const CommandInvocation*,
-                            const OpMsgRequest&) const override {}
+    void waitForReadConcern(OperationContext* opCtx,
+                            const CommandInvocation* invocation,
+                            const OpMsgRequest& request) const override {
+        auto rcStatus = mongo::waitForReadConcern(
+            opCtx, repl::ReadConcernArgs::get(opCtx), invocation->allowsAfterClusterTime());
+        uassertStatusOK(rcStatus);
+    }
 
-    void waitForWriteConcern(OperationContext*,
-                             const CommandInvocation*,
-                             const repl::OpTime&,
-                             BSONObjBuilder&) const override {}
+    void waitForWriteConcern(OperationContext* opCtx,
+                             const CommandInvocation* invocation,
+                             const repl::OpTime& lastOpBeforeRun,
+                             BSONObjBuilder& commandResponseBuilder) const override {
+        WriteConcernResult res;
+        auto waitForWCStatus =
+            mongo::waitForWriteConcern(opCtx, lastOpBeforeRun, opCtx->getWriteConcern(), &res);
 
-    void waitForLinearizableReadConcern(OperationContext*) const override {}
+        CommandHelpers::appendCommandWCStatus(commandResponseBuilder, waitForWCStatus, res);
+    }
 
-    void uassertCommandDoesNotSpecifyWriteConcern(const BSONObj&) const override {}
+    void waitForLinearizableReadConcern(OperationContext* opCtx) const override {
+        if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
+            repl::ReadConcernLevel::kLinearizableReadConcern) {
+            uassertStatusOK(mongo::waitForLinearizableReadConcern(opCtx));
+        }
+    }
+
+    void uassertCommandDoesNotSpecifyWriteConcern(const BSONObj& cmd) const override {
+        if (commandSpecifiesWriteConcern(cmd)) {
+            uasserted(ErrorCodes::InvalidOptions, "Command does not support writeConcern");
+        }
+    }
 
     void attachCurOpErrInfo(OperationContext*, const BSONObj&) const override {}
 };
