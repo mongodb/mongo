@@ -40,6 +40,12 @@ DBCollection.prototype.help = function() {
         ".count( query = {}, <optional params> ) - count the number of documents that matches the query, optional parameters are: limit, skip, hint, maxTimeMS");
     print(
         "\tdb." + shortName +
+        ".countDocuments( query = {}, <optional params> ) - count the number of documents that matches the query, optional parameters are: limit, skip, hint, maxTimeMS");
+    print(
+        "\tdb." + shortName +
+        ".estimatedDocumentCount( <optional params> ) - estimate the document count using collection metadata, optional parameters are: maxTimeMS");
+    print(
+        "\tdb." + shortName +
         ".copyTo(newColl) - duplicates collection by copying all documents to newColl; no indexes are copied.");
     print("\tdb." + shortName + ".convertToCapped(maxBytes) - calls {convertToCapped:'" +
           shortName + "', size:maxBytes}} command");
@@ -1405,12 +1411,90 @@ DBCollection.prototype.unsetWriteConcern = function() {
 * @param {object} [options.collation=null] The collation that should be used for string comparisons
 * for this count op.
 * @return {number}
+*
 */
 DBCollection.prototype.count = function(query, options) {
     query = this.find(query);
 
     // Apply options and return the result of the find
     return QueryHelpers._applyCountOptions(query, options).count(true);
+};
+
+/**
+* Count number of matching documents in the db to a query using aggregation.
+*
+* @method
+* @param {object} query The query for the count.
+* @param {object} [options=null] Optional settings.
+* @param {number} [options.limit=null] The limit of documents to count.
+* @param {number} [options.skip=null] The number of documents to skip for the count.
+* @param {string|object} [options.hint=null] An index name hint or specification for the query.
+* @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+* @param {object} [options.collation=null] The collation that should be used for string comparisons
+* for this count op.
+* @return {number}
+*/
+DBCollection.prototype.countDocuments = function(query, options) {
+    "use strict";
+    let pipeline = [{"$match": query}];
+    options = options || {};
+    assert.eq(typeof options, "object", "'options' argument must be an object");
+
+    if (options.skip) {
+        pipeline.push({"$skip": options.skip});
+    }
+    if (options.limit) {
+        pipeline.push({"$limit": options.limit});
+    }
+
+    // Construct an aggregation pipeline stage with sum to calculate the number of all documents.
+    pipeline.push({"$group": {"_id": null, "n": {"$sum": 1}}});
+
+    // countDocument options other than filter, skip, and limit, are added to the aggregate command.
+    let aggregateOptions = {};
+
+    if (options.hint) {
+        aggregateOptions.hint = options.hint;
+    }
+    if (options.maxTimeMS) {
+        aggregateOptions.maxTimeMS = options.maxTimeMS;
+    }
+    if (options.collation) {
+        aggregateOptions.collation = options.collation;
+    }
+
+    // Format cursor into an array.
+    const res = this.aggregate(pipeline, aggregateOptions).toArray();
+
+    return res[0].n;
+};
+
+/**
+* Estimates the count of documents in a collection using collection metadata.
+*
+* @method
+* @param {object} [options=null] Optional settings.
+* @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+* @return {number}
+*/
+DBCollection.prototype.estimatedDocumentCount = function(options) {
+    "use strict";
+    let cmd = {count: this.getName()};
+    options = options || {};
+    assert.eq(typeof options, "object", "'options' argument must be an object");
+
+    if (options.maxTimeMS) {
+        cmd.maxTimeMS = options.maxTimeMS;
+    }
+
+    const res = this.runCommand(cmd);
+
+    if (!res.ok) {
+        throw _getErrorWithCode(res, "Error estimating document count: " + tojson(ret));
+    }
+
+    // Return the 'n' field, which should be the count of documents.
+    return res.n;
 };
 
 /**
