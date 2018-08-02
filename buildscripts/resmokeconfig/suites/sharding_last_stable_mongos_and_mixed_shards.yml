@@ -35,6 +35,8 @@ selector:
   - jstests/sharding/geo_near_random2.js
   - jstests/sharding/shard7.js
   - jstests/sharding/shard_collection_existing_zones.js
+  - jstests/sharding/snapshot_aggregate_mongos.js
+  - jstests/sharding/snapshot_find_mongos.js
   # SERVER-35977
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/change_stream_metadata_notifications.js

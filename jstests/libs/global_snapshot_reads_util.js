@@ -2,7 +2,7 @@
  * Tests invalid getMore attempts against an established global snapshot cursor on mongos. The
  * cursor should still be valid and usable after each failed attempt.
  */
-function verifyInvalidGetMoreAttempts(mainDb, sessionDb, collName, cursorId, txnNumber) {
+function verifyInvalidGetMoreAttempts(mainDb, collName, cursorId, lsid, txnNumber) {
     // Reject getMores without a session.
     assert.commandFailedWithCode(
         mainDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1}), 50800);
@@ -18,13 +18,18 @@ function verifyInvalidGetMoreAttempts(mainDb, sessionDb, collName, cursorId, txn
     }),
                                  50801);
 
-    // Reject getMores without without txnNumber.
+    // Reject getMores without txnNumber.
     assert.commandFailedWithCode(
-        sessionDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1}), 50803);
+        mainDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1, lsid: lsid}),
+        50803);
 
-    // Reject getMores without without same txnNumber.
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(
-            {getMore: cursorId, collection: collName, batchSize: 1, txnNumber: NumberLong(50)}),
-        50804);
+    // Reject getMores without same txnNumber.
+    assert.commandFailedWithCode(mainDb.runCommand({
+        getMore: cursorId,
+        collection: collName,
+        batchSize: 1,
+        lsid: lsid,
+        txnNumber: NumberLong(50)
+    }),
+                                 50804);
 }
