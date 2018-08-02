@@ -595,6 +595,13 @@ void Session::_beginOrContinueTxn(WithLock wl,
                               << " does not match any in-progress transactions.",
                 startTransaction != boost::none);
 
+        // We cannot start a transaction if a prepared transaction is already running on the
+        // session.
+        uassert(ErrorCodes::PreparedTransactionInProgress,
+                "Cannot start a new transaction when a prepared transaction already exists on the "
+                "session.",
+                !_txnState.isPrepared(wl));
+
         _setActiveTxn(wl, txnNumber);
         _autocommit = false;
         _txnState.transitionTo(wl, TransactionState::kInProgress);

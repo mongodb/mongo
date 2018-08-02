@@ -19,6 +19,7 @@ selector:
   - jstests/core/txns/commit_prepared_transaction.js
   - jstests/core/txns/commit_prepared_transaction_errors.js
   - jstests/core/txns/empty_prepare.js
+  - jstests/core/txns/no_new_transactions_when_prepared_transaction_in_progress.js
   - jstests/core/txns/prepare_committed_transaction.js
   - jstests/core/txns/prepare_conflict.js
 

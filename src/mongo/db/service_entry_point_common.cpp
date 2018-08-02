@@ -230,6 +230,7 @@ BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& se
         || code == ErrorCodes::SnapshotUnavailable                        //
         || code == ErrorCodes::NoSuchTransaction                          //
         || code == ErrorCodes::LockTimeout                                //
+        || code == ErrorCodes::PreparedTransactionInProgress              //
         // Clients can retry a single commitTransaction command, but cannot retry the whole
         // transaction if commitTransaction fails due to NotMaster.
         || (isRetryable && (commandName != "commitTransaction"));

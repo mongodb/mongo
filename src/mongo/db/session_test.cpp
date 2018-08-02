@@ -1844,6 +1844,35 @@ TEST_F(SessionTest, KillSessionsDoesNotAbortPreparedTransactions) {
     ASSERT(_opObserver->transactionPrepared);
 }
 
+TEST_F(SessionTest, CannotStartNewTransactionWhilePreparedTransactionInProgress) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 26;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+
+    session.unstashTransactionResources(opCtx(), "insert");
+
+    // Check that prepareTimestamp gets set.
+    auto prepareTimestamp = session.prepareTransaction(opCtx());
+    ASSERT_EQ(kPrepareTimestamp, prepareTimestamp);
+    session.stashTransactionResources(opCtx());
+
+    // Try to start a new transaction while there is already a prepared transaction on the
+    // session. This should fail with a PreparedTransactionInProgress error.
+    const TxnNumber txnNum2 = 27;
+    ASSERT_THROWS_CODE(
+        session.beginOrContinueTxn(opCtx(), txnNum2, false, true, "testDB", "insert"),
+        AssertionException,
+        ErrorCodes::PreparedTransactionInProgress);
+
+    ASSERT_FALSE(session.transactionIsAborted());
+    ASSERT(_opObserver->transactionPrepared);
+}
+
 // Tests that a transaction aborts if it becomes too large before trying to commit it.
 TEST_F(SessionTest, TransactionTooLargeWhileBuilding) {
     const auto sessionId = makeLogicalSessionIdForTest();
