@@ -177,6 +177,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
+        enableElectionHandoff: 0
         logComponentVerbosity:
           replication:
             heartbeats: 2
