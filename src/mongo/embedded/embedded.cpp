@@ -57,6 +57,7 @@
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/ttl.h"
+#include "mongo/embedded/periodic_runner_embedded.h"
 #include "mongo/embedded/replication_coordinator_embedded.h"
 #include "mongo/embedded/service_context_embedded.h"
 #include "mongo/embedded/service_entry_point_embedded.h"
@@ -316,6 +317,11 @@ ServiceContext* initialize(const char* yaml_config) {
     if (!storageGlobalParams.readOnly) {
         restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
     }
+
+    auto periodicRunner = std::make_unique<PeriodicRunnerEmbedded>(
+        serviceContext, serviceContext->getPreciseClockSource());
+    periodicRunner->startup();
+    serviceContext->setPeriodicRunner(std::move(periodicRunner));
 
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore

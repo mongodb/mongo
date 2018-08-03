@@ -34,6 +34,7 @@
 
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/embedded/not_implemented.h"
+#include "mongo/embedded/periodic_runner_embedded.h"
 
 namespace mongo {
 
@@ -60,6 +61,11 @@ public:
 };
 
 DbResponse ServiceEntryPointEmbedded::handleRequest(OperationContext* opCtx, const Message& m) {
+    // Only one thread will pump at a time and concurrent calls to this will skip the pumping and go
+    // directly to handleRequest. This means that the jobs in the periodic runner can't provide any
+    // guarantees of the state (that they have run).
+    checked_cast<PeriodicRunnerEmbedded*>(opCtx->getServiceContext()->getPeriodicRunner())
+        ->tryPump();
     return ServiceEntryPointCommon::handleRequest(opCtx, m, Hooks{});
 }
 
