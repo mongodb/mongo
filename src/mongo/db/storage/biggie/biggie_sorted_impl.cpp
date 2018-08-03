@@ -336,7 +336,8 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
     if (!dupsAllowed) {
         std::string workingCopyLowerBound = combineKeyAndRID(key, RecordId::min(), _prefix, _order);
         std::string workingCopyUpperBound = combineKeyAndRID(key, RecordId::max(), _prefix, _order);
-        StringStore::iterator lowerBoundIterator = workingCopy->lower_bound(workingCopyLowerBound);
+        StringStore::const_iterator lowerBoundIterator =
+            workingCopy->lower_bound(workingCopyLowerBound);
 
         if (lowerBoundIterator != workingCopy->end() &&
             lowerBoundIterator->first.compare(_KSForIdentEnd) < 0) {
@@ -377,7 +378,11 @@ Status SortedDataInterface::truncate(OperationContext* opCtx) {
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
     auto workingCopyLowerBound = workingCopy->lower_bound(_KSForIdentStart);
     auto workingCopyUpperBound = workingCopy->upper_bound(_KSForIdentEnd);
-    workingCopy->erase(workingCopyLowerBound, workingCopyUpperBound);
+    // workingCopy->erase(workingCopyLowerBound, workingCopyUpperBound);
+    while (workingCopyLowerBound != workingCopyUpperBound) {
+        workingCopy->erase(workingCopyLowerBound->first);
+        ++workingCopyLowerBound;
+    }
     return Status::OK();
 }
 
@@ -428,8 +433,8 @@ bool SortedDataInterface::appendCustomStats(OperationContext* opCtx,
 long long SortedDataInterface::getSpaceUsedBytes(OperationContext* opCtx) const {
     StringStore* str = getRecoveryUnitBranch_forking(opCtx);
     size_t totalSize = 0;
-    StringStore::iterator it = str->lower_bound(_KSForIdentStart);
-    StringStore::iterator end = str->upper_bound(_KSForIdentEnd);
+    StringStore::const_iterator it = str->lower_bound(_KSForIdentStart);
+    StringStore::const_iterator end = str->upper_bound(_KSForIdentEnd);
     int64_t numElements = str->distance(it, end);
     for (int i = 0; i < numElements; i++) {
         totalSize += it->first.length();
@@ -547,7 +552,8 @@ void SortedDataInterface::Cursor::setEndPosition(const BSONObj& key, bool inclus
         // Reverse iterators work with upper bound since upper bound will return the first element
         // past the argument, so when it becomes a reverse iterator, it goes backwards one,
         // (according to the C++ standard) and we end up in the right place.
-        _endPosReverse = StringStore::reverse_iterator(workingCopy->upper_bound(_endPosBound));
+        _endPosReverse =
+            StringStore::const_reverse_iterator(workingCopy->upper_bound(_endPosBound));
     }
 }
 
@@ -614,8 +620,8 @@ boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekAfterProcessing(
                 // Reverse iterators work with upper bound since upper bound will return the first
                 // element past the argument, so when it becomes a reverse iterator, it goes
                 // backwards one, (according to the C++ standard) and we end up in the right place.
-                _reverseIt =
-                    StringStore::reverse_iterator(_workingCopy->upper_bound(workingCopyBound));
+                _reverseIt = StringStore::const_reverse_iterator(
+                    _workingCopy->upper_bound(workingCopyBound));
             }
             // Here, we check to make sure the iterator doesn't fall off the data structure and is
             // in the ident. We also check to make sure it is on the correct side of the end
@@ -633,7 +639,8 @@ boost::optional<IndexKeyEntry> SortedDataInterface::Cursor::seekAfterProcessing(
             // Reverse iterators work with upper bound since upper bound will return the first
             // element past the argument, so when it becomes a reverse iterator, it goes
             // backwards one, (according to the C++ standard) and we end up in the right place.
-            _reverseIt = StringStore::reverse_iterator(_workingCopy->upper_bound(workingCopyBound));
+            _reverseIt =
+                StringStore::const_reverse_iterator(_workingCopy->upper_bound(workingCopyBound));
         }
         // Once again, we check to make sure the iterator didn't fall off the data structure and
         // still is in the ident.
@@ -725,7 +732,7 @@ void SortedDataInterface::Cursor::restore() {
         if (_saveKey.length() == 0) {
             _reverseIt = workingCopy->rend();
         } else {
-            _reverseIt = StringStore::reverse_iterator(workingCopy->upper_bound(_saveKey));
+            _reverseIt = StringStore::const_reverse_iterator(workingCopy->upper_bound(_saveKey));
         }
         if (!checkCursorValid()) {
             _atEOF = true;

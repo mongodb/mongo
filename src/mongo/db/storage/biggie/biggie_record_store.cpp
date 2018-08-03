@@ -196,14 +196,18 @@ Status RecordStore::updateRecord(OperationContext* opCtx,
                                  UpdateNotifier* notifier) {
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
     std::string key = createKey(_ident, oldLocation.repr());
-    StringStore::iterator it = workingCopy->find(key);
+    StringStore::const_iterator it = workingCopy->find(key);
     invariant(it != workingCopy->end());
-    it->second = std::string(data, len);
+
+    StringStore::value_type vt{key, std::string(data, len)};
+    workingCopy->update(std::move(vt));
+    // it->second = std::string(data, len);
     return Status::OK();
 }
 
 bool RecordStore::updateWithDamagesSupported() const {
-    return true;
+    // TODO: enable updateWithDamages.
+    return false;
 }
 
 StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
@@ -211,17 +215,7 @@ StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
                                                       const RecordData& oldRec,
                                                       const char* damageSource,
                                                       const mutablebson::DamageVector& damages) {
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
-    std::string key = createKey(_ident, loc.repr());
-    StringStore::iterator doc = workingCopy->find(key);
-    invariant(doc != workingCopy->end());  // Only update existing records.
-    for (const auto& d : damages) {
-        const char* source = damageSource + d.sourceOffset;
-        char* target = (&doc->second[0]) + d.targetOffset;
-        std::memcpy(target, source, d.size);
-    }
-    RecordData updatedRecord(doc->second.c_str(), doc->second.length());
-    return updatedRecord;  // Data is un-owned.
+    return Status::OK();
 }
 
 std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* opCtx,
@@ -233,8 +227,8 @@ std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* o
 
 Status RecordStore::truncate(OperationContext* opCtx) {
     StringStore* str = getRecoveryUnitBranch_forking(opCtx);
-    StringStore::iterator it = str->lower_bound(_prefix);
-    StringStore::iterator end = str->upper_bound(_postfix);
+    StringStore::const_iterator it = str->lower_bound(_prefix);
+    StringStore::const_iterator end = str->upper_bound(_postfix);
     std::vector<std::string> keysToErase;
     while (it != end) {
         keysToErase.push_back(it->first);
@@ -382,7 +376,7 @@ boost::optional<Record> RecordStore::ReverseCursor::next() {
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
     if (_needFirstSeek) {
         _needFirstSeek = false;
-        it = StringStore::reverse_iterator(workingCopy->upper_bound(_postfix));
+        it = StringStore::const_reverse_iterator(workingCopy->upper_bound(_postfix));
     } else if (it != workingCopy->rend()) {
         ++it;
     } else {
@@ -404,12 +398,12 @@ boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id
     _savedPosition = boost::none;
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
     std::string key = createKey(_ident, id.repr());
-    StringStore::iterator canFind = workingCopy->find(key);
+    StringStore::const_iterator canFind = workingCopy->find(key);
     if (canFind == workingCopy->end() || !inPrefix(canFind->first)) {
         it = workingCopy->rend();
         return boost::none;
     }
-    it = StringStore::reverse_iterator(++canFind);  // reverse iterator returns item 1 before
+    it = StringStore::const_reverse_iterator(++canFind);  // reverse iterator returns item 1 before
     _savedPosition = it->first;
     return Record{id, RecordData(it->second.c_str(), it->second.length())};
 }
@@ -421,7 +415,7 @@ void RecordStore::ReverseCursor::saveUnpositioned() {}
 bool RecordStore::ReverseCursor::restore() {
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
     it = _savedPosition
-        ? StringStore::reverse_iterator(workingCopy->upper_bound(_savedPosition.value()))
+        ? StringStore::const_reverse_iterator(workingCopy->upper_bound(_savedPosition.value()))
         : workingCopy->rend();
     return true;
 }

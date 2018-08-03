@@ -144,7 +144,7 @@ private:
         StringData _ident;
         std::string _prefix;
         std::string _postfix;
-        StringStore::iterator it;
+        StringStore::const_iterator it;
         boost::optional<std::string> _savedPosition;
         bool _needFirstSeek{true};
 
@@ -166,7 +166,7 @@ private:
         StringData _ident;
         std::string _prefix;
         std::string _postfix;
-        StringStore::reverse_iterator it;
+        StringStore::const_reverse_iterator it;
         boost::optional<std::string> _savedPosition;
         bool _needFirstSeek{true};
 

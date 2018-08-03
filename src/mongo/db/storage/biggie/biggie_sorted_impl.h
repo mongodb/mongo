@@ -133,8 +133,8 @@ public:
         // This is the "working copy" of the master "branch" in the git analogy.
         StringStore* _workingCopy;
         // These store the end positions.
-        boost::optional<StringStore::iterator> _endPos;
-        boost::optional<StringStore::reverse_iterator> _endPosReverse;
+        boost::optional<StringStore::const_iterator> _endPos;
+        boost::optional<StringStore::const_reverse_iterator> _endPosReverse;
         // This means if the cursor is a forward or reverse cursor.
         bool _forward;
         // This means whether the cursor has reached the last EOF (with regard to this index).
@@ -146,10 +146,10 @@ public:
         // These are the same as before.
         std::string _prefix;
         std::string _identEnd;
-        // These two store the iterator, which is the data structure for cursors. The one we use
-        // depends on _forward.
-        StringStore::iterator _forwardIt;
-        StringStore::reverse_iterator _reverseIt;
+        // These two store the const_iterator, which is the data structure for cursors. The one we
+        // use depends on _forward.
+        StringStore::const_iterator _forwardIt;
+        StringStore::const_reverse_iterator _reverseIt;
         // This is the ordering for the key's values for multi-field keys.
         Ordering _order;
         // This stores whether or not the end position is inclusive for restore.
