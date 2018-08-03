@@ -943,8 +943,10 @@ void Session::_abortActiveTransaction(OperationContext* opCtx,
     }
 
     // Log the transaction if its duration is longer than the slowMS command threshold.
-    _logSlowTransaction(
-        lock, &(opCtx->lockState()->getLockerInfo())->stats, TransactionState::kAborted);
+    _logSlowTransaction(lock,
+                        &(opCtx->lockState()->getLockerInfo())->stats,
+                        TransactionState::kAborted,
+                        repl::ReadConcernArgs::get(opCtx));
 
     // Clean up the transaction resources on opCtx even if the transaction on session has been
     // aborted.
@@ -962,8 +964,10 @@ void Session::_abortTransactionOnSession(WithLock wl) {
 
     if (_txnResourceStash) {
         // The transaction is stashed, so we abort the inactive transaction on session.
-        _logSlowTransaction(
-            wl, &(_txnResourceStash->locker()->getLockerInfo())->stats, TransactionState::kAborted);
+        _logSlowTransaction(wl,
+                            &(_txnResourceStash->locker()->getLockerInfo())->stats,
+                            TransactionState::kAborted,
+                            _txnResourceStash->getReadConcernArgs());
         _txnResourceStash = boost::none;
         ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
     } else {
@@ -1152,8 +1156,10 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
 
     // Log the transaction if its duration is longer than the slowMS command threshold.
-    _logSlowTransaction(
-        lk, &(opCtx->lockState()->getLockerInfo())->stats, TransactionState::kCommitted);
+    _logSlowTransaction(lk,
+                        &(opCtx->lockState()->getLockerInfo())->stats,
+                        TransactionState::kCommitted,
+                        repl::ReadConcernArgs::get(opCtx));
 
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
@@ -1241,7 +1247,8 @@ void Session::_reportTransactionStats(WithLock wl,
 }
 
 std::string Session::_transactionInfoForLog(const SingleThreadedLockStats* lockStats,
-                                            TransactionState::StateFlag terminationCause) {
+                                            TransactionState::StateFlag terminationCause,
+                                            repl::ReadConcernArgs readConcernArgs) {
     invariant(lockStats);
     invariant(terminationCause == TransactionState::kCommitted ||
               terminationCause == TransactionState::kAborted);
@@ -1254,8 +1261,8 @@ std::string Session::_transactionInfoForLog(const SingleThreadedLockStats* lockS
     _sessionId.serialize(&lsidBuilder);
     lsidBuilder.doneFast();
     parametersBuilder.append("txnNumber", _activeTxnNumber);
-    // TODO: SERVER-35174 Add readConcern to parameters here once pushed.
     parametersBuilder.append("autocommit", _autocommit);
+    readConcernArgs.appendInfo(&parametersBuilder);
     s << "parameters:" << parametersBuilder.obj().toString() << ",";
 
     s << " readTimestamp:" << _speculativeTransactionReadOpTime.getTimestamp().toString() << ",";
@@ -1290,14 +1297,15 @@ std::string Session::_transactionInfoForLog(const SingleThreadedLockStats* lockS
 
 void Session::_logSlowTransaction(WithLock wl,
                                   const SingleThreadedLockStats* lockStats,
-                                  TransactionState::StateFlag terminationCause) {
+                                  TransactionState::StateFlag terminationCause,
+                                  repl::ReadConcernArgs readConcernArgs) {
     // Only log multi-document transactions.
     if (!_txnState.isNone(wl)) {
         // Log the transaction if its duration is longer than the slowMS command threshold.
         if (_singleTransactionStats->getDuration(curTimeMicros64()) >
             serverGlobalParams.slowMS * 1000ULL) {
             log(logger::LogComponent::kCommand)
-                << _transactionInfoForLog(lockStats, terminationCause);
+                << _transactionInfoForLog(lockStats, terminationCause, readConcernArgs);
         }
     }
 }
