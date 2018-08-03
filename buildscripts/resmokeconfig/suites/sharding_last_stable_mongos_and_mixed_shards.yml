@@ -37,6 +37,7 @@ selector:
   - jstests/sharding/shard_collection_existing_zones.js
   - jstests/sharding/snapshot_aggregate_mongos.js
   - jstests/sharding/snapshot_find_mongos.js
+  - jstests/sharding/update_sharded.js
   # SERVER-35977
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/change_stream_metadata_notifications.js
@@ -55,7 +56,6 @@ selector:
   - jstests/sharding/resume_change_stream.js
   - jstests/sharding/resume_change_stream_from_stale_mongos.js
   - jstests/sharding/resume_change_stream_on_subset_of_shards.js
-  - jstests/sharding/update_sharded.js
 executor:
   config:
     shell_options:
