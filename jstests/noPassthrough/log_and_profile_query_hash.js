@@ -118,5 +118,31 @@
     assert.neq(hashValues[0], hashValues[1]);
     assert.eq(hashValues[1], hashValues[2]);
 
+    // Test that the expected queryHash is included in the transitional log lines when an inactive
+    // cache entry is created.
+    assert.commandWorked(testDB.setLogLevel(1, "query"));
+    const testInactiveCreationLog = {
+        comment: "Test Creating inactive entry.",
+        test: function(db, comment) {
+            assert.eq(0,
+                      db.test.find({b: {$lt: 12}, a: {$eq: 500}})
+                          .sort({a: -1})
+                          .comment(comment)
+                          .itcount(),
+                      'unexpected document count');
+        },
+        hasQueryHash: true
+
+    };
+    const onCreationHash = runTestsAndGetHash(testDB, testInactiveCreationLog);
+    const log = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
+
+    // Fetch the line that logs when an inactive cache entry is created for the query with queryHash
+    // onCreationHash. Confirm only one line does this.
+    const creationLogList = log.filter(
+        logLine => (logLine.indexOf("Creating inactive cache entry for query shape query") != -1 &&
+                    logLine.indexOf(String(onCreationHash)) != -1));
+    assert.eq(1, creationLogList.length);
+
     MongoRunner.stopMongod(conn);
 })();

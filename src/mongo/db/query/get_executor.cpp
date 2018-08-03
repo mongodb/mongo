@@ -38,7 +38,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -352,9 +351,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         auto planCacheKey = collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
 
         // Fill in opDebug information.
-        boost::optional<uint32_t> hash =
-            SimpleStringDataComparator::kInstance.hash(StringData(planCacheKey));
-        CurOp::get(opCtx)->debug().queryHash = hash;
+        CurOp::get(opCtx)->debug().queryHash = PlanCache::computeQueryHash(planCacheKey);
 
         // Try to look up a cached solution for the query.
         if (auto cs =

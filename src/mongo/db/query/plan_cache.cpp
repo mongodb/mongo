@@ -47,6 +47,7 @@
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -728,12 +729,14 @@ void PlanCache::encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuild
  * - The new entry should be marked 'active'
  */
 PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query,
+                                                     uint32_t queryHash,
                                                      PlanCacheEntry* oldEntry,
                                                      size_t newWorks,
                                                      double growthCoefficient) {
     NewEntryState res;
     if (!oldEntry) {
         LOG(1) << "Creating inactive cache entry for query shape " << redact(query.toStringShort())
+               << " and queryHash " << unsignedIntToFixedLengthHex(queryHash)
                << " with works value " << newWorks;
         res.shouldBeCreated = true;
         res.shouldBeActive = false;
@@ -745,12 +748,14 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
         // occur if many MultiPlanners are run simultaneously.
 
         LOG(1) << "Replacing active cache entry for query " << redact(query.toStringShort())
-               << " with works " << oldEntry->works << " with a plan with works " << newWorks;
+               << " and queryHash " << unsignedIntToFixedLengthHex(queryHash) << " with works "
+               << oldEntry->works << " with a plan with works " << newWorks;
         res.shouldBeCreated = true;
         res.shouldBeActive = true;
     } else if (oldEntry->isActive) {
         LOG(1) << "Attempt to write to the planCache for query " << redact(query.toStringShort())
-               << "with a plan with works " << newWorks
+               << " and queryHash " << unsignedIntToFixedLengthHex(queryHash)
+               << " with a plan with works " << newWorks
                << " is a noop, since there's already a plan with works value " << oldEntry->works;
         // There is already an active cache entry with a higher works value.
         // We do nothing.
@@ -768,7 +773,8 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
             oldEntry->works + 1u, static_cast<size_t>(oldEntry->works * growthCoefficient));
 
         LOG(1) << "Increasing work value associated with cache entry for query "
-               << redact(query.toStringShort()) << " from " << oldEntry->works << " to "
+               << redact(query.toStringShort()) << " and queryHash "
+               << unsignedIntToFixedLengthHex(queryHash) << " from " << oldEntry->works << " to "
                << increasedWorks;
         oldEntry->works = increasedWorks;
 
@@ -779,8 +785,9 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
         // inactive entry's works. We use this as an indicator that it's safe to
         // cache (as an active entry) the plan this query used for the future.
         LOG(1) << "Inactive cache entry for query " << redact(query.toStringShort())
-               << " with works " << oldEntry->works
-               << " is being promoted to active entry with works value " << newWorks;
+               << " and queryHash " << unsignedIntToFixedLengthHex(queryHash) << " with works "
+               << oldEntry->works << " is being promoted to active entry with works value "
+               << newWorks;
         // We'll replace the old inactive entry with an active entry.
         res.shouldBeCreated = true;
         res.shouldBeActive = true;
@@ -818,15 +825,24 @@ Status PlanCache::set(const CanonicalQuery& query,
     const size_t newWorks = why->stats[0]->common.works;
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
     bool isNewEntryActive = false;
+    uint32_t queryHash;
     if (internalQueryCacheDisableInactiveEntries.load()) {
         // All entries are always active.
         isNewEntryActive = true;
+        queryHash = PlanCache::computeQueryHash(key);
     } else {
         PlanCacheEntry* oldEntry = nullptr;
         Status cacheStatus = _cache.get(key, &oldEntry);
         invariant(cacheStatus.isOK() || cacheStatus == ErrorCodes::NoSuchKey);
+        if (oldEntry) {
+            queryHash = oldEntry->queryHash;
+        } else {
+            queryHash = PlanCache::computeQueryHash(key);
+        }
+
         auto newState = getNewEntryState(
             query,
+            queryHash,
             oldEntry,
             newWorks,
             worksGrowthCoefficient.get_value_or(internalQueryCacheWorksGrowthCoefficient));
@@ -837,7 +853,6 @@ Status PlanCache::set(const CanonicalQuery& query,
         isNewEntryActive = newState.shouldBeActive;
     }
 
-    uint32_t queryHash = computeQueryHash(key);
     auto newEntry = std::make_unique<PlanCacheEntry>(solns, why.release(), queryHash);
     const QueryRequest& qr = query.getQueryRequest();
     newEntry->query = qr.getFilter().getOwned();

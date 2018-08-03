@@ -396,7 +396,7 @@ public:
      * The return value will provide the "state" of the cache entry, as well as the CachedSolution
      * for the query (if there is one).
      */
-    GetResult get(const PlanCacheKey& query) const;
+    GetResult get(const PlanCacheKey& key) const;
 
     /**
      * If the cache entry exists and is active, return a CachedSolution. If the cache entry is
@@ -483,6 +483,7 @@ private:
     };
 
     NewEntryState getNewEntryState(const CanonicalQuery& query,
+                                   uint32_t queryHash,
                                    PlanCacheEntry* oldEntry,
                                    size_t newWorks,
                                    double growthCoefficient);
