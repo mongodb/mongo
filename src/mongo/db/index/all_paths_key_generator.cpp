@@ -111,6 +111,10 @@ void AllPathsKeyGenerator::_traverseAllPaths(BSONObj obj,
                                              BSONObjSet* keys,
                                              MultikeyPathsMock* multikeyPaths) const {
     for (const auto elem : obj) {
+        // If the element's fieldName contains a ".", fast-path skip it because it's not queryable.
+        if (elem.fieldNameStringData().find('.', 0) != std::string::npos)
+            continue;
+
         // If this element is an empty object, fast-path skip it.
         if (elem.type() == BSONType::Object && elem.Obj().isEmpty())
             continue;

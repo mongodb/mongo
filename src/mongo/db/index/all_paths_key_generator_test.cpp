@@ -902,5 +902,44 @@ TEST(AllPathsKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
     ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
 }
 
+TEST(AllPathsKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
+    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, {}};
+
+    auto inputDoc = fromjson(
+        "{'a.b': 0, '.b': 1, 'b.': 2, a: {'.b': 3, 'b.': 4, 'b.c': 5, 'q': 6}, b: [{'d.e': 7}, {r: "
+        "8}, [{'a.b': 9}]], c: 10}}");
+
+    auto expectedKeys = makeKeySet({fromjson("{'': 'a.q', '': 6}"),
+                                    fromjson("{'': 'b.r', '': 8}"),
+                                    fromjson("{'': 'b', '': [{'a.b': 9}]}"),
+                                    fromjson("{'': 'c', '': 10}")});
+
+    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'b'}")});
+
+    auto outputKeys = makeKeySet();
+    auto multikeyPathsMock = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+
+    ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+}
+
+TEST(AllPathsKeyGeneratorDottedFieldsTest, DoNotIndexDottedFieldsWithSimilarSubpathInKey) {
+    AllPathsKeyGenerator keyGen{fromjson("{'a.b.$**': 1}"), {}, {}};
+
+    auto inputDoc = fromjson("{'a.b': 0}");
+
+    auto expectedKeys = makeKeySet();
+
+    auto expectedMultikeyPaths = makeKeySet();
+
+    auto outputKeys = makeKeySet();
+    auto multikeyPathsMock = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+
+    ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+}
+
 }  // namespace
 }  // namespace mongo
