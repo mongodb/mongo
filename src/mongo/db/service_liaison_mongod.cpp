@@ -36,7 +36,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/periodic_runner.h"
 
 namespace mongo {
 
@@ -86,12 +85,17 @@ LogicalSessionIdSet ServiceLiaisonMongod::getOpenCursorSessions() const {
 
 void ServiceLiaisonMongod::scheduleJob(PeriodicRunner::PeriodicJob job) {
     invariant(hasGlobalServiceContext());
-    getGlobalServiceContext()->getPeriodicRunner()->scheduleJob(std::move(job));
+    auto jobHandle = getGlobalServiceContext()->getPeriodicRunner()->makeJob(std::move(job));
+    jobHandle->start();
+    _jobs.push_back(std::move(jobHandle));
 }
 
 void ServiceLiaisonMongod::join() {
     invariant(hasGlobalServiceContext());
-    getGlobalServiceContext()->getPeriodicRunner()->shutdown();
+    for (auto&& jobHandle : _jobs) {
+        jobHandle->stop();
+    }
+    _jobs.clear();
 }
 
 Date_t ServiceLiaisonMongod::now() const {

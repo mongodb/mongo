@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2017 MongoDB Inc.
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,48 +26,30 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_liaison.h"
-#include "mongo/util/periodic_runner.h"
-#include "mongo/util/time_support.h"
+#include "mongo/platform/basic.h"
+
+#include <memory>
+
+#include "mongo/embedded/logical_session_cache_factory_embedded.h"
+
+#include "mongo/db/logical_session_cache_impl.h"
+#include "mongo/db/service_liaison_mongod.h"
+#include "mongo/db/sessions_collection_standalone.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-/**
- * This is the service liaison to mongod for the logical session cache.
- *
- * This class will return active sessions for cursors stored in the
- * global cursor manager and cursors in per-collection managers. This
- * class will also walk the service context to find all sessions for
- * currently-running operations on this server.
- *
- * Job scheduling on this class will be handled behind the scenes by a
- * periodic runner for this mongod. The time will be returned from the
- * system clock.
- */
-class ServiceLiaisonMongod : public ServiceLiaison {
-public:
-    LogicalSessionIdSet getActiveOpSessions() const override;
-    LogicalSessionIdSet getOpenCursorSessions() const override;
+std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheEmbedded() {
+    auto liaison = std::make_unique<ServiceLiaisonMongod>();
 
-    void scheduleJob(PeriodicRunner::PeriodicJob job) override;
+    // Set up the logical session cache
+    auto sessionsColl = std::make_shared<SessionsCollectionStandalone>();
 
-    void join() override;
-
-    Date_t now() const override;
-
-    std::pair<Status, int> killCursorsWithMatchingSessions(
-        OperationContext* opCtx, const SessionKiller::Matcher& matcher) override;
-
-protected:
-    /**
-     * Returns the service context.
-     */
-    ServiceContext* _context() override;
-    std::vector<std::unique_ptr<PeriodicRunner::PeriodicJobHandle>> _jobs;
-};
+    return stdx::make_unique<LogicalSessionCacheImpl>(
+        std::move(liaison), std::move(sessionsColl), nullptr, LogicalSessionCacheImpl::Options{});
+}
 
 }  // namespace mongo

@@ -159,6 +159,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
 
         _execStatus = PeriodicJobImpl::ExecutionStatus::CANCELED;
     }
+    invariant(_thread.joinable());
     _condvar.notify_one();
     _thread.join();
 }
@@ -166,7 +167,6 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
 bool PeriodicRunnerImpl::PeriodicJobImpl::isAlive() {
     return _execStatus == ExecutionStatus::RUNNING || _execStatus == ExecutionStatus::PAUSED;
 }
-
 
 namespace {
 
@@ -187,6 +187,11 @@ constexpr auto kPeriodicJobHandleLifetimeErrMsg =
 void PeriodicRunnerImpl::PeriodicJobHandleImpl::start() {
     auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
     job->start();
+}
+
+void PeriodicRunnerImpl::PeriodicJobHandleImpl::stop() {
+    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
+    job->stop();
 }
 
 void PeriodicRunnerImpl::PeriodicJobHandleImpl::pause() {

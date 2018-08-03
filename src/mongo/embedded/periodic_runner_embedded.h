@@ -65,7 +65,7 @@ private:
 
     public:
         friend class PeriodicRunnerEmbedded;
-        PeriodicJobImpl(PeriodicJob job, ClockSource* source, ServiceContext* svc);
+        PeriodicJobImpl(PeriodicJob job, ClockSource* source, PeriodicRunnerEmbedded* runner);
 
         void start();
         void pause();
@@ -83,7 +83,7 @@ private:
     private:
         PeriodicJob _job;
         ClockSource* _clockSource;
-        ServiceContext* _serviceContext;
+        PeriodicRunnerEmbedded* _periodicRunner;
         Date_t _lastRun{};
 
         // The mutex is protecting _execStatus, the variable that can be accessed from other
@@ -103,13 +103,13 @@ private:
         explicit PeriodicJobHandleImpl(std::weak_ptr<PeriodicJobImpl> jobImpl)
             : _jobWeak(jobImpl) {}
         void start() override;
+        void stop() override;
         void pause() override;
         void resume() override;
 
     private:
         std::weak_ptr<PeriodicJobImpl> _jobWeak;
     };
-
 
     ServiceContext* _svc;
     ClockSource* _clockSource;
