@@ -65,8 +65,7 @@ std::shared_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheSe
 
 }  // namespace
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(ServiceContext* svc,
-                                                              LogicalSessionCacheServer state) {
+std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state) {
     auto liaison = stdx::make_unique<ServiceLiaisonMongod>();
 
     // Set up the logical session cache

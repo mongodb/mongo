@@ -69,7 +69,7 @@ PeriodicRunnerEmbedded::~PeriodicRunnerEmbedded() {
 
 std::shared_ptr<PeriodicRunnerEmbedded::PeriodicJobImpl> PeriodicRunnerEmbedded::createAndAddJob(
     PeriodicJob job, bool shouldStart) {
-    auto impl = std::make_shared<PeriodicJobImpl>(std::move(job), this->_clockSource, this->_svc);
+    auto impl = std::make_shared<PeriodicJobImpl>(std::move(job), this->_clockSource, this);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _jobs.push_back(impl);
@@ -197,8 +197,8 @@ bool PeriodicRunnerEmbedded::tryPump() {
 
 PeriodicRunnerEmbedded::PeriodicJobImpl::PeriodicJobImpl(PeriodicJob job,
                                                          ClockSource* source,
-                                                         ServiceContext* svc)
-    : _job(std::move(job)), _clockSource(source), _serviceContext(svc) {}
+                                                         PeriodicRunnerEmbedded* runner)
+    : _job(std::move(job)), _clockSource(source), _periodicRunner(runner) {}
 
 void PeriodicRunnerEmbedded::PeriodicJobImpl::start() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -219,6 +219,9 @@ void PeriodicRunnerEmbedded::PeriodicJobImpl::resume() {
 }
 
 void PeriodicRunnerEmbedded::PeriodicJobImpl::stop() {
+    // Also take the master lock, the job lock is not held while executing the job and we must make
+    // sure the user can invalidate it after this call.
+    stdx::lock_guard<stdx::mutex> masterLock(_periodicRunner->_mutex);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(isAlive(lk));
 
@@ -232,6 +235,11 @@ bool PeriodicRunnerEmbedded::PeriodicJobImpl::isAlive(WithLock lk) {
 void PeriodicRunnerEmbedded::PeriodicJobHandleImpl::start() {
     auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
     job->start();
+}
+
+void PeriodicRunnerEmbedded::PeriodicJobHandleImpl::stop() {
+    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
+    job->stop();
 }
 
 void PeriodicRunnerEmbedded::PeriodicJobHandleImpl::pause() {

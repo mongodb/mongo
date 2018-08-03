@@ -97,6 +97,7 @@ private:
         explicit PeriodicJobHandleImpl(std::weak_ptr<PeriodicJobImpl> jobImpl)
             : _jobWeak(jobImpl) {}
         void start() override;
+        void stop() override;
         void pause() override;
         void resume() override;
 

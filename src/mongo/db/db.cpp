@@ -631,7 +631,7 @@ ExitCode _initAndListen(int listenPort) {
         kind = LogicalSessionCacheServer::kReplicaSet;
     }
 
-    auto sessionCache = makeLogicalSessionCacheD(serviceContext, kind);
+    auto sessionCache = makeLogicalSessionCacheD(kind);
     LogicalSessionCache::set(serviceContext, std::move(sessionCache));
 
     // MessageServer::run will return when exit code closes its socket and we don't need the

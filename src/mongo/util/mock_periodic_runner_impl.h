@@ -43,9 +43,10 @@ public:
     public:
         ~MockPeriodicJobHandleImpl() = default;
 
-        virtual void start(){};
-        virtual void pause(){};
-        virtual void resume(){};
+        void start() override{};
+        void stop() override{};
+        void pause() override{};
+        void resume() override{};
     };
 
     ~MockPeriodicRunnerImpl() = default;

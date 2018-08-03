@@ -89,6 +89,11 @@ public:
          * Resumes a paused job so that it continues executing each interval
          */
         virtual void resume() = 0;
+        /**
+         * Stops the job, this function blocks until the job is stopped
+         * Safe to invalidate the job callable after calling this.
+         */
+        virtual void stop() = 0;
     };
 
     virtual ~PeriodicRunner();
