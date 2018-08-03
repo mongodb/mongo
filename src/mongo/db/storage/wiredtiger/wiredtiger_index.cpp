@@ -299,7 +299,7 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                           << ", ns: "
                           << desc->parentNS()
                           << "} - version too new for this mongod."
-                          << " See http://dochub.mongodb.org/core/3.4-index-downgrade for detailed"
+                          << " See http://dochub.mongodb.org/core/4.2-downgrade-index for detailed"
                           << " instructions on how to handle this error.");
         fassertFailedWithStatusNoTrace(28579, indexVersionStatus);
     }
