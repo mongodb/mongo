@@ -2,7 +2,7 @@
 // ssl/detail/io.hpp
 // ~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -114,7 +114,7 @@ public:
   io_op(io_op&& other)
     : next_layer_(other.next_layer_),
       core_(other.core_),
-      op_(other.op_),
+      op_(ASIO_MOVE_CAST(Operation)(other.op_)),
       start_(other.start_),
       want_(other.want_),
       ec_(other.ec_),

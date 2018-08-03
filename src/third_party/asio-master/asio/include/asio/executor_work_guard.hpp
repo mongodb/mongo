@@ -2,7 +2,7 @@
 // executor_work_guard.hpp
 // ~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -154,7 +154,8 @@ inline executor_work_guard<typename associated_executor<T,
   typename ExecutionContext::executor_type>::type>
 make_work_guard(const T& t, ExecutionContext& ctx,
     typename enable_if<!is_executor<T>::value &&
-      !is_convertible<T&, execution_context&>::value>::type* = 0)
+      !is_convertible<T&, execution_context&>::value &&
+      is_convertible<ExecutionContext&, execution_context&>::value>::type* = 0)
 {
   return executor_work_guard<typename associated_executor<T,
     typename ExecutionContext::executor_type>::type>(

@@ -2,7 +2,7 @@
 // detail/type_traits.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -53,7 +53,13 @@ using std::is_function;
 using std::is_same;
 using std::remove_pointer;
 using std::remove_reference;
+#if defined(ASIO_HAS_STD_INVOKE_RESULT)
+template <typename> struct result_of;
+template <typename F, typename... Args>
+struct result_of<F(Args...)> : std::invoke_result<F, Args...> {};
+#else // defined(ASIO_HAS_STD_INVOKE_RESULT)
 using std::result_of;
+#endif // defined(ASIO_HAS_STD_INVOKE_RESULT)
 using std::true_type;
 #else // defined(ASIO_HAS_STD_TYPE_TRAITS)
 using boost::add_const;

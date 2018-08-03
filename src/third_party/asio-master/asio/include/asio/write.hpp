@@ -2,7 +2,7 @@
 // write.hpp
 // ~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -253,7 +253,7 @@ template <typename SyncWriteStream, typename DynamicBuffer>
 std::size_t write(SyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 /// Write all of the supplied data to a stream before returning.
@@ -288,7 +288,7 @@ std::size_t write(SyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     asio::error_code& ec,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 /// Write a certain amount of data to a stream before returning.
@@ -333,7 +333,7 @@ std::size_t write(SyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     CompletionCondition completion_condition,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 /// Write a certain amount of data to a stream before returning.
@@ -379,7 +379,7 @@ std::size_t write(SyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     CompletionCondition completion_condition, asio::error_code& ec,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 #if !defined(ASIO_NO_EXTENSIONS)
@@ -728,7 +728,7 @@ async_write(AsyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     ASIO_MOVE_ARG(WriteHandler) handler,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 /// Start an asynchronous operation to write a certain amount of data to a
@@ -797,7 +797,7 @@ async_write(AsyncWriteStream& s,
     CompletionCondition completion_condition,
     ASIO_MOVE_ARG(WriteHandler) handler,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 #if !defined(ASIO_NO_EXTENSIONS)

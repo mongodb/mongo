@@ -1,0 +1,166 @@
+From bf6b0974903d15c97eeb24fdbfa6385e37ba5176 Mon Sep 17 00:00:00 2001
+From: Jonathan Reams <jbreams@mongodb.com>
+Date:   Tue Feb 20 14:33:42 2018 -0500
+Subject: [PATCH 5/4] MONGO - Timeout connect
+
+---
+ asio/include/asio/detail/impl/socket_ops.ipp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/asio/include/asio/basic_socket.hpp b/asio/include/asio/basic_socket.hpp
+index 4343016127..d224bac0a8 100644
+--- a/asio/include/asio/basic_socket.hpp
++++ b/asio/include/asio/basic_socket.hpp
+@@ -760,7 +760,7 @@ public:
+           peer_endpoint.protocol(), ec);
+       asio::detail::throw_error(ec, "connect");
+     }
+-    this->get_service().connect(this->get_implementation(), peer_endpoint, ec);
++    this->get_service().connect(this->get_implementation(), peer_endpoint, -1, ec);
+     asio::detail::throw_error(ec, "connect");
+   }
+ 
+@@ -805,7 +805,63 @@ public:
+       }
+     }
+ 
+-    this->get_service().connect(this->get_implementation(), peer_endpoint, ec);
++    this->get_service().connect(this->get_implementation(), peer_endpoint, -1,  ec);
++    ASIO_SYNC_OP_VOID_RETURN(ec);
++  }
++
++  /// Connect the socket to the specified endpoint with a timeout.
++  /**
++   * This function is used to connect a socket to the specified remote endpoint.
++   * The function call will block until the connection is successfully made or
++   * an error occurs.
++   *
++   * The socket is automatically opened if it is not already open. If the
++   * connect fails, and the socket was automatically opened, the socket is
++   * not returned to the closed state.
++   *
++   * Passing a timeout of less than zero will return an invalid_argument error.
++   *
++   * @param peer_endpoint The remote endpoint to which the socket will be
++   * connected.
++   *
++   * @param timeout The time to wait for the connection before failing 
++   *
++   * @param ec Set to indicate what error occurred, if any.
++   *
++   * @par Example
++   * @code
++   * asio::ip::tcp::socket socket(io_context);
++   * asio::ip::tcp::endpoint endpoint(
++   *     asio::ip::address::from_string("1.2.3.4"), 12345);
++   * asio::error_code ec;
++   * socket.connect(endpoint, std::chrono::seconds{30}, ec);
++   * if (ec)
++   * {
++   *   // An error occurred.
++   * }
++   * @endcode
++   */
++  template <typename Duration>
++  ASIO_SYNC_OP_VOID connect(const endpoint_type& peer_endpoint,
++      Duration timeout, asio::error_code& ec)
++  {
++    if (!is_open())
++    {
++      this->get_service().open(this->get_implementation(),
++            peer_endpoint.protocol(), ec);
++      if (ec)
++      {
++        ASIO_SYNC_OP_VOID_RETURN(ec);
++      }
++    }
++
++    auto timeout_ms = std::chrono::duration_cast<std::chrono::milliseconds>(timeout);
++    if (timeout_ms.count() < 0)
++    {
++      ec = asio::error::invalid_argument;
++      ASIO_SYNC_OP_VOID_RETURN(ec);
++    }
++    this->get_service().connect(this->get_implementation(), peer_endpoint, timeout_ms.count(), ec);
+     ASIO_SYNC_OP_VOID_RETURN(ec);
+   }
+ 
+diff --git a/asio/include/asio/detail/impl/socket_ops.ipp b/asio/include/asio/detail/impl/socket_ops.ipp
+index 2f89889fac..58ad04ea66 100644
+--- a/asio/include/asio/detail/impl/socket_ops.ipp
++++ b/asio/include/asio/detail/impl/socket_ops.ipp
+@@ -491,7 +491,7 @@ int connect(socket_type s, const socket_addr_type* addr,
+ }
+ 
+ void sync_connect(socket_type s, const socket_addr_type* addr,
+-    std::size_t addrlen, asio::error_code& ec)
++    std::size_t addrlen, int timeout_ms, asio::error_code& ec)
+ {
+   // Perform the connect operation.
+   socket_ops::connect(s, addr, addrlen, ec);
+@@ -503,8 +503,15 @@ void sync_connect(socket_type s, const socket_addr_type* addr,
+   }
+ 
+   // Wait for socket to become ready.
+-  if (socket_ops::poll_connect(s, -1, ec) < 0)
++  int res = socket_ops::poll_connect(s, timeout_ms, ec);
++  if (res < 0)
++    return;
++
++  if (res == 0)
++  {
++    ec = asio::error::timed_out;
+     return;
++  }
+ 
+   // Get the error code from the connect operation.
+   int connect_error = 0;
+diff --git a/asio/include/asio/detail/reactive_socket_service.hpp b/asio/include/asio/detail/reactive_socket_service.hpp
+index b7b264806a..ef9a9366a8 100644
+--- a/asio/include/asio/detail/reactive_socket_service.hpp
++++ b/asio/include/asio/detail/reactive_socket_service.hpp
+@@ -486,10 +486,10 @@ public:
+ 
+   // Connect the socket to the specified endpoint.
+   asio::error_code connect(implementation_type& impl,
+-      const endpoint_type& peer_endpoint, asio::error_code& ec)
++      const endpoint_type& peer_endpoint, int timeout_ms, asio::error_code& ec)
+   {
+     socket_ops::sync_connect(impl.socket_,
+-        peer_endpoint.data(), peer_endpoint.size(), ec);
++        peer_endpoint.data(), peer_endpoint.size(), timeout_ms, ec);
+     return ec;
+   }
+ 
+diff --git a/asio/include/asio/detail/socket_ops.hpp b/asio/include/asio/detail/socket_ops.hpp
+index b1fe32af42..2f2a1c3855 100644
+--- a/asio/include/asio/detail/socket_ops.hpp
++++ b/asio/include/asio/detail/socket_ops.hpp
+@@ -104,7 +104,7 @@ ASIO_DECL int connect(socket_type s, const socket_addr_type* addr,
+     std::size_t addrlen, asio::error_code& ec);
+ 
+ ASIO_DECL void sync_connect(socket_type s, const socket_addr_type* addr,
+-    std::size_t addrlen, asio::error_code& ec);
++    std::size_t addrlen, int timeout_ms, asio::error_code& ec);
+ 
+ #if defined(ASIO_HAS_IOCP)
+ 
+diff --git a/asio/include/asio/detail/win_iocp_socket_service.hpp b/asio/include/asio/detail/win_iocp_socket_service.hpp
+index ab099f6eab..21d3f24fa7 100644
+--- a/asio/include/asio/detail/win_iocp_socket_service.hpp
++++ b/asio/include/asio/detail/win_iocp_socket_service.hpp
+@@ -562,10 +562,10 @@ public:
+ 
+   // Connect the socket to the specified endpoint.
+   asio::error_code connect(implementation_type& impl,
+-      const endpoint_type& peer_endpoint, asio::error_code& ec)
++      const endpoint_type& peer_endpoint, int timeout_ms, asio::error_code& ec)
+   {
+     socket_ops::sync_connect(impl.socket_,
+-        peer_endpoint.data(), peer_endpoint.size(), ec);
++        peer_endpoint.data(), peer_endpoint.size(), timeout_ms, ec);
+     return ec;
+   }
+ 
+-- 
+2.12.2

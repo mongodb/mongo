@@ -284,8 +284,15 @@ nobase_include_HEADERS = \
 	asio/error_code.hpp \
 	asio/error.hpp \
 	asio/execution_context.hpp \
-	asio/executor_work_guard.hpp \
 	asio/executor.hpp \
+	asio/executor_work_guard.hpp \
+	asio/experimental/co_spawn.hpp \
+	asio/experimental/detached.hpp \
+	asio/experimental.hpp \
+	asio/experimental/impl/co_spawn.hpp \
+	asio/experimental/impl/detached.hpp \
+	asio/experimental/impl/redirect_error.hpp \
+	asio/experimental/redirect_error.hpp \
 	asio/generic/basic_endpoint.hpp \
 	asio/generic/datagram_protocol.hpp \
 	asio/generic/detail/endpoint.hpp \
@@ -330,10 +337,10 @@ nobase_include_HEADERS = \
 	asio/impl/use_future.hpp \
 	asio/impl/write_at.hpp \
 	asio/impl/write.hpp \
-	asio/io_context_strand.hpp \
 	asio/io_context.hpp \
-	asio/io_service_strand.hpp \
+	asio/io_context_strand.hpp \
 	asio/io_service.hpp \
+	asio/io_service_strand.hpp \
 	asio/ip/address.hpp \
 	asio/ip/address_v4.hpp \
 	asio/ip/address_v4_iterator.hpp \
@@ -388,8 +395,8 @@ nobase_include_HEADERS = \
 	asio/placeholders.hpp \
 	asio/posix/basic_descriptor.hpp \
 	asio/posix/basic_stream_descriptor.hpp \
-	asio/posix/descriptor.hpp \
 	asio/posix/descriptor_base.hpp \
+	asio/posix/descriptor.hpp \
 	asio/posix/stream_descriptor.hpp \
 	asio/posix/stream_descriptor_service.hpp \
 	asio/post.hpp \

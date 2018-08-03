@@ -1,4 +1,4 @@
-AC_INIT(asio, [1.11.0])
+AC_INIT(asio, [1.12.0])
 AC_CONFIG_SRCDIR(include/asio.hpp)
 AM_MAINTAINER_MODE
 AM_INIT_AUTOMAKE([tar-ustar])
@@ -17,7 +17,7 @@ AC_ARG_WITH(boost,
   if test "${withval}" = no; then
     STANDALONE="yes"
   else
-    CPPFLAGS="$CPPFLAGS -I${withval} -DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING"
+    CPPFLAGS="$CPPFLAGS -I${withval} -DBOOST_CHRONO_HEADER_ONLY -DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING"
     LIBS="$LIBS -L${withval}/stage/lib"
   fi
 ],
@@ -27,7 +27,7 @@ AC_ARG_WITH(boost,
     BOOSTDIR="`pwd`/${BOOSTDIR}"
     if test -d "${BOOSTDIR}"; then
       echo "using automatically detected boost from ${BOOSTDIR}"
-      CPPFLAGS="$CPPFLAGS -I${BOOSTDIR} -DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING"
+      CPPFLAGS="$CPPFLAGS -I${BOOSTDIR} -DBOOST_CHRONO_HEADER_ONLY -DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING"
       LIBS="$LIBS -L${BOOSTDIR}/stage/lib"
     fi
   fi
@@ -50,6 +50,7 @@ if test "$STANDALONE" != yes; then
   [
     echo "Can't find boost headers. Please check the location of the boost"
     echo "distribution and rerun configure using the --with-boost=DIR option."
+    echo "Alternatively, run with --without-boost to enable standalone build."
     exit 1
   ],[])
 fi
@@ -121,9 +122,6 @@ esac
 
 if test "$GXX" = yes; then
   CXXFLAGS="$CXXFLAGS -ftemplate-depth-256"
-  if test "$STANDALONE" = yes; then
-    CPPFLAGS="-std=c++0x $CPPFLAGS"
-  fi
 fi
 
 if test "$STANDALONE" = yes; then
@@ -134,6 +132,37 @@ if test "$SEPARATE_COMPILATION" = yes; then
   CPPFLAGS="$CPPFLAGS -DASIO_SEPARATE_COMPILATION"
 fi
 
+AC_MSG_CHECKING([whether C++11 is enabled])
+AC_COMPILE_IFELSE(
+  [AC_LANG_PROGRAM(
+    [[#if __cplusplus < 201103L]]
+    [[#error C++11 not available]]
+    [[#endif]])],
+  [AC_MSG_RESULT([yes])
+    HAVE_CXX11=yes;],
+  [AC_MSG_RESULT([no])
+    HAVE_CXX11=no;])
+
+AC_MSG_CHECKING([whether C++14 is enabled])
+AC_COMPILE_IFELSE(
+  [AC_LANG_PROGRAM(
+    [[#if __cplusplus < 201402L]]
+    [[#error C++14 not available]]
+    [[#endif]])],
+  [AC_MSG_RESULT([yes])
+    HAVE_CXX14=yes;],
+  [AC_MSG_RESULT([no])
+    HAVE_CXX14=no;])
+
+if test "$GXX" = yes; then
+  if test "$STANDALONE" = yes; then
+    if test "$HAVE_CXX11" = no; then
+      HAVE_CXX11=yes
+      CPPFLAGS="-std=c++0x $CPPFLAGS"
+    fi
+  fi
+fi
+
 AM_CONDITIONAL(STANDALONE,test x$STANDALONE = xyes)
 
 AM_CONDITIONAL(SEPARATE_COMPILATION,test x$SEPARATE_COMPILATION = xyes)
@@ -141,6 +170,10 @@ AM_CONDITIONAL(SEPARATE_COMPILATION,test x$SEPARATE_COMPILATION = xyes)
 AM_CONDITIONAL(HAVE_BOOST_COROUTINE,test x$HAVE_BOOST_COROUTINE = xyes)
 
 AM_CONDITIONAL(WINDOWS_TARGET,test x$WINDOWS != xno)
+
+AM_CONDITIONAL(HAVE_CXX11,test x$HAVE_CXX11 = xyes)
+
+AM_CONDITIONAL(HAVE_CXX14,test x$HAVE_CXX14 = xyes)
 
 AC_OUTPUT([
   Makefile

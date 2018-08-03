@@ -2,7 +2,7 @@
 // io_context_strand.hpp
 // ~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -211,15 +211,16 @@ public:
    * handler object as required. The function signature of the handler must be:
    * @code void handler(); @endcode
    */
-  template <typename CompletionHandler>
-  ASIO_INITFN_RESULT_TYPE(CompletionHandler, void ())
-  dispatch(ASIO_MOVE_ARG(CompletionHandler) handler)
+  template <typename LegacyCompletionHandler>
+  ASIO_INITFN_RESULT_TYPE(LegacyCompletionHandler, void ())
+  dispatch(ASIO_MOVE_ARG(LegacyCompletionHandler) handler)
   {
     // If you get an error on the following line it means that your handler does
-    // not meet the documented type requirements for a CompletionHandler.
-    ASIO_COMPLETION_HANDLER_CHECK(CompletionHandler, handler) type_check;
+    // not meet the documented type requirements for a LegacyCompletionHandler.
+    ASIO_LEGACY_COMPLETION_HANDLER_CHECK(
+        LegacyCompletionHandler, handler) type_check;
 
-    async_completion<CompletionHandler, void ()> init(handler);
+    async_completion<LegacyCompletionHandler, void ()> init(handler);
 
     service_.dispatch(impl_, init.completion_handler);
 
@@ -265,15 +266,16 @@ public:
    * handler object as required. The function signature of the handler must be:
    * @code void handler(); @endcode
    */
-  template <typename CompletionHandler>
-  ASIO_INITFN_RESULT_TYPE(CompletionHandler, void ())
-  post(ASIO_MOVE_ARG(CompletionHandler) handler)
+  template <typename LegacyCompletionHandler>
+  ASIO_INITFN_RESULT_TYPE(LegacyCompletionHandler, void ())
+  post(ASIO_MOVE_ARG(LegacyCompletionHandler) handler)
   {
     // If you get an error on the following line it means that your handler does
-    // not meet the documented type requirements for a CompletionHandler.
-    ASIO_COMPLETION_HANDLER_CHECK(CompletionHandler, handler) type_check;
+    // not meet the documented type requirements for a LegacyCompletionHandler.
+    ASIO_LEGACY_COMPLETION_HANDLER_CHECK(
+        LegacyCompletionHandler, handler) type_check;
 
-    async_completion<CompletionHandler, void ()> init(handler);
+    async_completion<LegacyCompletionHandler, void ()> init(handler);
 
     service_.post(impl_, init.completion_handler);
 
