@@ -1257,6 +1257,7 @@ void recordTLSVersion(::SSLContextRef ssl) {
         case kTLSProtocol1Only:
         case kSSLProtocolAll:
         case kDTLSProtocol1:
+        default:  // Some system headers may define additional protocols, so suppress warnings.
             // Do nothing
             break;
     }
