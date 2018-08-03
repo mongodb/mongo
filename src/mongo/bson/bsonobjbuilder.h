@@ -48,7 +48,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/util/decimal_counter.h"
+#include "mongo/util/itoa.h"
 
 namespace mongo {
 
@@ -810,20 +810,20 @@ private:
 
 class BSONArrayBuilder {
 public:
-    BSONArrayBuilder() {}
-    BSONArrayBuilder(BufBuilder& _b) : _b(_b) {}
-    BSONArrayBuilder(int initialSize) : _b(initialSize) {}
+    BSONArrayBuilder() : _i(0), _b() {}
+    BSONArrayBuilder(BufBuilder& _b) : _i(0), _b(_b) {}
+    BSONArrayBuilder(int initialSize) : _i(0), _b(initialSize) {}
 
     template <typename T>
     BSONArrayBuilder& append(const T& x) {
-        _b.append(_fieldCount, x);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.append(itoa, x);
         return *this;
     }
 
     BSONArrayBuilder& append(const BSONElement& e) {
-        _b.appendAs(e, _fieldCount);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendAs(e, itoa);
         return *this;
     }
 
@@ -833,19 +833,19 @@ public:
 
     template <typename T>
     BSONArrayBuilder& operator<<(const T& x) {
-        _b << _fieldCount << x;
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b << itoa << x;
         return *this;
     }
 
     void appendNull() {
-        _b.appendNull(_fieldCount);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendNull(itoa);
     }
 
     void appendUndefined() {
-        _b.appendUndefined(_fieldCount);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendUndefined(itoa);
     }
 
     /**
@@ -875,57 +875,59 @@ public:
 
     // These two just use next position
     BufBuilder& subobjStart() {
-        return _b.subobjStart(_fieldCount++);
+        ItoA itoa(_i++);
+        return _b.subobjStart(itoa);
     }
     BufBuilder& subarrayStart() {
-        return _b.subarrayStart(_fieldCount++);
+        ItoA itoa(_i++);
+        return _b.subarrayStart(itoa);
     }
 
     BSONArrayBuilder& appendRegex(StringData regex, StringData options = "") {
-        _b.appendRegex(_fieldCount, regex, options);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendRegex(itoa, regex, options);
         return *this;
     }
 
     BSONArrayBuilder& appendBinData(int len, BinDataType type, const void* data) {
-        _b.appendBinData(_fieldCount, len, type, data);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendBinData(itoa, len, type, data);
         return *this;
     }
 
     BSONArrayBuilder& appendCode(StringData code) {
-        _b.appendCode(_fieldCount, code);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendCode(itoa, code);
         return *this;
     }
 
     BSONArrayBuilder& appendCodeWScope(StringData code, const BSONObj& scope) {
-        _b.appendCodeWScope(_fieldCount, code, scope);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendCodeWScope(itoa, code, scope);
         return *this;
     }
 
     BSONArrayBuilder& appendTimeT(time_t dt) {
-        _b.appendTimeT(_fieldCount, dt);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendTimeT(itoa, dt);
         return *this;
     }
 
     BSONArrayBuilder& appendDate(Date_t dt) {
-        _b.appendDate(_fieldCount, dt);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendDate(itoa, dt);
         return *this;
     }
 
     BSONArrayBuilder& appendBool(bool val) {
-        _b.appendBool(_fieldCount, val);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendBool(itoa, val);
         return *this;
     }
 
     BSONArrayBuilder& appendTimestamp(unsigned long long ts) {
-        _b.appendTimestamp(_fieldCount, ts);
-        ++_fieldCount;
+        ItoA itoa(_i++);
+        _b.appendTimestamp(itoa, ts);
         return *this;
     }
 
@@ -937,7 +939,7 @@ public:
         return _b.len();
     }
     int arrSize() const {
-        return _fieldCount;
+        return _i;
     }
 
     BufBuilder& bb() {
@@ -945,7 +947,7 @@ public:
     }
 
 private:
-    DecimalCounter<uint32_t> _fieldCount;
+    std::uint32_t _i;
     BSONObjBuilder _b;
 };
 

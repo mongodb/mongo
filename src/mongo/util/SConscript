@@ -608,13 +608,6 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='decimal_counter_test',
-    source=[
-        'decimal_counter_test.cpp',
-    ],
-)
-
-env.CppUnitTest(
     target='itoa_test',
     source=[
         'itoa_test.cpp',
@@ -688,15 +681,6 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-    ],
-)
-
-env.Benchmark(
-    target='decimal_counter_bm',
-    source=[
-        'decimal_counter_bm.cpp',
-    ],
-    LIBDEPS=[
     ],
 )
 
