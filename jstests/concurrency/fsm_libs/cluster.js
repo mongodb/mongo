@@ -221,6 +221,7 @@ var Cluster = function(options) {
                     oplogSize: 1024,
                     // Set the electionTimeoutMillis to 1 day to prevent unintended elections
                     settings: {electionTimeoutMillis: 60 * 60 * 24 * 1000},
+                    nodeOptions: {setParameter: "enableElectionHandoff=0"},
                     verbose: verbosityLevel
                 };
                 shardConfig.rsOptions = {};

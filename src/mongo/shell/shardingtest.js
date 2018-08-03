@@ -1142,6 +1142,9 @@ var ShardingTest = function(params) {
             var protocolVersion = rsDefaults.protocolVersion;
             delete rsDefaults.protocolVersion;
 
+            var nodeOptions = rsDefaults.nodeOptions || {};
+            delete rsDefaults.nodeOptions;
+
             var rs = new ReplSetTest({
                 name: setName,
                 nodes: numReplicas,
@@ -1151,7 +1154,8 @@ var ShardingTest = function(params) {
                 keyFile: keyFile,
                 protocolVersion: protocolVersion,
                 waitForKeys: false,
-                settings: rsSettings
+                settings: rsSettings,
+                nodeOptions: nodeOptions
             });
 
             this._rs[i] =
