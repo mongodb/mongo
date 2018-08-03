@@ -498,28 +498,38 @@ using future_details::Future;
  *
  * If the result is ready when producing the Future, it is more efficient to use
  * makeReadyFutureWith() or Future<T>::makeReady() than to use a Promise<T>.
+ *
+ * A default constructed `Promise` is in a null state.  Null `Promises` can only be assigned over
+ * and destroyed. It is a programmer error to call any methods on a null `Promise`.  Any methods
+ * that complete a `Promise` leave it in the null state.
  */
 template <typename T>
 class future_details::Promise {
 public:
     using value_type = T;
 
+    /**
+     * Creates a null `Promise`.
+     */
     Promise() = default;
 
     ~Promise() {
-        if (MONGO_unlikely(_sharedState)) {
-            _sharedState->setError({ErrorCodes::BrokenPromise, "broken promise"});
-        }
+        breakPromiseIfNeeded();
     }
 
     Promise(const Promise&) = delete;
     Promise& operator=(const Promise&) = delete;
 
-    // If we want to enable move-assignability, we need to handle breaking the promise on the old
-    // value of this.
-    Promise& operator=(Promise&&) = delete;
 
-    // The default move construction is fine.
+    /**
+     * Breaks this `Promise`, if not fulfilled and not in a moved-from state.
+     */
+    Promise& operator=(Promise&& p) noexcept {
+        breakPromiseIfNeeded();
+        _sharedState = std::move(p._sharedState);
+        return *this;
+    }
+
     Promise(Promise&&) = default;
 
     /**
@@ -582,13 +592,16 @@ public:
 
     static auto makePromiseFutureImpl() {
         struct PromiseAndFuture {
-            Promise<T> promise;
+            Promise<T> promise{make_intrusive<SharedState<T>>()};
             Future<T> future = promise.getFuture();
         };
         return PromiseAndFuture();
     }
 
 private:
+    explicit Promise(boost::intrusive_ptr<SharedState<T>>&& sharedState)
+        : _sharedState(std::move(sharedState)) {}
+
     // This is not public because we found it frequently was involved in races.  The
     // `makePromiseFuture<T>` API avoids those races entirely.
     Future<T> getFuture() noexcept;
@@ -606,7 +619,14 @@ private:
         // Note: `this` is potentially dead, at this point.
     }
 
-    boost::intrusive_ptr<SharedState<T>> _sharedState = make_intrusive<SharedState<T>>();
+    // The current promise will be broken, if not already fulfilled.
+    void breakPromiseIfNeeded() {
+        if (MONGO_unlikely(_sharedState)) {
+            _sharedState->setError({ErrorCodes::BrokenPromise, "broken promise"});
+        }
+    }
+
+    boost::intrusive_ptr<SharedState<T>> _sharedState;
 };
 
 /**

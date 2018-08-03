@@ -97,5 +97,18 @@ TEST(Promise_void, Fail_setWith_Future) {
     });
 }
 
+TEST(Promise_void, MoveAssignBreaksPromise) {
+    auto pf = makePromiseFuture<void>();
+    pf.promise = Promise<void>();  // This should break the promise.
+    ASSERT_THROWS_CODE(std::move(pf.future).get(), DBException, ErrorCodes::BrokenPromise);
+}
+
+TEST(Promise_void, MoveAssignedPromiseIsTheSameAsTheOldOne) {
+    auto pf = makePromiseFuture<void>();
+    auto promise = std::move(pf.promise);
+    promise.setWith([] {});
+    ASSERT_OK(std::move(pf.future).getNoThrow());
+}
+
 }  // namespace
 }  // namespace mongo
