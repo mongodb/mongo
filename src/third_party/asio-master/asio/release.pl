@@ -236,8 +236,9 @@ sub build_boost_asio_doc
   my $cwd = getcwd();
   my $bjam = abs_path(glob("../boost/bjam"));
   chdir("../boost/doc");
-  system("$bjam clean");
   system("rm -rf html/boost_asio");
+  chdir("../libs/asio/doc");
+  system("$bjam clean");
   system("$bjam asio");
   chdir($cwd);
 }

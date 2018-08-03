@@ -2,7 +2,7 @@
 // buffer.hpp
 // ~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -706,7 +706,7 @@ public:
 
   void operator()()
   {
-    *iter_;
+    (void)*iter_;
   }
 
 private:
@@ -1475,7 +1475,7 @@ inline ASIO_CONST_BUFFER buffer(
       );
 }
 
-#if defined(ASIO_HAS_STD_STRING_VIEW) \
+#if defined(ASIO_HAS_STRING_VIEW) \
   || defined(GENERATING_DOCUMENTATION)
 
 /// Create a new modifiable buffer that represents the given string_view.
@@ -1520,7 +1520,7 @@ inline ASIO_CONST_BUFFER buffer(
       );
 }
 
-#endif // defined(ASIO_HAS_STD_STRING_VIEW)
+#endif // defined(ASIO_HAS_STRING_VIEW)
        //  || defined(GENERATING_DOCUMENTATION)
 
 /*@}*/

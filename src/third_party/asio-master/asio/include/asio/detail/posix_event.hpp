@@ -2,7 +2,7 @@
 // detail/posix_event.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -117,13 +117,15 @@ public:
       state_ += 2;
       timespec ts;
 #if (defined(__MACH__) && defined(__APPLE__)) \
-      || (defined(__ANDROID__) && (__ANDROID_API__ < 21))
+      || (defined(__ANDROID__) && (__ANDROID_API__ < 21) \
+          && defined(HAVE_PTHREAD_COND_TIMEDWAIT_RELATIVE))
       ts.tv_sec = usec / 1000000;
       ts.tv_nsec = (usec % 1000000) * 1000;
       ::pthread_cond_timedwait_relative_np(
           &cond_, &lock.mutex().mutex_, &ts); // Ignore EINVAL.
 #else // (defined(__MACH__) && defined(__APPLE__))
-      // || (defined(__ANDROID__) && (__ANDROID_API__ < 21))
+      // || (defined(__ANDROID__) && (__ANDROID_API__ < 21)
+      //     && defined(HAVE_PTHREAD_COND_TIMEDWAIT_RELATIVE))
       if (::clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
       {
         ts.tv_sec += usec / 1000000;
@@ -134,7 +136,8 @@ public:
             &lock.mutex().mutex_, &ts); // Ignore EINVAL.
       }
 #endif // (defined(__MACH__) && defined(__APPLE__))
-       // || (defined(__ANDROID__) && (__ANDROID_API__ < 21))
+       // || (defined(__ANDROID__) && (__ANDROID_API__ < 21)
+       //     && defined(HAVE_PTHREAD_COND_TIMEDWAIT_RELATIVE))
       state_ -= 2;
     }
     return (state_ & 1) != 0;

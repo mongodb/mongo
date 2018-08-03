@@ -2,7 +2,7 @@
 // ip/impl/address.ipp
 // ~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -134,7 +134,7 @@ address make_address(const std::string& str,
   return make_address(str.c_str(), ec);
 }
 
-#if defined(ASIO_HAS_STD_STRING_VIEW)
+#if defined(ASIO_HAS_STRING_VIEW)
 
 address make_address(string_view str)
 {
@@ -147,7 +147,7 @@ address make_address(string_view str,
   return make_address(static_cast<std::string>(str), ec);
 }
 
-#endif // defined(ASIO_HAS_STD_STRING_VIEW)
+#endif // defined(ASIO_HAS_STRING_VIEW)
 
 asio::ip::address_v4 address::to_v4() const
 {

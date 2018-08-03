@@ -2,7 +2,7 @@
 // detail/strand_executor_service.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -51,6 +51,10 @@ public:
     // means that there is a handler upcall in progress, or that the strand
     // itself has been scheduled in order to invoke some pending handlers.
     bool locked_;
+
+    // Indicates that the strand has been shut down and will accept no further
+    // handlers.
+    bool shutdown_;
 
     // The handlers that are waiting on the strand but should not be run until
     // after the next time the strand is scheduled. This queue must only be

@@ -2,7 +2,7 @@
 // ip/basic_resolver_results.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -62,7 +62,7 @@ public:
   typedef typename protocol_type::endpoint endpoint_type;
 
   /// The type of a value in the results range.
-  typedef basic_resolver_entry<endpoint_type> value_type;
+  typedef basic_resolver_entry<protocol_type> value_type;
 
   /// The type of a const reference to a value in the range.
   typedef const value_type& const_reference;

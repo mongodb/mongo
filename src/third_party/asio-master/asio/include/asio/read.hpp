@@ -2,7 +2,7 @@
 // read.hpp
 // ~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -254,7 +254,7 @@ template <typename SyncReadStream, typename DynamicBuffer>
 std::size_t read(SyncReadStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 /// Attempt to read a certain amount of data from a stream before returning.
@@ -288,7 +288,7 @@ std::size_t read(SyncReadStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     asio::error_code& ec,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 /// Attempt to read a certain amount of data from a stream before returning.
@@ -333,7 +333,7 @@ std::size_t read(SyncReadStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     CompletionCondition completion_condition,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 /// Attempt to read a certain amount of data from a stream before returning.
@@ -379,7 +379,7 @@ std::size_t read(SyncReadStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     CompletionCondition completion_condition, asio::error_code& ec,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 #if !defined(ASIO_NO_EXTENSIONS)
@@ -739,7 +739,7 @@ async_read(AsyncReadStream& s,
     ASIO_MOVE_ARG(DynamicBuffer) buffers,
     ASIO_MOVE_ARG(ReadHandler) handler,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 /// Start an asynchronous operation to read a certain amount of data from a
@@ -809,7 +809,7 @@ async_read(AsyncReadStream& s,
     CompletionCondition completion_condition,
     ASIO_MOVE_ARG(ReadHandler) handler,
     typename enable_if<
-      is_dynamic_buffer<DynamicBuffer>::value
+      is_dynamic_buffer<typename decay<DynamicBuffer>::type>::value
     >::type* = 0);
 
 #if !defined(ASIO_NO_EXTENSIONS)

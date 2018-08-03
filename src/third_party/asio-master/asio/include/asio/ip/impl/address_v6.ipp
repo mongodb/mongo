@@ -2,7 +2,7 @@
 // ip/impl/address_v6.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -303,7 +303,7 @@ address_v6 make_address_v6(
   return make_address_v6(str.c_str(), ec);
 }
 
-#if defined(ASIO_HAS_STD_STRING_VIEW)
+#if defined(ASIO_HAS_STRING_VIEW)
 
 address_v6 make_address_v6(string_view str)
 {
@@ -316,7 +316,7 @@ address_v6 make_address_v6(string_view str,
   return make_address_v6(static_cast<std::string>(str), ec);
 }
 
-#endif // defined(ASIO_HAS_STD_STRING_VIEW)
+#endif // defined(ASIO_HAS_STRING_VIEW)
 
 address_v4 make_address_v4(
     v4_mapped_t, const address_v6& v6_addr)

@@ -1,7 +1,16 @@
-diff --git a/src/third_party/asio-master/asio/include/asio/local/detail/impl/endpoint.ipp b/src/third_party/asio-master/asio/include/asio/local/detail/impl/endpoint.ipp
+From bf6b0974903d15c97eeb24fdbfa6385e37ba5176 Mon Sep 17 00:00:00 2001
+From: Lier! <me@asdf.com>
+Date: Fri, 28 Apr 2017 11:22:56 -0400
+Subject: [PATCH 4/4] MONGO - FIX MO BROKEN
+
+---
+ asio/include/asio/detail/impl/socket_ops.ipp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/asio/include/asio/local/detail/impl/endpoint.ipp b/asio/include/asio/local/detail/impl/endpoint.ipp
 index af02feada1..e7e2f2e961 100644
---- a/src/third_party/asio-master/asio/include/asio/local/detail/impl/endpoint.ipp
-+++ b/src/third_party/asio-master/asio/include/asio/local/detail/impl/endpoint.ipp
+--- a/asio/include/asio/local/detail/impl/endpoint.ipp
++++ b/asio/include/asio/local/detail/impl/endpoint.ipp
 @@ -110,12 +110,15 @@ void endpoint::init(const char* path_name, std::size_t path_length)
    data_.local.sun_family = AF_UNIX;
    if (path_length > 0)
@@ -23,3 +32,5 @@ index af02feada1..e7e2f2e961 100644
  }
  
  } // namespace detail
+-- 
+2.12.2

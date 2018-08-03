@@ -1,7 +1,16 @@
-diff --git a/src/third_party/asio-master/asio/include/asio/detail/impl/socket_ops.ipp b/src/third_party/asio-master/asio/include/asio/detail/impl/socket_ops.ipp
+From bf6b0974903d15c97eeb24fdbfa6385e37ba5176 Mon Sep 17 00:00:00 2001
+From: Lier! <me@asdf.com>
+Date: Fri, 28 Apr 2017 11:22:56 -0400
+Subject: [PATCH 3/4] MONGO - FIX BROKEN
+
+---
+ asio/include/asio/detail/impl/socket_ops.ipp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/asio/include/asio/detail/impl/socket_ops.ipp b/asio/include/asio/detail/impl/socket_ops.ipp
 index b3b1a0cf81..2f89889fac 100644
---- a/src/third_party/asio-master/asio/include/asio/detail/impl/socket_ops.ipp
-+++ b/src/third_party/asio-master/asio/include/asio/detail/impl/socket_ops.ipp
+--- a/asio/include/asio/detail/impl/socket_ops.ipp
++++ b/asio/include/asio/detail/impl/socket_ops.ipp
 @@ -803,33 +803,19 @@ size_t sync_recv(socket_type s, state_type state, buf* bufs,
      return 0;
    }
@@ -76,3 +85,6 @@ index b3b1a0cf81..2f89889fac 100644
  }
  
  #if defined(ASIO_HAS_IOCP)
+-- 
+2.12.2
+

@@ -2,7 +2,7 @@
 // ip/network_v6.hpp
 // ~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 // Copyright (c) 2014 Oliver Kowalke (oliver dot kowalke at gmail dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -181,7 +181,7 @@ ASIO_DECL network_v6 make_network_v6(const std::string& str);
 ASIO_DECL network_v6 make_network_v6(
     const std::string& str, asio::error_code& ec);
 
-#if defined(ASIO_HAS_STD_STRING_VIEW) \
+#if defined(ASIO_HAS_STRING_VIEW) \
   || defined(GENERATING_DOCUMENTATION)
 
 /// Create an IPv6 network from a string containing IP address and prefix
@@ -199,7 +199,7 @@ ASIO_DECL network_v6 make_network_v6(string_view str);
 ASIO_DECL network_v6 make_network_v6(
     string_view str, asio::error_code& ec);
 
-#endif // defined(ASIO_HAS_STD_STRING_VIEW)
+#endif // defined(ASIO_HAS_STRING_VIEW)
        //  || defined(GENERATING_DOCUMENTATION)
 
 #if !defined(ASIO_NO_IOSTREAM)
