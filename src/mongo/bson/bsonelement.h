@@ -207,9 +207,16 @@ public:
                   bool full = false,
                   bool redactValues = false,
                   int depth = 0) const;
+
     std::string jsonString(JsonStringFormat format,
                            bool includeFieldNames = true,
                            int pretty = 0) const;
+
+    void jsonStringStream(JsonStringFormat format,
+                          bool includeFieldNames,
+                          int pretty,
+                          std::stringstream& s) const;
+
     operator std::string() const {
         return toString();
     }

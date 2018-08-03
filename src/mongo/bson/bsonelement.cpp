@@ -57,6 +57,14 @@ using std::string;
 
 string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, int pretty) const {
     std::stringstream s;
+    BSONElement::jsonStringStream(format, includeFieldNames, pretty, s);
+    return s.str();
+}
+
+void BSONElement::jsonStringStream(JsonStringFormat format,
+                                   bool includeFieldNames,
+                                   int pretty,
+                                   std::stringstream& s) const {
     if (includeFieldNames)
         s << '"' << escape(fieldName()) << "\" : ";
     switch (type()) {
@@ -129,7 +137,7 @@ string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, 
             }
             break;
         case Object:
-            s << embeddedObject().jsonString(format, pretty);
+            embeddedObject().jsonStringStream(format, pretty, false, s);
             break;
         case mongo::Array: {
             if (embeddedObject().isEmpty()) {
@@ -151,7 +159,7 @@ string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, 
                     if (strtol(e.fieldName(), 0, 10) > count) {
                         s << "undefined";
                     } else {
-                        s << e.jsonString(format, false, pretty ? pretty + 1 : 0);
+                        e.jsonStringStream(format, false, pretty ? pretty + 1 : 0, s);
                         e = i.next();
                     }
                     count++;
@@ -303,7 +311,6 @@ string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, 
             string message = ss.str();
             massert(10312, message.c_str(), false);
     }
-    return s.str();
 }
 
 namespace {
