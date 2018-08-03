@@ -143,6 +143,12 @@ public:
         }
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
+
+        auto scopedDbLock =
+            ShardingCatalogManager::get(opCtx)->serializeCreateOrDropDatabase(opCtx, nss.db());
+        auto scopedCollLock =
+            ShardingCatalogManager::get(opCtx)->serializeCreateOrDropCollection(opCtx, nss);
+
         auto dbDistLock = uassertStatusOK(
             catalogClient->getDistLockManager()->lock(opCtx, nss.db(), "dropCollection", waitFor));
         auto collDistLock = uassertStatusOK(

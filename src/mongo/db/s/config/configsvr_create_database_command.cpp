@@ -89,7 +89,7 @@ public:
                 [opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
 
             auto scopedLock =
-                ShardingCatalogManager::get(opCtx)->serializeCreateDatabase(opCtx, dbname);
+                ShardingCatalogManager::get(opCtx)->serializeCreateOrDropDatabase(opCtx, dbname);
 
             auto dbDistLock =
                 uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(

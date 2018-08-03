@@ -212,9 +212,9 @@ public:
 
     /**
      * Creates a ScopedLock on the database name in _namespaceSerializer. This is to prevent
-     * timeouts waiting on the dist lock if multiple threads attempt to create the same db.
+     * timeouts waiting on the dist lock if multiple threads attempt to create or drop the same db.
      */
-    auto serializeCreateDatabase(OperationContext* opCtx, StringData dbName) {
+    auto serializeCreateOrDropDatabase(OperationContext* opCtx, StringData dbName) {
         return _namespaceSerializer.lock(opCtx, dbName);
     }
 
@@ -299,9 +299,10 @@ public:
 
     /**
      * Creates a ScopedLock on the collection name in _namespaceSerializer. This is to prevent
-     * timeouts waiting on the dist lock if multiple threads attempt to create the same collection.
+     * timeouts waiting on the dist lock if multiple threads attempt to create or drop the same
+     * collection.
      */
-    auto serializeCreateCollection(OperationContext* opCtx, const NamespaceString& ns) {
+    auto serializeCreateOrDropCollection(OperationContext* opCtx, const NamespaceString& ns) {
         return _namespaceSerializer.lock(opCtx, ns.ns());
     }
 
