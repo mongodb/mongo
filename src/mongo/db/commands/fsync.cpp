@@ -324,6 +324,7 @@ SimpleMutex filesLockedFsync;
 
 void FSyncLockThread::run() {
     Client::initThread("fsyncLockWorker");
+    ON_BLOCK_EXIT([] { Client::destroy(); });
     stdx::lock_guard<SimpleMutex> lkf(filesLockedFsync);
     stdx::unique_lock<stdx::mutex> lk(fsyncCmd.lockStateMutex);
 

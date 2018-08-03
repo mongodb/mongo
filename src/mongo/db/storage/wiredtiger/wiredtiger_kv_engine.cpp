@@ -216,6 +216,7 @@ public:
 
     virtual void run() {
         Client::initThread(name().c_str());
+        ON_BLOCK_EXIT([] { Client::destroy(); });
 
         LOG(1) << "starting " << name() << " thread";
 
@@ -263,6 +264,7 @@ public:
 
     virtual void run() {
         Client::initThread(name().c_str());
+        ON_BLOCK_EXIT([] { Client::destroy(); });
 
         LOG(1) << "starting " << name() << " thread";
 

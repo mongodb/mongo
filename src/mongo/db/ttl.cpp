@@ -90,6 +90,7 @@ public:
 
     virtual void run() {
         Client::initThread(name().c_str());
+        ON_BLOCK_EXIT([] { Client::destroy(); });
         AuthorizationSession::get(cc())->grantInternalAuthorization();
 
         while (!globalInShutdownDeprecated()) {

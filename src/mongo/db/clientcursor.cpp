@@ -262,6 +262,7 @@ public:
 
     void run() {
         Client::initThread("clientcursormon");
+        ON_BLOCK_EXIT([] { Client::destroy(); });
         while (!globalInShutdownDeprecated()) {
             {
                 const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();

@@ -128,6 +128,7 @@ public:
 
     virtual void run() {
         Client::initThread(_name.c_str());
+        ON_BLOCK_EXIT([] { Client::destroy(); });
 
         while (!globalInShutdownDeprecated()) {
             if (!_deleteExcessDocuments()) {
