@@ -1,1 +1,48 @@
-# Evergreen configuration for MongoDB Cloud E2E tests with MongoDB
+stepback: true
+
+# Needed til EVG-3714 is deployed
+functions:
+  something:
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |
+        exit
+
+tasks:
+- name: GENERATE_MMS_TESTS
+  commands:
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |
+        set -ex
+        git clone --branch ${cloud_branch} --depth 1 git@github.com:${cloud_repo} mms
+        cd mms/scripts
+        ./init_virtualenv.sh ${workdir} 'no-om'
+        VIRTUAL_ENV_DISABLE_PROMPT=true source venv-activate
+        cd evergreen
+        sleep ${compile_wait_duration_seconds}
+        ./mongo_cloud_nightly/generate_cloud_nightly.py > ${workdir}/cloud_nightly.json
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      bucket: mciuploads
+      local_file: cloud_nightly.json
+      remote_file: cloud-nightly/${task_id}
+      content_type: application/json
+      display_name: "Generated tasks (cloud_nightly.json)"
+      permissions: private
+  - command: generate.tasks
+    params:
+      files:
+        - cloud_nightly.json
+
+buildvariants:
+- name: cloud_nightly
+  display_name: "Cloud Nightly"
+  run_on:
+    rhel70-small
+  tasks:
+    - name: GENERATE_MMS_TESTS
