@@ -171,6 +171,7 @@ protected:
                           bool dupsAllowed) = 0;
 
     void setKey(WT_CURSOR* cursor, const WT_ITEM* item);
+    void getKey(WT_CURSOR* cursor, WT_ITEM* key);
 
     class BulkBuilder;
     class StandardBulkBuilder;

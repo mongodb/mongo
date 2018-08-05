@@ -143,6 +143,16 @@ void WiredTigerIndex::setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
     }
 }
 
+void WiredTigerIndex::getKey(WT_CURSOR* cursor, WT_ITEM* key) {
+    if (_prefix == KVPrefix::kNotPrefixed) {
+        invariantWTOK(cursor->get_key(cursor, key));
+    } else {
+        int64_t prefix;
+        invariantWTOK(cursor->get_key(cursor, &prefix, key));
+        invariant(_prefix.repr() == prefix);
+    }
+}
+
 // static
 StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& options) {
     StringBuilder ss;
@@ -818,7 +828,7 @@ public:
         if (_eof)
             return {};
 
-        if (!_lastMoveWasRestore)
+        if (!_lastMoveSkippedKey)
             advanceWTCursor();
         updatePosition(true);
         return curr(parts);
@@ -898,16 +908,14 @@ public:
         invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession() == _cursor->getSession());
 
         if (!_eof) {
-            // Unique indices *don't* include the record id in their KeyStrings. If we seek to the
-            // same key with a new record id, seeking will successfully find the key and will return
-            // true. This will cause us to skip the key with the new record id, since we set
-            // _lastMoveWasRestore to false.
-            //
             // Standard (non-unique) indices *do* include the record id in their KeyStrings. This
             // means that restoring to the same key with a new record id will return false, and we
             // will *not* skip the key with the new record id.
-            _lastMoveWasRestore = !seekWTCursor(_key);
-            TRACE_CURSOR << "restore _lastMoveWasRestore:" << _lastMoveWasRestore;
+            //
+            // Unique indexes can have both kinds of KeyStrings, ie with or without the record id.
+            // Restore for unique indexes gets handled separately in it's own implementation.
+            _lastMoveSkippedKey = !seekWTCursor(_key);
+            TRACE_CURSOR << "restore _lastMoveSkippedKey:" << _lastMoveSkippedKey;
         }
     }
 
@@ -1062,7 +1070,7 @@ protected:
      * logically move the cursor until the following call to next().
      */
     void updatePosition(bool inNext = false) {
-        _lastMoveWasRestore = false;
+        _lastMoveSkippedKey = false;
         if (_cursorAtEof) {
             _eof = true;
             _id = RecordId();
@@ -1129,7 +1137,7 @@ protected:
 
     // Used by next to decide to return current position rather than moving. Should be reset to
     // false by any operation that moves the cursor, other than subsequent save/restore pairs.
-    bool _lastMoveWasRestore = false;
+    bool _lastMoveSkippedKey = false;
 
     KeyString _query;
     KVPrefix _prefix;
@@ -1176,22 +1184,38 @@ public:
         }
     }
 
-    boost::optional<IndexKeyEntry> seekExact(const BSONObj& key, RequestedInfo parts) override {
-        dassert(_opCtx->lockState()->isReadLocked());
-        _query.resetToKey(stripFieldNames(key), _idx.ordering());
-        const WiredTigerItem keyItem(_query.getBuffer(), _query.getSize());
+    void restore() override {
+        // Lets begin by calling the base implementaion
+        WiredTigerIndexCursorBase::restore();
 
-        WT_CURSOR* c = _cursor->get();
-        setKey(c, keyItem.Get());
+        // If this is not timestamp safe unique index, we are done
+        if (_idx.isIdIndex() || !_idx.isTimestampSafeUniqueIdx()) {
+            return;
+        }
 
-        // Using search rather than search_near.
-        int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search(c); });
-        if (ret != WT_NOTFOUND)
-            invariantWTOK(ret);
-        _cursorAtEof = ret == WT_NOTFOUND;
-        updatePosition();
-        dassert(_eof || _key.compare(_query) == 0);
-        return curr(parts);
+        if (_lastMoveSkippedKey && !_eof && !_cursorAtEof) {
+            // We did not get an exact match for the saved key. We need to determine if we
+            // skipped a record while trying to position the cursor.
+            // After a rolling upgrade an index can have keys from both timestamp unsafe (old)
+            // and timestamp safe (new) unique indexes. An older styled index entry key is
+            // KeyString of the prefix key only, whereas a newer styled index entry key is
+            // KeyString of the prefix key + RecordId.
+            // In either case we can compare the prefix key portion of the saved index entry
+            // key against the current key that we are positioned on, if there is a match we
+            // know we are positioned correctly and have not skipped a record.
+            WT_ITEM item;
+            WT_CURSOR* c = _cursor->get();
+            getKey(c, &item);
+
+            // Get the size of the prefix key
+            auto keySize = KeyString::getKeySize(
+                _key.getBuffer(), _key.getSize(), _idx.ordering(), _key.getTypeBits());
+
+            if (std::memcmp(_key.getBuffer(), item.data, keySize) == 0) {
+                _lastMoveSkippedKey = false;
+                TRACE_CURSOR << "restore _lastMoveSkippedKey changed to false.";
+            }
+        }
     }
 
 private:
@@ -1279,7 +1303,7 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
 
     WT_ITEM item;
     // Obtain the key from the record returned by search near.
-    invariantWTOK(c->get_key(c, &item));
+    getKey(c, &item);
 
     // Check if a prefix key already exists in the index.
     if (std::memcmp(prefixKey.getBuffer(), item.data, std::min(prefixKey.getSize(), item.size)) ==
@@ -1304,7 +1328,7 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
     }
 
     if (ret == 0) {
-        invariantWTOK(c->get_key(c, &item));
+        getKey(c, &item);
         return (std::memcmp(prefixKey.getBuffer(),
                             item.data,
                             std::min(prefixKey.getSize(), item.size)) == 0);
