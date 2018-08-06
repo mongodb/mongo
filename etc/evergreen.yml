@@ -6607,6 +6607,29 @@ tasks:
       client_options: "--numCrudClients=20 --numFsmClients=20 --writeConcern='{\"w\": \"majority\"}'"
       mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger\"
 
+- name: powercycle_mobile
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_ec2_instance
+  - command: expansions.update
+    <<: *powercycle_expansions
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+    vars:
+      <<: *powercycle_test
+      # We do 5 rather than 15 loops when running against the mobile storage engine because
+      # collection validation otherwise starts to take several minutes after each loop.
+      client_options: --testLoops=5 --numCrudClients=20 --numFsmClients=20
+      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine mobile\"
+
 - name: idl_tests
   depends_on:
   - name: compile
@@ -12411,6 +12434,7 @@ buildvariants:
   - name: jstestfuzz_concurrent
   - name: noPassthrough
   - name: noPassthroughWithMongod
+  - name: powercycle_mobile
   - name: serial_run
   - name: session_jscore_passthrough
 
