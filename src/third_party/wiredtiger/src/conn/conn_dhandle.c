@@ -140,7 +140,7 @@ __wt_conn_dhandle_alloc(
 		dhandle->type = WT_DHANDLE_TYPE_BTREE;
 	} else if (WT_PREFIX_MATCH(uri, "table:")) {
 		WT_RET(__wt_calloc_one(session, &table));
-		dhandle = &table->iface;
+		dhandle = (WT_DATA_HANDLE *)table;
 		dhandle->type = WT_DHANDLE_TYPE_TABLE;
 	} else
 		WT_PANIC_RET(session, EINVAL,

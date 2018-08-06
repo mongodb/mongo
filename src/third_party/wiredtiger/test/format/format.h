@@ -122,7 +122,16 @@ typedef struct {
 
 	WT_RAND_STATE rnd;			/* Global RNG state */
 
-	pthread_rwlock_t prepare_lock;		/* Prepare running */
+	/*
+	 * Prepare will return an error if the prepare timestamp is less than
+	 * any active read timestamp. Lock across allocating prepare and read
+	 * timestamps.
+	 *
+	 * We get the last committed timestamp periodically in order to update
+	 * the oldest timestamp, that requires locking out transactional ops
+	 * that set a timestamp.
+	 */
+	pthread_rwlock_t ts_lock;
 
 	uint64_t timestamp;			/* Counter for timestamps */
 
@@ -282,9 +291,6 @@ typedef struct {
 
 	WT_RAND_STATE rnd;			/* thread RNG state */
 
-	uint64_t commit_timestamp;		/* last committed timestamp */
-	uint64_t read_timestamp;		/* read timestamp */
-
 	volatile bool quit;			/* thread should quit */
 
 	uint64_t ops;				/* total operations */
@@ -380,4 +386,28 @@ mmrand(WT_RAND_STATE *rnd, u_int min, u_int max)
 	v %= range;
 	v += min;
 	return (v);
+}
+
+static inline void
+random_sleep(WT_RAND_STATE *rnd, u_int max_seconds)
+{
+	uint64_t i, micro_seconds;
+
+	/*
+	 * We need a fast way to choose a sleep time. We want to sleep a short
+	 * period most of the time, but occasionally wait longer. Divide the
+	 * maximum period of time into 10 buckets (where bucket 0 doesn't sleep
+	 * at all), and roll dice, advancing to the next bucket 50% of the time.
+	 * That means we'll hit the maximum roughly every 1K calls.
+	 */
+	for (i = 0;;)
+		if (rng(rnd) & 0x1 || ++i > 9)
+			break;
+
+	if (i == 0)
+		__wt_yield();
+	else {
+		micro_seconds = (uint64_t)max_seconds * WT_MILLION;
+		__wt_sleep(0, i * (micro_seconds / 10));
+	}
 }

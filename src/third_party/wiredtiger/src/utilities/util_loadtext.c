@@ -150,6 +150,8 @@ insert(WT_CURSOR *cursor, const char *name, bool readkey)
 			fflush(stdout);
 		}
 	}
+	free(key.mem);
+	free(value.mem);
 
 	if (verbose)
 		printf("\r\t%s: %" PRIu64 "\n", name, insert_count);

@@ -375,6 +375,7 @@ static int
 lz_add_compressor(WT_CONNECTION *connection, bool raw, const char *name)
 {
 	LZ4_COMPRESSOR *lz4_compressor;
+	int ret;
 
 	/*
 	 * There are two almost identical LZ4 compressors: one using raw
@@ -392,8 +393,12 @@ lz_add_compressor(WT_CONNECTION *connection, bool raw, const char *name)
 	lz4_compressor->wt_api = connection->get_extension_api(connection);
 
 	/* Load the compressor */
-	return (connection->add_compressor(
-	    connection, name, (WT_COMPRESSOR *)lz4_compressor, NULL));
+	if ((ret = connection->add_compressor(
+	    connection, name, (WT_COMPRESSOR *)lz4_compressor, NULL)) == 0)
+		return (0);
+
+	free(lz4_compressor);
+	return (ret);
 }
 
 int lz4_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);

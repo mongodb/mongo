@@ -36,8 +36,6 @@ extern "C" {
 }
 #endif
 
-#define	RANDOMIZER_SIZE  5    /* ":000:" prefix */
-
 namespace workgen {
 
 // A 'tint' or ('table integer') is a unique small value integer
@@ -131,6 +129,8 @@ struct ThreadRunner {
     uint64_t op_get_key_recno(Operation *, uint64_t range, tint_t tint);
     void op_get_static_counts(Operation *, Stats &, int);
     int op_run(Operation *);
+    float random_signed();
+    uint32_t random_value();
 
 #ifdef _DEBUG
     std::stringstream _debug_messages;

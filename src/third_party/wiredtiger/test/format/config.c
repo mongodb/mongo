@@ -615,10 +615,16 @@ config_lsm_reset(void)
 
 	/*
 	 * LSM doesn't currently play nicely with timestamps, don't choose the
-	 * pair unless forced to. Remove this code with WT-4067.
+	 * pair unless forced to. If we turn off timestamps, make sure we turn
+	 * off prepare as well, it requires timestamps. Remove this code with
+	 * WT-4067.
+	 *
 	 */
-	if (!config_is_perm("transaction_timestamps"))
+	if (!config_is_perm("prepare") &&
+	    !config_is_perm("transaction_timestamps")) {
+		config_single("prepare=off", 0);
 		config_single("transaction_timestamps=off", 0);
+	}
 }
 
 /*

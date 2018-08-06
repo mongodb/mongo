@@ -62,7 +62,7 @@ static char home[1024];			/* Program working dir */
 #define	MIN_TH		5
 #define	MIN_TIME	10
 #define	PREPARE_FREQ    5
-#define	PREPARE_YIELD   PREPARE_FREQ * 10
+#define	PREPARE_YIELD   (PREPARE_FREQ * 10)
 #define	RECORDS_FILE	"records-%" PRIu32
 #define	STABLE_PERIOD	100
 
@@ -1006,7 +1006,6 @@ main(int argc, char *argv[])
 			usage();
 		}
 	argc -= __wt_optind;
-	argv += __wt_optind;
 	if (argc != 0)
 		usage();
 

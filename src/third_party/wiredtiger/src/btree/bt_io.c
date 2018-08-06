@@ -172,7 +172,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 int
 __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
-    uint8_t *addr, size_t *addr_sizep,
+    uint8_t *addr, size_t *addr_sizep, size_t *compressed_sizep,
     bool checkpoint, bool checkpoint_io, bool compressed)
 {
 	WT_BM *bm;
@@ -188,6 +188,9 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	uint8_t *dst, *src;
 	int compression_failed;		/* Extension API, so not a bool. */
 	bool data_checksum, encrypted, timer;
+
+	if (compressed_sizep != NULL)
+		*compressed_sizep = 0;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -306,6 +309,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			memcpy(ctmp->mem, buf->mem, WT_BLOCK_COMPRESS_SKIP);
 			ctmp->size = result_len;
 			ip = ctmp;
+
+			/* Optionally return the compressed size. */
+			if (compressed_sizep != NULL)
+				*compressed_sizep = result_len;
 		}
 	}
 	/*

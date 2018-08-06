@@ -237,27 +237,33 @@ config_read(WT_SESSION *session, char ***listp, bool *hexp)
 	memset(&l, 0, sizeof(l));
 
 	/* Header line #1: "WiredTiger Dump" and a WiredTiger version. */
-	if (util_read_line(session, &l, false, &eof))
-		return (1);
+	if ((ret = util_read_line(session, &l, false, &eof)) != 0)
+		goto err;
 	s = "WiredTiger Dump ";
-	if (strncmp(l.mem, s, strlen(s)) != 0)
-		return (format(session));
+	if (strncmp(l.mem, s, strlen(s)) != 0) {
+		ret = format(session);
+		goto err;
+	}
 
 	/* Header line #2: "Format={hex,print}". */
-	if (util_read_line(session, &l, false, &eof))
-		return (1);
+	if ((ret = util_read_line(session, &l, false, &eof)) != 0)
+		goto err;
 	if (strcmp(l.mem, "Format=print") == 0)
 		*hexp = false;
 	else if (strcmp(l.mem, "Format=hex") == 0)
 		*hexp = true;
-	else
-		return (format(session));
+	else {
+		ret = format(session);
+		goto err;
+	}
 
 	/* Header line #3: "Header". */
-	if (util_read_line(session, &l, false, &eof))
-		return (1);
-	if (strcmp(l.mem, "Header") != 0)
-		return (format(session));
+	if ((ret = util_read_line(session, &l, false, &eof)) != 0)
+		goto err;
+	if (strcmp(l.mem, "Header") != 0) {
+		ret = format(session);
+		goto err;
+	}
 
 	/* Now, read in lines until we get to the end of the headers. */
 	for (entry = max_entry = 0, list = NULL;; ++entry) {
@@ -297,6 +303,8 @@ config_read(WT_SESSION *session, char ***listp, bool *hexp)
 		goto err;
 	}
 	*listp = list;
+
+	free(l.mem);
 	return (0);
 
 err:	if (list != NULL) {
@@ -304,6 +312,7 @@ err:	if (list != NULL) {
 			free(*tlist);
 		free(list);
 	}
+	free(l.mem);
 	return (ret);
 }
 
@@ -542,20 +551,21 @@ insert(WT_CURSOR *cursor, const char *name)
 		 * and ignore it (a dump with "append" set), or not read it at
 		 * all (flat-text load).
 		 */
-		if (util_read_line(session, &key, true, &eof))
-			return (1);
+		if ((ret = util_read_line(session, &key, true, &eof)) != 0)
+			goto err;
 		if (eof)
 			break;
 		if (!append)
 			cursor->set_key(cursor, key.mem);
 
-		if (util_read_line(session, &value, false, &eof))
-			return (1);
+		if ((ret = util_read_line(session, &value, false, &eof)) != 0)
+			goto err;
 		cursor->set_value(cursor, value.mem);
 
-		if ((ret = cursor->insert(cursor)) != 0)
-			return (
-			    util_err(session, ret, "%s: cursor.insert", name));
+		if ((ret = cursor->insert(cursor)) != 0) {
+			ret = util_err(session, ret, "%s: cursor.insert", name);
+			goto err;
+		}
 
 		/* Report on progress every 100 inserts. */
 		if (verbose && ++insert_count % 100 == 0) {
@@ -567,7 +577,10 @@ insert(WT_CURSOR *cursor, const char *name)
 	if (verbose)
 		printf("\r\t%s: %" PRIu64 "\n", name, insert_count);
 
-	return (0);
+err:	free(key.mem);
+	free(value.mem);
+
+	return (ret);
 }
 
 static int

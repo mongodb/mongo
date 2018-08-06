@@ -58,7 +58,6 @@ func_ok()
 	    -e '/int __wt_buf_catfmt$/d' \
 	    -e '/int __wt_buf_fmt$/d' \
 	    -e '/int __wt_curjoin_joined$/d' \
-	    -e '/int __wt_cursor_close$/d' \
 	    -e '/int __wt_cursor_noop$/d' \
 	    -e '/int __wt_epoch$/d' \
 	    -e '/int __wt_errno$/d' \

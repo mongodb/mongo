@@ -155,6 +155,7 @@ int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	NOP_COMPRESSOR *nop_compressor;
+	int ret;
 
 	(void)config;				/* Unused parameters */
 
@@ -177,7 +178,11 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	nop_compressor->wt_api = connection->get_extension_api(connection);
 
 						/* Load the compressor */
-	return (connection->add_compressor(
-	    connection, "nop", (WT_COMPRESSOR *)nop_compressor, NULL));
+	if ((ret = connection->add_compressor(
+	    connection, "nop", (WT_COMPRESSOR *)nop_compressor, NULL)) == 0)
+		return (0);
+
+	free(nop_compressor);
+	return (ret);
 }
 /*! [WT_COMPRESSOR initialization function] */

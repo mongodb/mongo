@@ -77,8 +77,8 @@ __curbackup_close(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
-
 	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
+err:
 
 	/*
 	 * When starting a hot backup, we serialize hot backup cursors and set
@@ -92,10 +92,10 @@ __curbackup_close(WT_CURSOR *cursor)
 	if (F_ISSET(cb, WT_CURBACKUP_LOCKER))
 		WT_TRET(__backup_stop(session, cb));
 
-	WT_TRET(__wt_cursor_close(cursor));
+	__wt_cursor_close(cursor);
 	session->bkp_cursor = NULL;
 
-err:	API_END_RET(session, ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -133,16 +133,14 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
 
-	cb = NULL;
-
 	WT_RET(__wt_calloc_one(session, &cb));
-	cursor = &cb->iface;
+	cursor = (WT_CURSOR *)cb;
 	*cursor = iface;
-	cursor->session = &session->iface;
-	session->bkp_cursor = cb;
-
+	cursor->session = (WT_SESSION *)session;
 	cursor->key_format = "S";	/* Return the file names as the key. */
 	cursor->value_format = "";	/* No value. */
+
+	session->bkp_cursor = cb;
 
 	/*
 	 * Start the backup and fill in the cursor's list.  Acquire the schema

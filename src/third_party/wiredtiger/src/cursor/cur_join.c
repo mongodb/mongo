@@ -324,8 +324,8 @@ __curjoin_close(WT_CURSOR *cursor)
 	u_int i;
 
 	cjoin = (WT_CURSOR_JOIN *)cursor;
-
 	JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
+err:
 
 	WT_TRET(__wt_schema_release_table(session, cjoin->table));
 
@@ -362,9 +362,9 @@ __curjoin_close(WT_CURSOR *cursor)
 		WT_TRET(cjoin->main->close(cjoin->main));
 
 	__wt_free(session, cjoin->entries);
-	WT_TRET(__wt_cursor_close(cursor));
+	__wt_cursor_close(cursor);
 
-err:	API_END_RET(session, ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -1339,11 +1339,12 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 	    session, tablename, size, false, 0, &table));
 
 	WT_RET(__wt_calloc_one(session, &cjoin));
-	cursor = &cjoin->iface;
+	cursor = (WT_CURSOR *)cjoin;
 	*cursor = iface;
-	cursor->session = &session->iface;
+	cursor->session = (WT_SESSION *)session;
 	cursor->key_format = table->key_format;
 	cursor->value_format = table->value_format;
+
 	cjoin->table = table;
 
 	/* Handle projections. */

@@ -542,7 +542,6 @@ wts_verify(const char *tag)
 	WT_CONNECTION *conn;
 	WT_DECL_RET;
 	WT_SESSION *session;
-	char config_buf[64];
 
 	if (g.c_verify == 0)
 		return;
@@ -554,17 +553,6 @@ wts_verify(const char *tag)
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify start ===============");
-
-	if (g.c_txn_timestamps && g.timestamp > 0) {
-		/*
-		 * Bump the oldest timestamp, otherwise recent operations can
-		 * prevent verify from running.
-		 */
-		testutil_check(__wt_snprintf(
-		    config_buf, sizeof(config_buf),
-		    "oldest_timestamp=%" PRIx64, g.timestamp));
-		testutil_check(conn->set_timestamp(conn, config_buf));
-	}
 
 	/*
 	 * Verify can return EBUSY if the handle isn't available. Don't yield

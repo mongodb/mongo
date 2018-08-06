@@ -1375,6 +1375,14 @@ struct __wt_session {
 	 * value of merge_max is used., an integer no more than 100; default \c
 	 * 0.}
 	 * @config{ ),,}
+	 * @config{memory_page_image_max, the maximum in-memory page image
+	 * represented by a single storage block.  Depending on compression
+	 * efficiency\, compression can create storage blocks which require
+	 * significant resources to re-instantiate in the cache\, penalizing the
+	 * performance of future point updates.  The value limits the maximum
+	 * in-memory page image a storage block will need.  If set to 0\, a
+	 * default of 4 times \c leaf_page_max is used., an integer greater than
+	 * or equal to 0; default \c 0.}
 	 * @config{memory_page_max, the maximum size a page can grow to in
 	 * memory before being reconciled to disk.  The specified size will be
 	 * adjusted to a lower bound of <code>leaf_page_max</code>\, and an
@@ -5290,28 +5298,19 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! lock: checkpoint lock internal thread wait time (usecs) */
 #define	WT_STAT_CONN_LOCK_CHECKPOINT_WAIT_INTERNAL	1168
 /*!
- * lock: commit timestamp queue lock application thread time waiting for
- * the dhandle lock (usecs)
+ * lock: commit timestamp queue lock application thread time waiting
+ * (usecs)
  */
 #define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WAIT_APPLICATION	1169
-/*!
- * lock: commit timestamp queue lock internal thread time waiting for the
- * dhandle lock (usecs)
- */
+/*! lock: commit timestamp queue lock internal thread time waiting (usecs) */
 #define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WAIT_INTERNAL	1170
 /*! lock: commit timestamp queue read lock acquisitions */
 #define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_READ_COUNT	1171
 /*! lock: commit timestamp queue write lock acquisitions */
 #define	WT_STAT_CONN_LOCK_COMMIT_TIMESTAMP_WRITE_COUNT	1172
-/*!
- * lock: dhandle lock application thread time waiting for the dhandle
- * lock (usecs)
- */
+/*! lock: dhandle lock application thread time waiting (usecs) */
 #define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_APPLICATION	1173
-/*!
- * lock: dhandle lock internal thread time waiting for the dhandle lock
- * (usecs)
- */
+/*! lock: dhandle lock internal thread time waiting (usecs) */
 #define	WT_STAT_CONN_LOCK_DHANDLE_WAIT_INTERNAL		1174
 /*! lock: dhandle read lock acquisitions */
 #define	WT_STAT_CONN_LOCK_DHANDLE_READ_COUNT		1175
@@ -5324,14 +5323,11 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! lock: metadata lock internal thread wait time (usecs) */
 #define	WT_STAT_CONN_LOCK_METADATA_WAIT_INTERNAL	1179
 /*!
- * lock: read timestamp queue lock application thread time waiting for
- * the dhandle lock (usecs)
+ * lock: read timestamp queue lock application thread time waiting
+ * (usecs)
  */
 #define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_WAIT_APPLICATION	1180
-/*!
- * lock: read timestamp queue lock internal thread time waiting for the
- * dhandle lock (usecs)
- */
+/*! lock: read timestamp queue lock internal thread time waiting (usecs) */
 #define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_WAIT_INTERNAL	1181
 /*! lock: read timestamp queue read lock acquisitions */
 #define	WT_STAT_CONN_LOCK_READ_TIMESTAMP_READ_COUNT	1182
@@ -5357,15 +5353,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOCK_TABLE_READ_COUNT		1189
 /*! lock: table write lock acquisitions */
 #define	WT_STAT_CONN_LOCK_TABLE_WRITE_COUNT		1190
-/*!
- * lock: txn global lock application thread time waiting for the dhandle
- * lock (usecs)
- */
+/*! lock: txn global lock application thread time waiting (usecs) */
 #define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WAIT_APPLICATION	1191
-/*!
- * lock: txn global lock internal thread time waiting for the dhandle
- * lock (usecs)
- */
+/*! lock: txn global lock internal thread time waiting (usecs) */
 #define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WAIT_INTERNAL	1192
 /*! lock: txn global read lock acquisitions */
 #define	WT_STAT_CONN_LOCK_TXN_GLOBAL_READ_COUNT		1193

@@ -315,8 +315,12 @@ zstd_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	zstd_compressor->compression_level = compression_level;
 
 	/* Load the compressor */
-	return (connection->add_compressor(
-	    connection, "zstd", (WT_COMPRESSOR *)zstd_compressor, NULL));
+	if ((ret = connection->add_compressor(
+	    connection, "zstd", (WT_COMPRESSOR *)zstd_compressor, NULL)) == 0)
+		return (0);
+
+	free(zstd_compressor);
+	return (ret);
 }
 
 /*

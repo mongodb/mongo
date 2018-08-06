@@ -252,6 +252,7 @@ int
 snappy_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	SNAPPY_COMPRESSOR *snappy_compressor;
+	int ret;
 
 	(void)config;				/* Unused parameters */
 
@@ -266,8 +267,12 @@ snappy_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 
 	snappy_compressor->wt_api = connection->get_extension_api(connection);
 
-	return (connection->add_compressor(
-	    connection, "snappy", (WT_COMPRESSOR *)snappy_compressor, NULL));
+	if ((ret = connection->add_compressor(connection,
+	    "snappy", (WT_COMPRESSOR *)snappy_compressor, NULL)) == 0)
+		return (0);
+
+	free(snappy_compressor);
+	return (ret);
 }
 
 /*
