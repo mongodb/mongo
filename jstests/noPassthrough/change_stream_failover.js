@@ -85,6 +85,9 @@
                 }
             ]
         });
+
+        // Unfreeze the original primary so that it can stand for election again.
+        assert.commandWorked(primaryDB.adminCommand({replSetFreeze: 0}));
     }
 
     rst.stopSet();
