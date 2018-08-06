@@ -158,11 +158,15 @@ ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
 
 void SessionCatalog::invalidateSessions(OperationContext* opCtx,
                                         boost::optional<BSONObj> singleSessionDoc) {
-    uassert(40528,
-            str::stream() << "Direct writes against "
-                          << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                          << " cannot be performed using a transaction or on a session.",
-            !opCtx->getLogicalSessionId());
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    if (isReplSet) {
+        uassert(40528,
+                str::stream() << "Direct writes against "
+                              << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                              << " cannot be performed using a transaction or on a session.",
+                !opCtx->getLogicalSessionId());
+    }
 
     const auto invalidateSessionFn = [&](WithLock, SessionRuntimeInfoMap::iterator it) {
         auto& sri = it->second;
