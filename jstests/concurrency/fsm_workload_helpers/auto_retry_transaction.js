@@ -29,8 +29,10 @@ var {withTxnAndAutoRetry} = (function() {
      * transaction started by the withTxnAndAutoRetry() function is only known to have committed
      * after the withTxnAndAutoRetry() function returns.
      */
-    function withTxnAndAutoRetry(
-        session, func, {txnOptions: txnOptions = {readConcern: {level: 'snapshot'}}} = {}) {
+    function withTxnAndAutoRetry(session, func, {
+        txnOptions: txnOptions = {readConcern: {level: 'snapshot'}},
+        retryOnKilledSession: retryOnKilledSession = false
+    } = {}) {
         let hasTransientError;
 
         do {
@@ -49,6 +51,7 @@ var {withTxnAndAutoRetry} = (function() {
                     hasCommitTxnError = true;
                     throw e;
                 }
+
             } catch (e) {
                 if (!hasCommitTxnError) {
                     // Use the version of abortTransaction() that ignores errors. We ignore the
@@ -61,8 +64,10 @@ var {withTxnAndAutoRetry} = (function() {
                     session.abortTransaction();
                 }
 
-                if (e.hasOwnProperty('errorLabels') &&
-                    e.errorLabels.includes('TransientTransactionError')) {
+                if ((e.hasOwnProperty('errorLabels') &&
+                     e.errorLabels.includes('TransientTransactionError')) ||
+                    (retryOnKilledSession &&
+                     (e.code === ErrorCodes.Interrupted || e.code === ErrorCodes.CursorKilled))) {
                     hasTransientError = true;
                     continue;
                 }

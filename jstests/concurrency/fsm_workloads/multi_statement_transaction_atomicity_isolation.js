@@ -118,7 +118,7 @@ var $config = (function() {
                     const batchSize = Math.max(2, Math.floor(numDocs / 5));
                     allDocuments.push(...txnCollection.find().batchSize(batchSize).toArray());
                 }
-            });
+            }, {retryOnKilledSession: this.retryOnKilledSession});
         } else {
             for (let collection of this.collections) {
                 allDocuments.push(...collection.find().toArray());
@@ -176,16 +176,18 @@ var $config = (function() {
                                 }
                             }
                         };
+
                         const txnCollection =
                             this.session.getDatabase(txnDbName).getCollection(txnCollName);
                         const res = txnCollection.runCommand('update', {
                             updates: [{q: {_id: docId}, u: updateMods}],
                         });
+
                         assertAlways.commandWorked(res);
                         assertWhenOwnColl.eq(res.n, 1, () => tojson(res));
                         assertWhenOwnColl.eq(res.nModified, 1, () => tojson(res));
                     }
-                });
+                }, {retryOnKilledSession: this.retryOnKilledSession});
 
                 ++this.iteration;
             },
@@ -236,6 +238,7 @@ var $config = (function() {
             getAllDocuments,
             getDocIdsToUpdate,
             numDocs: 10,
+            retryOnKilledSession: false,
         },
         setup: setup,
         teardown: teardown,
