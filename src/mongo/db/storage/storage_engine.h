@@ -281,8 +281,6 @@ public:
      *
      * Generally, this method should not be called directly except by the repairDatabase()
      * free function.
-     *
-     * NOTE: MMAPv1 does not support this method and has its own repairDatabase() method.
      */
     virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns) = 0;
 

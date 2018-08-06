@@ -109,13 +109,6 @@
         return coll;
     }, true);
 
-    // Test that the "repairDatabase" command doesn't upgrade existing indexes to the latest
-    // version.
-    testIndexVersionAutoUpgrades(function(coll) {
-        assert.commandWorked(coll.getDB().runCommand({repairDatabase: 1}));
-        return coll;
-    }, false);
-
     // Test that the "compact" command doesn't upgrade existing indexes to the latest version.
     testIndexVersionAutoUpgrades(function(coll) {
         var res = coll.getDB().runCommand({compact: coll.getName()});

@@ -427,7 +427,7 @@
             }
         ],
         repairCursor: {command: {repairCursor: "view"}, expectFailure: true},
-        repairDatabase: {command: {repairDatabase: 1}},
+        repairDatabase: {skip: isUnrelated},
         replSetAbortPrimaryCatchUp: {skip: isUnrelated},
         replSetFreeze: {skip: isUnrelated},
         replSetGetConfig: {skip: isUnrelated},

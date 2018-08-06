@@ -71,9 +71,6 @@
             // which would fail v:2 validation rules.
             assert.commandWorked(testDB.runCommand({compact: collName}));
 
-            // repairDatabase should similarly succeed.
-            assert.commandWorked(testDB.runCommand({repairDatabase: 1}));
-
             // reIndex will fail because when featureCompatibilityVersion>=3.4, reIndex
             // automatically upgrades v=1 indexes to v=2.
             assert.commandFailed(testDB[collName].reIndex());

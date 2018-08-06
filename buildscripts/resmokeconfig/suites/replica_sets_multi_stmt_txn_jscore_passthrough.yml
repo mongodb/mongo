@@ -166,7 +166,6 @@ selector:
   - jstests/core/dbref1.js
   - jstests/core/dbref2.js
   - jstests/core/ref3.js
-  - jstests/core/repair_database.js
   - jstests/core/update3.js
   - jstests/core/rename3.js
 

@@ -583,15 +583,6 @@ var DB;
         });
     };
 
-    /**
-      Repair database.
-
-     * @return Object returned has member ok set to true if operation succeeds, false otherwise.
-    */
-    DB.prototype.repairDatabase = function() {
-        return this._dbCommand({repairDatabase: 1});
-    };
-
     DB.prototype.help = function() {
         print("DB methods:");
         print(
@@ -640,7 +631,6 @@ var DB;
         print("\tdb.printShardingStatus()");
         print("\tdb.printSlaveReplicationInfo()");
         print("\tdb.dropUser(username)");
-        print("\tdb.repairDatabase()");
         print("\tdb.resetError()");
         print(
             "\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into {cmdObj: 1}");

@@ -181,16 +181,6 @@ load("jstests/libs/analyze_plan.js");
         assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
         assert.eq(getCursorForReadConcernLevel().itcount(), 10);
 
-        // Repair bumps the min snapshot.
-        assert.writeOK(t.bump.insert({a: 1}));  // Bump timestamp.
-        db.repairDatabase();
-        assertNoSnapshotAvailableForReadConcernLevel();
-        newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
-        assertNoSnapshotAvailableForReadConcernLevel();
-        assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
-        assert.eq(getCursorForReadConcernLevel().itcount(), 10);
-        assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
-
         // Dropping the collection is visible in the committed snapshot, even though it hasn't been
         // marked committed yet. This is allowed by the current specification even though it
         // violates strict read-committed semantics since we don't guarantee them on metadata

@@ -39,9 +39,6 @@ selector:
   - jstests/core/index9.js  # "local" database.
   - jstests/core/profile*.js  # profiling.
   - jstests/core/queryoptimizera.js  # "local" database. 
-  - jstests/core/repair_database.js # repairDatabase
-  - jstests/core/repair_database_input_validation.js # repairDatabase
-  - jstests/core/repair_server12955.js # repairDatabase
   - jstests/core/stages*.js  # stageDebug.
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.

@@ -70,8 +70,7 @@ struct StorageGlobalParams {
     bool upgrade;
 
     // --repair
-    // Runs a repair routine on all databases. This is equivalent to shutting down and
-    // running the repairDatabase database command on all databases.
+    // Runs a repair routine on all databases.
     bool repair;
 
     bool dur;  // --dur durability (now --journal)

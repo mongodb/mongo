@@ -165,17 +165,6 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
         },
 
         // Remaining cases are local-only operations.
-        repairDatabase: {
-            prepare: function(db) {
-                assert.writeOK(db.coll.insert({_id: 1}));
-            },
-            performOp: function(db) {
-                assert.commandWorked(db.repairDatabase());
-            },
-            blockedCollections: ['coll'],
-            unblockedCollections: ['otherDoesNotExist'],
-            localOnly: true,
-        },
         reIndex: {
             prepare: function(db) {
                 assert.writeOK(db.other.insert({_id: 1}));

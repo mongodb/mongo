@@ -170,7 +170,6 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::planCacheWrite
         << ActionType::reIndex
         << ActionType::renameCollectionSameDB  // read_write gets this also
-        << ActionType::repairDatabase
         << ActionType::storageDetails
         << ActionType::validate;
 
@@ -225,8 +224,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
 
     // hostManager role actions that target the database resource
     hostManagerRoleDatabaseActions
-        << ActionType::killCursors
-        << ActionType::repairDatabase;
+        << ActionType::killCursors;
 
 
     // clusterManager role actions that target the cluster resource
