@@ -282,7 +282,7 @@ class BuildloggerServer(object):
         build_num = int(self.config["build_num"])
 
         handler = handlers.HTTPHandler(url_root=_config.BUILDLOGGER_URL, username=username,
-                                       password=password)
+                                       password=password, should_retry=True)
 
         response = handler.post(CREATE_BUILD_ENDPOINT, data={
             "builder": builder,
@@ -297,7 +297,7 @@ class BuildloggerServer(object):
         """Return a new test id for sending test logs to."""
         handler = handlers.HTTPHandler(url_root=_config.BUILDLOGGER_URL,
                                        username=self.config["username"],
-                                       password=self.config["password"])
+                                       password=self.config["password"], should_retry=True)
 
         endpoint = CREATE_TEST_ENDPOINT % {"build_id": build_id}
         response = handler.post(
