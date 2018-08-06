@@ -3123,7 +3123,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
-    std::string expectedTransactionInfo =
+    std::string expectedTransactionInfo = "transaction " +
         session.transactionInfoForLogForTest(&lockerInfo->stats, true, readConcernArgs);
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
@@ -3161,7 +3161,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
-    std::string expectedTransactionInfo =
+    std::string expectedTransactionInfo = "transaction " +
         session.transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
@@ -3202,7 +3202,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     session.abortArbitraryTransaction();
     stopCapturingLogMessages();
 
-    std::string expectedTransactionInfo =
+    std::string expectedTransactionInfo = "transaction " +
         session.transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }

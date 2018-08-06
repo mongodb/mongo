@@ -1375,7 +1375,8 @@ void Session::_logSlowTransaction(WithLock wl,
         // Log the transaction if its duration is longer than the slowMS command threshold.
         if (_singleTransactionStats->getDuration(curTimeMicros64()) >
             serverGlobalParams.slowMS * 1000ULL) {
-            log(logger::LogComponent::kCommand)
+            log(logger::LogComponent::kTransaction)
+                << "transaction "
                 << _transactionInfoForLog(lockStats, terminationCause, readConcernArgs);
         }
     }
