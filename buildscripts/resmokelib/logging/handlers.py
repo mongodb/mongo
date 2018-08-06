@@ -9,6 +9,7 @@ import threading
 import warnings
 
 import requests
+import requests.adapters
 import requests.auth
 
 try:
@@ -16,6 +17,8 @@ try:
 except ImportError:
     # Versions of the requests package prior to 1.2.0 did not vendor the urllib3 package.
     urllib3_exceptions = None
+
+import urllib3.util.retry as urllib3_retry
 
 from . import flush
 from .. import utils
@@ -159,10 +162,23 @@ class BufferedHandler(logging.Handler):
 class HTTPHandler(object):
     """A class which sends data to a web server using POST requests."""
 
-    def __init__(self, url_root, username, password):
+    def __init__(self, url_root, username, password, should_retry=False):
         """Initialize the handler with the necessary authentication credentials."""
 
         self.auth_handler = requests.auth.HTTPBasicAuth(username, password)
+
+        self.session = requests.Session()
+
+        if should_retry:
+            retry_status = [500, 502, 503, 504]  # Retry for these statuses.
+            retry = urllib3_retry.Retry(
+                backoff_factor=0.1,  # Enable backoff starting at 0.1s.
+                method_whitelist=False,  # Support all HTTP verbs.
+                status_forcelist=retry_status)
+
+            adapter = requests.adapters.HTTPAdapter(max_retries=retry)
+            self.session.mount('http://', adapter)
+            self.session.mount('https://', adapter)
 
         self.url_root = url_root
 
@@ -205,8 +221,9 @@ class HTTPHandler(object):
                     # that defined InsecureRequestWarning.
                     pass
 
-            response = requests.post(url, data=data, headers=headers, timeout=timeout_secs,
-                                     auth=self.auth_handler, verify=should_validate_certificates)
+            response = self.session.post(url, data=data, headers=headers, timeout=timeout_secs,
+                                         auth=self.auth_handler,
+                                         verify=should_validate_certificates)
 
         response.raise_for_status()
 
