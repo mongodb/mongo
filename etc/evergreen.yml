@@ -3255,6 +3255,7 @@ tasks:
           - "./test*"
           - "./dbtest*"
           - "./mongobridge*"
+          - "./mongoebench*"
           - "./mongoed*"
           - "buildscripts/**"
           - "*Example"
@@ -12062,7 +12063,7 @@ buildvariants:
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_mongoreplay: true
-    additional_targets: mongoed
+    additional_targets: mongoebench mongoed
   display_tasks:
   - *unittests
   tasks:
@@ -12121,7 +12122,7 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: -gccgoflags "$(pkg-config --libs)"
     build_mongoreplay: true
-    additional_targets: mongoed
+    additional_targets: mongoebench mongoed
   display_tasks:
   - *unittests
   tasks:
@@ -12205,7 +12206,7 @@ buildvariants:
     num_jobs_available: 1
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     build_mongoreplay: true
-    additional_targets: mongoed
+    additional_targets: mongoebench mongoed
   display_tasks:
   - *unittests
   tasks:

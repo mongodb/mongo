@@ -31,8 +31,10 @@
 #include <boost/optional.hpp>
 #include <string>
 
+#include "mongo/base/shim.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -59,11 +61,32 @@ enum class OpType {
     CPULOAD
 };
 
+class BenchRunConfig;
+struct BenchRunStats;
+class BsonTemplateEvaluator;
+class LogicalSessionIdToClient;
+
 /**
  * Object representing one operation passed to benchRun
  */
 struct BenchRunOp {
-public:
+    struct State {
+        State(BsonTemplateEvaluator* bsonTemplateEvaluator_, BenchRunStats* stats_)
+            : bsonTemplateEvaluator(bsonTemplateEvaluator_), stats(stats_) {}
+
+        BsonTemplateEvaluator* bsonTemplateEvaluator;
+        BenchRunStats* stats;
+
+        // Transaction state
+        TxnNumber txnNumber = 0;
+        bool inProgressMultiStatementTxn = false;
+    };
+
+    void executeOnce(DBClientBase* conn,
+                     const boost::optional<LogicalSessionIdToClient>& lsid,
+                     const BenchRunConfig& config,
+                     State* state) const;
+
     int batchSize = 0;
     BSONElement check;
     BSONObj command;
@@ -114,6 +137,9 @@ public:
      * Caller owns the returned object, and is responsible for its deletion.
      */
     static BenchRunConfig* createFromBson(const BSONObj& args);
+
+    static MONGO_DECLARE_SHIM((const BenchRunConfig&)->std::unique_ptr<DBClientBase>)
+        createConnectionImpl;
 
     BenchRunConfig();
 
@@ -199,6 +225,8 @@ public:
     bool breakOnTrap;
 
 private:
+    static std::function<std::unique_ptr<DBClientBase>(const BenchRunConfig&)> _factory;
+
     /// Initialize a config object to its default values.
     void initializeToDefaults();
 };

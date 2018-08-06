@@ -5,6 +5,9 @@ Import('get_option')
 
 env = env.Clone()
 
+yamlEnv = env.Clone()
+yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+
 mongobridge = env.Program(
     target="mongobridge",
     source=[
@@ -29,6 +32,29 @@ mongobridge = env.Program(
     ],
 )
 
+mongoebench = yamlEnv.Program(
+    target='mongoebench',
+    source=[
+        'mongoebench_main.cpp',
+        'mongoebench_options.cpp',
+        'mongoebench_options_init.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/embedded/embedded',
+        '$BUILD_DIR/mongo/embedded/embedded_integration_helpers',
+        '$BUILD_DIR/mongo/shell/benchrun',
+        '$BUILD_DIR/mongo/util/signal_handlers',
+    ],
+    INSTALL_ALIAS=[
+        'mobile-test',
+        'tools',
+    ],
+)
+
 hygienic = get_option('install-mode') == 'hygienic'
 if not hygienic:
     env.Install("#/", mongobridge)
+    env.Install("#/", mongoebench)
+
+env.Alias('all', mongoebench)  # This ensures it compiles and links, but doesn't copy it anywhere.

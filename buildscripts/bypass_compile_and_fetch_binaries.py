@@ -269,6 +269,7 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
                 extract_files = [
                     executable_name("dbtest"),
                     executable_name("mongobridge"),
+                    executable_name("mongoebench"),
                     executable_name("mongoed"),
                     "build/integration_tests.txt",
                 ]
