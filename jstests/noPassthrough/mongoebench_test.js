@@ -31,6 +31,15 @@
         },
         {dbpath});
 
+    const output = cat(dbpath + "/perf.json");
+    const stats = assert.doesNotThrow(
+        JSON.parse, [output], "failed to parse output file as strict JSON: " + output);
+    assert.eq({$numberLong: "0"},
+              stats.errCount,
+              () => "stats file reports errors but exit code was zero: " + tojson(stats));
+    assert(stats.hasOwnProperty("totalOps/s"),
+           () => "stats file doesn't report ops per second: " + tojson(stats));
+
     const conn = MongoRunner.runMongod({dbpath, noCleanData: true});
     assert.neq(null, conn, "failed to start mongod after running mongoebench");
 
