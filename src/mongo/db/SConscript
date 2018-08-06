@@ -799,6 +799,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
     LIBDEPS_PRIVATE=[
+        'handle_request_response',
         'snapshot_window_util',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
@@ -1380,6 +1381,16 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status',
     ]
+)
+
+env.Library(
+    target='handle_request_response',
+    source=[
+        'handle_request_response.cpp',
+    ],
+    LIBDEPS=[
+        'logical_session_cache_impl',
+    ],
 )
 
 env.Library(

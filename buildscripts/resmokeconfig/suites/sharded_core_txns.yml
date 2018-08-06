@@ -53,7 +53,7 @@ selector:
   # TODO SERVER-33709: Support readConcern snapshot in cluster count command.
   - jstests/core/txns/commands_not_allowed_in_txn.js
 
-  # TODO SERVER-35708 Mongos does not attach errorLabels on command response.
+  # TODO SERVER-36580 Mongos should preserve error labels for write ops.
   - jstests/core/txns/multi_statement_transaction_abort.js
 
   # TODO SERVER-35825: Mongos should only allow readConcern on writes that start transactions.

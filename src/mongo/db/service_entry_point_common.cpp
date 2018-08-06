@@ -47,6 +47,7 @@
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/handle_request_response.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
@@ -218,30 +219,6 @@ void generateErrorResponse(OperationContext* opCtx,
     replyBuilder->reset();
     replyBuilder->setCommandReply(exception.toStatus(), extraFields);
     replyBuilder->getBodyBuilder().appendElements(replyMetadata);
-}
-
-BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& sessionOptions,
-                       const std::string& commandName,
-                       ErrorCodes::Error code) {
-    // By specifying "autocommit", the user indicates they want to run a transaction.
-    if (!sessionOptions || !sessionOptions->getAutocommit()) {
-        return {};
-    }
-
-    bool isRetryable = ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code);
-    bool isTransientTransactionError = code == ErrorCodes::WriteConflict  //
-        || code == ErrorCodes::SnapshotUnavailable                        //
-        || code == ErrorCodes::NoSuchTransaction                          //
-        || code == ErrorCodes::LockTimeout                                //
-        || code == ErrorCodes::PreparedTransactionInProgress              //
-        // Clients can retry a single commitTransaction command, but cannot retry the whole
-        // transaction if commitTransaction fails due to NotMaster.
-        || (isRetryable && (commandName != "commitTransaction"));
-
-    if (isTransientTransactionError) {
-        return BSON("errorLabels" << BSON_ARRAY("TransientTransactionError"));
-    }
-    return {};
 }
 
 /**
