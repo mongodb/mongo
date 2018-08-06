@@ -175,7 +175,6 @@ else:
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-            '$BUILD_DIR/mongo/executor/network_interface',
         ],
         SYSLIBDEPS=[
             'winhttp' if env.TargetOSIs('windows') else 'curl',

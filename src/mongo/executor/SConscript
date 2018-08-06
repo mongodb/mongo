@@ -181,10 +181,10 @@ env.Library(
         'network_interface_factory.cpp',
     ],
     LIBDEPS=[
-        'network_interface',
         'connection_pool_executor',
     ],
     LIBDEPS_PRIVATE=[
+        'network_interface',
         'network_interface_tl',
         'egress_tag_closer_manager',
     ])
@@ -212,6 +212,9 @@ env.Library(
         'task_executor_interface',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/db/service_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        'network_interface',
     ]
 )
 

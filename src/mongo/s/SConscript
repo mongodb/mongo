@@ -78,9 +78,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_cache_factory_mongos',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_impl',
         '$BUILD_DIR/mongo/s/catalog/replset_dist_lock_manager',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
@@ -89,6 +86,9 @@ env.Library(
         'coreshard',
         'sharding_task_executor',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+    ]
 )
 
 env.Library(

@@ -143,12 +143,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ],
 )
