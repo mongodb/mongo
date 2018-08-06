@@ -736,9 +736,11 @@ var {
             return cmdObj;
         };
 
-        this.startTransaction = function startTransaction(txnOptsObj) {
-            // If the session is already in a transaction, raise an error.
-            if (this.isTxnActive()) {
+        this.startTransaction = function startTransaction(txnOptsObj, ignoreActiveTxn) {
+            // If the session is already in a transaction, raise an error. If retryNewTxnNum
+            // is true, don't raise an error. This is to allow multiple threads to try to
+            // use the same session in a concurrency workload.
+            if (this.isTxnActive() && !ignoreActiveTxn) {
                 throw new Error("Transaction already in progress on this session.");
             }
             if (!serverSupports(kWireVersionSupportingMultiDocumentTransactions)) {
@@ -939,6 +941,11 @@ var {
 
             this.startTransaction = function startTransaction(txnOptsObj = {}) {
                 this._serverSession.startTransaction(txnOptsObj);
+            };
+
+            this.startTransaction_forTesting = function startTransaction_forTesting(
+                txnOptsObj = {}, {ignoreActiveTxn: ignoreActiveTxn = false} = {}) {
+                this._serverSession.startTransaction(txnOptsObj, ignoreActiveTxn);
             };
 
             this.commitTransaction = function commitTransaction() {

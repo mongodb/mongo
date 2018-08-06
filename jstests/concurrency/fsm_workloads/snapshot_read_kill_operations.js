@@ -69,7 +69,8 @@ var $config = (function() {
         killCursors: function killCursors(db, collName) {
             const killCursorCmd = {killCursors: collName, cursors: [this.cursorId]};
             const res = this.sessionDb.runCommand(killCursorCmd);
-            assertWorkedOrFailed(killCursorCmd, res, [ErrorCodes.CursorNotFound]);
+            assert.commandWorkedOrFailedWithCode(
+                res, [ErrorCodes.CursorNotFound], () => `cmd: ${tojson(killCursorCmd)}`);
         },
 
     };

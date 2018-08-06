@@ -2,7 +2,7 @@
  * Helpers for doing a snapshot read in concurrency suites. Specifically, the read is a find that
  * spans a getmore.
  */
-
+load('jstests/concurrency/fsm_workload_helpers/cleanup_txns.js');
 /**
  * Parses a cursor from cmdResult, if possible.
  */
@@ -12,21 +12,6 @@ function parseCursor(cmdResult) {
         return cmdResult.cursor;
     }
     return null;
-}
-
-/**
- * Asserts cmd has either failed with a code in a specified set of codes or has succeeded.
- */
-function assertWorkedOrFailed(cmd, cmdResult, errorCodeSet) {
-    if (!cmdResult.ok) {
-        assert.commandFailedWithCode(cmdResult,
-                                     errorCodeSet,
-                                     "expected command to fail with one of " + errorCodeSet +
-                                         ", cmd: " + tojson(cmd) + ", result: " +
-                                         tojson(cmdResult));
-    } else {
-        assert.commandWorked(cmdResult);
-    }
 }
 
 /**
@@ -51,7 +36,7 @@ function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
 
     // Establish a snapshot batchSize:0 cursor.
     let res = data.sessionDb.runCommand(findCmd);
-    assertWorkedOrFailed(findCmd, res, findErrorCodes);
+    assert.commandWorkedOrFailedWithCode(res, findErrorCodes, () => `cmd: ${tojson(findCmd)}`);
     const cursor = parseCursor(res);
 
     if (!cursor) {
@@ -84,7 +69,8 @@ function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionE
         autocommit: false
     };
     let res = data.sessionDb.runCommand(getMoreCmd);
-    assertWorkedOrFailed(getMoreCmd, res, getMoreErrorCodes);
+    assert.commandWorkedOrFailedWithCode(
+        res, getMoreErrorCodes, () => `cmd: ${tojson(getMoreCmd)}`);
 
     const commitCmd = {
         commitTransaction: 1,
@@ -93,7 +79,8 @@ function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionE
         autocommit: false
     };
     res = data.sessionDb.adminCommand(commitCmd);
-    assertWorkedOrFailed(commitCmd, res, commitTransactionErrorCodes);
+    assert.commandWorkedOrFailedWithCode(
+        res, commitTransactionErrorCodes, () => `cmd: ${tojson(commitCmd)}`);
 }
 
 /**
@@ -119,48 +106,3 @@ function killSessionsFromDocs(db, collName, tid) {
     let sessionIds = db[collName].find({"_id": docs}, {_id: 0, id: 1}).toArray();
     assert.commandWorked(db.runCommand({killSessions: sessionIds}));
 }
-
-/**
- * Abort the transaction on the session and return result.
- */
-function abortTransaction(db, txnNumber, errorCodes) {
-    abortCmd = {abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false};
-    res = db.adminCommand(abortCmd);
-    assertWorkedOrFailed(abortCmd, res, errorCodes);
-    return res;
-}
-
-/**
- * This function operates on the last iteration of each thread to abort any active transactions.
- */
-var {cleanupOnLastIteration} = (function() {
-    function cleanupOnLastIteration(data, func) {
-        const abortErrorCodes = [
-            ErrorCodes.NoSuchTransaction,
-            ErrorCodes.TransactionCommitted,
-            ErrorCodes.TransactionTooOld
-        ];
-        let lastIteration = ++data.iteration >= data.iterations;
-        try {
-            func();
-        } catch (e) {
-            lastIteration = true;
-            throw e;
-        } finally {
-            if (lastIteration) {
-                // Abort the latest transactions for this session as some may have been skipped due
-                // to incrementing data.txnNumber. Go in increasing order, so as to avoid bumping
-                // the txnNumber on the server past that of an in-progress transaction. See
-                // SERVER-36847.
-                for (let i = 0; i <= data.txnNumber; i++) {
-                    let res = abortTransaction(data.sessionDb, i, abortErrorCodes);
-                    if (res.ok === 1) {
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    return {cleanupOnLastIteration};
-})();

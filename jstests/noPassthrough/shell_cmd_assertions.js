@@ -80,6 +80,13 @@
         // commandFailedWithCode should succeed if any of the passed error codes are matched.
         assert.doesNotThrow(
             () => assert.commandFailedWithCode(res, [ErrorCodes.CommandNotFound, kFakeErrCode]));
+        assert.doesNotThrow(() => assert.commandWorkedOrFailedWithCode(
+                                res,
+                                [ErrorCodes.CommandNotFound, kFakeErrCode],
+                                "threw even though failed with correct error codes"));
+        assert.throws(
+            () => assert.commandWorkedOrFailedWithCode(
+                res, [kFakeErrCode], "didn't throw even though failed with incorrect error code"));
     });
 
     tests.push(function rawCommandWriteOk() {
@@ -88,6 +95,8 @@
         assert.doesNotThrow(() => assert.commandWorkedIgnoringWriteErrors(res));
         assert.throws(() => assert.commandFailed(res));
         assert.throws(() => assert.commandFailedWithCode(res, 0));
+        assert.doesNotThrow(
+            () => assert.commandWorkedOrFailedWithCode(res, 0, "threw even though succeeded"));
     });
 
     tests.push(function rawCommandWriteErr() {
@@ -98,6 +107,11 @@
         assert.doesNotThrow(() => assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey));
         assert.doesNotThrow(
             () => assert.commandFailedWithCode(res, [ErrorCodes.DuplicateKey, kFakeErrCode]));
+        assert.throws(
+            () => assert.commandWorkedOrFailedWithCode(
+                res, [ErrorCodes.DuplicateKey, kFakeErrCode], "expected to throw on write error"));
+        assert.throws(() => assert.commandWorkedOrFailedWithCode(
+                          res, [kFakeErrCode], "expected to throw on write error"));
     });
 
     tests.push(function collInsertWriteOk() {
@@ -127,6 +141,8 @@
         assert.doesNotThrow(() => assert.commandWorkedIgnoringWriteErrors(res));
         assert.throws(() => assert.commandFailed(res));
         assert.throws(() => assert.commandFailedWithCode(res, 0));
+        assert.throws(
+            () => assert.commandWorkedOrFailedWithCode(res, 0, "threw even though succeeded"));
     });
 
     tests.push(function collMultiInsertWriteErr() {
@@ -161,6 +177,13 @@
         assert.doesNotThrow(() => assert.commandFailedWithCode(res, ErrorCodes.FailedToParse));
         assert.doesNotThrow(
             () => assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, kFakeErrCode]));
+        assert.doesNotThrow(() => assert.commandWorkedOrFailedWithCode(
+                                res,
+                                [ErrorCodes.FailedToParse, kFakeErrCode],
+                                "threw even though failed with correct error codes"));
+        assert.throws(
+            () => assert.commandWorkedOrFailedWithCode(
+                res, [kFakeErrCode], "didn't throw even though failed with incorrect error codes"));
     });
 
     tests.push(function mapReduceOk() {

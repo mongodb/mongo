@@ -15,9 +15,6 @@ var $config = (function() {
 
     var data = {
         viewList: ['viewA', 'viewB', 'viewC'].map(viewName => prefix + viewName),
-        assertCommandWorkedOrFailedWithCode: function(result, codeArr) {
-            assertAlways(result.ok === 1 || codeArr.indexOf(result.code) > -1, tojson(result));
-        },
         getRandomView: function(viewList) {
             return viewList[Random.randInt(viewList.length)];
         },
@@ -33,9 +30,11 @@ var $config = (function() {
         function remapViewToView(db, collName) {
             const fromName = this.getRandomView(this.viewList);
             const toName = this.getRandomView(this.viewList);
-            const res = db.runCommand({collMod: fromName, viewOn: toName, pipeline: []});
-            this.assertCommandWorkedOrFailedWithCode(
-                res, [ErrorCodes.GraphContainsCycle, ErrorCodes.NamespaceNotFound]);
+            const cmd = {collMod: fromName, viewOn: toName, pipeline: []};
+            const res = db.runCommand(cmd);
+            const errorCodes = [ErrorCodes.GraphContainsCycle, ErrorCodes.NamespaceNotFound];
+            assertAlways.commandWorkedOrFailedWithCode(
+                res, errorCodes, () => `cmd: ${tojson(cmd)}`);
         }
 
         /**
@@ -45,11 +44,16 @@ var $config = (function() {
          */
         function recreateViewOnCollection(db, collName) {
             const viewName = this.getRandomView(this.viewList);
-            this.assertCommandWorkedOrFailedWithCode(db.runCommand({drop: viewName}),
-                                                     [ErrorCodes.NamespaceNotFound]);
-            this.assertCommandWorkedOrFailedWithCode(
-                db.createView(viewName, collName, []),
-                [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound]);
+            const dropCmd = {drop: viewName};
+            let res = db.runCommand(dropCmd);
+            let errorCodes = [ErrorCodes.NamespaceNotFound];
+            assertAlways.commandWorkedOrFailedWithCode(
+                db.runCommand(dropCmd), errorCodes, () => `cmd: ${tojson(cmd)}`);
+
+            res = db.createView(viewName, collName, []);
+            errorCodes = [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound];
+            assertAlways.commandWorkedOrFailedWithCode(
+                res, errorCodes, () => `cmd: ${tojson(cmd)}`);
         }
 
         /**
@@ -60,9 +64,12 @@ var $config = (function() {
          */
         function readFromView(db, collName) {
             const viewName = this.getRandomView(this.viewList);
-            const res = db.runCommand({find: viewName});
+            const cmd = {find: viewName};
+            const res = db.runCommand(cmd);
+            const errorCodes = [ErrorCodes.CommandNotSupportedOnView];
             // TODO SERVER-26037: Replace with the appropriate error code. See ticket for details.
-            this.assertCommandWorkedOrFailedWithCode(res, [ErrorCodes.CommandNotSupportedOnView]);
+            assertAlways.commandWorkedOrFailedWithCode(
+                res, errorCodes, () => `cmd: ${tojson(cmd)}`);
         }
 
         return {
@@ -86,7 +93,7 @@ var $config = (function() {
         assertAlways.writeOK(coll.insert({x: 1}));
 
         for (let viewName of this.viewList) {
-            assert.commandWorked(db.createView(viewName, collName, []));
+            assertAlways.commandWorked(db.createView(viewName, collName, []));
         }
     }
 
