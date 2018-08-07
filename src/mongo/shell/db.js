@@ -1952,6 +1952,12 @@ var DB;
 
     DB.prototype.enableFreeMonitoring = function() {
         'use strict';
+        const isMaster = this.isMaster();
+        if (isMaster.ismaster == false) {
+            print("ERROR: db.enableFreeMonitoring() may only be run on a primary");
+            return;
+        }
+
         assert.commandWorked(this.adminCommand({setFreeMonitoring: 1, action: 'enable'}));
 
         const cmd = this.adminCommand({getFreeMonitoringStatus: 1});
@@ -1965,9 +1971,12 @@ var DB;
         assert.commandWorked(cmd);
 
         if (cmd.state !== 'enabled') {
-            print("Successfully initiated free monitoring. The registration is " +
-                  "proceeding in the background. ");
-            print("Run db.getFreeMonitoringStatus() at any time to check on the progress.");
+            const url = this.adminCommand({'getParameter': 1, 'cloudFreeMonitoringEndpointURL': 1})
+                            .cloudFreeMonitoringEndpointURL;
+
+            print("Unable to get immediate response from the Cloud Monitoring service. We will" +
+                  "continue to retry in the background. Please check your firewall " +
+                  "settings to ensure that mongod can communicate with \"" + url + "\"");
             return;
         }
 
