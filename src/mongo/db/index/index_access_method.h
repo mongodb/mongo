@@ -348,11 +348,6 @@ protected:
                            MultikeyPaths* multikeyPaths) const = 0;
 
     /**
-     * Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
-     */
-    bool ignoreKeyTooLong(OperationContext* opCtx);
-
-    /**
      * Determine whether the given Status represents an exception that should cause the indexing
      * process to abort. The 'key' argument is passed in to allow the offending entry to be logged
      * in the event that a non-fatal 'ErrorCodes::DuplicateKeyValue' is encountered during a
@@ -364,6 +359,18 @@ protected:
     const IndexDescriptor* _descriptor;
 
 private:
+    /**
+     * Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
+     * TODO SERVER-36385: Remove this function.
+     */
+    bool ignoreKeyTooLong();
+
+    /**
+     * If true, we should check whether the index key exceeds the hardcoded limit.
+     * TODO SERVER-36385: Remove this function.
+     */
+    bool shouldCheckIndexKeySize(OperationContext* opCtx);
+
     void removeOneKey(OperationContext* opCtx,
                       const BSONObj& key,
                       const RecordId& loc,

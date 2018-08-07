@@ -113,11 +113,6 @@ protected:
     Status _dupKeyError(const BSONObj& key);
 
     /**
-     * Checks if key size is too long.
-     */
-    static Status _checkKeySize(const BSONObj& key);
-
-    /**
      * Performs the deletion from the table matching the given key.
      */
     void _doDelete(OperationContext* opCtx, const KeyString& key, KeyString* value = nullptr);

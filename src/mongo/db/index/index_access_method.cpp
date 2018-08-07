@@ -85,6 +85,19 @@ std::vector<BSONObj> asVector(const BSONObjSet& objSet) {
     return {objSet.begin(), objSet.end()};
 }
 
+// TODO SERVER-36385: Remove this
+const int TempKeyMaxSize = 1024;
+
+// TODO SERVER-36385: Completely remove the key size check in 4.4
+Status checkKeySize(const BSONObj& key) {
+    if (key.objsize() >= TempKeyMaxSize) {
+        std::string msg = mongoutils::str::stream() << "Index key too large to index, failing "
+                                                    << key.objsize() << ' ' << redact(key);
+        return Status(ErrorCodes::KeyTooLong, msg);
+    }
+    return Status::OK();
+}
+
 }  // namespace
 
 // TODO SERVER-36386: Remove the server parameter
@@ -125,18 +138,31 @@ IndexAccessMethod::IndexAccessMethod(IndexCatalogEntry* btreeState, SortedDataIn
     verify(IndexDescriptor::isIndexVersionSupported(_descriptor->version()));
 }
 
-bool IndexAccessMethod::ignoreKeyTooLong(OperationContext* opCtx) {
-    // Ignore this error if we cannot write to the collection or if the user requested it
+// TODO SERVER-36385: Remove this when there is no KeyTooLong error.
+bool IndexAccessMethod::ignoreKeyTooLong() {
+    return !failIndexKeyTooLongParam();
+}
+
+// TODO SERVER-36385: Remove this when there is no KeyTooLong error.
+bool IndexAccessMethod::shouldCheckIndexKeySize(OperationContext* opCtx) {
+    // Don't check index key size if we cannot write to the collection. That indicates we are a
+    // secondary node and we should accept any index key.
+    const NamespaceString collName(_btreeState->ns());
     const auto shouldRelaxConstraints =
-        repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(
-            opCtx, NamespaceString(_btreeState->ns()));
-    return shouldRelaxConstraints || !failIndexKeyTooLongParam();
+        repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, collName);
+
+    // Don't check index key size if FCV hasn't been initialized.
+    return !shouldRelaxConstraints &&
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40;
 }
 
 bool IndexAccessMethod::isFatalError(OperationContext* opCtx, Status status, BSONObj key) {
     // If the status is Status::OK(), or if it is ErrorCodes::KeyTooLong and the user has chosen to
     // ignore this error, return false immediately.
-    if (status.isOK() || (status == ErrorCodes::KeyTooLong && ignoreKeyTooLong(opCtx))) {
+    // TODO SERVER-36385: Remove this when there is no KeyTooLong error.
+    if (status.isOK() || (status == ErrorCodes::KeyTooLong && ignoreKeyTooLong())) {
         return false;
     }
 
@@ -157,6 +183,7 @@ Status IndexAccessMethod::insert(OperationContext* opCtx,
                                  int64_t* numInserted) {
     invariant(numInserted);
     *numInserted = 0;
+    bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
     BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
@@ -169,7 +196,9 @@ Status IndexAccessMethod::insert(OperationContext* opCtx,
     for (const auto keySet : {&keys, &multikeyMetadataKeys}) {
         const auto& recordId = (keySet == &keys ? loc : kMultikeyMetadataKeyId);
         for (const auto& key : *keySet) {
-            Status status = _newInterface->insert(opCtx, key, recordId, options.dupsAllowed);
+            Status status = checkIndexKeySize ? checkKeySize(key) : Status::OK();
+            if (status.isOK())
+                status = _newInterface->insert(opCtx, key, recordId, options.dupsAllowed);
             if (isFatalError(opCtx, status, key)) {
                 return status;
             }
@@ -401,6 +430,8 @@ Status IndexAccessMethod::update(OperationContext* opCtx,
         _newInterface->unindex(opCtx, remKey, ticket.loc, ticket.dupsAllowed);
     }
 
+    bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
+
     // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
     // over the data keys, each of them should point to the doc's RecordId. When iterating over
     // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
@@ -408,7 +439,9 @@ Status IndexAccessMethod::update(OperationContext* opCtx,
     for (const auto keySet : {&ticket.added, &newMultikeyMetadataKeys}) {
         const auto& recordId = (keySet == &ticket.added ? ticket.loc : kMultikeyMetadataKeyId);
         for (const auto& key : *keySet) {
-            Status status = _newInterface->insert(opCtx, key, recordId, ticket.dupsAllowed);
+            Status status = checkIndexKeySize ? checkKeySize(key) : Status::OK();
+            if (status.isOK())
+                status = _newInterface->insert(opCtx, key, recordId, ticket.dupsAllowed);
             if (isFatalError(opCtx, status, key)) {
                 return status;
             }
@@ -505,6 +538,8 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
     auto builder = std::unique_ptr<SortedDataBuilderInterface>(
         _newInterface->getBulkBuilder(opCtx, dupsAllowed));
 
+    bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
+
     while (it->more()) {
         if (mayInterrupt) {
             opCtx->checkForInterrupt();
@@ -514,11 +549,15 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
 
         // Get the next datum and add it to the builder.
         BulkBuilder::Sorter::Data data = it->next();
-        Status status = builder->addKey(data.first, data.second);
+
+        Status status = checkIndexKeySize ? checkKeySize(data.first) : Status::OK();
+        if (status.isOK())
+            status = builder->addKey(data.first, data.second);
 
         if (!status.isOK()) {
             // Overlong key that's OK to skip?
-            if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(opCtx)) {
+            // TODO SERVER-36385: Remove this when there is no KeyTooLong error.
+            if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong()) {
                 continue;
             }
 
@@ -563,6 +602,7 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
                                 BSONObjSet* keys,
                                 BSONObjSet* multikeyMetadataKeys,
                                 MultikeyPaths* multikeyPaths) const {
+    // TODO SERVER-36385: Remove ErrorCodes::KeyTooLong.
     static stdx::unordered_set<int> whiteList{ErrorCodes::CannotBuildIndexKeys,
                                               // Btree
                                               ErrorCodes::KeyTooLong,

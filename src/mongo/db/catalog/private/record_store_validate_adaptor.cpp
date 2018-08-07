@@ -46,6 +46,14 @@
 
 namespace mongo {
 
+namespace {
+// TODO SERVER-36385: Completely remove the key size check in 4.4
+bool isLargeKeyDisallowed() {
+    return serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40;
+}
+}
+
 Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                                             const RecordData& record,
                                             size_t* dataSize) {
@@ -101,9 +109,11 @@ Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
 
         const auto& pattern = descriptor->keyPattern();
         const Ordering ord = Ordering::make(pattern);
+        bool largeKeyDisallowed = isLargeKeyDisallowed();
 
         for (const auto& key : documentKeySet) {
-            if (key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
+            if (largeKeyDisallowed &&
+                key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
                 // Index keys >= 1024 bytes are not indexed.
                 _indexConsistency->addLongIndexKey(indexNumber);
                 continue;

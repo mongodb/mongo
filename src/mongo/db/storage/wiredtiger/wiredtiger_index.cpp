@@ -80,8 +80,6 @@ MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
 using std::string;
 using std::vector;
 
-static const int TempKeyMaxSize = 1024;  // this goes away with SERVER-3372
-
 static const WiredTigerItem emptyItem(NULL, 0);
 
 
@@ -102,16 +100,6 @@ BSONObj stripFieldNames(const BSONObj& query) {
         bb.appendAs(e, StringData());
     }
     return bb.obj();
-}
-
-Status checkKeySize(const BSONObj& key) {
-    if (key.objsize() >= TempKeyMaxSize) {
-        string msg = mongoutils::str::stream()
-            << "WiredTigerIndex::insert: key too large to index, failing " << ' ' << key.objsize()
-            << ' ' << key;
-        return Status(ErrorCodes::KeyTooLong, msg);
-    }
-    return Status::OK();
 }
 }  // namespace
 
@@ -320,10 +308,6 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
     dassert(opCtx->lockState()->isWriteLocked());
     invariant(id.isValid());
     dassert(!hasFieldNames(key));
-
-    Status s = checkKeySize(key);
-    if (!s.isOK())
-        return s;
 
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
     curwrap.assertInActiveTxn();
@@ -628,12 +612,6 @@ public:
         : BulkBuilder(idx, opCtx, prefix), _idx(idx) {}
 
     Status addKey(const BSONObj& key, const RecordId& id) override {
-        {
-            const Status s = checkKeySize(key);
-            if (!s.isOK())
-                return s;
-        }
-
         KeyString data(_idx->keyStringVersion(), key, _idx->_ordering, id);
 
         // Can't use WiredTigerCursor since we aren't using the cache.
@@ -699,12 +677,6 @@ public:
 
 private:
     Status addKeyTimestampSafe(const BSONObj& newKey, const RecordId& id) {
-        {
-            const Status s = checkKeySize(newKey);
-            if (!s.isOK())
-                return s;
-        }
-
         // Do a duplicate check
         const int cmp = newKey.woCompare(_previousKey, _ordering);
         if (cmp == 0) {
@@ -738,12 +710,6 @@ private:
     }
 
     Status addKeyTimestampUnsafe(const BSONObj& newKey, const RecordId& id) {
-        {
-            const Status s = checkKeySize(newKey);
-            if (!s.isOK())
-                return s;
-        }
-
         const int cmp = newKey.woCompare(_previousKey, _ordering);
         if (cmp != 0) {
             if (!_previousKey.isEmpty()) {

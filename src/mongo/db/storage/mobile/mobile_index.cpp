@@ -48,8 +48,6 @@ using std::vector;
 
 // BTree stuff
 
-const int TempKeyMaxSize = 1024;  // This goes away with SERVER-3372.
-
 bool hasFieldNames(const BSONObj& obj) {
     BSONForEach(e, obj) {
         if (e.fieldName()[0])
@@ -82,11 +80,6 @@ Status MobileIndex::insert(OperationContext* opCtx,
                            bool dupsAllowed) {
     invariant(recId.isValid());
     invariant(!hasFieldNames(key));
-
-    Status status = _checkKeySize(key);
-    if (!status.isOK()) {
-        return status;
-    }
 
     return _insert(opCtx, key, recId, dupsAllowed);
 }
@@ -284,13 +277,6 @@ Status MobileIndex::_dupKeyError(const BSONObj& key) {
     return Status(ErrorCodes::DuplicateKey, sb.str());
 }
 
-Status MobileIndex::_checkKeySize(const BSONObj& key) {
-    if (key.objsize() >= TempKeyMaxSize) {
-        return Status(ErrorCodes::KeyTooLong, "key too big");
-    }
-    return Status::OK();
-}
-
 class MobileIndex::BulkBuilderBase : public SortedDataBuilderInterface {
 public:
     BulkBuilderBase(MobileIndex* index, OperationContext* opCtx, bool dupsAllowed)
@@ -302,12 +288,7 @@ public:
         invariant(recId.isValid());
         invariant(!hasFieldNames(key));
 
-        Status status = _checkKeySize(key);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        status = _checkNextKey(key);
+        Status status = _checkNextKey(key);
         if (!status.isOK()) {
             return status;
         }

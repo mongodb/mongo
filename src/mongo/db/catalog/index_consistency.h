@@ -102,6 +102,7 @@ public:
     /**
      * Add one to the `_longKeys` count for the given `indexNs`.
      * This is required because index keys > `KeyString::kMaxKeyBytes` are not indexed.
+     * TODO SERVER-36385: Completely remove the key size check in 4.4
      */
     void addLongIndexKey(int indexNumber);
 

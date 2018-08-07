@@ -48,7 +48,6 @@ using std::vector;
 
 namespace {
 
-const int TempKeyMaxSize = 1024;  // this goes away with SERVER-3372
 
 bool hasFieldNames(const BSONObj& obj) {
     BSONForEach(e, obj) {
@@ -102,10 +101,6 @@ public:
     Status addKey(const BSONObj& key, const RecordId& loc) {
         // inserts should be in ascending (key, RecordId) order.
 
-        if (key.objsize() >= TempKeyMaxSize) {
-            return Status(ErrorCodes::KeyTooLong, "key too big");
-        }
-
         invariant(loc.isValid());
         invariant(!hasFieldNames(key));
 
@@ -153,12 +148,6 @@ public:
         invariant(loc.isValid());
         invariant(!hasFieldNames(key));
 
-        if (key.objsize() >= TempKeyMaxSize) {
-            string msg = mongoutils::str::stream()
-                << "EphemeralForTestBtree::insert: key too large to index, failing " << ' '
-                << key.objsize() << ' ' << key;
-            return Status(ErrorCodes::KeyTooLong, msg);
-        }
 
         // TODO optimization: save the iterator from the dup-check to speed up insert
         if (!dupsAllowed && isDup(*_data, key, loc))

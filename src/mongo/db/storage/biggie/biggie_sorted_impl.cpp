@@ -55,8 +55,6 @@ namespace mongo {
 namespace biggie {
 namespace {
 
-const int TempKeyMaxSize = 1024;  // this goes away with SERVER-3372
-
 // This function is the same as the one in record store--basically, using the git analogy, create
 // a working branch if one does not exist.
 StringStore* getRecoveryUnitBranch_forking(OperationContext* opCtx) {
@@ -242,10 +240,6 @@ void SortedDataBuilderInterface::commit(bool mayInterrupt) {
 Status SortedDataBuilderInterface::addKey(const BSONObj& key, const RecordId& loc) {
     StringStore* workingCopy = getRecoveryUnitBranch_forking(_opCtx);
 
-    if (key.objsize() >= TempKeyMaxSize) {
-        return Status(ErrorCodes::KeyTooLong, "key too big");
-    }
-
     invariant(loc.isNormal());
     invariant(!hasFieldNames(key));
 
@@ -321,10 +315,6 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
     std::string workingCopyInsertKey = combineKeyAndRID(key, loc, _prefix, _order);
 
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
-
-    if (key.objsize() >= TempKeyMaxSize) {
-        return Status(ErrorCodes::KeyTooLong, "Error: key too long");
-    }
 
     if (workingCopy->find(workingCopyInsertKey) != workingCopy->end()) {
         return Status::OK();

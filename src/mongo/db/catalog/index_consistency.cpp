@@ -38,6 +38,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/query_yield.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -47,6 +48,12 @@ namespace mongo {
 namespace {
 // The number of items we can scan before we must yield.
 static const int kScanLimit = 1000;
+
+// TODO SERVER-36385: Completely remove the key size check in 4.4
+bool largeKeyDisallowed() {
+    return (serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo40);
+}
 }  // namespace
 
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
@@ -227,8 +234,9 @@ void IndexConsistency::applyChange(const IndexDescriptor* descriptor,
         _setYieldAtRecord_inlock(indexEntry->loc);
         if (_isBeforeLastProcessedRecordId_inlock(indexEntry->loc)) {
             if (operation == ValidationOperation::INSERT) {
-                if (indexEntry->key.objsize() >=
-                    static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
+                if (largeKeyDisallowed() &&
+                    indexEntry->key.objsize() >=
+                        static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
                     // Index keys >= 1024 bytes are not indexed but are stored in the document key
                     // set.
                     _indexesInfo[indexNumber].numRecords++;
@@ -237,8 +245,9 @@ void IndexConsistency::applyChange(const IndexDescriptor* descriptor,
                     _addDocKey_inlock(ks, indexNumber);
                 }
             } else if (operation == ValidationOperation::REMOVE) {
-                if (indexEntry->key.objsize() >=
-                    static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
+                if (largeKeyDisallowed() &&
+                    indexEntry->key.objsize() >=
+                        static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
                     _indexesInfo[indexNumber].numRecords--;
                     _indexesInfo[indexNumber].numLongKeys--;
                 } else {
@@ -249,7 +258,8 @@ void IndexConsistency::applyChange(const IndexDescriptor* descriptor,
     } else if (_stage == ValidationStage::INDEX) {
 
         // Index entries with key sizes >= 1024 bytes are not indexed.
-        if (indexEntry->key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
+        if (largeKeyDisallowed() &&
+            indexEntry->key.objsize() >= static_cast<int64_t>(KeyString::TypeBits::kMaxKeyBytes)) {
             return;
         }
 

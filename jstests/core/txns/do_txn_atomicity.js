@@ -24,15 +24,14 @@
     assert.eq(t.count({x: 1}), 0);
 
     // Operations only including CRUD commands should be atomic, so the next insert will fail.
-    var tooLong = Array(2000).join("hello");
     assert.commandFailedWithCode(sessionDb.adminCommand({
         doTxn: [
             {op: 'i', ns: t.getFullName(), o: {_id: ObjectId(), x: 1}},
-            {op: 'i', ns: t.getFullName(), o: {_id: tooLong, x: 1}},
+            {op: 'i', ns: "invalid", o: {_id: ObjectId(), x: 1}},
         ],
         txnNumber: NumberLong(txnNumber++)
     }),
-                                 ErrorCodes.KeyTooLong);
+                                 16886);  // nsToCollectionSubstring: no .
     assert.eq(t.count({x: 1}), 0);
 
     // Operations on non-existent databases cannot be atomic.
