@@ -3,6 +3,7 @@
 /**
  * Tests that the group command either succeeds or fails gracefully when interspersed with inserts
  * on a capped collection. Designed to reproduce SERVER-34725.
+ * @tags: [requires_capped]
  */
 var $config = (function() {
 

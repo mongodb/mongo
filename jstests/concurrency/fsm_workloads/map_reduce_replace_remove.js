@@ -10,6 +10,8 @@
  * yields.
  *
  * This workload was designed to reproduce SERVER-15539.
+ *
+ * @tags: [SERVER-35473]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');          // for extendWorkload
 load('jstests/concurrency/fsm_workloads/map_reduce_replace.js');  // for $config

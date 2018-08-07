@@ -9,7 +9,7 @@
  * MongoDB raises the storage size of a capped collection
  * to an integer multiple of 256.
  *
- * @tags: [requires_collstats]
+ * @tags: [requires_collstats, requires_capped]
  */
 
 var $config = (function() {
