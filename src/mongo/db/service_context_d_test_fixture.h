@@ -30,6 +30,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -52,6 +53,7 @@ private:
         std::string engine;
         bool engineSetByUser;
     } _stashedStorageParams;
+    unittest::TempDir _tempDir;
 };
 
 }  // namespace mongo
