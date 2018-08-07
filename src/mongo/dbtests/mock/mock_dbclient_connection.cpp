@@ -121,15 +121,6 @@ string MockDBClientConnection::toString() const {
     return _remoteServer->toString();
 }
 
-unsigned long long MockDBClientConnection::query(stdx::function<void(const BSONObj&)> f,
-                                                 const string& ns,
-                                                 mongo::Query query,
-                                                 const BSONObj* fieldsToReturn,
-                                                 int queryOptions) {
-    verify(false);
-    return 0;
-}
-
 unsigned long long MockDBClientConnection::query(
     stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
     const std::string& ns,

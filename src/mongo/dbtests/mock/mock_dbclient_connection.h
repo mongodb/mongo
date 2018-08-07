@@ -57,10 +57,13 @@ public:
     //
     // DBClientBase methods
     //
+    using DBClientBase::query;
 
     bool connect(const char* hostName, StringData applicationName, std::string& errmsg);
 
-    inline bool connect(const HostAndPort& host, StringData applicationName, std::string& errmsg) {
+    inline bool connect(const HostAndPort& host,
+                        StringData applicationName,
+                        std::string& errmsg) override {
         return connect(host.toString().c_str(), applicationName, errmsg);
     }
 
@@ -87,20 +90,15 @@ public:
     // Getters
     //
 
-    mongo::ConnectionString::ConnectionType type() const;
-    bool isFailed() const;
+    mongo::ConnectionString::ConnectionType type() const override;
+    bool isFailed() const override;
     double getSoTimeout() const override;
-    std::string getServerAddress() const;
-    std::string toString() const;
+    std::string getServerAddress() const override;
+    std::string toString() const override;
 
     //
     // Unsupported methods (defined to get rid of virtual function was hidden error)
     //
-    unsigned long long query(stdx::function<void(const mongo::BSONObj&)> f,
-                             const std::string& ns,
-                             mongo::Query query,
-                             const mongo::BSONObj* fieldsToReturn = 0,
-                             int queryOptions = 0) override;
 
     unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
                              const std::string& ns,
@@ -118,10 +116,10 @@ public:
               bool assertOk,
               std::string* actualServer) override;
     void say(mongo::Message& toSend, bool isRetry = false, std::string* actualServer = 0) override;
-    bool lazySupported() const;
+    bool lazySupported() const override;
 
 private:
-    void checkConnection();
+    void checkConnection() override;
 
     MockRemoteDBServer::InstanceID _remoteServerInstanceID;
     MockRemoteDBServer* _remoteServer;

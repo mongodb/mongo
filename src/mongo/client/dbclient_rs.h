@@ -78,36 +78,36 @@ public:
      * @param info the result object for the logout command (provided for backwards
      *     compatibility with mongo shell)
      */
-    virtual void logout(const std::string& dbname, BSONObj& info);
+    void logout(const std::string& dbname, BSONObj& info) override;
 
     // ----------- simple functions --------------
 
     /** throws userassertion "no master found" */
-    virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
-                                                  Query query,
-                                                  int nToReturn = 0,
-                                                  int nToSkip = 0,
-                                                  const BSONObj* fieldsToReturn = 0,
-                                                  int queryOptions = 0,
-                                                  int batchSize = 0);
+    std::unique_ptr<DBClientCursor> query(const std::string& ns,
+                                          Query query,
+                                          int nToReturn = 0,
+                                          int nToSkip = 0,
+                                          const BSONObj* fieldsToReturn = 0,
+                                          int queryOptions = 0,
+                                          int batchSize = 0) override;
 
     /** throws userassertion "no master found" */
-    virtual BSONObj findOne(const std::string& ns,
-                            const Query& query,
-                            const BSONObj* fieldsToReturn = 0,
-                            int queryOptions = 0);
+    BSONObj findOne(const std::string& ns,
+                    const Query& query,
+                    const BSONObj* fieldsToReturn = 0,
+                    int queryOptions = 0) override;
 
-    virtual void insert(const std::string& ns, BSONObj obj, int flags = 0);
+    void insert(const std::string& ns, BSONObj obj, int flags = 0) override;
 
     /** insert multiple objects.  Note that single object insert is asynchronous, so this version
         is only nominally faster and not worth a special effort to try to use.  */
-    virtual void insert(const std::string& ns, const std::vector<BSONObj>& v, int flags = 0);
+    void insert(const std::string& ns, const std::vector<BSONObj>& v, int flags = 0) override;
 
-    virtual void remove(const std::string& ns, Query obj, int flags);
+    void remove(const std::string& ns, Query obj, int flags) override;
 
-    virtual void update(const std::string& ns, Query query, BSONObj obj, int flags);
+    void update(const std::string& ns, Query query, BSONObj obj, int flags) override;
 
-    virtual void killCursor(const NamespaceString& ns, long long cursorID);
+    void killCursor(const NamespaceString& ns, long long cursorID) override;
 
     // ---- access raw connections ----
 
@@ -130,12 +130,12 @@ public:
 
     // ---- callback pieces -------
 
-    virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-    virtual bool recv(Message& toRecv, int lastRequestId);
-    virtual void checkResponse(const std::vector<BSONObj>& batch,
-                               bool networkError,
-                               bool* retry = NULL,
-                               std::string* targetHost = NULL);
+    void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0) override;
+    bool recv(Message& toRecv, int lastRequestId) override;
+    void checkResponse(const std::vector<BSONObj>& batch,
+                       bool networkError,
+                       bool* retry = NULL,
+                       std::string* targetHost = NULL) override;
 
     /* this is the callback from our underlying connections to notify us that we got a "not master"
      * error.
@@ -148,10 +148,10 @@ public:
 
     // ----- status ------
 
-    virtual bool isFailed() const {
+    bool isFailed() const override {
         return !_master || _master->isFailed();
     }
-    bool isStillConnected();
+    bool isStillConnected() override;
 
     // ----- informational ----
 
@@ -168,20 +168,20 @@ public:
      */
     HostAndPort getSuspectedPrimaryHostAndPort() const;
 
-    double getSoTimeout() const {
+    double getSoTimeout() const override {
         return _so_timeout;
     }
 
-    std::string toString() const {
+    std::string toString() const override {
         return getServerAddress();
     }
 
-    std::string getServerAddress() const;
+    std::string getServerAddress() const override;
 
-    virtual ConnectionString::ConnectionType type() const {
+    ConnectionString::ConnectionType type() const override {
         return ConnectionString::SET;
     }
-    virtual bool lazySupported() const {
+    bool lazySupported() const override {
         return true;
     }
 
@@ -199,7 +199,10 @@ public:
     int getMaxWireVersion() final;
     // ---- low level ------
 
-    virtual bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer);
+    bool call(Message& toSend,
+              Message& response,
+              bool assertOk,
+              std::string* actualServer) override;
 
     /**
      * Returns whether a query or command can be sent to secondaries based on the query object
@@ -217,7 +220,7 @@ public:
      * Performs a "soft reset" by clearing all states relating to secondary nodes and
      * returning secondary connections to the pool.
      */
-    virtual void reset();
+    void reset() override;
 
     bool isReplicaSetMember() const override {
         return true;
@@ -236,7 +239,7 @@ public:
 protected:
     /** Authorize.  Authorizes all nodes as needed
     */
-    virtual void _auth(const BSONObj& params);
+    void _auth(const BSONObj& params) override;
 
 private:
     /**

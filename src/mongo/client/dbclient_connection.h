@@ -144,25 +144,25 @@ public:
      * @param info the result object for the logout command (provided for backwards
      *     compatibility with mongo shell)
      */
-    virtual void logout(const std::string& dbname, BSONObj& info);
+    void logout(const std::string& dbname, BSONObj& info) override;
 
-    virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
-                                                  Query query = Query(),
-                                                  int nToReturn = 0,
-                                                  int nToSkip = 0,
-                                                  const BSONObj* fieldsToReturn = 0,
-                                                  int queryOptions = 0,
-                                                  int batchSize = 0) {
+    std::unique_ptr<DBClientCursor> query(const std::string& ns,
+                                          Query query = Query(),
+                                          int nToReturn = 0,
+                                          int nToSkip = 0,
+                                          const BSONObj* fieldsToReturn = 0,
+                                          int queryOptions = 0,
+                                          int batchSize = 0) override {
         checkConnection();
         return DBClientBase::query(
             ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
     }
 
-    virtual unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
-                                     const std::string& ns,
-                                     Query query,
-                                     const BSONObj* fieldsToReturn,
-                                     int queryOptions);
+    unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
+                             const std::string& ns,
+                             Query query,
+                             const BSONObj* fieldsToReturn,
+                             int queryOptions) override;
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
@@ -176,11 +176,11 @@ public:
        @return true if this connection is currently in a failed state.  When autoreconnect is on,
                a connection will transition back to an ok state after reconnecting.
      */
-    bool isFailed() const {
+    bool isFailed() const override {
         return _failed;
     }
 
-    bool isStillConnected();
+    bool isStillConnected() override;
 
     void setTags(transport::Session::TagMask tag);
 
@@ -199,7 +199,7 @@ public:
         return _maxWireVersion;
     }
 
-    std::string toString() const {
+    std::string toString() const override {
         std::stringstream ss;
         ss << _serverAddress;
         if (!_resolvedAddress.empty())
@@ -209,29 +209,32 @@ public:
         return ss.str();
     }
 
-    std::string getServerAddress() const {
+    std::string getServerAddress() const override {
         return _serverAddress.toString();
     }
     const HostAndPort& getServerHostAndPort() const {
         return _serverAddress;
     }
 
-    virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
-    virtual bool recv(Message& m, int lastRequestId);
-    virtual void checkResponse(const std::vector<BSONObj>& batch,
-                               bool networkError,
-                               bool* retry = NULL,
-                               std::string* host = NULL);
-    virtual bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer);
-    virtual ConnectionString::ConnectionType type() const {
+    void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0) override;
+    bool recv(Message& m, int lastRequestId) override;
+    void checkResponse(const std::vector<BSONObj>& batch,
+                       bool networkError,
+                       bool* retry = NULL,
+                       std::string* host = NULL) override;
+    bool call(Message& toSend,
+              Message& response,
+              bool assertOk,
+              std::string* actualServer) override;
+    ConnectionString::ConnectionType type() const override {
         return ConnectionString::MASTER;
     }
     void setSoTimeout(double timeout);
-    double getSoTimeout() const {
+    double getSoTimeout() const override {
         return _socketTimeout.value_or(Milliseconds{0}).count() / 1000.0;
     }
 
-    virtual bool lazySupported() const {
+    bool lazySupported() const override {
         return true;
     }
 
@@ -271,7 +274,7 @@ protected:
     bool _isReplicaSetMember = false;
     bool _isMongos = false;
 
-    virtual void _auth(const BSONObj& params);
+    void _auth(const BSONObj& params) override;
 
     transport::SessionHandle _session;
     boost::optional<Milliseconds> _socketTimeout;

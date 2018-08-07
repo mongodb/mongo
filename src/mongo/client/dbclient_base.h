@@ -67,9 +67,35 @@ std::string nsGetDB(const std::string& ns);
 std::string nsGetCollection(const std::string& ns);
 
 /**
+ * This class pre-declares all the "query()" methods for DBClient so the subclasses can mark
+ * them as "final" or "override" as appropriate.
+ */
+class DBClientQueryInterface {
+    virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
+                                                  Query query,
+                                                  int nToReturn = 0,
+                                                  int nToSkip = 0,
+                                                  const BSONObj* fieldsToReturn = 0,
+                                                  int queryOptions = 0,
+                                                  int batchSize = 0) = 0;
+
+    virtual unsigned long long query(stdx::function<void(const BSONObj&)> f,
+                                     const std::string& ns,
+                                     Query query,
+                                     const BSONObj* fieldsToReturn = 0,
+                                     int queryOptions = 0) = 0;
+
+    virtual unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
+                                     const std::string& ns,
+                                     Query query,
+                                     const BSONObj* fieldsToReturn = 0,
+                                     int queryOptions = 0) = 0;
+};
+
+/**
  abstract class that implements the core db operations
  */
-class DBClientBase {
+class DBClientBase : public DBClientQueryInterface {
     MONGO_DISALLOW_COPYING(DBClientBase);
 
 public:
@@ -546,13 +572,13 @@ public:
      @return    cursor.   0 if error (connection failure)
      @throws AssertionException
     */
-    virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
-                                                  Query query,
-                                                  int nToReturn = 0,
-                                                  int nToSkip = 0,
-                                                  const BSONObj* fieldsToReturn = 0,
-                                                  int queryOptions = 0,
-                                                  int batchSize = 0);
+    std::unique_ptr<DBClientCursor> query(const std::string& ns,
+                                          Query query,
+                                          int nToReturn = 0,
+                                          int nToSkip = 0,
+                                          const BSONObj* fieldsToReturn = 0,
+                                          int queryOptions = 0,
+                                          int batchSize = 0) override;
 
 
     /** Uses QueryOption_Exhaust, when available.
@@ -563,17 +589,17 @@ public:
         Use the DBClientCursorBatchIterator version, below, if you want to do items in large
         blocks, perhaps to avoid granular locking and such.
      */
-    virtual unsigned long long query(stdx::function<void(const BSONObj&)> f,
-                                     const std::string& ns,
-                                     Query query,
-                                     const BSONObj* fieldsToReturn = 0,
-                                     int queryOptions = 0);
+    unsigned long long query(stdx::function<void(const BSONObj&)> f,
+                             const std::string& ns,
+                             Query query,
+                             const BSONObj* fieldsToReturn = 0,
+                             int queryOptions = 0) final;
 
-    virtual unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
-                                     const std::string& ns,
-                                     Query query,
-                                     const BSONObj* fieldsToReturn = 0,
-                                     int queryOptions = 0);
+    unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
+                             const std::string& ns,
+                             Query query,
+                             const BSONObj* fieldsToReturn = 0,
+                             int queryOptions = 0) override;
 
 
     /** don't use this - called automatically by DBClientCursor for you
