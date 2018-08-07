@@ -49,8 +49,10 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -184,35 +186,50 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
 
     RecordStore* rs = collection->getRecordStore();
     auto cursor = rs->getCursor(opCtx);
-    while (auto record = cursor->next()) {
-        RecordId id = record->id;
-        RecordData& data = record->data;
-
-        // Use the latest BSON validation version. We retain decimal data when repairing the
-        // database even if decimal is disabled.
-        Status status = validateBSON(data.data(), data.size(), BSONVersion::kLatest);
-        if (!status.isOK()) {
-            log() << "Invalid BSON detected at " << id << ": " << redact(status) << ". Deleting.";
-            cursor->save();  // 'data' is no longer valid.
-            {
-                WriteUnitOfWork wunit(opCtx);
-                rs->deleteRecord(opCtx, id);
-                wunit.commit();
+    auto record = cursor->next();
+    while (record) {
+        opCtx->checkForInterrupt();
+        // Cursor is left one past the end of the batch inside writeConflictRetry
+        auto beginBatchId = record->id;
+        Status status = writeConflictRetry(opCtx, "repairDatabase", cce->ns().ns(), [&] {
+            // In the case of WCE in a partial batch, we need to go back to the beginning
+            if (!record || (beginBatchId != record->id)) {
+                record = cursor->seekExact(beginBatchId);
             }
-            cursor->restore();
-            continue;
-        }
-
-        numRecords++;
-        dataSize += data.size();
-
-        // Now index the record.
-        // TODO SERVER-14812 add a mode that drops duplicates rather than failing
-        WriteUnitOfWork wunit(opCtx);
-        status = indexer->insert(data.releaseToBson(), id);
-        if (!status.isOK())
+            WriteUnitOfWork wunit(opCtx);
+            for (int i = 0; record && i < internalInsertMaxBatchSize.load(); i++) {
+                RecordId id = record->id;
+                RecordData& data = record->data;
+                // Use the latest BSON validation version. We retain decimal data when repairing
+                // database even if decimal is disabled.
+                auto validStatus = validateBSON(data.data(), data.size(), BSONVersion::kLatest);
+                if (!validStatus.isOK()) {
+                    warning() << "Invalid BSON detected at " << id << ": " << redact(validStatus)
+                              << ". Deleting.";
+                    rs->deleteRecord(opCtx, id);
+                } else {
+                    numRecords++;
+                    dataSize += data.size();
+                    auto insertStatus = indexer->insert(data.releaseToBson(), id);
+                    if (!insertStatus.isOK()) {
+                        return insertStatus;
+                    }
+                }
+                record = cursor->next();
+            }
+            cursor->save();  // Can't fail per API definition
+            // When this exits via success or WCE, we need to restore the cursor
+            ON_BLOCK_EXIT([ opCtx, ns = cce->ns().ns(), &cursor ]() {
+                // restore CAN throw WCE per API
+                writeConflictRetry(
+                    opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
+            });
+            wunit.commit();
+            return Status::OK();
+        });
+        if (!status.isOK()) {
             return status;
-        wunit.commit();
+        }
     }
 
     Status status = indexer->doneInserting();
