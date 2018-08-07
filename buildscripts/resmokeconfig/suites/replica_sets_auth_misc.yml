@@ -226,6 +226,7 @@ selector:
   - jstests/replsets/bulk_api_wc.js
   - jstests/replsets/dbcheck.js
   - jstests/replsets/batch_write_command_wc.js
+  - jstests/replsets/transactions_reaped_with_tickets_exhausted.js
 
 executor:
   config:

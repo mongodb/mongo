@@ -679,12 +679,14 @@ Session::OplogSlotReserver::~OplogSlotReserver() {
     }
 }
 
-Session::TxnResources::TxnResources(OperationContext* opCtx) {
+Session::TxnResources::TxnResources(OperationContext* opCtx, bool keepTicket) {
     _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
 
     _locker = opCtx->swapLockState(stdx::make_unique<LockerImpl>());
-    _locker->releaseTicket();
+    if (!keepTicket) {
+        _locker->releaseTicket();
+    }
     _locker->unsetThreadId();
 
     // This thread must still respect the transaction lock timeout, since it can prevent the
@@ -741,7 +743,7 @@ Session::SideTransactionBlock::SideTransactionBlock(OperationContext* opCtx) : _
     if (_opCtx->getWriteUnitOfWork()) {
         // This must be done under the client lock, since we are modifying '_opCtx'.
         stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
-        _txnResources = Session::TxnResources(_opCtx);
+        _txnResources = Session::TxnResources(_opCtx, true /* keepTicket*/);
     }
 }
 
