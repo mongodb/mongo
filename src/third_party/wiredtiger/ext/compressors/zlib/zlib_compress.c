@@ -452,6 +452,7 @@ zlib_add_compressor(
     WT_CONNECTION *connection, bool raw, const char *name, int zlib_level)
 {
 	ZLIB_COMPRESSOR *zlib_compressor;
+	int ret;
 
 	/*
 	 * There are two almost identical zlib compressors: one using raw
@@ -471,8 +472,12 @@ zlib_add_compressor(
 	zlib_compressor->zlib_level = zlib_level;
 
 	/* Load the compressor. */
-	return (connection->add_compressor(
-	    connection, name, (WT_COMPRESSOR *)zlib_compressor, NULL));
+	if ((ret = connection->add_compressor(
+	    connection, name, (WT_COMPRESSOR *)zlib_compressor, NULL)) == 0)
+		return (0);
+
+	free(zlib_compressor);
+	return (ret);
 }
 
 /*

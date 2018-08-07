@@ -34,7 +34,7 @@ decode_key(char *key_buf)
 	return (strtoull(key_buf, NULL, 10));
 }
 
-int
+void
 setup_truncate(WTPERF *wtperf, WTPERF_THREAD *thread, WT_SESSION *session)
 {
 	CONFIG_OPTS *opts;
@@ -42,9 +42,8 @@ setup_truncate(WTPERF *wtperf, WTPERF_THREAD *thread, WT_SESSION *session)
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	WORKLOAD *workload;
 	WT_CURSOR *cursor;
-	char *key;
-	int ret;
 	uint64_t end_point, final_stone_gap, i, start_point;
+	char *key;
 
 	opts = wtperf->opts;
 	end_point = final_stone_gap = start_point = 0;
@@ -52,9 +51,8 @@ setup_truncate(WTPERF *wtperf, WTPERF_THREAD *thread, WT_SESSION *session)
 	workload = thread->workload;
 
 	/* We are limited to only one table when running truncate. */
-	if ((ret = session->open_cursor(
-	    session, wtperf->uris[0], NULL, NULL, &cursor)) != 0)
-		goto err;
+	testutil_check(session->open_cursor(
+	    session, wtperf->uris[0], NULL, NULL, &cursor));
 
 	/*
 	 * If we find the workload getting behind we multiply the number of
@@ -79,18 +77,13 @@ setup_truncate(WTPERF *wtperf, WTPERF_THREAD *thread, WT_SESSION *session)
 	 * data available, then we need to setup some initial truncation
 	 * stones.
 	 */
-	if ((ret = cursor->next(cursor)) != 0 ||
-	    (ret = cursor->get_key(cursor, &key)) != 0) {
-		lprintf(wtperf, ret, 0, "truncate setup start: failed");
-		goto err;
-	}
+	testutil_check(cursor->next(cursor));
+	testutil_check(cursor->get_key(cursor, &key));
 
 	start_point = decode_key(key);
-	if ((cursor->reset(cursor)) != 0 || (ret = cursor->prev(cursor)) != 0 ||
-	    (ret = cursor->get_key(cursor, &key)) != 0) {
-		lprintf(wtperf, ret, 0, "truncate setup end: failed");
-		goto err;
-	}
+	testutil_check(cursor->reset(cursor));
+	testutil_check(cursor->prev(cursor));
+	testutil_check(cursor->get_key(cursor, &key));
 	end_point = decode_key(key);
 
 	/* Assign stones if there are enough documents. */
@@ -119,10 +112,7 @@ setup_truncate(WTPERF *wtperf, WTPERF_THREAD *thread, WT_SESSION *session)
 	}
 	trunc_cfg->stone_gap = final_stone_gap;
 
-err:	if ((ret = cursor->close(cursor)) != 0) {
-		lprintf(wtperf, ret, 0, "truncate setup: cursor close failed");
-	}
-	return (ret);
+	testutil_check(cursor->close(cursor));
 }
 
 int

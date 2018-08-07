@@ -28,7 +28,7 @@ __wt_schema_get_table_uri(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_session_get_dhandle(session, uri, NULL, NULL, flags));
 	table = (WT_TABLE *)session->dhandle;
 	if (!ok_incomplete && !table->cg_complete) {
-		ret = EINVAL;
+		ret = __wt_set_return(session, EINVAL);
 		WT_TRET(__wt_session_release_dhandle(session));
 		WT_ERR_MSG(session, ret, "'%s' cannot be used "
 		    "until all column groups are created",

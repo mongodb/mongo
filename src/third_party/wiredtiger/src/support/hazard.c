@@ -401,6 +401,29 @@ __wt_hazard_count(WT_SESSION_IMPL *session, WT_REF *ref)
 
 #ifdef HAVE_DIAGNOSTIC
 /*
+ * __wt_hazard_check_assert --
+ *	Assert there's no hazard pointer to the page.
+ */
+bool
+__wt_hazard_check_assert(WT_SESSION_IMPL *session, void *ref, bool waitfor)
+{
+	WT_HAZARD *hp;
+	int i;
+
+	for (i = 0;;) {
+		if ((hp = __wt_hazard_check(session, ref)) == NULL)
+			return (true);
+		if (!waitfor || ++i > 100)
+			break;
+		__wt_sleep(0, 10000);
+	}
+	__wt_errx(session,
+	    "hazard pointer reference to discarded object: (%p: %s, line %d)",
+	    (void *)hp->ref, hp->file, hp->line);
+	return (false);
+}
+
+/*
  * __hazard_dump --
  *	Display the list of hazard pointers.
  */

@@ -55,11 +55,11 @@ extern "C" {
 
 #define THROTTLE_PER_SEC  20     // times per sec we will throttle
 
-#define MIN(a, b)		((a) < (b) ? (a) : (b))
-#define MAX(a, b)		((a) < (b) ? (b) : (a))
-#define TIMESPEC_DOUBLE(ts)	((double)(ts).tv_sec + ts.tv_nsec * 0.000000001)
-#define PCT(n, total)		((total) == 0 ? 0 : ((n) * 100) / (total))
-#define OPS_PER_SEC(ops, ts)	(int) ((ts) == 0 ? 0.0 : \
+#define MIN(a, b)        ((a) < (b) ? (a) : (b))
+#define MAX(a, b)        ((a) < (b) ? (b) : (a))
+#define TIMESPEC_DOUBLE(ts)    ((double)(ts).tv_sec + ts.tv_nsec * 0.000000001)
+#define PCT(n, total)        ((total) == 0 ? 0 : ((n) * 100) / (total))
+#define OPS_PER_SEC(ops, ts)    (int) ((ts) == 0 ? 0.0 : \
     (ops) / TIMESPEC_DOUBLE(ts))
 
 // Get the value of a STL container, even if it is not present
@@ -345,7 +345,7 @@ int Monitor::run() {
                 << std::endl;
 
         if (_json != NULL) {
-#define	WORKGEN_TIMESTAMP_JSON		"%Y-%m-%dT%H:%M:%S.000Z"
+#define    WORKGEN_TIMESTAMP_JSON        "%Y-%m-%dT%H:%M:%S.000Z"
             (void)strftime(time_buf, sizeof(time_buf),
               WORKGEN_TIMESTAMP_JSON, tm);
 
@@ -598,7 +598,7 @@ void ThreadRunner::op_create_all(Operation *op, size_t &keysize,
 }
 
 
-#define	PARETO_SHAPE	1.5
+#define    PARETO_SHAPE    1.5
 
 // Return a value within the interval [ 0, recno_max )
 // that is weighted toward lower numbers with pareto_param at 0 (the minimum),
@@ -653,7 +653,7 @@ uint64_t ThreadRunner::op_get_key_recno(Operation *op, uint64_t range,
     if (recno_count == 0)
         // The file has no entries, returning 0 forces a WT_NOTFOUND return.
         return (0);
-    rval = workgen_random(_rand_state);
+    rval = random_value();
     if (op->_key._keytype == Key::KEYGEN_PARETO)
         rval = pareto_calculation(rval, recno_count, op->_key._pareto);
     return (rval % recno_count + 1);  // recnos are one-based.
@@ -742,13 +742,12 @@ int ThreadRunner::op_run(Operation *op) {
         _in_transaction = true;
     }
     if (op->_optype != Operation::OP_NONE) {
-        op->kv_gen(true, 0, recno, _keybuf);
+        op->kv_gen(this, true, 100, recno, _keybuf);
         cursor->set_key(cursor, _keybuf);
         if (OP_HAS_VALUE(op)) {
-            uint32_t r = 0;
-            if (op->_table.options.random_value)
-                r = workgen_random(_rand_state);
-            op->kv_gen(false, r, recno, _valuebuf);
+            uint64_t compressibility = op->_table.options.random_value ?
+                0 : op->_table.options.value_compressibility;
+            op->kv_gen(this, false, compressibility, recno, _valuebuf);
             cursor->set_value(cursor, _valuebuf);
         }
         switch (op->_optype) {
@@ -806,6 +805,18 @@ std::string ThreadRunner::get_debug() {
 }
 #endif
 
+uint32_t ThreadRunner::random_value() {
+    return (workgen_random(_rand_state));
+}
+
+// Generate a random 32-bit value then return a float value equally distributed
+// between -1.0 and 1.0.
+float ThreadRunner::random_signed() {
+    uint32_t r = random_value();
+    int sign = ((r & 0x1) == 0 ? 1 : -1);
+    return (((float)r * sign) / UINT32_MAX);
+}
+
 Throttle::Throttle(ThreadRunner &runner, double throttle,
     double throttle_burst) : _runner(runner), _throttle(throttle),
     _burst(throttle_burst), _next_div(), _ops_delta(0), _ops_prev(0),
@@ -816,13 +827,6 @@ Throttle::Throttle(ThreadRunner &runner, double throttle,
 }
 
 Throttle::~Throttle() {}
-
-// Given a random 32-bit value, return a float value equally distributed
-// between -1.0 and 1.0.
-static float rand_signed(uint32_t r) {
-    int sign = ((r & 0x1) == 0 ? 1 : -1);
-    return (((float)r * sign) / UINT32_MAX);
-}
 
 // Each time throttle is called, we sleep and return a number of operations to
 // perform next.  To implement this we keep a time calculation in _next_div set
@@ -851,8 +855,7 @@ int Throttle::throttle(uint64_t op_count, uint64_t *op_limit) {
         _ops_delta += (op_count - _ops_prev);
         if (now < _next_div) {
             sleep_ms = ts_ms(_next_div - now);
-            sleep_ms += (_ms_per_div * _burst *
-              rand_signed(workgen_random(_runner._rand_state)));
+            sleep_ms += (_ms_per_div * _burst * _runner.random_signed());
             if (sleep_ms > 0) {
                 DEBUG_CAPTURE(_runner, ", sleep=" << sleep_ms);
                 usleep((useconds_t)ms_to_us(sleep_ms));
@@ -1066,10 +1069,6 @@ void Operation::kv_compute_max(bool iskey, bool has_random) {
     if (has_random) {
         if (iskey)
             THROW("Random keys not allowed");
-        size -= RANDOMIZER_SIZE;
-        if (size < 1)
-            THROW("Value.size with random values too small for table '"
-              << _table._uri << "'");
     }
 
     if (size > 1)
@@ -1096,8 +1095,8 @@ void Operation::kv_size_buffer(bool iskey, size_t &maxsize) const {
     }
 }
 
-void Operation::kv_gen(bool iskey, uint32_t randomizer, uint64_t n,
-  char *result) const {
+void Operation::kv_gen(ThreadRunner *runner, bool iskey,
+  uint64_t compressibility, uint64_t n, char *result) const {
     uint64_t max;
     int size;
 
@@ -1106,13 +1105,40 @@ void Operation::kv_gen(bool iskey, uint32_t randomizer, uint64_t n,
     if (n > max)
         THROW((iskey ? "Key" : "Value") << " (" << n
           << ") too large for size (" << size << ")");
-    if (randomizer != 0) {
-        randomizer %= 1000;
-        snprintf(result, 6, ":%3.3d:", randomizer);
-        n -= RANDOMIZER_SIZE;
-        result += RANDOMIZER_SIZE;
-    }
+    /* Setup the buffer, defaulting to zero filled. */
     workgen_u64_to_string_zf(n, result, size);
+
+    /*
+     * Compressibility is a percentage, 100 is all zeroes, it applies to the
+     * proportion of the value that can't be used for the identifier.
+     */
+    if (size > 20 && compressibility < 100) {
+        static const char alphanum[] =
+          "0123456789"
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+          "abcdefghijklmnopqrstuvwxyz";
+        /*
+         * The random length is the proportion of the string that should not
+         * be compressible. As an example a compressibility of 25 in a value
+         * of length 100 should be:
+         * 100 - ((100 * 25) / 100) = 75
+         * That means that 75% of the string will be random numbers, and 25
+         * will be easily compressible zero-fill.
+         */
+        uint64_t random_len = size - ((size * compressibility) / 100);
+
+        /* Never overwrite the record number identifier */
+        if (random_len > size - 20)
+            random_len = size - 20;
+
+        for (int i = 0; i < random_len; ++i)
+            /*
+             * TODO: It'd be nice to use workgen_rand here, but this class
+             * is without the context of a runner thread, so it's not easy
+             * to get access to a state.
+             */
+            result[i] = alphanum[runner->random_value() % (sizeof(alphanum) - 1)];
+    }
 }
 
 void Operation::size_check() const {
@@ -1436,18 +1462,21 @@ void Stats::track_latency(bool latency) {
 }
 
 TableOptions::TableOptions() : key_size(0), value_size(0),
-    random_value(false), range(0), _options() {
+    value_compressibility(100), random_value(false), range(0), _options() {
     _options.add_int("key_size", key_size,
       "default size of the key, unless overridden by Key.size");
     _options.add_int("value_size", value_size,
       "default size of the value, unless overridden by Value.size");
     _options.add_bool("random_value", random_value,
       "generate random content for the value");
+    _options.add_bool("value_compressibility", value_compressibility,
+      "How compressible the generated value should be");
     _options.add_int("range", range,
       "if zero, keys are inserted at the end and reads/updates are in the current range, if non-zero, inserts/reads/updates are at a random key between 0 and the given range");
 }
 TableOptions::TableOptions(const TableOptions &other) :
     key_size(other.key_size), value_size(other.value_size),
+    value_compressibility(other.value_compressibility),
     random_value(other.random_value), range(other.range),
     _options(other._options) {}
 TableOptions::~TableOptions() {}

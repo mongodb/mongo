@@ -235,7 +235,7 @@ __rebalance_col_walk(
 			    unpack.type == WT_CELL_ADDR_LEAF ?
 			    WT_ADDR_LEAF : WT_ADDR_LEAF_NO, rs));
 			break;
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE_ERR(session, unpack.type);
 		}
 	}
 
@@ -386,7 +386,7 @@ __rebalance_row_walk(
 
 			first_cell = false;
 			break;
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE_ERR(session, unpack.type);
 		}
 	}
 
@@ -440,7 +440,7 @@ __wt_bt_rebalance(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(
 		    __rebalance_col_walk(session, btree->root.page->dsk, rs));
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
+	WT_ILLEGAL_VALUE_ERR(session, rs->type);
 	}
 
 	/* Build a new root page. */

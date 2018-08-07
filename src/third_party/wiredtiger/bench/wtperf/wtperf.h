@@ -268,7 +268,7 @@ int	 run_truncate(
 	    WTPERF *, WTPERF_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(WTPERF *);
 void	 setup_throttle(WTPERF_THREAD *);
-int	 setup_truncate(WTPERF *, WTPERF_THREAD *, WT_SESSION *);
+void	 setup_truncate(WTPERF *, WTPERF_THREAD *, WT_SESSION *);
 void	 start_idle_table_cycle(WTPERF *, wt_thread_t *);
 void	 stop_idle_table_cycle(WTPERF *, wt_thread_t);
 void	 worker_throttle(WTPERF_THREAD *);

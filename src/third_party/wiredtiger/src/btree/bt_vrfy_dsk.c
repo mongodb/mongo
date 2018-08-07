@@ -166,7 +166,7 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 	case WT_PAGE_BLOCK_MANAGER:
 	case WT_PAGE_OVFL:
 		return (__verify_dsk_chunk(session, tag, dsk, dsk->u.datalen));
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE(session, dsk->type);
 	}
 	/* NOTREACHED */
 }

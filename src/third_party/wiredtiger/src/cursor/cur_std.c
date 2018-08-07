@@ -835,7 +835,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
  * __wt_cursor_close --
  *	WT_CURSOR->close default implementation.
  */
-int
+void
 __wt_cursor_close(WT_CURSOR *cursor)
 {
 	WT_SESSION_IMPL *session;
@@ -854,7 +854,6 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_free(session, cursor->internal_uri);
 	__wt_free(session, cursor->uri);
 	__wt_overwrite_and_free(session, cursor);
-	return (0);
 }
 
 /*

@@ -27,9 +27,10 @@ extern void __wt_stream_set_no_buffer(FILE *fp) WT_GCC_FUNC_DECL_ATTRIBUTE((visi
 extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern int __wt_vsnprintf_len_incr(char *buf, size_t size, size_t *retsizep, const char *fmt, va_list ap) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t *tid) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_thread_id(uintmax_t *id) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern int __wt_thread_str(char *buf, size_t buflen) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern uintmax_t __wt_process_id(void);
 extern void __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp);
+extern int __wt_localtime(WT_SESSION_IMPL *session, const time_t *timep, struct tm *result) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_yield(void) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));

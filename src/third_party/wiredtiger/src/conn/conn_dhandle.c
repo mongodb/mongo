@@ -47,7 +47,7 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
 	if ((ret =
 	    __wt_metadata_search(session, dhandle->name, &metaconf)) != 0) {
 		if (ret == WT_NOTFOUND)
-			ret = ENOENT;
+			ret = __wt_set_return(session, ENOENT);
 		WT_RET(ret);
 	}
 
@@ -140,10 +140,11 @@ __wt_conn_dhandle_alloc(
 		dhandle->type = WT_DHANDLE_TYPE_BTREE;
 	} else if (WT_PREFIX_MATCH(uri, "table:")) {
 		WT_RET(__wt_calloc_one(session, &table));
-		dhandle = &table->iface;
+		dhandle = (WT_DATA_HANDLE *)table;
 		dhandle->type = WT_DHANDLE_TYPE_TABLE;
 	} else
-		return (__wt_illegal_value(session, NULL));
+		WT_PANIC_RET(session, EINVAL,
+		    "illegal handle allocation URI %s", uri);
 
 	/* Btree handles keep their data separate from the interface. */
 	if (dhandle->type == WT_DHANDLE_TYPE_BTREE) {
@@ -703,7 +704,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, bool final)
 	/* Check if the handle was reacquired by a session while we waited. */
 	if (!final &&
 	    (dhandle->session_inuse != 0 || dhandle->session_ref != 0))
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket);
 	return (0);

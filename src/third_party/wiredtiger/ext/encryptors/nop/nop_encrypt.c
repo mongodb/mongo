@@ -168,6 +168,7 @@ int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	NOP_ENCRYPTOR *nop_encryptor;
+	int ret;
 
 	(void)config;				/* Unused parameters */
 
@@ -189,7 +190,11 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	nop_encryptor->wt_api = connection->get_extension_api(connection);
 
 						/* Load the encryptor */
-	return (connection->add_encryptor(
-	    connection, "nop", (WT_ENCRYPTOR *)nop_encryptor, NULL));
+	if ((ret = connection->add_encryptor(
+	    connection, "nop", (WT_ENCRYPTOR *)nop_encryptor, NULL)) == 0)
+		return (0);
+
+	free(nop_encryptor);
+	return (ret);
 }
 /*! [WT_ENCRYPTOR initialization function] */

@@ -414,24 +414,41 @@ restart:		/*
 				empty_internal = false;
 			}
 
-			/*
-			 * Optionally return internal pages. Swap our previous
-			 * hazard pointer for the page we'll return. We don't
-			 * handle restart or not-found returns, it would require
-			 * additional complexity and is not a possible return:
-			 * we're moving to the parent of the current child page,
-			 * the parent can't have been evicted.
-			 */
-			if (!LF_ISSET(WT_READ_SKIP_INTL)) {
-				WT_ERR(__wt_page_swap(
-				    session, couple, ref, flags));
-				couple = NULL;
-				*refp = ref;
-				goto done;
-			}
-
 			/* Encourage races. */
 			__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_8);
+
+			/* Optionally return internal pages. */
+			if (LF_ISSET(WT_READ_SKIP_INTL))
+				continue;
+
+			for (;;) {
+				/*
+				 * Swap our previous hazard pointer for the page
+				 * we'll return.
+				 *
+				 * Not-found is an expected return, as eviction
+				 * might have been attempted. The page can't be
+				 * evicted, we're holding a hazard pointer on a
+				 * child, spin until we're successful.
+				 *
+				 * Restart is not expected, our parent WT_REF
+				 * should not have split.
+				 */
+				ret = __wt_page_swap(session,
+				    couple, ref, WT_READ_NOTFOUND_OK | flags);
+				if (ret == 0) {
+					/* Success, "couple" released. */
+					couple = NULL;
+					*refp = ref;
+					goto done;
+				}
+
+				 WT_ASSERT(session, ret == WT_NOTFOUND);
+				 WT_ERR_NOTFOUND_OK(ret);
+
+				__wt_spin_backoff(&yield_count, &sleep_usecs);
+			}
+			/* NOTREACHED */
 		}
 
 		if (prev)

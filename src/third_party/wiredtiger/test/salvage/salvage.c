@@ -97,7 +97,6 @@ main(int argc, char *argv[])
 			return (usage());
 		}
 	argc -= __wt_optind;
-	argv += __wt_optind;
 	if (argc != 0)
 		return (usage());
 
@@ -670,7 +669,7 @@ empty(int cnt)
 
 	if (page_type == WT_PAGE_COL_FIX)
 		for (i = 0; i < cnt; ++i)
-			fputs("\\00\n", res_fp);
+			CHECK(fputs("\\00\n", res_fp));
 }
 
 /*

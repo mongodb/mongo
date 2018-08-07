@@ -72,7 +72,7 @@ __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 	if (handle->fh_extend != NULL)
 		return (handle->fh_extend(
 		    handle, (WT_SESSION *)session, offset));
-	return (ENOTSUP);
+	return (__wt_set_return(session, ENOTSUP));
 }
 
 /*
@@ -157,7 +157,7 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 	if (handle->fh_truncate != NULL)
 		return (handle->fh_truncate(
 		    handle, (WT_SESSION *)session, offset));
-	return (ENOTSUP);
+	return (__wt_set_return(session, ENOTSUP));
 }
 
 /*

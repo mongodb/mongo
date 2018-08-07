@@ -120,7 +120,7 @@ ops_start(SHARED_CONFIG *cfg)
 
 	/* Wait for the threads. */
 	for (i = 0; i < cfg->reverse_scanners + cfg->append_inserters; ++i)
-		testutil_check(__wt_thread_join(NULL, tids[i]));
+		testutil_check(__wt_thread_join(NULL, &tids[i]));
 
 	(void)gettimeofday(&stop, NULL);
 	seconds = (stop.tv_sec - start.tv_sec) +

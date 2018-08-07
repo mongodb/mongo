@@ -21,12 +21,15 @@ __wt_optrack_record_funcid(
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	wt_off_t fsize;
+	bool locked;
 
 	conn = S2C(session);
+	locked = false;
 
 	WT_ERR(__wt_scr_alloc(session, strlen(func) + 32, &tmp));
 
 	__wt_spin_lock(session, &conn->optrack_map_spinlock);
+	locked = true;
 	if (*func_idp == 0) {
 		*func_idp = ++optrack_uid;
 
@@ -38,10 +41,12 @@ __wt_optrack_record_funcid(
 	}
 
 	if (0) {
-err:		WT_PANIC_MSG(session, ret, "%s", __func__);
+err:		WT_PANIC_MSG(session, ret,
+		    "operation tracking initialization failure");
 	}
 
-	__wt_spin_unlock(session, &conn->optrack_map_spinlock);
+	if (locked)
+		__wt_spin_unlock(session, &conn->optrack_map_spinlock);
 	__wt_scr_free(session, &tmp);
 }
 
@@ -61,8 +66,7 @@ __optrack_open_file(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	if (!F_ISSET(conn, WT_CONN_OPTRACK))
-		WT_RET_MSG(session, WT_ERROR,
-		    "%s: WT_CONN_OPTRACK not set", __func__);
+		WT_RET_MSG(session, WT_ERROR, "WT_CONN_OPTRACK not set");
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_filename_construct(session, conn->optrack_path,

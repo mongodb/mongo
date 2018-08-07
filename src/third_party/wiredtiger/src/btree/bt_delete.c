@@ -209,9 +209,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 		case WT_REF_LIMBO:
 		case WT_REF_LOOKASIDE:
 		case WT_REF_READING:
-		default:
-			return (__wt_illegal_value(session,
-			    "illegal WT_REF.state rolling back deleted page"));
+		WT_ILLEGAL_VALUE(session, current_state);
 		}
 
 		if (locked)

@@ -47,3 +47,17 @@ __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp)
 	NO TIME-OF-DAY IMPLEMENTATION: see src/os_posix/os_time.c
 #endif
 }
+
+/*
+ * __wt_localtime --
+ *	Return the current local broken-down time.
+ */
+int
+__wt_localtime(WT_SESSION_IMPL *session, const time_t *timep, struct tm *result)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+	if (localtime_r(timep, result) != NULL)
+		return (0);
+
+	WT_RET_MSG(session, __wt_errno(), "localtime_r");
+}

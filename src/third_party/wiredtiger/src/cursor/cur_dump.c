@@ -337,16 +337,17 @@ __curdump_close(WT_CURSOR *cursor)
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
-
 	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
+err:
+
 	if (child != NULL)
 		WT_TRET(child->close(child));
 	/* We shared the child's URI. */
 	cursor->internal_uri = NULL;
 	__wt_json_close(session, cursor);
-	WT_TRET(__wt_cursor_close(cursor));
+	__wt_cursor_close(cursor);
 
-err:	API_END_RET(session, ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -389,7 +390,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	session = (WT_SESSION_IMPL *)child->session;
 
 	WT_RET(__wt_calloc_one(session, &cdump));
-	cursor = &cdump->iface;
+	cursor = (WT_CURSOR *)cdump;
 	*cursor = iface;
 	cursor->session = child->session;
 	cursor->internal_uri = child->internal_uri;

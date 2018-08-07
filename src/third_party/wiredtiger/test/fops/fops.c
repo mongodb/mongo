@@ -69,7 +69,7 @@ fop_start(u_int nthreads)
 
 	/* Wait for the threads. */
 	for (i = 0; i < nthreads; ++i)
-		testutil_check(__wt_thread_join(NULL, tids[i]));
+		testutil_check(__wt_thread_join(NULL, &tids[i]));
 
 	(void)gettimeofday(&stop, NULL);
 	seconds = (stop.tv_sec - start.tv_sec) +

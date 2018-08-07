@@ -238,7 +238,7 @@ if __name__ == '__main__':
     tests = unittest.TestSuite()
 
     # Turn numbers and ranges into test module names
-    preserve = timestamp = debug = dryRun = gdbSub = longtest = False
+    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = False
     parallel = 0
     configfile = None
     configwrite = False
@@ -268,6 +268,9 @@ if __name__ == '__main__':
                 continue
             if option == '-gdb' or option == 'g':
                 gdbSub = True
+                continue
+            if option == '-lldb':
+                lldbSub = True
                 continue
             if option == '-help' or option == 'h':
                 usage()
@@ -323,7 +326,7 @@ if __name__ == '__main__':
 
     # All global variables should be set before any test classes are loaded.
     # That way, verbose printing can be done at the class definition level.
-    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub,
+    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, lldbSub,
                                           verbose, wt_builddir, dirarg,
                                           longtest)
 

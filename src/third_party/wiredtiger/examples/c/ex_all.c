@@ -1356,8 +1356,9 @@ main(int argc, char *argv[])
 	const char *buffer = "some string";
 	size_t len = strlen(buffer);
 	/*! [Checksum a buffer] */
-	uint32_t crc32c;
-	crc32c = wiredtiger_checksum_crc32c(buffer, len);
+	uint32_t crc32c, (*func)(const void *, size_t);
+	func = wiredtiger_crc32c_func();
+	crc32c = func(buffer, len);
 	/*! [Checksum a buffer] */
 	(void)crc32c;
 	}

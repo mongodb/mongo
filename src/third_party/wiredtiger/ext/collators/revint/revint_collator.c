@@ -80,9 +80,10 @@ revint_compare(WT_COLLATOR *collator,
 	 * when comparing primary keys.
 	 */
 	if ((ret = wt_api->unpack_start(
-	    wt_api, session, "ii", k1->data, k1->size, &pstream)) != 0 ||
-	    (ret = wt_api->unpack_int(wt_api, pstream, &i1)) != 0)
+	    wt_api, session, "ii", k1->data, k1->size, &pstream)) != 0)
 		return (ret);
+	if ((ret = wt_api->unpack_int(wt_api, pstream, &i1)) != 0)
+		goto err;
 	if ((ret = wt_api->unpack_int(wt_api, pstream, &p1)) != 0)
 		/* A missing primary key is OK and sorts first. */
 		p1 = INT64_MIN;
@@ -91,9 +92,12 @@ revint_compare(WT_COLLATOR *collator,
 
 	/* Unpack the second pair of numbers. */
 	if ((ret = wt_api->unpack_start(
-	    wt_api, session, "ii", k2->data, k2->size, &pstream)) != 0 ||
-	    (ret = wt_api->unpack_int(wt_api, pstream, &i2)) != 0)
+	    wt_api, session, "ii", k2->data, k2->size, &pstream)) != 0)
 		return (ret);
+	if ((ret = wt_api->unpack_int(wt_api, pstream, &i2)) != 0) {
+err:		(void)wt_api->pack_close(wt_api, pstream, NULL);
+		return (ret);
+	}
 	if ((ret = wt_api->unpack_int(wt_api, pstream, &p2)) != 0)
 		/* A missing primary key is OK and sorts first. */
 		p2 = INT64_MIN;
@@ -138,6 +142,7 @@ int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	REVINT_COLLATOR *revint_collator;
+	int ret;
 
 	(void)config;				/* Unused parameters */
 
@@ -148,6 +153,10 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	revint_collator->collator.terminate = revint_terminate;
 	revint_collator->wt_api = connection->get_extension_api(connection);
 
-	return (connection->add_collator(
-	    connection, "revint", &revint_collator->collator, NULL));
+	if ((ret = connection->add_collator(
+	    connection, "revint", (WT_COLLATOR *)revint_collator, NULL)) == 0)
+		return (0);
+
+	free(revint_collator);
+	return (ret);
 }

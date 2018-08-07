@@ -1832,6 +1832,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "checkpoint",		WT_VERB_CHECKPOINT },
 		{ "checkpoint_progress",WT_VERB_CHECKPOINT_PROGRESS },
 		{ "compact",		WT_VERB_COMPACT },
+		{ "error_returns",      WT_VERB_ERROR_RETURNS },
 		{ "evict",		WT_VERB_EVICT },
 		{ "evict_stuck",	WT_VERB_EVICT_STUCK },
 		{ "evictserver",	WT_VERB_EVICTSERVER },
@@ -2025,7 +2026,6 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "split_6",		WT_TIMING_STRESS_SPLIT_6 },
 		{ "split_7",		WT_TIMING_STRESS_SPLIT_7 },
 		{ "split_8",		WT_TIMING_STRESS_SPLIT_8 },
-		{ "split_9",		WT_TIMING_STRESS_SPLIT_9 },
 		{ NULL, 0 }
 	};
 	WT_CONFIG_ITEM cval, sval;
@@ -2749,16 +2749,4 @@ err:	/* Discard the scratch buffers. */
 	}
 
 	return (ret);
-}
-
-/*
- * wiredtiger_checksum_crc32c --
- *	CRC32C checksum function entry point.
- */
-uint32_t
-wiredtiger_checksum_crc32c(const void *buffer, size_t len)
-{
-	if (__wt_process.checksum == NULL)
-		__wt_checksum_init();
-	return (__wt_process.checksum(buffer, len));
 }

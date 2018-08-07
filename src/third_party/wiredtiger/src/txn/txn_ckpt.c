@@ -1896,7 +1896,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	if (btree->modified && !bulk &&
 	    S2C(session)->txn_global.has_stable_timestamp &&
 	    !__wt_btree_immediately_durable(session))
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	/*
 	 * Turn on metadata tracking if:

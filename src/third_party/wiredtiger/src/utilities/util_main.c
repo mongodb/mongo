@@ -11,7 +11,7 @@
 const char *home = ".";				/* Home directory */
 const char *progname;				/* Program name */
 						/* Global arguments */
-const char *usage_prefix = "[-LRVv] [-C config] [-E secretkey] [-h home]";
+const char *usage_prefix = "[-LRSVv] [-C config] [-E secretkey] [-h home]";
 bool verbose = false;				/* Verbose flag */
 
 static const char *command;			/* Command name */
@@ -19,6 +19,7 @@ static const char *command;			/* Command name */
 #define	REC_ERROR	"log=(recover=error)"
 #define	REC_LOGOFF	"log=(enabled=false)"
 #define	REC_RECOVER	"log=(recover=on)"
+#define	REC_SALVAGE	"log=(recover=salvage)"
 
 static void
 usage(void)
@@ -70,7 +71,7 @@ main(int argc, char *argv[])
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
 	const char *cmd_config, *config, *p1, *p2, *p3, *rec_config;
 	char *p, *secretkey;
-	bool logoff, needconn, recover;
+	bool logoff, needconn, recover, salvage;
 
 	conn = NULL;
 	p = NULL;
@@ -105,9 +106,9 @@ main(int argc, char *argv[])
 	 * needed, the user can specify -R to run recovery.
 	 */
 	rec_config = REC_ERROR;
-	logoff = recover = false;
+	logoff = recover = salvage = false;
 	/* Check for standard options. */
-	while ((ch = __wt_getopt(progname, argc, argv, "C:E:h:LRVv")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "C:E:h:LRSVv")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			cmd_config = __wt_optarg;
@@ -131,6 +132,10 @@ main(int argc, char *argv[])
 			rec_config = REC_RECOVER;
 			recover = true;
 			break;
+		case 'S':			/* salvage */
+			rec_config = REC_SALVAGE;
+			salvage = true;
+			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
 			goto done;
@@ -142,8 +147,9 @@ main(int argc, char *argv[])
 			usage();
 			goto err;
 		}
-	if (logoff && recover) {
-		fprintf(stderr, "Only one of -L and -R is allowed.\n");
+	if ((logoff && recover) || (logoff && salvage) ||
+	    (recover && salvage)) {
+		fprintf(stderr, "Only one of -L, -R, and -S is allowed.\n");
 		goto err;
 	}
 	argc -= __wt_optind;

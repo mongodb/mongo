@@ -48,7 +48,7 @@
 	WT_TRACK_OP_INIT(s);						\
 	WT_SINGLE_THREAD_CHECK_START(s);				\
 	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
-	/* Reset wait time if this isn't an API re entry. */		\
+	/* Reset wait time if this isn't an API reentry. */		\
 	if (__oldname == NULL)						\
 		(s)->cache_wait_us = 0;					\
 	__wt_verbose((s), WT_VERB_API, "%s", "CALL: " #h ":" #n)

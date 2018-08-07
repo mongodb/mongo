@@ -393,7 +393,7 @@ __win_file_set_end(
 
 	if (SetEndOfFile(win_fh->filehandle_secondary) == FALSE) {
 		if (GetLastError() == ERROR_USER_MAPPED_FILE)
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 		windows_error = __wt_getlasterror();
 		ret = __wt_map_windows_error(windows_error);
 		__wt_err(session, ret,

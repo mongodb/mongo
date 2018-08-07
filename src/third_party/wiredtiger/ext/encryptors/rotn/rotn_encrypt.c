@@ -479,7 +479,11 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		return (ret);
 	}
 						/* Load the encryptor */
-	return (connection->add_encryptor(
-	    connection, "rotn", (WT_ENCRYPTOR *)rotn_encryptor, NULL));
+	if ((ret = connection->add_encryptor(
+	    connection, "rotn", (WT_ENCRYPTOR *)rotn_encryptor, NULL)) == 0)
+		return (0);
+
+	free(rotn_encryptor);
+	return (ret);
 }
 /*! [WT_ENCRYPTOR initialization function] */

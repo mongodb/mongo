@@ -26,9 +26,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "wt_internal.h"
+#include <inttypes.h>
+#include <stddef.h>
 
-#if defined(__linux__) && defined(HAVE_CRC32_HARDWARE)
+/*
+ * The checksum code doesn't include WiredTiger configuration or include files.
+ * This means the HAVE_NO_CRC32_HARDWARE #define isn't configurable as part of
+ * standalone WiredTiger configuration, there's no way to turn off the checksum
+ * hardware.
+ */
+#if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
 #include <asm/hwcap.h>
 #include <sys/auxv.h>
 
@@ -84,23 +91,27 @@ __wt_checksum_hw(const void *chunk, size_t len)
 }
 #endif
 
+extern uint32_t __wt_checksum_sw(const void *chunk, size_t len);
+#if defined(__GNUC__)
+extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
+    __attribute__((visibility("default")));
+#else
+extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
+#endif
+
 /*
- * __wt_checksum_init --
- *	WiredTiger: detect CRC hardware and set the checksum function.
+ * wiredtiger_crc32c_func --
+ *	WiredTiger: detect CRC hardware and return the checksum function.
  */
-void
-__wt_checksum_init(void)
-    WT_GCC_FUNC_ATTRIBUTE((cold))
+uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 {
-#if defined(__linux__) && defined(HAVE_CRC32_HARDWARE)
+#if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
 	unsigned long caps = getauxval(AT_HWCAP);
 
 	if (caps & HWCAP_CRC32)
-		__wt_process.checksum = __wt_checksum_hw;
-	else
-		__wt_process.checksum = __wt_checksum_sw;
-
+		return (__wt_checksum_hw);
+	return (__wt_checksum_sw);
 #else
-	__wt_process.checksum = __wt_checksum_sw;
+	return (__wt_checksum_sw);
 #endif
 }

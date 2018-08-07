@@ -311,7 +311,7 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 		ret = __wt_lsm_tree_close_all(session);
 
 		WT_TRET(__wt_thread_join(
-		    session, manager->lsm_worker_cookies[0].tid));
+		    session, &manager->lsm_worker_cookies[0].tid));
 
 		/* Release memory from any operations left on the queue. */
 		while ((current = TAILQ_FIRST(&manager->switchqh)) != NULL) {

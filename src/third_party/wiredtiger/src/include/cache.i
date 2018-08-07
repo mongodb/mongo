@@ -220,9 +220,9 @@ __wt_cache_update_lookaside_score(
 	global_score = cache->evict_lookaside_score;
 
 	if (score > global_score && global_score < 100)
-		__wt_atomic_addi32(&cache->evict_lookaside_score, 1);
+		(void)__wt_atomic_addi32(&cache->evict_lookaside_score, 1);
 	else if (score < global_score && global_score > 0)
-		__wt_atomic_subi32(&cache->evict_lookaside_score, 1);
+		(void)__wt_atomic_subi32(&cache->evict_lookaside_score, 1);
 }
 
 /*

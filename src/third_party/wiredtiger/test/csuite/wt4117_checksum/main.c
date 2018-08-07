@@ -44,65 +44,51 @@ static void
 run(void)
 {
 	size_t len;
-	uint32_t crc32c;
+	uint32_t crc32c, (*func)(const void *, size_t);
 	uint8_t *data;
 
 	/* Allocate aligned memory for the data. */
 	data = dcalloc(100, sizeof(uint8_t));
 
+	/* Get a pointer to the CRC32C function. */
+	func = wiredtiger_crc32c_func();
+
 	/*
 	 * Some simple known checksums.
 	 */
 	len = 1;
-	crc32c = wiredtiger_checksum_crc32c(data, len);
+	crc32c = func(data, len);
 	check(crc32c, (uint32_t)0x527d5351, len, "nul x1");
 
 	len = 2;
-	crc32c = wiredtiger_checksum_crc32c(data, len);
+	crc32c = func(data, len);
 	check(crc32c, (uint32_t)0xf16177d2, len, "nul x2");
 
 	len = 3;
-	crc32c = wiredtiger_checksum_crc32c(data, len);
+	crc32c = func(data, len);
 	check(crc32c, (uint32_t)0x6064a37a, len, "nul x3");
 
 	len = 4;
-	crc32c = wiredtiger_checksum_crc32c(data, len);
+	crc32c = func(data, len);
 	check(crc32c, (uint32_t)0x48674bc7, len, "nul x4");
 
 	len = strlen("123456789");
 	memcpy(data, "123456789", len);
-	crc32c = wiredtiger_checksum_crc32c(data, len);
+	crc32c = func(data, len);
 	check(crc32c, (uint32_t)0xe3069283, len, "known string #1");
 
 	len = strlen("The quick brown fox jumps over the lazy dog");
 	memcpy(data, "The quick brown fox jumps over the lazy dog", len);
-	crc32c = wiredtiger_checksum_crc32c(data, len);
+	crc32c = func(data, len);
 	check(crc32c, (uint32_t)0x22620404, len, "known string #2");
 
 	free(data);
 }
 
 int
-main(int argc, char *argv[])
+main(void)
 {
-	TEST_OPTS *opts, _opts;
-
-	opts = &_opts;
-	memset(opts, 0, sizeof(*opts));
-	testutil_check(testutil_parse_opts(argc, argv, opts));
-	testutil_make_work_dir(opts->home);
-
-	/*
-	 * The external API should work before the library configures itself,
-	 * run before and after calling wiredtiger_open().
-	 */
 	run();
 
-	testutil_check(
-	    wiredtiger_open(opts->home, NULL, "create", &opts->conn));
-
-	run();
-
-	testutil_cleanup(opts);
 	return (EXIT_SUCCESS);
 }

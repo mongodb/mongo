@@ -31,8 +31,7 @@ util_alter(WT_SESSION *session, int argc, char *argv[])
 	if (argc % 2 != 0)
 		return (usage());
 
-	for (configp = argv;
-	    configp != NULL && *configp != NULL; configp += 2)
+	for (configp = argv; *configp != NULL; configp += 2)
 		if ((ret = session->alter(
 		    session, configp[0], configp[1])) != 0) {
 			(void)util_err(session, ret,

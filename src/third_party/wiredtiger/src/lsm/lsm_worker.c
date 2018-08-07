@@ -37,7 +37,7 @@ __wt_lsm_worker_stop(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 {
 	args->running = false;
 	args->tid_set = false;
-	return (__wt_thread_join(session, args->tid));
+	return (__wt_thread_join(session, &args->tid));
 }
 
 /*
