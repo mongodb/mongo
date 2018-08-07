@@ -51,13 +51,13 @@ MobileRecoveryUnit::MobileRecoveryUnit(MobileSessionPool* sessionPool)
     // Increment the global instance count and assign this instance an id.
     _id = _nextID.addAndFetch(1);
 
-    RECOVERY_UNIT_TRACE() << " Created.";
+    RECOVERY_UNIT_TRACE() << "Created.";
 }
 
 MobileRecoveryUnit::~MobileRecoveryUnit() {
     invariant(!_inUnitOfWork);
     _abort();
-    RECOVERY_UNIT_TRACE() << " Destroyed.";
+    RECOVERY_UNIT_TRACE() << "Destroyed.";
 }
 
 void MobileRecoveryUnit::_commit() {
@@ -94,7 +94,7 @@ void MobileRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     invariant(!_areWriteUnitOfWorksBanned);
     invariant(!_inUnitOfWork);
 
-    RECOVERY_UNIT_TRACE() << " Unit of work Active.";
+    RECOVERY_UNIT_TRACE() << "Unit of work Active.";
 
     if (_active) {
         // Confirm a write transaction is not running
@@ -110,7 +110,7 @@ void MobileRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
 void MobileRecoveryUnit::commitUnitOfWork() {
     invariant(_inUnitOfWork);
 
-    RECOVERY_UNIT_TRACE() << " Unit of work commited, marked inactive.";
+    RECOVERY_UNIT_TRACE() << "Unit of work commited, marked inactive.";
 
     _inUnitOfWork = false;
     _commit();
@@ -119,7 +119,7 @@ void MobileRecoveryUnit::commitUnitOfWork() {
 void MobileRecoveryUnit::abortUnitOfWork() {
     invariant(_inUnitOfWork);
 
-    RECOVERY_UNIT_TRACE() << " Unit of work aborted, marked inactive.";
+    RECOVERY_UNIT_TRACE() << "Unit of work aborted, marked inactive.";
 
     _inUnitOfWork = false;
     _abort();
@@ -140,7 +140,7 @@ void MobileRecoveryUnit::registerChange(Change* change) {
 }
 
 MobileSession* MobileRecoveryUnit::getSession(OperationContext* opCtx, bool readOnly) {
-    RECOVERY_UNIT_TRACE() << " getSession called with readOnly:" << (readOnly ? "TRUE" : "FALSE");
+    RECOVERY_UNIT_TRACE() << "getSession called with readOnly:" << (readOnly ? "TRUE" : "FALSE");
 
     invariant(_inUnitOfWork || readOnly);
     if (!_active) {
@@ -160,7 +160,7 @@ void MobileRecoveryUnit::assertInActiveTxn() const {
 }
 
 void MobileRecoveryUnit::_ensureSession(OperationContext* opCtx) {
-    RECOVERY_UNIT_TRACE() << " Creating new session:" << (_session ? "NO" : "YES");
+    RECOVERY_UNIT_TRACE() << "Creating new session:" << (_session ? "NO" : "YES");
     if (!_session) {
         _session = _sessionPool->getSession(opCtx);
     }
@@ -168,7 +168,7 @@ void MobileRecoveryUnit::_ensureSession(OperationContext* opCtx) {
 
 void MobileRecoveryUnit::_txnOpen(OperationContext* opCtx, bool readOnly) {
     invariant(!_active);
-    RECOVERY_UNIT_TRACE() << " _txnOpen called with readOnly:" << (readOnly ? "TRUE" : "FALSE");
+    RECOVERY_UNIT_TRACE() << "_txnOpen called with readOnly:" << (readOnly ? "TRUE" : "FALSE");
     _ensureSession(opCtx);
 
     /*
@@ -206,7 +206,7 @@ void MobileRecoveryUnit::_txnOpen(OperationContext* opCtx, bool readOnly) {
 
 void MobileRecoveryUnit::_txnClose(bool commit) {
     invariant(_active);
-    RECOVERY_UNIT_TRACE() << " _txnClose called with " << (commit ? "commit " : "rollback ");
+    RECOVERY_UNIT_TRACE() << "_txnClose called with " << (commit ? "commit " : "rollback ");
 
     if (commit) {
         SqliteStatement::execQuery(_session.get(), "COMMIT");

@@ -116,7 +116,9 @@ public:
     }
 
     void save() final {
-        _resetStatement();
+        // SQLite acquires implicit locks over the snapshot this cursor is using. It is important
+        // to finalize the corresponding statement to release these locks.
+        _stmt->finalize();
     }
 
     void saveUnpositioned() final {
@@ -129,7 +131,12 @@ public:
             return true;
         }
 
-        _resetStatement();
+        // Obtaining a session starts a read transaction if not done already.
+        MobileSession* session = MobileRecoveryUnit::get(_opCtx)->getSession(_opCtx);
+        // save() finalized this cursor's SQLite statement. We need to prepare a new statement,
+        // before re-positioning it at the saved state.
+        _stmt->prepare(*session);
+
         _stmt->bindInt(0, _savedId.repr());
         return true;
     }

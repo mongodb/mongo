@@ -49,15 +49,33 @@ AtomicInt64 SqliteStatement::_nextID(0);
 SqliteStatement::SqliteStatement(const MobileSession& session, const std::string& sqlQuery) {
     // Increment the global instance count and assign this instance an id.
     _id = _nextID.addAndFetch(1);
-    SQLITE_STMT_TRACE() << "Preparing: " << sqlQuery;
+    _sqlQuery = sqlQuery;
+
+    prepare(session);
+}
+
+void SqliteStatement::finalize() {
+    if (!_stmt) {
+        return;
+    }
+    SQLITE_STMT_TRACE() << "Finalize: " << _sqlQuery;
+
+    int status = sqlite3_finalize(_stmt);
+    fassert(37053, status == _exceptionStatus);
+    _stmt = NULL;
+}
+
+void SqliteStatement::prepare(const MobileSession& session) {
+    SQLITE_STMT_TRACE() << "Preparing: " << _sqlQuery;
+
     int status = sqlite3_prepare_v2(
-        session.getSession(), sqlQuery.c_str(), sqlQuery.length() + 1, &_stmt, NULL);
+        session.getSession(), _sqlQuery.c_str(), _sqlQuery.length() + 1, &_stmt, NULL);
     if (status == SQLITE_BUSY) {
         SQLITE_STMT_TRACE() << "Throwing writeConflictException, "
-                            << "SQLITE_BUSY while preparing: " << sqlQuery;
+                            << "SQLITE_BUSY while preparing: " << _sqlQuery;
         throw WriteConflictException();
     } else if (status != SQLITE_OK) {
-        SQLITE_STMT_TRACE() << "Error while preparing: " << sqlQuery;
+        SQLITE_STMT_TRACE() << "Error while preparing: " << _sqlQuery;
         std::string errMsg = "sqlite3_prepare_v2 failed: ";
         errMsg += sqlite3_errstr(status);
         uasserted(ErrorCodes::UnknownError, errMsg);
@@ -65,8 +83,7 @@ SqliteStatement::SqliteStatement(const MobileSession& session, const std::string
 }
 
 SqliteStatement::~SqliteStatement() {
-    int status = sqlite3_finalize(_stmt);
-    fassert(37053, status == _exceptionStatus);
+    finalize();
 }
 
 void SqliteStatement::bindInt(int paramIndex, int64_t intValue) {
