@@ -92,26 +92,28 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // Initially featureCompatibilityVersion is 3.6.
     checkFCV(adminDB, "3.6");
 
-    // featureCompatibilityVersion cannot be set to invalid value.
+    jsTestLog("EXPECTED TO FAIL: featureCompatibilityVersion cannot be set to invalid value.");
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: 5}));
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.8"}));
 
-    // setFeatureCompatibilityVersion rejects unknown fields.
+    jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion rejects unknown fields.");
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4", unknown: 1}));
 
-    // setFeatureCompatibilityVersion can only be run on the admin database.
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion can only be run on the admin database.");
     assert.commandFailed(conn.getDB("test").runCommand({setFeatureCompatibilityVersion: "3.4"}));
 
-    // featureCompatibilityVersion cannot be set via setParameter.
+    jsTestLog("EXPECTED TO FAIL: featureCompatibilityVersion cannot be set via setParameter.");
     assert.commandFailed(adminDB.runCommand({setParameter: 1, featureCompatibilityVersion: "3.4"}));
 
-    // setFeatureCompatibilityVersion fails to downgrade to FCV=3.4 if the write fails.
     assert.commandWorked(adminDB.runCommand({
         configureFailPoint: "failCollectionUpdates",
         data: {collectionNS: "admin.system.version"},
         mode: "alwaysOn"
     }));
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion fails to downgrade to FCV=3.4 if the write fails.");
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
     checkFCV(adminDB, "3.6");
     assert.commandWorked(adminDB.runCommand({
@@ -120,16 +122,17 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         mode: "off"
     }));
 
-    // featureCompatibilityVersion can be set to 3.4.
+    jsTestLog("EXPECTED TO FAIL: featureCompatibilityVersion can be set to 3.4.");
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
     checkFCV(adminDB, "3.4");
 
-    // setFeatureCompatibilityVersion fails to upgrade to FCV=3.6 if the write fails.
     assert.commandWorked(adminDB.runCommand({
         configureFailPoint: "failCollectionUpdates",
         data: {collectionNS: "admin.system.version"},
         mode: "alwaysOn"
     }));
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion fails to upgrade to FCV=3.6 if the write fails.");
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
     checkFCV(adminDB, "3.4");
     assert.commandWorked(adminDB.runCommand({
@@ -265,7 +268,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     rst.awaitReplication();
     checkFCV(secondaryAdminDB, "3.4");
 
-    // setFeatureCompatibilityVersion cannot be run on secondary.
+    jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion cannot be run on secondary.");
     assert.commandFailed(secondaryAdminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
 
     rst.stopSet();
@@ -377,19 +380,22 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     checkFCV(configPrimaryAdminDB, "3.6");
     checkFCV(shardPrimaryAdminDB, "3.6");
 
-    // featureCompatibilityVersion cannot be set to invalid value on mongos.
+    jsTestLog(
+        "EXPECTED TO FAIL: featureCompatibilityVersion cannot be set to invalid value on mongos.");
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: 5}));
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.8"}));
 
-    // setFeatureCompatibilityVersion rejects unknown fields on mongos.
+    jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion rejects unknown fields on mongos.");
     assert.commandFailed(
         mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.4", unknown: 1}));
 
-    // setFeatureCompatibilityVersion can only be run on the admin database on mongos.
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion can only be run on the admin database on mongos.");
     assert.commandFailed(st.s.getDB("test").runCommand({setFeatureCompatibilityVersion: "3.4"}));
 
-    // featureCompatibilityVersion cannot be set via setParameter on mongos.
+    jsTestLog(
+        "EXPECTED TO FAIL: featureCompatibilityVersion cannot be set via setParameter on mongos.");
     assert.commandFailed(
         mongosAdminDB.runCommand({setParameter: 1, featureCompatibilityVersion: "3.4"}));
 
@@ -397,6 +403,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // to set the featureCompatibilityVersion to "3.4", the command should fail because the shard
     // cannot be contacted.
     st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 1.0);
+    jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion to 3.4 should fail because the shard cannot be contacted.");
     assert.commandFailed(
         mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.4", maxTimeMS: 1000}));
     checkFCV(configPrimaryAdminDB, "3.4", "3.4" /* indicates downgrade in progress */);
