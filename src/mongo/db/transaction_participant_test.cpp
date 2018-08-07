@@ -1119,6 +1119,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfPrepareTransactionAndMigration) {
 }
 
 TEST_F(TxnParticipantTest, ContinuingATransactionWithNoResourcesAborts) {
+    OperationContextSessionMongod(opCtx(), true, false, true);
     ASSERT_THROWS_CODE(OperationContextSessionMongod(opCtx(), true, false, boost::none),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
@@ -1274,6 +1275,12 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
     };
 
     txnParticipant->commitPreparedTransaction(opCtx(), prepareTimestamp);
+}
+
+TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
+    ASSERT_THROWS_CODE(OperationContextSessionMongod(opCtx(), true, false, boost::none),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
 }
 
 // Tests that a transaction aborts if it becomes too large before trying to commit it.
