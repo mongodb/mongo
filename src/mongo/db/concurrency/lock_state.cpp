@@ -319,7 +319,25 @@ LockResult LockerImpl<IsForMMAPV1>::lockGlobal(OperationContext* opCtx, LockMode
 template <bool IsForMMAPV1>
 void LockerImpl<IsForMMAPV1>::reacquireTicket(OperationContext* opCtx) {
     invariant(_modeForTicket != MODE_NONE);
+    auto clientState = _clientState.load();
+    const bool reader = isSharedLockMode(_modeForTicket);
+
+    // Ensure that either we don't have a ticket, or the current ticket mode matches the lock mode.
+    invariant(clientState == kInactive || (clientState == kActiveReader && reader) ||
+              (clientState == kActiveWriter && !reader));
+
+    // If we already have a ticket, there's nothing to do.
+    if (clientState != kInactive)
+        return;
+
     auto acquireTicketResult = _acquireTicket(opCtx, _modeForTicket, Date_t::max());
+    uassert(ErrorCodes::LockTimeout,
+            str::stream() << "Unable to acquire ticket with mode '" << _modeForTicket
+                          << "' within a max lock request timeout of '"
+                          << _maxLockTimeout.get()
+                          << "' milliseconds.",
+            acquireTicketResult == LOCK_OK || !_maxLockTimeout);
+    // If no deadline is specified we should always get a ticket.
     invariant(acquireTicketResult == LOCK_OK);
 }
 
@@ -331,6 +349,10 @@ LockResult LockerImpl<IsForMMAPV1>::_acquireTicket(OperationContext* opCtx,
     auto holder = shouldAcquireTicket() ? ticketHolders[mode] : nullptr;
     if (holder) {
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
+
+        if (_maxLockTimeout && !_uninterruptibleLocksRequested) {
+            deadline = std::min(deadline, Date_t::now() + _maxLockTimeout.get());
+        }
 
         // If the ticket wait is interrupted, restore the state of the client.
         auto restoreStateOnErrorGuard = MakeGuard([&] { _clientState.store(kInactive); });

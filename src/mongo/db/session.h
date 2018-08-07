@@ -72,8 +72,10 @@ public:
         /**
          * Stashes transaction state from 'opCtx' in the newly constructed TxnResources.
          * This ephemerally takes the Client lock associated with the opCtx.
+         * keepTicket: If true, do not release locker's throttling ticket.
+         *             Use only for short-term stashing.
          */
-        TxnResources(OperationContext* opCtx);
+        TxnResources(OperationContext* opCtx, bool keepTicket = false);
 
         ~TxnResources();
 

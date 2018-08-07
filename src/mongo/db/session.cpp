@@ -654,13 +654,15 @@ void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {
             txnNumber >= _activeTxnNumber);
 }
 
-Session::TxnResources::TxnResources(OperationContext* opCtx) {
+Session::TxnResources::TxnResources(OperationContext* opCtx, bool keepTicket) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
 
     _locker = opCtx->swapLockState(stdx::make_unique<DefaultLockerImpl>());
-    _locker->releaseTicket();
+    if (!keepTicket) {
+        _locker->releaseTicket();
+    }
     _locker->unsetThreadId();
 
     // This thread must still respect the transaction lock timeout, since it can prevent the
