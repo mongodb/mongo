@@ -48,15 +48,18 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(writeConfilctInRenameCollCopyToTmp);
 namespace {
 
 NamespaceString getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
@@ -444,22 +447,39 @@ Status renameCollectionCommon(OperationContext* opCtx,
         }
 
         auto cursor = sourceColl->getCursor(opCtx);
-        while (auto record = cursor->next()) {
+        auto record = cursor->next();
+        while (record) {
             opCtx->checkForInterrupt();
-
-            const auto obj = record->data.releaseToBson();
-
+            // Cursor is left one past the end of the batch inside writeConflictRetry.
+            auto beginBatchId = record->id;
             status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
-                const InsertStatement stmt(obj);
-                OpDebug* const opDebug = nullptr;
-                auto status = tmpColl->insertDocument(opCtx, stmt, opDebug, true);
-                if (!status.isOK())
-                    return status;
+                // Need to reset cursor if it gets a WCE midway through.
+                if (!record || (beginBatchId != record->id)) {
+                    record = cursor->seekExact(beginBatchId);
+                }
+                for (int i = 0; record && (i < internalInsertMaxBatchSize.load()); i++) {
+                    const InsertStatement stmt(record->data.releaseToBson());
+                    OpDebug* const opDebug = nullptr;
+                    auto status = tmpColl->insertDocument(opCtx, stmt, opDebug, true);
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                    record = cursor->next();
+                }
+                cursor->save();
+                // When this exits via success or WCE, we need to restore the cursor.
+                ON_BLOCK_EXIT([ opCtx, ns = tmpName.ns(), &cursor ]() {
+                    writeConflictRetry(
+                        opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
+                });
+                // Used to make sure that a WCE can be handled by this logic without data loss.
+                if (MONGO_FAIL_POINT(writeConfilctInRenameCollCopyToTmp)) {
+                    throw WriteConflictException();
+                }
                 wunit.commit();
                 return Status::OK();
             });
-
             if (!status.isOK()) {
                 return status;
             }
