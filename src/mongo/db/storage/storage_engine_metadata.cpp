@@ -47,8 +47,10 @@
 #include <sys/types.h>
 #endif
 
+#include "mongo/base/data_type_validated.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -83,7 +85,7 @@ std::unique_ptr<StorageEngineMetadata> StorageEngineMetadata::forPath(const std:
         Status status = metadata->read();
         if (!status.isOK()) {
             error() << "Unable to read the storage engine metadata file: " << status;
-            fassertFailed(28661);
+            fassertFailedNoTrace(28661);
         }
     }
     return metadata;
@@ -172,15 +174,13 @@ Status StorageEngineMetadata::read() {
                                     << ex.what());
     }
 
-    BSONObj obj;
-    try {
-        obj = BSONObj(&buffer[0]);
-    } catch (DBException& ex) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Failed to convert data in " << metadataPath.string()
-                                    << " to BSON: "
-                                    << ex.what());
+    ConstDataRange cdr(&buffer[0], buffer.size());
+    auto swObj = cdr.read<Validated<BSONObj>>();
+    if (!swObj.isOK()) {
+        return swObj.getStatus();
     }
+
+    BSONObj obj = swObj.getValue();
 
     // Validate 'storage.engine' field.
     BSONElement storageEngineElement = dps::extractElementAtPath(obj, "storage.engine");
