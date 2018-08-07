@@ -107,4 +107,6 @@ private:
     bool _released = false;
 };
 
+std::ostream& operator<<(std::ostream& os, WriteUnitOfWork::RecoveryUnitState state);
+
 }  // namespace mongo

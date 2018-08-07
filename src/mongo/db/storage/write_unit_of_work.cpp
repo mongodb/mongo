@@ -100,4 +100,16 @@ void WriteUnitOfWork::commit() {
     _committed = true;
 }
 
+std::ostream& operator<<(std::ostream& os, WriteUnitOfWork::RecoveryUnitState state) {
+    switch (state) {
+        case WriteUnitOfWork::kNotInUnitOfWork:
+            return os << "NotInUnitOfWork";
+        case WriteUnitOfWork::kActiveUnitOfWork:
+            return os << "ActiveUnitOfWork";
+        case WriteUnitOfWork::kFailedUnitOfWork:
+            return os << "FailedUnitOfWork";
+    }
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

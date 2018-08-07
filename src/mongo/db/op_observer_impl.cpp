@@ -294,7 +294,8 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
                              const OperationSessionInfo& sessionInfo,
                              StmtId stmtId,
                              const repl::OplogLink& oplogLink,
-                             bool prepare) {
+                             bool prepare,
+                             const OplogSlot& oplogSlot) {
     OpTimeBundle times;
     times.wallClockTime = getWallClockTimeForOpLog(opCtx);
     times.writeOpTime = logOperation(opCtx,
@@ -309,7 +310,7 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
                                      stmtId,
                                      oplogLink,
                                      prepare,
-                                     OplogSlot());
+                                     oplogSlot);
     return times;
 }
 
@@ -885,7 +886,7 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
 
     // Only transactional 'applyOps' commands can be prepared.
     constexpr bool prepare = false;
-    replLogApplyOps(opCtx, cmdNss, applyOpCmd, {}, kUninitializedStmtId, {}, prepare);
+    replLogApplyOps(opCtx, cmdNss, applyOpCmd, {}, kUninitializedStmtId, {}, prepare, OplogSlot());
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
@@ -923,7 +924,7 @@ namespace {
 OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
                                        Session* const session,
                                        std::vector<repl::ReplOperation> stmts,
-                                       bool prepare) {
+                                       const OplogSlot& prepareOplogSlot) {
     BSONObjBuilder applyOpsBuilder;
     BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
     for (auto& stmt : stmts) {
@@ -943,9 +944,11 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     invariant(oplogLink.prevOpTime.isNull());
 
     try {
+        // We are only given an oplog slot for prepared transactions.
+        auto prepare = !prepareOplogSlot.opTime.isNull();
         auto applyOpCmd = applyOpsBuilder.done();
-        auto times =
-            replLogApplyOps(opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink, prepare);
+        auto times = replLogApplyOps(
+            opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink, prepare, prepareOplogSlot);
 
         onWriteOpCompleted(
             opCtx, cmdNss, session, {stmtId}, times.writeOpTime, times.wallClockTime);
@@ -996,32 +999,29 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx, bool wasPrepar
             return;
 
         const auto commitOpTime =
-            logApplyOpsForTransaction(opCtx, session, stmts, false /* prepare */).writeOpTime;
+            logApplyOpsForTransaction(opCtx, session, stmts, OplogSlot()).writeOpTime;
         invariant(!commitOpTime.isNull());
     }
 }
 
-void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx) {
+void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) {
     invariant(opCtx->getTxnNumber());
     Session* const session = OperationContextSession::get(opCtx);
     invariant(session);
     invariant(session->inMultiDocumentTransaction());
+    invariant(!prepareOpTime.opTime.isNull());
     auto stmts = session->endTransactionAndRetrieveOperations(opCtx);
 
     // We write the oplog entry in a side transaction so that we do not commit the now-prepared
-    // transaction. We then return to the main transaction and set its 'prepareTimestamp'.
+    // transaction.
     // We write an empty 'applyOps' entry if there were no writes to choose a prepare timestamp
     // and allow this transaction to be continued on failover.
-    repl::OpTime prepareOpTime;
     {
         Session::SideTransactionBlock sideTxn(opCtx);
         WriteUnitOfWork wuow(opCtx);
-        prepareOpTime =
-            logApplyOpsForTransaction(opCtx, session, stmts, true /* prepare */).writeOpTime;
+        logApplyOpsForTransaction(opCtx, session, stmts, prepareOpTime);
         wuow.commit();
     }
-    invariant(!prepareOpTime.isNull());
-    opCtx->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
 }
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {

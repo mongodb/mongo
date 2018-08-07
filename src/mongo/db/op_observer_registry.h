@@ -222,10 +222,10 @@ public:
             o->onTransactionCommit(opCtx, wasPrepared);
     }
 
-    void onTransactionPrepare(OperationContext* opCtx) override {
+    void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) override {
         ReservedTimes times{opCtx};
         for (auto& observer : _observers) {
-            observer->onTransactionPrepare(opCtx);
+            observer->onTransactionPrepare(opCtx, prepareOpTime);
         }
     }
 

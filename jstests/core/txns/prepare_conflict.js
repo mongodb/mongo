@@ -32,9 +32,16 @@
         assert(prepareConflicted);
     }
 
-    // Insert the document.
-    const doc1 = {_id: 1, x: 1};
-    assert.commandWorked(testColl.insert(doc1));
+    // Insert a document modified by the transaction.
+    const txnDoc = {_id: 1, x: 1};
+    assert.commandWorked(testColl.insert(txnDoc));
+
+    // Insert a document unmodified by the transaction.
+    const otherDoc = {_id: 2, y: 2};
+    assert.commandWorked(testColl.insert(otherDoc));
+
+    // Create an index on 'y' to avoid conflicts on the field.
+    assert.commandWorked(testColl.createIndex({y: 1}));
 
     // Enable the profiler to log slow queries. We expect a 'find' to hang until the prepare
     // conflict is resolved.
@@ -45,19 +52,31 @@
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandWorked(sessionDB.runCommand({
         update: collName,
-        updates: [{q: doc1, u: {$inc: {x: 1}}}],
+        updates: [{q: txnDoc, u: {$inc: {x: 1}}}],
     }));
 
     assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
-    assertPrepareConflict({_id: 1});
+
+    // Conflict on _id of prepared document.
+    assertPrepareConflict({_id: txnDoc._id});
+
+    // Conflict on field that could be added to a prepared document.
+    assertPrepareConflict({randomField: "random"});
+
+    // No conflict on _id of a non-prepared document.
+    assert.commandWorked(testDB.runCommand({find: collName, filter: {_id: otherDoc._id}}));
+
+    // No conflict on indexed field of a non-prepared document.
+    assert.commandWorked(testDB.runCommand({find: collName, filter: {y: otherDoc.y}}));
 
     // At this point, we can guarantee all subsequent reads will conflict. Do a read in a parallel
     // shell, abort the transaction, then ensure the read succeeded with the old document.
     TestData.collName = collName;
     TestData.dbName = dbName;
+    TestData.txnDoc = txnDoc;
     const findAwait = startParallelShell(function() {
         const it = db.getSiblingDB(TestData.dbName)
-                       .runCommand({find: TestData.collName, filter: {_id: 1}});
+                       .runCommand({find: TestData.collName, filter: {_id: TestData.txnDoc._id}});
     }, db.getMongo().port);
 
     session.abortTransaction();
@@ -66,5 +85,5 @@
     findAwait({checkExitSuccess: true});
 
     // The document should be unmodified, because we aborted.
-    assert.eq(doc1, testColl.findOne(doc1));
+    assert.eq(txnDoc, testColl.findOne(txnDoc));
 })();

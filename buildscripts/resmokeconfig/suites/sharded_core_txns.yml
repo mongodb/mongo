@@ -22,6 +22,7 @@ selector:
   - jstests/core/txns/no_new_transactions_when_prepared_transaction_in_progress.js
   - jstests/core/txns/prepare_committed_transaction.js
   - jstests/core/txns/prepare_conflict.js
+  - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
 
   # Mongos doesn't upconvert from local or majority level readConcern to snapshot.
   - jstests/core/txns/upconvert_read_concern.js

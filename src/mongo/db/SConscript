@@ -645,6 +645,7 @@ env.Library(
         'logical_session_id',
         'namespace_string',
         'repl/oplog_entry',
+        'repl/oplog_shim',
         's/sharding_api_d',
         'views/views',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',

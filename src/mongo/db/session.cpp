@@ -286,6 +286,8 @@ MONGO_FAIL_POINT_DEFINE(onPrimaryTransactionalWrite);
 // Failpoint which will pause an operation just after allocating a point-in-time storage engine
 // transaction.
 MONGO_FAIL_POINT_DEFINE(hangAfterPreallocateSnapshot);
+
+MONGO_FAIL_POINT_DEFINE(hangAfterReservingPrepareTimestamp);
 }  // namespace
 
 const BSONObj Session::kDeadEndSentinel(BSON("$incompleteOplogHistory" << 1));
@@ -636,6 +638,47 @@ void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {
             txnNumber >= _activeTxnNumber);
 }
 
+Session::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx) {
+    // Stash the transaction on the OperationContext on the stack. At the end of this function it
+    // will be unstashed onto the OperationContext.
+    Session::SideTransactionBlock sideTxn(opCtx);
+
+    // Begin a new WUOW and reserve a slot in the oplog.
+    WriteUnitOfWork wuow(opCtx);
+    _oplogSlot = repl::getNextOpTime(opCtx);
+
+    // Release the WUOW state since this WUOW is no longer in use.
+    wuow.release();
+
+    // The new transaction should have an empty locker, and thus we do not need to save it.
+    invariant(opCtx->lockState()->getClientState() == Locker::ClientState::kInactive);
+    _locker = opCtx->swapLockState(stdx::make_unique<LockerImpl>());
+    _locker->unsetThreadId();
+
+    // This thread must still respect the transaction lock timeout, since it can prevent the
+    // transaction from making progress.
+    auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
+    if (maxTransactionLockMillis >= 0) {
+        opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
+    }
+
+    // Save the RecoveryUnit from the new transaction and replace it with an empty one.
+    _recoveryUnit = std::unique_ptr<RecoveryUnit>(opCtx->releaseRecoveryUnit());
+    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+}
+
+Session::OplogSlotReserver::~OplogSlotReserver() {
+    // If the constructor did not complete, we do not attempt to abort the units of work.
+    if (_recoveryUnit) {
+        // We should be at WUOW nesting level 1, only the top level WUOW for the oplog reservation
+        // side transaction.
+        _locker->endWriteUnitOfWork();
+        invariant(!_locker->inAWriteUnitOfWork());
+        _recoveryUnit->abortUnitOfWork();
+    }
+}
+
 Session::TxnResources::TxnResources(OperationContext* opCtx) {
     _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
@@ -683,8 +726,10 @@ void Session::TxnResources::release(OperationContext* opCtx) {
     opCtx->swapLockState(std::move(_locker));
     opCtx->lockState()->updateThreadIdToCurrentThread();
 
-    opCtx->setRecoveryUnit(_recoveryUnit.release(),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    auto oldState = opCtx->setRecoveryUnit(_recoveryUnit.release(),
+                                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    invariant(oldState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+              str::stream() << "RecoveryUnit state was " << oldState);
 
     opCtx->setWriteUnitOfWork(WriteUnitOfWork::createForSnapshotResume(opCtx, _ruState));
 
@@ -870,24 +915,50 @@ Timestamp Session::prepareTransaction(OperationContext* opCtx) {
 
     _txnState.transitionTo(lk, TransactionState::kPrepared);
 
+    // Reserve an optime for the 'prepareTimestamp'. This will create a hole in the oplog and cause
+    // 'snapshot' and 'afterClusterTime' readers to block until this transaction is done being
+    // prepared. When the OplogSlotReserver goes out of scope and is destroyed, the
+    // storage-transaction it uses to keep the hole open will abort and the slot (and corresponding
+    // oplog hole) will vanish.
+    OplogSlotReserver oplogSlotReserver(opCtx);
+    const auto prepareOplogSlot = oplogSlotReserver.getReservedOplogSlot();
+    const auto prepareTimestamp = prepareOplogSlot.opTime.getTimestamp();
+
+    if (MONGO_FAIL_POINT(hangAfterReservingPrepareTimestamp)) {
+        // This log output is used in js tests so please leave it.
+        log() << "transaction - hangAfterReservingPrepareTimestamp fail point "
+                 "enabled. Blocking until fail point is disabled. Prepare OpTime: "
+              << prepareOplogSlot.opTime;
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterReservingPrepareTimestamp);
+    }
+
+    opCtx->recoveryUnit()->setPrepareTimestamp(prepareTimestamp);
+    opCtx->getWriteUnitOfWork()->prepare();
+
     // We need to unlock the session to run the opObserver onTransactionPrepare, which calls back
     // into the session.
     lk.unlock();
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
-    opObserver->onTransactionPrepare(opCtx);
-    lk.lock();
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+    opObserver->onTransactionPrepare(opCtx, prepareOplogSlot);
 
-    // Ensure that the transaction is still prepared.
-    invariant(_txnState.isPrepared(lk), str::stream() << "Current state: " << _txnState);
+    // After the oplog entry is written successfully, it is illegal to implicitly abort or fail.
+    try {
+        abortGuard.Dismiss();
 
-    opCtx->getWriteUnitOfWork()->prepare();
+        lk.lock();
 
-    abortGuard.Dismiss();
+        // Although we are not allowed to abort here, we check that we don't even try to. If we do
+        // try to, that is a bug and we will fassert below.
+        _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    // Return the prepareTimestamp from the recovery unit.
-    return opCtx->recoveryUnit()->getPrepareTimestamp();
+        // Ensure that the transaction is still prepared.
+        invariant(_txnState.isPrepared(lk), str::stream() << "Current state: " << _txnState);
+    } catch (...) {
+        severe() << "Illegal exception after transaction was prepared.";
+        fassertFailedWithStatus(50906, exceptionToStatus());
+    }
+    return prepareTimestamp;
 }
 
 void Session::abortArbitraryTransaction() {

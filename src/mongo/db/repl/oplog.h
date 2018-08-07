@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -264,11 +265,20 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
                             OplogApplication::Mode mode);
 
-/**
- * Allocates optimes for new entries in the oplog.  Returns an OplogSlot or a vector of OplogSlots,
- * which contain the new optimes along with their terms and newly calculated hash fields.
- */
-OplogSlot getNextOpTime(OperationContext* opCtx);
+// Shims currently do not support free functions so we wrap getNextOpTime in a class as a
+// workaround.
+struct GetNextOpTimeClass {
+    /**
+     * Allocates optimes for new entries in the oplog.  Returns an OplogSlot or a vector of
+     * OplogSlots, which contain the new optimes along with their terms and newly calculated hash
+     * fields.
+     */
+    static MONGO_DECLARE_SHIM((OperationContext * opCtx)->OplogSlot) getNextOpTime;
+};
+
+inline OplogSlot getNextOpTime(OperationContext* opCtx) {
+    return GetNextOpTimeClass::getNextOpTime(opCtx);
+}
 
 /**
  * Allocates an OpTime, but does not update the storage engine with the timestamp. This is used to

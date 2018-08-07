@@ -269,8 +269,10 @@ public:
     /**
      * The onTransactionPrepare method is called when an atomic transaction is prepared. It must be
      * called when a transaction is active.
+     *
+     * The 'prepareOpTime' is passed in to be used as the OpTime of the oplog entry.
      */
-    virtual void onTransactionPrepare(OperationContext* opCtx) = 0;
+    virtual void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) = 0;
 
     /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the

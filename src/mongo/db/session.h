@@ -36,6 +36,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -481,6 +482,36 @@ private:
                                       TxnNumber newTxnNumber,
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
+
+    /**
+     * Reserves a slot in the oplog with an open storage-transaction while it is alive. Reserves the
+     * slot at construction. Aborts the storage-transaction and releases the oplog slot at
+     * destruction.
+     */
+    class OplogSlotReserver {
+    public:
+        OplogSlotReserver(OperationContext* opCtx);
+
+        ~OplogSlotReserver();
+
+        // Rule of 5: because we have a class-defined destructor, we need to explictly specify
+        // the move operator and move assignment operator.
+        OplogSlotReserver(OplogSlotReserver&&) = default;
+        OplogSlotReserver& operator=(OplogSlotReserver&&) = default;
+
+        /**
+         * Returns the oplog slot reserved at construction.
+         */
+        OplogSlot getReservedOplogSlot() const {
+            invariant(!_oplogSlot.opTime.isNull());
+            return _oplogSlot;
+        }
+
+    private:
+        std::unique_ptr<Locker> _locker;
+        std::unique_ptr<RecoveryUnit> _recoveryUnit;
+        OplogSlot _oplogSlot;
+    };
 
     /**
      * Indicates the state of the current multi-document transaction, if any.  If the transaction is

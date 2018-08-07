@@ -593,7 +593,12 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, false, boost::none);
 
     session()->transitionToPreparedforTest();
-    opObserver().onTransactionPrepare(opCtx());
+    {
+        WriteUnitOfWork wuow(opCtx());
+        OplogSlot slot = repl::getNextOpTime(opCtx());
+        opObserver().onTransactionPrepare(opCtx(), slot);
+        opCtx()->recoveryUnit()->setPrepareTimestamp(slot.opTime.getTimestamp());
+    }
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);
@@ -654,7 +659,12 @@ TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
 
     session()->unstashTransactionResources(opCtx(), "prepareTransaction");
     session()->transitionToPreparedforTest();
-    opObserver().onTransactionPrepare(opCtx());
+    {
+        WriteUnitOfWork wuow(opCtx());
+        OplogSlot slot = repl::getNextOpTime(opCtx());
+        opObserver().onTransactionPrepare(opCtx(), slot);
+        opCtx()->recoveryUnit()->setPrepareTimestamp(slot.opTime.getTimestamp());
+    }
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);

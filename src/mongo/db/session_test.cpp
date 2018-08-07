@@ -54,7 +54,6 @@ namespace {
 
 const NamespaceString kNss("TestDB", "TestColl");
 const OptionalCollectionUUID kUUID;
-const Timestamp kPrepareTimestamp(Timestamp(1, 1));
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
@@ -87,7 +86,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 
 class OpObserverMock : public OpObserverNoop {
 public:
-    void onTransactionPrepare(OperationContext* opCtx) override;
+    void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) override;
     bool onTransactionPrepareThrowsException = false;
     bool transactionPrepared = false;
     stdx::function<void()> onTransactionPrepareFn = [this]() { transactionPrepared = true; };
@@ -100,13 +99,9 @@ public:
     };
 };
 
-void OpObserverMock::onTransactionPrepare(OperationContext* opCtx) {
+void OpObserverMock::onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-    OpObserverNoop::onTransactionPrepare(opCtx);
-
-    // Get the recovery unit and set the prepareTimestamp.
-    RecoveryUnit* recoveryUnit = opCtx->recoveryUnit();
-    recoveryUnit->setPrepareTimestamp(kPrepareTimestamp);
+    OpObserverNoop::onTransactionPrepare(opCtx, prepareOpTime);
 
     uassert(ErrorCodes::OperationFailed,
             "onTransactionPrepare() failed",
@@ -1525,10 +1520,13 @@ TEST_F(SessionTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
 
     session.unstashTransactionResources(opCtx(), "prepareTransaction");
 
+    auto ruPrepareTimestamp = Timestamp();
     auto originalFn = _opObserver->onTransactionPrepareFn;
     _opObserver->onTransactionPrepareFn = [&]() {
         originalFn();
 
+        ruPrepareTimestamp = opCtx()->recoveryUnit()->getPrepareTimestamp();
+        ASSERT_FALSE(ruPrepareTimestamp.isNull());
         // The transaction may be aborted without checking out the session.
         session.abortArbitraryTransaction();
         ASSERT_FALSE(session.transactionIsAborted());
@@ -1536,12 +1534,12 @@ TEST_F(SessionTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
 
     // Check that prepareTimestamp gets set.
     auto prepareTimestamp = session.prepareTransaction(opCtx());
-    ASSERT_EQ(kPrepareTimestamp, prepareTimestamp);
+    ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
     ASSERT(_opObserver->transactionPrepared);
     ASSERT_FALSE(session.transactionIsAborted());
 }
 
-TEST_F(SessionTest, AbortDuringPrepareAbortsTransaction) {
+DEATH_TEST_F(SessionTest, AbortDuringPrepareIsFatal, "Fatal assertion 50906") {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
@@ -1562,10 +1560,7 @@ TEST_F(SessionTest, AbortDuringPrepareAbortsTransaction) {
         ASSERT(session.transactionIsAborted());
     };
 
-    // A prepareTransaction() after an abort should uassert.
-    ASSERT_THROWS_CODE(
-        session.prepareTransaction(opCtx()), AssertionException, ErrorCodes::NoSuchTransaction);
-    ASSERT(session.transactionIsAborted());
+    session.prepareTransaction(opCtx());
 }
 
 TEST_F(SessionTest, ThrowDuringOnTransactionPrepareAbortsTransaction) {
@@ -1834,9 +1829,18 @@ TEST_F(SessionTest, KillSessionsDoesNotAbortPreparedTransactions) {
 
     session.unstashTransactionResources(opCtx(), "insert");
 
-    // Check that prepareTimestamp is set.
+    auto ruPrepareTimestamp = Timestamp();
+    auto originalFn = _opObserver->onTransactionPrepareFn;
+    _opObserver->onTransactionPrepareFn = [&]() {
+        originalFn();
+
+        ruPrepareTimestamp = opCtx()->recoveryUnit()->getPrepareTimestamp();
+        ASSERT_FALSE(ruPrepareTimestamp.isNull());
+    };
+
+    // Check that prepareTimestamp gets set.
     auto prepareTimestamp = session.prepareTransaction(opCtx());
-    ASSERT_EQ(kPrepareTimestamp, prepareTimestamp);
+    ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
     session.stashTransactionResources(opCtx());
 
     session.abortArbitraryTransaction();
@@ -1856,9 +1860,19 @@ TEST_F(SessionTest, CannotStartNewTransactionWhilePreparedTransactionInProgress)
 
     session.unstashTransactionResources(opCtx(), "insert");
 
+    auto ruPrepareTimestamp = Timestamp();
+    auto originalFn = _opObserver->onTransactionPrepareFn;
+    _opObserver->onTransactionPrepareFn = [&]() {
+        originalFn();
+
+        ruPrepareTimestamp = opCtx()->recoveryUnit()->getPrepareTimestamp();
+        ASSERT_FALSE(ruPrepareTimestamp.isNull());
+    };
+
     // Check that prepareTimestamp gets set.
     auto prepareTimestamp = session.prepareTransaction(opCtx());
-    ASSERT_EQ(kPrepareTimestamp, prepareTimestamp);
+    ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
+
     session.stashTransactionResources(opCtx());
 
     // Try to start a new transaction while there is already a prepared transaction on the
