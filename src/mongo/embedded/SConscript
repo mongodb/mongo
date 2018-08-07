@@ -153,13 +153,11 @@ env.Library(
         'mongoc_client.cpp',
     ],
     LIBDEPS=[
+        # No LIBDEPS or LIBDEPS_PRIVATE to mongo libraries are allowed in this library. They would get duplicated in mongo_embedded_capi.
         'mongo_embedded_capi',
     ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/third_party/shim_zlib',
-    ],
     SYSLIBDEPS=[
+        # No other SYSLIBDEPS than mongoc and bson are allowed in this library.
         'mongoc-1.0',
         'bson-1.0',
     ],

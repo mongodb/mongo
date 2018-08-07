@@ -26,39 +26,97 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/embedded/mongoc_client.h"
 
+#include <algorithm>
+#include <cassert>
+#include <cinttypes>
 #include <cstdlib>
-#include <deque>
-#include <iostream>
-#include <iterator>
 #include <memory>
-#include <string>
+#include <stdexcept>
 
-#include "mongo/base/data_range.h"
-#include "mongo/base/data_range_cursor.h"
+// Only header-only includes allowed here (except for capi.h)
 #include "mongo/embedded/capi.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/shared_buffer.h"
+#include "mongo/platform/endian.h"
 
-enum RPCState { WaitingForMessageLength, WaitingForMessageContent, HaveOutput };
+// Macro to trick the linter into accepting assert.
+#define mongoc_client_assert assert
+
+namespace {
+enum RPCState { kWaitingForMessageLength, kWaitingForMessageContent, kHaveOutput };
+
+// A non-owning memory view with that encapulates reading or writing from that memory by keeping
+// track of a current pointer that advances on the read or write.
+struct MemoryView {
+    MemoryView() = default;
+    explicit MemoryView(char* data, size_t size)
+        : _begin(data), _current(data), _end(data + size) {}
+
+    char* begin() {
+        return _begin;
+    }
+
+    char* current() {
+        return _current;
+    }
+
+    char* end() {
+        return _end;
+    }
+
+    // Write memory to current position and advance internal pointer
+    void write(const void* source, size_t size) {
+        if (remaining() < size) {
+            mongoc_client_assert(false);
+            return;
+        }
+
+        memcpy(_current, source, size);
+        _current += size;
+    }
+
+    // Read memory from current position and advance internal pointer
+    size_t read(void* destination, size_t size) {
+        size_t bytes_to_read = std::min(remaining(), size);
+        memcpy(destination, current(), bytes_to_read);
+        _current += bytes_to_read;
+        return bytes_to_read;
+    }
+
+    // Size that have currently been read or written
+    size_t size() const {
+        return _current - _begin;
+    }
+
+    // Total capacity for the memory this view is holding
+    size_t capacity() const {
+        return _end - _begin;
+    }
+
+    // Remaining memory available for read or write
+    size_t remaining() const {
+        return _end - _current;
+    }
+
+    char* _begin{nullptr};
+    char* _current{nullptr};
+    char* _end{nullptr};
+};
 
 struct FreeDeleter {
     void operator()(void* x) {
         free(x);
     }
 };
+}  // namespace
 
 struct mongoc_stream_embedded_t : mongoc_stream_t {
     mongo_embedded_v1_client* clientHandle;
-    mongo::DataRangeCursor inputBuf = mongo::DataRangeCursor(nullptr, nullptr);
+    MemoryView inputBuf;
     std::unique_ptr<char, FreeDeleter> hiddenBuf;
-    mongo::ConstDataRangeCursor outputBuf = mongo::ConstDataRangeCursor(nullptr, nullptr);
-
-    void* libmongo_output;
-    size_t libmongo_output_size;
-    // If this is 0, we have recieved a full message and expect another header
-    u_long input_length_to_go;
+    MemoryView outputBuf;
     RPCState state;
 };
 
@@ -84,8 +142,8 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
                                                  size_t iovcnt,
                                                  int32_t timeout_msec) try {
     auto stream = static_cast<mongoc_stream_embedded_t*>(s);
-    invariant(stream->state == RPCState::WaitingForMessageContent ||
-              stream->state == RPCState::WaitingForMessageLength);
+    mongoc_client_assert(stream->state == RPCState::kWaitingForMessageContent ||
+                         stream->state == RPCState::kWaitingForMessageLength);
 
     u_long already_read = 0;
     for (size_t i = 0; i < iovcnt; i++) {
@@ -93,27 +151,28 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
         u_long remaining_iov = iov[i].iov_len;
 
         // do we need a new message?
-        if (stream->state == RPCState::WaitingForMessageLength) {
+        if (stream->state == RPCState::kWaitingForMessageLength) {
+            // The message should start with a 4 byte size
+            int32_t message_length;
+            if (remaining_iov < sizeof(message_length)) {
+                errno = EBADMSG;
+                return 0;
+            }
 
-            invariant(remaining_iov >= 4);
+            // memcpy into message_length, to be super safe in case the buffer is not 32bit aligned.
+            memcpy(&message_length, current_loc, sizeof(message_length));
 
-            // message length is the first four bytes
-            // Should use dataview from mongo server
-            stream->input_length_to_go =
-                mongo::ConstDataView(current_loc).read<mongo::LittleEndian<int32_t>>();
-            // stream->hiddenBuf = (char*)malloc(stream->input_length_to_go);
-            stream->hiddenBuf =
-                std::unique_ptr<char, FreeDeleter>((char*)malloc(stream->input_length_to_go));
-            stream->inputBuf = mongo::DataRangeCursor(
-                stream->hiddenBuf.get(), stream->hiddenBuf.get() + stream->input_length_to_go);
-            auto writeOK =
-                stream->inputBuf.writeAndAdvance(mongo::DataRange(current_loc, current_loc + 4));
-            invariant(writeOK.isOK());
-            current_loc += 4;
-            remaining_iov -= 4;
-            stream->input_length_to_go -= 4;
-            already_read += 4;
-            stream->state = RPCState::WaitingForMessageContent;
+            // make sure we convert from network byte order to host byte order before using it.
+            message_length = mongo::endian::littleToNative(message_length);
+
+            stream->hiddenBuf = std::unique_ptr<char, FreeDeleter>((char*)malloc(message_length));
+            stream->inputBuf = MemoryView(stream->hiddenBuf.get(), message_length);
+            stream->inputBuf.write(current_loc, sizeof(message_length));
+
+            current_loc += sizeof(message_length);
+            remaining_iov -= sizeof(message_length);
+            already_read += sizeof(message_length);
+            stream->state = RPCState::kWaitingForMessageContent;
         }
 
         // if there is no more message after reading length, we're done
@@ -122,23 +181,22 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
 
         // copy message length into buffer
         // pipelining is not allowed, so remaining_iov must be less than input_length_to_go
-        invariant(stream->input_length_to_go >= remaining_iov);
-        auto writeOK = stream->inputBuf.writeAndAdvance(
-            mongo::DataRange(current_loc, current_loc + remaining_iov));
-        invariant(writeOK.isOK());
+        mongoc_client_assert(stream->inputBuf.remaining() >= remaining_iov);
+        stream->inputBuf.write(current_loc, remaining_iov);
+
         // cleanup number values to reflect the copy
-        stream->input_length_to_go -= remaining_iov;
         already_read += remaining_iov;
         remaining_iov = 0;
 
         // if we found a complete message, send it
-        if (stream->input_length_to_go == 0) {
-            auto input_len = (size_t)(stream->inputBuf.data() - stream->hiddenBuf.get());
+        if (stream->inputBuf.remaining() == 0) {
+            void* output_buffer;
+            size_t output_buffer_size;
             int retVal = mongo_embedded_v1_client_invoke(stream->clientHandle,
-                                                         stream->hiddenBuf.get(),
-                                                         input_len,
-                                                         &(stream->libmongo_output),
-                                                         &(stream->libmongo_output_size),
+                                                         stream->inputBuf.begin(),
+                                                         stream->inputBuf.size(),
+                                                         &output_buffer,
+                                                         &output_buffer_size,
                                                          nullptr);
             if (retVal != MONGO_EMBEDDED_V1_SUCCESS) {
                 return -1;
@@ -147,10 +205,8 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
             // We will allocate a new one when we read in the next message length
             stream->hiddenBuf.reset();
             // and then write the output to our output buffer
-            auto start = static_cast<char*>(stream->libmongo_output);
-            auto end = (static_cast<char*>(stream->libmongo_output)) + stream->libmongo_output_size;
-            stream->outputBuf = mongo::ConstDataRangeCursor(start, end);
-            stream->state = RPCState::HaveOutput;
+            stream->outputBuf = MemoryView(static_cast<char*>(output_buffer), output_buffer_size);
+            stream->state = RPCState::kHaveOutput;
         }
     }
 
@@ -166,18 +222,14 @@ extern "C" ssize_t mongoc_stream_embedded_readv(mongoc_stream_t* s,
                                                 int32_t timeout_msec) try {
     size_t bytes_read = 0;
     auto stream = static_cast<mongoc_stream_embedded_t*>(s);
-    invariant(stream->state == RPCState::HaveOutput);
-    for (size_t i = 0; i < iovcnt && stream->outputBuf.length() > 0; i++) {
+    mongoc_client_assert(stream->state == RPCState::kHaveOutput);
+    for (size_t i = 0; i < iovcnt && stream->outputBuf.remaining() > 0; ++i) {
 
         // for each vector, fill the vector if we are able
-        size_t bytes_to_copy = std::min(iov[i].iov_len, stream->outputBuf.length());
-        memcpy(iov[i].iov_base, stream->outputBuf.data(), bytes_to_copy);
-        auto x = stream->outputBuf.advance(bytes_to_copy);
-        invariant(x.isOK());
-        bytes_read += bytes_to_copy;
+        bytes_read += stream->outputBuf.read(iov[i].iov_base, iov[i].iov_len);
     }
-    stream->state =
-        stream->outputBuf.length() == 0 ? RPCState::WaitingForMessageLength : RPCState::HaveOutput;
+    stream->state = stream->outputBuf.remaining() == 0 ? RPCState::kWaitingForMessageLength
+                                                       : RPCState::kHaveOutput;
     return bytes_read;
 } catch (...) {
     errno = EBADMSG;
@@ -219,7 +271,7 @@ extern "C" mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
     std::unique_ptr<mongoc_stream_embedded_t, FreeAndDestroy> stream(
         new (stream_buf.get()) mongoc_stream_embedded_t());
     stream_buf.release();  // This must be here so we don't have double ownership
-    stream->state = RPCState::WaitingForMessageLength;
+    stream->state = RPCState::kWaitingForMessageLength;
     // Set up connections to database
     stream->clientHandle = mongo_embedded_v1_client_create(
         static_cast<mongo_embedded_v1_instance*>(user_data), nullptr);
@@ -257,16 +309,16 @@ extern "C" mongoc_client_t* mongo_embedded_v1_mongoc_client_create(
     std::unique_ptr<mongoc_client_t, ClientDeleter> client(mongoc_client_new(NULL));
     mongoc_client_set_stream_initiator(client.get(), embedded_stream_initiator, db);
     return client.release();
-} catch (const std::out_of_range& c) {
+} catch (const std::out_of_range&) {
     errno = EACCES;
     return nullptr;
-} catch (const std::overflow_error& c) {
+} catch (const std::overflow_error&) {
     errno = EOVERFLOW;
     return nullptr;
-} catch (const std::underflow_error& c) {
+} catch (const std::underflow_error&) {
     errno = ERANGE;
     return nullptr;
-} catch (const std::invalid_argument& c) {
+} catch (const std::invalid_argument&) {
     errno = EINVAL;
     return nullptr;
 } catch (...) {

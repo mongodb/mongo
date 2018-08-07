@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/embedded/mongoc_client.h"
 
 #include <mongoc.h>
