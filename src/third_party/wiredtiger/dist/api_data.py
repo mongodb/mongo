@@ -302,6 +302,14 @@ file_config = format_meta + file_runtime_config + [
     Config('leaf_item_max', '0', r'''
         historic term for leaf_key_max and leaf_value_max''',
         min=0, undoc=True),
+    Config('memory_page_image_max', '0', r'''
+        the maximum in-memory page image represented by a single storage block.
+        Depending on compression efficiency, compression can create storage
+        blocks which require significant resources to re-instantiate in the
+        cache, penalizing the performance of future point updates. The value
+        limits the maximum in-memory page image a storage block will need. If
+        set to 0, a default of 4 times \c leaf_page_max is used''',
+        min='0'),
     Config('memory_page_max', '5MB', r'''
         the maximum size a page can grow to in memory before being
         reconciled to disk.  The specified size will be adjusted to a lower
@@ -590,8 +598,7 @@ connection_runtime_config = [
         type='list', undoc=True,
         choices=[
         'checkpoint_slow', 'lookaside_sweep_race', 'split_1', 'split_2',
-        'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'split_8',
-        'split_9']),
+        'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'split_8']),
     Config('verbose', '', r'''
         enable messages for various events. Options are given as a
         list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -601,6 +608,7 @@ connection_runtime_config = [
             'checkpoint',
             'checkpoint_progress',
             'compact',
+            'error_returns',
             'evict',
             'evict_stuck',
             'evictserver',
@@ -709,7 +717,7 @@ wiredtiger_open_log_configuration = [
         Config('recover', 'on', r'''
             run recovery or error if recovery needs to run after an
             unclean shutdown''',
-            choices=['error','on'])
+            choices=['error', 'on', 'salvage'])
     ]),
 ]
 

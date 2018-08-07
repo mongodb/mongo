@@ -553,16 +553,17 @@ __curmetadata_close(WT_CURSOR *cursor)
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	c = mdc->file_cursor;
-	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, c == NULL ?
-	    NULL : ((WT_CURSOR_BTREE *)c)->btree);
+	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close,
+	    c == NULL ?  NULL : ((WT_CURSOR_BTREE *)c)->btree);
+err:
 
 	if (c != NULL)
-		ret = c->close(c);
+		WT_TRET(c->close(c));
 	if ((c = mdc->create_cursor) != NULL)
 		WT_TRET(c->close(c));
-	WT_TRET(__wt_cursor_close(cursor));
+	__wt_cursor_close(cursor);
 
-err:	API_END_RET(session, ret);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -606,10 +607,9 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 
 	WT_RET(__wt_calloc_one(session, &mdc));
-
-	cursor = &mdc->iface;
+	cursor = (WT_CURSOR *)mdc;
 	*cursor = iface;
-	cursor->session = &session->iface;
+	cursor->session = (WT_SESSION *)session;
 	cursor->key_format = "S";
 	cursor->value_format = "S";
 

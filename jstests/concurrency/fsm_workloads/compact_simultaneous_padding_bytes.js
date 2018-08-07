@@ -6,6 +6,8 @@
  * Bulk inserts 1000 documents and builds indexes. Then alternates between compacting the
  * collection and verifying the number of documents and indexes. Operates on a single collection
  * for all threads. Uses paddingBytes as a parameter for compact.
+ *
+ * @tags: [requires_compact]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload

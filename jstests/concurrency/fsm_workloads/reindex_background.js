@@ -7,6 +7,8 @@
  * and querying against the collection. Operates on a separate collection for each thread. Note
  * that because indexes are initially built in the background, reindexing is also done in the
  * background.
+ *
+ * @tags: [SERVER-32709]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload

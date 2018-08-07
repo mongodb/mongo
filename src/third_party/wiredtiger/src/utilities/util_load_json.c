@@ -599,16 +599,16 @@ util_load_json(WT_SESSION *session, const char *filename, uint32_t flags)
 
 	memset(&instate, 0, sizeof(instate));
 	instate.session = session;
-	if (util_read_line(session, &instate.line, false, &instate.ateof))
-		return (1);
-	instate.p = (const char *)instate.line.mem;
-	instate.linenum = 1;
-	instate.filename = filename;
+	if ((ret = util_read_line(
+	    session, &instate.line, false, &instate.ateof)) == 0) {
+		instate.p = (const char *)instate.line.mem;
+		instate.linenum = 1;
+		instate.filename = filename;
 
-	if ((ret = json_top_level(session, &instate, flags)) != 0)
-		goto err;
+		ret = json_top_level(session, &instate, flags);
+	}
 
-err:	free(instate.line.mem);
+	free(instate.line.mem);
 	free(instate.kvraw);
 	return (ret);
 }

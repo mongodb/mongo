@@ -68,9 +68,10 @@ static char home[1024];			/* Program working dir */
 #define	RECORDS_FILE	"records-%" PRIu32
 #define	STABLE_PERIOD	100
 
-static const char * const uri_local = "table:local";
-static const char * const uri_oplog = "table:oplog";
-static const char * const uri_collection = "table:collection";
+static const char * table_pfx = "table";
+static const char * const uri_local = "local";
+static const char * const uri_oplog = "oplog";
+static const char * const uri_collection = "collection";
 
 static const char * const ckpt_file = "checkpoint_done";
 
@@ -210,7 +211,7 @@ thread_ckpt_run(void *arg)
 		    session, "use_timestamp=true"));
 		testutil_check(td->conn->query_timestamp(
 		    td->conn, buf, "get=last_checkpoint"));
-		sscanf(buf, "%" SCNx64, &stable);
+		testutil_assert(sscanf(buf, "%" SCNx64, &stable) == 1);
 		printf("Checkpoint %d complete at stable %"
 		    PRIu64 ".\n", i, stable);
 		fflush(stdout);
@@ -243,7 +244,7 @@ thread_run(void *arg)
 	THREAD_DATA *td;
 	uint64_t i, stable_ts;
 	char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
-	char kname[64], tscfg[64];
+	char kname[64], tscfg[64], uri[128];
 	bool use_prep;
 
 	__wt_random_init(&rnd);
@@ -283,19 +284,25 @@ thread_run(void *arg)
 	/*
 	 * Open a cursor to each table.
 	 */
+	testutil_check(__wt_snprintf(
+	    uri, sizeof(uri), "%s:%s", table_pfx, uri_collection));
 	testutil_check(session->open_cursor(session,
-	    uri_collection, NULL, NULL, &cur_coll));
+	    uri, NULL, NULL, &cur_coll));
+	testutil_check(__wt_snprintf(
+	    uri, sizeof(uri), "%s:%s", table_pfx, uri_local));
 	testutil_check(session->open_cursor(session,
-	    uri_local, NULL, NULL, &cur_local));
+	    uri, NULL, NULL, &cur_local));
+	testutil_check(__wt_snprintf(
+	    uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog));
 	oplog_session = NULL;
 	if (use_prep) {
 		testutil_check(td->conn->open_session(
 		    td->conn, NULL, NULL, &oplog_session));
 		testutil_check(session->open_cursor(oplog_session,
-		    uri_oplog, NULL, NULL, &cur_oplog));
+		    uri, NULL, NULL, &cur_oplog));
 	} else
 		testutil_check(session->open_cursor(session,
-		    uri_oplog, NULL, NULL, &cur_oplog));
+		    uri, NULL, NULL, &cur_oplog));
 
 	/*
 	 * Write our portion of the key space until we're killed.
@@ -407,7 +414,7 @@ run_workload(uint32_t nth)
 	THREAD_DATA *td;
 	wt_thread_t *thr;
 	uint32_t ckpt_id, i, ts_id;
-	char envconf[512];
+	char envconf[512], uri[128];
 
 	thr = dcalloc(nth+2, sizeof(*thr));
 	td = dcalloc(nth+2, sizeof(THREAD_DATA));
@@ -425,12 +432,18 @@ run_workload(uint32_t nth)
 	/*
 	 * Create all the tables.
 	 */
-	testutil_check(session->create(session, uri_collection,
+	testutil_check(__wt_snprintf(
+	    uri, sizeof(uri), "%s:%s", table_pfx, uri_collection));
+	testutil_check(session->create(session, uri,
 		"key_format=S,value_format=u,log=(enabled=false)"));
+	testutil_check(__wt_snprintf(
+	    uri, sizeof(uri), "%s:%s", table_pfx, uri_local));
 	testutil_check(session->create(session,
-	    uri_local, "key_format=S,value_format=u"));
+	    uri, "key_format=S,value_format=u"));
+	testutil_check(__wt_snprintf(
+	    uri, sizeof(uri), "%s:%s", table_pfx, uri_oplog));
 	testutil_check(session->create(session,
-	    uri_oplog, "key_format=S,value_format=u"));
+	    uri, "key_format=S,value_format=u"));
 	/*
 	 * Don't log the stable timestamp table so that we know what timestamp
 	 * was stored at the checkpoint.
@@ -468,7 +481,7 @@ run_workload(uint32_t nth)
 	 */
 	fflush(stdout);
 	for (i = 0; i <= ts_id; ++i)
-		testutil_check(__wt_thread_join(NULL, thr[i]));
+		testutil_check(__wt_thread_join(NULL, &thr[i]));
 	/*
 	 * NOTREACHED
 	 */
@@ -574,13 +587,16 @@ main(int argc, char *argv[])
 	verify_only = false;
 	working_dir = "WT_TEST.timestamp-abort";
 
-	while ((ch = __wt_getopt(progname, argc, argv, "Ch:mT:t:vz")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "Ch:LmT:t:vz")) != EOF)
 		switch (ch) {
 		case 'C':
 			compat = true;
 			break;
 		case 'h':
 			working_dir = __wt_optarg;
+			break;
+		case 'L':
+			table_pfx = "lsm";
 			break;
 		case 'm':
 			inmem = true;
@@ -603,7 +619,6 @@ main(int argc, char *argv[])
 			usage();
 		}
 	argc -= __wt_optind;
-	argv += __wt_optind;
 	if (argc != 0)
 		usage();
 
@@ -714,12 +729,18 @@ main(int argc, char *argv[])
 	/*
 	 * Open a cursor on all the tables.
 	 */
+	testutil_check(__wt_snprintf(
+	    buf, sizeof(buf), "%s:%s", table_pfx, uri_collection));
 	testutil_check(session->open_cursor(session,
-	    uri_collection, NULL, NULL, &cur_coll));
+	    buf, NULL, NULL, &cur_coll));
+	testutil_check(__wt_snprintf(
+	    buf, sizeof(buf), "%s:%s", table_pfx, uri_local));
 	testutil_check(session->open_cursor(session,
-	    uri_local, NULL, NULL, &cur_local));
+	    buf, NULL, NULL, &cur_local));
+	testutil_check(__wt_snprintf(
+	    buf, sizeof(buf), "%s:%s", table_pfx, uri_oplog));
 	testutil_check(session->open_cursor(session,
-	    uri_oplog, NULL, NULL, &cur_oplog));
+	    buf, NULL, NULL, &cur_oplog));
 
 	/*
 	 * Find the biggest stable timestamp value that was saved.
@@ -728,7 +749,7 @@ main(int argc, char *argv[])
 	if (use_ts) {
 		testutil_check(
 		    conn->query_timestamp(conn, buf, "get=recovery"));
-		sscanf(buf, "%" SCNx64, &stable_val);
+		testutil_assert(sscanf(buf, "%" SCNx64, &stable_val) == 1);
 		printf("Got stable_val %" PRIu64 "\n", stable_val);
 	}
 

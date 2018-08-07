@@ -38,16 +38,23 @@ __wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen)
 		return (p);
 
 	/*
-	 * When called from wiredtiger_strerror, write a passed-in buffer.
-	 * When called from WT_SESSION.strerror, write the session's buffer.
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
+	 *
+	 * When called with a passed-in buffer, write the buffer.
+	 * When called with a valid session handle, write the session's buffer.
+	 * There's no way the session's buffer should be NULL if buffer format
+	 * succeeded, but Coverity is unconvinced; regardless, a test for NULL
+	 * isn't a bad idea given future code changes in the underlying code.
 	 *
 	 * Fallback to a generic message.
 	 */
-	if (session == NULL &&
+	if (errbuf != NULL &&
 	    __wt_snprintf(errbuf, errlen, "error return: %d", error) == 0)
 		return (errbuf);
 	if (session != NULL && __wt_buf_fmt(
-	    session, &session->err, "error return: %d", error) == 0)
+	    session, &session->err, "error return: %d", error) == 0 &&
+	    session->err.data != NULL)
 		return (session->err.data);
 
 	/* Defeated. */

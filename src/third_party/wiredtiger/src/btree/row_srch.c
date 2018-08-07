@@ -432,7 +432,7 @@ append:			if (__wt_split_descent_race(
 		}
 
 descend:	/* Encourage races. */
-		__wt_timing_stress(session, WT_TIMING_STRESS_SPLIT_9);
+		WT_DIAGNOSTIC_YIELD;
 
 		/*
 		 * Swap the current page for the child page. If the page splits

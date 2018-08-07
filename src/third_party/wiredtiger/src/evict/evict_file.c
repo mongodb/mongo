@@ -126,7 +126,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			break;
 		case WT_SYNC_CHECKPOINT:
 		case WT_SYNC_WRITE_LEAVES:
-			WT_ERR(__wt_illegal_value(session, NULL));
+			WT_ERR(__wt_illegal_value(session, syncop));
 			break;
 		}
 	}

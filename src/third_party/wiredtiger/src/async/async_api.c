@@ -145,7 +145,7 @@ retry:
 	 */
 	if (op == NULL || op->state != WT_ASYNCOP_FREE) {
 		WT_STAT_CONN_INCR(session, async_full);
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 	}
 	/*
 	 * Set the state of this op handle as READY for the user to use.
@@ -400,7 +400,7 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 			F_CLR(async->worker_sessions[i],
 			    WT_SESSION_SERVER_ASYNC);
 			WT_TRET(__wt_thread_join(
-			    session, async->worker_tids[i]));
+			    session, &async->worker_tids[i]));
 			wt_session = &async->worker_sessions[i]->iface;
 			WT_TRET(wt_session->close(wt_session, NULL));
 			async->worker_sessions[i] = NULL;
@@ -434,7 +434,7 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
 
 	F_CLR(conn, WT_CONN_SERVER_ASYNC);
 	for (i = 0; i < conn->async_workers; i++)
-		WT_TRET(__wt_thread_join(session, async->worker_tids[i]));
+		WT_TRET(__wt_thread_join(session, &async->worker_tids[i]));
 	__wt_cond_destroy(session, &async->flush_cond);
 
 	/* Close the server threads' sessions. */

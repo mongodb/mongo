@@ -16,11 +16,13 @@
  *  - There is no record for the second session id.
  *  - A record for the third session id was created during oplog replay.
  *
- * TODO(SERVER-33879): Unblacklist this test from WiredTiger.
- * @tags: [requires_mmapv1]
  */
 (function() {
     "use strict";
+
+    // This test drops a collection in the config database, which is not allowed under a session. It
+    // also manually simulates a session, which is not compatible with implicit sessions.
+    TestData.disableImplicitSessions = true;
 
     load("jstests/libs/retryable_writes_util.js");
 

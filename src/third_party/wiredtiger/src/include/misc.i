@@ -259,15 +259,26 @@ __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs)
 static inline void
 __wt_timing_stress(WT_SESSION_IMPL *session, u_int flag)
 {
-	WT_CONNECTION_IMPL *conn;
-	uint64_t sleep_usecs;
+	uint64_t i;
 
-	conn = S2C(session);
-
-	/* Only sleep when the specified configuration flag is set. */
-	if (!FLD_ISSET(conn->timing_stress_flags, flag))
+	/* Optionally only sleep when a specified configuration flag is set. */
+	if (flag != 0 && !FLD_ISSET(S2C(session)->timing_stress_flags, flag))
 		return;
 
-	sleep_usecs = __wt_random(&session->rnd) % WT_TIMING_STRESS_MAX_DELAY;
-	__wt_sleep(0, sleep_usecs);
+	/*
+	 * We need a fast way to choose a sleep time. We want to sleep a short
+	 * period most of the time, but occasionally wait longer. Divide the
+	 * maximum period of time into 10 buckets (where bucket 0 doesn't sleep
+	 * at all), and roll dice, advancing to the next bucket 50% of the time.
+	 * That means we'll hit the maximum roughly every 1K calls.
+	 */
+	for (i = 0;;)
+		if (__wt_random(&session->rnd) & 0x1 || ++i > 9)
+			break;
+
+	if (i == 0)
+		__wt_yield();
+	else
+		/* The default maximum delay is 1/10th of a second. */
+		__wt_sleep(0, i * (WT_TIMING_STRESS_MAX_DELAY / 10));
 }

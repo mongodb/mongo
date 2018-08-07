@@ -44,7 +44,7 @@ columns in a table, values are nested using parentheses.  For example:
 
 All types of parentheses are treated equivalently by the parser.
 
-When an integer values is expected, the value may have multiplier characters
+When an integer value is expected, the value may have multiplier characters
 appended, as follows:
 
 <table>

@@ -1770,7 +1770,8 @@ __slvg_row_trk_update_start(
 	 * would have discarded it, we wouldn't be here.  Therefore, this test
 	 * is safe.  (But, it never hurts to check.)
 	 */
-	WT_ERR_TEST(!found, WT_ERROR);
+	if (!found)
+		WT_ERR_MSG(session, WT_ERROR, "expected on-page key not found");
 	WT_ERR(__slvg_key_copy(session, &trk->row_start, key));
 
 	/*
@@ -2350,7 +2351,7 @@ __slvg_ovfl_ref(WT_SESSION_IMPL *session, WT_TRACK *trk, bool multi_panic)
 {
 	if (F_ISSET(trk, WT_TRACK_OVFL_REFD)) {
 		if (!multi_panic)
-			return (EBUSY);
+			return (__wt_set_return(session, EBUSY));
 		WT_PANIC_RET(session, EINVAL,
 		    "overflow record unexpectedly referenced multiple times "
 		    "during leaf page merge");

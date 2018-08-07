@@ -252,7 +252,7 @@ __txn_abort_newer_updates(
 	case WT_PAGE_ROW_LEAF:
 		__txn_abort_newer_row_leaf(session, page, rollback_timestamp);
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE(session, page->type);
 	}
 
 	return (0);
@@ -466,7 +466,8 @@ __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 	 * trees in cache populates a list that is used to check which
 	 * lookaside records should be removed.
 	 */
-	WT_ERR(__txn_rollback_to_stable_lookaside_fixup(session));
+	if (!F_ISSET(conn, WT_CONN_IN_MEMORY))
+		WT_ERR(__txn_rollback_to_stable_lookaside_fixup(session));
 
 err:	F_CLR(conn, WT_CONN_EVICTION_NO_LOOKASIDE);
 	__wt_free(session, conn->stable_rollback_bitstring);

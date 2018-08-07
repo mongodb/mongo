@@ -116,11 +116,22 @@ public:
      */
     static void execQuery(MobileSession* session, const std::string& query);
 
+    /**
+     * Finalizes a prepared statement.
+     */
+    void finalize();
+
+    /**
+     * Prepare a statement with the given mobile session.
+     */
+    void prepare(const MobileSession& session);
+
     uint64_t _id;
 
 private:
     static AtomicInt64 _nextID;
     sqlite3_stmt* _stmt;
+    std::string _sqlQuery;
 
     // If the most recent call to sqlite3_step on this statement returned an error, the error is
     // returned again when the statement is finalized. This is used to verify that the last error

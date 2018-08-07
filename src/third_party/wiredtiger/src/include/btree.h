@@ -95,6 +95,7 @@ struct __wt_btree {
 	uint32_t maxleafkey;		/* Leaf page max key size */
 	uint32_t maxleafvalue;		/* Leaf page max value size */
 	uint64_t maxmempage;		/* In-memory page max size */
+	uint32_t maxmempage_image;	/* In-memory page image max size */
 	uint64_t splitmempage;		/* In-memory split trigger size */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
@@ -129,6 +130,16 @@ struct __wt_btree {
 	int   split_pct;		/* Split page percent */
 
 	WT_COMPRESSOR *compressor;	/* Page compressor */
+	/*
+	 * When doing compression, the pre-compression in-memory byte size is
+	 * optionally adjusted based on previous compression results.
+	 * It's an 8B value because it's updated without a lock.
+	 */
+	bool	 leafpage_compadjust;	/* Run-time compression adjustment */
+	uint64_t maxleafpage_precomp;	/* Leaf page pre-compression size */
+	bool	 intlpage_compadjust;	/* Run-time compression adjustment */
+	uint64_t maxintlpage_precomp;	/* Internal page pre-compression size */
+
 	WT_KEYED_ENCRYPTOR *kencryptor;	/* Page encryptor */
 
 	WT_RWLOCK ovfl_lock;		/* Overflow lock */

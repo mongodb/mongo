@@ -137,7 +137,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 
 	/* This read lock can only be granted if there are no active writers. */
 	if (old.u.s.current != old.u.s.next)
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	/*
 	 * The replacement lock value is a result of adding an active reader.
@@ -146,7 +146,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 	 */
 	new.u.v = old.u.v;
 	if (++new.u.s.readers_active == 0)
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	/* We rely on this atomic operation to provide a barrier. */
 	return (__wt_atomic_casv64(&l->u.v, old.u.v, new.u.v) ? 0 : EBUSY);
@@ -331,7 +331,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 	 */
 	old.u.v = l->u.v;
 	if (old.u.s.current != old.u.s.next || old.u.s.readers_active != 0)
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 
 	/*
 	 * We've checked above that there is no writer active (since

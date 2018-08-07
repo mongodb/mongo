@@ -419,7 +419,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				 */
 				if (!__wt_atomic_cas_ptr(
 				    &lsm_tree->excl_session, NULL, session))
-					return (EBUSY);
+					return (__wt_set_return(
+					    session, EBUSY));
 
 				/*
 				 * Drain the work queue before checking for
@@ -431,7 +432,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				if (lsm_tree->refcnt != 1) {
 					__wt_lsm_tree_release(
 					    session, lsm_tree);
-					return (EBUSY);
+					return (__wt_set_return(
+					    session, EBUSY));
 				}
 			} else {
 				(void)__wt_atomic_add32(&lsm_tree->refcnt, 1);
@@ -445,7 +447,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 					    lsm_tree->refcnt > 0);
 					__wt_lsm_tree_release(
 					    session, lsm_tree);
-					return (EBUSY);
+					return (__wt_set_return(
+					    session, EBUSY));
 				}
 			}
 

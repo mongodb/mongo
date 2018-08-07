@@ -852,7 +852,7 @@ __wt_txn_op_printlog(WT_SESSION_IMPL *session,
 		WT_RET(__wt_logop_prev_lsn_print(session, pp, end, flags));
 		break;
 
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE(session, optype);
 	}
 
 	return (0);

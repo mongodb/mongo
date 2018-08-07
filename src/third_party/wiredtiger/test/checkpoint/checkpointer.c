@@ -53,7 +53,7 @@ start_checkpoints(void)
 void
 end_checkpoints(void)
 {
-	testutil_check(__wt_thread_join(NULL, g.checkpoint_thread));
+	testutil_check(__wt_thread_join(NULL, &g.checkpoint_thread));
 }
 
 /*

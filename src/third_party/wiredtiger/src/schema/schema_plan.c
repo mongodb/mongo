@@ -298,7 +298,7 @@ __find_column_format(WT_SESSION_IMPL *session, WT_TABLE *table,
 		if (k.len == colname->len &&
 		    strncmp(colname->str, k.str, k.len) == 0) {
 			if (value_only && inkey)
-				return (EINVAL);
+				return (__wt_set_return(session, EINVAL));
 			return (0);
 		}
 	}

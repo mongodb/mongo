@@ -1,5 +1,4 @@
 // perform basic js tests in parallel & some other tasks as well
-// @tags: [SERVER-32993]
 load('jstests/libs/parallelTester.js');
 
 var c = db.jstests_parallel_basicPlus;

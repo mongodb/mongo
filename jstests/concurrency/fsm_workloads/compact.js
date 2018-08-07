@@ -11,7 +11,7 @@
  * with wiredTiger LSM variants. Bypass this command for the wiredTiger LSM variant
  * until a fix is available for WT-2523.
  *
- * @tags: [does_not_support_wiredtiger_lsm]
+ * @tags: [does_not_support_wiredtiger_lsm, requires_compact]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral

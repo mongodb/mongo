@@ -119,7 +119,7 @@ retry:
 	 * decide if retrying is necessary or not.
 	 */
 	if (forced && WT_LOG_SLOT_INPROGRESS(old_state))
-		return (EBUSY);
+		return (__wt_set_return(session, EBUSY));
 	/*
 	 * If someone else is switching out this slot we lost.  Nothing to
 	 * do but return.  Return WT_NOTFOUND anytime the given slot was

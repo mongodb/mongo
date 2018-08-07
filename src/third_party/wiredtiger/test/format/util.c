@@ -588,72 +588,47 @@ WT_THREAD_RET
 timestamp(void *arg)
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	TINFO **tinfo_list, *tinfo;
-	time_t last, now;
-	uint64_t oldest_timestamp, this_ts, usecs;
-	uint32_t i;
-	char config_buf[64];
+	char buf[64];
+	bool done;
 
-	tinfo_list = arg;
-
+	(void)(arg);
 	conn = g.wts_conn;
+
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-	__wt_seconds((WT_SESSION_IMPL *)session, &last);
+	testutil_check(
+	    __wt_snprintf(buf, sizeof(buf), "%s", "oldest_timestamp="));
 
-	/*
-	 * Update the oldest timestamp every 100 transactions, but at least
-	 * once every 15 seconds.
-	 */
-	while (!g.workers_finished) {
+	/* Update the oldest timestamp at least once every 15 seconds. */
+	done = false;
+	do {
 		/*
-		 * Find the lowest in-use timestamp. The timestamp thread starts
-		 * before the operational threads, wait for them.
+		 * Do a final bump of the oldest timestamp as part of shutting
+		 * down the worker threads, otherwise recent operations can
+		 * prevent verify from running.
 		 */
-		oldest_timestamp = g.timestamp;
-		for (i = 0; i < g.c_threads; ++i) {
-			tinfo = tinfo_list[i];
-			this_ts = tinfo->commit_timestamp;
-			if (this_ts != 0 && this_ts < oldest_timestamp)
-				oldest_timestamp = this_ts;
-			this_ts = tinfo->read_timestamp;
-			if (this_ts != 0 && this_ts < oldest_timestamp)
-				oldest_timestamp = this_ts;
-		}
+		if (g.workers_finished)
+			done = true;
+		else
+			random_sleep(&g.rnd, 15);
 
 		/*
-		 * Don't try to update until we've committed some transactions
-		 * with timestamps.
+		 * Lock out transaction timestamp operations. The lock acts as a
+		 * barrier ensuring we've checked if the workers have finished,
+		 * we don't want that line reordered.
 		 */
-		if (oldest_timestamp == 0) {
-			__wt_sleep(1, 0);
-			continue;
-		}
+		testutil_check(pthread_rwlock_wrlock(&g.ts_lock));
 
-		/*
-		 * If less than 100 transactions out of date, wait up to 15
-		 * seconds before updating.
-		 */
-		WT_READ_BARRIER();
-		testutil_assert(oldest_timestamp <= g.timestamp);
-		if (g.timestamp - oldest_timestamp < 100) {
-			__wt_seconds((WT_SESSION_IMPL *)session, &now);
-			if (difftime(now, last) < 15) {
-				__wt_sleep(1, 0);
-				continue;
-			}
-		}
+		ret = conn->query_timestamp(conn,
+		    buf + strlen("oldest_timestamp="), "get=all_committed");
+		testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+		if (ret == 0)
+			testutil_check(conn->set_timestamp(conn, buf));
 
-		testutil_check(__wt_snprintf(
-		    config_buf, sizeof(config_buf),
-		    "oldest_timestamp=%" PRIx64, oldest_timestamp));
-		testutil_check(conn->set_timestamp(conn, config_buf));
-		__wt_seconds((WT_SESSION_IMPL *)session, &last);
-
-		usecs = mmrand(NULL, 5, 40);
-		__wt_sleep(0, usecs);
-	}
+		testutil_check(pthread_rwlock_unlock(&g.ts_lock));
+	} while (!done);
 
 	testutil_check(session->close(session, NULL));
 	return (WT_THREAD_RET_VALUE);
