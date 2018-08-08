@@ -51,6 +51,7 @@
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/version.h"
@@ -649,11 +650,13 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     // Find whether there is an index filter set for the query shape. The 'indexFilterSet'
     // field will always be false in the case of EOF or idhack plans.
     bool indexFilterSet = false;
+    boost::optional<uint32_t> queryHash;
     if (collection && exec->getCanonicalQuery()) {
         const CollectionInfoCache* infoCache = collection->infoCache();
         const QuerySettings* querySettings = infoCache->getQuerySettings();
         PlanCacheKey planCacheKey =
             infoCache->getPlanCache()->computeKey(*exec->getCanonicalQuery());
+        queryHash = PlanCache::computeQueryHash(planCacheKey);
         if (auto allowedIndicesFilter = querySettings->getAllowedIndicesFilter(planCacheKey)) {
             // Found an index filter set on the query shape.
             indexFilterSet = true;
@@ -672,6 +675,10 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
         if (query->getCollator()) {
             plannerBob.append("collation", query->getCollator()->getSpec().toBSON());
         }
+    }
+
+    if (queryHash) {
+        plannerBob.append("queryHash", unsignedIntToFixedLengthHex(*queryHash));
     }
 
     BSONObjBuilder winningPlanBob(plannerBob.subobjStart("winningPlan"));

@@ -58,6 +58,19 @@
     assert.eq(1, shapes.length, 'unexpected number of shapes in planCacheListQueryShapes result');
     assert.eq(profileObj0.queryHash, profileObj1.queryHash, 'unexpected not matching query hashes');
 
+    // Test that the queryHash is the same in explain output for query0 and query1 as it was in
+    // system.profile output.
+    let explain = assert.commandWorked(coll.find({a: 1, b: 1}, {a: 1})
+                                           .sort({a: -1})
+                                           .comment("Query0 find command")
+                                           .explain("queryPlanner"));
+    assert.eq(explain.queryPlanner.queryHash, profileObj0.queryHash, () => tojson(explain));
+    explain = assert.commandWorked(coll.find({a: 2, b: 1}, {a: 1})
+                                       .sort({a: -1})
+                                       .comment("Query1 find command")
+                                       .explain("queryPlanner"));
+    assert.eq(explain.queryPlanner.queryHash, profileObj0.queryHash, () => tojson(explain));
+
     // Executes query2 and gets the corresponding system.profile entry.
     assert.eq(0,
               coll.find({a: 12000, b: 1}).comment("Query2 find command").itcount(),
@@ -72,4 +85,11 @@
     shapes = getShapes(coll);
     assert.eq(2, shapes.length, 'unexpected number of shapes in planCacheListQueryShapes result');
     assert.neq(profileObj0.queryHash, profileObj2.queryHash, 'unexpected matching query hashes');
+
+    // The queryHash in explain should be different for query2 than the hash from query0 and query1.
+    explain = assert.commandWorked(
+        coll.find({a: 12000, b: 1}).comment("Query2 find command").explain("queryPlanner"));
+    assert(explain.queryPlanner.hasOwnProperty("queryHash"));
+    assert.neq(explain.queryPlanner.queryHash, profileObj0.queryHash, () => tojson(explain));
+    assert.eq(explain.queryPlanner.queryHash, profileObj2.queryHash, () => tojson(explain));
 })();
