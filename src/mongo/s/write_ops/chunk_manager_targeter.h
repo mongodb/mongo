@@ -56,7 +56,7 @@ class ChunkManagerTargeter : public NSTargeter {
 public:
     enum class UpdateType { kReplacement, kOpStyle, kUnknown };
 
-    ChunkManagerTargeter(const NamespaceString& nss, TargeterStats* stats);
+    ChunkManagerTargeter(const NamespaceString& nss);
 
     /**
      * Initializes the ChunkManagerTargeter with the latest targeting information for the
@@ -160,9 +160,6 @@ private:
 
     // Stores whether we need to check the remote server on refresh
     bool _needsTargetingRefresh;
-
-    // Represents only the view and not really part of the targeter state. This is not owned here.
-    TargeterStats* _stats;
 
     // The latest loaded routing cache entry
     boost::optional<CachedCollectionRoutingInfo> _routingInfo;

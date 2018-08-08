@@ -199,18 +199,6 @@ private:
     // Max version across all chunks
     const ChunkVersion _collectionVersion;
 
-    // Auto-split throttling state (state mutable by write commands)
-    struct AutoSplitThrottle {
-    public:
-        AutoSplitThrottle() : _splitTickets(maxParallelSplits) {}
-
-        TicketHolder _splitTickets;
-
-        // Maximum number of parallel threads requesting a split
-        static const int maxParallelSplits = 5;
-
-    } _autoSplitThrottle;
-
     friend class ChunkManager;
 };
 
@@ -405,10 +393,6 @@ public:
 
     bool uuidMatches(UUID uuid) const {
         return _rt->uuidMatches(uuid);
-    }
-
-    auto& autoSplitThrottle() const {
-        return _rt->_autoSplitThrottle;
     }
 
     auto getRoutingHistory() const {

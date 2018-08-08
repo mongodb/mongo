@@ -315,8 +315,8 @@ bool wasMetadataRefreshed(const std::shared_ptr<ChunkManager>& managerA,
 
 }  // namespace
 
-ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss, TargeterStats* stats)
-    : _nss(nss), _needsTargetingRefresh(false), _stats(stats) {}
+ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss)
+    : _nss(nss), _needsTargetingRefresh(false) {}
 
 
 Status ChunkManagerTargeter::init(OperationContext* opCtx) {
@@ -627,12 +627,6 @@ ShardEndpoint ChunkManagerTargeter::_targetShardKey(const BSONObj& shardKey,
                                                     const BSONObj& collation,
                                                     long long estDataSize) const {
     const auto chunk = _routingInfo->cm()->findIntersectingChunk(shardKey, collation);
-
-    // Track autosplit stats for sharded collections
-    // Note: this is only best effort accounting and is not accurate.
-    if (estDataSize > 0) {
-        _stats->chunkSizeDelta[chunk.getMin()] += estDataSize;
-    }
 
     return {chunk.getShardId(), _routingInfo->cm()->getVersion(chunk.getShardId())};
 }

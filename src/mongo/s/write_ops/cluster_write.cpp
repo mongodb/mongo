@@ -74,10 +74,8 @@ void ClusterWriter::write(OperationContext* opCtx,
     if (nss.db() == NamespaceString::kAdminDb) {
         Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
     } else {
-        TargeterStats targeterStats;
-
         {
-            ChunkManagerTargeter targeter(request.getTargetingNS(), &targeterStats);
+            ChunkManagerTargeter targeter(request.getTargetingNS());
 
             Status targetInitStatus = targeter.init(opCtx);
             if (!targetInitStatus.isOK()) {
