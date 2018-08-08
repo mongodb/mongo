@@ -73,6 +73,11 @@ public:
                 "prepareTransaction must be run within a transaction",
                 txnParticipant);
 
+        uassert(ErrorCodes::CommandNotSupported,
+                "'prepareTransaction' is only supported in feature compatibility version 4.2",
+                (serverGlobalParams.featureCompatibility.getVersion() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
+
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
                 txnParticipant->inMultiDocumentTransaction());
