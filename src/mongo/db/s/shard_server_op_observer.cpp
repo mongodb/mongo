@@ -170,7 +170,8 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
 
     const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
 
-    if (chunkWritesTracker->shouldSplit(balancerConfig->getMaxChunkSizeBytes())) {
+    if (balancerConfig->getShouldAutoSplit() &&
+        chunkWritesTracker->shouldSplit(balancerConfig->getMaxChunkSizeBytes())) {
         auto chunkSplitStateDriver = ChunkSplitStateDriver::tryInitiateSplit(chunkWritesTracker);
         if (chunkSplitStateDriver) {
             ChunkSplitter::get(opCtx).trySplitting(
