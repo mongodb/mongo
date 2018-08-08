@@ -47,10 +47,9 @@ using std::vector;
 
 namespace {
 
-// These values indicate the minimum deviation shard's number of chunks need to have from the
+// This value indicates the minimum deviation shard's number of chunks need to have from the
 // optimal average across all shards for a zone for a rebalancing migration to be initiated.
-const size_t kDefaultImbalanceThreshold = 2;
-const size_t kAggressiveImbalanceThreshold = 1;
+const size_t kDefaultImbalanceThreshold = 1;
 
 }  // namespace
 
@@ -290,7 +289,6 @@ ShardId BalancerPolicy::_getMostOverloadedShard(const ShardStatisticsVector& sha
 
 vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
-                                            bool shouldAggressivelyBalance,
                                             std::set<ShardId>* usedShards) {
     vector<MigrateInfo> migrations;
 
@@ -388,9 +386,6 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
     }
 
     // 3) for each tag balance
-    const size_t imbalanceThreshold = (shouldAggressivelyBalance || distribution.totalChunks() < 20)
-        ? kAggressiveImbalanceThreshold
-        : kDefaultImbalanceThreshold;
 
     vector<string> tagsPlusEmpty(distribution.tags().begin(), distribution.tags().end());
     tagsPlusEmpty.push_back("");
@@ -419,16 +414,14 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
             continue;
         }
 
-        // Calculate the ceiling of the optimal number of chunks per shard
+        // Calculate the rounded optimal number of chunks per shard
         const size_t idealNumberOfChunksPerShardForTag =
-            (totalNumberOfChunksWithTag / totalNumberOfShardsWithTag) +
-            (totalNumberOfChunksWithTag % totalNumberOfShardsWithTag ? 1 : 0);
+            (size_t)std::roundf(totalNumberOfChunksWithTag / (float)totalNumberOfShardsWithTag);
 
         while (_singleZoneBalance(shardStats,
                                   distribution,
                                   tag,
                                   idealNumberOfChunksPerShardForTag,
-                                  imbalanceThreshold,
                                   &migrations,
                                   usedShards))
             ;
@@ -456,7 +449,6 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
                                         const DistributionStatus& distribution,
                                         const string& tag,
                                         size_t idealNumberOfChunksPerShardForTag,
-                                        size_t imbalanceThreshold,
                                         vector<MigrateInfo>* migrations,
                                         set<ShardId>* usedShards) {
     const ShardId from = _getMostOverloadedShard(shardStats, distribution, tag, *usedShards);
@@ -490,10 +482,10 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
     LOG(1) << "donor      : " << from << " chunks on " << max;
     LOG(1) << "receiver   : " << to << " chunks on " << min;
     LOG(1) << "ideal      : " << idealNumberOfChunksPerShardForTag;
-    LOG(1) << "threshold  : " << imbalanceThreshold;
+    LOG(1) << "threshold  : " << kDefaultImbalanceThreshold;
 
     // Check whether it is necessary to balance within this zone
-    if (imbalance < imbalanceThreshold)
+    if (imbalance < kDefaultImbalanceThreshold)
         return false;
 
     const vector<ChunkType>& chunks = distribution.getChunks(from);

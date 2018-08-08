@@ -376,12 +376,12 @@ void Balancer::_mainThread() {
                     LOG(1) << "Done enforcing tag range boundaries.";
                 }
 
-                const auto candidateChunks = uassertStatusOK(
-                    _chunkSelectionPolicy->selectChunksToMove(opCtx.get(), _balancedLastTime));
+                const auto candidateChunks =
+                    uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx.get()));
 
                 if (candidateChunks.empty()) {
                     LOG(1) << "no need to move any chunk";
-                    _balancedLastTime = false;
+                    _balancedLastTime = 0;
                 } else {
                     _balancedLastTime = _moveChunks(opCtx.get(), candidateChunks);
 

@@ -181,16 +181,12 @@ public:
      * any of the shards have chunks, which are sufficiently higher than this number, suggests
      * moving chunks to shards, which are under this number.
      *
-     * The shouldAggressivelyBalance parameter causes the threshold for chunk could disparity
-     * between shards to be lowered.
-     *
      * The usedShards parameter is in/out and it contains the set of shards, which have already been
      * used for migrations. Used so we don't return multiple conflicting migrations for the same
      * shard.
      */
     static std::vector<MigrateInfo> balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
-                                            bool shouldAggressivelyBalance,
                                             std::set<ShardId>* usedShards);
 
     /**
@@ -236,7 +232,6 @@ private:
                                    const DistributionStatus& distribution,
                                    const std::string& tag,
                                    size_t idealNumberOfChunksPerShardForTag,
-                                   size_t imbalanceThreshold,
                                    std::vector<MigrateInfo>* migrations,
                                    std::set<ShardId>* usedShards);
 };

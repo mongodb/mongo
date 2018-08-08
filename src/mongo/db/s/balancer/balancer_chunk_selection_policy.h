@@ -90,12 +90,9 @@ public:
     virtual StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx) = 0;
 
     /**
-     * Potentially blocking method, which gives out a set of chunks to be moved. The
-     * aggressiveBalanceHint indicates to the balancing logic that it should lower the threshold for
-     * difference in number of chunks across shards and thus potentially cause more chunks to move.
+     * Potentially blocking method, which gives out a set of chunks to be moved.
      */
-    virtual StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx,
-                                                             bool aggressiveBalanceHint) = 0;
+    virtual StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx) = 0;
 
     /**
      * Requests a single chunk to be relocated to a different shard, if possible. If some error

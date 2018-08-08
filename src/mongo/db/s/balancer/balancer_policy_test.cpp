@@ -114,8 +114,7 @@ std::vector<MigrateInfo> balanceChunks(const ShardStatisticsVector& shardStats,
                                        const DistributionStatus& distribution,
                                        bool shouldAggressivelyBalance) {
     std::set<ShardId> usedShards;
-    return BalancerPolicy::balance(
-        shardStats, distribution, shouldAggressivelyBalance, &usedShards);
+    return BalancerPolicy::balance(shardStats, distribution, &usedShards);
 }
 
 TEST(BalancerPolicy, Basic) {
@@ -245,7 +244,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNe
     // Here kShardId0 would have been selected as a donor
     std::set<ShardId> usedShards{kShardId0};
     const auto migrations(BalancerPolicy::balance(
-        cluster.first, DistributionStatus(kNamespace, cluster.second), false, &usedShards));
+        cluster.first, DistributionStatus(kNamespace, cluster.second), &usedShards));
     ASSERT_EQ(1U, migrations.size());
 
     ASSERT_EQ(kShardId1, migrations[0].from);
@@ -264,7 +263,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNo
     // Here kShardId0 would have been selected as a donor
     std::set<ShardId> usedShards{kShardId0};
     const auto migrations(BalancerPolicy::balance(
-        cluster.first, DistributionStatus(kNamespace, cluster.second), false, &usedShards));
+        cluster.first, DistributionStatus(kNamespace, cluster.second), &usedShards));
     ASSERT_EQ(0U, migrations.size());
 }
 
@@ -278,7 +277,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseDestinationShards) {
     // Here kShardId2 would have been selected as a recipient
     std::set<ShardId> usedShards{kShardId2};
     const auto migrations(BalancerPolicy::balance(
-        cluster.first, DistributionStatus(kNamespace, cluster.second), false, &usedShards));
+        cluster.first, DistributionStatus(kNamespace, cluster.second), &usedShards));
     ASSERT_EQ(1U, migrations.size());
 
     ASSERT_EQ(kShardId0, migrations[0].from);

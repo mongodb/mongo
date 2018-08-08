@@ -42,8 +42,7 @@ public:
 
     StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx) override;
 
-    StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx,
-                                                     bool aggressiveBalanceHint) override;
+    StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx) override;
 
     StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
         OperationContext* opCtx, const ChunkType& chunk) override;
@@ -70,7 +69,6 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ShardStatisticsVector& shardStats,
-        bool aggressiveBalanceHint,
         std::set<ShardId>* usedShards);
 
     // Source for obtaining cluster statistics. Not owned and must not be destroyed before the
