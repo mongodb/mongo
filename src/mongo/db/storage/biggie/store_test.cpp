@@ -118,10 +118,14 @@ TEST_F(RadixStoreTest, InsertInCopyFromRootTest) {
     // node
     ASSERT_TRUE(check_other->first == value4.first);
     ASSERT_TRUE(check_this->first == value3.first);
-    check_other++;
 
-    // Both should point to the same "fee" node.
-    ASSERT_EQUALS(&*check_this, &*check_other);
+    // 'otherStore' should have a 'fee' object.
+    check_other++;
+    ASSERT_TRUE(check_other->first == value3.first);
+
+    // Both should point to different "fee" nodes due to the insertion of 'fed' splitting
+    // the 'fee' node in other.
+    ASSERT_NOT_EQUALS(&*check_this, &*check_other);
     check_this++;
     check_other++;
 
@@ -207,10 +211,14 @@ TEST_F(RadixStoreTest, InsertTwiceInCopyTest) {
     // node
     ASSERT_TRUE(check_other->first == value4.first);
     ASSERT_TRUE(check_this->first == value3.first);
-    check_other++;
 
-    // Both should point to the same "fee" node.
-    ASSERT_EQUALS(&*check_this, &*check_other);
+    // 'otherStore' should have a 'fee' object.
+    check_other++;
+    ASSERT_TRUE(check_other->first == value3.first);
+
+    // Both should point to different "fee" nodes due to the insertion of 'fed' splitting
+    // the 'fee' node in other.
+    ASSERT_NOT_EQUALS(&*check_this, &*check_other);
     check_this++;
     check_other++;
 
@@ -312,8 +320,12 @@ TEST_F(RadixStoreTest, InsertNonLeafNodeInBranchWithSharedChildrenTest) {
     ASSERT_TRUE(check_other->first == value2.first);
     check_other++;
 
-    // Now both should point to the same "feed" node.
-    ASSERT_EQUALS(&*check_this, &*check_other);
+    // Now both should point to a "feed" node.
+    ASSERT_TRUE(check_this->first == check_other->first);
+
+    // The 'feed' nodes should be different due to the insertion of 'fee' splitting the 'feed'
+    // node in 'otherStore'
+    ASSERT_NOT_EQUALS(&*check_this, &*check_other);
     check_this++;
     check_other++;
 
@@ -345,8 +357,16 @@ TEST_F(RadixStoreTest, FindTest) {
     ASSERT_FALSE(iter1 == thisStore.end());
     ASSERT_TRUE(*iter1 == value1);
 
-    StringStore::const_iterator iter2 = thisStore.find("fooze");
-    ASSERT_TRUE(iter2 == thisStore.end());
+    StringStore::const_iterator iter2 = thisStore.find(value2.first);
+    ASSERT_FALSE(iter2 == thisStore.end());
+    ASSERT_TRUE(*iter2 == value2);
+
+    StringStore::const_iterator iter3 = thisStore.find(value3.first);
+    ASSERT_FALSE(iter3 == thisStore.end());
+    ASSERT_TRUE(*iter3 == value3);
+
+    StringStore::const_iterator iter4 = thisStore.find("fooze");
+    ASSERT_TRUE(iter4 == thisStore.end());
 }
 
 TEST_F(RadixStoreTest, UpdateTest) {
@@ -612,10 +632,14 @@ TEST_F(RadixStoreTest, EraseNonLeafNodeWithSharedParent) {
     // 'feed' object.
     ASSERT_TRUE(this_it->first == value3.first);
     ASSERT_TRUE(other_it->first == value5.first);
-    this_it++;
 
-    // Now both iterators should point to the same 'feed' object.
-    ASSERT_TRUE(&*this_it == &*other_it);
+    // 'thisStore' should have a 'feed' node.
+    this_it++;
+    ASSERT_TRUE(this_it->first == value5.first);
+
+    // Both iterators should point to different 'feed' objects because erasing 'fee' from
+    // 'otherStore' caused 'feed' to be compressed.
+    ASSERT_NOT_EQUALS(&*this_it, &*other_it);
     this_it++;
     other_it++;
 
@@ -733,7 +757,13 @@ TEST_F(RadixStoreTest, CopyTest) {
     StringStore::const_iterator iter = thisStore.begin();
     StringStore::const_iterator copy_iter = copy.begin();
 
-    ASSERT_EQ(&*iter, &*copy_iter);
+    // Both 'iter' and 'copy_iter' should point to 'bar'.
+    ASSERT_EQ(iter->first, value2.first);
+    ASSERT_EQ(copy_iter->first, value2.first);
+
+    // The insertion of 'baz' split the 'bar' node in 'copy_iter', so these
+    // nodes should be different.
+    ASSERT_NOT_EQUALS(&*iter, &*copy_iter);
 
     iter++;
     copy_iter++;
@@ -1085,6 +1115,109 @@ TEST_F(RadixStoreTest, LowerBoundTest) {
 
     iter = thisStore.lower_bound("baz");
     ASSERT_TRUE(iter == thisStore.find("foo"));
+
+    // Lower bound not found
+    iter = thisStore.lower_bound("fooze");
+    ASSERT_TRUE(iter == thisStore.end());
+
+    iter = thisStore.lower_bound("fright");
+    ASSERT_TRUE(iter == thisStore.end());
+
+    iter = thisStore.lower_bound("three");
+    ASSERT_TRUE(iter == thisStore.end());
+}
+
+TEST_F(RadixStoreTest, LowerBoundTestSmallerThanExistingPrefix) {
+    value_type value1 = std::make_pair("abcdef", "1");
+    value_type value2 = std::make_pair("abc", "1");
+    value_type value3 = std::make_pair("bah", "2");
+
+    thisStore.insert(value_type(value1));
+    thisStore.insert(value_type(value2));
+    thisStore.insert(value_type(value3));
+
+    // Test the various ways in which the key we are trying to lower
+    // bound can be smaller than existing keys it shares prefixes with.
+
+    // Search key is smaller than existing key.
+    StringStore::const_iterator iter = thisStore.lower_bound("abcd");
+    ASSERT_TRUE(iter != thisStore.end());
+    ASSERT_EQ(iter->first, value1.first);
+
+    // Smaller character at mismatch between search key and existing key.
+    StringStore::const_iterator iter2 = thisStore.lower_bound("abcda");
+    ASSERT_TRUE(iter2 != thisStore.end());
+    ASSERT_EQ(iter2->first, value1.first);
+}
+
+TEST_F(RadixStoreTest, LowerBoundTestLargerThanExistingPrefix) {
+    value_type value1 = std::make_pair("abcdef", "1");
+    value_type value2 = std::make_pair("abc", "1");
+    value_type value3 = std::make_pair("agh", "1");
+
+    thisStore.insert(value_type(value1));
+    thisStore.insert(value_type(value2));
+    thisStore.insert(value_type(value3));
+
+    // Test the various ways in which the key we are trying to lower
+    // bound can be smaller than existing keys it shares prefixes with.
+
+    // Search key is longer than existing key.
+    StringStore::const_iterator iter = thisStore.lower_bound("abcdefg");
+    ASSERT_TRUE(iter != thisStore.end());
+    ASSERT_EQ(iter->first, value3.first);
+
+    // Larger character at mismatch between search key and existing key.
+    StringStore::const_iterator iter2 = thisStore.lower_bound("abcdz");
+    ASSERT_TRUE(iter2 != thisStore.end());
+    ASSERT_EQ(iter2->first, value3.first);
+}
+
+TEST_F(RadixStoreTest, LowerBoundTestExactPrefixMatch) {
+    value_type value1 = std::make_pair("aba", "1");
+    value_type value2 = std::make_pair("abd", "1");
+
+    thisStore.insert(value_type(value1));
+    thisStore.insert(value_type(value2));
+
+    // Search for a string that matches a prefix in the tree with no value.
+    StringStore::const_iterator iter = thisStore.lower_bound("ab");
+    ASSERT_TRUE(iter != thisStore.end());
+    ASSERT_EQ(iter->first, value1.first);
+}
+
+TEST_F(RadixStoreTest, LowerBoundTestNullCharacter) {
+    value_type value1 = std::make_pair(std::string("ab\0", 3), "1");
+    value_type value2 = std::make_pair("abd", "1");
+
+    thisStore.insert(value_type(value1));
+    thisStore.insert(value_type(value2));
+
+    StringStore::const_iterator iter = thisStore.lower_bound(std::string("ab"));
+    ASSERT_TRUE(iter != thisStore.end());
+    ASSERT_EQ(iter->first, value1.first);
+}
+
+TEST_F(RadixStoreTest, BasicInsertFindDeleteNullCharacter) {
+    value_type value1 = std::make_pair(std::string("ab\0", 3), "1");
+    value_type value2 = std::make_pair("abd", "1");
+
+    thisStore.insert(value_type(value1));
+    thisStore.insert(value_type(value2));
+
+    StringStore::const_iterator iter = thisStore.find(std::string("ab\0", 3));
+    ASSERT_TRUE(iter != thisStore.end());
+    ASSERT_EQ(iter->first, value1.first);
+
+    ASSERT_EQ(thisStore.erase(std::string("ab\0", 3)), StringStore::size_type(1));
+    ASSERT_EQ(thisStore.size(), StringStore::size_type(1));
+
+    iter = thisStore.find(std::string("ab\0", 3));
+    ASSERT_TRUE(iter == thisStore.end());
+
+    iter = thisStore.find(std::string("abd"));
+    ASSERT_TRUE(iter != thisStore.end());
+    ASSERT_EQ(iter->first, value2.first);
 }
 
 TEST_F(RadixStoreTest, ReverseIteratorTest) {
@@ -1245,6 +1378,90 @@ TEST_F(RadixStoreTest, ReverseIteratorAssignmentOpTest) {
     ASSERT_EQ(cur, 0);
 }
 
+TEST_F(RadixStoreTest, PathCompressionTest) {
+    value_type value1 = std::make_pair("food", "1");
+    value_type value2 = std::make_pair("foo", "2");
+    value_type value3 = std::make_pair("bar", "3");
+    value_type value4 = std::make_pair("batter", "4");
+    value_type value5 = std::make_pair("batty", "5");
+    value_type value6 = std::make_pair("bats", "6");
+    value_type value7 = std::make_pair("foodie", "7");
+
+    thisStore.insert(value_type(value1));
+    ASSERT_EQ(thisStore.to_string_for_test(), "\n food*\n");
+
+    // Add a key that is a prefix of a key already in the tree
+    thisStore.insert(value_type(value2));
+    ASSERT_EQ(thisStore.to_string_for_test(),
+              "\n foo*"
+              "\n  d*\n");
+
+    // Add a key with no prefix already in the tree
+    thisStore.insert(value_type(value3));
+    ASSERT_EQ(thisStore.to_string_for_test(),
+              "\n bar*"
+              "\n foo*"
+              "\n  d*\n");
+
+    // Add a key that shares a prefix with a key in the tree
+    thisStore.insert(value_type(value4));
+    ASSERT_EQ(thisStore.to_string_for_test(),
+              "\n ba"
+              "\n  r*"
+              "\n  tter*"
+              "\n foo*"
+              "\n  d*\n");
+
+    // Add another level to the tree
+    thisStore.insert(value_type(value5));
+    ASSERT_EQ(thisStore.to_string_for_test(),
+              "\n ba"
+              "\n  r*"
+              "\n  tt"
+              "\n   er*"
+              "\n   y*"
+              "\n foo*"
+              "\n  d*\n");
+
+    // Erase a key that causes the path to be compressed
+    thisStore.erase(value2.first);
+    ASSERT_EQ(thisStore.to_string_for_test(),
+              "\n ba"
+              "\n  r*"
+              "\n  tt"
+              "\n   er*"
+              "\n   y*"
+              "\n food*\n");
+
+    // Erase a key that causes the path to be compressed
+    thisStore.erase(value3.first);
+    ASSERT_EQ(thisStore.to_string_for_test(),
+              "\n batt"
+              "\n  er*"
+              "\n  y*"
+              "\n food*\n");
+
+    // Add a key that causes a node with children to be split
+    thisStore.insert(value_type(value6));
+    ASSERT_EQ(thisStore.to_string_for_test(),
+              "\n bat"
+              "\n  s*"
+              "\n  t"
+              "\n   er*"
+              "\n   y*"
+              "\n food*\n");
+    
+    // Add a key that has a prefix already in the tree with a value
+    thisStore.insert(value_type(value7));
+    ASSERT_EQ(thisStore.to_string_for_test(),
+              "\n bat"
+              "\n  s*"
+              "\n  t"
+              "\n   er*"
+              "\n   y*"
+              "\n food*"
+              "\n  ie*\n");
+}
 }  // namespace
 }  // mongo namespace
 }  // biggie namespace
