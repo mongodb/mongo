@@ -200,6 +200,35 @@ if (typeof _threadInject != "undefined") {
 
             // Destroys and recreates the catalog, which will interfere with other tests.
             "restart_catalog.js",
+
+            // Use eval command and potentially cause deadlock.
+            "apitest_db.js",
+            "constructors.js",
+            "error2.js",
+            "eval0.js",
+            "eval1.js",
+            "eval3.js",
+            "eval4.js",
+            "eval5.js",
+            "eval6.js",
+            "eval7.js",
+            "eval9.js",
+            "evala.js",
+            "evalb.js",
+            "evald.js",
+            "evale.js",
+            "evalg.js",
+            "eval_mr.js",
+            "eval_nolock.js",
+            "fsync.js",
+            "recursion.js",
+            "js3.js",
+            "js7.js",
+            "js9.js",
+            "remove8.js",
+            "rename4.js",
+            "shellkillop.js",
+            "storefunc.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.
