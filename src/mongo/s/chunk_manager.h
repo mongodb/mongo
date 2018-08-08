@@ -212,11 +212,6 @@ private:
     } _autoSplitThrottle;
 
     friend class ChunkManager;
-    // This function needs to be able to access the auto-split throttle
-    friend void updateChunkWriteStatsAndSplitIfNeeded(OperationContext*,
-                                                      ChunkManager*,
-                                                      Chunk,
-                                                      long);
 };
 
 // This will be renamed to RoutingTableHistory and the original RoutingTableHistory will be

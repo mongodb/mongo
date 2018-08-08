@@ -1786,7 +1786,6 @@ public:
         long long inputCount = 0;
         unsigned int index = 0;
         BSONObj query;
-        BSONArrayBuilder chunkSizes;
         BSONList values;
 
         while (true) {
@@ -1796,7 +1795,6 @@ public:
                 b.appendAs(chunk.getMin().firstElement(), "$gte");
                 b.appendAs(chunk.getMax().firstElement(), "$lt");
                 query = BSON("_id" << b.obj());
-                //                        chunkSizes.append(min);
             }
 
             // reduce from each shard for a chunk
@@ -1804,8 +1802,6 @@ public:
             ParallelSortClusteredCursor cursor(
                 servers, inputNS, Query(query).sort(sortKey), QueryOption_NoCursorTimeout);
             cursor.init(opCtx);
-
-            int chunkSize = 0;
 
             while (cursor.more() || !values.empty()) {
                 BSONObj t;
@@ -1825,7 +1821,6 @@ public:
                 }
 
                 BSONObj res = config.reducer->finalReduce(values, config.finalizer.get());
-                chunkSize += res.objsize();
                 if (state.isOnDisk())
                     state.insert(config.tempNamespace, res);
                 else
@@ -1837,20 +1832,12 @@ public:
                     values.push_back(t);
             }
 
-            if (chunks.size() > 0) {
-                const auto& chunk = chunks[index];
-                chunkSizes.append(chunk.getMin());
-                chunkSizes.append(chunkSize);
-            }
-
             if (++index >= chunks.size())
                 break;
         }
 
         // Forget temporary input collection, if output is sharded collection
         ShardConnection::forgetNS(inputNS);
-
-        result.append("chunkSizes", chunkSizes.arr());
 
         long long outputCount = state.postProcessCollection(opCtx, curOp, pm);
         state.appendResults(result);

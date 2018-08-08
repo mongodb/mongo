@@ -35,8 +35,6 @@
 namespace mongo {
 
 class BSONObj;
-class Chunk;
-class ChunkManager;
 class OperationContext;
 
 class ClusterWriter {
@@ -46,15 +44,5 @@ public:
                       BatchWriteExecStats* stats,
                       BatchedCommandResponse* response);
 };
-
-/**
- * Adds the specified amount of data written to the chunk's stats and if the total amount nears the
- * max size of a shard attempt to split the chunk. This call is opportunistic and swallows any
- * errors.
- */
-void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
-                                           ChunkManager* manager,
-                                           Chunk chunk,
-                                           long dataWritten);
 
 }  // namespace mongo

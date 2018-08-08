@@ -543,7 +543,6 @@ public:
                 shardedOutputCollUUID->appendToBuilder(&finalCmd, "shardedOutputCollUUID");
             }
 
-            auto chunkSizes = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>();
             {
                 // Take distributed lock to prevent split / migration.
                 auto scopedDistLock = catalogClient->getDistLockManager()->lock(
@@ -599,20 +598,6 @@ public:
                     reduceCount += counts.getIntField("reduce");
                     outputCount += counts.getIntField("output");
                     postCountsB.append(server, counts);
-
-                    // get the size inserted for each chunk
-                    // split cannot be called here since we already have the distributed lock
-                    if (singleResult.hasField("chunkSizes")) {
-                        std::vector<BSONElement> sizes =
-                            singleResult.getField("chunkSizes").Array();
-                        for (unsigned int i = 0; i < sizes.size(); i += 2) {
-                            BSONObj key = sizes[i].Obj().getOwned();
-                            const long long size = sizes[i + 1].numberLong();
-
-                            invariant(size < std::numeric_limits<int>::max());
-                            chunkSizes[key] = static_cast<int>(size);
-                        }
-                    }
                 }
             }
 
@@ -624,18 +609,6 @@ public:
                     str::stream() << "Failed to write mapreduce output to " << outputCollNss.ns()
                                   << "; expected that collection to be sharded, but it was not",
                     outputRoutingInfo.cm());
-
-            const auto outputCM = outputRoutingInfo.cm();
-
-            for (const auto& chunkSize : chunkSizes) {
-                BSONObj key = chunkSize.first;
-                const int size = chunkSize.second;
-                invariant(size < std::numeric_limits<int>::max());
-
-                // Key reported should be the chunk's minimum
-                auto chunkWritten = outputCM->findIntersectingChunkWithSimpleCollation(key);
-                updateChunkWriteStatsAndSplitIfNeeded(opCtx, outputCM.get(), chunkWritten, size);
-            }
         }
 
         cleanUp(servers, dbname, shardResultCollection);
