@@ -2985,6 +2985,35 @@ TEST_F(ReplCoordTest, IsMasterWithCommittedSnapshot) {
     ASSERT_EQUALS(majorityWriteDate, response.getLastMajorityWriteDate());
 }
 
+TEST_F(ReplCoordTest, IsMasterInShutdown) {
+    init("mySet");
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234"))),
+                       HostAndPort("test1", 1234));
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
+
+    IsMasterResponse responseBeforeShutdown;
+    getReplCoord()->fillIsMasterForReplSet(&responseBeforeShutdown);
+    ASSERT_TRUE(responseBeforeShutdown.isMaster());
+    ASSERT_FALSE(responseBeforeShutdown.isSecondary());
+
+    shutdown(opCtx.get());
+
+    // Must not report ourselves as master while we're in shutdown.
+    IsMasterResponse responseAfterShutdown;
+    getReplCoord()->fillIsMasterForReplSet(&responseAfterShutdown);
+    ASSERT_FALSE(responseAfterShutdown.isMaster());
+    ASSERT_FALSE(responseBeforeShutdown.isSecondary());
+}
+
+
 TEST_F(ReplCoordTest, LogAMessageWhenShutDownBeforeReplicationStartUpFinished) {
     init();
     startCapturingLogMessages();
