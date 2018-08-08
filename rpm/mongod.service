@@ -1,6 +1,6 @@
 [Unit]
 Description=MongoDB Database Server
-After=network.target
+After=multi-user.target
 Documentation=https://docs.mongodb.org/manual
 
 [Service]
