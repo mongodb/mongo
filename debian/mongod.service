@@ -1,6 +1,6 @@
 [Unit]
-Description=High-performance, schema-free document-oriented database
-After=network.target
+Description=MongoDB Database Server
+After=multi-user.target
 Documentation=https://docs.mongodb.org/manual
 
 [Service]
