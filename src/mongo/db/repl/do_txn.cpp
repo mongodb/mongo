@@ -307,7 +307,7 @@ Status doTxn(OperationContext* opCtx,
         txnParticipant->commitUnpreparedTransaction(opCtx);
         result->appendElements(intermediateResult.obj());
     } catch (const DBException& ex) {
-        txnParticipant->abortActiveTransaction(opCtx);
+        txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
         BSONArrayBuilder ab;
         ++numApplied;
         for (int j = 0; j < numApplied; j++)

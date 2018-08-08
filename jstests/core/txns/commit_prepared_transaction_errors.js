@@ -19,7 +19,7 @@
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
 
-    const doc = {x: 1};
+    const doc = {_id: 1};
 
     jsTestLog("Test committing a prepared transaction with no 'commitTimestamp'.");
     session.startTransaction();
@@ -27,6 +27,14 @@
     PrepareHelpers.prepareTransaction(session);
     assert.commandFailedWithCode(sessionDB.adminCommand({commitTransaction: 1}),
                                  ErrorCodes.InvalidOptions);
+    // Make sure the transaction is still running by observing write conflicts.
+    const anotherSession = db.getMongo().startSession({causalConsistency: false});
+    anotherSession.startTransaction();
+    assert.commandFailedWithCode(
+        anotherSession.getDatabase(dbName).getCollection(collName).insert(doc),
+        ErrorCodes.WriteConflict);
+    anotherSession.abortTransaction();
+    // Abort the original transaction.
     session.abortTransaction();
 
     jsTestLog("Test committing a prepared transaction with an invalid 'commitTimestamp'.");

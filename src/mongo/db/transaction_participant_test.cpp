@@ -108,7 +108,7 @@ void OpObserverMock::onTransactionPrepare(OperationContext* opCtx, const OplogSl
     uassert(ErrorCodes::OperationFailed,
             "onTransactionPrepare() failed",
             !onTransactionPrepareThrowsException);
-
+    transactionPrepared = true;
     onTransactionPrepareFn();
 }
 
@@ -118,6 +118,7 @@ void OpObserverMock::onTransactionCommit(OperationContext* opCtx, bool wasPrepar
     uassert(ErrorCodes::OperationFailed,
             "onTransactionCommit() failed",
             !onTransactionCommitThrowsException);
+    transactionCommitted = true;
     onTransactionCommitFn(wasPrepared);
 }
 
@@ -1026,7 +1027,7 @@ TEST_F(TxnParticipantTest, AbortDuringPreparedCommitDoesNotAbortTransaction) {
         ASSERT(wasPrepared);
 
         // The transaction may be aborted without checking out the txnParticipant.
-        auto func = [&](OperationContext* opCtx) { txnParticipant->abortActiveTransaction(opCtx); };
+        auto func = [&](OperationContext* opCtx) { txnParticipant->abortArbitraryTransaction(); };
         runFunctionFromDifferentOpCtx(func);
         ASSERT_FALSE(txnParticipant->transactionIsAborted());
     };
@@ -1079,27 +1080,30 @@ TEST_F(TxnParticipantTest, KillSessionsDuringUnpreparedCommitDoesNotAbortTransac
     ASSERT(txnParticipant->transactionIsCommitted());
 }
 
-TEST_F(TxnParticipantTest, AbortDuringUnpreparedCommitDoesNotAbortTransaction) {
+DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringUnpreparedCommit, "Cannot abort transaction") {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
 
+    auto sessionId = *opCtx()->getLogicalSessionId();
+    auto txnNumber = *opCtx()->getTxnNumber();
     auto originalFn = _opObserver->onTransactionCommitFn;
     _opObserver->onTransactionCommitFn = [&](bool wasPrepared) {
         originalFn(wasPrepared);
         ASSERT_FALSE(wasPrepared);
 
         // The transaction may be aborted without checking out the txnParticipant.
-        auto func = [&](OperationContext* opCtx) { txnParticipant->abortActiveTransaction(opCtx); };
+        auto func = [&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(sessionId);
+            opCtx->setTxnNumber(txnNumber);
+            // Hit an invariant. This should never happen.
+            txnParticipant->abortActiveTransaction(opCtx);
+        };
         runFunctionFromDifferentOpCtx(func);
         ASSERT_FALSE(txnParticipant->transactionIsAborted());
     };
 
     txnParticipant->commitUnpreparedTransaction(opCtx());
-
-    ASSERT(_opObserver->transactionCommitted);
-    ASSERT_FALSE(txnParticipant->transactionIsAborted());
-    ASSERT(txnParticipant->transactionIsCommitted());
 }
 
 // This tests documents behavior, though it is not necessarily the behavior we want.
@@ -1187,6 +1191,30 @@ TEST_F(TxnParticipantTest, KillSessionsDoesNotAbortPreparedTransactions) {
     ASSERT(_opObserver->transactionPrepared);
 }
 
+TEST_F(TxnParticipantTest, TransactionTimeoutDoesNotAbortPreparedTransactions) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+
+    auto ruPrepareTimestamp = Timestamp();
+    auto originalFn = _opObserver->onTransactionPrepareFn;
+    _opObserver->onTransactionPrepareFn = [&]() {
+        originalFn();
+        ruPrepareTimestamp = opCtx()->recoveryUnit()->getPrepareTimestamp();
+        ASSERT_FALSE(ruPrepareTimestamp.isNull());
+    };
+
+    // Check that prepareTimestamp gets set.
+    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx());
+    ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
+    txnParticipant->stashTransactionResources(opCtx());
+
+    txnParticipant->abortArbitraryTransactionIfExpired();
+    ASSERT_FALSE(txnParticipant->transactionIsAborted());
+    ASSERT(_opObserver->transactionPrepared);
+}
+
 TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInProgress) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -1211,11 +1239,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
     {
         // Try to start a new transaction while there is already a prepared transaction on the
         // session. This should fail with a PreparedTransactionInProgress error.
-
         auto func = [&](OperationContext* newOpCtx) {
-            // newOpCtx->setLogicalSessionId(*opCtx()->getLogicalSessionId());
-            // newOpCtx->setTxnNumber(*opCtx()->getTxnNumber() + 1);
-
             auto session = SessionCatalog::get(newOpCtx)->getOrCreateSession(
                 newOpCtx, *opCtx()->getLogicalSessionId());
 
@@ -1230,6 +1254,69 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
 
     ASSERT_FALSE(txnParticipant->transactionIsAborted());
     ASSERT(_opObserver->transactionPrepared);
+}
+
+TEST_F(TxnParticipantTest, MigrationThrowsOnPreparedTransaction) {
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    txnParticipant->addTransactionOperation(opCtx(), operation);
+
+    txnParticipant->prepareTransaction(opCtx());
+
+    // A migration may bump the active transaction number without checking out the session.
+    auto higherTxnNum = *opCtx()->getTxnNumber() + 1;
+    ASSERT_THROWS_CODE(
+        bumpTxnNumberFromDifferentOpCtx(*opCtx()->getLogicalSessionId(), higherTxnNum),
+        AssertionException,
+        ErrorCodes::PreparedTransactionInProgress);
+    // The transaction is not affected.
+    ASSERT_TRUE(_opObserver->transactionPrepared);
+}
+
+TEST_F(TxnParticipantTest, ImplictAbortDoesNotAbortPreparedTransaction) {
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    txnParticipant->addTransactionOperation(opCtx(), operation);
+
+    txnParticipant->prepareTransaction(opCtx());
+
+    // The next command throws an exception and wants to abort the transaction.
+    // This is a no-op.
+    txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx());
+    ASSERT_FALSE(txnParticipant->transactionIsAborted());
+    ASSERT_TRUE(_opObserver->transactionPrepared);
+}
+
+DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransaction, "invariant") {
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    txnParticipant->addTransactionOperation(opCtx(), operation);
+    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx());
+
+    auto sessionId = *opCtx()->getLogicalSessionId();
+    auto txnNum = *opCtx()->getTxnNumber();
+    _opObserver->onTransactionCommitFn = [&](bool wasPrepared) {
+        // This should never happen.
+        auto func = [&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(sessionId);
+            opCtx->setTxnNumber(txnNum);
+            // Hit an invariant. This should never happen.
+            txnParticipant->abortActiveTransaction(opCtx);
+        };
+        runFunctionFromDifferentOpCtx(func);
+        ASSERT_FALSE(txnParticipant->transactionIsAborted());
+    };
+
+    txnParticipant->commitPreparedTransaction(opCtx(), prepareTimestamp);
 }
 
 // Tests that a transaction aborts if it becomes too large before trying to commit it.

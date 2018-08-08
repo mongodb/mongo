@@ -185,13 +185,6 @@ void TransactionParticipant::beginOrContinue(TxnNumber txnNumber,
                 str::stream() << "Given transaction number " << txnNumber
                               << " does not match any in-progress transactions.",
                 startTransaction != boost::none);
-
-        // We cannot start a transaction if a prepared transaction is already running on the
-        // session.
-        uassert(ErrorCodes::PreparedTransactionInProgress,
-                "Cannot start a new transaction when a prepared transaction already exists on the "
-                "session.",
-                !_txnState.isPrepared(lg));
     }
 
     _setNewTxnNumber(lg, txnNumber);
@@ -348,6 +341,31 @@ TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
         _txnResources->release(_opCtx);
     }
 }
+void TransactionParticipant::_stashActiveTransaction(WithLock, OperationContext* opCtx) {
+    invariant(_activeTxnNumber == opCtx->getTxnNumber());
+
+    if (_singleTransactionStats.isActive()) {
+        _singleTransactionStats.setInactive(curTimeMicros64());
+    }
+
+    // Add the latest operation stats to the aggregate OpDebug object stored in the
+    // SingleTransactionStats instance on the Session.
+    _singleTransactionStats.getOpDebug()->additiveMetrics.add(
+        CurOp::get(opCtx)->debug().additiveMetrics);
+
+    invariant(!_txnResourceStash);
+    _txnResourceStash = TxnResources(opCtx);
+
+    // We accept possible slight inaccuracies in these counters from non-atomicity.
+    ServerTransactionsMetrics::get(opCtx)->decrementCurrentActive();
+    ServerTransactionsMetrics::get(opCtx)->incrementCurrentInactive();
+
+    // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
+    // with this Client's information. This is the last client that ran a transaction operation on
+    // the Session.
+    _singleTransactionStats.updateLastClientInfo(opCtx->getClient());
+}
+
 
 void TransactionParticipant::stashTransactionResources(OperationContext* opCtx) {
     if (opCtx->getClient()->isInDirectClient()) {
@@ -374,26 +392,7 @@ void TransactionParticipant::stashTransactionResources(OperationContext* opCtx) 
         return;
     }
 
-    if (_singleTransactionStats.isActive()) {
-        _singleTransactionStats.setInactive(curTimeMicros64());
-    }
-
-    // Add the latest operation stats to the aggregate OpDebug object stored in the
-    // SingleTransactionStats instance on the Session.
-    _singleTransactionStats.getOpDebug()->additiveMetrics.add(
-        CurOp::get(opCtx)->debug().additiveMetrics);
-
-    invariant(!_txnResourceStash);
-    _txnResourceStash = TxnResources(opCtx);
-
-    // We accept possible slight inaccuracies in these counters from non-atomicity.
-    ServerTransactionsMetrics::get(opCtx)->decrementCurrentActive();
-    ServerTransactionsMetrics::get(opCtx)->incrementCurrentInactive();
-
-    // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
-    // with this Client's information. This is the last client that ran a transaction operation on
-    // the Session.
-    _singleTransactionStats.updateLastClientInfo(opCtx->getClient());
+    _stashActiveTransaction(lg, opCtx);
 }
 
 void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx,
@@ -668,11 +667,9 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
 void TransactionParticipant::_commitTransaction(stdx::unique_lock<stdx::mutex> lk,
                                                 OperationContext* opCtx) {
     auto abortGuard = MakeGuard([this, opCtx]() {
-        _abortActiveTransaction(opCtx,
-                                TransactionState::kCommittingWithoutPrepare |
-                                    TransactionState::kCommittingWithPrepare);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _abortActiveTransaction(lock, opCtx, TransactionState::kCommittingWithoutPrepare);
     });
-
     lk.unlock();
 
     opCtx->getWriteUnitOfWork()->commit();
@@ -753,13 +750,25 @@ void TransactionParticipant::_abortArbitraryTransaction(WithLock lock) {
 }
 
 void TransactionParticipant::abortActiveTransaction(OperationContext* opCtx) {
-    _abortActiveTransaction(opCtx, TransactionState::kInProgress | TransactionState::kPrepared);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _abortActiveTransaction(
+        lock, opCtx, TransactionState::kInProgress | TransactionState::kPrepared);
 }
 
-void TransactionParticipant::_abortActiveTransaction(OperationContext* opCtx,
-                                                     TransactionState::StateSet expectedStates) {
+void TransactionParticipant::abortActiveUnpreparedOrStashPreparedTransaction(
+    OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    // Stash the transaction if it's in prepared state.
+    if (_txnState.isInSet(lock, TransactionState::kPrepared)) {
+        _stashActiveTransaction(lock, opCtx);
+        return;
+    }
+    _abortActiveTransaction(lock, opCtx, TransactionState::kInProgress);
+}
 
+void TransactionParticipant::_abortActiveTransaction(WithLock lock,
+                                                     OperationContext* opCtx,
+                                                     TransactionState::StateSet expectedStates) {
     invariant(!_txnResourceStash);
 
     if (!_txnState.isNone(lock)) {
@@ -779,6 +788,16 @@ void TransactionParticipant::_abortActiveTransaction(OperationContext* opCtx,
     if (_txnState.isInSet(lock, expectedStates)) {
         invariant(opCtx->getTxnNumber() == _activeTxnNumber);
         _abortTransactionOnSession(lock);
+    } else if (opCtx->getTxnNumber() == _activeTxnNumber) {
+        // Cannot abort these states unless they are specified in expectedStates explicitly.
+        const auto unabortableStates = TransactionState::kPrepared  //
+            | TransactionState::kCommittingWithPrepare              //
+            | TransactionState::kCommittingWithoutPrepare;          //
+        invariant(!_txnState.isInSet(lock, unabortableStates),
+                  str::stream() << "Cannot abort transaction in " << _txnState.toString());
+    } else {
+        // If _activeTxnNumber is higher than ours, it means the transaction is already aborted.
+        invariant(_txnState.isInSet(lock, TransactionState::kNone | TransactionState::kAborted));
     }
 
     // Log the transaction if its duration is longer than the slowMS command threshold.

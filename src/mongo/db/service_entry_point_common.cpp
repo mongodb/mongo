@@ -473,8 +473,9 @@ void invokeInTransaction(OperationContext* opCtx,
     }
 
     txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
-    ScopeGuard guard =
-        MakeGuard([&txnParticipant, opCtx]() { txnParticipant->abortActiveTransaction(opCtx); });
+    ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
+        txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
+    });
 
     invocation->run(opCtx, replyBuilder);
 

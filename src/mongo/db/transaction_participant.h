@@ -329,11 +329,19 @@ public:
     void abortArbitraryTransactionIfExpired();
 
     /*
-     * Aborts the transaction inside the transaction, releasing transaction resources.
-     * We're inside the transaction when we have the Session checked out and 'opCtx' owns the
-     * transaction resources.
+    * Aborts the transaction inside the transaction, releasing transaction resources.
+    * We're inside the transaction when we have the Session checked out and 'opCtx' owns the
+    * transaction resources.
+    * Aborts the transaction and releases transaction resources when we have the Session checked
+    * out and 'opCtx' owns the transaction resources.
      */
     void abortActiveTransaction(OperationContext* opCtx);
+
+    /*
+     * If the transaction is prepared, stash its resources. If not, it's the same as
+     * abortActiveTransaction.
+     */
+    void abortActiveUnpreparedOrStashPreparedTransaction(OperationContext* opCtx);
 
     void addMultikeyPathInfo(MultikeyPathInfo info) {
         _multikeyPathInfo.push_back(std::move(info));
@@ -508,9 +516,13 @@ private:
     // 3) Migration. Should be able to skip committing transactions.
     void _commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx);
 
+    // Stash transaction resources.
+    void _stashActiveTransaction(WithLock, OperationContext* opCtx);
+
     // Abort the transaction if it's in one of the expected states and clean up the transaction
     // states associated with the opCtx.
-    void _abortActiveTransaction(OperationContext* opCtx,
+    void _abortActiveTransaction(WithLock,
+                                 OperationContext* opCtx,
                                  TransactionState::StateSet expectedStates);
 
     void _abortArbitraryTransaction(WithLock);
