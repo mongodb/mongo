@@ -2129,6 +2129,11 @@ void ReplicationCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* respon
         response->setIsMaster(false);
         response->setIsSecondary(true);
     }
+
+    if (_inShutdown) {
+        response->setIsMaster(false);
+        response->setIsSecondary(false);
+    }
 }
 
 void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
