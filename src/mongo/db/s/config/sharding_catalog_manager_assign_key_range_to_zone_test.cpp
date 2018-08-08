@@ -80,6 +80,16 @@ public:
     }
 
     /**
+     * Asserts that the config.tags collection does not contain any tag document with
+     * the given namespace.
+     */
+    void assertNoZoneDocWithNamespace(NamespaceString ns) {
+        auto findStatus = findOneOnConfigCollection(
+            operationContext(), TagsType::ConfigNS, BSON("ns" << ns.toString()));
+        ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
+    }
+
+    /**
      * Asserts that this is the only tag that exists in config.tags.
      */
     void assertOnlyZone(const NamespaceString& ns,
@@ -112,6 +122,10 @@ public:
         return NamespaceString("test.foo");
     }
 
+    NamespaceString unshardedNS() const {
+        return NamespaceString("unsharded.coll");
+    }
+
     string zoneName() const {
         return "z";
     }
@@ -125,35 +139,29 @@ TEST_F(AssignKeyRangeToZoneTestFixture, BasicAssignKeyRange) {
     assertOnlyZone(shardedNS(), newRange, zoneName());
 }
 
-TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeOnUnshardedCollShouldFail) {
-    auto status = ShardingCatalogManager::get(operationContext())
-                      ->assignKeyRangeToZone(operationContext(),
-                                             NamespaceString("unsharded.coll"),
-                                             ChunkRange(BSON("x" << 0), BSON("x" << 10)),
-                                             zoneName());
-    ASSERT_EQ(ErrorCodes::NamespaceNotSharded, status);
+TEST_F(AssignKeyRangeToZoneTestFixture, BasicAssignKeyRangeOnUnshardedColl) {
+    const ChunkRange newRange(BSON("x" << 0), BSON("x" << 10));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(), unshardedNS(), newRange, zoneName()));
 
-    assertNoZoneDoc();
+    assertOnlyZone(unshardedNS(), newRange, zoneName());
 }
 
-TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeOnDroppedShardedCollShouldFail) {
+TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeOnDroppedShardedColl) {
     CollectionType unshardedCollection;
-    NamespaceString ns("unsharded.coll");
-    unshardedCollection.setNs(ns);
+    unshardedCollection.setNs(unshardedNS());
     unshardedCollection.setEpoch(OID::gen());
     unshardedCollection.setKeyPattern(BSON("x" << 1));
     unshardedCollection.setDropped(true);
 
+    const ChunkRange newRange(BSON("x" << 0), BSON("x" << 10));
     ASSERT_OK(insertToConfigCollection(
         operationContext(), CollectionType::ConfigNS, unshardedCollection.toBSON()));
 
-    auto status =
-        ShardingCatalogManager::get(operationContext())
-            ->assignKeyRangeToZone(
-                operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10)), zoneName());
-    ASSERT_EQ(ErrorCodes::NamespaceNotSharded, status);
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(operationContext(), unshardedNS(), newRange, zoneName()));
 
-    assertNoZoneDoc();
+    assertOnlyZone(unshardedNS(), newRange, zoneName());
 }
 
 TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeNonExistingZoneShouldFail) {
@@ -206,6 +214,26 @@ TEST_F(AssignKeyRangeToZoneTestFixture, AssignZoneWithDollarPrefixedShardKeysSho
                                    zoneName()));
     assertNoZoneDoc();
 }
+
+TEST_F(AssignKeyRangeToZoneTestFixture,
+       AssignZoneWithDollarPrefixedShardKeysOnUnshardedCollShouldFail) {
+    ASSERT_NOT_OK(ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(
+                          operationContext(),
+                          unshardedNS(),
+                          ChunkRange(BSON("x" << BSON("$A" << 1)), BSON("x" << BSON("$B" << 1))),
+                          zoneName()));
+    assertNoZoneDoc();
+
+    ASSERT_NOT_OK(
+        ShardingCatalogManager::get(operationContext())
+            ->assignKeyRangeToZone(operationContext(),
+                                   unshardedNS(),
+                                   ChunkRange(BSON("x" << 0), BSON("x" << BSON("$maxKey" << 1))),
+                                   zoneName()));
+    assertNoZoneDoc();
+}
+
 
 TEST_F(AssignKeyRangeToZoneTestFixture, RemoveZoneWithDollarPrefixedShardKeysShouldFail) {
     ChunkRange zoneWithDollarKeys(BSON("x" << BSON("$A" << 1)), BSON("x" << BSON("$B" << 1)));
@@ -327,6 +355,29 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsAShardKeyPrefixShouldSucceed
                   ->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName()));
 
     assertOnlyZone(ns, newRange, zoneName());
+}
+
+TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxOnUnshardedCollMustHaveTheSameShardKeys) {
+    auto status = ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(operationContext(),
+                                             unshardedNS(),
+                                             ChunkRange(BSON("x" << 0), BSON("y" << 10)),
+                                             zoneName());
+    ASSERT_EQ(ErrorCodes::ShardKeyNotFound, status);
+
+    assertNoZoneDoc();
+}
+
+TEST_F(AssignKeyRangeToZoneTestFixture, PrefixIsNotAllowedOnUnshardedColl) {
+    auto status =
+        ShardingCatalogManager::get(operationContext())
+            ->assignKeyRangeToZone(operationContext(),
+                                   unshardedNS(),
+                                   ChunkRange(BSON("x" << 0), BSON("x" << 10 << "y" << 1)),
+                                   zoneName());
+    ASSERT_EQ(ErrorCodes::ShardKeyNotFound, status);
+
+    assertNoZoneDoc();
 }
 
 /**
@@ -618,20 +669,19 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, BasicRemoveKeyRange) {
     assertNoZoneDoc();
 }
 
-TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveKeyRangeOnUnshardedCollShouldFail) {
-    auto status = ShardingCatalogManager::get(operationContext())
-                      ->removeKeyRangeFromZone(operationContext(),
-                                               NamespaceString("unsharded.coll"),
-                                               ChunkRange(BSON("x" << 0), BSON("x" << 10)));
-    ASSERT_EQ(ErrorCodes::NamespaceNotSharded, status);
+TEST_F(AssignKeyRangeWithOneRangeFixture, BasicRemoveKeyRangeOnUnshardedColl) {
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->assignKeyRangeToZone(
+                      operationContext(), unshardedNS(), getExistingRange(), zoneName()));
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->removeKeyRangeFromZone(operationContext(), unshardedNS(), getExistingRange()));
 
-    assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
+    assertNoZoneDocWithNamespace(unshardedNS());
 }
 
-TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveKeyRangeOnDroppedShardedCollShouldFail) {
+TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveKeyRangeOnDroppedShardedColl) {
     CollectionType unshardedCollection;
-    NamespaceString ns("unsharded.coll");
-    unshardedCollection.setNs(ns);
+    unshardedCollection.setNs(unshardedNS());
     unshardedCollection.setEpoch(OID::gen());
     unshardedCollection.setKeyPattern(BSON("x" << 1));
     unshardedCollection.setDropped(true);
@@ -639,11 +689,10 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveKeyRangeOnDroppedShardedCollShou
     ASSERT_OK(insertToConfigCollection(
         operationContext(), CollectionType::ConfigNS, unshardedCollection.toBSON()));
 
-    auto status = ShardingCatalogManager::get(operationContext())
-                      ->removeKeyRangeFromZone(
-                          operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10)));
-    ASSERT_EQ(ErrorCodes::NamespaceNotSharded, status);
-
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->removeKeyRangeFromZone(operationContext(),
+                                           unshardedNS(),
+                                           ChunkRange(BSON("x" << 0), BSON("x" << 10))));
     assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
 }
 

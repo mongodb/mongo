@@ -65,6 +65,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/implicit_create_collection.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -630,6 +631,7 @@ void execCommandDatabase(OperationContext* opCtx,
     auto startOperationTime = getClientOperationTime(opCtx);
     auto invocation = command->parse(opCtx, request);
     boost::optional<OperationSessionInfoFromClient> sessionOptions = boost::none;
+
     try {
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -861,6 +863,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);
+        ScopedOperationCompletionShardingActions operationCompletionShardingActions(opCtx);
 
         // This may trigger the maxTimeAlwaysTimeOut failpoint.
         auto status = opCtx->checkForInterruptNoAssert();

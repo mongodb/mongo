@@ -51,6 +51,10 @@ constexpr auto kDbVersionField = "databaseVersion"_sd;
 
 OperationShardingState::OperationShardingState() = default;
 
+OperationShardingState::~OperationShardingState() {
+    invariant(!_shardingOperationFailedStatus);
+}
+
 OperationShardingState& OperationShardingState::get(OperationContext* opCtx) {
     return shardingMetadataDecoration(opCtx);
 }
@@ -178,6 +182,20 @@ void OperationShardingState::setMovePrimaryCriticalSectionSignal(
     std::shared_ptr<Notification<void>> critSecSignal) {
     invariant(critSecSignal);
     _movePrimaryCriticalSectionSignal = std::move(critSecSignal);
+}
+
+void OperationShardingState::setShardingOperationFailedStatus(const Status& status) {
+    invariant(!_shardingOperationFailedStatus);
+    _shardingOperationFailedStatus = std::move(status);
+}
+
+boost::optional<Status> OperationShardingState::resetShardingOperationFailedStatus() {
+    if (!_shardingOperationFailedStatus) {
+        return boost::none;
+    }
+    Status failedStatus = Status(*_shardingOperationFailedStatus);
+    _shardingOperationFailedStatus = boost::none;
+    return failedStatus;
 }
 
 }  // namespace mongo

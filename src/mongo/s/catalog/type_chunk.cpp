@@ -121,6 +121,27 @@ void ChunkRange::append(BSONObjBuilder* builder) const {
     builder->append(kMaxKey, _maxKey);
 }
 
+const Status ChunkRange::extractKeyPattern(KeyPattern* shardKeyPatternOut) const {
+    BSONObjIterator min(getMin());
+    BSONObjIterator max(getMax());
+    BSONObjBuilder b;
+    while (min.more() && max.more()) {
+        BSONElement x = min.next();
+        BSONElement y = max.next();
+        if (!str::equals(x.fieldName(), y.fieldName()) || (min.more() && !max.more()) ||
+            (!min.more() && max.more())) {
+            return {ErrorCodes::ShardKeyNotFound,
+                    str::stream() << "the shard key of min " << _minKey << " doesn't match with "
+                                  << "the shard key of max "
+                                  << _maxKey};
+        }
+        b.append(x.fieldName(), 1);
+    }
+    const auto& shardKeyPattern = KeyPattern(b.obj());
+    *shardKeyPatternOut = shardKeyPattern;
+    return Status::OK();
+}
+
 std::string ChunkRange::toString() const {
     return str::stream() << "[" << _minKey << ", " << _maxKey << ")";
 }
