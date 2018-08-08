@@ -322,12 +322,10 @@ const SpecificStats* CachedPlanStage::getSpecificStats() const {
 }
 
 void CachedPlanStage::updatePlanCache() {
-    std::unique_ptr<PlanCacheEntryFeedback> feedback = stdx::make_unique<PlanCacheEntryFeedback>();
-    feedback->stats = getStats();
-    feedback->score = PlanRanker::scoreTree(feedback->stats->children[0].get());
+    const double score = PlanRanker::scoreTree(getStats()->children[0].get());
 
     PlanCache* cache = _collection->infoCache()->getPlanCache();
-    Status fbs = cache->feedback(*_canonicalQuery, feedback.release());
+    Status fbs = cache->feedback(*_canonicalQuery, score);
     if (!fbs.isOK()) {
         LOG(5) << _canonicalQuery->ns() << ": Failed to update cache with feedback: " << redact(fbs)
                << " - "

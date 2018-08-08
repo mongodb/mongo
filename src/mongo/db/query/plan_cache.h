@@ -50,22 +50,6 @@ struct QuerySolution;
 struct QuerySolutionNode;
 
 /**
- * When the CachedPlanStage runs a cached query, it can provide feedback to the cache.  This
- * feedback is available to anyone who retrieves that query in the future.
- */
-struct PlanCacheEntryFeedback {
-    // How well did the cached plan perform?
-    std::unique_ptr<PlanStageStats> stats;
-
-    // The "goodness" score produced by the plan ranker
-    // corresponding to 'stats'.
-    double score;
-};
-
-// TODO: Replace with opaque type.
-typedef std::string PlanID;
-
-/**
  * A PlanCacheIndexTree is the meaty component of the data
  * stored in SolutionCacheData. It is a tree structure with
  * index tags that indicates to the access planner which indices
@@ -283,9 +267,8 @@ public:
     // the other plans lost.
     std::unique_ptr<PlanRankingDecision> decision;
 
-    // Annotations from cached runs.  The CachedPlanStage provides these stats about its
-    // runs when they complete.
-    std::vector<PlanCacheEntryFeedback*> feedback;
+    // Scores from uses of this cache entry.
+    std::vector<double> feedback;
 
     // Whether or not the cache entry is active. Inactive cache entries should not be used for
     // planning.
@@ -407,10 +390,9 @@ public:
 
     /**
      * When the CachedPlanStage runs a plan out of the cache, we want to record data about the
-     * plan's performance.  The CachedPlanStage calls feedback(...) after executing the cached
-     * plan for a trial period in order to do this.
-     *
-     * Cache takes ownership of 'feedback'.
+     * plan's performance. The CachedPlanStage calls feedback(...) after executing the cached
+     * plan for a trial period in order to do this. Currently, the only feedback metric recorded is
+     * the score associated with the cached plan trial period.
      *
      * If the entry corresponding to 'cq' isn't in the cache anymore, the feedback is ignored
      * and an error Status is returned.
@@ -418,7 +400,7 @@ public:
      * If the entry corresponding to 'cq' still exists, 'feedback' is added to the run
      * statistics about the plan.  Status::OK() is returned.
      */
-    Status feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback);
+    Status feedback(const CanonicalQuery& cq, double score);
 
     /**
      * Remove the entry corresponding to 'ck' from the cache.  Returns Status::OK() if the plan

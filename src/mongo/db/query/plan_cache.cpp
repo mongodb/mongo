@@ -411,9 +411,6 @@ PlanCacheEntry::PlanCacheEntry(const std::vector<QuerySolution*>& solutions,
 }
 
 PlanCacheEntry::~PlanCacheEntry() {
-    for (size_t i = 0; i < feedback.size(); ++i) {
-        delete feedback[i];
-    }
     for (size_t i = 0; i < plannerData.size(); ++i) {
         delete plannerData[i];
     }
@@ -439,12 +436,8 @@ PlanCacheEntry* PlanCacheEntry::clone() const {
     entry->works = works;
 
     // Copy performance stats.
-    for (size_t i = 0; i < feedback.size(); ++i) {
-        PlanCacheEntryFeedback* fb = new PlanCacheEntryFeedback();
-        fb->stats.reset(feedback[i]->stats->clone());
-        fb->score = feedback[i]->score;
-        entry->feedback.push_back(fb);
-    }
+    entry->feedback = feedback;
+
     return entry;
 }
 
@@ -923,11 +916,7 @@ PlanCache::GetResult PlanCache::get(const PlanCacheKey& key) const {
     return {state, stdx::make_unique<CachedSolution>(key, *entry)};
 }
 
-Status PlanCache::feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback) {
-    if (NULL == feedback) {
-        return Status(ErrorCodes::BadValue, "feedback is NULL");
-    }
-    std::unique_ptr<PlanCacheEntryFeedback> autoFeedback(feedback);
+Status PlanCache::feedback(const CanonicalQuery& cq, double score) {
     PlanCacheKey ck = computeKey(cq);
 
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
@@ -940,7 +929,7 @@ Status PlanCache::feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* fee
 
     // We store up to a constant number of feedback entries.
     if (entry->feedback.size() < static_cast<size_t>(internalQueryCacheFeedbacksStored.load())) {
-        entry->feedback.push_back(autoFeedback.release());
+        entry->feedback.push_back(score);
     }
 
     return Status::OK();

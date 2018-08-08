@@ -425,7 +425,7 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
             BSONArrayBuilder scoresBob(feedbackBob.subarrayStart("scores"));
             for (size_t i = 0; i < entry->feedback.size(); ++i) {
                 BSONObjBuilder scoreBob(scoresBob.subobjStart());
-                scoreBob.append("score", entry->feedback[i]->score);
+                scoreBob.append("score", entry->feedback[i]);
             }
             scoresBob.doneFast();
         }
