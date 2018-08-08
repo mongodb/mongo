@@ -139,40 +139,6 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
     return shardKeyPattern.extractShardKeyFromDoc(end);
 }
 
-/**
- * Splits the chunks touched based from the targeter stats if needed.
- */
-void splitIfNeeded(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const TargeterStats& stats) {
-    auto routingInfoStatus = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
-    if (!routingInfoStatus.isOK()) {
-        log() << "failed to get collection information for " << nss
-              << " while checking for auto-split" << causedBy(routingInfoStatus.getStatus());
-        return;
-    }
-
-    auto& routingInfo = routingInfoStatus.getValue();
-
-    if (!routingInfo.cm()) {
-        return;
-    }
-
-    for (auto it = stats.chunkSizeDelta.cbegin(); it != stats.chunkSizeDelta.cend(); ++it) {
-        boost::optional<Chunk> chunk;
-        try {
-            chunk.emplace(routingInfo.cm()->findIntersectingChunkWithSimpleCollation(it->first));
-        } catch (const AssertionException& ex) {
-            warning() << "could not find chunk while checking for auto-split: "
-                      << causedBy(redact(ex));
-            return;
-        }
-
-        updateChunkWriteStatsAndSplitIfNeeded(
-            opCtx, routingInfo.cm().get(), chunk.get(), it->second);
-    }
-}
-
 }  // namespace
 
 void ClusterWriter::write(OperationContext* opCtx,
@@ -231,9 +197,6 @@ void ClusterWriter::write(OperationContext* opCtx,
 
             BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
         }
-
-        // TODO Re-enable for mixed-version scenarios
-        // splitIfNeeded(opCtx, request.getNS(), targeterStats);
     }
 }
 
