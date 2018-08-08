@@ -81,6 +81,15 @@ public:
     void prepareSplit();
 
     /**
+     * In the case that we trigger a split but decide not to split due to the
+     * actual size of a chunk on disk being too small, we update our estimate
+     * by abandoning the stashed bytes we had written prior to prepare. That
+     * way we won't continue to trigger splits on a chunk that is smaller than
+     * we currently estimate it to be.
+     */
+    void abandonPrepare();
+
+    /**
      * Marks the split as committed, which means that shouldSplit will
      * never again return true.
      */

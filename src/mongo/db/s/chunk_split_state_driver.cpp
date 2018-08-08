@@ -76,6 +76,10 @@ void ChunkSplitStateDriver::prepareSplit() {
     _stashedBytesWritten = wt->clearBytesWritten();
 }
 
+void ChunkSplitStateDriver::abandonPrepare() {
+    _stashedBytesWritten = 0;
+}
+
 void ChunkSplitStateDriver::commitSplit() {
     invariant(_splitState == SplitState::kSplitPrepared);
     _splitState = SplitState::kSplitCommitted;

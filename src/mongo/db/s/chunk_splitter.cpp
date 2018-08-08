@@ -329,6 +329,9 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
             LOG(1)
                 << "ChunkSplitter attempted split but not enough split points were found for chunk "
                 << redact(chunk.toString());
+            // Reset our size estimate that we had prior to splitVector to 0, while still counting
+            // the bytes that have been written in parallel to this split task
+            chunkSplitStateDriver->abandonPrepare();
             // No split points means there isn't enough data to split on; 1 split point means we
             // have between half the chunk size to full chunk size so there is no need to split yet
             return;

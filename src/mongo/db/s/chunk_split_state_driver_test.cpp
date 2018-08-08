@@ -104,6 +104,25 @@ TEST_F(ChunkSplitStateDriverTestNoTeardown,
     ASSERT_EQ(writesTracker().getBytesWritten(), bytesInTracker + extraBytesToAdd);
 }
 
+TEST_F(ChunkSplitStateDriverTestNoTeardown,
+       PrepareSplitThenAbandonPrepareFollowedByDestructorWithoutCommitKeepsOnlyNewBytesWritten) {
+    auto bytesInTracker = writesTracker().getBytesWritten();
+    ASSERT_GT(bytesInTracker, 0ull);
+
+    splitDriver()->prepareSplit();
+
+    uint64_t extraBytesToAdd{4};
+    writesTracker().addBytesWritten(extraBytesToAdd);
+
+    // Should clear previous bytes-written estimate that was stashed by prepare, but not new
+    // bytes written
+    splitDriver()->abandonPrepare();
+
+    splitDriver().reset();
+
+    ASSERT_EQ(writesTracker().getBytesWritten(), extraBytesToAdd);
+}
+
 TEST_F(ChunkSplitStateDriverTest,
        PrepareSplitThenAddBytesThenCommitSplitLeavesNewBytesWrittenUnchanged) {
     splitDriver()->prepareSplit();
