@@ -191,8 +191,6 @@ public:
                     nss,
                     cmdObj,
                     &result);
-        updateChunkWriteStatsAndSplitIfNeeded(
-            opCtx, chunkMgr.get(), chunk, cmdObj.getObjectField("update").objsize());
 
         return true;
     }
