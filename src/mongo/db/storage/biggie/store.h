@@ -70,7 +70,7 @@ public:
 
     public:
         using iterator_category = std::forward_iterator_tag;
-        using value_type = RadixStore::value_type;
+        using value_type = typename RadixStore::value_type;
         using difference_type = std::ptrdiff_t;
         using pointer = pointer_type;
         using reference = reference_type;
@@ -210,7 +210,7 @@ public:
         friend class radix_iterator<pointer_type, reference_type&>;
 
     public:
-        using value_type = RadixStore::value_type;
+        using value_type = typename RadixStore::value_type;
         using difference_type = std::ptrdiff_t;
         using pointer = pointer_type;
         using reference = reference_type;
