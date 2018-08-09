@@ -78,12 +78,24 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                 // Additionally, be careful not to push into 'remoteCursors' until we are sure we
                 // have a valid cursor, since the error handling path will attempt to clean up
                 // anything in 'remoteCursors'
-                RemoteCursor cursor;
-                cursor.setCursorResponse(CursorResponse::parseFromBSONThrowing(
-                    uassertStatusOK(std::move(response.swResponse)).data));
-                cursor.setShardId(std::move(response.shardId));
-                cursor.setHostAndPort(*response.shardHostAndPort);
-                remoteCursors.push_back(std::move(cursor));
+                auto cursors = CursorResponse::parseFromBSONMany(
+                    uassertStatusOK(std::move(response.swResponse)).data);
+
+                for (auto& cursor : cursors) {
+                    if (cursor.isOK()) {
+                        RemoteCursor remoteCursor;
+                        remoteCursor.setCursorResponse(std::move(cursor.getValue()));
+                        remoteCursor.setShardId(std::move(response.shardId));
+                        remoteCursor.setHostAndPort(*response.shardHostAndPort);
+                        remoteCursors.push_back(std::move(remoteCursor));
+                    }
+                }
+
+                // Throw if there is any error and then the catch block below will do the cleanup.
+                for (auto& cursor : cursors) {
+                    uassertStatusOK(cursor.getStatus());
+                }
+
             } catch (const DBException& ex) {
                 // Retriable errors are swallowed if 'allowPartialResults' is true.
                 if (allowPartialResults &&

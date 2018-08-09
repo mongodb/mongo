@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source_exchange_gen.h"
 #include "mongo/db/query/explain_options.h"
 
 namespace mongo {
@@ -58,6 +59,7 @@ public:
     static constexpr StringData kAllowDiskUseName = "allowDiskUse"_sd;
     static constexpr StringData kHintName = "hint"_sd;
     static constexpr StringData kCommentName = "comment"_sd;
+    static constexpr StringData kExchangeName = "exchange"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -186,6 +188,10 @@ public:
         return _unwrappedReadPref;
     }
 
+    const auto& getExchangeSpec() const {
+        return _exchangeSpec;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -242,6 +248,10 @@ public:
         _unwrappedReadPref = unwrappedReadPref.getOwned();
     }
 
+    void setExchangeSpec(ExchangeSpec spec) {
+        _exchangeSpec = std::move(spec);
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -282,5 +292,10 @@ private:
 
     // A user-specified maxTimeMS limit, or a value of '0' if not specified.
     unsigned int _maxTimeMS = 0;
+
+    // An optional exchange specification for this request. If set it means that the request
+    // represents a producer running as a part of the exchange machinery.
+    // This is an internal option; we do not expect it to be set on requests from users or drivers.
+    boost::optional<ExchangeSpec> _exchangeSpec;
 };
 }  // namespace mongo

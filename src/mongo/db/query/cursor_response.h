@@ -166,6 +166,12 @@ public:
     };
 
     /**
+     * Constructs a vector of CursorResponses from a command BSON response that represents one or
+     * more cursors.
+     */
+    static std::vector<StatusWith<CursorResponse>> parseFromBSONMany(const BSONObj& cmdResponse);
+
+    /**
      * Constructs a CursorResponse from the command BSON response.
      */
     static StatusWith<CursorResponse> parseFromBSON(const BSONObj& cmdResponse);

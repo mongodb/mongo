@@ -39,6 +39,7 @@ namespace mongo {
 
 namespace {
 
+const char kCursorsField[] = "cursors";
 const char kCursorField[] = "cursor";
 const char kIdField[] = "id";
 const char kNsField[] = "ns";
@@ -128,6 +129,31 @@ CursorResponse::CursorResponse(NamespaceString nss,
       _numReturnedSoFar(numReturnedSoFar),
       _latestOplogTimestamp(latestOplogTimestamp),
       _writeConcernError(std::move(writeConcernError)) {}
+
+std::vector<StatusWith<CursorResponse>> CursorResponse::parseFromBSONMany(
+    const BSONObj& cmdResponse) {
+    std::vector<StatusWith<CursorResponse>> cursors;
+    BSONElement cursorsElt = cmdResponse[kCursorsField];
+
+    // If there is not "cursors" array then treat it as a single cursor response
+    if (cursorsElt.type() != BSONType::Array) {
+        cursors.push_back(parseFromBSON(cmdResponse));
+    } else {
+        BSONObj cursorsObj = cursorsElt.embeddedObject();
+        for (BSONElement elt : cursorsObj) {
+            if (elt.type() != BSONType::Object) {
+                cursors.push_back({ErrorCodes::BadValue,
+                                   str::stream()
+                                       << "Cursors array element contains non-object element: "
+                                       << elt});
+            } else {
+                cursors.push_back(parseFromBSON(elt.Obj()));
+            }
+        }
+    }
+
+    return cursors;
+}
 
 StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);

@@ -59,6 +59,7 @@ constexpr StringData AggregationRequest::kExplainName;
 constexpr StringData AggregationRequest::kAllowDiskUseName;
 constexpr StringData AggregationRequest::kHintName;
 constexpr StringData AggregationRequest::kCommentName;
+constexpr StringData AggregationRequest::kExchangeName;
 
 constexpr long long AggregationRequest::kDefaultBatchSize;
 
@@ -213,6 +214,13 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                                       << typeName(elem.type())};
             }
             request.setAllowDiskUse(elem.Bool());
+        } else if (kExchangeName == fieldName) {
+            try {
+                IDLParserErrorContext ctx("internalExchange");
+                request.setExchangeSpec(ExchangeSpec::parse(ctx, elem.Obj()));
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
         } else if (bypassDocumentValidationCommandOption() == fieldName) {
             request.setBypassDocumentValidation(elem.trueValue());
         } else if (!isGenericArgument(fieldName)) {
@@ -313,7 +321,8 @@ Document AggregationRequest::serializeToCommandObj() const {
          _unwrappedReadPref.isEmpty() ? Value() : Value(_unwrappedReadPref)},
         // Only serialize maxTimeMs if specified.
         {QueryRequest::cmdOptionMaxTimeMS,
-         _maxTimeMS == 0 ? Value() : Value(static_cast<int>(_maxTimeMS))}};
+         _maxTimeMS == 0 ? Value() : Value(static_cast<int>(_maxTimeMS))},
+        {kExchangeName, _exchangeSpec ? Value(_exchangeSpec->toBSON()) : Value()}};
 }
 
 }  // namespace mongo

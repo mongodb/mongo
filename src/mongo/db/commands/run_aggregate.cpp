@@ -318,6 +318,26 @@ std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
                 ? collection->getDefaultCollator()->clone()
                 : nullptr);
 }
+
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
+    OperationContext* opCtx,
+    const AggregationRequest& request,
+    std::unique_ptr<CollatorInterface> collator,
+    boost::optional<UUID> uuid) {
+    boost::intrusive_ptr<ExpressionContext> expCtx =
+        new ExpressionContext(opCtx,
+                              request,
+                              std::move(collator),
+                              MongoDInterface::create(opCtx),
+                              uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
+                              uuid);
+    expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    expCtx->inMultiDocumentTransaction =
+        txnParticipant && txnParticipant->inMultiDocumentTransaction();
+
+    return expCtx;
+}
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
@@ -462,17 +482,7 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         invariant(collatorToUse);
-        expCtx.reset(
-            new ExpressionContext(opCtx,
-                                  request,
-                                  std::move(*collatorToUse),
-                                  MongoDInterface::create(opCtx),
-                                  uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
-                                  uuid));
-        expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        expCtx->inMultiDocumentTransaction =
-            txnParticipant && txnParticipant->inMultiDocumentTransaction();
+        expCtx = makeExpressionContext(opCtx, request, std::move(*collatorToUse), uuid);
 
         auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
 
@@ -506,21 +516,31 @@ Status runAggregate(OperationContext* opCtx,
 
         std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
 
-        pipelines.emplace_back(std::move(pipeline));
+        if (request.getExchangeSpec()) {
+            boost::intrusive_ptr<Exchange> exchange =
+                new Exchange(request.getExchangeSpec().get(), std::move(pipeline));
 
-        auto exchange =
-            dynamic_cast<DocumentSourceExchange*>(pipelines[0]->getSources().back().get());
-        if (exchange) {
-            for (size_t idx = 1; idx < exchange->getConsumers(); ++idx) {
-                auto sources = pipelines[0]->getSources();
-                sources.back() = new DocumentSourceExchange(expCtx, exchange->getExchange(), idx);
-                pipelines.emplace_back(
-                    uassertStatusOK(Pipeline::create(std::move(sources), expCtx)));
+            for (size_t idx = 0; idx < exchange->getConsumers(); ++idx) {
+                // For every new pipeline we have create a new ExpressionContext as the context
+                // cannot be shared between threads. There is no synchronization for pieces of the
+                // execution machinery above the Exchange, so nothing above the Exchange can be
+                // shared between different exchange-producer cursors.
+                expCtx = makeExpressionContext(
+                    opCtx,
+                    request,
+                    expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr,
+                    uuid);
+
+                // Create a new pipeline for the consumer consisting of a single
+                // DocumentSourceExchange.
+                boost::intrusive_ptr<DocumentSource> consumer =
+                    new DocumentSourceExchange(expCtx, exchange, idx);
+                pipelines.emplace_back(uassertStatusOK(Pipeline::create({consumer}, expCtx)));
             }
+        } else {
+            pipelines.emplace_back(std::move(pipeline));
         }
 
-        // TODO we will revisit the current vector of pipelines design when we will implement
-        // plan summaries, explains, etc.
         for (size_t idx = 0; idx < pipelines.size(); ++idx) {
             // Transfer ownership of the Pipeline to the PipelineProxyStage.
             auto ws = make_unique<WorkingSet>();

@@ -62,20 +62,18 @@ class Exchange : public RefCountable {
     static Ordering extractOrdering(const BSONObj& obj);
 
 public:
-    explicit Exchange(const ExchangeSpec& spec);
-    DocumentSource::GetNextResult getNext(size_t consumerId);
+    Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
+    DocumentSource::GetNextResult getNext(OperationContext* opCtx, size_t consumerId);
 
     size_t getConsumers() const {
         return _consumers.size();
     }
 
-    void setSource(DocumentSource* source) {
-        pSource = source;
-    }
-
-    const auto& getSpec() const {
+    auto& getSpec() const {
         return _spec;
     }
+
+    void dispose(OperationContext* opCtx);
 
 private:
     size_t loadNextBatch();
@@ -126,7 +124,7 @@ private:
     const size_t _maxBufferSize;
 
     // An input to the exchange operator
-    DocumentSource* pSource;
+    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 
     // Synchronization.
     stdx::mutex _mutex;
@@ -137,14 +135,15 @@ private:
 
     size_t _roundRobinCounter{0};
 
+    // A rundown counter of consumers disposing of the pipelines. Only the last consumer will
+    // dispose of the 'inner' exchange pipeline.
+    size_t _disposeRunDown{0};
+
     std::vector<std::unique_ptr<ExchangeBuffer>> _consumers;
 };
 
-class DocumentSourceExchange final : public DocumentSource, public NeedsMergerDocumentSource {
+class DocumentSourceExchange final : public DocumentSource {
 public:
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
     DocumentSourceExchange(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            const boost::intrusive_ptr<Exchange> exchange,
                            size_t consumerId);
@@ -164,21 +163,12 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return this;
-    }
-    MergingLogic mergingLogic() final {
-        // TODO SERVER-35974 we have to revisit this when we implement consumers.
-        return {this};
-    }
-
     /**
-     * Set the underlying source this source should use to get Documents from. Must not throw
-     * exceptions.
+     * DocumentSourceExchange does not have a direct source (it is reading through the shared
+     * Exchange pipeline).
      */
     void setSource(DocumentSource* source) final {
-        DocumentSource::setSource(source);
-        _exchange->setSource(source);
+        invariant(!source);
     }
 
     GetNextResult getNext(size_t consumerId);
@@ -189,6 +179,14 @@ public:
 
     auto getExchange() const {
         return _exchange;
+    }
+
+    void doDispose() final {
+        _exchange->dispose(pExpCtx->opCtx);
+    }
+
+    auto getConsumerId() const {
+        return _consumerId;
     }
 
 private:
