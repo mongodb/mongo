@@ -215,7 +215,8 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
                                             const BSONObj& collation);
 
 /**
- * Returns the latest known lastCommittedOpTime for the targeted shard.
+ * Returns the latest known lastCommittedOpTime for the targeted shard, or the latest in-memory
+ * cluster time if there is none.
  *
  * A null logical time is returned if the readConcern on the OperationContext is not snapshot.
  */

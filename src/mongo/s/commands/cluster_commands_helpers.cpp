@@ -616,7 +616,16 @@ boost::optional<LogicalTime> computeAtClusterTimeForOneShard(OperationContext* o
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     invariant(shardRegistry);
-    return shardRegistry->getShardNoReload(shardId)->getLastCommittedOpTime();
+
+    auto shard = shardRegistry->getShardNoReload(shardId);
+    uassert(ErrorCodes::ShardNotFound, str::stream() << "Could not find shard " << shardId, shard);
+
+    // Return the cached last committed opTime for the shard if there is one, otherwise return the
+    // lastest cluster time from the logical clock.
+    auto lastCommittedOpTime = shard->getLastCommittedOpTime();
+    return lastCommittedOpTime != LogicalTime::kUninitialized
+        ? lastCommittedOpTime
+        : LogicalClock::get(opCtx)->getClusterTime();
 }
 
 namespace {

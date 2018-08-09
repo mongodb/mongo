@@ -123,6 +123,30 @@ TEST_F(AtClusterTimeTest, ComputeInvalidInvalid) {
     ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
 }
 
+TEST_F(AtClusterTimeTest, ComputeForOneShard) {
+    auto shardOne = shardRegistry()->getShardNoReload(shardOneId);
+
+    LogicalTime timeOne(Timestamp(10, 2));
+    shardOne->updateLastCommittedOpTime(timeOne);
+    ASSERT_EQ(timeOne, shardOne->getLastCommittedOpTime());
+
+    auto atClusterTime = computeAtClusterTimeForOneShard(operationContext(), shardOneId);
+    ASSERT_EQ(*atClusterTime, timeOne);
+}
+
+TEST_F(AtClusterTimeTest, ComputeForOneShardNoCachedOpTime) {
+    auto shardOne = shardRegistry()->getShardNoReload(shardOneId);
+    ASSERT_EQ(LogicalTime(), shardOne->getLastCommittedOpTime());
+
+    auto atClusterTime = computeAtClusterTimeForOneShard(operationContext(), shardOneId);
+    ASSERT_EQ(*atClusterTime, kInMemoryLogicalTime);
+}
+
+TEST_F(AtClusterTimeTest, ComputeForOneShardNoShard) {
+    ASSERT_THROWS_CODE(computeAtClusterTimeForOneShard(operationContext(), ShardId("fakeShard")),
+                       AssertionException,
+                       ErrorCodes::ShardNotFound);
+}
 
 class AtClusterTimeTargetingTest : public CatalogCacheTestFixture {
 protected:
