@@ -375,11 +375,6 @@ public:
         _txnState.transitionTo(lk, TransactionState::kPrepared);
     }
 
-    void transitionToCommittingforTest() {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _txnState.transitionTo(lk, TransactionState::kCommittingWithoutPrepare);
-    }
-
     /**
      * Checks to see if the txnNumber changed in the parent session and perform the necessary
      * cleanup.

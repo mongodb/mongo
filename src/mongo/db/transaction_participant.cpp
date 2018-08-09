@@ -602,8 +602,8 @@ std::vector<repl::ReplOperation> TransactionParticipant::endTransactionAndRetrie
     // and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    // Ensure that we only ever end a transaction when prepared or committing.
-    invariant(_txnState.isPrepared(lk) || _txnState.isCommittingWithoutPrepare(lk),
+    // Ensure that we only ever end a transaction when prepared or in progress.
+    invariant(_txnState.isInSet(lk, TransactionState::kPrepared | TransactionState::kInProgress),
               str::stream() << "Current state: " << _txnState);
 
     invariant(_autoCommit);
@@ -622,8 +622,6 @@ void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx
     // and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    _txnState.transitionTo(lk, TransactionState::kCommittingWithoutPrepare);
-
     // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
     // into the session.
     lk.unlock();
@@ -635,6 +633,11 @@ void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx
     lk.lock();
 
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+    // The oplog entry is written in the same WUOW with the data change for unprepared transactions.
+    // We can still consider the state is InProgress until now, since no externally visible changes
+    // have been made yet by the commit operation. If anything throws before this point in the
+    // function, entry point will abort the transaction.
+    _txnState.transitionTo(lk, TransactionState::kCommittingWithoutPrepare);
     _commitTransaction(std::move(lk), opCtx);
 }
 

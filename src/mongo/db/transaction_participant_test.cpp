@@ -1060,56 +1060,7 @@ TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionCommitDoesNothing) {
     ASSERT_FALSE(txnParticipant->transactionIsCommitted());
 }
 
-TEST_F(TxnParticipantTest, KillSessionsDuringUnpreparedCommitDoesNotAbortTransaction) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
-
-    auto originalFn = _opObserver->onTransactionCommitFn;
-    _opObserver->onTransactionCommitFn = [&](bool wasPrepared) {
-        originalFn(wasPrepared);
-        ASSERT_FALSE(wasPrepared);
-
-        // The transaction may be aborted without checking out the txnParticipant.
-        txnParticipant->abortArbitraryTransaction();
-        ASSERT_FALSE(txnParticipant->transactionIsAborted());
-    };
-
-    txnParticipant->commitUnpreparedTransaction(opCtx());
-
-    ASSERT(_opObserver->transactionCommitted);
-    ASSERT_FALSE(txnParticipant->transactionIsAborted());
-    ASSERT(txnParticipant->transactionIsCommitted());
-}
-
-DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringUnpreparedCommit, "Cannot abort transaction") {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
-
-    auto sessionId = *opCtx()->getLogicalSessionId();
-    auto txnNumber = *opCtx()->getTxnNumber();
-    auto originalFn = _opObserver->onTransactionCommitFn;
-    _opObserver->onTransactionCommitFn = [&](bool wasPrepared) {
-        originalFn(wasPrepared);
-        ASSERT_FALSE(wasPrepared);
-
-        // The transaction may be aborted without checking out the txnParticipant.
-        auto func = [&](OperationContext* opCtx) {
-            opCtx->setLogicalSessionId(sessionId);
-            opCtx->setTxnNumber(txnNumber);
-            // Hit an invariant. This should never happen.
-            txnParticipant->abortActiveTransaction(opCtx);
-        };
-        runFunctionFromDifferentOpCtx(func);
-        ASSERT_FALSE(txnParticipant->transactionIsAborted());
-    };
-
-    txnParticipant->commitUnpreparedTransaction(opCtx());
-}
-
-// This tests documents behavior, though it is not necessarily the behavior we want.
-TEST_F(TxnParticipantTest, ThrowDuringUnpreparedOnTransactionCommitDoesNothing) {
+TEST_F(TxnParticipantTest, ThrowDuringUnpreparedCommitLetsTheAbortAtEntryPointToCleanUp) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
@@ -1122,6 +1073,10 @@ TEST_F(TxnParticipantTest, ThrowDuringUnpreparedOnTransactionCommitDoesNothing) 
     ASSERT_FALSE(_opObserver->transactionCommitted);
     ASSERT_FALSE(txnParticipant->transactionIsAborted());
     ASSERT_FALSE(txnParticipant->transactionIsCommitted());
+
+    // Simulate the abort at entry point.
+    txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx());
+    ASSERT_TRUE(txnParticipant->transactionIsAborted());
 }
 
 TEST_F(TxnParticipantTest, ConcurrencyOfCommitTransactionAndMigration) {
