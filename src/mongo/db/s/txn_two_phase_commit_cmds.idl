@@ -19,9 +19,17 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 
+structs:
+    CommitParticipant:
+        description: "Describes a shard participant in a transaction commit"
+        fields:
+            shardId:
+                description: "The id of the shard"
+                type: shard_id
+
 commands:
     voteCommitTransaction:
-        description: "voteCommitTransaction Command"
+        description: "Parser for the 'voteCommitTransaction' command."
         namespace: ignored
         fields:
             shardId:
@@ -33,9 +41,18 @@ commands:
                 type: timestamp
 
     voteAbortTransaction:
-        description: "voteAbortTransaction Command"
+        description: "Parser for the 'voteAbortTransaction' command."
         namespace: ignored
         fields:
             shardId:
                 description: "The shard name of the sender"
                 type: shard_id
+
+    coordinateCommitTransaction:
+        description: "Parser for the 'coordinateCommitTransaction' command."
+        strict: false
+        namespace: ignored
+        fields:
+            participants:
+                description: "An array of shard participants that must be included in the commit."
+                type: array<CommitParticipant>

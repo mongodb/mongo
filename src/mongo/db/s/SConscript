@@ -138,7 +138,6 @@ env.Library(
 env.Library(
     target='sharded_transaction_types',
     source=[
-        env.Idlc('coordinate_commit_transaction.idl')[0],
         env.Idlc('prepare_transaction.idl')[0],
     ],
     LIBDEPS=[
@@ -290,7 +289,6 @@ env.Library(
         'config/configsvr_shard_collection_command.cpp',
         'config/configsvr_split_chunk_command.cpp',
         'config/configsvr_update_zone_key_range_command.cpp',
-        'coordinate_commit_transaction_command.cpp',
         'txn_two_phase_commit_cmds.cpp',
         'flush_database_cache_updates_command.cpp',
         'flush_routing_table_cache_updates_command.cpp',

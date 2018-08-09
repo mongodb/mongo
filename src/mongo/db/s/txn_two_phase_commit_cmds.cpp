@@ -31,7 +31,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/transaction_participant.h"
 
 namespace mongo {
 namespace {
@@ -105,6 +107,61 @@ public:
         return AllowedOnSecondary::kNever;
     }
 } voteAbortTransactionCmd;
+
+class CoordinateCommitTransactionCmd : public TypedCommand<CoordinateCommitTransactionCmd> {
+public:
+    using Request = CoordinateCommitTransaction;
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            uassert(ErrorCodes::CommandFailed,
+                    "commitTransaction must be run within a transaction",
+                    txnParticipant);
+
+            // commitTransaction is retryable.
+            if (txnParticipant->transactionIsCommitted()) {
+                // We set the client last op to the last optime observed by the system to ensure
+                // that we wait for the specified write concern on an optime greater than or equal
+                // to the commit oplog entry.
+                auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+                replClient.setLastOpToSystemLastOpTime(opCtx);
+                return;
+            }
+
+            uassert(ErrorCodes::NoSuchTransaction,
+                    "Transaction isn't in progress",
+                    txnParticipant->inMultiDocumentTransaction());
+
+            txnParticipant->commitUnpreparedTransaction(opCtx);
+        }
+
+    private:
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName(), "");
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {}
+    };
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    std::string help() const override {
+        return "Coordinates the commit for a transaction. Only called by mongos.";
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+} coordinateCommitTransactionCmd;
 
 }  // namespace
 }  // namespace mongo
