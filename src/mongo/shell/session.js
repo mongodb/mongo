@@ -80,11 +80,11 @@ var {
         };
     }
 
-    function SessionAwareClient(client) {
-        const kWireVersionSupportingCausalConsistency = 6;
-        const kWireVersionSupportingLogicalSession = 6;
-        const kWireVersionSupportingRetryableWrites = 6;
+    const kWireVersionSupportingCausalConsistency = 6;
+    const kWireVersionSupportingLogicalSession = 6;
+    const kWireVersionSupportingRetryableWrites = 6;
 
+    function SessionAwareClient(client) {
         this.getReadPreference = function getReadPreference(driverSession) {
             const sessionOptions = driverSession.getOptions();
             if (sessionOptions.getReadPreference() !== undefined) {
@@ -444,7 +444,16 @@ var {
         let _nextTxnNum = 0;
 
         this.client = new SessionAwareClient(client);
+        if (!serverSupports(kWireVersionSupportingLogicalSession)) {
+            throw new DriverSession.UnsupportedError(
+                "Logical Sessions are only supported on server versions 3.6 and greater.");
+        }
         this.handle = client._startSession();
+
+        function serverSupports(wireVersion) {
+            return client.getMinWireVersion() <= wireVersion &&
+                wireVersion <= client.getMaxWireVersion();
+        }
 
         this.getLastUsed = function getLastUsed() {
             return _lastUsed;
@@ -585,7 +594,7 @@ var {
     }
 
     function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
-        return function(client, options = defaultOptions) {
+        var driverSessionConstructor = function(client, options = defaultOptions) {
             let _options = options;
             let _hasEnded = false;
 
@@ -685,6 +694,19 @@ var {
                 return "session " + tojson(sessionId);
             };
         };
+
+        // Having a specific Error for when logical sessions aren't supported by the server, allows
+        // the correct fallback behavior in this case (while propagating other errors).
+        driverSessionConstructor.UnsupportedError = function(message) {
+            this.name = "DriverSession.UnsupportedError";
+            this.message = message;
+            this.stack = this.toString() + "\n" + (new Error()).stack;
+        };
+        driverSessionConstructor.UnsupportedError.prototype = Object.create(Error.prototype);
+        driverSessionConstructor.UnsupportedError.prototype.constructor =
+            driverSessionConstructor.UnsupportedError;
+
+        return driverSessionConstructor;
     }
 
     const DriverSession = makeDriverSessionConstructor({

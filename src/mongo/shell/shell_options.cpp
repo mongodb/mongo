@@ -214,6 +214,11 @@ Status addMongoShellOptions(moe::OptionSection* options) {
         moe::Switch,
         "automatically retry write operations upon transient network errors");
 
+    options->addOptionChaining("disableImplicitSessions",
+                               "disableImplicitSessions",
+                               moe::Switch,
+                               "do not automatically create and use implicit sessions");
+
     options
         ->addOptionChaining(
             "rpcProtocols", "rpcProtocols", moe::String, " none, opQueryOnly, opCommandOnly, all")
@@ -371,6 +376,9 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
     if (params.count("retryWrites")) {
         shellGlobalParams.shouldRetryWrites = true;
+    }
+    if (params.count("disableImplicitSessions")) {
+        shellGlobalParams.shouldUseImplicitSessions = false;
     }
     if (params.count("rpcProtocols")) {
         std::string protos = params["rpcProtocols"].as<string>();

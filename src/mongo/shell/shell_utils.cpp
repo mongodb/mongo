@@ -218,7 +218,7 @@ BSONObj shouldRetryWrites(const BSONObj&, void* data) {
 }
 
 BSONObj shouldUseImplicitSessions(const BSONObj&, void* data) {
-    return BSON("" << true);
+    return BSON("" << shellGlobalParams.shouldUseImplicitSessions);
 }
 
 BSONObj interpreterVersion(const BSONObj& a, void* data) {
