@@ -1200,7 +1200,7 @@ public:
             // and timestamp safe (new) unique indexes. An older styled index entry key is
             // KeyString of the prefix key only, whereas a newer styled index entry key is
             // KeyString of the prefix key + RecordId.
-            // In either case we can compare the prefix key portion of the saved index entry
+            // In either case we compare the prefix key portion of the saved index entry
             // key against the current key that we are positioned on, if there is a match we
             // know we are positioned correctly and have not skipped a record.
             WT_ITEM item;
@@ -1211,7 +1211,10 @@ public:
             auto keySize = KeyString::getKeySize(
                 _key.getBuffer(), _key.getSize(), _idx.ordering(), _key.getTypeBits());
 
-            if (std::memcmp(_key.getBuffer(), item.data, keySize) == 0) {
+            // This check is only to avoid returning the same key again after a restore. Keys
+            // shorter than _key cannot have "prefix key" same as _key. Therefore we care only about
+            // the keys with size greater than or equal to that of the _key.
+            if (item.size >= keySize && std::memcmp(_key.getBuffer(), item.data, keySize) == 0) {
                 _lastMoveSkippedKey = false;
                 TRACE_CURSOR << "restore _lastMoveSkippedKey changed to false.";
             }
