@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/server_options.h"
 
@@ -78,6 +80,13 @@ Status validateIndexSpecFieldNames(const BSONObj& indexSpec);
 StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
                                                const BSONObj& indexSpec,
                                                const CollatorInterface* defaultCollator);
+
+/**
+ * Optional filtering function to adjust allowed index field names at startup.
+ * Set it in a MONGO_INITIALIZER with 'FilterAllowedIndexFieldNames' as a dependant.
+ */
+extern std::function<void(std::set<StringData>& allowedIndexFieldNames)>
+    filterAllowedIndexFieldNames;
 
 }  // namespace index_key_validate
 }  // namespace mongo

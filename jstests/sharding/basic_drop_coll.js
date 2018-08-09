@@ -25,6 +25,9 @@
     st.s.adminCommand({split: 'test.user', middle: {_id: 0}});
     assert.commandWorked(
         st.s.adminCommand({moveChunk: 'test.user', find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: 'foo'}));
+    assert.commandWorked(st.s.adminCommand(
+        {updateZoneKeyRange: 'test.user', min: {_id: 0}, max: {_id: 10}, zone: 'foo'}));
 
     assert.writeOK(testDB.user.insert({_id: 10}));
     assert.writeOK(testDB.user.insert({_id: -10}));
@@ -38,6 +41,7 @@
     assert(!collDoc.dropped);
 
     assert.eq(2, configDB.chunks.count({ns: 'test.user'}));
+    assert.eq(1, configDB.tags.count({ns: 'test.user'}));
 
     assert.commandWorked(testDB.runCommand({drop: 'user'}));
 
@@ -56,6 +60,7 @@
     assert(collDoc.dropped);
 
     assert.eq(0, configDB.chunks.count({ns: 'test.user'}));
+    assert.eq(0, configDB.tags.count({ns: 'test.user'}));
 
     st.stop();
 
