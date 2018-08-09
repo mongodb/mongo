@@ -248,8 +248,9 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
     }
 
     // Save the RecoveryUnit from the new transaction and replace it with an empty one.
-    _recoveryUnit = std::unique_ptr<RecoveryUnit>(opCtx->releaseRecoveryUnit());
-    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+    _recoveryUnit = opCtx->releaseRecoveryUnit();
+    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
+                               opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 }
 
@@ -281,8 +282,9 @@ TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, bool
         opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
     }
 
-    _recoveryUnit = std::unique_ptr<RecoveryUnit>(opCtx->releaseRecoveryUnit());
-    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+    _recoveryUnit = opCtx->releaseRecoveryUnit();
+    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
+                               opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
@@ -313,7 +315,7 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     opCtx->swapLockState(std::move(_locker));
     opCtx->lockState()->updateThreadIdToCurrentThread();
 
-    auto oldState = opCtx->setRecoveryUnit(_recoveryUnit.release(),
+    auto oldState = opCtx->setRecoveryUnit(std::move(_recoveryUnit),
                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     invariant(oldState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
               str::stream() << "RecoveryUnit state was " << oldState);
@@ -858,7 +860,8 @@ void TransactionParticipant::_cleanUpTxnResourceOnOpCtx(WithLock wl, OperationCo
 
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
-    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
+                               opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     opCtx->lockState()->unsetMaxLockTimeout();

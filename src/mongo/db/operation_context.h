@@ -97,7 +97,7 @@ public:
      * We rely on active cursors being killed when collections or databases are dropped,
      * or when collection metadata changes.
      */
-    RecoveryUnit* releaseRecoveryUnit();
+    std::unique_ptr<RecoveryUnit> releaseRecoveryUnit();
 
     /**
      * Associates the OperatingContext with a different RecoveryUnit for getMore or
@@ -105,7 +105,7 @@ public:
      * returned separately even though the state logically belongs to the RecoveryUnit,
      * as it is managed by the OperationContext.
      */
-    WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
+    WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(std::unique_ptr<RecoveryUnit> unit,
                                                        WriteUnitOfWork::RecoveryUnitState state);
 
     /**

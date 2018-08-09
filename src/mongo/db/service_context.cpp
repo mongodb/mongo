@@ -235,7 +235,7 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         opCtx->setLockState(std::make_unique<LockerNoop>());
     }
     if (!opCtx->recoveryUnit()) {
-        opCtx->setRecoveryUnit(new RecoveryUnitNoop(),
+        opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
     {

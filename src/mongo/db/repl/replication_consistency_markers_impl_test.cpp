@@ -272,7 +272,8 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
 
     // Recovery unit will be owned by "opCtx".
     RecoveryUnitWithDurabilityTracking* recoveryUnit = new RecoveryUnitWithDurabilityTracking();
-    opCtx->setRecoveryUnit(recoveryUnit, WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(recoveryUnit),
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     // Set min valid without waiting for the changes to be durable.
     OpTime endOpTime2({Seconds(789), 0}, 1LL);

@@ -379,13 +379,13 @@ void OperationContext::setTxnNumber(TxnNumber txnNumber) {
     _txnNumber = txnNumber;
 }
 
-RecoveryUnit* OperationContext::releaseRecoveryUnit() {
-    return _recoveryUnit.release();
+std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit() {
+    return std::move(_recoveryUnit);
 }
 
 WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
-    RecoveryUnit* unit, WriteUnitOfWork::RecoveryUnitState state) {
-    _recoveryUnit.reset(unit);
+    std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state) {
+    _recoveryUnit = std::move(unit);
     WriteUnitOfWork::RecoveryUnitState oldState = _ruState;
     _ruState = state;
     return oldState;

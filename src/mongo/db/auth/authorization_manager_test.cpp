@@ -352,7 +352,8 @@ public:
     };
 
     virtual void setUp() override {
-        opCtx->setRecoveryUnit(recoveryUnit, WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(recoveryUnit),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         AuthorizationManagerTest::setUp();
     }
 

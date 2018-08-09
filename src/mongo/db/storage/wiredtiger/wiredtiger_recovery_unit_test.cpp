@@ -134,7 +134,7 @@ public:
         auto sc = harnessHelper->serviceContext();
         auto client = sc->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        opCtx->setRecoveryUnit(harnessHelper->newRecoveryUnit().release(),
+        opCtx->setRecoveryUnit(harnessHelper->newRecoveryUnit(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return std::make_pair(std::move(client), std::move(opCtx));
     }

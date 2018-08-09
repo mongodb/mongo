@@ -59,7 +59,7 @@ public:
 
     virtual ServiceContext::UniqueOperationContext newOperationContext(Client* const client) {
         auto opCtx = client->makeOperationContext();
-        opCtx->setRecoveryUnit(newRecoveryUnit().release(),
+        opCtx->setRecoveryUnit(newRecoveryUnit(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
     }

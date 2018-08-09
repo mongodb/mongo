@@ -1016,11 +1016,12 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
                                                             const RecordId& justInserted) {
     // we do this in a side transaction in case it aborts
     WiredTigerRecoveryUnit* realRecoveryUnit =
-        checked_cast<WiredTigerRecoveryUnit*>(opCtx->releaseRecoveryUnit());
+        checked_cast<WiredTigerRecoveryUnit*>(opCtx->releaseRecoveryUnit().release());
     invariant(realRecoveryUnit);
     WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
-    WriteUnitOfWork::RecoveryUnitState const realRUstate = opCtx->setRecoveryUnit(
-        new WiredTigerRecoveryUnit(sc), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    WriteUnitOfWork::RecoveryUnitState const realRUstate =
+        opCtx->setRecoveryUnit(std::make_unique<WiredTigerRecoveryUnit>(sc),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
 
@@ -1148,18 +1149,18 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
             }
         }
     } catch (const WriteConflictException&) {
-        delete opCtx->releaseRecoveryUnit();
-        opCtx->setRecoveryUnit(realRecoveryUnit, realRUstate);
+        opCtx->releaseRecoveryUnit();
+        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(realRecoveryUnit), realRUstate);
         log() << "got conflict truncating capped, ignoring";
         return 0;
     } catch (...) {
-        delete opCtx->releaseRecoveryUnit();
-        opCtx->setRecoveryUnit(realRecoveryUnit, realRUstate);
+        opCtx->releaseRecoveryUnit();
+        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(realRecoveryUnit), realRUstate);
         throw;
     }
 
-    delete opCtx->releaseRecoveryUnit();
-    opCtx->setRecoveryUnit(realRecoveryUnit, realRUstate);
+    opCtx->releaseRecoveryUnit();
+    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(realRecoveryUnit), realRUstate);
     return docsRemoved;
 }
 
