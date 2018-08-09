@@ -277,9 +277,10 @@ env.Library(
         'mongod_process_interface.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
+        '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/mongo/db/storage/backup_cursor_service',
         '$BUILD_DIR/mongo/s/sharding_api',
         'mongo_process_common',
     ]
@@ -302,8 +303,10 @@ pipelineeEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 pipelineeEnv.Library(
     target='pipeline',
     source=[
+        "cluster_aggregation_planner.cpp",
         'document_source.cpp',
         'document_source_add_fields.cpp',
+        'document_source_backup_cursor.cpp',
         'document_source_bucket.cpp',
         'document_source_bucket_auto.cpp',
         'document_source_change_stream.cpp',
@@ -343,7 +346,6 @@ pipelineeEnv.Library(
         'document_source_skip.cpp',
         'document_source_sort.cpp',
         'document_source_sort_by_count.cpp',
-        "cluster_aggregation_planner.cpp",
         'document_source_tee_consumer.cpp',
         'document_source_unwind.cpp',
         'pipeline.cpp',

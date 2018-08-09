@@ -394,6 +394,26 @@ boost::optional<Document> MongoDInterface::lookupSingleDocument(
     return lookedUpDocument;
 }
 
+void MongoDInterface::fsyncLock(OperationContext* opCtx) {
+    auto backupCursorService = BackupCursorService::get(opCtx->getServiceContext());
+    backupCursorService->fsyncLock(opCtx);
+}
+
+void MongoDInterface::fsyncUnlock(OperationContext* opCtx) {
+    auto backupCursorService = BackupCursorService::get(opCtx->getServiceContext());
+    backupCursorService->fsyncUnlock(opCtx);
+}
+
+BackupCursorState MongoDInterface::openBackupCursor(OperationContext* opCtx) {
+    auto backupCursorService = BackupCursorService::get(opCtx->getServiceContext());
+    return backupCursorService->openBackupCursor(opCtx);
+}
+
+void MongoDInterface::closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) {
+    auto backupCursorService = BackupCursorService::get(opCtx->getServiceContext());
+    backupCursorService->closeBackupCursor(opCtx, cursorId);
+}
+
 BSONObj MongoDInterface::_reportCurrentOpForClient(OperationContext* opCtx,
                                                    Client* client,
                                                    CurrentOpTruncateMode truncateOps) const {

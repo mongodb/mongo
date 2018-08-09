@@ -93,6 +93,10 @@ public:
         boost::optional<BSONObj> readConcern) final;
     std::vector<GenericCursor> getCursors(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+    void fsyncLock(OperationContext* opCtx) final;
+    void fsyncUnlock(OperationContext* opCtx) final;
+    BackupCursorState openBackupCursor(OperationContext* opCtx) final;
+    void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) final;
 
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,

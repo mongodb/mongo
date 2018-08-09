@@ -136,6 +136,26 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    /**
+     * The following methods only make sense for data-bearing nodes and should never be called on
+     * a mongos.
+     */
+    void fsyncLock(OperationContext* opCtx) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void fsyncUnlock(OperationContext* opCtx) final {
+        MONGO_UNREACHABLE;
+    }
+
+    BackupCursorState openBackupCursor(OperationContext* opCtx) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) final {
+        MONGO_UNREACHABLE;
+    }
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

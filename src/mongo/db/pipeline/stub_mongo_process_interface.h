@@ -152,5 +152,21 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
         MONGO_UNREACHABLE;
     }
+
+    void fsyncLock(OperationContext* opCtx) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void fsyncUnlock(OperationContext* opCtx) final {
+        MONGO_UNREACHABLE;
+    }
+
+    BackupCursorState openBackupCursor(OperationContext* opCtx) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) final {
+        MONGO_UNREACHABLE;
+    }
 };
 }  // namespace mongo

@@ -1692,8 +1692,10 @@ var ReplSetTest = function(opts) {
         var activeException = false;
 
         // Lock the primary to prevent the TTL monitor from deleting expired documents in
-        // the background while we are getting the dbhashes of the replica set members.
-        assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
+        // the background while we are getting the dbhashes of the replica set members. It's not
+        // important if the storage engine fails to perform its fsync operation. The only
+        // requirement is that writes are locked out.
+        assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1, allowFsyncFailure: true}),
                              'failed to lock the primary');
         try {
             this.awaitReplication(null, null, slaves);

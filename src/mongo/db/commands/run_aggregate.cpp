@@ -269,36 +269,6 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
 }
 
 /**
- * Round trips the pipeline through serialization by calling serialize(), then Pipeline::parse().
- * fasserts if it fails to parse after being serialized.
- */
-std::unique_ptr<Pipeline, PipelineDeleter> reparsePipeline(
-    const Pipeline* pipeline,
-    const AggregationRequest& request,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto serialized = pipeline->serialize();
-
-    // Convert vector<Value> to vector<BSONObj>.
-    std::vector<BSONObj> parseableSerialization;
-    parseableSerialization.reserve(serialized.size());
-    for (auto&& serializedStage : serialized) {
-        invariant(serializedStage.getType() == BSONType::Object);
-        parseableSerialization.push_back(serializedStage.getDocument().toBson());
-    }
-
-    auto reparsedPipeline = Pipeline::parse(parseableSerialization, expCtx);
-    if (!reparsedPipeline.isOK()) {
-        error() << "Aggregation command did not round trip through parsing and serialization "
-                   "correctly. Input pipeline: "
-                << Value(request.getPipeline()) << ", serialized pipeline: " << Value(serialized);
-        fassertFailedWithStatusNoTrace(40175, reparsedPipeline.getStatus());
-    }
-
-    reparsedPipeline.getValue()->optimizePipeline();
-    return std::move(reparsedPipeline.getValue());
-}
-
-/**
  * Returns Status::OK if each view namespace in 'pipeline' has a default collator equivalent to
  * 'collator'. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
  */
@@ -514,14 +484,6 @@ Status runAggregate(OperationContext* opCtx,
 
         pipeline->optimizePipeline();
 
-        if (kDebugBuild && !expCtx->explain && !expCtx->fromMongos) {
-            // Make sure all operations round-trip through Pipeline::serialize() correctly by
-            // re-parsing every command in debug builds. This is important because sharded
-            // aggregations rely on this ability.  Skipping when fromMongos because this has
-            // already been through the transformation (and this un-sets expCtx->fromMongos).
-            pipeline = reparsePipeline(pipeline.get(), request, expCtx);
-        }
-
         // Prepare a PlanExecutor to provide input into the pipeline, if needed.
         if (liteParsedPipeline.hasChangeStream()) {
             // If we are using a change stream, the cursor stage should have a simple collation,
@@ -603,7 +565,9 @@ Status runAggregate(OperationContext* opCtx,
             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
             repl::ReadConcernArgs::get(opCtx).getLevel(),
             cmdObj);
-        if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+        if (expCtx->tailableMode == TailableModeEnum::kTailable) {
+            cursorParams.setTailable(true);
+        } else if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
             cursorParams.setTailable(true);
             cursorParams.setAwaitData(true);
         }

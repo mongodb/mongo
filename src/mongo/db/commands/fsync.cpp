@@ -71,12 +71,16 @@ Lock::ResourceMutex commandMutex("fsyncCommandMutex");
  */
 class FSyncLockThread : public BackgroundJob {
 public:
-    FSyncLockThread() : BackgroundJob(false) {}
+    FSyncLockThread(bool allowFsyncFailure)
+        : BackgroundJob(false), _allowFsyncFailure(allowFsyncFailure) {}
     virtual ~FSyncLockThread() {}
     virtual string name() const {
         return "FSyncLockThread";
     }
     virtual void run();
+
+private:
+    bool _allowFsyncFailure;
 };
 
 class FSyncCommand : public ErrmsgCommandDeprecated {
@@ -128,11 +132,15 @@ public:
             return false;
         }
 
-
         const bool sync =
             !cmdObj["async"].trueValue();  // async means do an fsync, but return immediately
         const bool lock = cmdObj["lock"].trueValue();
         log() << "CMD fsync: sync:" << sync << " lock:" << lock;
+
+        // fsync + lock is sometimes used to block writes out of the system and does not care if
+        // the `BackupCursorService::fsyncLock` call succeeds.
+        const bool allowFsyncFailure =
+            getTestCommandsEnabled() && cmdObj["allowFsyncFailure"].trueValue();
 
         if (!lock) {
             // Take a global IS lock to ensure the storage engine is not shutdown
@@ -160,7 +168,7 @@ public:
                 stdx::unique_lock<stdx::mutex> lk(lockStateMutex);
                 threadStatus = Status::OK();
                 threadStarted = false;
-                _lockThread = stdx::make_unique<FSyncLockThread>();
+                _lockThread = stdx::make_unique<FSyncLockThread>(allowFsyncFailure);
                 _lockThread->go();
 
                 while (!threadStarted && threadStatus.isOK()) {
@@ -346,16 +354,27 @@ void FSyncLockThread::run() {
             return;
         }
 
+        bool successfulFsyncLock = false;
         auto backupCursorService = BackupCursorService::get(opCtx.getServiceContext());
         try {
-            writeConflictRetry(&opCtx, "beginBackup", "global", [&opCtx, backupCursorService] {
-                backupCursorService->fsyncLock(&opCtx);
-            });
+            writeConflictRetry(&opCtx,
+                               "beginBackup",
+                               "global",
+                               [&opCtx, backupCursorService, &successfulFsyncLock] {
+                                   backupCursorService->fsyncLock(&opCtx);
+                                   successfulFsyncLock = true;
+                               });
         } catch (const DBException& e) {
-            error() << "storage engine unable to begin backup : " << e.toString();
-            fsyncCmd.threadStatus = e.toStatus();
-            fsyncCmd.acquireFsyncLockSyncCV.notify_one();
-            return;
+            if (_allowFsyncFailure) {
+                warning() << "Locking despite storage engine being unable to begin backup : "
+                          << e.toString();
+                opCtx.recoveryUnit()->waitUntilDurable();
+            } else {
+                error() << "storage engine unable to begin backup : " << e.toString();
+                fsyncCmd.threadStatus = e.toStatus();
+                fsyncCmd.acquireFsyncLockSyncCV.notify_one();
+                return;
+            }
         }
 
         fsyncCmd.threadStarted = true;
@@ -365,7 +384,9 @@ void FSyncLockThread::run() {
             fsyncCmd.releaseFsyncLockSyncCV.wait(lk);
         }
 
-        backupCursorService->fsyncUnlock(&opCtx);
+        if (successfulFsyncLock) {
+            backupCursorService->fsyncUnlock(&opCtx);
+        }
 
     } catch (const std::exception& e) {
         severe() << "FSyncLockThread exception: " << e.what();

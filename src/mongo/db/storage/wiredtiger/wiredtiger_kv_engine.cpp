@@ -810,7 +810,9 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
         const auto wiredTigerLogFilePrefix = "WiredTigerLog";
         if (name.find(wiredTigerLogFilePrefix) == 0) {
             // TODO SERVER-13455:replace `journal/` with the configurable journal path.
-            name = "journal/" + name;
+            auto path = boost::filesystem::path("journal");
+            path /= name;
+            name = path.string();
         }
         filesToCopy.push_back(std::move(name));
     }

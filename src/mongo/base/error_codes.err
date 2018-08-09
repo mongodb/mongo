@@ -265,7 +265,7 @@ error_code("TooManyLogicalSessions", 264);
 error_code("OrphanedRangeCleanUpFailed", 265);
 error_code("ExceededTimeLimit", 266);
 error_code("PreparedTransactionInProgress", 267);
-
+error_code("CannotBackup", 268);
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)
