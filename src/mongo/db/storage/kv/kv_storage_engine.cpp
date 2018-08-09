@@ -141,6 +141,39 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
     std::vector<std::string> collectionsKnownToCatalog;
     _catalog->getAllCollections(&collectionsKnownToCatalog);
 
+    if (loadingFromUncleanShutdownOrRepair) {
+        // If we are loading the catalog after an unclean shutdown or during repair, it's possible
+        // that there are collection files on disk that are unknown to the catalog. If we can't find
+        // an ident in the catalog, we generate a catalog entry for it.
+        for (const auto& ident : identsKnownToStorageEngine) {
+            if (_catalog->isCollectionIdent(ident)) {
+                bool isOrphan = !std::any_of(collectionsKnownToCatalog.begin(),
+                                             collectionsKnownToCatalog.end(),
+                                             [this, &ident](const auto& coll) {
+                                                 return _catalog->getCollectionIdent(coll) == ident;
+                                             });
+                if (isOrphan) {
+                    // If the catalog does not have information about this
+                    // collection, we create an new entry for it.
+                    WriteUnitOfWork wuow(opCtx);
+                    StatusWith<std::string> statusWithNs = _catalog->newOrphanedIdent(opCtx, ident);
+                    if (statusWithNs.isOK()) {
+                        wuow.commit();
+                        log() << "Successfully created an entry in the catalog for the orphaned "
+                                 "collection: "
+                              << statusWithNs.getValue();
+                    } else {
+                        // Log an error message if we cannot create the entry.
+                        // reconcileCatalogAndIdents() will later drop this ident.
+                        error()
+                            << "Cannot create an entry in the catalog for the orphaned collection: "
+                            << ident << " due to " << statusWithNs.getStatus().reason();
+                    }
+                }
+            }
+        }
+    }
+
     KVPrefix maxSeenPrefix = KVPrefix::kNotPrefixed;
     for (const auto& coll : collectionsKnownToCatalog) {
         NamespaceString nss(coll);
@@ -171,6 +204,10 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
         db->initCollection(opCtx, coll, _options.forRepair);
         auto maxPrefixForCollection = _catalog->getMetaData(opCtx, coll).getMaxPrefix();
         maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
+
+        if (nss.isOrphanCollection()) {
+            log() << "Orphaned collection found: " << nss;
+        }
     }
 
     KVPrefix::setLargestPrefix(maxSeenPrefix);
@@ -280,6 +317,10 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
         if (!_catalog->isUserDataIdent(it)) {
             continue;
         }
+
+        // In repair context, any orphaned collection idents from the engine should already be
+        // recovered in the catalog in loadCatalog().
+        invariant(!(_catalog->isCollectionIdent(it) && _options.forRepair));
 
         const auto& toRemove = it;
         log() << "Dropping unknown ident: " << toRemove;
