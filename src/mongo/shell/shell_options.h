@@ -73,6 +73,7 @@ struct ShellGlobalParams {
     std::string writeMode = "commands";
     std::string readMode = "compatibility";
     bool shouldRetryWrites = false;
+    bool shouldUseImplicitSessions = true;
 
     boost::optional<rpc::ProtocolSet> rpcProtocols = boost::none;
 

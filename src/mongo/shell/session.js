@@ -500,6 +500,10 @@ var {
         let _lastUsed = new Date();
 
         this.client = new SessionAwareClient(client);
+        if (!serverSupports(kWireVersionSupportingLogicalSession)) {
+            throw new DriverSession.UnsupportedError(
+                "Logical Sessions are only supported on server versions 3.6 and greater.");
+        }
         this.handle = client._startSession();
 
         function serverSupports(wireVersion) {
@@ -835,7 +839,7 @@ var {
     };
 
     function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
-        return function(client, options = defaultOptions) {
+        var driverSessionConstructor = function(client, options = defaultOptions) {
             let _options = options;
             let _hasEnded = false;
 
@@ -964,6 +968,19 @@ var {
                 return this._serverSession.abortTransaction(this);
             };
         };
+
+        // Having a specific Error for when logical sessions aren't supported by the server, allows
+        // the correct fallback behavior in this case (while propagating other errors).
+        driverSessionConstructor.UnsupportedError = function(message) {
+            this.name = "DriverSession.UnsupportedError";
+            this.message = message;
+            this.stack = this.toString() + "\n" + (new Error()).stack;
+        };
+        driverSessionConstructor.UnsupportedError.prototype = Object.create(Error.prototype);
+        driverSessionConstructor.UnsupportedError.prototype.constructor =
+            driverSessionConstructor.UnsupportedError;
+
+        return driverSessionConstructor;
     }
 
     const DriverSession = makeDriverSessionConstructor({
