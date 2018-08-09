@@ -35,6 +35,7 @@ selector:
   - jstests/sharding/movePrimary1.js
   - jstests/sharding/mongos_validate_writes.js
   - jstests/sharding/resume_change_stream_on_subset_of_shards.js
+  - jstests/sharding/drop_sharded_db_tags_cleanup.js
   # Can be un-blacklisted once the version of 3.6 used for 'last-stable' includes SERVER-34338's
   # backport.
   - jstests/sharding/explainFind_stale_mongos.js
