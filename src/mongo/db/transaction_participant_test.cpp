@@ -141,7 +141,7 @@ private:
 
 class TxnParticipantTest : public MockReplCoordServerFixture {
 protected:
-    void setUp() final {
+    void setUp() override {
         MockReplCoordServerFixture::setUp();
 
         auto service = opCtx()->getServiceContext();
@@ -160,7 +160,7 @@ protected:
         opCtx()->setTxnNumber(_txnNumber);
     }
 
-    void tearDown() final {
+    void tearDown() override {
         // Clear all sessions to free up any stashed resources.
         SessionCatalog::get(opCtx()->getServiceContext())->reset_forTest();
 
@@ -536,13 +536,24 @@ TEST_F(TxnParticipantTest, AutocommitRequiredOnEveryTxnOp) {
                        AssertionException,
                        ErrorCodes::InvalidOptions);
 
-    // Setting 'autocommit=true' should throw an error.
-    ASSERT_THROWS_CODE(txnParticipant->beginOrContinue(txnNum, true, boost::none),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
-
     // Including autocommit=false should succeed.
     txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, boost::none);
+}
+
+DEATH_TEST_F(TxnParticipantTest, AutocommitCannotBeTrue, "invariant") {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Passing 'autocommit=true' is not allowed and should crash.
+    txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), true, boost::none);
+}
+
+DEATH_TEST_F(TxnParticipantTest, StartTransactionCannotBeFalse, "invariant") {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Passing 'startTransaction=false' is not allowed and should crash.
+    txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), false, false);
 }
 
 TEST_F(TxnParticipantTest, SameTransactionPreservesStoredStatements) {
@@ -1542,6 +1553,176 @@ TEST_F(TxnParticipantTest, UnstashInNestedSessionIsANoop) {
         ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
         ASSERT_FALSE(opCtx()->getWriteUnitOfWork());
     }
+}
+
+/**
+ * Test fixture for testing behavior that depends on a server's cluster role.
+ *
+ * Each test case relies on the txnNumber on the operation context, which cannot be changed, so
+ * define tests for behavior shared by config and shard servers as methods here and call them in the
+ * fixtures for config and shard servers defined below.
+ */
+class ShardedClusterParticipantTest : public TxnParticipantTest {
+protected:
+    void canSpecifyStartTransactionOnInProgressTxn() {
+        auto autocommit = false;
+        auto startTransaction = true;
+        OperationContextSessionMongod opCtxSession(
+            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT(txnParticipant->inMultiDocumentTransaction());
+
+        txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction);
+        ASSERT(txnParticipant->inMultiDocumentTransaction());
+    }
+
+    void canSpecifyStartTransactionOnAbortedTxn() {
+        auto autocommit = false;
+        auto startTransaction = true;
+        OperationContextSessionMongod opCtxSession(
+            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT(txnParticipant->inMultiDocumentTransaction());
+
+        txnParticipant->abortActiveTransaction(opCtx());
+        ASSERT(txnParticipant->transactionIsAborted());
+
+        txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction);
+        ASSERT(txnParticipant->inMultiDocumentTransaction());
+    }
+
+    void cannotSpecifyStartTransactionOnCommittedTxn() {
+        auto autocommit = false;
+        auto startTransaction = true;
+        OperationContextSessionMongod opCtxSession(
+            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT(txnParticipant->inMultiDocumentTransaction());
+
+        txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+        txnParticipant->commitUnpreparedTransaction(opCtx());
+
+        ASSERT_THROWS_CODE(
+            txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction),
+            AssertionException,
+            50911);
+    }
+
+    void cannotSpecifyStartTransactionOnPreparedTxn() {
+        auto autocommit = false;
+        auto startTransaction = true;
+        OperationContextSessionMongod opCtxSession(
+            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT(txnParticipant->inMultiDocumentTransaction());
+
+        txnParticipant->unstashTransactionResources(opCtx(), "insert");
+        auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+        txnParticipant->addTransactionOperation(opCtx(), operation);
+        txnParticipant->prepareTransaction(opCtx());
+
+        ASSERT_THROWS_CODE(
+            txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction),
+            AssertionException,
+            50911);
+    }
+
+    void cannotSpecifyStartTransactionOnStartedRetryableWrite() {
+        boost::optional<bool> autocommit = boost::none;
+        boost::optional<bool> startTransaction = boost::none;
+        OperationContextSessionMongod opCtxSession(
+            opCtx(), true /* shouldCheckOutSession */, autocommit, startTransaction);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        ASSERT_FALSE(txnParticipant->inMultiDocumentTransaction());
+
+        autocommit = false;
+        startTransaction = true;
+        ASSERT_THROWS_CODE(
+            txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction),
+            AssertionException,
+            50911);
+    }
+
+    // TODO SERVER-36639: Add tests that the active transaction number cannot be reused if the
+    // transaction is in the abort after prepare state (or any state indicating the participant
+    // has been involved in a two phase commit).
+};
+
+/**
+ * Test fixture for a transaction participant running on a shard server.
+ */
+class ShardTxnParticipantTest : public ShardedClusterParticipantTest {
+protected:
+    void setUp() final {
+        TxnParticipantTest::setUp();
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+    }
+
+    void tearDown() final {
+        serverGlobalParams.clusterRole = ClusterRole::None;
+        TxnParticipantTest::tearDown();
+    }
+};
+
+TEST_F(ShardTxnParticipantTest, CanSpecifyStartTransactionOnInProgressTxn) {
+    canSpecifyStartTransactionOnInProgressTxn();
+}
+
+TEST_F(ShardTxnParticipantTest, CanSpecifyStartTransactionOnAbortedTxn) {
+    canSpecifyStartTransactionOnAbortedTxn();
+}
+
+TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnCommittedTxn) {
+    cannotSpecifyStartTransactionOnCommittedTxn();
+}
+
+TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnPreparedTxn) {
+    cannotSpecifyStartTransactionOnPreparedTxn();
+}
+
+TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnStartedRetryableWrite) {
+    cannotSpecifyStartTransactionOnStartedRetryableWrite();
+}
+
+/**
+ * Test fixture for a transaction participant running on a config server.
+ */
+class ConfigTxnParticipantTest : public ShardedClusterParticipantTest {
+protected:
+    void setUp() final {
+        TxnParticipantTest::setUp();
+        serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    }
+
+    void tearDown() final {
+        serverGlobalParams.clusterRole = ClusterRole::None;
+        TxnParticipantTest::tearDown();
+    }
+};
+
+TEST_F(ConfigTxnParticipantTest, CanSpecifyStartTransactionOnInProgressTxn) {
+    canSpecifyStartTransactionOnInProgressTxn();
+}
+
+TEST_F(ConfigTxnParticipantTest, CanSpecifyStartTransactionOnAbortedTxn) {
+    canSpecifyStartTransactionOnAbortedTxn();
+}
+
+TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnCommittedTxn) {
+    cannotSpecifyStartTransactionOnCommittedTxn();
+}
+
+TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnPreparedTxn) {
+    cannotSpecifyStartTransactionOnPreparedTxn();
+}
+
+TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnStartedRetryableWrite) {
+    cannotSpecifyStartTransactionOnStartedRetryableWrite();
 }
 
 /**

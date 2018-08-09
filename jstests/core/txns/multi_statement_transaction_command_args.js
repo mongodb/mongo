@@ -238,10 +238,7 @@
     assert.commandFailedWithCode(
         sessionDb.runCommand(
             {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}),
-        [
-          ErrorCodes.InvalidOptions,  // TODO SERVER-36203: mongod should return NoSuchTransaction.
-          ErrorCodes.NoSuchTransaction
-        ]);
+        ErrorCodes.NoSuchTransaction);
 
     /***********************************************************************************************
      * The 'autocommit' field must be specified on commit/abort commands.

@@ -140,67 +140,73 @@ Session* TransactionParticipant::_getSession() {
     return getTransactionParticipant.owner(this);
 }
 
-void TransactionParticipant::beginOrContinue(TxnNumber txnNumber,
-                                             boost::optional<bool> autocommit,
-                                             boost::optional<bool> startTransaction) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-    if (auto newState = _getSession()->getLastRefreshState()) {
-        _updateState(lg, *newState);
-    }
-
-    if (txnNumber == _activeTxnNumber) {
-        // It is never valid to specify 'startTransaction' on an active transaction.
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Cannot specify 'startTransaction' on transaction " << txnNumber
-                              << " since it is already in progress.",
-                startTransaction == boost::none);
-
-        if (_txnState.isNone(lg)) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "Cannot specify 'autocommit' on an operation not inside a multi-statement "
-                    "transaction.",
-                    autocommit == boost::none);
-            return;
-        }
-
-        // Continue a multi-statement transaction. In this case, it is required that
-        // autocommit=false be given as an argument on the request.
-
+void TransactionParticipant::_beginOrContinueRetryableWrite(WithLock wl, TxnNumber txnNumber) {
+    if (txnNumber > _activeTxnNumber) {
+        // New retryable write.
+        _setNewTxnNumber(wl, txnNumber);
+        _autoCommit = boost::none;
+    } else {
+        // Retrying a retryable write.
         uassert(ErrorCodes::InvalidOptions,
                 "Must specify autocommit=false on all operations of a multi-statement transaction.",
-                autocommit == boost::optional<bool>(false));
+                _txnState.isNone(wl));
+        invariant(_autoCommit == boost::none);
+    }
+}
 
-        if (_txnState.isInProgress(lg) && !_txnResourceStash) {
-            // This indicates that the first command in the transaction failed but did not
-            // implicitly abort the transaction. It is not safe to continue the transaction, in
-            // particular because we have not saved the readConcern from the first statement of
-            // the transaction.
-            _abortTransactionOnSession(lg);
-            uasserted(ErrorCodes::NoSuchTransaction,
-                      str::stream() << "Transaction " << txnNumber << " has been aborted.");
-        }
+void TransactionParticipant::_continueMultiDocumentTransaction(WithLock wl, TxnNumber txnNumber) {
+    uassert(ErrorCodes::NoSuchTransaction,
+            str::stream()
+                << "Given transaction number "
+                << txnNumber
+                << " does not match any in-progress transactions. The active transaction number is "
+                << _activeTxnNumber,
+            txnNumber == _activeTxnNumber && !_txnState.isNone(wl));
 
-        return;
+    if (_txnState.isInProgress(wl) && !_txnResourceStash) {
+        // This indicates that the first command in the transaction failed but did not
+        // implicitly abort the transaction. It is not safe to continue the transaction, in
+        // particular because we have not saved the readConcern from the first statement of
+        // the transaction.
+        _abortTransactionOnSession(wl);
+        uasserted(ErrorCodes::NoSuchTransaction,
+                  str::stream() << "Transaction " << txnNumber << " has been aborted.");
     }
 
-    if (autocommit) {
-        uassert(ErrorCodes::NoSuchTransaction,
-                str::stream() << "Given transaction number " << txnNumber
-                              << " does not match any in-progress transactions.",
-                startTransaction != boost::none);
+    return;
+}
+
+void TransactionParticipant::_beginMultiDocumentTransaction(WithLock wl, TxnNumber txnNumber) {
+    // Servers in a sharded cluster can start a new transaction at the active transaction number to
+    // allow internal retries by routers on re-targeting errors, like StaleShardVersion or
+    // SnapshotTooOld.
+    if (txnNumber == _activeTxnNumber) {
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "Only servers in a sharded cluster can start a new transaction at the active "
+                "transaction number",
+                serverGlobalParams.clusterRole != ClusterRole::None);
+
+        // The active transaction number can only be reused if the transaction is not in a state
+        // that indicates it has been involved in a two phase commit. In normal operation this check
+        // should never fail.
+        //
+        // TODO SERVER-36639: Ensure the active transaction number cannot be reused if the
+        // transaction is in the abort after prepare state (or any state indicating the participant
+        // has been involved in a two phase commit).
+        const auto restartableStates = TransactionState::kInProgress | TransactionState::kAborted;
+        uassert(50911,
+                str::stream() << "Cannot start a transaction at given transaction number "
+                              << txnNumber
+                              << " a transaction with the same number is in state "
+                              << _txnState.toString(),
+                _txnState.isInSet(wl, restartableStates));
     }
 
-    _setNewTxnNumber(lg, txnNumber);
+    // Aborts any in-progress txns.
+    _setNewTxnNumber(wl, txnNumber);
+    _autoCommit = false;
 
-    _autoCommit = autocommit;
-    if (!autocommit) {
-        return;
-    }
-
-    // Start a multi-document transaction.
-    invariant(*autocommit == false);
-    _txnState.transitionTo(lg, TransactionState::kInProgress);
+    _txnState.transitionTo(wl, TransactionState::kInProgress);
 
     // Tracks various transactions metrics.
     _singleTransactionStats.setStartTime(curTimeMicros64());
@@ -214,6 +220,41 @@ void TransactionParticipant::beginOrContinue(TxnNumber txnNumber,
     ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentInactive();
 
     invariant(_transactionOperations.empty());
+}
+
+void TransactionParticipant::beginOrContinue(TxnNumber txnNumber,
+                                             boost::optional<bool> autocommit,
+                                             boost::optional<bool> startTransaction) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+    if (auto newState = _getSession()->getLastRefreshState()) {
+        _updateState(lg, *newState);
+    }
+
+    // Requests without an autocommit field are interpreted as retryable writes. They cannot specify
+    // startTransaction, which is verified earlier when parsing the request.
+    if (!autocommit) {
+        invariant(!startTransaction);
+        _beginOrContinueRetryableWrite(lg, txnNumber);
+        return;
+    }
+
+    // Attempt to continue a multi-statement transaction. In this case, it is required that
+    // autocommit be given as an argument on the request, and currently it can only be false, which
+    // is verified earlier when parsing the request.
+    invariant(*autocommit == false);
+
+    if (!startTransaction) {
+        _continueMultiDocumentTransaction(lg, txnNumber);
+        return;
+    }
+
+    // Attempt to start a multi-statement transaction, which requires startTransaction be given as
+    // an argument on the request. startTransaction can only be specified as true, which is verified
+    // earlier when parsing the request.
+    invariant(*startTransaction);
+
+    _beginMultiDocumentTransaction(lg, txnNumber);
 }
 
 void TransactionParticipant::setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opCtx) {

@@ -568,6 +568,16 @@ private:
     // Bumps up the transaction number of this transaction and perform the necessary cleanup.
     void _setNewTxnNumber(WithLock wl, const TxnNumber& txnNumber);
 
+    // Attempt to begin or retry a retryable write at the given transaction number.
+    void _beginOrContinueRetryableWrite(WithLock wl, TxnNumber txnNumber);
+
+    // Attempt to begin a new multi document transaction at the given transaction number.
+    void _beginMultiDocumentTransaction(WithLock wl, TxnNumber txnNumber);
+
+    // Attempt to continue an in-progress multi document transaction at the given transaction
+    // number.
+    void _continueMultiDocumentTransaction(WithLock wl, TxnNumber txnNumber);
+
     // Returns the session that this transaction belongs to.
     const Session* _getSession() const;
     Session* _getSession();
