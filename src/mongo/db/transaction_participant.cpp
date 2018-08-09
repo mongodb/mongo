@@ -735,24 +735,37 @@ void TransactionParticipant::_commitTransaction(stdx::unique_lock<stdx::mutex> l
 
 void TransactionParticipant::abortArbitraryTransaction() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _abortArbitraryTransaction(lock);
-}
 
-void TransactionParticipant::abortArbitraryTransactionIfExpired() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    if (!_transactionExpireDate || _transactionExpireDate >= Date_t::now()) {
-        return;
-    }
-
-    _abortArbitraryTransaction(lock);
-}
-
-void TransactionParticipant::_abortArbitraryTransaction(WithLock lock) {
     if (!_txnState.isInProgress(lock)) {
         // We do not want to abort transactions that are prepared unless we get an
         // 'abortTransaction' command.
         return;
     }
+
+    _abortTransactionOnSession(lock);
+}
+
+void TransactionParticipant::abortArbitraryTransactionIfExpired() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (!_txnState.isInProgress(lock) || !_transactionExpireDate ||
+        _transactionExpireDate >= Date_t::now()) {
+        return;
+    }
+
+    const auto session = _getSession();
+    auto currentOperation = session->getCurrentOperation();
+    if (currentOperation) {
+        // If an operation is still running for this transaction when it expires, kill the currently
+        // running operation.
+        stdx::lock_guard<Client> clientLock(*currentOperation->getClient());
+        getGlobalServiceContext()->killOperation(currentOperation, ErrorCodes::ExceededTimeLimit);
+    }
+
+    // Log after killing the current operation because jstests may wait to see this log message to
+    // imply that the operation has been killed.
+    log() << "Aborting transaction with txnNumber " << _activeTxnNumber << " on session with lsid "
+          << session->getSessionId().getId()
+          << " because it has been running for longer than 'transactionLifetimeLimitSeconds'";
 
     _abortTransactionOnSession(lock);
 }

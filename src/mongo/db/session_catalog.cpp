@@ -264,6 +264,7 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx, bool c
 
     const auto session = checkedOutSession->get();
     invariant(opCtx->getLogicalSessionId() == session->getSessionId());
+    session->setCurrentOperation(opCtx);
 }
 
 OperationContextSession::~OperationContextSession() {
@@ -274,6 +275,10 @@ OperationContextSession::~OperationContextSession() {
     }
 
     auto& checkedOutSession = operationSessionDecoration(_opCtx);
+    if (checkedOutSession) {
+        checkedOutSession->get()->clearCurrentOperation();
+    }
+
     // We acquire a Client lock here to guard the destruction of this session so that references to
     // this session are safe to use while the lock is held.
     stdx::lock_guard<Client> lk(*_opCtx->getClient());

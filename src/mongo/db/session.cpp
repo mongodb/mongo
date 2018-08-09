@@ -692,4 +692,21 @@ void Session::unlockTxnNumber() {
     _txnNumberLockConflictStatus = boost::none;
 }
 
+void Session::setCurrentOperation(OperationContext* currentOperation) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(!_currentOperation);
+    _currentOperation = currentOperation;
+}
+
+void Session::clearCurrentOperation() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(_currentOperation);
+    _currentOperation = nullptr;
+}
+
+OperationContext* Session::getCurrentOperation() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _currentOperation;
+}
+
 }  // namespace mongo

@@ -530,8 +530,6 @@ private:
                                  OperationContext* opCtx,
                                  TransactionState::StateSet expectedStates);
 
-    void _abortArbitraryTransaction(WithLock);
-
     // Releases stashed transaction resources to abort the transaction on the session.
     void _abortTransactionOnSession(WithLock);
 

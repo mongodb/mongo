@@ -212,6 +212,22 @@ public:
      */
     void unlockTxnNumber();
 
+    /**
+     * Sets the current operation running on this Session.
+     */
+    void setCurrentOperation(OperationContext* currentOperation);
+
+    /**
+     * Clears the current operation running on this Session.
+     */
+    void clearCurrentOperation();
+
+    /**
+     * Returns a pointer to the current operation running on this Session, or nullptr if there is no
+     * operation currently running on this Session.
+     */
+    OperationContext* getCurrentOperation() const;
+
 private:
     void _beginOrContinueTxn(WithLock, TxnNumber txnNumber);
 
@@ -251,6 +267,10 @@ private:
 
     // Protects the member variables below.
     mutable stdx::mutex _mutex;
+
+    // A pointer back to the currently running operation on this Session, or nullptr if there
+    // is no operation currently running for the Session.
+    OperationContext* _currentOperation{nullptr};
 
     // Specifies whether the session information needs to be refreshed from storage
     bool _isValid{false};
