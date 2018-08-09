@@ -4874,7 +4874,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager),
+                roles: roles_clusterManager,
                 privileges: [{
                     resource: {db: '$setFeatureCompatibilityVersion', collection: 'version'},
                     actions: ['update']

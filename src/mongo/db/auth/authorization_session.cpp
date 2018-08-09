@@ -753,7 +753,12 @@ static int buildResourceSearchList(const ResourcePattern& target,
             // Some databases should not be matchable with ResourcePattern::forAnyNormalResource.
             // 'local' and 'config' are used to store special system collections, which user level
             // administrators should not be able to manipulate.
-            if (target.ns().db() != "local" && target.ns().db() != "config") {
+            // '$setFeatureCompatibilityVersion' is a virtual database that
+            // setFeatureCompatibilityVersion performs auth checks against. When this command was
+            // first written, there was a moratorium on creating new ActionTypes. SERVER-31983
+            // introduced the ActionType after the moratorium expired.
+            if (target.ns().db() != "local" && target.ns().db() != "config" &&
+                target.ns().db() != "$setFeatureCompatibilityVersion") {
                 resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
             }
             resourceSearchList[size++] = ResourcePattern::forDatabaseName(target.ns().db());
