@@ -60,6 +60,10 @@ public:
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
+    // Prefix for orphan collections
+    static constexpr StringData kOrphanCollectionPrefix = "system.orphan-"_sd;
+    static constexpr StringData kOrphanCollectionDb = "local"_sd;
+
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration
     // state of the server, which needs to be recovered/consulted at startup. Each document in this
@@ -259,6 +263,9 @@ public:
     }
     bool isNormal() const {
         return normal(_ns);
+    }
+    bool isOrphanCollection() const {
+        return db() == kOrphanCollectionDb && coll().startsWith(kOrphanCollectionPrefix);
     }
 
     /**
