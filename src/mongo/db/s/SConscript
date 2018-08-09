@@ -136,17 +136,6 @@ env.Library(
 )
 
 env.Library(
-    target='sharded_transaction_types',
-    source=[
-        env.Idlc('prepare_transaction.idl')[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/s/common_s',
-    ],
-)
-
-env.Library(
     target='type_shard_identity',
     source=[
         env.Idlc('add_shard_cmd.idl')[0],
@@ -321,7 +310,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         'balancer',
-        'sharded_transaction_types',
         'sharding_runtime_d',
     ],
 )

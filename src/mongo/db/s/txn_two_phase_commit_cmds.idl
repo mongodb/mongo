@@ -28,6 +28,15 @@ structs:
                 type: shard_id
 
 commands:
+    prepareTransaction:
+        description: "Parser for the 'prepareTransaction' command."
+        strict: true
+        namespace: ignored
+        fields:
+            coordinator:
+                description: "The coordinator shard for this transaction."
+                type: shard_id
+
     voteCommitTransaction:
         description: "Parser for the 'voteCommitTransaction' command."
         namespace: ignored

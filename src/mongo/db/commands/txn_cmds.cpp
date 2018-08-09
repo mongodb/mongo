@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -109,54 +108,6 @@ public:
     }
 
 } commitTxn;
-
-class CmdPrepareTxn : public BasicCommand {
-public:
-    CmdPrepareTxn() : BasicCommand("prepareTransaction") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
-    }
-
-    virtual bool adminOnly() const {
-        return true;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    std::string help() const override {
-        return "Prepares a transaction. This is only expected to be called by mongos.";
-    }
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        uassert(ErrorCodes::CommandFailed,
-                "prepareTransaction must be run within a transaction",
-                txnParticipant);
-
-        uassert(ErrorCodes::NoSuchTransaction,
-                "Transaction isn't in progress",
-                txnParticipant->inMultiDocumentTransaction());
-
-        // Add prepareTimestamp to the command response.
-        auto timestamp = txnParticipant->prepareTransaction(opCtx);
-        result.append("prepareTimestamp", timestamp);
-        return true;
-    }
-};
-
-MONGO_REGISTER_TEST_COMMAND(CmdPrepareTxn);
 
 class CmdAbortTxn : public BasicCommand {
 public:
