@@ -263,6 +263,10 @@ connect = function(url, user, pass) {
         }
     }
 
+    if (_shouldUseImplicitSessions()) {
+        chatty("Implicit session: " + db.getSession());
+    }
+
     // Implicit sessions should not be used when opening a connection. In particular, the buildInfo
     // command is erroneously marked as requiring auth in MongoDB 3.6 and therefore fails if a
     // logical session id is included in the request.
@@ -445,12 +449,28 @@ Mongo.prototype._getDefaultSession = function getDefaultSession() {
     // a logical session id. These implicit sessions are intentionally not causally consistent. If
     // implicit sessions have been globally disabled, a dummy session is used instead of a real one.
     if (!this.hasOwnProperty("_defaultSession")) {
-        this._defaultSession = _shouldUseImplicitSessions()
-            ? this.startSession({causalConsistency: false})
-            : new _DummyDriverSession(this);
+        if (_shouldUseImplicitSessions()) {
+            try {
+                this._defaultSession = this.startSession({causalConsistency: false});
+            } catch (e) {
+                if (e instanceof DriverSession.UnsupportedError) {
+                    chatty("WARNING: No implicit session: " + e.message);
+                    this._setDummyDefaultSession();
+                } else {
+                    print("ERROR: Implicit session failed: " + e.message);
+                    throw(e);
+                }
+            }
+        } else {
+            this._setDummyDefaultSession();
+        }
         this._defaultSession._isExplicit = false;
     }
     return this._defaultSession;
+};
+
+Mongo.prototype._setDummyDefaultSession = function setDummyDefaultSession() {
+    this._defaultSession = new _DummyDriverSession(this);
 };
 
 Mongo.prototype.isCausalConsistency = function isCausalConsistency() {
