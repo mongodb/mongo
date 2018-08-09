@@ -71,9 +71,9 @@
     topDB.foo.find().itcount();
     topDB.baz.update({}, {$set: {a: 1}});
     topDB.bar.remove({});
+
     let res = topDB.adminCommand("top");
-    assert.isnull(res.totals["test.foo"]);
-    assert.isnull(res.totals["test.bar"]);
-    assert.isnull(res.totals["test.baz"]);
+    checkTopEntries([]);
+
     assert.commandWorked(topDB.dropDatabase());
 }());
