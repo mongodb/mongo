@@ -2,6 +2,7 @@
  * Tests upgrading a cluster with two shards and two mongos servers from last stable to current
  * version, verifying the behavior of $clusterTime metadata and afterClusterTime commands throughout
  * the process.
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
     "use strict";

@@ -1,5 +1,6 @@
 // Tests the behavior of looking up the post image for change streams on collections which are
 // sharded with a key which is just the "_id" field.
+// @tags: [requires_majority_read_concern]
 (function() {
     "use strict";
 

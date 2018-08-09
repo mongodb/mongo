@@ -1,6 +1,7 @@
 /**
  * Tests the behavior of a sharded cluster when featureCompatibilityVersion is set to 3.4, with
  * respect to causal consistency. In noPassthrough to avoid issues with auth.
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
     "use strict";

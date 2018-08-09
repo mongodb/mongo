@@ -1,6 +1,7 @@
 // Tests the behavior of change streams on a collection that was initially unsharded but then
 // becomes sharded. In particular, test that post-shardCollection inserts update their cached
 // 'documentKey' to include the new shard key.
+// @tags: [requires_majority_read_concern]
 (function() {
     "use strict";
 

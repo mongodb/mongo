@@ -1,7 +1,7 @@
 // Tests the behavior of a change stream on a collection that becomes sharded, however the primary
 // shard is unaware and still sees the collection as unsharded.
 //
-// @tags: [requires_persistence]
+// @tags: [requires_persistence, requires_majority_read_concern]
 (function() {
     "use strict";
 

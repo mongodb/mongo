@@ -199,6 +199,11 @@ def parse_command_line():
                       help=("Enable or disable the stagger of launching resmoke jobs."
                             " Defaults to %default."))
 
+    parser.add_option("--majorityReadConcern", type="choice", action="store",
+                      dest="majority_read_concern", choices=("on", "off"), metavar="ON|OFF",
+                      help=("Enable or disable majority read concern support."
+                            " Defaults to %default."))
+
     parser.add_option("--storageEngine", dest="storage_engine", metavar="ENGINE",
                       help="The storage engine used by dbtests and jstests.")
 
@@ -300,7 +305,8 @@ def parse_command_line():
                         suite_files="with_server",
                         prealloc_journal="off",
                         shuffle="auto",
-                        stagger_jobs="off")
+                        stagger_jobs="off",
+                        majority_read_concern="on")
 
     options, args = parser.parse_args()
 
@@ -350,6 +356,7 @@ def update_config_vars(values):
     _config.FAIL_FAST = not config.pop("continue_on_failure")
     _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("include_with_any_tags"))
     _config.JOBS = config.pop("jobs")
+    _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
     _config.MONGOD_SET_PARAMETERS = config.pop("mongod_set_parameters")

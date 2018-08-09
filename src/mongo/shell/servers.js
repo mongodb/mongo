@@ -1092,6 +1092,11 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 if (programName.endsWith('mongod')) {
                     if (jsTest.options().storageEngine === "wiredTiger" ||
                         !jsTest.options().storageEngine) {
+                        if (!argArrayContains("--enableMajorityReadConcern")) {
+                            argArray.push(
+                                ...['--enableMajorityReadConcern',
+                                    jsTest.options().enableMajorityReadConcern.toString()]);
+                        }
                         if (jsTest.options().storageEngineCacheSizeGB &&
                             !argArrayContains('--wiredTigerCacheSizeGB')) {
                             argArray.push(...['--wiredTigerCacheSizeGB',

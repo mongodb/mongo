@@ -1,6 +1,7 @@
 /**
  * Validates the operationTime value in the command response depends on the read/writeConcern of the
  * the read/write commmand that produced it.
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
     "use strict";

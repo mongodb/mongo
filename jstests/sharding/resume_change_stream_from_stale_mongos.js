@@ -1,6 +1,7 @@
 // Tests that resuming a change stream that has become sharded via a mongos that believes the
 // collection is still unsharded will end up targeting the change stream to all shards after getting
 // a stale shard version.
+// @tags: [requires_majority_read_concern]
 (function() {
     "use strict";
 

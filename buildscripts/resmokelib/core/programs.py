@@ -80,6 +80,7 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {
+        "enableMajorityReadConcern": config.MAJORITY_READ_CONCERN,
         "nojournal": config.NO_JOURNAL,
         "nopreallocj": config.NO_PREALLOC_JOURNAL,
         "serviceExecutor": config.SERVICE_EXECUTOR,
@@ -177,6 +178,7 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
     global_vars = kwargs.pop("global_vars", {}).copy()
 
     shortcut_opts = {
+        "enableMajorityReadConcern": (config.MAJORITY_READ_CONCERN, True),
         "noJournal": (config.NO_JOURNAL, False),
         "noJournalPrealloc": (config.NO_PREALLOC_JOURNAL, False),
         "serviceExecutor": (config.SERVICE_EXECUTOR, ""),
@@ -314,6 +316,7 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
     if suites is not None:
         args.extend(suites)
 
+    kwargs["enableMajorityReadConcern"] = config.MAJORITY_READ_CONCERN
     if config.STORAGE_ENGINE is not None:
         kwargs["storageEngine"] = config.STORAGE_ENGINE
 

@@ -8,6 +8,7 @@
  * read concern majority request.
  *
  * This test requires mmapv1, but does not rely on the tag to ensure this.
+ * @tags: [requires_mmapv1]
  */
 (function() {
     "use strict";

@@ -1,4 +1,5 @@
 // Tests the behavior of change streams on sharded collections.
+// @tags: [requires_majority_read_concern]
 (function() {
     "use strict";
 

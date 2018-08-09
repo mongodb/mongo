@@ -1,5 +1,6 @@
 // Designed to reproduce SERVER-32088, this tests that resuming a change stream on a sharded
 // collection where not all shards have a chunk in the collection will not work.
+// @tags: [requires_majority_read_concern]
 (function() {
     "use strict";
 

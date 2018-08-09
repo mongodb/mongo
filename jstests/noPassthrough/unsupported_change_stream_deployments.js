@@ -1,4 +1,5 @@
 // Tests that the $changeStream stage returns an error when run against a standalone mongod.
+// @tags: [requires_majority_read_concern]
 (function() {
     "use strict";
     load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.

@@ -2,7 +2,7 @@
  * Test to ensure that specifying non-local read concern with an uninitiated set does not crash
  * node.
  *
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, requires_majority_read_concern]
  */
 (function() {
     "use strict";

@@ -7367,6 +7367,176 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
+- name: enterprise-rhel-62-64-bit-majority-read-concern-off
+  display_name: "Enterprise RHEL 6.2 (majority read concern off)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions:
+    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    test_flags: --majorityReadConcern=off --excludeWithAnyTags=requires_mmapv1,requires_majority_read_concern
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    tooltags: "-tags 'ssl sasl'"
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
+  - name: rollback_fuzzer_WT
+  - name: aggregation_WT
+  - name: aggregation_WT_ese
+  - name: aggregation_auth
+  - name: aggregation_facet_unwind_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
+  - name: audit_WT
+  - name: auth_WT
+  - name: auth_audit_WT
+  - name: bulk_gle_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_WT
+  - name: causally_consistent_jscore_passthrough_auth_WT
+  - name: sharded_causally_consistent_jscore_passthrough_WT
+  - name: concurrency_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+  - name: concurrency_sharded_causal_consistency_WT
+  - name: concurrency_sharded_causal_consistency_and_balancer_WT
+  - name: concurrency_simultaneous_WT
+  - name: dbtest_WT
+  - name: disk_WT
+  - name: ese_WT
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth_WT
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: gle_auth_write_cmd_WT
+  - name: integration_tests_replset
+  - name: integration_tests_sharded
+  - name: integration_tests_standalone
+  - name: jsCore_WT
+  - name: jsCore_WT_ese
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal_WT
+  - name: jsCore_minimum_batch_size_WT
+  - name: jsCore_op_query_WT
+  - name: jsonSchema
+  - name: aggregation_fuzzer_WT
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_replication_session_WT
+  - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_concurrent_sharded_causal_consistency_WT
+  - name: jstestfuzz_concurrent_sharded_continuous_stepdown
+  - name: jstestfuzz_concurrent_sharded_session_WT
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_replication_initsync_WT
+  - name: jstestfuzz_replication_session_WT
+  - name: jstestfuzz_sharded_WT
+  - name: jstestfuzz_sharded_causal_consistency_WT
+  - name: jstestfuzz_sharded_continuous_stepdown
+  - name: jstestfuzz_sharded_session_WT
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough_WT
+  - name: multiversion_WT
+  - name: multiversion_multistorage_engine
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: parallel_WT
+  - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: read_only_WT
+  - name: read_only_sharded_WT
+  - name: replica_sets_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_WT_ese
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth
+    distros:
+    - rhel62-large
+  - name: replica_sets_pv0
+    distros:
+    - rhel62-large
+  - name: replica_sets_rollback_refetch_no_uuid
+    distros:
+    - rhel62-large
+  - name: replica_sets_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_initsync_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_initsync_static_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_resync_static_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_jscore_fcv34_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: retryable_writes_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: rlp_WT
+  - name: sasl
+  - name: session_jscore_passthrough_WT
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding_WT
+    distros:
+    - rhel62-large
+  - name: sharding_WT_ese
+    distros:
+    - rhel62-large
+  - name: sharding_auth
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_WT
+    distros:
+    - rhel62-large
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_op_query_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_last_stable_mongos_and_mixed_shards
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_WT
+    distros:
+    - rhel62-large
+  - name: sharding_csrs_continuous_config_stepdown_WT
+    distros:
+    - rhel62-large
+  - name: slow1_WT
+  - name: serial_run_WT
+  - name: snmp_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool_WT
+  - name: update_fuzzer_WT
+  - name: update_fuzzer_replication_WT
+  - name: write_concern_majority_passthrough_WT
+    distros:
+    - rhel62-large
+
 - name: enterprise-rhel-62-64-bit-coverage
   display_name: "~ Enterprise RHEL 6.2 DEBUG Code Coverage"
   modules:
