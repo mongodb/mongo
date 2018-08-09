@@ -620,6 +620,13 @@ var Cluster = function(options) {
         return this.shouldPerformContinuousStepdowns() &&
             options.sharded.stepdownOptions.shardStepdown;
     };
+
+    this.awaitReplication = () => {
+        assert(this.isReplication(), 'cluster does not contain replica sets');
+        for (let rst of replSets) {
+            rst.awaitReplication();
+        }
+    };
 };
 
 /**
