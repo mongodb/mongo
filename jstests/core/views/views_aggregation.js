@@ -74,7 +74,7 @@
     assertAggResultEq("popSortedView", [{$limit: 1}, {$project: {_id: 1}}], [{_id: "Palo Alto"}]);
 
     // Test that the $out stage errors when given a view namespace.
-    assertErrorCode(coll, [{$out: "emptyPipelineView"}], 18631);
+    assertErrorCode(coll, [{$out: "emptyPipelineView"}], ErrorCodes.CommandNotSupportedOnView);
 
     // Test that an aggregate on a view propagates the 'bypassDocumentValidation' option.
     const validatedCollName = "collectionWithValidator";

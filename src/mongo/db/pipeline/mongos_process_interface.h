@@ -59,9 +59,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
-        MONGO_UNREACHABLE;
-    }
+    bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,

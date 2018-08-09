@@ -204,4 +204,9 @@ std::vector<GenericCursor> MongoSInterface::getCursors(
     return cursorManager->getAllCursors();
 }
 
+bool MongoSInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
+    auto routingInfo = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
+    return routingInfo.isOK() && routingInfo.getValue().cm();
+}
+
 }  // namespace mongo

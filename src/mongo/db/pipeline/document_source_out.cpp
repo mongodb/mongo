@@ -49,8 +49,10 @@ std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::l
             spec.type() == BSONType::String || spec.type() == BSONType::Object);
 
     NamespaceString targetNss;
+    bool allowSharded;
     if (spec.type() == BSONType::String) {
         targetNss = NamespaceString(request.getNamespaceString().db(), spec.valueStringData());
+        allowSharded = false;
     } else if (spec.type() == BSONType::Object) {
         auto outSpec =
             DocumentSourceOutSpec::parse(IDLParserErrorContext("$out"), spec.embeddedObject());
@@ -61,6 +63,9 @@ std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::l
             targetNss =
                 NamespaceString(request.getNamespaceString().db(), outSpec.getTargetCollection());
         }
+
+        // Sharded output collections are not allowed with mode "replaceCollection".
+        allowSharded = outSpec.getMode() != WriteModeEnum::kModeReplaceCollection;
     }
 
     uassert(ErrorCodes::InvalidNamespace,
@@ -74,7 +79,6 @@ std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::l
 
     PrivilegeVector privileges{Privilege(ResourcePattern::forExactNamespace(targetNss), actions)};
 
-    constexpr bool allowSharded = true;
     return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(
         std::move(targetNss), std::move(privileges), allowSharded);
 }
@@ -192,12 +196,20 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
         } else {
             outputNs = NamespaceString(expCtx->ns.db(), spec.getTargetCollection());
         }
-
     } else {
         uasserted(16990,
                   str::stream() << "$out only supports a string or object argument, not "
                                 << typeName(elem.type()));
     }
+
+    // Although we perform a check for "replaceCollection" mode with a sharded output collection
+    // during lite parsing, we need to do it here as well in case mongos is stale or the command is
+    // sent directly to the shard.
+    uassert(17017,
+            str::stream() << "$out with mode " << WriteMode_serializer(mode)
+                          << " is not supported to an existing *sharded* output collection.",
+            !(mode == WriteModeEnum::kModeReplaceCollection &&
+              expCtx->mongoProcessInterface->isSharded(expCtx->opCtx, outputNs)));
 
     uassert(17385, "Can't $out to special collection: " + outputNs.coll(), !outputNs.isSpecial());
 

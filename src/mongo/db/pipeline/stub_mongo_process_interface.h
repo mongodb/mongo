@@ -54,7 +54,7 @@ public:
     }
 
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
-        MONGO_UNREACHABLE;
+        return false;
     }
 
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -46,14 +46,9 @@ void DocumentSourceOutReplaceColl::initializeWriteNs() {
     _originalOutOptions = pExpCtx->mongoProcessInterface->getCollectionOptions(outputNs);
     _originalIndexes = conn->getIndexSpecs(outputNs.ns());
 
-    // Check if it's sharded or capped to make sure we have a chance of succeeding before we do
-    // all the work. If the collection becomes capped during processing, the collection options will
-    // have changed, and the $out will fail. If it becomes sharded during processing, the final
-    // rename will fail.
-    uassert(17017,
-            str::stream() << "namespace '" << outputNs.ns()
-                          << "' is sharded so it can't be used for $out'",
-            !pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, outputNs));
+    // Check if it's capped to make sure we have a chance of succeeding before we do all the work.
+    // If the collection becomes capped during processing, the collection options will have changed,
+    // and the $out will fail.
     uassert(17152,
             str::stream() << "namespace '" << outputNs.ns()
                           << "' is capped so it can't be used for $out",

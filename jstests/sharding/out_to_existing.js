@@ -58,17 +58,21 @@
         sourceColl.aggregate([{$out: {to: targetColl.getName(), mode: "insertDocuments"}}]);
         assert.eq(20, targetColl.find().itcount());
 
-        // Test that mode "replaceCollection" will drop the target collection and replace with the
-        // contents of the $out.
-        // TODO SERVER-36123: Mode "replaceCollection" should fail (gracefully) if the target exists
-        // and is sharded.
         if (!shardedTarget) {
+            // Test that mode "replaceCollection" will drop the target collection and replace with
+            // the contents of the $out.
             sourceColl.aggregate([{$out: {to: targetColl.getName(), mode: "replaceCollection"}}]);
             assert.eq(10, targetColl.find().itcount());
 
             // Legacy syntax should behave identical to mode "replaceCollection".
             sourceColl.aggregate([{$out: targetColl.getName()}]);
             assert.eq(10, targetColl.find().itcount());
+        } else {
+            // Test that mode "replaceCollection" fails if the target collection is sharded.
+            assertErrorCode(
+                sourceColl, [{$out: {to: targetColl.getName(), mode: "replaceCollection"}}], 28769);
+
+            assertErrorCode(sourceColl, [{$out: targetColl.getName()}], 28769);
         }
     }
 

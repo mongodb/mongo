@@ -44,8 +44,24 @@ StringData kModeFieldName = DocumentSourceOutSpec::kModeFieldName;
 StringData kUniqueKeyFieldName = DocumentSourceOutSpec::kUniqueKeyFieldName;
 StringData kDefaultMode = WriteMode_serializer(WriteModeEnum::kModeReplaceCollection);
 
+/**
+ * For the purpsoses of this test, assume every collection is unsharded. Stages may ask this during
+ * setup. For example, to compute its constraints, the $out stage needs to know if the output
+ * collection is sharded.
+ */
+class MongoProcessInterfaceForTest : public StubMongoProcessInterface {
+public:
+    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
+        return false;
+    }
+};
+
 class DocumentSourceOutTest : public AggregationContextFixture {
 public:
+    DocumentSourceOutTest() : AggregationContextFixture() {
+        getExpCtx()->mongoProcessInterface = std::make_shared<MongoProcessInterfaceForTest>();
+    }
+
     intrusive_ptr<DocumentSourceOut> createOutStage(BSONObj spec) {
         auto specElem = spec.firstElement();
         intrusive_ptr<DocumentSourceOut> outStage = dynamic_cast<DocumentSourceOut*>(
