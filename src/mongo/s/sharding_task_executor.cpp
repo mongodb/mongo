@@ -44,7 +44,7 @@
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/s/transaction/router_session_runtime_state.h"
+#include "mongo/s/transaction/router_transaction_state.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -136,7 +136,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         newRequest->cmdObj = bob.obj();
     }
 
-    auto routerSession = RouterSessionRuntimeState::get(request.opCtx);
+    auto routerSession = RouterTransactionState::get(request.opCtx);
     if (routerSession) {
         auto shard =
             Grid::get(request.opCtx)->shardRegistry()->getShardForHostNoReload(request.target);

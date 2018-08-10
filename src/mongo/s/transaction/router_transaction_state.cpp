@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/transaction/router_session_runtime_state.h"
+#include "mongo/s/transaction/router_transaction_state.h"
 
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -48,7 +48,7 @@ const char kStartTransactionField[] = "startTransaction";
 
 class RouterSessionCatalog {
 public:
-    std::shared_ptr<RouterSessionRuntimeState> checkoutSessionState(OperationContext* opCtx);
+    std::shared_ptr<RouterTransactionState> checkoutSessionState(OperationContext* opCtx);
     void checkInSessionState(const LogicalSessionId& sessionId);
 
     static RouterSessionCatalog* get(ServiceContext* service);
@@ -57,16 +57,16 @@ public:
 private:
     stdx::mutex _mutex;
     stdx::unordered_map<LogicalSessionId,
-                        std::shared_ptr<RouterSessionRuntimeState>,
+                        std::shared_ptr<RouterTransactionState>,
                         LogicalSessionIdHash>
         _catalog;
 };
 
 const auto getRouterSessionCatalog = ServiceContext::declareDecoration<RouterSessionCatalog>();
 const auto getRouterSessionRuntimeState =
-    OperationContext::declareDecoration<std::shared_ptr<RouterSessionRuntimeState>>();
+    OperationContext::declareDecoration<std::shared_ptr<RouterTransactionState>>();
 
-std::shared_ptr<RouterSessionRuntimeState> RouterSessionCatalog::checkoutSessionState(
+std::shared_ptr<RouterTransactionState> RouterSessionCatalog::checkoutSessionState(
     OperationContext* opCtx) {
     auto logicalSessionId = opCtx->getLogicalSessionId();
     invariant(logicalSessionId);
@@ -82,7 +82,7 @@ std::shared_ptr<RouterSessionRuntimeState> RouterSessionCatalog::checkoutSession
         return iter->second;
     }
 
-    auto newRuntimeState = std::make_shared<RouterSessionRuntimeState>(*logicalSessionId);
+    auto newRuntimeState = std::make_shared<RouterTransactionState>(*logicalSessionId);
     newRuntimeState->checkOut();
     _catalog.insert(std::make_pair(*logicalSessionId, newRuntimeState));
     return newRuntimeState;
@@ -131,12 +131,12 @@ void appendReadConcernForTxn(BSONObjBuilder* bob, repl::ReadConcernArgs readConc
 
 }  // unnamed namespace
 
-TransactionParticipant::TransactionParticipant(bool isCoordinator,
-                                               TxnNumber txnNumber,
-                                               repl::ReadConcernArgs readConcernArgs)
+RouterTransactionState::Participant::Participant(bool isCoordinator,
+                                                 TxnNumber txnNumber,
+                                                 repl::ReadConcernArgs readConcernArgs)
     : _isCoordinator(isCoordinator), _txnNumber(txnNumber), _readConcernArgs(readConcernArgs) {}
 
-BSONObj TransactionParticipant::attachTxnFieldsIfNeeded(BSONObj cmd) {
+BSONObj RouterTransactionState::Participant::attachTxnFieldsIfNeeded(BSONObj cmd) {
     auto isTxnCmd = isTransactionCommand(cmd);  // check first before moving cmd.
     BSONObjBuilder newCmd(std::move(cmd));
 
@@ -163,21 +163,21 @@ BSONObj TransactionParticipant::attachTxnFieldsIfNeeded(BSONObj cmd) {
     return newCmd.obj();
 }
 
-TransactionParticipant::State TransactionParticipant::getState() {
+RouterTransactionState::Participant::State RouterTransactionState::Participant::getState() {
     return _state;
 }
 
-bool TransactionParticipant::isCoordinator() {
+bool RouterTransactionState::Participant::isCoordinator() {
     return _isCoordinator;
 }
 
-void TransactionParticipant::markAsCommandSent() {
+void RouterTransactionState::Participant::markAsCommandSent() {
     if (_state == State::kMustStart) {
         _state = State::kStarted;
     }
 }
 
-RouterSessionRuntimeState* RouterSessionRuntimeState::get(OperationContext* opCtx) {
+RouterTransactionState* RouterTransactionState::get(OperationContext* opCtx) {
     auto& opCtxSession = getRouterSessionRuntimeState(opCtx);
     if (!opCtxSession) {
         return nullptr;
@@ -186,26 +186,27 @@ RouterSessionRuntimeState* RouterSessionRuntimeState::get(OperationContext* opCt
     return opCtxSession.get();
 }
 
-RouterSessionRuntimeState::RouterSessionRuntimeState(LogicalSessionId sessionId)
+RouterTransactionState::RouterTransactionState(LogicalSessionId sessionId)
     : _sessionId(std::move(sessionId)) {}
 
-void RouterSessionRuntimeState::checkIn() {
+void RouterTransactionState::checkIn() {
     _isCheckedOut = false;
 }
 
-void RouterSessionRuntimeState::checkOut() {
+void RouterTransactionState::checkOut() {
     _isCheckedOut = true;
 }
 
-bool RouterSessionRuntimeState::isCheckedOut() {
+bool RouterTransactionState::isCheckedOut() {
     return _isCheckedOut;
 }
 
-boost::optional<ShardId> RouterSessionRuntimeState::getCoordinatorId() const {
+boost::optional<ShardId> RouterTransactionState::getCoordinatorId() const {
     return _coordinatorId;
 }
 
-TransactionParticipant& RouterSessionRuntimeState::getOrCreateParticipant(const ShardId& shard) {
+RouterTransactionState::Participant& RouterTransactionState::getOrCreateParticipant(
+    const ShardId& shard) {
     auto iter = _participants.find(shard.toString());
 
     if (iter != _participants.end()) {
@@ -223,18 +224,19 @@ TransactionParticipant& RouterSessionRuntimeState::getOrCreateParticipant(const 
     invariant(!_readConcernArgs.isEmpty());
 
     auto resultPair = _participants.try_emplace(
-        shard.toString(), TransactionParticipant(isFirstParticipant, _txnNumber, _readConcernArgs));
+        shard.toString(),
+        RouterTransactionState::Participant(isFirstParticipant, _txnNumber, _readConcernArgs));
 
     return resultPair.first->second;
 }
 
-const LogicalSessionId& RouterSessionRuntimeState::getSessionId() const {
+const LogicalSessionId& RouterTransactionState::getSessionId() const {
     return _sessionId;
 }
 
-void RouterSessionRuntimeState::beginOrContinueTxn(OperationContext* opCtx,
-                                                   TxnNumber txnNumber,
-                                                   bool startTransaction) {
+void RouterTransactionState::beginOrContinueTxn(OperationContext* opCtx,
+                                                TxnNumber txnNumber,
+                                                bool startTransaction) {
     invariant(_isCheckedOut);
 
     if (startTransaction) {
@@ -297,7 +299,7 @@ ScopedRouterSession::ScopedRouterSession(OperationContext* opCtx) : _opCtx(opCtx
 }
 
 ScopedRouterSession::~ScopedRouterSession() {
-    auto opCtxSession = RouterSessionRuntimeState::get(_opCtx);
+    auto opCtxSession = RouterTransactionState::get(_opCtx);
     invariant(opCtxSession);
     RouterSessionCatalog::get(_opCtx)->checkInSessionState(opCtxSession->getSessionId());
 }

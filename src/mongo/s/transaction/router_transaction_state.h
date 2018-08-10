@@ -42,52 +42,53 @@
 namespace mongo {
 
 /**
- * Represents a shard participant in a distributed transaction. Lives only for the duration of the
- * transaction that created it.
- */
-class TransactionParticipant {
-public:
-    explicit TransactionParticipant(bool isCoordinator,
-                                    TxnNumber txnNumber,
-                                    repl::ReadConcernArgs readConcernArgs);
-
-    enum class State {
-        // Next transaction should include startTransaction.
-        kMustStart,
-        // startTransaction already sent to this participant.
-        kStarted,
-    };
-
-    /**
-     * Attaches necessary fields if this is participating in a multi statement transaction.
-     */
-    BSONObj attachTxnFieldsIfNeeded(BSONObj cmd);
-
-    State getState();
-
-    /**
-     * True if the participant has been chosen as the coordinator for its transaction.
-     */
-    bool isCoordinator();
-
-    /**
-     * Mark this participant as a node that has been successfully sent a command.
-     */
-    void markAsCommandSent();
-
-private:
-    State _state{State::kMustStart};
-    const bool _isCoordinator{false};
-    const TxnNumber _txnNumber;
-    const repl::ReadConcernArgs _readConcernArgs;
-};
-
-/**
  * Keeps track of the transaction state. A session is in use when it is being used by a request.
  */
-class RouterSessionRuntimeState {
+class RouterTransactionState {
 public:
-    RouterSessionRuntimeState(LogicalSessionId sessionId);
+    /**
+     * Represents a shard participant in a distributed transaction. Lives only for the duration of
+     * the
+     * transaction that created it.
+     */
+    class Participant {
+    public:
+        explicit Participant(bool isCoordinator,
+                             TxnNumber txnNumber,
+                             repl::ReadConcernArgs readConcernArgs);
+
+        enum class State {
+            // Next transaction should include startTransaction.
+            kMustStart,
+            // startTransaction already sent to this participant.
+            kStarted,
+        };
+
+        /**
+         * Attaches necessary fields if this is participating in a multi statement transaction.
+         */
+        BSONObj attachTxnFieldsIfNeeded(BSONObj cmd);
+
+        State getState();
+
+        /**
+         * True if the participant has been chosen as the coordinator for its transaction.
+         */
+        bool isCoordinator();
+
+        /**
+         * Mark this participant as a node that has been successfully sent a command.
+         */
+        void markAsCommandSent();
+
+    private:
+        State _state{State::kMustStart};
+        const bool _isCoordinator{false};
+        const TxnNumber _txnNumber;
+        const repl::ReadConcernArgs _readConcernArgs;
+    };
+
+    RouterTransactionState(LogicalSessionId sessionId);
 
     /**
      * Starts a fresh transaction in this session. Also cleans up the previous transaction state.
@@ -97,7 +98,7 @@ public:
     /**
      * Returns the participant for this transaction. Creates a new one if it doesn't exist.
      */
-    TransactionParticipant& getOrCreateParticipant(const ShardId& shard);
+    Participant& getOrCreateParticipant(const ShardId& shard);
 
     void checkIn();
     void checkOut();
@@ -112,7 +113,7 @@ public:
      * Extract the runtimne state attached to the operation context. Returns nullptr if none is
      * attached.
      */
-    static RouterSessionRuntimeState* get(OperationContext* opCtx);
+    static RouterTransactionState* get(OperationContext* opCtx);
 
 private:
     const LogicalSessionId _sessionId;
@@ -122,7 +123,7 @@ private:
     bool _isCheckedOut{false};
 
     // Map of current participants of the current transaction.
-    StringMap<TransactionParticipant> _participants;
+    StringMap<Participant> _participants;
 
     // The id of coordinator participant, used to construct prepare requests.
     boost::optional<ShardId> _coordinatorId;
