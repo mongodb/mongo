@@ -105,12 +105,16 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
 
         ixparams.bounds.startKey = FTSIndexFormat::getIndexKey(
             MAX_WEIGHT, term, _params.indexPrefix, _params.spec.getTextIndexVersion());
+
+        string term_end = term;
+        term_end[term_end.size() - 1]++;          // increment last character key code of search term for End-Key
         ixparams.bounds.endKey = FTSIndexFormat::getIndexKey(
-            0, term, _params.indexPrefix, _params.spec.getTextIndexVersion());
-        ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+            MAX_WEIGHT, term_end, _params.indexPrefix, _params.spec.getTextIndexVersion());
+        ixparams.bounds.endKeyInclusive = false;  // End key is not inclusive (endKey is artificially generated)      
+      
         ixparams.bounds.isSimpleRange = true;
         ixparams.descriptor = _params.index;
-        ixparams.direction = -1;
+        ixparams.direction = 1;
 
         indexScanList.push_back(stdx::make_unique<IndexScan>(opCtx, ixparams, ws, nullptr));
     }
