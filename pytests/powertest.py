@@ -107,7 +107,7 @@ if _IS_WINDOWS:
     _try_import("win32serviceutil")
 
 
-__version__ = "1.0"
+__version__ = "0.1"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1268,14 +1268,8 @@ def remote_handler(options, operations):
             ret = wait_for_mongod_shutdown(mongod)
 
         elif operation == "rsync_data":
-            rsync_dir, new_rsync_dir = options.rsync_dest
-            ret, output = rsync(options.db_path, rsync_dir, options.rsync_exclude_files)
-            if output:
-                LOGGER.info(output)
-            # Rename the rsync_dir only if it has a different name than new_rsync_dir.
-            if ret == 0 and rsync_dir != new_rsync_dir:
-                LOGGER.info("Renaming directory {} to {}".format(rsync_dir, new_rsync_dir))
-                os.rename(rsync_dir, new_rsync_dir)
+            ret, output = rsync(options.db_path, options.rsync_dest, options.rsync_exclude_files)
+            LOGGER.info(output)
 
         elif operation == "seed_docs":
             mongo = pymongo.MongoClient(**mongo_client_opts)
@@ -1325,11 +1319,6 @@ def remote_handler(options, operations):
             return ret
 
     return 0
-
-
-def get_backup_path(path, loop_num):
-    """Return the backup path based on the loop_num."""
-    return re.sub("-{}$".format(loop_num - 1), "-{}".format(loop_num), path)
 
 
 def rsync(src_dir, dest_dir, exclude_files=None):
@@ -2125,11 +2114,16 @@ Examples:
     # Remote options, include commands and options sent from client to server under test.
     # These are 'internal' options, not meant to be directly specifed.
     # More than one remote operation can be provided and they are specified in the program args.
-    program_options.add_option("--remoteOperation", dest="remote_operation",
-                               help=optparse.SUPPRESS_HELP, action="store_true", default=False)
+    program_options.add_option("--remoteOperation",
+                               dest="remote_operation",
+                               help=optparse.SUPPRESS_HELP,
+                               action="store_true",
+                               default=False)
 
-    program_options.add_option("--rsyncDest", dest="rsync_dest", nargs=2,
-                               help=optparse.SUPPRESS_HELP, default=None)
+    program_options.add_option("--rsyncDest",
+                               dest="rsync_dest",
+                               help=optparse.SUPPRESS_HELP,
+                               default=None)
 
     parser.add_option_group(test_options)
     parser.add_option_group(crash_options)
@@ -2263,9 +2257,6 @@ Examples:
         backup_path_after = options.backup_path_after
         if not backup_path_after:
             backup_path_after = "{}/data-afterrecovery".format(options.root_dir)
-        # Set the first backup directory, for loop 1.
-        backup_path_before = "{}-1".format(backup_path_before)
-        backup_path_after = "{}-1".format(backup_path_after)
     else:
         rsync_cmd = ""
         rsync_opt = ""
@@ -2460,9 +2451,7 @@ Examples:
         # Since rsync requires Posix style paths, we do not use os.path.join to
         # construct the rsync destination directory.
         if rsync_cmd:
-            new_path_dir = get_backup_path(backup_path_before, loop_num)
-            rsync_opt = "--rsyncDest {} {}".format(backup_path_before, new_path_dir)
-            backup_path_before = new_path_dir
+            rsync_opt = "--rsyncDest {}".format(backup_path_before)
 
         # Optionally, rsync the pre-recovery database.
         # Start monogd on the secret port.
@@ -2541,9 +2530,7 @@ Examples:
         # Since rsync requires Posix style paths, we do not use os.path.join to
         # construct the rsync destination directory.
         if rsync_cmd:
-            new_path_dir = get_backup_path(backup_path_after, loop_num)
-            rsync_opt = "--rsyncDest {} {}".format(backup_path_after, new_path_dir)
-            backup_path_after = new_path_dir
+            rsync_opt = "--rsyncDest {}".format(backup_path_after)
 
         # Optionally, rsync the post-recovery database.
         # Start monogd on the standard port.
