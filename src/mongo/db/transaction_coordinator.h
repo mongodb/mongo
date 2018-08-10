@@ -40,6 +40,7 @@
 
 namespace mongo {
 
+class OperationContext;
 class Session;
 
 /**
@@ -53,49 +54,8 @@ public:
     TransactionCoordinator() = default;
     ~TransactionCoordinator() = default;
 
-    static boost::optional<TransactionCoordinator>& get(Session* session);
+    static boost::optional<TransactionCoordinator>& get(OperationContext* opCtx);
     static void create(Session* session);
-
-    /**
-     * The coordinateCommit command contains the full participant list that this node is responsible
-     * for coordinating the commit across.
-     *
-     * Stores the participant list.
-     *
-     * Throws if any participants that this node has already heard a vote from are not in the list.
-     */
-    void recvCoordinateCommit(const std::set<ShardId>& participants);
-
-    /**
-     * A participant sends a voteCommit command with its prepareTimestamp if it succeeded in
-     * preparing the transaction.
-     *
-     * Stores the participant's vote.
-     *
-     * Throws if the full participant list has been received and this shard is not one of the
-     * participants.
-     */
-    void recvVoteCommit(const ShardId& shardId, int prepareTimestamp);
-
-    /**
-     * A participant sends a voteAbort command if it failed to prepare the transaction.
-     *
-     * Stores the participant's vote and causes the coordinator to decide to abort the transaction.
-     *
-     * Throws if the full participant list has been received and this shard is not one of the
-     * participants.
-     */
-    void recvVoteAbort(const ShardId& shardId);
-
-    /**
-     * Marks this participant as having completed committing the transaction.
-     */
-    void recvCommitAck(const ShardId& shardId);
-
-    /**
-     * Marks this participant as having completed aborting the transaction.
-     */
-    void recvAbortAck(const ShardId& shardId);
 
     /**
      * The internal state machine, or "brain", used by the TransactionCoordinator to determine what
@@ -106,6 +66,7 @@ public:
 
     public:
         enum class State {
+            kWaitingForParticipantList,
             kWaitingForVotes,
             kWaitingForAbortAcks,
             kAborted,
@@ -121,8 +82,10 @@ public:
 
         // State machine inputs
         enum class Event {
-            kRecvFinalVoteCommit,
             kRecvVoteAbort,
+            kRecvVoteCommit,
+            kRecvParticipantList,
+            kRecvFinalVoteCommit,
             kRecvFinalCommitAck,
             kRecvFinalAbortAck,
         };
@@ -148,8 +111,57 @@ public:
         };
 
         static const std::map<State, std::map<Event, Transition>> transitionTable;
-        State _state{State::kWaitingForVotes};
+        State _state{State::kWaitingForParticipantList};
     };
+
+    /**
+     * The coordinateCommit command contains the full participant list that this node is responsible
+     * for coordinating the commit across.
+     *
+     * Stores the participant list.
+     *
+     * Throws if any participants that this node has already heard a vote from are not in the list.
+     */
+    StateMachine::Action recvCoordinateCommit(const std::set<ShardId>& participants);
+
+    /**
+     * A participant sends a voteCommit command with its prepareTimestamp if it succeeded in
+     * preparing the transaction.
+     *
+     * Stores the participant's vote.
+     *
+     * Throws if the full participant list has been received and this shard is not one of the
+     * participants.
+     */
+    StateMachine::Action recvVoteCommit(const ShardId& shardId, int prepareTimestamp);
+
+    /**
+     * A participant sends a voteAbort command if it failed to prepare the transaction.
+     *
+     * Stores the participant's vote and causes the coordinator to decide to abort the transaction.
+     *
+     * Throws if the full participant list has been received and this shard is not one of the
+     * participants.
+     */
+    StateMachine::Action recvVoteAbort(const ShardId& shardId);
+
+    /**
+     * Marks this participant as having completed committing the transaction.
+     */
+    void recvCommitAck(const ShardId& shardId);
+
+    /**
+     * Marks this participant as having completed aborting the transaction.
+     */
+    void recvAbortAck(const ShardId& shardId);
+
+    std::set<ShardId> getNonAckedCommitParticipants() const {
+        return _participantList.getNonAckedCommitParticipants();
+    }
+
+    std::set<ShardId> getNonAckedAbortParticipants() const {
+        return _participantList.getNonAckedAbortParticipants();
+    }
 
     StateMachine::State state() const {
         return _stateMachine.state();
@@ -163,9 +175,12 @@ public:
         void recordCommitAck(const ShardId& shardId);
         void recordAbortAck(const ShardId& shardId);
 
-        bool allParticipantsVotedCommit();
-        bool allParticipantsAckedAbort();
-        bool allParticipantsAckedCommit();
+        bool allParticipantsVotedCommit() const;
+        bool allParticipantsAckedAbort() const;
+        bool allParticipantsAckedCommit() const;
+
+        std::set<ShardId> getNonAckedCommitParticipants() const;
+        std::set<ShardId> getNonAckedAbortParticipants() const;
 
         class Participant {
         public:
@@ -182,7 +197,7 @@ public:
         void _recordParticipant(const ShardId& shardId);
         void _validate(const std::set<ShardId>& participants);
 
-        bool _participantListReceived{false};
+        bool _fullListReceived{false};
         std::map<ShardId, Participant> _participants;
     };
 
@@ -196,12 +211,13 @@ inline StringBuilder& operator<<(StringBuilder& sb,
     using State = TransactionCoordinator::StateMachine::State;
     switch (state) {
         // clang-format off
-        case State::kWaitingForVotes:       return sb << "kWaitingForVotes";
-        case State::kWaitingForAbortAcks:   return sb << "kWaitingForAbortAcks";
-        case State::kAborted:               return sb << "kAborted";
-        case State::kWaitingForCommitAcks:  return sb << "kWaitingForCommitAcks";
-        case State::kCommitted:             return sb << "kCommitted";
-        case State::kBroken:                return sb << "kBroken";
+        case State::kWaitingForParticipantList:     return sb << "kWaitingForParticipantlist";
+        case State::kWaitingForVotes:               return sb << "kWaitingForVotes";
+        case State::kWaitingForAbortAcks:           return sb << "kWaitingForAbortAcks";
+        case State::kAborted:                       return sb << "kAborted";
+        case State::kWaitingForCommitAcks:          return sb << "kWaitingForCommitAcks";
+        case State::kCommitted:                     return sb << "kCommitted";
+        case State::kBroken:                        return sb << "kBroken";
         // clang-format on
         default:
             MONGO_UNREACHABLE;
@@ -220,8 +236,10 @@ inline StringBuilder& operator<<(StringBuilder& sb,
     using Event = TransactionCoordinator::StateMachine::Event;
     switch (event) {
         // clang-format off
-        case Event::kRecvFinalVoteCommit:   return sb << "kRecvFinalVoteCommit";
         case Event::kRecvVoteAbort:         return sb << "kRecvVoteAbort";
+        case Event::kRecvVoteCommit:        return sb << "kRecvVoteCommit";
+        case Event::kRecvParticipantList:   return sb << "kRecvParticipantList";
+        case Event::kRecvFinalVoteCommit:   return sb << "kRecvFinalVoteCommit";
         case Event::kRecvFinalCommitAck:    return sb << "kRecvFinalCommitAck";
         case Event::kRecvFinalAbortAck:     return sb << "kRecvFinalAbortAck";
         // clang-format on

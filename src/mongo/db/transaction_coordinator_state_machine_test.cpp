@@ -71,13 +71,15 @@ TEST(CoordinatorStateMachine, AbortSucceeds) {
 }
 
 TEST(CoordinatorStateMachine, CommitSucceeds) {
-    expectScheduleSucceeds({Event::kRecvFinalVoteCommit, Event::kRecvFinalCommitAck},
-                           State::kCommitted);
+    expectScheduleSucceeds(
+        {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit, Event::kRecvFinalCommitAck},
+        State::kCommitted);
 }
 
 TEST(CoordinatorStateMachine, RecvFinalVoteCommitAndRecvVoteAbortThrows) {
     expectScheduleThrows({Event::kRecvVoteAbort, Event::kRecvFinalVoteCommit});
-    expectScheduleThrows({Event::kRecvFinalVoteCommit, Event::kRecvVoteAbort});
+    expectScheduleThrows(
+        {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit, Event::kRecvVoteAbort});
 }
 
 }  // namespace mongo
