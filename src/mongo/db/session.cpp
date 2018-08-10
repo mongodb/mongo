@@ -345,18 +345,10 @@ void Session::onMigrateCompletedOnPrimary(OperationContext* opCtx,
     _checkValid(ul);
     _checkIsActiveTransaction(ul, txnNumber);
 
-    // If the transaction has a populated lastWriteDate, we will use that as the most up-to-date
-    // value. Using the lastWriteDate from the oplog being migrated may move the lastWriteDate
-    // back. However, in the case that the transaction doesn't have the lastWriteDate populated,
-    // the oplog's value serves as a best-case fallback.
-    const auto txnLastStmtIdWriteDate = _getLastWriteDate(ul, txnNumber);
-    const auto updatedLastStmtIdWriteDate =
-        txnLastStmtIdWriteDate == Date_t::min() ? oplogLastStmtIdWriteDate : txnLastStmtIdWriteDate;
-
     // We do not migrate transaction oplog entries.
     auto txnState = boost::none;
     const auto updateRequest = _makeUpdateRequest(
-        ul, txnNumber, lastStmtIdWriteOpTime, updatedLastStmtIdWriteDate, txnState);
+        ul, txnNumber, lastStmtIdWriteOpTime, oplogLastStmtIdWriteDate, txnState);
 
     ul.unlock();
 
