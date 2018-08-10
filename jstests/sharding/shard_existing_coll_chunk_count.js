@@ -10,7 +10,7 @@
 
     var s = new ShardingTest({
         name: "shard_existing_coll_chunk_count",
-        shards: 1,
+        shards: [{verbose: 2}],
         mongos: 1,
         other: {enableAutoSplit: true},
     });
@@ -129,12 +129,15 @@
         ],
     });
 
-    // Lower chunksize to 1MB, and restart the mongod for it to take.
+    // Lower chunksize to 1MB, and restart the mongod for it to take. We also
+    // need to restart mongos for the case of the last-stable suite where the
+    // shard is also last-stable.
     assert.writeOK(
         s.getDB("config").getCollection("settings").update({_id: "chunksize"}, {$set: {value: 1}}, {
             upsert: true
         }));
 
+    s.restartMongos(0);
     s.restartShardRS(0);
 
     // Original problematic case, scaled down to smaller chunksize.
