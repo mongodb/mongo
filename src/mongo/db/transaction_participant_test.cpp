@@ -183,13 +183,15 @@ protected:
         Client::setCurrent(std::move(newClientOwned));
         auto newOpCtx = newClient->makeOperationContext();
 
+        ON_BLOCK_EXIT([&] {
+            // Restore the original client.
+            newOpCtx.reset();
+            Client::releaseCurrent();
+            Client::setCurrent(std::move(originalClient));
+        });
+
         // Run the function on bahalf of another operation context.
         func(newOpCtx.get());
-
-        // Restore the original client.
-        newOpCtx.reset();
-        Client::releaseCurrent();
-        Client::setCurrent(std::move(originalClient));
     }
 
     void bumpTxnNumberFromDifferentOpCtx(const LogicalSessionId& sessionId, TxnNumber newTxnNum) {
