@@ -73,17 +73,6 @@ BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
 BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow);
 
 /**
- * Returns a copy of 'cmdObj' with atClusterTime appended to a readConcern.
- */
-BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime);
-
-/**
- * Returns a copy of the given readConcern object with atClusterTime appended. The given object must
- * not already have an atClusterTime field.
- */
-BSONObj appendAtClusterTimeToReadConcern(BSONObj readConcernObj, LogicalTime atClusterTime);
-
-/**
  * Utility for dispatching unversioned commands to all shards in a cluster.
  *
  * Returns a non-OK status if a failure occurs on *this* node during execution. Otherwise, returns
@@ -214,26 +203,4 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
                                             const BSONObj& query,
                                             const BSONObj& collation);
 
-/**
- * Returns the latest known lastCommittedOpTime for the targeted shard, or the latest in-memory
- * cluster time if there is none.
- *
- * A null logical time is returned if the readConcern on the OperationContext is not snapshot.
- */
-boost::optional<LogicalTime> computeAtClusterTimeForOneShard(OperationContext* opCtx,
-                                                             const ShardId& shardId);
-
-/**
- * Returns the atClusterTime to use for the given query. This will be the latest known
- * lastCommittedOpTime for the targeted shards if the same set of shards would be targeted at that
- * time, otherwise the latest in-memory cluster time.
- *
- * A null logical time is returned if the readConcern on the OperationContext is not snapshot.
- */
-boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
-                                                  bool mustRunOnAll,
-                                                  const std::set<ShardId>& shardIds,
-                                                  const NamespaceString& nss,
-                                                  const BSONObj query,
-                                                  const BSONObj collation);
 }  // namespace mongo

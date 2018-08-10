@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/transaction/transaction_router.h"
 #include "mongo/unittest/death_test.h"
@@ -38,9 +40,32 @@ namespace {
 
 class TransactionRouterTest : public ShardingTestFixture {
 protected:
+    const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(3, 1));
+
+    const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
+
+    const ShardId shard1 = ShardId("shard1");
+    const HostAndPort hostAndPort1 = HostAndPort("shard1:1234");
+
+    const ShardId shard2 = ShardId("shard2");
+    const HostAndPort hostAndPort2 = HostAndPort("shard2:1234");
+
     void setUp() {
+        ShardingTestFixture::setUp();
+        configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
+        std::vector<std::tuple<ShardId, HostAndPort>> shardInfos;
+        shardInfos.push_back(std::make_tuple(shard1, hostAndPort1));
+        shardInfos.push_back(std::make_tuple(shard2, hostAndPort2));
+
+        ShardingTestFixture::addRemoteShards(shardInfos);
+
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+        // Set up a logical clock with an initial time.
+        auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
+        logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
+        LogicalClock::set(getServiceContext(), std::move(logicalClock));
     }
 };
 
@@ -53,11 +78,11 @@ TEST_F(TransactionRouterTest, BasicStartTxn) {
 
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "startTransaction"
-                                  << true
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot")
+                                  << "startTransaction"
+                                  << true
                                   << "coordinator"
                                   << true
                                   << "autocommit"
@@ -65,10 +90,65 @@ TEST_F(TransactionRouterTest, BasicStartTxn) {
                                   << "txnNumber"
                                   << txnNum);
 
-    ShardId shard1("a");
 
     {
         auto& participant = sessionState.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+    }
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+        participant.markAsCommandSent();
+    }
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(BSON("update"
+                               << "test"
+                               << "coordinator"
+                               << true
+                               << "autocommit"
+                               << false
+                               << "txnNumber"
+                               << txnNum),
+                          newCmd);
+    }
+}
+
+TEST_F(TransactionRouterTest, BasicStartTxnWithAtClusterTime) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter sessionState({});
+    sessionState.checkOut();
+    sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    BSONObj expectedNewObj = BSON("insert"
+                                  << "test"
+                                  << "readConcern"
+                                  << BSON("level"
+                                          << "snapshot"
+                                          << "atClusterTime"
+                                          << kInMemoryLogicalTime.asTimestamp())
+                                  << "startTransaction"
+                                  << true
+                                  << "coordinator"
+                                  << true
+                                  << "autocommit"
+                                  << false
+                                  << "txnNumber"
+                                  << txnNum);
+
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard1);
+        participant.setAtClusterTime(kInMemoryLogicalTime);
         auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
                                                                << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
@@ -115,14 +195,13 @@ TEST_F(TransactionRouterTest, NewParticipantMustAttachTxnAndReadConcern) {
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
-    ShardId shard1("a");
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "startTransaction"
-                                  << true
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot")
+                                  << "startTransaction"
+                                  << true
                                   << "coordinator"
                                   << true
                                   << "autocommit"
@@ -153,15 +232,96 @@ TEST_F(TransactionRouterTest, NewParticipantMustAttachTxnAndReadConcern) {
                           newCmd);
     }
 
-    ShardId shard2("b");
-
     expectedNewObj = BSON("insert"
                           << "test"
-                          << "startTransaction"
-                          << true
                           << "readConcern"
                           << BSON("level"
                                   << "snapshot")
+                          << "startTransaction"
+                          << true
+                          << "autocommit"
+                          << false
+                          << "txnNumber"
+                          << txnNum);
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard2);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+        participant.markAsCommandSent();
+    }
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard2);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(BSON("update"
+                               << "test"
+                               << "autocommit"
+                               << false
+                               << "txnNumber"
+                               << txnNum),
+                          newCmd);
+    }
+}
+
+TEST_F(TransactionRouterTest, NewParticipantMustAttachTxnAndReadConcernWithAtClusterTime) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter sessionState({});
+    sessionState.checkOut();
+    sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
+    sessionState.computeAtClusterTimeForOneShard(operationContext(), shard1);
+
+    BSONObj expectedNewObj = BSON("insert"
+                                  << "test"
+                                  << "readConcern"
+                                  << BSON("level"
+                                          << "snapshot"
+                                          << "atClusterTime"
+                                          << kInMemoryLogicalTime.asTimestamp())
+                                  << "startTransaction"
+                                  << true
+                                  << "coordinator"
+                                  << true
+                                  << "autocommit"
+                                  << false
+                                  << "txnNumber"
+                                  << txnNum);
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
+        participant.markAsCommandSent();
+    }
+
+    {
+        auto& participant = sessionState.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(BSON("update"
+                               << "test"
+                               << "coordinator"
+                               << true
+                               << "autocommit"
+                               << false
+                               << "txnNumber"
+                               << txnNum),
+                          newCmd);
+    }
+
+    expectedNewObj = BSON("insert"
+                          << "test"
+                          << "readConcern"
+                          << BSON("level"
+                                  << "snapshot"
+                                  << "atClusterTime"
+                                  << kInMemoryLogicalTime.asTimestamp())
+                          << "startTransaction"
+                          << true
                           << "autocommit"
                           << false
                           << "txnNumber"
@@ -195,16 +355,21 @@ TEST_F(TransactionRouterTest, StartingNewTxnShouldClearState) {
     TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
-
-    ShardId shard1("a");
+    sessionState.computeAtClusterTimeForOneShard(operationContext(), shard1);
 
     {
         auto& participant = sessionState.getOrCreateParticipant(shard1);
-        participant.markAsCommandSent();
         auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("update"
                                                                << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
+                               << "readConcern"
+                               << BSON("level"
+                                       << "snapshot"
+                                       << "atClusterTime"
+                                       << kInMemoryLogicalTime.asTimestamp())
+                               << "startTransaction"
+                               << true
                                << "coordinator"
                                << true
                                << "autocommit"
@@ -219,11 +384,11 @@ TEST_F(TransactionRouterTest, StartingNewTxnShouldClearState) {
 
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "startTransaction"
-                                  << true
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot")
+                                  << "startTransaction"
+                                  << true
                                   << "coordinator"
                                   << true
                                   << "autocommit"
@@ -248,7 +413,6 @@ TEST_F(TransactionRouterTest, FirstParticipantIsCoordinator) {
 
     ASSERT_FALSE(sessionState.getCoordinatorId());
 
-    ShardId shard1("a");
 
     {
         auto& participant = sessionState.getOrCreateParticipant(shard1);
@@ -256,8 +420,6 @@ TEST_F(TransactionRouterTest, FirstParticipantIsCoordinator) {
         ASSERT(sessionState.getCoordinatorId());
         ASSERT_EQ(*sessionState.getCoordinatorId(), shard1);
     }
-
-    ShardId shard2("b");
 
     {
         auto& participant = sessionState.getOrCreateParticipant(shard2);
@@ -290,17 +452,16 @@ TEST_F(TransactionRouterTest, DoesNotAttachTxnNumIfAlreadyThere) {
                                   << "test"
                                   << "txnNumber"
                                   << txnNum
-                                  << "startTransaction"
-                                  << true
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot")
+                                  << "startTransaction"
+                                  << true
                                   << "coordinator"
                                   << true
                                   << "autocommit"
                                   << false);
 
-    ShardId shard1("a");
     auto& participant = sessionState.getOrCreateParticipant(shard1);
     auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
                                                            << "test"
@@ -316,7 +477,6 @@ DEATH_TEST_F(TransactionRouterTest, CrashesIfCmdHasDifferentTxnNumber, "invarian
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
-    ShardId shard1("a");
     auto& participant = sessionState.getOrCreateParticipant(shard1);
     participant.attachTxnFieldsIfNeeded(BSON("insert"
                                              << "test"
@@ -331,7 +491,6 @@ TEST_F(TransactionRouterTest, AttachTxnValidatesReadConcernIfAlreadyOnCmd) {
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
-    ShardId shard1("a");
 
     {
         auto& participant = sessionState.getOrCreateParticipant(shard1);
@@ -380,11 +539,11 @@ TEST_F(TransactionRouterTest, UpconvertToSnapshotIfNoReadConcernLevelGiven) {
 
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "startTransaction"
-                                  << true
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot")
+                                  << "startTransaction"
+                                  << true
                                   << "coordinator"
                                   << true
                                   << "autocommit"
@@ -392,7 +551,6 @@ TEST_F(TransactionRouterTest, UpconvertToSnapshotIfNoReadConcernLevelGiven) {
                                   << "txnNumber"
                                   << txnNum);
 
-    ShardId shard1("a");
     auto& participant = sessionState.getOrCreateParticipant(shard1);
     auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
                                                            << "test"));
@@ -410,8 +568,6 @@ TEST_F(TransactionRouterTest, UpconvertToSnapshotIfNoReadConcernLevelButHasAfter
 
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "startTransaction"
-                                  << true
                                   << "readConcern"
                                   << BSON("level"
                                           << "snapshot"
@@ -419,6 +575,8 @@ TEST_F(TransactionRouterTest, UpconvertToSnapshotIfNoReadConcernLevelButHasAfter
                                           // by an atClusterTime at least as large.
                                           << "afterClusterTime"
                                           << Timestamp(10, 1))
+                                  << "startTransaction"
+                                  << true
                                   << "coordinator"
                                   << true
                                   << "autocommit"
@@ -426,7 +584,6 @@ TEST_F(TransactionRouterTest, UpconvertToSnapshotIfNoReadConcernLevelButHasAfter
                                   << "txnNumber"
                                   << txnNum);
 
-    ShardId shard1("a");
     auto& participant = sessionState.getOrCreateParticipant(shard1);
     auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
                                                            << "test"));

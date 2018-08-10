@@ -69,6 +69,7 @@
 #include "mongo/s/query/router_stage_pipeline.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction/transaction_router.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
@@ -169,8 +170,7 @@ std::set<ShardId> getTargetedShards(OperationContext* opCtx,
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   OperationContext* opCtx,
                                   const AggregationRequest& request,
-                                  BSONObj collationObj,
-                                  boost::optional<LogicalTime> atClusterTime) {
+                                  BSONObj collationObj) {
     cmdForShards[AggregationRequest::kFromMongosName] = Value(true);
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
     // explain command.
@@ -188,20 +188,15 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
             Value(static_cast<long long>(*opCtx->getTxnNumber()));
     }
 
-    BSONObj cmdObj =
-        (atClusterTime ? appendAtClusterTime(cmdForShards.freeze().toBson(), *atClusterTime)
-                       : cmdForShards.freeze().toBson());
-
     // agg creates temp collection and should handle implicit create separately.
-    return appendAllowImplicitCreate(cmdObj, true);
+    return appendAllowImplicitCreate(cmdForShards.freeze().toBson(), true);
 }
 
 BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
                                          const AggregationRequest& request,
                                          Pipeline* pipeline,
                                          const BSONObj& originalCmdObj,
-                                         BSONObj collationObj,
-                                         boost::optional<LogicalTime> atClusterTime) {
+                                         BSONObj collationObj) {
     // Create the command for the shards.
     MutableDocument targetedCmd(request.serializeToCommandObj());
     if (pipeline) {
@@ -210,15 +205,13 @@ BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
     // This pipeline is not split, ensure that the write concern is propagated if present.
     targetedCmd["writeConcern"] = Value(originalCmdObj["writeConcern"]);
 
-    return genericTransformForShards(
-        std::move(targetedCmd), opCtx, request, collationObj, atClusterTime);
+    return genericTransformForShards(std::move(targetedCmd), opCtx, request, collationObj);
 }
 
 BSONObj createCommandForTargetedShards(OperationContext* opCtx,
                                        const AggregationRequest& request,
                                        const SplitPipeline& splitPipeline,
-                                       const BSONObj collationObj,
-                                       boost::optional<LogicalTime> atClusterTime) {
+                                       const BSONObj collationObj) {
 
     // Create the command for the shards.
     MutableDocument targetedCmd(request.serializeToCommandObj());
@@ -232,8 +225,7 @@ BSONObj createCommandForTargetedShards(OperationContext* opCtx,
     targetedCmd[AggregationRequest::kCursorName] =
         Value(DOC(AggregationRequest::kBatchSizeName << 0));
 
-    return genericTransformForShards(
-        std::move(targetedCmd), opCtx, request, collationObj, atClusterTime);
+    return genericTransformForShards(std::move(targetedCmd), opCtx, request, collationObj);
 }
 
 BSONObj createCommandForMergingShard(const AggregationRequest& request,
@@ -388,10 +380,10 @@ DispatchShardPipelineResults dispatchShardPipeline(
     std::set<ShardId> shardIds = getTargetedShards(
         opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, aggRequest.getCollation());
 
-    auto atClusterTime = computeAtClusterTime(
-        opCtx, mustRunOnAll, shardIds, executionNss, shardQuery, aggRequest.getCollation());
-
-    invariant(!atClusterTime || *atClusterTime != LogicalTime::kUninitialized);
+    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        txnRouter->computeAtClusterTime(
+            opCtx, mustRunOnAll, shardIds, executionNss, shardQuery, aggRequest.getCollation());
+    }
 
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
     // - There is a stage that needs to be run on the primary shard and the single target shard
@@ -407,10 +399,9 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
     // Generate the command object for the targeted shards.
     BSONObj targetedCommand = splitPipeline
-        ? createCommandForTargetedShards(
-              opCtx, aggRequest, *splitPipeline, collationObj, atClusterTime)
+        ? createCommandForTargetedShards(opCtx, aggRequest, *splitPipeline, collationObj)
         : createPassthroughCommandForShard(
-              opCtx, aggRequest, pipeline.get(), originalCmdObj, collationObj, atClusterTime);
+              opCtx, aggRequest, pipeline.get(), originalCmdObj, collationObj);
 
     // Refresh the shard registry if we're targeting all shards.  We need the shard registry
     // to be at least as current as the logical time used when creating the command for
@@ -1046,12 +1037,14 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
 
     // aggPassthrough is for unsharded collections since changing primary shardId will cause SSV
     // error and hence shardId history does not need to be verified.
-    auto atClusterTime = computeAtClusterTimeForOneShard(opCtx, shardId);
+    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        txnRouter->computeAtClusterTimeForOneShard(opCtx, shardId);
+    }
 
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
-    cmdObj = CommandHelpers::filterCommandRequestForPassthrough(createPassthroughCommandForShard(
-        opCtx, aggRequest, nullptr, cmdObj, BSONObj(), atClusterTime));
+    cmdObj = CommandHelpers::filterCommandRequestForPassthrough(
+        createPassthroughCommandForShard(opCtx, aggRequest, nullptr, cmdObj, BSONObj()));
 
     auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
         opCtx,

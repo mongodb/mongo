@@ -61,6 +61,7 @@
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction/transaction_router.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -177,16 +178,9 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     const CachedCollectionRoutingInfo& routingInfo,
     const std::set<ShardId>& shardIds,
     const CanonicalQuery& query,
-    bool appendGeoNearDistanceProjection,
-    boost::optional<LogicalTime> atClusterTime) {
+    bool appendGeoNearDistanceProjection) {
     const auto qrToForward = uassertStatusOK(
         transformQueryForShards(query.getQueryRequest(), appendGeoNearDistanceProjection));
-
-    if (atClusterTime) {
-        auto readConcernAtClusterTime =
-            appendAtClusterTimeToReadConcern(qrToForward->getReadConcern(), *atClusterTime);
-        qrToForward->setReadConcern(readConcernAtClusterTime);
-    }
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     std::vector<std::pair<ShardId, BSONObj>> requests;
@@ -224,16 +218,15 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                               query.getQueryRequest().getFilter(),
                                               query.getQueryRequest().getCollation());
 
-    // Determine atClusterTime for snapshot reads. This will be a null time for requests with any
-    // other readConcern.
-    auto atClusterTime = computeAtClusterTime(opCtx,
-                                              false,
-                                              shardIds,
-                                              query.nss(),
-                                              query.getQueryRequest().getFilter(),
-                                              query.getQueryRequest().getCollation());
+    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        txnRouter->computeAtClusterTime(opCtx,
+                                        false,
+                                        shardIds,
+                                        query.nss(),
+                                        query.getQueryRequest().getFilter(),
+                                        query.getQueryRequest().getCollation());
+    }
 
-    invariant(!atClusterTime || *atClusterTime != LogicalTime::kUninitialized);
     // Construct the query and parameters.
 
     ClusterClientCursorParams params(query.nss(), readPref);
@@ -279,7 +272,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // attaching the shardVersion and txnNumber, if necessary.
 
     auto requests = constructRequestsForShards(
-        opCtx, routingInfo, shardIds, query, appendGeoNearDistanceProjection, atClusterTime);
+        opCtx, routingInfo, shardIds, query, appendGeoNearDistanceProjection);
 
     // Establish the cursors with a consistent shardVersion across shards.
 

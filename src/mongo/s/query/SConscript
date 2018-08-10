@@ -58,6 +58,8 @@ env.CppUnitTest(
     LIBDEPS=[
         'cluster_query',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/keys_collection_client_sharded',
+        '$BUILD_DIR/mongo/s/commands/cluster_commands',
         '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
     ],
 )

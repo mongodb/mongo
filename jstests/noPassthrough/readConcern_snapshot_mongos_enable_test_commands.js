@@ -18,7 +18,9 @@
         assert.commandFailedWithCode(session.getDatabase(dbName).runCommand({
             find: collName,
             readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(txnNumber++)
+            txnNumber: NumberLong(txnNumber++),
+            startTransaction: true,
+            autocommit: false
         }),
                                      ErrorCodes.InvalidOptions);
 
@@ -27,7 +29,9 @@
             pipeline: [],
             cursor: {},
             readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(txnNumber++)
+            txnNumber: NumberLong(txnNumber++),
+            startTransaction: true,
+            autocommit: false
         }),
                                      ErrorCodes.InvalidOptions);
 
@@ -46,7 +50,9 @@
         assert.commandWorked(session.getDatabase(dbName).runCommand({
             find: collName,
             readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(txnNumber++)
+            txnNumber: NumberLong(txnNumber++),
+            startTransaction: true,
+            autocommit: false
         }));
 
         assert.commandWorked(session.getDatabase(dbName).runCommand({
@@ -54,7 +60,9 @@
             pipeline: [],
             cursor: {},
             readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(txnNumber++)
+            txnNumber: NumberLong(txnNumber++),
+            startTransaction: true,
+            autocommit: false
         }));
 
         session.endSession();

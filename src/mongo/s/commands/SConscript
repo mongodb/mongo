@@ -13,6 +13,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/s/async_requests_sender',
+        '$BUILD_DIR/mongo/s/transaction/router_session',
     ],
 )
 
@@ -130,33 +131,6 @@ env.Library(
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'shared_cluster_commands',
-    ]
-)
-
-env.CppUnitTest(
-    target='append_at_cluster_time_test',
-    source=[
-        'append_at_cluster_time_test.cpp',
-    ],
-    LIBDEPS=[
-        'cluster_commands_helpers',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/logical_time',
-        '$BUILD_DIR/mongo/unittest/unittest',
-    ]
-)
-
-env.CppUnitTest(
-    target='compute_at_cluster_time_test',
-    source=[
-        'compute_at_cluster_time_test.cpp',
-    ],
-    LIBDEPS=[
-        'cluster_commands_helpers',
-        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/logical_clock',
-        '$BUILD_DIR/mongo/unittest/unittest',
     ]
 )
 

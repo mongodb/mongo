@@ -29,11 +29,16 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/keys_collection_client_sharded.h"
+#include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_session_cache_noop.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/s/commands/strategy.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/unittest/unittest.h"
 
@@ -49,12 +54,22 @@ const auto kFindCmdTargeted = BSON("find" << kNss.coll() << "filter" << BSON("_i
 
 const LogicalTime kInMemoryLogicalTime(Timestamp(10, 1));
 
+const LogicalTime kAfterClusterTime(Timestamp(50, 2));
+
 using InspectionCallback = stdx::function<void(const executor::RemoteCommandRequest& request)>;
 
-BSONObj appendSnapshotReadConcern(BSONObj cmdObj) {
+BSONObj appendSnapshotReadConcernAndTxnOptions(BSONObj cmdObj,
+                                               bool includeAfterClusterTime = false) {
     BSONObjBuilder bob(cmdObj);
+    bob.append("autocommit", false);
+    bob.append("txnNumber", TxnNumber(1));
+    bob.append("startTransaction", true);
+    bob.append("lsid", makeLogicalSessionIdForTest().toBSON());
     BSONObjBuilder readConcernBob = bob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
     readConcernBob.append("level", "snapshot");
+    if (includeAfterClusterTime) {
+        readConcernBob.append("afterClusterTime", kAfterClusterTime.asTimestamp());
+    }
     readConcernBob.doneFast();
     return bob.obj();
 }
@@ -69,6 +84,20 @@ protected:
         auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
+
+        auto keysCollectionClient = stdx::make_unique<KeysCollectionClientSharded>(
+            Grid::get(operationContext())->catalogClient());
+
+        auto keyManager = std::make_shared<KeysCollectionManager>(
+            "dummy", std::move(keysCollectionClient), Seconds(KeysRotationIntervalSec));
+
+        auto validator = stdx::make_unique<LogicalTimeValidator>(keyManager);
+        LogicalTimeValidator::set(getServiceContext(), std::move(validator));
+
+        LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
+
+        // ReadConcern 'snapshot' is only supported with test commands enabled.
+        setTestCommandsEnabled(true);
     }
 
     // The index of the shard expected to receive the response is used to prevent different shards
@@ -179,8 +208,18 @@ protected:
         future.timed_get(kFutureTimeout);
     }
 
+    DbResponse runCommandThroughStrategy(BSONObj cmd) {
+        // Create a new client/operation context per command
+        auto client = getServiceContext()->makeClient("ClusterFindCmdClient");
+        auto opCtx = client->makeOperationContext();
+
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.db(), cmd);
+
+        return Strategy::clientCommand(opCtx.get(), opMsgRequest.serialize());
+    }
+
     void runFindCommandInspectRequests(BSONObj cmd, InspectionCallback cb, bool isTargeted) {
-        auto future = launchAsync([&] { runFindCommand(cmd); });
+        auto future = launchAsync([&] { runCommandThroughStrategy(cmd); });
 
         size_t numMocks = isTargeted ? 1 : numShards;
         for (size_t i = 0; i < numMocks; i++) {
@@ -230,11 +269,6 @@ TEST_F(ClusterFindTest, MaxRetriesSnapshotErrors) {
 
 TEST_F(ClusterFindTest, AttachesAtClusterTimeForSnapshotReadConcern) {
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
-    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
-    operationContext()->setTxnNumber(1);
-
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
     auto containsAtClusterTime = [](const executor::RemoteCommandRequest& request) {
         ASSERT(!request.cmdObj["readConcern"]["atClusterTime"].eoo());
@@ -242,25 +276,20 @@ TEST_F(ClusterFindTest, AttachesAtClusterTimeForSnapshotReadConcern) {
 
     // Target one shard.
     runFindCommandInspectRequests(
-        appendSnapshotReadConcern(kFindCmdTargeted), containsAtClusterTime, true);
+        appendSnapshotReadConcernAndTxnOptions(kFindCmdTargeted), containsAtClusterTime, true);
 
     // Target all shards.
-    runFindCommandInspectRequests(
-        appendSnapshotReadConcern(kFindCmdScatterGather), containsAtClusterTime, false);
+    runFindCommandInspectRequests(appendSnapshotReadConcernAndTxnOptions(kFindCmdScatterGather),
+                                  containsAtClusterTime,
+                                  false);
 }
 
 TEST_F(ClusterFindTest, SnapshotReadConcernWithAfterClusterTime) {
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
-    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
-    operationContext()->setTxnNumber(1);
-
-    const auto afterClusterTime = LogicalTime(Timestamp(50, 2));
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(afterClusterTime, repl::ReadConcernLevel::kSnapshotReadConcern);
 
     // This cannot be true in a real cluster, but is done to verify that the chosen atClusterTime
     // cannot be less than afterClusterTime.
-    ASSERT_GT(afterClusterTime, kInMemoryLogicalTime);
+    ASSERT_GT(kAfterClusterTime, kInMemoryLogicalTime);
 
     auto containsAtClusterTimeNoAfterClusterTime =
         [&](const executor::RemoteCommandRequest& request) {
@@ -270,17 +299,19 @@ TEST_F(ClusterFindTest, SnapshotReadConcernWithAfterClusterTime) {
             // The chosen atClusterTime should be greater than or equal to the request's
             // afterClusterTime.
             ASSERT_GTE(LogicalTime(request.cmdObj["readConcern"]["atClusterTime"].timestamp()),
-                       afterClusterTime);
+                       kAfterClusterTime);
         };
 
     // Target one shard.
-    runFindCommandInspectRequests(
-        appendSnapshotReadConcern(kFindCmdTargeted), containsAtClusterTimeNoAfterClusterTime, true);
+    runFindCommandInspectRequests(appendSnapshotReadConcernAndTxnOptions(kFindCmdTargeted, true),
+                                  containsAtClusterTimeNoAfterClusterTime,
+                                  true);
 
     // Target all shards.
-    runFindCommandInspectRequests(appendSnapshotReadConcern(kFindCmdScatterGather),
-                                  containsAtClusterTimeNoAfterClusterTime,
-                                  false);
+    runFindCommandInspectRequests(
+        appendSnapshotReadConcernAndTxnOptions(kFindCmdScatterGather, true),
+        containsAtClusterTimeNoAfterClusterTime,
+        false);
 }
 
 }  // namespace

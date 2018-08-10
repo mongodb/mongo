@@ -42,11 +42,27 @@ protected:
     const BSONObj kAggregateCmdTargeted{
         fromjson("{aggregate: 'coll', pipeline: [{$match: {_id: 0}}], explain: false, "
                  "allowDiskUse: false, fromMongos: true, "
-                 "cursor: {batchSize: 10}, maxTimeMS: 100, readConcern: {level: 'snapshot'}}")};
+                 "cursor: {batchSize: 10}, maxTimeMS: 100, readConcern: {level: 'snapshot'}, "
+                 "autocommit: false, txnNumber: NumberLong(1), startTransaction: true}")};
 
     const BSONObj kAggregateCmdScatterGather{fromjson(
         "{aggregate: 'coll', pipeline: [], explain: false, allowDiskUse: false, fromMongos: true, "
-        "cursor: {batchSize: 10}, readConcern: {level: 'snapshot'}}")};
+        "cursor: {batchSize: 10}, readConcern: {level: 'snapshot'}, autocommit: false, txnNumber: "
+        "NumberLong(1), startTransaction: true}")};
+
+    BSONObj appendLogicalSessionId(BSONObj cmdObj) {
+        BSONObjBuilder bob(cmdObj);
+        bob.append("lsid", makeLogicalSessionIdForTest().toBSON());
+        return bob.obj();
+    }
+
+    BSONObj aggregateCmdTargeted() {
+        return appendLogicalSessionId(kAggregateCmdTargeted);
+    }
+
+    BSONObj aggregateCmdScatterGather() {
+        return appendLogicalSessionId(kAggregateCmdScatterGather);
+    }
 
     // The index of the shard expected to receive the response is used to prevent different shards
     // from returning documents with the same shard key. This is expected to be 0 for queries
@@ -78,10 +94,10 @@ TEST_F(ClusterAggregateTest, NoErrors) {
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
 
     // Target one shard.
-    runCommandSuccessful(kAggregateCmdTargeted, true);
+    runCommandSuccessful(aggregateCmdTargeted(), true);
 
     // Target all shards.
-    runCommandSuccessful(kAggregateCmdScatterGather, false);
+    runCommandSuccessful(aggregateCmdScatterGather(), false);
 }
 
 // Verify aggregate through mongos will retry on a snapshot error.
@@ -89,12 +105,12 @@ TEST_F(ClusterAggregateTest, RetryOnSnapshotError) {
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
 
     // Target one shard.
-    runCommandOneError(kAggregateCmdTargeted, ErrorCodes::SnapshotUnavailable, true);
-    runCommandOneError(kAggregateCmdTargeted, ErrorCodes::SnapshotTooOld, true);
+    runCommandOneError(aggregateCmdTargeted(), ErrorCodes::SnapshotUnavailable, true);
+    runCommandOneError(aggregateCmdTargeted(), ErrorCodes::SnapshotTooOld, true);
 
     // Target all shards
-    runCommandOneError(kAggregateCmdScatterGather, ErrorCodes::SnapshotUnavailable, false);
-    runCommandOneError(kAggregateCmdScatterGather, ErrorCodes::SnapshotTooOld, false);
+    runCommandOneError(aggregateCmdScatterGather(), ErrorCodes::SnapshotUnavailable, false);
+    runCommandOneError(aggregateCmdScatterGather(), ErrorCodes::SnapshotTooOld, false);
 }
 
 TEST_F(ClusterAggregateTest, AttachesAtClusterTimeForSnapshotReadConcern) {
@@ -105,10 +121,10 @@ TEST_F(ClusterAggregateTest, AttachesAtClusterTimeForSnapshotReadConcern) {
     };
 
     // Target one shard.
-    runCommandInspectRequests(kAggregateCmdTargeted, containsAtClusterTime, true);
+    runCommandInspectRequests(aggregateCmdTargeted(), containsAtClusterTime, true);
 
     // Target all shards.
-    runCommandInspectRequests(kAggregateCmdScatterGather, containsAtClusterTime, false);
+    runCommandInspectRequests(aggregateCmdScatterGather(), containsAtClusterTime, false);
 }
 
 // Verify aggregate commands will retry up to its max retry attempts on snapshot errors
@@ -117,12 +133,12 @@ TEST_F(ClusterAggregateTest, MaxRetriesSnapshotErrors) {
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
 
     // Target one shard.
-    runCommandMaxErrors(kAggregateCmdTargeted, ErrorCodes::SnapshotUnavailable, true);
-    runCommandMaxErrors(kAggregateCmdTargeted, ErrorCodes::SnapshotTooOld, true);
+    runCommandMaxErrors(aggregateCmdTargeted(), ErrorCodes::SnapshotUnavailable, true);
+    runCommandMaxErrors(aggregateCmdTargeted(), ErrorCodes::SnapshotTooOld, true);
 
     // Target all shards
-    runCommandMaxErrors(kAggregateCmdScatterGather, ErrorCodes::SnapshotUnavailable, false);
-    runCommandMaxErrors(kAggregateCmdScatterGather, ErrorCodes::SnapshotTooOld, false);
+    runCommandMaxErrors(aggregateCmdScatterGather(), ErrorCodes::SnapshotUnavailable, false);
+    runCommandMaxErrors(aggregateCmdScatterGather(), ErrorCodes::SnapshotTooOld, false);
 }
 
 }  // namespace

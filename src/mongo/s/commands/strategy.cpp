@@ -255,6 +255,10 @@ void execCommandClient(OperationContext* opCtx,
                        "read concern snapshot is not supported with atClusterTime on mongos"));
             return;
         }
+
+        uassert(ErrorCodes::InvalidOptions,
+                "read concern snapshot is only supported in a multi-statement transaction",
+                TransactionRouter::get(opCtx));
     }
 
     // attach tracking

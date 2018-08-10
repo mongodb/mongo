@@ -37,6 +37,7 @@
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/util/log.h"
 
@@ -60,6 +61,8 @@ void ClusterCommandTestFixture::setUp() {
     auto validator = stdx::make_unique<LogicalTimeValidator>(keyManager);
     LogicalTimeValidator::set(getServiceContext(), std::move(validator));
 
+    LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
+
     // ReadConcern 'snapshot' is only supported with test commands enabled.
     setTestCommandsEnabled(true);
 }
@@ -73,12 +76,9 @@ void ClusterCommandTestFixture::expectReturnsError(ErrorCodes::Error code) {
 }
 
 DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
-    // Create a new client/operation context per command, and setup a test session ID and
-    // transaction number.
+    // Create a new client/operation context per command
     auto client = getServiceContext()->makeClient("ClusterCmdClient");
     auto opCtx = client->makeOperationContext();
-    opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
-    opCtx->setTxnNumber(1);
 
     const auto opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.db(), cmd);
 

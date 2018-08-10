@@ -81,11 +81,14 @@ public:
          */
         void markAsCommandSent();
 
+        void setAtClusterTime(const LogicalTime atClusterTime);
+
     private:
         State _state{State::kMustStart};
         const bool _isCoordinator{false};
         const TxnNumber _txnNumber;
         const repl::ReadConcernArgs _readConcernArgs;
+        boost::optional<LogicalTime> _atClusterTime;
     };
 
     TransactionRouter(LogicalSessionId sessionId);
@@ -102,6 +105,25 @@ public:
 
     void checkIn();
     void checkOut();
+
+    /**
+     * Computes and sets the atClusterTime for the current transaction. Does nothing if the given
+     * query is not the first statement that this transaction runs (i.e. if the atClusterTime
+     * has already been set).
+     */
+    void computeAtClusterTime(OperationContext* opCtx,
+                              bool mustRunOnAll,
+                              const std::set<ShardId>& shardIds,
+                              const NamespaceString& nss,
+                              const BSONObj query,
+                              const BSONObj collation);
+
+    /**
+     * Computes and sets the atClusterTime for the current transaction if it targets the
+     * given shard during its first statement. Does nothing if the atClusterTime has already
+     * been set.
+     */
+    void computeAtClusterTimeForOneShard(OperationContext* opCtx, const ShardId& shardId);
 
     bool isCheckedOut();
 
@@ -130,6 +152,11 @@ private:
 
     // The read concern the current transaction was started with.
     repl::ReadConcernArgs _readConcernArgs;
+
+    // The cluster time of the timestamp all participant shards in the current transaction with
+    // snapshot level read concern must read from. Selected during the first statement of the
+    // transaction.
+    boost::optional<LogicalTime> _atClusterTime;
 };
 
 /**

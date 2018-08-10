@@ -41,12 +41,17 @@ protected:
     const Timestamp kAfterClusterTime = Timestamp(50, 2);
 
     const BSONObj kDistinctCmdTargeted{
-        fromjson("{distinct: 'coll', key: 'x', query: {'_id': {$lt: -1}}}")};
+        fromjson("{distinct: 'coll', key: 'x', query: {'_id': {$lt: -1}}, autocommit: false, "
+                 "txnNumber: NumberLong(1), startTransaction: true}")};
 
-    const BSONObj kDistinctCmdScatterGather{fromjson("{distinct: 'coll', key: '_id'}")};
+    const BSONObj kDistinctCmdScatterGather{
+        fromjson("{distinct: 'coll', key: '_id', autocommit: false, txnNumber: NumberLong(1), "
+                 "startTransaction: true}")};
 
-    BSONObj appendSnapshotReadConcern(BSONObj cmdObj, bool includeAfterClusterTime) {
+    BSONObj appendLogicalSessionIdAndSnapshotReadConcern(BSONObj cmdObj,
+                                                         bool includeAfterClusterTime) {
         BSONObjBuilder bob(cmdObj);
+        bob.append("lsid", makeLogicalSessionIdForTest().toBSON());
         BSONObjBuilder readConcernBob =
             bob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
         readConcernBob.append("level", "snapshot");
@@ -58,11 +63,13 @@ protected:
     }
 
     BSONObj distinctCmdTargeted(bool includeAfterClusterTime = false) {
-        return appendSnapshotReadConcern(kDistinctCmdTargeted, includeAfterClusterTime);
+        return appendLogicalSessionIdAndSnapshotReadConcern(kDistinctCmdTargeted,
+                                                            includeAfterClusterTime);
     }
 
     BSONObj distinctCmdScatterGather(bool includeAfterClusterTime = false) {
-        return appendSnapshotReadConcern(kDistinctCmdScatterGather, includeAfterClusterTime);
+        return appendLogicalSessionIdAndSnapshotReadConcern(kDistinctCmdScatterGather,
+                                                            includeAfterClusterTime);
     }
 
     void expectInspectRequest(int shardIndex, InspectionCallback cb) override {

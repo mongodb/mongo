@@ -32,8 +32,10 @@
 
 #include "mongo/s/transaction/transaction_router.h"
 
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/s/transaction/at_cluster_time_util.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -109,22 +111,37 @@ bool isTransactionCommand(const BSONObj& cmd) {
         cmdName == "prepareTransaction";
 }
 
-void appendReadConcernForTxn(BSONObjBuilder* bob, repl::ReadConcernArgs readConcernArgs) {
+BSONObj appendReadConcernForTxn(BSONObj cmd,
+                                repl::ReadConcernArgs readConcernArgs,
+                                boost::optional<LogicalTime> atClusterTime) {
     // Check for an existing read concern. The first statement in a transaction may already have
     // one, in which case its level should always match the level of the transaction's readConcern.
-    if (bob->hasField(repl::ReadConcernArgs::kReadConcernFieldName)) {
+    if (cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName)) {
         repl::ReadConcernArgs existingReadConcernArgs;
-        dassert(existingReadConcernArgs.initialize(bob->asTempObj()));
+        dassert(existingReadConcernArgs.initialize(cmd));
         dassert(existingReadConcernArgs.getLevel() == readConcernArgs.getLevel());
-
-        // TODO SERVER-36237: Attach atClusterTime to outgoing requests.
-
-        return;
+        return atClusterTime
+            ? at_cluster_time_util::appendAtClusterTime(std::move(cmd), *atClusterTime)
+            : cmd;
     }
 
-    // TODO SERVER-36237: Attach atClusterTime to outgoing requests.
+    BSONObjBuilder bob(std::move(cmd));
+    readConcernArgs.appendInfo(&bob);
 
-    readConcernArgs.appendInfo(bob);
+    return atClusterTime
+        ? at_cluster_time_util::appendAtClusterTime(bob.asTempObj(), *atClusterTime)
+        : bob.obj();
+}
+
+BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
+                                               repl::ReadConcernArgs readConcernArgs,
+                                               boost::optional<LogicalTime> atClusterTime) {
+    auto cmdWithReadConcern =
+        appendReadConcernForTxn(std::move(cmd), readConcernArgs, atClusterTime);
+    BSONObjBuilder bob(std::move(cmdWithReadConcern));
+    bob.append(kStartTransactionField, true);
+
+    return bob;
 }
 
 }  // unnamed namespace
@@ -136,13 +153,10 @@ TransactionRouter::Participant::Participant(bool isCoordinator,
 
 BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(BSONObj cmd) {
     auto isTxnCmd = isTransactionCommand(cmd);  // check first before moving cmd.
-    BSONObjBuilder newCmd(std::move(cmd));
 
-    if (_state == State::kMustStart && !isTxnCmd) {
-        newCmd.append(kStartTransactionField, true);
-
-        appendReadConcernForTxn(&newCmd, _readConcernArgs);
-    }
+    BSONObjBuilder newCmd = (_state == State::kMustStart && !isTxnCmd)
+        ? appendFieldsForStartTransaction(std::move(cmd), _readConcernArgs, _atClusterTime)
+        : BSONObjBuilder(std::move(cmd));
 
     if (_isCoordinator) {
         newCmd.append(kCoordinatorField, true);
@@ -184,6 +198,10 @@ TransactionRouter* TransactionRouter::get(OperationContext* opCtx) {
     return opCtxSession.get();
 }
 
+void TransactionRouter::Participant::setAtClusterTime(const LogicalTime atClusterTime) {
+    _atClusterTime = atClusterTime;
+}
+
 TransactionRouter::TransactionRouter(LogicalSessionId sessionId)
     : _sessionId(std::move(sessionId)) {}
 
@@ -220,15 +238,61 @@ TransactionRouter::Participant& TransactionRouter::getOrCreateParticipant(const 
     // The transaction must have been started with a readConcern.
     invariant(!_readConcernArgs.isEmpty());
 
-    auto resultPair = _participants.try_emplace(
-        shard.toString(),
-        TransactionRouter::Participant(isFirstParticipant, _txnNumber, _readConcernArgs));
+    auto participant =
+        TransactionRouter::Participant(isFirstParticipant, _txnNumber, _readConcernArgs);
+    // TODO SERVER-36557: Every command that starts a cross-shard transaction should
+    // compute atClusterTime with snapshot read concern. Hence, we should be able to
+    // add an invariant here to ensure that atClusterTime is not none.
+    if (_atClusterTime) {
+        participant.setAtClusterTime(*_atClusterTime);
+    }
+
+    auto resultPair = _participants.try_emplace(shard.toString(), std::move(participant));
 
     return resultPair.first->second;
 }
 
 const LogicalSessionId& TransactionRouter::getSessionId() const {
     return _sessionId;
+}
+
+void TransactionRouter::computeAtClusterTime(OperationContext* opCtx,
+                                             bool mustRunOnAll,
+                                             const std::set<ShardId>& shardIds,
+                                             const NamespaceString& nss,
+                                             const BSONObj query,
+                                             const BSONObj collation) {
+    // TODO SERVER-36688: We should also return immediately if the read concern
+    // is not snapshot.
+    if (_atClusterTime) {
+        return;
+    }
+
+    // atClusterTime could be none if the the read concern is not snapshot.
+    auto atClusterTime = at_cluster_time_util::computeAtClusterTime(
+        opCtx, mustRunOnAll, shardIds, nss, query, collation);
+    // TODO SERVER-36688: atClusterTime should never be none once we add the check above.
+    invariant(!atClusterTime || *atClusterTime != LogicalTime::kUninitialized);
+    if (atClusterTime) {
+        _atClusterTime = *atClusterTime;
+    }
+}
+
+void TransactionRouter::computeAtClusterTimeForOneShard(OperationContext* opCtx,
+                                                        const ShardId& shardId) {
+    // TODO SERVER-36688: We should also return immediately if the read concern
+    // is not snapshot.
+    if (_atClusterTime) {
+        return;
+    }
+
+    // atClusterTime could be none if the the read concern is not snapshot.
+    auto atClusterTime = at_cluster_time_util::computeAtClusterTimeForOneShard(opCtx, shardId);
+    // TODO SERVER-36688: atClusterTime should never be none once we add the check above.
+    invariant(!atClusterTime || *atClusterTime != LogicalTime::kUninitialized);
+    if (atClusterTime) {
+        _atClusterTime = *atClusterTime;
+    }
 }
 
 void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
@@ -283,6 +347,7 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     _txnNumber = txnNumber;
     _participants.clear();
     _coordinatorId.reset();
+    _atClusterTime.reset();
 }
 
 ScopedRouterSession::ScopedRouterSession(OperationContext* opCtx) : _opCtx(opCtx) {

@@ -38,6 +38,7 @@
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/transaction/at_cluster_time_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -88,7 +89,7 @@ TEST_F(AtClusterTimeTest, ComputeValidValid) {
     shardTwo->updateLastCommittedOpTime(timeTwo);
     ASSERT_EQ(timeTwo, shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = computeAtClusterTime(
+    auto maxTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
     // TODO: SERVER-31767
     // ASSERT_EQ(*maxTime, timeTwo);
@@ -104,7 +105,7 @@ TEST_F(AtClusterTimeTest, ComputeValidInvalid) {
     shardTwo->updateLastCommittedOpTime(timeTwo);
     ASSERT_EQ(timeTwo, shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = computeAtClusterTime(
+    auto maxTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
     // TODO: SERVER-31767
     // ASSERT_EQ(*maxTime, timeTwo);
@@ -118,7 +119,7 @@ TEST_F(AtClusterTimeTest, ComputeInvalidInvalid) {
     auto shardTwo = shardRegistry()->getShardNoReload(shardTwoId);
     ASSERT_EQ(LogicalTime(), shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = computeAtClusterTime(
+    auto maxTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
     ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
 }
@@ -130,7 +131,8 @@ TEST_F(AtClusterTimeTest, ComputeForOneShard) {
     shardOne->updateLastCommittedOpTime(timeOne);
     ASSERT_EQ(timeOne, shardOne->getLastCommittedOpTime());
 
-    auto atClusterTime = computeAtClusterTimeForOneShard(operationContext(), shardOneId);
+    auto atClusterTime =
+        at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), shardOneId);
     ASSERT_EQ(*atClusterTime, timeOne);
 }
 
@@ -138,12 +140,14 @@ TEST_F(AtClusterTimeTest, ComputeForOneShardNoCachedOpTime) {
     auto shardOne = shardRegistry()->getShardNoReload(shardOneId);
     ASSERT_EQ(LogicalTime(), shardOne->getLastCommittedOpTime());
 
-    auto atClusterTime = computeAtClusterTimeForOneShard(operationContext(), shardOneId);
+    auto atClusterTime =
+        at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), shardOneId);
     ASSERT_EQ(*atClusterTime, kInMemoryLogicalTime);
 }
 
 TEST_F(AtClusterTimeTest, ComputeForOneShardNoShard) {
-    ASSERT_THROWS_CODE(computeAtClusterTimeForOneShard(operationContext(), ShardId("fakeShard")),
+    ASSERT_THROWS_CODE(at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(),
+                                                                             ShardId("fakeShard")),
                        AssertionException,
                        ErrorCodes::ShardNotFound);
 }
@@ -176,7 +180,8 @@ TEST_F(AtClusterTimeTargetingTest, ReturnsLatestInMemoryTime) {
     repl::ReadConcernArgs::get(operationContext()) =
         repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
     ASSERT_EQ(kInMemoryLogicalTime,
-              *computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+              *at_cluster_time_util::computeAtClusterTime(
+                  operationContext(), true, shards, kNss, query, collation));
 }
 
 // Verifies that the greatest logical time is returned when all shard's lastCommittedOpTime values
@@ -200,9 +205,11 @@ TEST_F(AtClusterTimeTargetingTest, ReturnsLatestTimeFromShard) {
         repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
     // TODO: SERVER-31767
     // ASSERT_EQ(time2,
-    //           *computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    //           *at_cluster_time_util::computeAtClusterTime(operationContext(), true, shards, kNss,
+    //           query, collation));
     ASSERT_EQ(kInMemoryLogicalTime,
-              *computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+              *at_cluster_time_util::computeAtClusterTime(
+                  operationContext(), true, shards, kNss, query, collation));
 }
 
 // Verifies that a null logical time is returned for all requests without snapshot readConcern.
@@ -213,25 +220,30 @@ TEST_F(AtClusterTimeTargetingTest, NonSnapshotReadConcern) {
     auto shards = getTargetedShardsForQuery(operationContext(), routingInfo, query, collation);
 
     // Uninitialized read concern.
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, shards, kNss, query, collation));
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
 
     // Local readConcern.
     readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, shards, kNss, query, collation));
 
     // Majority readConcern.
     readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, shards, kNss, query, collation));
 
     // Linearizable readConcern.
     readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLinearizableReadConcern);
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, shards, kNss, query, collation));
 
     // Available readConcern.
     readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kAvailableReadConcern);
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, shards, kNss, query, collation));
 }
 
 // Verifies that if atClusterTime is specified in the request, atClusterTime is always greater than
@@ -251,13 +263,13 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {
     // Neither shard has a last committed optime.
 
     // Target one shard.
-    auto computedTime =
-        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    auto computedTime = at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
     ASSERT(computedTime);
     ASSERT_GTE(*computedTime, afterClusterTime);
 
     // Target all shards.
-    computedTime = computeAtClusterTime(
+    computedTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
     ASSERT(computedTime);
     ASSERT_GTE(*computedTime, afterClusterTime);
@@ -269,13 +281,13 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {
     ASSERT_LT(time1, afterClusterTime);
 
     // Target one shard.
-    computedTime =
-        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    computedTime = at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
     ASSERT(computedTime);
     ASSERT_GTE(*computedTime, afterClusterTime);
 
     // Target all shards.
-    computedTime = computeAtClusterTime(
+    computedTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
     ASSERT(computedTime);
     ASSERT_GTE(*computedTime, afterClusterTime);
@@ -287,13 +299,13 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {
     ASSERT_LT(time2, afterClusterTime);
 
     // Target one shard.
-    computedTime =
-        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    computedTime = at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
     ASSERT(computedTime);
     ASSERT_GTE(*computedTime, afterClusterTime);
 
     // Target all shards.
-    computedTime = computeAtClusterTime(
+    computedTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
     ASSERT(computedTime);
     ASSERT_GTE(*computedTime, afterClusterTime);
@@ -312,8 +324,8 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTimeLowerBound) {
 
     // Target one shard without a last committed optime. The computed value should equal
     // afterClusterTime.
-    auto computedTime =
-        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    auto computedTime = at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
     ASSERT(computedTime);
     ASSERT_EQ(*computedTime, afterClusterTime);
 
@@ -323,8 +335,8 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTimeLowerBound) {
     shardRegistry()->getShardNoReload(s0)->updateLastCommittedOpTime(time1);
     ASSERT_LT(time1, afterClusterTime);
 
-    computedTime =
-        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    computedTime = at_cluster_time_util::computeAtClusterTime(
+        operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
     ASSERT(computedTime);
     ASSERT_EQ(*computedTime, afterClusterTime);
 }

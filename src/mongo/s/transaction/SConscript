@@ -8,11 +8,13 @@ env.Library(
     target='router_session',
     source=[
         'transaction_router.cpp',
+        'at_cluster_time_util.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/mongo/s/grid',
     ],
 )
 
@@ -24,5 +26,33 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'router_session',
+    ]
+)
+
+env.CppUnitTest(
+    target='append_at_cluster_time_test',
+    source=[
+        'append_at_cluster_time_test.cpp',
+    ],
+    LIBDEPS=[
+        'router_session',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/logical_time',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ]
+)
+
+env.CppUnitTest(
+    target='compute_at_cluster_time_test',
+    source=[
+        'compute_at_cluster_time_test.cpp',
+    ],
+    LIBDEPS=[
+        'router_session',
+        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+        '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/unittest/unittest',
     ]
 )

@@ -32,7 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/transaction/at_cluster_time_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -55,7 +55,8 @@ TEST(ClusterCommands, AddAtClusterTimeNormal) {
                                            << "snapshot"
                                            << "atClusterTime"
                                            << Timestamp(1, 0)));
-    BSONObj newCommand = appendAtClusterTime(command, LogicalTime(Timestamp(1, 0)));
+    BSONObj newCommand =
+        at_cluster_time_util::appendAtClusterTime(command, LogicalTime(Timestamp(1, 0)));
     ASSERT_BSONOBJ_EQ(expectedCommand, newCommand);
 }
 
@@ -79,41 +80,9 @@ TEST(ClusterCommands, AddingAtClusterTimeOverwritesExistingAfterClusterTime) {
                                            << "atClusterTime"
                                            << computedAtClusterTime));
 
-    BSONObj newCommand = appendAtClusterTime(command, LogicalTime(computedAtClusterTime));
+    BSONObj newCommand =
+        at_cluster_time_util::appendAtClusterTime(command, LogicalTime(computedAtClusterTime));
     ASSERT_BSONOBJ_EQ(expectedCommand, newCommand);
-}
-
-// Add atClusterTime to a standalone readConcern object with level snapshot.
-TEST(ClusterCommands, AddAtClusterTimeToReadConcern) {
-    BSONObj readConcern = BSON("level"
-                               << "snapshot");
-    BSONObj expectedReadConcern = BSON("level"
-                                       << "snapshot"
-                                       << "atClusterTime"
-                                       << Timestamp(1, 0));
-
-    BSONObj newReadConcern =
-        appendAtClusterTimeToReadConcern(readConcern, LogicalTime(Timestamp(1, 0)));
-    ASSERT_BSONOBJ_EQ(expectedReadConcern, newReadConcern);
-}
-
-// Adding atClusterTime to a standalone readConcern object overwrites an existing afterClusterTime.
-TEST(ClusterCommands, AddingAtClusterTimeToReadConcernOverwritesExistingAfterClusterTime) {
-    const auto existingAfterClusterTime = Timestamp(1, 1);
-    BSONObj readConcern = BSON("level"
-                               << "snapshot"
-                               << "afterClusterTime"
-                               << existingAfterClusterTime);
-
-    const auto computedAtClusterTime = Timestamp(2, 1);
-    BSONObj expectedReadConcern = BSON("level"
-                                       << "snapshot"
-                                       << "atClusterTime"
-                                       << computedAtClusterTime);
-
-    BSONObj newReadConcern =
-        appendAtClusterTimeToReadConcern(readConcern, LogicalTime(computedAtClusterTime));
-    ASSERT_BSONOBJ_EQ(expectedReadConcern, newReadConcern);
 }
 
 }  // namespace
