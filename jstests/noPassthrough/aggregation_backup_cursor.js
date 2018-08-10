@@ -27,7 +27,7 @@
         assert.commandWorked(db.runCommand({getMore: cursorId, collection: "$cmd.aggregate"}));
     // Sanity check the results.
     assert.neq(0, response.cursor.id);
-    assert.gt(response.cursor.nextBatch.length, 6);
+    assert.gt(response.cursor.nextBatch.length, 4);
 
     // The $backupCursor is a tailable cursor. Even though we've exhausted the results, running a
     // getMore should succeed.
