@@ -1621,12 +1621,20 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
     {
         for (const auto& memberData : _memberData) {
             BSONObjBuilder entry(replicationProgress.subobjStart());
-            const auto lastDurableOpTime = memberData.getLastDurableOpTime();
-            BSONObjBuilder opTime(entry.subobjStart("optime"));
-            opTime.append("ts", lastDurableOpTime.getTimestamp());
-            opTime.append("term", lastDurableOpTime.getTerm());
-            opTime.done();
             entry.append("host", memberData.getHostAndPort().toString());
+
+            const auto lastDurableOpTime = memberData.getLastDurableOpTime();
+            entry.append("optime", lastDurableOpTime.toBSON());
+
+            const auto lastAppliedOpTime = memberData.getLastAppliedOpTime();
+            entry.append("lastAppliedOpTime", lastAppliedOpTime.toBSON());
+
+            const auto heartbeatAppliedOpTime = memberData.getHeartbeatAppliedOpTime();
+            entry.append("heartbeatAppliedOpTime", heartbeatAppliedOpTime.toBSON());
+
+            const auto heartbeatDurableOpTime = memberData.getHeartbeatDurableOpTime();
+            entry.append("heartbeatDurableOpTime", heartbeatDurableOpTime.toBSON());
+
             if (_selfIndex >= 0) {
                 const int memberId = memberData.getMemberId();
                 invariant(memberId >= 0);

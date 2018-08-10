@@ -1589,6 +1589,15 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
             if (getTestCommandsEnabled()) {
                 // log state of replica set on timeout to help with diagnosis.
                 BSONObjBuilder progress;
+
+                const auto lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
+                progress.append("lastCommittedOpTime", lastCommittedOpTime.toBSON());
+
+                const auto currentCommittedSnapshotOpTime =
+                    _getCurrentCommittedSnapshotOpTime_inlock();
+                progress.append("currentCommittedSnapshotOpTime",
+                                currentCommittedSnapshotOpTime.toBSON());
+
                 _topCoord->fillMemberData(&progress);
                 log() << "Replication for failed WC: " << writeConcern.toBSON()
                       << ", waitInfo: " << waiter << ", opID: " << opCtx->getOpID()
