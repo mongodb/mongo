@@ -831,7 +831,7 @@ void execCommandDatabase(OperationContext* opCtx,
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot is only valid in multi-statement transactions",
-                    txnParticipant && txnParticipant->inMultiDocumentTransaction());
+                    txnParticipant && txnParticipant->inActiveOrKilledMultiDocumentTransaction());
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot requires a session ID",
                     opCtx->getLogicalSessionId());
