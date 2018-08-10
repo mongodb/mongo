@@ -234,7 +234,7 @@ bool handleError(OperationContext* opCtx,
     }
 
     auto session = OperationContextSession::get(opCtx);
-    if (session && session->inMultiDocumentTransaction()) {
+    if (session && session->inActiveOrKilledMultiDocumentTransaction()) {
         // If we are in a transaction, we must fail the whole batch.
         throw;
     }
@@ -489,7 +489,7 @@ WriteResult performInserts(OperationContext* opCtx,
     // transaction.
     auto session = OperationContextSession::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (session && session->inMultiDocumentTransaction()));
+              (session && session->inActiveOrKilledMultiDocumentTransaction()));
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
         // This is the only part of finishCurOp we need to do for inserts because they reuse the
@@ -695,7 +695,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     // transaction.
     auto session = OperationContextSession::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (session && session->inMultiDocumentTransaction()));
+              (session && session->inActiveOrKilledMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(
@@ -836,7 +836,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     // transaction.
     auto session = OperationContextSession::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
-              (session && session->inMultiDocumentTransaction()));
+              (session && session->inActiveOrKilledMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(

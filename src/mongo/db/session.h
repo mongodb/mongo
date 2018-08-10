@@ -307,6 +307,17 @@ public:
     }
 
     /**
+     * Returns true if we are in an active multi-document transaction or if the transaction has
+     * been aborted. This is used to cover the case where a transaction has been aborted, but the
+     * OperationContext state has not been cleared yet.
+     */
+    bool inActiveOrKilledMultiDocumentTransaction() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return (_txnState == MultiDocumentTransactionState::kInProgress ||
+                _txnState == MultiDocumentTransactionState::kAborted);
+    }
+
+    /**
      * Adds a stored operation to the list of stored operations for the current multi-document
      * (non-autocommit) transaction.  It is illegal to add operations when no multi-document
      * transaction is in progress.

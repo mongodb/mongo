@@ -834,7 +834,7 @@ void execCommandDatabase(OperationContext* opCtx,
             auto session = OperationContextSession::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot is only valid in multi-statement transactions",
-                    session && session->inMultiDocumentTransaction());
+                    session && session->inActiveOrKilledMultiDocumentTransaction());
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot requires a session ID",
                     opCtx->getLogicalSessionId());
