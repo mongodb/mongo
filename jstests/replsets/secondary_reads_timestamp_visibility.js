@@ -34,7 +34,7 @@
         assert.commandWorked(primaryColl.insert({_id: i, x: 0, y: i + 1}));
     }
 
-    replSet.awaitReplication();
+    replSet.awaitLastOpCommitted();
 
     // Sanity check.
     assert.eq(secondaryDB.getCollection(collName).find({x: 0}).itcount(), 100);
