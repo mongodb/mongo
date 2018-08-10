@@ -627,6 +627,7 @@ env.Library(
         'session_catalog.cpp',
         'single_transaction_stats.cpp',
         'transaction_coordinator.cpp',
+        'transaction_coordinator_io.cpp',
         'transaction_participant.cpp',
         'transaction_history_iterator.cpp',
         env.Idlc('session_txn_record.idl')[0],
@@ -661,12 +662,15 @@ env.Library(
 env.CppUnitTest(
     target='transaction_two_phase_commit_test',
     source=[
+        'transaction_coordinator_io_test.cpp',
         'transaction_coordinator_participant_list_test.cpp',
         'transaction_coordinator_state_machine_test.cpp',
         'transaction_coordinator_test.cpp',
         'transaction_participant_state_machine_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
+        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
         'auth/authmocks',
         'catalog_raii',
     ],
