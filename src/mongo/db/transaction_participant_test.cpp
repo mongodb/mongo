@@ -1434,8 +1434,13 @@ TEST_F(TxnParticipantTest, TrackTotalActiveAndInactiveTransactionsWithCommit) {
     unsigned long long beforeInactiveCounter =
         ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
 
-    // Tests that the first unstash only increments the active counter only.
+    // Starting the transaction should put it into an inactive state.
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactiveCounter + 1);
+
+    // Tests that the first unstash increments the active counter and decrements the inactive
+    // counter.
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
@@ -1469,10 +1474,14 @@ TEST_F(TxnParticipantTest, TrackTotalActiveAndInactiveTransactionsWithStashedAbo
     unsigned long long beforeInactiveCounter =
         ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
 
+    // Starting the transaction should put it into an inactive state.
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
-    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactiveCounter + 1);
 
-    // Tests that the first unstash only increments the active counter only.
+    // Tests that the first unstash increments the active counter and decrements the inactive
+    // counter.
+    auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
               beforeActiveCounter + 1U);
@@ -1498,10 +1507,14 @@ TEST_F(TxnParticipantTest, TrackTotalActiveAndInactiveTransactionsWithUnstashedA
     unsigned long long beforeInactiveCounter =
         ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
 
+    // Starting the transaction should put it into an inactive state.
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
-    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactiveCounter + 1);
 
-    // Tests that the first unstash only increments the active counter only.
+    // Tests that the first unstash increments the active counter and decrements the inactive
+    // counter.
+    auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
               beforeActiveCounter + 1U);

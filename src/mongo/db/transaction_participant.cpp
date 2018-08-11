@@ -205,7 +205,9 @@ void TransactionParticipant::beginOrContinue(TxnNumber txnNumber,
         stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
 
     ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalStarted();
+    // The transaction is considered open here and stays inactive until its first unstash event.
     ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentOpen();
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentInactive();
 
     invariant(_transactionOperations.empty());
 }
@@ -467,6 +469,7 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
         // transaction. Set up the transaction resources on the opCtx.
         opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentActive();
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
 
         // Set the starting active time for this transaction.
         _singleTransactionStats.setActive(curTimeMicros64());
