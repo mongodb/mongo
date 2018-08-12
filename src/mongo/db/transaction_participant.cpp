@@ -510,10 +510,6 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx) {
     // session kill and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    uassert(ErrorCodes::TransactionCommitted,
-            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been committed.",
-            !_txnState.isCommitted(lk));
-
     _getSession()->lockTxnNumber(
         _activeTxnNumber,
         {ErrorCodes::PreparedTransactionInProgress,
@@ -797,10 +793,17 @@ void TransactionParticipant::_abortActiveTransaction(WithLock lock,
         invariant(opCtx->getTxnNumber() == _activeTxnNumber);
         _abortTransactionOnSession(lock);
     } else if (opCtx->getTxnNumber() == _activeTxnNumber) {
+        if (_txnState.isNone(lock)) {
+            // The active transaction is not a multi-document transaction.
+            invariant(opCtx->getWriteUnitOfWork() == nullptr);
+            return;
+        }
+
         // Cannot abort these states unless they are specified in expectedStates explicitly.
         const auto unabortableStates = TransactionState::kPrepared  //
             | TransactionState::kCommittingWithPrepare              //
-            | TransactionState::kCommittingWithoutPrepare;          //
+            | TransactionState::kCommittingWithoutPrepare           //
+            | TransactionState::kCommitted;                         //
         invariant(!_txnState.isInSet(lock, unabortableStates),
                   str::stream() << "Cannot abort transaction in " << _txnState.toString());
     } else {

@@ -919,21 +919,6 @@ TEST_F(TxnParticipantTest, ConcurrencyOfPrepareTransactionAndAbort) {
     ASSERT(txnParticipant->transactionIsAborted());
 }
 
-TEST_F(TxnParticipantTest, ConcurrencyOfPrepareTransactionAndCommit) {
-    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
-    txnParticipant->commitUnpreparedTransaction(opCtx());
-
-    // A prepareTransaction() after a commit should uassert.
-    ASSERT_THROWS_CODE(txnParticipant->prepareTransaction(opCtx()),
-                       AssertionException,
-                       ErrorCodes::TransactionCommitted);
-    ASSERT_FALSE(_opObserver->transactionPrepared);
-    ASSERT(txnParticipant->transactionIsCommitted());
-}
-
 TEST_F(TxnParticipantTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
