@@ -37,6 +37,15 @@ imports:
     - "mongo/db/logical_session_id.idl"
     - "mongo/db/repl/replication_types.idl"
 
+enums:
+    DurableTxnState:
+        description: "The state of the most recent durable transaction on a session"
+        type: string
+        values:
+            kPrepared: "prepared"
+            kCommitted: "committed"
+            kAborted: "aborted"
+
 structs:
     sessionTxnRecord:
         description: "A document used for storing session transaction states."
@@ -57,3 +66,7 @@ structs:
                 type: date
                 description: "Wall clock time of the last write which happened on on this
                               transaction."
+            state:
+                type: DurableTxnState
+                optional: true # Retryable writes do not have a state field.
+                description: "The state of the most recent durable transaction on the session"

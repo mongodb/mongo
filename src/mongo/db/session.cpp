@@ -285,7 +285,8 @@ void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
                                           TxnNumber txnNumber,
                                           std::vector<StmtId> stmtIdsWritten,
                                           const repl::OpTime& lastStmtIdWriteOpTime,
-                                          Date_t lastStmtIdWriteDate) {
+                                          Date_t lastStmtIdWriteDate,
+                                          boost::optional<DurableTxnStateEnum> txnState) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
@@ -300,7 +301,7 @@ void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
     }
 
     const auto updateRequest =
-        _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime, lastStmtIdWriteDate);
+        _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime, lastStmtIdWriteDate, txnState);
 
     ul.unlock();
 
@@ -354,8 +355,10 @@ void Session::onMigrateCompletedOnPrimary(OperationContext* opCtx,
     const auto updatedLastStmtIdWriteDate =
         txnLastStmtIdWriteDate == Date_t::min() ? oplogLastStmtIdWriteDate : txnLastStmtIdWriteDate;
 
-    const auto updateRequest =
-        _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime, updatedLastStmtIdWriteDate);
+    // We do not migrate transaction oplog entries.
+    auto txnState = boost::none;
+    const auto updateRequest = _makeUpdateRequest(
+        ul, txnNumber, lastStmtIdWriteOpTime, updatedLastStmtIdWriteDate, txnState);
 
     ul.unlock();
 
@@ -519,7 +522,8 @@ Date_t Session::_getLastWriteDate(WithLock wl, TxnNumber txnNumber) const {
 UpdateRequest Session::_makeUpdateRequest(WithLock,
                                           TxnNumber newTxnNumber,
                                           const repl::OpTime& newLastWriteOpTime,
-                                          Date_t newLastWriteDate) const {
+                                          Date_t newLastWriteDate,
+                                          boost::optional<DurableTxnStateEnum> newState) const {
     UpdateRequest updateRequest(NamespaceString::kSessionTransactionsTableNamespace);
 
     const auto updateBSON = [&] {
@@ -528,6 +532,7 @@ UpdateRequest Session::_makeUpdateRequest(WithLock,
         newTxnRecord.setTxnNum(newTxnNumber);
         newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
         newTxnRecord.setLastWriteDate(newLastWriteDate);
+        newTxnRecord.setState(newState);
         return newTxnRecord.toBSON();
     }();
     updateRequest.setUpdates(updateBSON);
@@ -632,6 +637,12 @@ boost::optional<repl::OplogEntry> Session::createMatchingTransactionTableUpdate(
         newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
         newTxnRecord.setLastWriteDate(*entry.getWallClockTime());
+
+        if (entry.isCommand() &&
+            entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+            newTxnRecord.setState(entry.shouldPrepare() ? DurableTxnStateEnum::kPrepared
+                                                        : DurableTxnStateEnum::kCommitted);
+        }
         return newTxnRecord.toBSON();
     }();
 

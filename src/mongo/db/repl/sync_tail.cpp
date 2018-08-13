@@ -545,8 +545,9 @@ void fillWriterVectors(OperationContext* opCtx,
             }
             try {
                 derivedOps->emplace_back(ApplyOps::extractOperations(op));
-                fillWriterVectors(
-                    opCtx, &derivedOps->back(), writerVectors, derivedOps, sessionUpdateTracker);
+
+                // Nested entries cannot have different session updates.
+                fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
             } catch (...) {
                 fassertFailedWithStatusNoTrace(
                     50711,

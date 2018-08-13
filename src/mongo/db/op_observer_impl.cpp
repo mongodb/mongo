@@ -108,7 +108,8 @@ void onWriteOpCompleted(OperationContext* opCtx,
                         Session* session,
                         std::vector<StmtId> stmtIdsWritten,
                         const repl::OpTime& lastStmtIdWriteOpTime,
-                        Date_t lastStmtIdWriteDate) {
+                        Date_t lastStmtIdWriteDate,
+                        boost::optional<DurableTxnStateEnum> txnState) {
     if (lastStmtIdWriteOpTime.isNull())
         return;
 
@@ -117,7 +118,8 @@ void onWriteOpCompleted(OperationContext* opCtx,
                                              *opCtx->getTxnNumber(),
                                              std::move(stmtIdsWritten),
                                              lastStmtIdWriteOpTime,
-                                             lastStmtIdWriteDate);
+                                             lastStmtIdWriteDate,
+                                             txnState);
     }
 }
 
@@ -412,7 +414,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                        std::back_inserter(stmtIdsWritten),
                        [](const InsertStatement& stmt) { return stmt.stmtId; });
 
-        onWriteOpCompleted(opCtx, nss, session, stmtIdsWritten, lastOpTime, lastWriteDate);
+        onWriteOpCompleted(
+            opCtx, nss, session, stmtIdsWritten, lastOpTime, lastWriteDate, boost::none);
     }
 
     auto* const css = (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
@@ -482,7 +485,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                            session,
                            std::vector<StmtId>{args.stmtId},
                            opTime.writeOpTime,
-                           opTime.wallClockTime);
+                           opTime.wallClockTime,
+                           boost::none);
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -541,7 +545,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                            session,
                            std::vector<StmtId>{stmtId},
                            opTime.writeOpTime,
-                           opTime.wallClockTime);
+                           opTime.wallClockTime,
+                           boost::none);
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -954,8 +959,9 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
         auto times = replLogApplyOps(
             opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink, prepare, prepareOplogSlot);
 
+        auto txnState = prepare ? DurableTxnStateEnum::kPrepared : DurableTxnStateEnum::kCommitted;
         onWriteOpCompleted(
-            opCtx, cmdNss, session, {stmtId}, times.writeOpTime, times.wallClockTime);
+            opCtx, cmdNss, session, {stmtId}, times.writeOpTime, times.wallClockTime, txnState);
         return times;
     } catch (const AssertionException& e) {
         // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.

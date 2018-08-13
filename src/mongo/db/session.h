@@ -103,6 +103,8 @@ public:
      * in the write's WUOW. Updates the on-disk state of the session to match the specified
      * transaction/opTime and keeps the cached state in sync.
      *
+     * 'txnState' is 'none' for retryable writes.
+     *
      * Must only be called with the session checked-out.
      *
      * Throws if the session has been invalidated or the active transaction number doesn't match.
@@ -111,7 +113,8 @@ public:
                                      TxnNumber txnNumber,
                                      std::vector<StmtId> stmtIdsWritten,
                                      const repl::OpTime& lastStmtIdWriteOpTime,
-                                     Date_t lastStmtIdWriteDate);
+                                     Date_t lastStmtIdWriteDate,
+                                     boost::optional<DurableTxnStateEnum> txnState);
 
     /**
      * Helper function to begin a migration on a primary node.
@@ -236,7 +239,8 @@ private:
     UpdateRequest _makeUpdateRequest(WithLock,
                                      TxnNumber newTxnNumber,
                                      const repl::OpTime& newLastWriteTs,
-                                     Date_t newLastWriteDate) const;
+                                     Date_t newLastWriteDate,
+                                     boost::optional<DurableTxnStateEnum> newState) const;
 
     void _registerUpdateCacheOnCommit(OperationContext* opCtx,
                                       TxnNumber newTxnNumber,
