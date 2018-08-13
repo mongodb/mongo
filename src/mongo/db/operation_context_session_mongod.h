@@ -46,7 +46,8 @@ public:
     OperationContextSessionMongod(OperationContext* opCtx,
                                   bool shouldCheckOutSession,
                                   boost::optional<bool> autocommit,
-                                  boost::optional<bool> startTransaction);
+                                  boost::optional<bool> startTransaction,
+                                  boost::optional<bool> coordinator = boost::none);
 
 private:
     OperationContextSession _operationContextSession;

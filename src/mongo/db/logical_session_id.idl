@@ -120,6 +120,10 @@ structs:
                       transaction."
         type: bool
         optional: true
+      coordinator:
+        description: "Indicates that this shard is the coordinator shard for the transaction two-phase commit."
+        type: bool
+        optional: true
 
   SessionsCollectionFetchResultIndividualResult:
     description: "Individual result"

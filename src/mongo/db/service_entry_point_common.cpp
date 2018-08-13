@@ -134,7 +134,9 @@ const StringMap<int> sessionCheckoutWhitelist = {{"abortTransaction", 1},
                                                  {"mapReduce", 1},
                                                  {"prepareTransaction", 1},
                                                  {"refreshLogicalSessionCacheNow", 1},
-                                                 {"update", 1}};
+                                                 {"update", 1},
+                                                 {"voteAbortTransaction", 1},
+                                                 {"voteCommitTransaction", 1}};
 
 bool shouldActivateFailCommandFailPoint(const BSONObj& data, StringData cmdName) {
     if (cmdName == "configureFailPoint"_sd)  // Banned even if in failCommands.
@@ -668,9 +670,11 @@ void execCommandDatabase(OperationContext* opCtx,
         // Parse the arguments specific to multi-statement transactions.
         boost::optional<bool> startMultiDocTxn = boost::none;
         boost::optional<bool> autocommitVal = boost::none;
+        boost::optional<bool> coordinatorVal = boost::none;
         if (sessionOptions) {
             startMultiDocTxn = sessionOptions->getStartTransaction();
             autocommitVal = sessionOptions->getAutocommit();
+            coordinatorVal = sessionOptions->getCoordinator();
             if (command->getName() == "doTxn") {
                 // Autocommit and 'startMultiDocTxn' are overridden for 'doTxn' to get the oplog
                 // entry generation behavior used for multi-document transactions. The 'doTxn'
@@ -703,7 +707,7 @@ void execCommandDatabase(OperationContext* opCtx,
         // handles the appropriate state management for both multi-statement transactions and
         // retryable writes.
         OperationContextSessionMongod sessionTxnState(
-            opCtx, shouldCheckoutSession, autocommitVal, startMultiDocTxn);
+            opCtx, shouldCheckoutSession, autocommitVal, startMultiDocTxn, coordinatorVal);
 
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 

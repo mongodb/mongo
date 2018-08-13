@@ -28,6 +28,7 @@
 
 #include "mongo/db/operation_context_session_mongod.h"
 
+#include "mongo/db/transaction_coordinator.h"
 #include "mongo/db/transaction_participant.h"
 
 namespace mongo {
@@ -35,7 +36,8 @@ namespace mongo {
 OperationContextSessionMongod::OperationContextSessionMongod(OperationContext* opCtx,
                                                              bool shouldCheckOutSession,
                                                              boost::optional<bool> autocommit,
-                                                             boost::optional<bool> startTransaction)
+                                                             boost::optional<bool> startTransaction,
+                                                             boost::optional<bool> coordinator)
     : _operationContextSession(opCtx, shouldCheckOutSession) {
     if (shouldCheckOutSession && !opCtx->getClient()->isInDirectClient()) {
         auto session = OperationContextSession::get(opCtx);
@@ -45,6 +47,14 @@ OperationContextSessionMongod::OperationContextSessionMongod(OperationContext* o
         session->refreshFromStorageIfNeeded(opCtx);
         session->beginOrContinueTxn(opCtx, clientTxnNumber);
 
+        if (coordinator && *coordinator) {
+            if (!TransactionCoordinator::get(opCtx)) {
+                uassert(ErrorCodes::InternalError,
+                        "'coordinator' flag was not sent on first statement",
+                        startTransaction && *startTransaction);
+                TransactionCoordinator::create(session);
+            }
+        }
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant->beginOrContinue(clientTxnNumber, autocommit, startTransaction);
     }
