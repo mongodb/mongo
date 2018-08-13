@@ -76,8 +76,8 @@
             const orQueryBounds = [];
 
             for (let path of pathList) {
-                // {_path: ['path.to.field', 'path.to.field'], path.to.field: [[computed bounds]]}
-                const expectedBounds = {_path: [`["${path}", "${path}"]`], [path]: op.bounds};
+                // {$_path: ['path.to.field', 'path.to.field'], path.to.field: [[computed bounds]]}
+                const expectedBounds = {$_path: [`["${path}", "${path}"]`], [path]: op.bounds};
                 const query = {[path]: op.expression};
 
                 // Explain the query, and determine whether an indexed solution is available.
@@ -93,7 +93,7 @@
 
                 // Verify that the winning plan uses the $** index with the expected bounds.
                 assert.eq(ixScans.length, 1);
-                assert.docEq(ixScans[0].keyPattern, {_path: 1, [path]: 1});
+                assert.docEq(ixScans[0].keyPattern, {$_path: 1, [path]: 1});
                 assert.docEq(ixScans[0].indexBounds, expectedBounds);
 
                 // Verify that the results obtained from the $** index are identical to a COLLSCAN.
@@ -146,10 +146,10 @@
             assert.eq(winningIxScan.length, 1);
             assert.eq(rejectedIxScans.length, numAndSortedIxScans + expectedPaths.length - 1);
 
-            // Verify that each of the IXSCANs have the expected bounds and _path key.
+            // Verify that each of the IXSCANs have the expected bounds and $_path key.
             for (let ixScan of winningIxScan.concat(rejectedIxScans)) {
-                // {_path: ["['path.to.field', 'path.to.field']"], path.to.field: [[bounds]]}
-                const ixScanPath = JSON.parse(ixScan.indexBounds._path[0])[0];
+                // {$_path: ["['path.to.field', 'path.to.field']"], path.to.field: [[bounds]]}
+                const ixScanPath = JSON.parse(ixScan.indexBounds.$_path[0])[0];
                 assert.eq(ixScan.indexBounds[ixScanPath], op.bounds);
                 assert(expectedPaths.includes(ixScanPath));
             }

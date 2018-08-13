@@ -598,19 +598,19 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
     }
 
     // For $** indexes, the IndexEntry key pattern is {'path.to.field': ±1} but the actual keys in
-    // the index are of the form {'_path': ±1, 'path.to.field': ±1}, where the value of the first
+    // the index are of the form {'$_path': ±1, 'path.to.field': ±1}, where the value of the first
     // field in each key is 'path.to.field'. We push a point-interval on 'path.to.field' into the
-    // bounds vector for the leading '_path' bound here. We also push corresponding fields into the
+    // bounds vector for the leading '$_path' bound here. We also push corresponding fields into the
     // IndexScanNode's keyPattern and its multikeyPaths vector.
     if (index.type == IndexType::INDEX_ALLPATHS) {
         invariant(bounds->fields.size() == 1 && index.keyPattern.nFields() == 1);
         invariant(!bounds->fields.front().name.empty());
         invariant(nodeIndex);
-        bounds->fields.insert(bounds->fields.begin(), {"_path"});
+        bounds->fields.insert(bounds->fields.begin(), {"$_path"});
         bounds->fields.front().intervals.push_back(
             IndexBoundsBuilder::makePointInterval(nodeIndex->keyPattern.firstElementFieldName()));
-        nodeIndex->keyPattern = BSON("_path" << nodeIndex->keyPattern.firstElement()
-                                             << nodeIndex->keyPattern.firstElement());
+        nodeIndex->keyPattern = BSON("$_path" << nodeIndex->keyPattern.firstElement()
+                                              << nodeIndex->keyPattern.firstElement());
         nodeIndex->multikeyPaths.insert(nodeIndex->multikeyPaths.begin(), {});
     }
 

@@ -55,7 +55,6 @@ std::size_t numPathComponents(StringData path) {
     return FieldRef{path}.numParts();
 }
 
-
 /**
  * Given a single allPaths index, and a set of fields which are being queried, create 'mock'
  * IndexEntry for each of the appropriate fields.
@@ -86,6 +85,7 @@ void expandIndex(const IndexEntry& allPathsIndex,
                          allPathsIndex.infoObj,
                          allPathsIndex.collator);
 
+        invariant("$_path"_sd != fieldName);
         out->push_back(std::move(entry));
     }
 }
