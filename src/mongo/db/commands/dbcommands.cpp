@@ -170,7 +170,7 @@ static const char* repairRemovedMessage =
     "This command has been removed. If you would like to compact your data, use the 'compact' "
     "command. If you would like to rebuild indexes, use the 'reIndex' command. If you need to "
     "recover data, please see the documentation for repairing your database offline: "
-    "https://dochub.mongodb.org/core/repair";
+    "http://dochub.mongodb.org/core/repair";
 
 class CmdRepairDatabase : public ErrmsgCommandDeprecated {
 public:
