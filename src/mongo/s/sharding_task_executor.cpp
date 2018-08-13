@@ -44,7 +44,7 @@
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/s/transaction/router_transaction_state.h"
+#include "mongo/s/transaction/transaction_router.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -136,8 +136,8 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         newRequest->cmdObj = bob.obj();
     }
 
-    auto routerSession = RouterTransactionState::get(request.opCtx);
-    if (routerSession) {
+    auto txnRouter = TransactionRouter::get(request.opCtx);
+    if (txnRouter) {
         auto shard =
             Grid::get(request.opCtx)->shardRegistry()->getShardForHostNoReload(request.target);
 
@@ -151,7 +151,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             newRequest.emplace(request);
         }
 
-        auto& participant = routerSession->getOrCreateParticipant(shard->getId());
+        auto& participant = txnRouter->getOrCreateParticipant(shard->getId());
         newRequest->cmdObj = participant.attachTxnFieldsIfNeeded(newRequest->cmdObj);
     }
 
@@ -160,7 +160,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
     auto clusterGLE = ClusterLastErrorInfo::get(request.opCtx->getClient());
 
     auto shardingCb =
-        [ timeTracker, clusterGLE, cb, grid = Grid::get(request.opCtx), routerSession ](
+        [ timeTracker, clusterGLE, cb, grid = Grid::get(request.opCtx), txnRouter ](
             const TaskExecutor::RemoteCommandCallbackArgs& args) {
         ON_BLOCK_EXIT([&cb, &args]() { cb(args); });
 
@@ -168,9 +168,9 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         auto shard = grid->shardRegistry()->getShardForHostNoReload(args.request.target);
         if (!shard) {
             LOG(1) << "Could not find shard containing host: " << args.request.target.toString();
-        } else if (routerSession) {
+        } else if (txnRouter) {
             // TODO: SERVER-35707 only mark as sent for non-network error?
-            auto& participant = routerSession->getOrCreateParticipant(shard->getId());
+            auto& participant = txnRouter->getOrCreateParticipant(shard->getId());
             participant.markAsCommandSent();
         }
 

@@ -29,14 +29,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/s/transaction/router_transaction_state.h"
+#include "mongo/s/transaction/transaction_router.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
-class RouterTransactionStateTest : public ShardingTestFixture {
+class TransactionRouterTest : public ShardingTestFixture {
 protected:
     void setUp() {
         repl::ReadConcernArgs::get(operationContext()) =
@@ -44,10 +44,10 @@ protected:
     }
 };
 
-TEST_F(RouterTransactionStateTest, BasicStartTxn) {
+TEST_F(TransactionRouterTest, BasicStartTxn) {
     TxnNumber txnNum{3};
 
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
@@ -98,20 +98,20 @@ TEST_F(RouterTransactionStateTest, BasicStartTxn) {
     }
 }
 
-TEST_F(RouterTransactionStateTest, CannotContiueTxnWithoutStarting) {
+TEST_F(TransactionRouterTest, CannotContiueTxnWithoutStarting) {
     TxnNumber txnNum{3};
 
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     ASSERT_THROWS_CODE(sessionState.beginOrContinueTxn(operationContext(), txnNum, false),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
 
-TEST_F(RouterTransactionStateTest, NewParticipantMustAttachTxnAndReadConcern) {
+TEST_F(TransactionRouterTest, NewParticipantMustAttachTxnAndReadConcern) {
     TxnNumber txnNum{3};
 
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
@@ -189,10 +189,10 @@ TEST_F(RouterTransactionStateTest, NewParticipantMustAttachTxnAndReadConcern) {
     }
 }
 
-TEST_F(RouterTransactionStateTest, StartingNewTxnShouldClearState) {
+TEST_F(TransactionRouterTest, StartingNewTxnShouldClearState) {
     TxnNumber txnNum{3};
 
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
@@ -239,10 +239,10 @@ TEST_F(RouterTransactionStateTest, StartingNewTxnShouldClearState) {
     }
 }
 
-TEST_F(RouterTransactionStateTest, FirstParticipantIsCoordinator) {
+TEST_F(TransactionRouterTest, FirstParticipantIsCoordinator) {
     TxnNumber txnNum{3};
 
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
@@ -279,10 +279,10 @@ TEST_F(RouterTransactionStateTest, FirstParticipantIsCoordinator) {
     }
 }
 
-TEST_F(RouterTransactionStateTest, DoesNotAttachTxnNumIfAlreadyThere) {
+TEST_F(TransactionRouterTest, DoesNotAttachTxnNumIfAlreadyThere) {
     TxnNumber txnNum{3};
 
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
@@ -309,10 +309,10 @@ TEST_F(RouterTransactionStateTest, DoesNotAttachTxnNumIfAlreadyThere) {
     ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
 }
 
-DEATH_TEST_F(RouterTransactionStateTest, CrashesIfCmdHasDifferentTxnNumber, "invariant") {
+DEATH_TEST_F(TransactionRouterTest, CrashesIfCmdHasDifferentTxnNumber, "invariant") {
     TxnNumber txnNum{3};
 
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
@@ -324,10 +324,10 @@ DEATH_TEST_F(RouterTransactionStateTest, CrashesIfCmdHasDifferentTxnNumber, "inv
                                              << TxnNumber(10)));
 }
 
-TEST_F(RouterTransactionStateTest, AttachTxnValidatesReadConcernIfAlreadyOnCmd) {
+TEST_F(TransactionRouterTest, AttachTxnValidatesReadConcernIfAlreadyOnCmd) {
     TxnNumber txnNum{3};
 
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true);
 
@@ -357,10 +357,10 @@ TEST_F(RouterTransactionStateTest, AttachTxnValidatesReadConcernIfAlreadyOnCmd) 
     }
 }
 
-TEST_F(RouterTransactionStateTest, CannotSpecifyReadConcernAfterFirstStatement) {
+TEST_F(TransactionRouterTest, CannotSpecifyReadConcernAfterFirstStatement) {
     TxnNumber txnNum{3};
 
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true /* startTransaction */);
 
@@ -370,11 +370,11 @@ TEST_F(RouterTransactionStateTest, CannotSpecifyReadConcernAfterFirstStatement) 
         ErrorCodes::InvalidOptions);
 }
 
-TEST_F(RouterTransactionStateTest, UpconvertToSnapshotIfNoReadConcernLevelGiven) {
+TEST_F(TransactionRouterTest, UpconvertToSnapshotIfNoReadConcernLevelGiven) {
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
 
     TxnNumber txnNum{3};
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true /* startTransaction */);
 
@@ -399,12 +399,12 @@ TEST_F(RouterTransactionStateTest, UpconvertToSnapshotIfNoReadConcernLevelGiven)
     ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
 }
 
-TEST_F(RouterTransactionStateTest, UpconvertToSnapshotIfNoReadConcernLevelButHasAfterClusterTime) {
+TEST_F(TransactionRouterTest, UpconvertToSnapshotIfNoReadConcernLevelButHasAfterClusterTime) {
     repl::ReadConcernArgs::get(operationContext()) =
         repl::ReadConcernArgs(LogicalTime(Timestamp(10, 1)), boost::none);
 
     TxnNumber txnNum{3};
-    RouterTransactionState sessionState({});
+    TransactionRouter sessionState({});
     sessionState.checkOut();
     sessionState.beginOrContinueTxn(operationContext(), txnNum, true /* startTransaction */);
 
@@ -433,7 +433,7 @@ TEST_F(RouterTransactionStateTest, UpconvertToSnapshotIfNoReadConcernLevelButHas
     ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
 }
 
-TEST_F(RouterTransactionStateTest, CannotUpconvertIfLevelOtherThanSnapshotWasGiven) {
+TEST_F(TransactionRouterTest, CannotUpconvertIfLevelOtherThanSnapshotWasGiven) {
     auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
                               repl::ReadConcernLevel::kMajorityReadConcern,
                               repl::ReadConcernLevel::kLinearizableReadConcern,
@@ -443,7 +443,7 @@ TEST_F(RouterTransactionStateTest, CannotUpconvertIfLevelOtherThanSnapshotWasGiv
         repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(readConcernLevel);
 
         TxnNumber txnNum{3};
-        RouterTransactionState sessionState({});
+        TransactionRouter sessionState({});
         sessionState.checkOut();
         ASSERT_THROWS_CODE(sessionState.beginOrContinueTxn(
                                operationContext(), txnNum, true /* startTransaction */),
@@ -452,7 +452,7 @@ TEST_F(RouterTransactionStateTest, CannotUpconvertIfLevelOtherThanSnapshotWasGiv
     }
 }
 
-TEST_F(RouterTransactionStateTest,
+TEST_F(TransactionRouterTest,
        CannotUpconvertIfLevelOtherThanSnapshotWasGivenWithAfterClusterTime) {
     auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
                               repl::ReadConcernLevel::kMajorityReadConcern,
@@ -464,7 +464,7 @@ TEST_F(RouterTransactionStateTest,
             repl::ReadConcernArgs(LogicalTime(Timestamp(10, 1)), readConcernLevel);
 
         TxnNumber txnNum{3};
-        RouterTransactionState sessionState({});
+        TransactionRouter sessionState({});
         sessionState.checkOut();
         ASSERT_THROWS_CODE(sessionState.beginOrContinueTxn(
                                operationContext(), txnNum, true /* startTransaction */),
@@ -473,7 +473,7 @@ TEST_F(RouterTransactionStateTest,
     }
 }
 
-TEST_F(RouterTransactionStateTest, CannotUpconvertWithAfterOpTime) {
+TEST_F(TransactionRouterTest, CannotUpconvertWithAfterOpTime) {
     auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
                               repl::ReadConcernLevel::kMajorityReadConcern,
                               repl::ReadConcernLevel::kLinearizableReadConcern,
@@ -484,7 +484,7 @@ TEST_F(RouterTransactionStateTest, CannotUpconvertWithAfterOpTime) {
             repl::ReadConcernArgs(repl::OpTime(Timestamp(10, 1), 2), readConcernLevel);
 
         TxnNumber txnNum{3};
-        RouterTransactionState sessionState({});
+        TransactionRouter sessionState({});
         sessionState.checkOut();
         ASSERT_THROWS_CODE(sessionState.beginOrContinueTxn(
                                operationContext(), txnNum, true /* startTransaction */),
@@ -498,7 +498,7 @@ TEST_F(RouterTransactionStateTest, CannotUpconvertWithAfterOpTime) {
     {
 
         TxnNumber txnNum{3};
-        RouterTransactionState sessionState({});
+        TransactionRouter sessionState({});
         sessionState.checkOut();
         ASSERT_THROWS_CODE(sessionState.beginOrContinueTxn(
                                operationContext(), txnNum, true /* startTransaction */),

@@ -74,7 +74,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/s/transaction/router_transaction_state.h"
+#include "mongo/s/transaction/transaction_router.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -349,8 +349,8 @@ void runCommand(OperationContext* opCtx,
         if (osi->getAutocommit()) {
             scopedSession.emplace(opCtx);
 
-            auto routerSession = RouterTransactionState::get(opCtx);
-            invariant(routerSession);
+            auto txnRouter = TransactionRouter::get(opCtx);
+            invariant(txnRouter);
 
             auto txnNumber = opCtx->getTxnNumber();
             invariant(txnNumber);
@@ -358,7 +358,7 @@ void runCommand(OperationContext* opCtx,
             auto startTxnSetting = osi->getStartTransaction();
             bool startTransaction = startTxnSetting ? *startTxnSetting : false;
 
-            routerSession->beginOrContinueTxn(opCtx, *txnNumber, startTransaction);
+            txnRouter->beginOrContinueTxn(opCtx, *txnNumber, startTransaction);
         }
     }
 

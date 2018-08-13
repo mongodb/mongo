@@ -44,7 +44,7 @@ namespace mongo {
 /**
  * Keeps track of the transaction state. A session is in use when it is being used by a request.
  */
-class RouterTransactionState {
+class TransactionRouter {
 public:
     /**
      * Represents a shard participant in a distributed transaction. Lives only for the duration of
@@ -88,7 +88,7 @@ public:
         const repl::ReadConcernArgs _readConcernArgs;
     };
 
-    RouterTransactionState(LogicalSessionId sessionId);
+    TransactionRouter(LogicalSessionId sessionId);
 
     /**
      * Starts a fresh transaction in this session. Also cleans up the previous transaction state.
@@ -113,7 +113,7 @@ public:
      * Extract the runtimne state attached to the operation context. Returns nullptr if none is
      * attached.
      */
-    static RouterTransactionState* get(OperationContext* opCtx);
+    static TransactionRouter* get(OperationContext* opCtx);
 
 private:
     const LogicalSessionId _sessionId;

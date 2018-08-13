@@ -7,7 +7,7 @@ env = env.Clone()
 env.Library(
     target='router_session',
     source=[
-        'router_transaction_state.cpp',
+        'transaction_router.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_id',
@@ -17,9 +17,9 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='router_transaction_test',
+    target='transaction_router_test',
     source=[
-        'router_transaction_state_test.cpp',
+        'transaction_router_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
