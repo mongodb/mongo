@@ -1062,6 +1062,51 @@ functions:
             PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh ${android_toolchain_target_arch} ${android_toolchain_api_version}
         fi
 
+  "shared scons cache pruning" :
+    command: shell.exec
+    type: system
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+        # removes files from the shared scons cache.
+
+        set +o errexit
+        mount | grep "\/efs" > /dev/null
+        if [ $? -eq 0 ]; then
+          echo "Shared cache is already mounted"
+        else
+          echo "Shared cache - mounting file system"
+          sudo mount /efs
+        fi
+        set -o errexit
+
+        dirs=$(ls -l /efs | grep -v total | awk '{print $NF}')
+
+        echo "Pruning shared SCons directories"
+
+        for dir in $dirs; do
+          echo "Pruning /efs/$dir/scons-cache"
+          distro=$(cat /efs/$dir/info/distro_name)
+
+          # Set cache sizes by distro
+          case $distro in
+               ubuntu1604|ubuntu1804|rhel62|rhel70)
+                    cache_size=300
+                    ;;
+               *)
+                    # default
+                    cache_size=200
+                    ;;
+          esac
+
+          sudo python buildscripts/scons_cache_prune.py --cache-dir /efs/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
+          echo ""
+        done
+
+        sudo umount /efs || true
+
   "scons cache pruning" :
     command: shell.exec
     params:
@@ -1069,33 +1114,12 @@ functions:
       script: |
         set -o errexit
         set -o verbose
-        # removes files from the (local) or shared scons cache when it's over a
-        # threshold, to the $prune_ratio percentage. Ideally override
-        # these default values in the distro config in evergreen.
+        # removes files from the local scons cache.
 
         ${activate_virtualenv}
-        prune_scons_cache="$python buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}"
-        if [ "${scons_cache_scope}" = "shared" ]; then
-            if [ "${shared_scons_pruning}" = "true" ] && [ "${is_patch}" != "true" ]; then
-              echo "shared_scons_pruning is set to true, checking last prune time"
-              if $python buildscripts/prune_check.py; then
-                echo "Pruning shared cache"
-                $prune_scons_cache
-                if [ $? -eq 0 ]; then
-                  echo "Prune successful.  Resetting last_prune timestamp"
-                  $python buildscripts/prune_check.py -w
-                fi
-              else
-                echo "We are less than the 'shared_scons_pruning' num seconds threshold, pruning will be skipped"
-              fi
-            else
-              echo "Shared cache enabled but 'shared_scons_pruning' is not enabled for this variant or we are running a patch build, pruning will be skipped"
-            fi
-        else
-            echo "Legacy local shared cache prune"
-            if [ -d "${scons_cache_path}" ]; then
-              $prune_scons_cache
-            fi
+        echo "Legacy local shared cache prune"
+        if [ -d "${scons_cache_path}" ]; then
+          $python buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
         fi
 
   "umount shared scons directory" :
@@ -7526,6 +7550,12 @@ tasks:
             --gitUserEmail "build+testlifecycle@mongodb.com"            \
             --jiraConfig .jira.yml
 
+- name: shared_scons_cache_pruning
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on: []
+  commands:
+  - func: "git get project"
+  - func: "shared scons cache pruning"
 
 #######################################
 #             Task Groups             #
@@ -7770,7 +7800,6 @@ buildvariants:
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off
     scons_cache_scope: shared
-    shared_scons_pruning: true
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: ""
     build_mongoreplay: true
@@ -8016,7 +8045,6 @@ buildvariants:
     packager_distro: ubuntu1404
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags ssl"
     build_mongoreplay: true
@@ -8849,7 +8877,6 @@ buildvariants:
     packager_distro: amazon
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
@@ -9030,7 +9057,6 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
@@ -11279,7 +11305,6 @@ buildvariants:
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
     compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     scons_cache_scope: shared
-    shared_scons_pruning: true
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: ""
     build_mongoreplay: true
@@ -11406,7 +11431,6 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags ssl"
     build_mongoreplay: true
@@ -12222,7 +12246,6 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
@@ -12372,7 +12395,6 @@ buildvariants:
     packager_distro: debian81
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
@@ -12528,7 +12550,6 @@ buildvariants:
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     tooltags: "-tags 'ssl'"
     scons_cache_scope: shared
-    shared_scons_pruning: true
     build_mongoreplay: true
   display_tasks:
   - *dbtest
@@ -13741,3 +13762,12 @@ buildvariants:
   - name: fetch_test_lifecycle
     distros:
     - rhel62-small
+
+- name: shared-scons-cache-pruning
+  display_name: "Shared SCons Cache Pruning"
+  run_on:
+  - ubuntu1604-test
+  batchtime: 1440 # 1 day
+  stepback: false
+  tasks:
+  - name: shared_scons_cache_pruning
