@@ -763,8 +763,11 @@ class ProcessControl(object):
             return self.pids
         self.pids = []
         for proc in psutil.process_iter():
-            if proc.name() == self.name:
-                self.pids.append(proc.pid)
+            try:
+                if proc.name() == self.name:
+                    self.pids.append(proc.pid)
+            except psutil.NoSuchProcess:
+                pass
         return self.pids
 
     def get_name(self):
