@@ -786,14 +786,14 @@ functions:
       bucket: mciuploads
       extract_to: src
 
-  "fetch benchmark embedded files" : &fetch_benchrun_embedded_files
+  "fetch benchrun embedded files" : &fetch_benchrun_embedded_files
     command: s3.get
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       remote_file: ${project}/benchrun_embedded/benchrun_json_files.tgz
       bucket: mciuploads
-      extract_to: src/benchrun_embedded
+      extract_to: src/benchrun_embedded/testcases
 
   "get buildnumber" : &get_buildnumber
     command: keyval.inc

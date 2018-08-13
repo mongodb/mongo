@@ -2,8 +2,8 @@ test_kind: benchrun_embedded_test
 
 selector:
   roots:
-    - benchrun_embedded/**/mixed*.json
-    - benchrun_embedded/**/multi*.json
+    - benchrun_embedded/testcases/**/mixed*.json
+    - benchrun_embedded/testcases/**/multi*.json
 
 executor:
   hooks:

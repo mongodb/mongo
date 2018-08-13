@@ -2,7 +2,7 @@ test_kind: benchrun_embedded_test
 
 selector:
   roots:
-    - benchrun_embedded/**/aggregation*.json
+    - benchrun_embedded/testcases/**/aggregation*.json
 
 executor:
   hooks:

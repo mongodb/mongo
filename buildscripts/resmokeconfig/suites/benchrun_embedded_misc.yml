@@ -2,16 +2,16 @@ test_kind: benchrun_embedded_test
 
 selector:
   roots:
-    - benchrun_embedded/**/*.json
+    - benchrun_embedded/testcases/**/*.json
   exclude_files:
-    - benchrun_embedded/**/aggregation*.json
-    - benchrun_embedded/**/commands*.json
-    - benchrun_embedded/**/insert*.json
-    - benchrun_embedded/**/mixed*.json
-    - benchrun_embedded/**/multi*.json
-    - benchrun_embedded/**/queries*.json
-    - benchrun_embedded/**/remove*.json
-    - benchrun_embedded/**/update*.json
+    - benchrun_embedded/testcases/**/aggregation*.json
+    - benchrun_embedded/testcases/**/commands*.json
+    - benchrun_embedded/testcases/**/insert*.json
+    - benchrun_embedded/testcases/**/mixed*.json
+    - benchrun_embedded/testcases/**/multi*.json
+    - benchrun_embedded/testcases/**/queries*.json
+    - benchrun_embedded/testcases/**/remove*.json
+    - benchrun_embedded/testcases/**/update*.json
 
 executor:
   hooks:

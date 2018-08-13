@@ -2,7 +2,7 @@ test_kind: benchrun_embedded_test
 
 selector:
   roots:
-    - benchrun_embedded/**/insert*.json
+    - benchrun_embedded/testcases/**/insert*.json
 
 executor:
   hooks:

@@ -8,6 +8,7 @@ import datetime
 import glob
 import json
 import os
+import re
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.testing.hooks import combine_benchmark_results as cbr
@@ -24,6 +25,11 @@ class CombineBenchrunEmbeddedResults(cbr.CombineBenchmarkResults):
 
     DESCRIPTION = "Combine JSON results from embedded benchrun"
 
+    def __init__(self, hook_logger, fixture):
+        """Initialize CombineBenchrunEmbeddedResults."""
+        cbr.CombineBenchmarkResults.__init__(self, hook_logger, fixture)
+        self.report_root = _config.BENCHRUN_REPORT_ROOT
+
     def before_test(self, test, test_report):
         """Remove any existing mongoebench reports for this test."""
         for bm_report in self._test_result_files(test):
@@ -32,7 +38,8 @@ class CombineBenchrunEmbeddedResults(cbr.CombineBenchmarkResults):
     def after_test(self, test, test_report):
         """Update test report."""
         for bm_report in self._test_result_files(test):
-            test_name, thread_count = self._parse_report_name(bm_report)
+            test_name = test.short_name()
+            thread_count = self._parse_report_name(bm_report)
             with open(bm_report, "r") as report_file:
                 report_dict = json.load(report_file)
                 if test_name not in self.benchmark_reports:
@@ -62,22 +69,21 @@ class CombineBenchrunEmbeddedResults(cbr.CombineBenchmarkResults):
 
         return perf_report
 
-    @staticmethod
-    def _test_result_files(test):
+    def _test_result_files(self, test):
         """Return a list of existing test result files based on the test.short_name()."""
-        return glob.glob("mongoebench[.]{}[.]*[.]json".format(test.short_name()))
+        return glob.glob(
+            os.path.join(self.report_root, test.short_name(), "**", "mongoebench[.]*[.]json"))
 
-    @staticmethod
-    def _parse_report_name(report_path):
-        """Parse mongoebench report path and return test_name and thread_count.
+    def _parse_report_name(self, report_path):
+        """Parse mongoebench report path and return thread_count.
 
         The format of the mongoebench report file name is defined in
         ../testing/testcases/benchrun_embedded_test.py
-        as mongoebench.<test_name>.<num threads>.<iteration num>.json
+        as self.report_root/<test_name>/thread<num threads>/mongoebench.<iteration num>.json
         """
-        report_base = os.path.basename(report_path)
-        _, test_name, thread_count, _, _ = report_base.split(".")
-        return test_name, thread_count
+        _, report_subpath = report_path.split(self.report_root + os.sep)
+        _, thread_name, _ = report_subpath.split(os.sep)
+        return re.findall(r"\d+", thread_name)[0]
 
 
 class _BenchrunEmbeddedThreadsReport(object):
@@ -116,7 +122,7 @@ class _BenchrunEmbeddedThreadsReport(object):
 
     def add_report(self, thread_count, report):
         """Add to report."""
-        self.thread_benchmark_map[str(thread_count)].append(report)
+        self.thread_benchmark_map[thread_count].append(report)
 
     def generate_perf_plugin_dict(self):
         """Generate perf plugin data points of the following format.

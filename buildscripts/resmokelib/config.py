@@ -43,6 +43,9 @@ DEFAULTS = {
     "archive_limit_mb": 5000,
     "archive_limit_tests": 10,
     "base_port": 20000,
+    "benchrun_device": "Desktop",
+    "benchrun_embedded_root": "/data/local/tmp/benchrun_embedded",
+    "benchrun_report_root": "benchrun_embedded/results",
     "buildlogger_url": "https://logkeeper.mongodb.org",
     "continue_on_failure": False,
     "dbpath_prefix": None,
@@ -355,6 +358,11 @@ BENCHMARK_FILTER = None
 BENCHMARK_LIST_TESTS = None
 BENCHMARK_MIN_TIME = None
 BENCHMARK_REPETITIONS = None
+
+# Embedded Benchrun Test options.
+BENCHRUN_DEVICE = None
+BENCHRUN_EMBEDDED_ROOT = None
+BENCHRUN_REPORT_ROOT = None
 
 ##
 # Internally used configuration options that aren't exposed to the user
