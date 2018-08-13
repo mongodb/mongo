@@ -159,9 +159,8 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
     auto clusterGLE = ClusterLastErrorInfo::get(request.opCtx->getClient());
 
-    auto shardingCb =
-        [ timeTracker, clusterGLE, cb, grid = Grid::get(request.opCtx), txnRouter ](
-            const TaskExecutor::RemoteCommandCallbackArgs& args) {
+    auto shardingCb = [ timeTracker, clusterGLE, cb, grid = Grid::get(request.opCtx), txnRouter ](
+        const TaskExecutor::RemoteCommandCallbackArgs& args) {
         ON_BLOCK_EXIT([&cb, &args]() { cb(args); });
 
         // Update replica set monitor info.

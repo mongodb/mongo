@@ -452,8 +452,7 @@ TEST_F(TransactionRouterTest, CannotUpconvertIfLevelOtherThanSnapshotWasGiven) {
     }
 }
 
-TEST_F(TransactionRouterTest,
-       CannotUpconvertIfLevelOtherThanSnapshotWasGivenWithAfterClusterTime) {
+TEST_F(TransactionRouterTest, CannotUpconvertIfLevelOtherThanSnapshotWasGivenWithAfterClusterTime) {
     auto readConcernLevels = {repl::ReadConcernLevel::kLocalReadConcern,
                               repl::ReadConcernLevel::kMajorityReadConcern,
                               repl::ReadConcernLevel::kLinearizableReadConcern,

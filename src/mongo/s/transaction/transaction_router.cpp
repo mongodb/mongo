@@ -56,9 +56,7 @@ public:
 
 private:
     stdx::mutex _mutex;
-    stdx::unordered_map<LogicalSessionId,
-                        std::shared_ptr<TransactionRouter>,
-                        LogicalSessionIdHash>
+    stdx::unordered_map<LogicalSessionId, std::shared_ptr<TransactionRouter>, LogicalSessionIdHash>
         _catalog;
 };
 
@@ -132,8 +130,8 @@ void appendReadConcernForTxn(BSONObjBuilder* bob, repl::ReadConcernArgs readConc
 }  // unnamed namespace
 
 TransactionRouter::Participant::Participant(bool isCoordinator,
-                                                 TxnNumber txnNumber,
-                                                 repl::ReadConcernArgs readConcernArgs)
+                                            TxnNumber txnNumber,
+                                            repl::ReadConcernArgs readConcernArgs)
     : _isCoordinator(isCoordinator), _txnNumber(txnNumber), _readConcernArgs(readConcernArgs) {}
 
 BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(BSONObj cmd) {
@@ -205,8 +203,7 @@ boost::optional<ShardId> TransactionRouter::getCoordinatorId() const {
     return _coordinatorId;
 }
 
-TransactionRouter::Participant& TransactionRouter::getOrCreateParticipant(
-    const ShardId& shard) {
+TransactionRouter::Participant& TransactionRouter::getOrCreateParticipant(const ShardId& shard) {
     auto iter = _participants.find(shard.toString());
 
     if (iter != _participants.end()) {
@@ -235,8 +232,8 @@ const LogicalSessionId& TransactionRouter::getSessionId() const {
 }
 
 void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
-                                                TxnNumber txnNumber,
-                                                bool startTransaction) {
+                                           TxnNumber txnNumber,
+                                           bool startTransaction) {
     invariant(_isCheckedOut);
 
     if (startTransaction) {
