@@ -708,7 +708,8 @@ wiredtiger_open_log_configuration = [
             information'''),
         Config('file_max', '100MB', r'''
             the maximum size of log files''',
-            min='100KB', max='2GB'),
+            min='100KB',    # !!! Must match WT_LOG_FILE_MIN
+            max='2GB'),    # !!! Must match WT_LOG_FILE_MAX
         Config('path', '"."', r'''
             the name of a directory into which log files are written. The
             directory must already exist. If the value is not an absolute path,
@@ -862,7 +863,11 @@ wiredtiger_open_common =\
         file extension configuration.  If set, extend files of the set
         type in allocations of the set size, instead of a block at a
         time as each new block is written.  For example,
-        <code>file_extend=(data=16MB)</code>''',
+        <code>file_extend=(data=16MB)</code>. If set to 0, disable the file
+        extension for the set type. For log files, the allowed range is
+        between 100KB and 2GB; values larger than the configured maximum log
+        size and the default config would extend log files in allocations of
+        the maximum log file size.''',
         type='list', choices=['data', 'log']),
     Config('hazard_max', '1000', r'''
         maximum number of simultaneous hazard pointers per session

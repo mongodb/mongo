@@ -174,7 +174,7 @@ __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler)
  */
 static int
 __eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
-    const char *func_name, int line_number, const char *fmt, va_list ap)
+    const char *func, int line, const char *fmt, va_list ap)
     WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 	struct timespec ts;
@@ -231,8 +231,8 @@ __eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
 		WT_ERROR_APPEND(p, remain, ", %s", prefix);
 	WT_ERROR_APPEND(p, remain, ": ");
 
-	if (func_name != NULL)
-		WT_ERROR_APPEND(p, remain, "%s, %d: ", func_name, line_number);
+	if (func != NULL)
+		WT_ERROR_APPEND(p, remain, "%s, %d: ", func, line);
 
 	WT_ERROR_APPEND_AP(p, remain, fmt, ap);
 
@@ -314,7 +314,7 @@ err:		if (fprintf(stderr,
  */
 void
 __wt_err_func(WT_SESSION_IMPL *session,
-    int error, const char *func_name, int line_number, const char *fmt, ...)
+    int error, const char *func, int line, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 5, 6)))
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
@@ -326,8 +326,7 @@ __wt_err_func(WT_SESSION_IMPL *session,
 	 * an error value to return.
 	 */
 	va_start(ap, fmt);
-	WT_IGNORE_RET(__eventv(session,
-	    false, error, func_name, line_number, fmt, ap));
+	WT_IGNORE_RET(__eventv(session, false, error, func, line, fmt, ap));
 	va_end(ap);
 }
 
@@ -337,7 +336,7 @@ __wt_err_func(WT_SESSION_IMPL *session,
  */
 void
 __wt_errx_func(WT_SESSION_IMPL *session,
-    const char *func_name, int line_number, const char *fmt, ...)
+    const char *func, int line, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 4, 5)))
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
@@ -349,8 +348,7 @@ __wt_errx_func(WT_SESSION_IMPL *session,
 	 * an error value to return.
 	 */
 	va_start(ap, fmt);
-	WT_IGNORE_RET(__eventv(session,
-	    false, 0, func_name, line_number, fmt, ap));
+	WT_IGNORE_RET(__eventv(session, false, 0, func, line, fmt, ap));
 	va_end(ap);
 }
 

@@ -149,7 +149,6 @@ struct __wt_cache {
 	WT_SPINLOCK evict_pass_lock;	/* Eviction pass lock */
 	WT_SESSION_IMPL *walk_session;	/* Eviction pass session */
 	WT_DATA_HANDLE *walk_tree;	/* LRU walk current tree */
-	uint32_t walk_progress, walk_target;/* Progress in current tree */
 
 	WT_SPINLOCK evict_queue_lock;	/* Eviction current queue lock */
 	WT_EVICT_QUEUE evict_queues[WT_EVICT_QUEUE_MAX];

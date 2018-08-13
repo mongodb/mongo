@@ -50,6 +50,7 @@ struct __wt_config_parser_impl {
 		"", 0, 0, WT_CONFIG_ITEM_NUM				\
 	}
 
+#define	WT_CONFIG_UNSET	-1
 /*
  * DO NOT EDIT: automatically built by dist/api_config.py.
  * configuration section: BEGIN
