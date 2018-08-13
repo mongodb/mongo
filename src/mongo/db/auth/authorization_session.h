@@ -144,6 +144,9 @@ public:
     // multiple users are authenticated, this method will throw an exception.
     User* getSingleUser();
 
+    // Is authenticated as at least one user.
+    bool isAuthenticated();
+
     // Gets an iterator over the names of all authenticated users stored in this manager.
     UserNameIterator getAuthenticatedUserNames();
 

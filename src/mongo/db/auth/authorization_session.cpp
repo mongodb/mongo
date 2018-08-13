@@ -209,6 +209,10 @@ User* AuthorizationSession::getSingleUser() {
     return lookupUser(userName);
 }
 
+bool AuthorizationSession::isAuthenticated() {
+    return _authenticatedUsers.begin() != _authenticatedUsers.end();
+}
+
 void AuthorizationSession::logoutDatabase(const std::string& dbname) {
     User* removedUser = _authenticatedUsers.removeByDBName(dbname);
     if (removedUser) {
