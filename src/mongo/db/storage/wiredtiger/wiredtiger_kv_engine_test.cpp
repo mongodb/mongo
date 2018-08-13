@@ -186,10 +186,6 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 
     ASSERT_OK(_engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options));
 #endif
-
-    // The existing RecordStore is still usable with a different OperationContext and
-    // RecoveryUnit because a new session with new cursors will be opened.
-    ASSERT_EQUALS(record, rs->dataFor(opCtxPtr.get(), loc).data());
 }
 
 TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesFailGracefully) {
