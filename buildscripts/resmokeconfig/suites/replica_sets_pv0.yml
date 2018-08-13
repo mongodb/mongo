@@ -38,8 +38,7 @@ selector:
   - jstests/replsets/noop_writes_wait_for_write_concern_fcv.js
   # Election handoff is not supported in PV0, since it requires replSetStepUp.
   - jstests/replsets/election_handoff*.js
-  # replSetGetStatus doesn't return read concern majority optime in PV0.
-  - jstests/replsets/awaitdata_getmore_new_last_committed_optime.js
+
 
 executor:
   config:
