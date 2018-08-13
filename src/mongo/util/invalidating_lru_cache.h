@@ -67,7 +67,7 @@ public:
      */
     void insertOrAssign(const Key& key, std::unique_ptr<Value> value) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _invalidateWithLock(lk, key);
+        _invalidateKey(lk, key);
         _cache.add(key, std::move(value));
     }
 
@@ -77,7 +77,7 @@ public:
      */
     std::shared_ptr<Value> insertOrAssignAndGet(const Key& key, std::unique_ptr<Value> value) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _invalidateWithLock(lk, key);
+        _invalidateKey(lk, key);
         auto ret = std::shared_ptr<Value>(value.release(), _makeDeleterWithLock(key, _generation));
         bool inserted;
         std::tie(std::ignore, inserted) = _active.emplace(key, ret);
@@ -91,7 +91,7 @@ public:
      */
     void invalidate(const Key& key) {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
-        return _invalidateWithLock(lk, key);
+        return _invalidateKey(lk, key);
     }
 
     /*
@@ -102,6 +102,8 @@ public:
     void invalidateIf(Pred predicate) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
+        // Remove any matching values from the cache (of inactive items). Do not bump the
+        // generation - that only happens if any active items are invalidated.
         for (auto it = _cache.begin(); it != _cache.end();) {
             if (predicate(it->first, it->second.get())) {
                 auto toErase = it++;
@@ -115,14 +117,19 @@ public:
         while (it != _active.end()) {
             auto& kv = *it;
             auto value = kv.second.lock();
+
+            // If the value is a valid ptr (they're still checked out), and the key/value
+            // doesn't match the predicate, then just skip this one.
             if (value && !predicate(kv.first, value.get())) {
                 it++;
                 continue;
             }
 
-            _generation++;
-            _invalidator(value.get());
-            it = _active.erase(it);
+            // If the weak_ptr is expired (about to be returned to the cache), or the predicate
+            // returned true, then invalidate the item.
+            //
+            // After this the iterator will point to the next item to check or _active.end().
+            it = _invalidateActiveIterator(lk, it, std::move(value));
         }
     }
 
@@ -213,27 +220,60 @@ private:
         static constexpr bool value = std::is_same<decltype(test<T>(0)), yes>::value;
     };
 
+    using ActiveMap = stdx::unordered_map<Key, std::weak_ptr<Value>>;
+    using ActiveIterator = typename ActiveMap::iterator;
+
     static_assert(hasIsValidMethod<Value>::value,
                   "Value type must have a method matching bool isValid()");
 
-    void _invalidateWithLock(WithLock, const Key& key) {
+    /*
+     * Invalidates an item in the cache and active map by key.
+     */
+    void _invalidateKey(WithLock lk, const Key& key) {
         // Erase any cached user (one that hasn't been given out yet).
         _cache.erase(key);
 
         // Then invalidate any user we've already given out.
-        auto it = _active.find(key);
+
+        _invalidateActiveIterator(lk, _active.find(key), nullptr);
+    }
+
+
+    /*
+     * Invalidates an item in the active map pointed to by an iterator, and returns the next
+     * iterator in the map or the end() iterator.
+     *
+     * If the active item's weak_ptr has already been locked, it should be moved into value,
+     * otherwise pass nullptr and this function will lock/check the weak_ptr itself.
+     */
+    ActiveIterator _invalidateActiveIterator(WithLock,
+                                             const ActiveIterator& it,
+                                             std::shared_ptr<Value>&& value) {
+        // If the iterator is past-the-end, then just return the iterator
         if (it == _active.end()) {
-            return;
+            return it;
+        }
+        // Bump the generation count so that any now-invalid shared_ptr<Values> returned
+        // from get() and insertOrAssignAndGet() don't get returned to the cache. Since
+        // the key for it was in the _active list, we know we want to invalidate it, but
+        // calling _invalidator is only for items still checked out from the cache.
+        _generation++;
+
+        // It's valid to pass in a nullptr here, so if value is a nullptr, then try to lock
+        // the weak_ptr in the active map.
+        if (!value) {
+            value = it->second.lock();
         }
 
-        _generation++;
-        auto value = it->second.lock();
-        _active.erase(it);
+        // We only call the invalidator if the value is a valid ptr, otherwise it's about to
+        // be returned to the cache and the generation bump should invalidate it.
         if (value) {
             _invalidator(value.get());
         }
 
-        return;
+        // Erase the iterator from the _active map and return the next iterator (so this
+        // can be called in a loop).
+        return _active.erase(it);
     }
 
     /*
@@ -272,7 +312,7 @@ private:
     uint64_t _generation = 0;
 
     // Items that have been checked out of the cache
-    stdx::unordered_map<Key, std::weak_ptr<Value>> _active;
+    ActiveMap _active;
 
     // Items that are inactive but valid
     LRUCache<Key, std::unique_ptr<Value>> _cache;
