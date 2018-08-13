@@ -348,6 +348,7 @@ selector:
   - jstests/sharding/collation_targeting_inherited.js
   - jstests/sharding/geo_near_random1.js
   - jstests/sharding/geo_near_random2.js
+  - jstests/sharding/out_with_chunk_migrations.js
   - jstests/sharding/out_from_stale_mongos.js
   - jstests/sharding/out_to_existing.js
   - jstests/sharding/out_to_non_existing.js

@@ -128,7 +128,9 @@ public:
     }
 
     /**
-     * Returns true if the involved namespace 'nss' is allowed to be sharded.
+     * Returns true if the involved namespace 'nss' is allowed to be sharded. The behavior is to
+     * allow by default and stages should opt-out if foreign collections are not allowed to be
+     * sharded.
      */
     virtual bool allowShardedForeignCollection(NamespaceString nss) const {
         return true;

@@ -26,6 +26,8 @@
  * it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -36,9 +38,13 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeDocumentSourceCursorLoadBatch);
 
 using boost::intrusive_ptr;
 using std::shared_ptr;
@@ -71,6 +77,11 @@ void DocumentSourceCursor::loadBatch() {
     if (!_exec || _exec->isDisposed()) {
         // No more documents.
         return;
+    }
+
+    while (MONGO_FAIL_POINT(hangBeforeDocumentSourceCursorLoadBatch)) {
+        log() << "Hanging aggregation due to 'hangBeforeDocumentSourceCursorLoadBatch' failpoint";
+        sleepmillis(10);
     }
 
     PlanExecutor::ExecState state;
