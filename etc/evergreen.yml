@@ -8999,6 +8999,8 @@ buildvariants:
     python: python
     ext: zip
     use_scons_cache: true
+    multiversion_platform: windows
+    multiversion_edition: enterprise
     gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10"'
     tooltags: ""
     build_mongoreplay: false
