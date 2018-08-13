@@ -101,7 +101,7 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
         ->addOptionChaining("configExpand",
                             "configExpand",
                             moe::String,
-                            "Process expansion directives in config file (none, rest)")
+                            "Process expansion directives in config file (none, exec, rest)")
         .setSources(moe::SourceCommandLine);
 
     options

@@ -51,6 +51,7 @@
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/shell_exec.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -245,6 +246,7 @@ bool OptionIsStringMap(const std::vector<OptionDescription>& options_vector, con
 Status parseYAMLConfigFile(const std::string&, YAML::Node*);
 /* Searches a YAML node for configuration expansion directives such as:
  * __rest: https://example.com/path?query=val
+ * __exec: '/usr/bin/getConfig param'
  *
  * and optionally the fields `type` and `trim`.
  *
@@ -276,39 +278,53 @@ public:
         }
 
         const auto getStringField = [&node, &prefix](const std::string& fieldName,
-                                                     bool allowed) -> StatusWith<std::string> {
+                                                     bool allowed) -> boost::optional<std::string> {
             try {
                 const auto& strField = node[fieldName];
                 if (!strField.IsDefined()) {
-                    return {ErrorCodes::NoSuchKey, "Not a configuration expansion block"};
+                    return {boost::none};
                 }
-                if (!allowed) {
-                    return {ErrorCodes::BadValue,
-                            str::stream() << prefix << fieldName
-                                          << " support has not been enabled"};
-                }
-                if (!strField.IsScalar()) {
-                    return {ErrorCodes::BadValue,
-                            str::stream() << prefix << fieldName << " must be a string"};
-                }
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << prefix << fieldName << " support has not been enabled",
+                        allowed);
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << prefix << fieldName << " must be a string",
+                        strField.IsScalar());
                 return strField.Scalar();
             } catch (const YAML::InvalidNode&) {
                 // Not this kind of expansion block.
-                return {ErrorCodes::NoSuchKey, "Not a configuration expansion block"};
+                return {boost::none};
             }
         };
 
         _expansion = ExpansionType::kRest;
-        _action = uassertStatusOK(getStringField("__rest", configExpand.rest));
+        auto optRestAction = getStringField("__rest", configExpand.rest);
+        auto optExecAction = getStringField("__exec", configExpand.exec);
+        uassert(ErrorCodes::NoSuchKey,
+                "Neither __exec nor __rest specified for config expansion",
+                optRestAction || optExecAction);
+        uassert(ErrorCodes::BadValue,
+                "Must not specify both __rest and __exec in a single config expansion",
+                !optRestAction || !optExecAction);
+
+        if (optRestAction) {
+            invariant(!optExecAction);
+            _expansion = ExpansionType::kRest;
+            _action = std::move(*optRestAction);
+        } else {
+            invariant(optExecAction);
+            _expansion = ExpansionType::kExec;
+            _action = std::move(*optExecAction);
+        }
 
         // Parse optional fields, keeping track of how many we've handled.
         // If there are additional (unknown) fields beyond that, raise an error.
         size_t numVisitedFields = 1;
 
-        auto swType = getStringField("type", true);
-        if (swType.isOK()) {
+        auto optType = getStringField("type", true);
+        if (optType) {
             ++numVisitedFields;
-            auto typeField = std::move(swType.getValue());
+            auto typeField = std::move(*optType);
             if (typeField == "string") {
                 _type = ContentType::kString;
             } else if (typeField == "yaml") {
@@ -317,14 +333,12 @@ public:
                 uasserted(ErrorCodes::BadValue,
                           str::stream() << prefix << "type must be either 'string' or 'yaml'");
             }
-        } else if (swType.getStatus().code() != ErrorCodes::NoSuchKey) {
-            uassertStatusOK(swType.getStatus());
-        }  // else not specified, assume string.
+        }
 
-        auto swTrim = getStringField("trim", true);
-        if (swTrim.isOK()) {
+        auto optTrim = getStringField("trim", true);
+        if (optTrim) {
             ++numVisitedFields;
-            auto trimField = std::move(swTrim.getValue());
+            auto trimField = std::move(*optTrim);
             if (trimField == "none") {
                 _trim = Trim::kNone;
             } else if (trimField == "whitespace") {
@@ -333,9 +347,7 @@ public:
                 uasserted(ErrorCodes::BadValue,
                           str::stream() << prefix << "trim must be either 'whitespace' or 'none'");
             }
-        } else if (swTrim.getStatus().code() != ErrorCodes::NoSuchKey) {
-            uassertStatusOK(swTrim.getStatus());
-        }  // else not specified, assume none.
+        }
 
         uassert(ErrorCodes::BadValue,
                 str::stream() << nodeName << " expansion block must contain only '"
@@ -349,11 +361,15 @@ public:
     }
 
     std::string getExpansionName() const {
-        return "__rest";
+        return isRestExpansion() ? "__rest" : "__exec";
     }
 
     bool isRestExpansion() const {
-        return true;
+        return _expansion == ExpansionType::kRest;
+    }
+
+    bool isExecExpansion() const {
+        return _expansion == ExpansionType::kExec;
     }
 
     std::string getAction() const {
@@ -401,6 +417,7 @@ private:
     // The type of expansion represented.
     enum class ExpansionType {
         kRest,
+        kExec,
     };
     ExpansionType _expansion = ExpansionType::kRest;
 
@@ -458,6 +475,9 @@ std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
  * If a __rest configuration expansion directive is found,
  * mongo::HttpClient will be invoked to fetch the resource via GET request.
  *
+ * If an __exec configuration expansion directive is found,
+ * mongo::shellExec() will be invoked to execute the process.
+ *
  * See the comment for class ConfigExpandNode for more details.
  */
 StatusWith<YAML::Node> runYAMLExpansion(const YAML::Node& node,
@@ -478,10 +498,21 @@ StatusWith<YAML::Node> runYAMLExpansion(const YAML::Node& node,
     const auto action = expansion.getAction();
     LOG(2) << prefix << expansion.getExpansionName() << ": " << action;
 
-    invariant(expansion.isRestExpansion());
-    auto output = runYAMLRestExpansion(action, configExpand.timeout);
+    if (expansion.isRestExpansion()) {
+        return expansion.process(runYAMLRestExpansion(action, configExpand.timeout));
+    }
 
-    return expansion.process(std::move(output));
+    invariant(expansion.isExecExpansion());
+    // Hard-cap shell expansion at 128MB
+    const size_t kShellExpandMaxLenBytes = 128 << 20;
+    auto swOutput = shellExec(action, configExpand.timeout, kShellExpandMaxLenBytes);
+    if (!swOutput.isOK()) {
+        return {ErrorCodes::OperationFailed,
+                str::stream() << "Failed expanding __exec section: "
+                              << swOutput.getStatus().reason()};
+    }
+    return expansion.process(std::move(swOutput.getValue()));
+
 } catch (...) {
     return exceptionToStatus();
 }
@@ -1515,6 +1546,8 @@ StatusWith<OptionsParser::ConfigExpand> parseConfigExpand(const Environment& cli
         }
         if (elem == "rest") {
             ret.rest = true;
+        } else if (elem == "exec") {
+            ret.exec = true;
         } else {
             return {ErrorCodes::BadValue,
                     str::stream() << "Invalid value for --configExpand: '" << elem << "'"};

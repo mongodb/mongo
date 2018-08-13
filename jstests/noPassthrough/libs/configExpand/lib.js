@@ -7,18 +7,10 @@ class ConfigExpandRestServer {
     * Create a new webserver.
     */
     constructor() {
-        this.python = "/opt/mongodbtoolchain/v2/bin/python3";
-
-        if (_isWindows()) {
-            const paths = ["c:\\python36\\python.exe", "c:\\python\\python36\\python.exe"];
-            for (let p of paths) {
-                if (fileExists(p)) {
-                    this.python = p;
-                }
-            }
-        }
-
+        load('jstests/libs/python.js');
+        this.python = getPython3Binary();
         print("Using python interpreter: " + this.python);
+
         this.web_server_py = "jstests/noPassthrough/libs/configExpand/rest_server.py";
 
         this.pid = undefined;
@@ -88,6 +80,30 @@ class ConfigExpandRestServer {
     }
 }
 
+function makeReflectionCmd(arg, opts = {}) {
+    'use strict';
+
+    load('jstests/libs/python.js');
+    let cmd = getPython3Binary();
+    if (_isWindows()) {
+        cmd = '"' + cmd + '"';
+    }
+    cmd += ' jstests/noPassthrough/libs/configExpand/reflect.py';
+
+    if (opts.sleep && (opts.sleep > 0)) {
+        cmd += ' -s ' + Number(opts.sleep);
+    }
+
+    // Escape arguments to the shell by wrapping in OS appropriate quotes.
+    if (_isWindows()) {
+        cmd += ' ' + arg.split('"').map(v => '"' + v + '"').join('\\"');
+    } else {
+        cmd += ' ' + arg.split("'").map(v => "'" + v + "'").join("\\'");
+    }
+
+    return cmd;
+}
+
 function jsToYaml(config, toplevel = true) {
     if (typeof config === 'object') {
         if (Array.isArray(config)) {
@@ -124,7 +140,7 @@ function configExpandSuccess(config, test = null, opts = {}) {
     writeFile(configFile, jsToYaml(config));
 
     const mongod = MongoRunner.runMongod(Object.assign({
-        configExpand: 'rest',
+        configExpand: 'rest,exec',
         config: configFile,
     },
                                                        opts));
@@ -143,7 +159,7 @@ function configExpandFailure(config, test = null, opts = {}) {
     writeFile(configFile, jsToYaml(config));
 
     const options = Object.assign({
-        configExpand: 'rest',
+        configExpand: 'rest,exec',
         config: configFile,
         port: allocatePort(),
     },

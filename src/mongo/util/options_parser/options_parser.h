@@ -128,6 +128,7 @@ public:
      */
     struct ConfigExpand {
         bool rest = false;
+        bool exec = false;
         Seconds timeout = kDefaultConfigExpandTimeout;
     };
 
