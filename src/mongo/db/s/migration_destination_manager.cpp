@@ -899,28 +899,15 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
     {
         // Pause to wait for replication. This will prevent us from going into critical section
         // until we're ready.
-        Timer t;
-        while (t.minutes() < 600) {
-            opCtx->checkForInterrupt();
 
-            if (getState() == ABORT) {
-                log() << "Migration aborted while waiting for replication";
-                return;
-            }
+        log() << "Waiting for replication to catch up before entering critical section";
 
-            log() << "Waiting for replication to catch up before entering critical section";
+        auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+            opCtx, lastOpApplied, writeConcern);
+        uassertStatusOKWithContext(awaitReplicationResult.status,
+                                   awaitReplicationResult.status.codeString());
 
-            if (_flushPendingWrites(opCtx, _nss.ns(), min, max, lastOpApplied, writeConcern)) {
-                break;
-            }
-
-            opCtx->sleepFor(Seconds(1));
-        }
-
-        if (t.minutes() >= 600) {
-            _setStateFail("Cannot go to critical section because secondaries cannot keep up");
-            return;
-        }
+        log() << "Chunk data replicated successfully.";
     }
 
     {

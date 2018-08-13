@@ -157,6 +157,8 @@ variables:
        value: ${remote_dir}/afterrecovery
      - key: backup_path_before
        value: ${remote_dir}/beforerecovery
+     - key: backup_artifacts
+       value: ${remote_dir}/afterrecovery* ${remote_dir}/beforerecovery*
      - key: db_path
        value: /data/db
      - key: log_path
@@ -165,7 +167,7 @@ variables:
        value: powercycle_exit.yml
 
 - &powercycle_test
-  ec2_artifacts: ${log_path} ${db_path} ${backup_path_after} ${backup_path_before}
+  ec2_artifacts: ${log_path} ${db_path} ${backup_artifacts}
   program_options:  --exitYamlFile=${exit_file} --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
   connection_options: --sshUserHost=${private_ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
@@ -2118,7 +2120,7 @@ functions:
           user_group="$USER:$group"
           script_opts="$script_opts -u $user_group"
           data_db=/data/db
-          cmds="$sudo bash mount_drives.sh $script_opts; ls -ld $data_db $log; df; mount"
+          cmds="$sudo bash mount_drives.sh $script_opts; mount; ls -ld $data_db $log; df"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${activate_virtualenv}
           $python buildscripts/remote_operations.py          \
@@ -3431,7 +3433,7 @@ tasks:
           set -o errexit
           set -o verbose
 
-          tar cfvz ./embedded-sdk.tgz ./mongo-embedded-sdk-${version}
+          tar cfvz embedded-sdk.tgz mongo-embedded-sdk-${version}
 
     # Upload it so we can download from EVG.
     - command: s3.put
@@ -3452,6 +3454,31 @@ tasks:
       vars:
         targets: install-mobile-test
         task_compile_flags: *embedded_sdk_compile_flags
+
+- name: embedded_sdk_tests_s3_put
+  commands:
+    # Not using archive.targz_pack here because I can't get it to work.
+    - command: shell.exec
+      params:
+        working_dir: "src/build"
+        script: |
+          set -o errexit
+          set -o verbose
+
+          tar cfvz embedded-sdk-tests.tgz mongo-embedded-sdk-${version}
+
+    # Upload it so we can download from EVG.
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/embedded-sdk-tests.tgz"
+        remote_file: ${project}/embedded-sdk-test/${build_variant}/${revision}/${version}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "Embedded SDK Tests Tar Archive"
 
 - name: embedded_sdk_run_tests
   commands:
@@ -3514,6 +3541,22 @@ tasks:
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk.tgz"
         remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+
+- name: embedded_sdk_tests_s3_put_latest
+  commands:
+    # A second put, this time to -latest, to give devs a reasonable
+    # way to get the most recent build.
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/embedded-sdk-tests.tgz"
+        remote_file: ${project}/embedded-sdk-test/${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -7225,8 +7268,10 @@ task_groups:
   - "embedded_sdk_install_dev"
   - "embedded_sdk_s3_put"
   - "embedded_sdk_install_tests"
+  - "embedded_sdk_tests_s3_put"
   - "embedded_sdk_run_tests"
   - "embedded_sdk_s3_put_latest"
+  - "embedded_sdk_tests_s3_put_latest"
 
 #######################################
 #               Modules               #
