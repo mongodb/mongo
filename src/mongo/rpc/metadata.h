@@ -53,7 +53,7 @@ BSONObj makeEmptyMetadata();
 /**
  * Reads metadata from a metadata object and sets it on this OperationContext.
  */
-void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj);
+void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bool requiresAuth);
 
 /**
  * A legacy command object and a corresponding query flags bitfield. The legacy command object

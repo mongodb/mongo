@@ -31,6 +31,7 @@
 #include "mongo/rpc/metadata.h"
 
 #include "mongo/client/read_preference.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
@@ -50,7 +51,7 @@ BSONObj makeEmptyMetadata() {
     return BSONObj();
 }
 
-void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
+void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bool requiresAuth) {
     BSONElement readPreferenceElem;
     BSONElement auditElem;
     BSONElement configSvrElem;
@@ -96,6 +97,19 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
             uassertStatusOK(rpc::LogicalTimeMetadata::readFromMetadata(logicalTimeElem));
 
         auto& signedTime = logicalTimeMetadata.getSignedTime();
+
+        if (!requiresAuth &&
+            AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled() &&
+            (!signedTime.getProof() || *signedTime.getProof() == TimeProofService::TimeProof())) {
+
+            AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+            // The client is not authenticated and is not using localhost auth bypass.
+            if (authSession && !authSession->isAuthenticated() &&
+                !authSession->isUsingLocalhostBypass()) {
+                return;
+            }
+        }
+
         // LogicalTimeMetadata is default constructed if no cluster time metadata was sent, so a
         // default constructed SignedLogicalTime should be ignored.
         if (signedTime.getTime() != LogicalTime::kUninitialized) {
