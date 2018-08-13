@@ -2483,7 +2483,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=no_passthrough --storageEngine=mmapv1
+      resmoke_args: --suites=no_passthrough --storageEngine=mmapv1 --excludeWithAnyTags=requires_document_locking
       run_multiple_jobs: true
 
 - <<: *task_template
