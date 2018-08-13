@@ -357,30 +357,15 @@ Status PlanCacheListPlans::runPlanCacheCommand(OperationContext* opCtx,
     AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
 
     PlanCache* planCache;
-    Status status = getPlanCache(opCtx, ctx.getCollection(), ns, &planCache);
-    if (!status.isOK()) {
-        // No collection - return empty plans array.
-        BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));
-        plansBuilder.doneFast();
-        return Status::OK();
-    }
+    uassertStatusOK(getPlanCache(opCtx, ctx.getCollection(), ns, &planCache));
     return list(opCtx, *planCache, ns, cmdObj, bob);
 }
 
-// static
-Status PlanCacheListPlans::list(OperationContext* opCtx,
-                                const PlanCache& planCache,
-                                const std::string& ns,
-                                const BSONObj& cmdObj,
-                                BSONObjBuilder* bob) {
-    auto statusWithCQ = canonicalize(opCtx, ns, cmdObj);
-    if (!statusWithCQ.isOK()) {
-        return statusWithCQ.getStatus();
-    }
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-
+namespace {
+Status listPlansOriginalFormat(std::unique_ptr<CanonicalQuery> cq,
+                               const PlanCache& planCache,
+                               BSONObjBuilder* bob) {
     auto lookupResult = planCache.getEntry(*cq);
-
     if (lookupResult == ErrorCodes::NoSuchKey) {
         // Return empty plans in results if query shape does not
         // exist in plan cache.
@@ -390,9 +375,11 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
     } else if (!lookupResult.isOK()) {
         return lookupResult.getStatus();
     }
-    std::unique_ptr<PlanCacheEntry> entry = std::move(lookupResult.getValue());
+
+    auto entry = std::move(lookupResult.getValue());
 
     BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));
+
     size_t numPlans = entry->plannerData.size();
     invariant(numPlans == entry->decision->stats.size());
     invariant(numPlans == entry->decision->scores.size());
@@ -442,7 +429,57 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
     // Append whether or not the entry is active.
     bob->append("isActive", entry->isActive);
     bob->append("works", static_cast<long long>(entry->works));
+    return Status::OK();
+}
+}  // namespace
 
+// static
+Status PlanCacheListPlans::list(OperationContext* opCtx,
+                                const PlanCache& planCache,
+                                const std::string& ns,
+                                const BSONObj& cmdObj,
+                                BSONObjBuilder* bob) {
+    auto statusWithCQ = canonicalize(opCtx, ns, cmdObj);
+    if (!statusWithCQ.isOK()) {
+        return statusWithCQ.getStatus();
+    }
+
+    if (!internalQueryCacheListPlansNewOutput.load())
+        return listPlansOriginalFormat(std::move(statusWithCQ.getValue()), planCache, bob);
+
+    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto entry = uassertStatusOK(planCache.getEntry(*cq));
+
+    // internalQueryCacheDisableInactiveEntries is True and we should use the new output format.
+    BSONObjBuilder shapeBuilder(bob->subobjStart("createdFromQuery"));
+    shapeBuilder.append("query", entry->query);
+    shapeBuilder.append("sort", entry->sort);
+    shapeBuilder.append("projection", entry->projection);
+    if (!entry->collation.isEmpty()) {
+        shapeBuilder.append("collation", entry->collation);
+    }
+    shapeBuilder.doneFast();
+    bob->append("queryHash", unsignedIntToFixedLengthHex(entry->queryHash));
+
+    // Append whether or not the entry is active.
+    bob->append("isActive", entry->isActive);
+    bob->append("works", static_cast<long long>(entry->works));
+
+    BSONObjBuilder cachedPlanBob(bob->subobjStart("cachedPlan"));
+    Explain::statsToBSON(
+        *entry->decision->stats[0], &cachedPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
+    cachedPlanBob.doneFast();
+
+    bob->append("timeOfCreation", entry->timeOfCreation);
+
+    BSONArrayBuilder creationBuilder(bob->subarrayStart("creationExecStats"));
+    for (auto&& stat : entry->decision->stats) {
+        BSONObjBuilder planBob(creationBuilder.subobjStart());
+        Explain::generateSinglePlanExecutionInfo(
+            stat.get(), ExplainOptions::Verbosity::kExecAllPlans, boost::none, &planBob);
+        planBob.doneFast();
+    }
+    creationBuilder.doneFast();
     return Status::OK();
 }
 

@@ -79,6 +79,9 @@ extern AtomicDouble internalQueryCacheWorksGrowthCoefficient;
 // Whether or not cache entries can be marked as "inactive."
 extern AtomicBool internalQueryCacheDisableInactiveEntries;
 
+// Whether or not planCacheListPlans uses the new output format.
+extern AtomicBool internalQueryCacheListPlansNewOutput;
+
 //
 // Planning and enumeration.
 //

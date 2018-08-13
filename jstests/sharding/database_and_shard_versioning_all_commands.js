@@ -324,7 +324,14 @@
             sendsDbVersion: false,
             // Uses connection versioning.
             sendsShardVersion: false,
-            command: {planCacheListPlans: collName}
+            setUp: function(mongosConn) {
+                // Expects the collection to exist, and doesn't implicitly create it.
+                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
+            },
+            command: {planCacheListPlans: collName, query: {_id: "A"}},
+            cleanUp: function(mongosConn) {
+                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
+            }
         },
         planCacheListQueryShapes: {
             sendsDbVersion: false,

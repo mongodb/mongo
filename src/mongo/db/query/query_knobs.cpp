@@ -55,6 +55,8 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWorksGrowthCoefficient, double, 
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheDisableInactiveEntries, bool, false);
 
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheListPlansNewOutput, bool, false);
+
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 64);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxOrSolutions, int, 10);
