@@ -77,8 +77,6 @@ public:
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
 
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
-
     StageType stageType() const final {
         return STAGE_SORT;
     }
@@ -169,10 +167,6 @@ private:
 
     // Iterates through _data post-sort returning it.
     std::vector<SortableDataItem>::iterator _resultIterator;
-
-    // We buffer a lot of data and we want to look it up by RecordId quickly upon invalidation.
-    typedef stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
-    DataMap _wsidByRecordId;
 
     SortStats _specificStats;
 

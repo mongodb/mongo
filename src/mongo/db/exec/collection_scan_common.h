@@ -45,8 +45,7 @@ struct CollectionScanParams {
     // not owned
     const Collection* collection = nullptr;
 
-    // isNull by default.  If you specify any value for this, you're responsible for the RecordId
-    // not being invalidated before the first call to work(...).
+    // The RecordId to which we should seek to as the first document of the scan.
     RecordId start;
 
     // If present, the collection scan will stop and return EOF the first time it sees a document

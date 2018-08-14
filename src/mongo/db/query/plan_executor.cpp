@@ -397,12 +397,6 @@ void PlanExecutor::reattachToOperationContext(OperationContext* opCtx) {
     _currentState = kSaved;
 }
 
-void PlanExecutor::invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    if (!isMarkedAsKilled()) {
-        _root->invalidate(opCtx, dl, type);
-    }
-}
-
 PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, RecordId* dlOut) {
     Snapshotted<BSONObj> snapshotted;
     ExecState state = getNextImpl(objOut ? &snapshotted : NULL, dlOut);

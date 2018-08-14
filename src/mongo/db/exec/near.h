@@ -80,15 +80,8 @@ namespace mongo {
  * correctness does not depend on interval size.
  *
  * The child stage may return duplicate documents, so it is the responsibility of NearStage to
- * deduplicate. Every document in _resultBuffer is kept track of in _seenDocuments. When a
- * document is returned or invalidated, it is removed from _seenDocuments.
- *
- * TODO: If a document is indexed in multiple cells (Polygons, PolyLines, etc.), there is a
- * possibility that it will be returned more than once. Since doInvalidate() force fetches a
- * document and removes it from _seenDocuments, NearStage will not deduplicate if it encounters
- * another instance of this document. This will only occur if two cells for a document are in the
- * same interval and the invalidation occurs between the scan of the first cell and the second, so
- * NearStage no longer knows that it's seen this document before.
+ * deduplicate. Every document in _resultBuffer is kept track of in _seenDocuments. When a document
+ * is returned, it is removed from _seenDocuments.
  *
  * TODO: Right now the interface allows the nextCovering() to be adaptive, but doesn't allow
  * aborting and shrinking a covered range being buffered if we guess wrong.
@@ -101,8 +94,6 @@ public:
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
-
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final;
     std::unique_ptr<PlanStageStats> getStats() final;
@@ -169,9 +160,7 @@ private:
     // Generic state for progressive near search
     //
 
-    // Not owned here
     WorkingSet* const _workingSet;
-    // Not owned here, used for fetching buffered results before invalidation
     Collection* const _collection;
 
     // A progressive search works in stages of buffering and then advancing
@@ -182,8 +171,7 @@ private:
         SearchState_Finished
     } _searchState;
 
-    // May need to track disklocs from the child stage to do our own deduping, also to do
-    // invalidation of buffered results.
+    // Tracks RecordIds from the child stage to do our own deduping.
     stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _seenDocuments;
 
     // Stats for the stage covering this interval
@@ -212,14 +200,9 @@ private:
  * A covered interval over which a portion of a near search can be run.
  */
 struct NearStage::CoveredInterval {
-    CoveredInterval(PlanStage* covering,
-                    bool dedupCovering,
-                    double minDistance,
-                    double maxDistance,
-                    bool inclusiveMax);
+    CoveredInterval(PlanStage* covering, double minDistance, double maxDistance, bool inclusiveMax);
 
     PlanStage* const covering;  // Owned in PlanStage::_children.
-    const bool dedupCovering;
 
     const double minDistance;
     const double maxDistance;

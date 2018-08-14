@@ -66,8 +66,6 @@ public:
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
 
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
-
     StageType stageType() const final {
         return STAGE_SORT_MERGE;
     }
@@ -79,49 +77,15 @@ public:
     static const char* kStageType;
 
 private:
-    // Not owned by us.
-    const Collection* _collection;
-
-    // Not owned by us.
-    WorkingSet* _ws;
-
-    // The pattern that we're sorting by.
-    BSONObj _pattern;
-
-    // Null if this merge sort stage orders strings according to simple binary compare. If non-null,
-    // represents the collator used to compare strings.
-    const CollatorInterface* _collator;
-
-    // Are we deduplicating on RecordId?
-    bool _dedup;
-
-    // Which RecordIds have we seen?
-    stdx::unordered_set<RecordId, RecordId::Hasher> _seen;
-
-    // In order to pick the next smallest value, we need each child work(...) until it produces
-    // a result.  This is the queue of children that haven't given us a result yet.
-    std::queue<PlanStage*> _noResultToMerge;
-
-    // There is some confusing STL wrangling going on below.  Here's a guide:
-    //
-    // We want to keep a priority_queue of results so we can quickly return the min result.
-    //
-    // If we receive an invalidate, we need to iterate over any cached state to see if the
-    // invalidate is relevant.
-    //
-    // We can't iterate over a priority_queue, so we keep the actual cached state in a list and
-    // have a priority_queue of iterators into that list.
-    //
-    // Why an iterator instead of a pointer?  We need to be able to use the information in the
-    // priority_queue to remove the item from the list and quickly.
-
     struct StageWithValue {
         StageWithValue() : id(WorkingSet::INVALID_ID), stage(NULL) {}
         WorkingSetID id;
         PlanStage* stage;
     };
 
-    // We have a priority queue of these.
+    // This stage maintains a priority queue of results from each child stage so that it can quickly
+    // return the next result according to the sort order. A value in the priority queue is a
+    // MergingRef, an iterator which refers to a buffered (WorkingSetMember, child stage) pair.
     typedef std::list<StageWithValue>::iterator MergingRef;
 
     // The comparison function used in our priority queue.
@@ -139,6 +103,29 @@ private:
         BSONObj _pattern;
         const CollatorInterface* _collator;
     };
+
+    // Not owned by us.
+    const Collection* _collection;
+
+    // Not owned by us.
+    WorkingSet* _ws;
+
+    // The pattern that we're sorting by.
+    BSONObj _pattern;
+
+    // Null if this merge sort stage orders strings according to simple binary compare. If non-null,
+    // represents the collator used to compare strings.
+    const CollatorInterface* _collator;
+
+    // Are we deduplicating on RecordId?
+    const bool _dedup;
+
+    // Which RecordIds have we seen?
+    stdx::unordered_set<RecordId, RecordId::Hasher> _seen;
+
+    // In order to pick the next smallest value, we need each child work(...) until it produces
+    // a result.  This is the queue of children that haven't given us a result yet.
+    std::queue<PlanStage*> _noResultToMerge;
 
     // The min heap of the results we're returning.
     std::priority_queue<MergingRef, std::vector<MergingRef>, StageWithValueComparison> _merging;

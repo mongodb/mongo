@@ -40,15 +40,10 @@
 namespace mongo {
 
 /**
- * Reads from N children, each of which must have a valid RecordId.  Uses a hash table to
- * intersect the outputs of the N children, and outputs the intersection.
+ * Reads from N children, each of which must have a valid RecordId. Uses a hash table to intersect
+ * the outputs of the N children based on their record ids, and outputs the intersection.
  *
- * Preconditions: Valid RecordId.  More than one child.
- *
- * Any RecordId that we keep a reference to that is invalidated before we are able to return it
- * is fetched and added to the WorkingSet as "flagged for further review."  Because this stage
- * operates with RecordIds, we are unable to evaluate the AND for the invalidated RecordId, and it
- * must be fully matched later.
+ * Preconditions: Valid RecordId. More than one child.
  */
 class AndHashStage final : public PlanStage {
 public:
@@ -72,8 +67,6 @@ public:
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
-
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_AND_HASH;

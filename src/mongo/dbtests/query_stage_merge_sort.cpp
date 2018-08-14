@@ -39,6 +39,7 @@
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/merge_sort.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/plan_executor.h"
@@ -92,6 +93,10 @@ public:
 
     void remove(const BSONObj& obj) {
         _client.remove(ns(), obj);
+    }
+
+    void update(const BSONObj& predicate, const BSONObj& update) {
+        _client.update(ns(), predicate, update);
     }
 
     void getRecordIds(set<RecordId>* out, Collection* coll) {
@@ -506,8 +511,8 @@ public:
     }
 };
 
-// Invalidation mid-run
-class QueryStageMergeSortInvalidation : public QueryStageMergeSortTestBase {
+// Document is deleted mid-run.
+class QueryStageMergeSortDeletedDocument : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
@@ -565,12 +570,15 @@ public:
             ++it;
         }
 
-        // Invalidate recordIds[11].  Should force a fetch and return the deleted document.
+        // Delete recordIds[11]. The deleted document should be buffered inside the SORT_MERGE
+        // stage, and therefore should still be returned.
         ms->saveState();
-        ms->invalidate(&_opCtx, *it, INVALIDATION_DELETION);
+        remove(BSON(std::string(1u, 'a' + count) << 1));
         ms->restoreState();
 
-        // Make sure recordIds[11] was fetched for us.
+        // Make sure recordIds[11] is returned as expected. We expect the corresponding working set
+        // member to remain in RID_AND_IDX state. It should have been marked as "suspicious", since
+        // this is an index key WSM that survived a yield.
         {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status;
@@ -579,14 +587,19 @@ public:
             } while (PlanStage::ADVANCED != status);
 
             WorkingSetMember* member = ws.get(id);
-            ASSERT(!member->hasRecordId());
-            ASSERT(member->hasObj());
+            ASSERT_EQ(member->getState(), WorkingSetMember::RID_AND_IDX);
+            ASSERT(member->hasRecordId());
+            ASSERT(!member->hasObj());
             string index(1, 'a' + count);
             BSONElement elt;
             ASSERT_TRUE(member->getFieldDotted(index, &elt));
             ASSERT_EQUALS(1, elt.numberInt());
             ASSERT(member->getFieldDotted("foo", &elt));
             ASSERT_EQUALS(count, elt.numberInt());
+
+            // An attempt to fetch the WSM should show that the key is no longer present in the
+            // index.
+            ASSERT_FALSE(WorkingSetCommon::fetch(&_opCtx, &ws, id, coll->getCursor(&_opCtx)));
 
             ++it;
             ++count;
@@ -616,7 +629,7 @@ public:
 
 // Test that if a WSM buffered inside the merge sort stage gets updated, we return the document and
 // then correctly dedup if we see the same RecordId again.
-class QueryStageMergeSortInvalidationMutationDedup : public QueryStageMergeSortTestBase {
+class QueryStageMergeSortConcurrentUpdateDedup : public QueryStageMergeSortTestBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
@@ -672,12 +685,17 @@ public:
         ASSERT_BSONOBJ_EQ(member->obj.value(), BSON("_id" << 4 << "a" << 4));
         ++it;
 
-        // Doc {a: 5} gets invalidated by an update.
-        ms->invalidate(&_opCtx, *it, INVALIDATION_MUTATION);
+        // Update doc {a: 5} such that the postimage will no longer match the query.
+        ms->saveState();
+        update(BSON("a" << 5), BSON("$set" << BSON("a" << 15)));
+        ms->restoreState();
 
-        // Invalidated doc {a: 5} should still get returned.
+        // Invalidated doc {a: 5} should still get returned. We expect an RID_AND_OBJ working set
+        // member with an owned BSONObj.
         member = getNextResult(&ws, ms.get());
-        ASSERT_EQ(member->getState(), WorkingSetMember::OWNED_OBJ);
+        ASSERT_EQ(member->getState(), WorkingSetMember::RID_AND_OBJ);
+        ASSERT(member->hasObj());
+        ASSERT(member->obj.value().isOwned());
         ASSERT_BSONOBJ_EQ(member->obj.value(), BSON("_id" << 5 << "a" << 5));
         ++it;
 
@@ -851,8 +869,8 @@ public:
         add<QueryStageMergeSortPrefixIndexReverse>();
         add<QueryStageMergeSortOneStageEOF>();
         add<QueryStageMergeSortManyShort>();
-        add<QueryStageMergeSortInvalidation>();
-        add<QueryStageMergeSortInvalidationMutationDedup>();
+        add<QueryStageMergeSortDeletedDocument>();
+        add<QueryStageMergeSortConcurrentUpdateDedup>();
         add<QueryStageMergeSortStringsWithNullCollation>();
         add<QueryStageMergeSortStringsRespectsCollation>();
     }

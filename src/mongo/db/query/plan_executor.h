@@ -33,7 +33,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/util/partitioned.h"
-#include "mongo/db/invalidation_type.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/stdx/unordered_set.h"
@@ -104,11 +103,11 @@ public:
         // will handle all WriteConflictExceptions that occur while processing the query.
         YIELD_AUTO,
 
-        // This will handle WriteConflictExceptions that occur while processing the query, but
-        // will not yield locks. abandonSnapshot() will be called if a WriteConflictException
-        // occurs so callers must be prepared to get a new snapshot. A PlanExecutor constructed with
-        // this yield policy will not be registered to receive invalidations, so the caller must
-        // hold their locks continuously from construction to destruction.
+        // This will handle WriteConflictExceptions that occur while processing the query, but will
+        // not yield locks. abandonSnapshot() will be called if a WriteConflictException occurs so
+        // callers must be prepared to get a new snapshot. The caller must hold their locks
+        // continuously from construction to destruction, since a PlanExecutor with this policy will
+        // not be registered to receive kill notifications.
         WRITE_CONFLICT_RETRY_ONLY,
 
         // Use this policy if you want to disable auto-yielding, but will release locks while using
@@ -395,13 +394,6 @@ public:
      *    deleting the PlanExecutor.
      */
     void dispose(OperationContext* opCtx, CursorManager* cursorManager);
-
-    /**
-     * If we're yielding locks, writes may occur to documents that we rely on to keep valid
-     * state.  As such, if the plan yields, it must be notified of relevant writes so that
-     * we can ensure that it doesn't crash if we try to access invalid state.
-     */
-    void invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type);
 
     /**
      * Helper method to aid in displaying an ExecState for debug or other recreational purposes.

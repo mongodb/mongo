@@ -74,15 +74,6 @@ void PlanStage::restoreState() {
     doRestoreState();
 }
 
-void PlanStage::invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    ++_commonStats.invalidates;
-    for (auto&& child : _children) {
-        child->invalidate(opCtx, dl, type);
-    }
-
-    doInvalidate(opCtx, dl, type);
-}
-
 void PlanStage::detachFromOperationContext() {
     invariant(_opCtx);
     _opCtx = nullptr;

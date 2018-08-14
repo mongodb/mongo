@@ -274,7 +274,7 @@ public:
 // "next" object we would have gotten after that.
 //
 
-class QueryStageCollscanInvalidateUpcomingObject : public QueryStageCollectionScanBase {
+class QueryStageCollscanDeleteUpcomingObject : public QueryStageCollectionScanBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
@@ -308,11 +308,6 @@ public:
 
         // Remove recordIds[count].
         scan->saveState();
-        {
-            WriteUnitOfWork wunit(&_opCtx);
-            scan->invalidate(&_opCtx, recordIds[count], INVALIDATION_DELETION);
-            wunit.commit();  // to avoid rollback of the invalidate
-        }
         remove(coll->docFor(&_opCtx, recordIds[count]).value());
         scan->restoreState();
 
@@ -340,7 +335,7 @@ public:
 // "next" object we would have gotten after that.  But, do it in reverse!
 //
 
-class QueryStageCollscanInvalidateUpcomingObjectBackward : public QueryStageCollectionScanBase {
+class QueryStageCollscanDeleteUpcomingObjectBackward : public QueryStageCollectionScanBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
@@ -373,11 +368,6 @@ public:
 
         // Remove recordIds[count].
         scan->saveState();
-        {
-            WriteUnitOfWork wunit(&_opCtx);
-            scan->invalidate(&_opCtx, recordIds[count], INVALIDATION_DELETION);
-            wunit.commit();  // to avoid rollback of the invalidate
-        }
         remove(coll->docFor(&_opCtx, recordIds[count]).value());
         scan->restoreState();
 
@@ -412,8 +402,8 @@ public:
         add<QueryStageCollscanBasicBackwardWithMatch>();
         add<QueryStageCollscanObjectsInOrderForward>();
         add<QueryStageCollscanObjectsInOrderBackward>();
-        add<QueryStageCollscanInvalidateUpcomingObject>();
-        add<QueryStageCollscanInvalidateUpcomingObjectBackward>();
+        add<QueryStageCollscanDeleteUpcomingObject>();
+        add<QueryStageCollscanDeleteUpcomingObjectBackward>();
     }
 };
 

@@ -252,9 +252,9 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
             // We pass the SometimesCache option to the MPS because the SubplanStage currently does
             // not use the CachedPlanStage's eviction mechanism. We therefore are more conservative
-            // about putting a potentially bad plan into the cache in the subplan path.
-            // We temporarily add the MPS to _children to ensure that we pass down all
-            // save/restore/invalidate messages that can be generated if pickBestPlan yields.
+            // about putting a potentially bad plan into the cache in the subplan path.  We
+            // temporarily add the MPS to _children to ensure that we pass down all save/restore
+            // messages that can be generated if pickBestPlan yields.
             invariant(_children.empty());
             _children.emplace_back(
                 stdx::make_unique<MultiPlanStage>(getOpCtx(),

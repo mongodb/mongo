@@ -68,12 +68,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void doInvalidate(OperationContext* opCtx, const RecordId& rid, InvalidationType type) final {
-        // A PlanExecutor with a PipelineProxyStage should be registered with the global cursor
-        // manager, so should not receive invalidations.
-        MONGO_UNREACHABLE;
-    }
-
     /**
      * Pass through the last oplog timestamp from the proxied pipeline.
      */

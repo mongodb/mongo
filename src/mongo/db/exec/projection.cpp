@@ -150,11 +150,6 @@ Status ProjectionStage::transform(WorkingSetMember* member) {
 
     BSONObjBuilder bob;
 
-    // Note that even if our fast path analysis is bug-free something that is
-    // covered might be invalidated and just be an obj.  In this case we just go
-    // through the SIMPLE_DOC path which is still correct if the covered data
-    // is not available.
-    //
     // SIMPLE_DOC implies that we expect an object so it's kind of redundant.
     if ((ProjectionStageParams::SIMPLE_DOC == _projImpl) || member->hasObj()) {
         // If we got here because of SIMPLE_DOC the planner shouldn't have messed up.

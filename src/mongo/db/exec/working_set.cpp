@@ -157,7 +157,7 @@ bool WorkingSetMember::hasOwnedObj() const {
 }
 
 void WorkingSetMember::makeObjOwnedIfNeeded() {
-    if (supportsDocLocking() && _state == RID_AND_OBJ && !obj.value().isOwned()) {
+    if (_state == RID_AND_OBJ && !obj.value().isOwned()) {
         obj.setValue(obj.value().getOwned());
     }
 }

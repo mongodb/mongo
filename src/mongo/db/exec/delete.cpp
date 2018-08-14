@@ -157,11 +157,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // We want to free this member when we return, unless we need to retry deleting or returning it.
     ScopeGuard memberFreer = MakeGuard(&WorkingSet::free, _ws, id);
 
-    if (!member->hasRecordId()) {
-        // We expect to be here because of an invalidation causing a force-fetch.
-        ++_specificStats.nInvalidateSkips;
-        return PlanStage::NEED_TIME;
-    }
+    invariant(member->hasRecordId());
     RecordId recordId = member->recordId;
     // Deletes can't have projections. This means that covering analysis will always add
     // a fetch. We should always get fetched data, and never just key data.

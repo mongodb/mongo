@@ -443,5 +443,46 @@ TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
     ASSERT(!cursor->next());
 }
 
+// seekExact() must return boost::none if the RecordId does not exist.
+TEST(RecordStoreTestHarness, SeekExactForMissingRecordReturnsNone) {
+    const auto harnessHelper{newRecordStoreHarnessHelper()};
+    auto recordStore = harnessHelper->newNonCappedRecordStore();
+    ServiceContext::UniqueOperationContext opCtx{harnessHelper->newOperationContext()};
+
+    // Insert three records and remember their record ids.
+    const int nToInsert = 3;
+    RecordId recordIds[nToInsert];
+    for (int i = 0; i < nToInsert; ++i) {
+        StringBuilder sb;
+        sb << "record " << i;
+        string data = sb.str();
+
+        WriteUnitOfWork uow{opCtx.get()};
+        auto res =
+            recordStore->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp{});
+        ASSERT_OK(res.getStatus());
+        recordIds[i] = res.getValue();
+        uow.commit();
+    }
+
+    // Delete the second record.
+    {
+        WriteUnitOfWork uow{opCtx.get()};
+        recordStore->deleteRecord(opCtx.get(), recordIds[1]);
+        uow.commit();
+    }
+
+    // Seeking to the second record should now return boost::none, for both forward and reverse
+    // cursors.
+    for (bool direction : {true, false}) {
+        auto cursor = recordStore->getCursor(opCtx.get(), direction);
+        ASSERT(!cursor->seekExact(recordIds[1]));
+    }
+
+    // Similarly, findRecord() should not find the deleted record.
+    RecordData outputData;
+    ASSERT_FALSE(recordStore->findRecord(opCtx.get(), recordIds[1], &outputData));
+}
+
 }  // namespace
 }  // namespace mongo

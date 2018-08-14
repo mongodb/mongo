@@ -90,7 +90,6 @@ TEST_F(QueuedDataStageTest, validateStats) {
     const CommonStats* stats = mock->getCommonStats();
     ASSERT_EQUALS(stats->yields, 0U);
     ASSERT_EQUALS(stats->unyields, 0U);
-    ASSERT_EQUALS(stats->invalidates, 0U);
     ASSERT_EQUALS(stats->works, 0U);
     ASSERT_EQUALS(stats->needTime, 0U);
     ASSERT_EQUALS(stats->advanced, 0U);
@@ -118,10 +117,6 @@ TEST_F(QueuedDataStageTest, validateStats) {
     mock->restoreState();
     ASSERT_EQUALS(stats->unyields, 1U);
 
-    // invalidates
-    const RecordId dl(0, 0);
-    mock->invalidate(NULL, dl, INVALIDATION_MUTATION);
-    ASSERT_EQUALS(stats->invalidates, 1U);
 
     // and now we are d1U, but must trigger EOF with getStats()
     ASSERT_FALSE(stats->isEOF);

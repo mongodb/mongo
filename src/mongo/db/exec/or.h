@@ -37,11 +37,9 @@
 namespace mongo {
 
 /**
- * This stage outputs the union of its children.  It optionally deduplicates on RecordId.
+ * This stage outputs the union of its children. It optionally deduplicates on RecordId.
  *
  * Preconditions: Valid RecordId.
- *
- * If we're deduping, we may fail to dedup any invalidated RecordId properly.
  */
 class OrStage final : public PlanStage {
 public:
@@ -54,8 +52,6 @@ public:
     bool isEOF() final;
 
     StageState doWork(WorkingSetID* out) final;
-
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_OR;
@@ -78,7 +74,7 @@ private:
     size_t _currentChild;
 
     // True if we dedup on RecordId, false otherwise.
-    bool _dedup;
+    const bool _dedup;
 
     // Which RecordIds have we returned?
     stdx::unordered_set<RecordId, RecordId::Hasher> _seen;

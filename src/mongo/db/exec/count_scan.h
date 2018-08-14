@@ -114,7 +114,6 @@ public:
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_COUNT_SCAN;
@@ -136,7 +135,7 @@ private:
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
 
     // Could our index have duplicates?  If so, we use _returned to dedup.
-    bool _shouldDedup;
+    const bool _shouldDedup;
     stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
 
     CountScanParams _params;

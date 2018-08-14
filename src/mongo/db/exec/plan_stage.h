@@ -33,7 +33,6 @@
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/invalidation_type.h"
 
 namespace mongo {
 
@@ -246,21 +245,6 @@ public:
      */
     void reattachToOperationContext(OperationContext* opCtx);
 
-    /**
-     * Notifies a stage that a RecordId is going to be deleted (or in-place updated) so that the
-     * stage can invalidate or modify any state required to continue processing without this
-     * RecordId.
-     *
-     * Can only be called after a saveState but before a restoreState.
-     *
-     * The provided OperationContext should be used if any work needs to be performed during the
-     * invalidate (as the state of the stage must be saved before any calls to invalidate, the
-     * stage's own OperationContext is inactive during the invalidate and should not be used).
-     *
-     * Propagates to all children, then calls doInvalidate().
-     */
-    void invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type);
-
     /*
      * Releases any resources held by this stage. It is an error to use a PlanStage in any way after
      * calling dispose(). Does not throw exceptions.
@@ -380,11 +364,6 @@ protected:
      * Does stage-specific destruction. Must not throw exceptions.
      */
     virtual void doDispose() {}
-
-    /**
-     * Does the stage-specific invalidation work.
-     */
-    virtual void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {}
 
     ClockSource* getClock() const;
 

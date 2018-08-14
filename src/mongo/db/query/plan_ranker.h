@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <list>
 #include <memory>
+#include <queue>
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
@@ -77,7 +77,7 @@ struct CandidatePlan {
     WorkingSet* ws;   // Not owned here.
 
     // Any results produced during the plan's execution prior to ranking are retained here.
-    std::list<WorkingSetID> results;
+    std::queue<WorkingSetID> results;
 
     bool failed;
 };

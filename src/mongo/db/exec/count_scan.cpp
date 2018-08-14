@@ -94,7 +94,6 @@ CountScan::CountScan(OperationContext* opCtx, CountScanParams params, WorkingSet
                                        /*compareFieldNames*/ false) <= 0);
 }
 
-
 PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF)
         return PlanStage::IS_EOF;
@@ -164,21 +163,6 @@ void CountScan::doDetachFromOperationContext() {
 void CountScan::doReattachToOperationContext() {
     if (_cursor)
         _cursor->reattachToOperationContext(getOpCtx());
-}
-
-void CountScan::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    // The only state we're responsible for holding is what RecordIds to drop.  If a document
-    // mutates the underlying index cursor will deal with it.
-    if (INVALIDATION_MUTATION == type) {
-        return;
-    }
-
-    // If we see this RecordId again, it may not be the same document it was before, so we want
-    // to return it if we see it again.
-    stdx::unordered_set<RecordId, RecordId::Hasher>::iterator it = _returned.find(dl);
-    if (it != _returned.end()) {
-        _returned.erase(it);
-    }
 }
 
 unique_ptr<PlanStageStats> CountScan::getStats() {

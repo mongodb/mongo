@@ -58,7 +58,6 @@ public:
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;

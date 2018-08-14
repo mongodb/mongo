@@ -383,57 +383,6 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
     }
 }
 
-// TODO SERVER-16857: Delete this method, as the invalidation mechanism was only needed for the
-// MMAPv1 storage engine.
-void AndHashStage::doInvalidate(OperationContext* opCtx,
-                                const RecordId& dl,
-                                InvalidationType type) {
-    // TODO remove this since calling isEOF is illegal inside of doInvalidate().
-    if (isEOF()) {
-        return;
-    }
-
-    // Invalidation can happen to our warmup results.  If that occurs just
-    // flag it and forget about it.
-    for (size_t i = 0; i < _lookAheadResults.size(); ++i) {
-        if (WorkingSet::INVALID_ID != _lookAheadResults[i]) {
-            WorkingSetMember* member = _ws->get(_lookAheadResults[i]);
-            if (member->hasRecordId() && member->recordId == dl) {
-                WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-                _lookAheadResults[i] = WorkingSet::INVALID_ID;
-            }
-        }
-    }
-
-    // If it's a deletion, we have to forget about the RecordId, and since the AND-ing is by
-    // RecordId we can't continue processing it even with the object.
-    //
-    // If it's a mutation the predicates implied by the AND-ing may no longer be true.
-    //
-    // So, we flag and try to pick it up later.
-    DataMap::iterator it = _dataMap.find(dl);
-    if (_dataMap.end() != it) {
-        WorkingSetID id = it->second;
-        WorkingSetMember* member = _ws->get(id);
-        verify(member->recordId == dl);
-
-        if (_hashingChildren) {
-            ++_specificStats.flaggedInProgress;
-        } else {
-            ++_specificStats.flaggedButPassed;
-        }
-
-        // Update memory stats.
-        _memUsage -= member->getMemUsage();
-
-        // The RecordId is about to be invalidated.  Fetch it and clear the RecordId.
-        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-
-        // And don't return it from this stage.
-        _dataMap.erase(it);
-    }
-}
-
 unique_ptr<PlanStageStats> AndHashStage::getStats() {
     _commonStats.isEOF = isEOF();
 

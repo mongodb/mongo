@@ -131,21 +131,6 @@ void MultiIteratorStage::doReattachToOperationContext() {
     }
 }
 
-void MultiIteratorStage::doInvalidate(OperationContext* opCtx,
-                                      const RecordId& dl,
-                                      InvalidationType type) {
-    switch (type) {
-        case INVALIDATION_DELETION:
-            for (size_t i = 0; i < _iterators.size(); i++) {
-                _iterators[i]->invalidate(opCtx, dl);
-            }
-            break;
-        case INVALIDATION_MUTATION:
-            // no-op
-            break;
-    }
-}
-
 unique_ptr<PlanStageStats> MultiIteratorStage::getStats() {
     unique_ptr<PlanStageStats> ret =
         make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_ITERATOR);

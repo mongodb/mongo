@@ -227,35 +227,6 @@ PlanStage::StageState AndSortedStage::moveTowardTargetRecordId(WorkingSetID* out
     }
 }
 
-
-// TODO SERVER-16857: Delete this method, as the invalidation mechanism was only needed for the
-// MMAPv1 storage engine.
-void AndSortedStage::doInvalidate(OperationContext* opCtx,
-                                  const RecordId& dl,
-                                  InvalidationType type) {
-    // TODO remove this since calling isEOF is illegal inside of doInvalidate().
-    if (isEOF()) {
-        return;
-    }
-
-    if (dl == _targetRecordId) {
-        // We're in the middle of moving children forward until they hit _targetRecordId, which is
-        // no
-        // longer a valid target.  If it's a deletion we can't AND it with anything, if it's a
-        // mutation the predicates implied by the AND may no longer be true.  So no matter what,
-        // fetch it, flag for review, and find another _targetRecordId.
-        ++_specificStats.flagged;
-
-        // The RecordId could still be a valid result so flag it and save it for later.
-        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, _ws->get(_targetId), _collection);
-
-        _targetId = WorkingSet::INVALID_ID;
-        _targetNode = numeric_limits<size_t>::max();
-        _targetRecordId = RecordId();
-        _workingTowardRep = std::queue<size_t>();
-    }
-}
-
 unique_ptr<PlanStageStats> AndSortedStage::getStats() {
     _commonStats.isEOF = isEOF();
 

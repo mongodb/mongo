@@ -739,11 +739,8 @@ StatusWith<NearStage::CoveredInterval*>  //
     _children.emplace_back(
         new FetchStageWithMatch(opCtx, workingSet, scan, docMatcher, collection));
 
-    return StatusWith<CoveredInterval*>(new CoveredInterval(_children.back().get(),
-                                                            true,
-                                                            nextBounds.getInner(),
-                                                            nextBounds.getOuter(),
-                                                            isLastInterval));
+    return StatusWith<CoveredInterval*>(new CoveredInterval(
+        _children.back().get(), nextBounds.getInner(), nextBounds.getOuter(), isLastInterval));
 }
 
 StatusWith<double> GeoNear2DStage::computeDistance(WorkingSetMember* member) {
@@ -1094,11 +1091,8 @@ StatusWith<NearStage::CoveredInterval*>  //
     // FetchStage owns index scan
     _children.emplace_back(new FetchStage(opCtx, workingSet, scan, _nearParams.filter, collection));
 
-    return StatusWith<CoveredInterval*>(new CoveredInterval(_children.back().get(),
-                                                            true,
-                                                            nextBounds.getInner(),
-                                                            nextBounds.getOuter(),
-                                                            isLastInterval));
+    return StatusWith<CoveredInterval*>(new CoveredInterval(
+        _children.back().get(), nextBounds.getInner(), nextBounds.getOuter(), isLastInterval));
 }
 
 StatusWith<double> GeoNear2DSphereStage::computeDistance(WorkingSetMember* member) {

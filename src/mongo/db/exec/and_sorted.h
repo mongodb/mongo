@@ -39,16 +39,10 @@
 namespace mongo {
 
 /**
- * Reads from N children, each of which must have a valid RecordId.  Assumes each child produces
- * RecordIds in sorted order.  Outputs the intersection of the RecordIds outputted by the
- * children.
+ * Reads from N children, each of which must have a valid RecordId. Assumes each child produces
+ * RecordIds in sorted order. Outputs the intersection of the RecordIds outputted by the children.
  *
- * Preconditions: Valid RecordId.  More than one child.
- *
- * Any RecordId that we keep a reference to that is invalidated before we are able to return it
- * is fetched and added to the WorkingSet as "flagged for further review."  Because this stage
- * operates with RecordIds, we are unable to evaluate the AND for the invalidated RecordId, and it
- * must be fully matched later.
+ * Preconditions: Valid RecordId. More than one child.
  */
 class AndSortedStage final : public PlanStage {
 public:
@@ -58,8 +52,6 @@ public:
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
-
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_AND_SORTED;

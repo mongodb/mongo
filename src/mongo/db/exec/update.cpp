@@ -569,11 +569,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // it.
         ScopeGuard memberFreer = MakeGuard(&WorkingSet::free, _ws, id);
 
-        if (!member->hasRecordId()) {
-            // We expect to be here because of an invalidation causing a force-fetch.
-            ++_specificStats.nInvalidateSkips;
-            return PlanStage::NEED_TIME;
-        }
+        invariant(member->hasRecordId());
         recordId = member->recordId;
 
         // Updates can't have projections. This means that covering analysis will always add

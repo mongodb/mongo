@@ -232,8 +232,9 @@ public:
         // BSONObj might be owned or unowned.
         RID_AND_OBJ,
 
-        // RecordId has been invalidated, or the obj doesn't correspond to an on-disk document
-        // anymore (e.g. is a computed expression).
+        // The WSM doesn't correspond to an on-disk document anymore (e.g. is a computed
+        // expression). Since it doesn't correspond to a stored document, a WSM in this state has an
+        // owned BSONObj, but no record id.
         OWNED_OBJ,
     };
 
@@ -265,7 +266,8 @@ public:
      * Ensures that 'obj' of a WSM in the RID_AND_OBJ state is owned BSON. It is a no-op if the WSM
      * is in a different state or if 'obj' is already owned.
      *
-     * It is also a no-op if the active storage engine doesn't support document-level concurrency.
+     * It is illegal for unowned BSON to survive a yield, so this must be called on any working set
+     * members which may stay alive across yield points.
      */
     void makeObjOwnedIfNeeded();
 

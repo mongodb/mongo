@@ -104,17 +104,6 @@ void TextOrStage::doReattachToOperationContext() {
         _recordCursor->reattachToOperationContext(getOpCtx());
 }
 
-void TextOrStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    // Remove the RecordID from the ScoreMap.
-    ScoreMap::iterator scoreIt = _scores.find(dl);
-    if (scoreIt != _scores.end()) {
-        if (scoreIt == _scoreIterator) {
-            _scoreIterator++;
-        }
-        _scores.erase(scoreIt);
-    }
-}
-
 std::unique_ptr<PlanStageStats> TextOrStage::getStats() {
     _commonStats.isEOF = isEOF();
 

@@ -160,7 +160,6 @@ public:
                                                             BSONArrayBuilder* arrBuilder);
 
 private:
-    friend class DeleteNotificationStage;
     friend class LogOpForShardingHandler;
 
     // Represents the states in which the cloner can be

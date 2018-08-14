@@ -122,12 +122,9 @@ private:
     DBDirectClient _client;
 };
 
-//
-// Test invalidation for the delete stage.  Use the delete stage to delete some objects
-// retrieved by a collscan, then invalidate the upcoming object, then expect the delete stage to
-// skip over it and successfully delete the rest.
-//
-class QueryStageDeleteInvalidateUpcomingObject : public QueryStageDeleteBase {
+// Use the delete stage to delete some objects retrieved by a collscan, then separately delete the
+// upcoming object. We expect the delete stage to skip over it and successfully continue.
+class QueryStageDeleteUpcomingObjectWasDeleted : public QueryStageDeleteBase {
 public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
@@ -167,11 +164,6 @@ public:
 
         // Remove recordIds[targetDocIndex];
         deleteStage.saveState();
-        {
-            WriteUnitOfWork wunit(&_opCtx);
-            deleteStage.invalidate(&_opCtx, recordIds[targetDocIndex], INVALIDATION_DELETION);
-            wunit.commit();
-        }
         BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
         ASSERT(!targetDoc.isEmpty());
         remove(targetDoc);
@@ -255,65 +247,14 @@ public:
     }
 };
 
-/**
- * Test that a delete stage which has not been asked to return the deleted document will skip a
- * WorkingSetMember that has been returned from the child in the OWNED_OBJ state. A WorkingSetMember
- * in the OWNED_OBJ state implies there was a conflict during execution, so this WorkingSetMember
- * should be skipped.
- */
-class QueryStageDeleteSkipOwnedObjects : public QueryStageDeleteBase {
-public:
-    void run() {
-        // Various variables we'll need.
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        Collection* coll = ctx.getCollection();
-        const BSONObj query = BSONObj();
-        const auto ws = make_unique<WorkingSet>();
-        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
-
-        // Configure a QueuedDataStage to pass an OWNED_OBJ to the delete stage.
-        auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());
-        {
-            WorkingSetID id = ws->allocate();
-            WorkingSetMember* member = ws->get(id);
-            member->obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{x: 1}"));
-            member->transitionToOwnedObj();
-            qds->pushBack(id);
-        }
-
-        // Configure the delete.
-        DeleteStageParams deleteParams;
-        deleteParams.isMulti = false;
-        deleteParams.canonicalQuery = cq.get();
-
-        const auto deleteStage =
-            make_unique<DeleteStage>(&_opCtx, deleteParams, ws.get(), coll, qds.release());
-        const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
-
-        // Call work, passing the set up member to the delete stage.
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        PlanStage::StageState state = deleteStage->work(&id);
-
-        // Should return NEED_TIME, not deleting anything.
-        ASSERT_EQUALS(PlanStage::NEED_TIME, state);
-        ASSERT_EQUALS(stats->docsDeleted, 0U);
-
-        id = WorkingSet::INVALID_ID;
-        state = deleteStage->work(&id);
-        ASSERT_EQUALS(PlanStage::IS_EOF, state);
-    }
-};
-
-
 class All : public Suite {
 public:
     All() : Suite("query_stage_delete") {}
 
     void setupTests() {
         // Stage-specific tests below.
-        add<QueryStageDeleteInvalidateUpcomingObject>();
+        add<QueryStageDeleteUpcomingObjectWasDeleted>();
         add<QueryStageDeleteReturnOldDoc>();
-        add<QueryStageDeleteSkipOwnedObjects>();
     }
 };
 

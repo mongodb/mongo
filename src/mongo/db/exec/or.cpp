@@ -120,23 +120,6 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
     return childStatus;
 }
 
-void OrStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    // TODO remove this since calling isEOF is illegal inside of doInvalidate().
-    if (isEOF()) {
-        return;
-    }
-
-    // If we see DL again it is not the same record as it once was so we still want to
-    // return it.
-    if (_dedup && INVALIDATION_DELETION == type) {
-        stdx::unordered_set<RecordId, RecordId::Hasher>::iterator it = _seen.find(dl);
-        if (_seen.end() != it) {
-            ++_specificStats.recordIdsForgotten;
-            _seen.erase(dl);
-        }
-    }
-}
-
 unique_ptr<PlanStageStats> OrStage::getStats() {
     _commonStats.isEOF = isEOF();
 

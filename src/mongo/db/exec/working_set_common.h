@@ -41,15 +41,6 @@ class SeekableRecordCursor;
 class WorkingSetCommon {
 public:
     /**
-     * Get an owned copy of the BSONObj the WSM refers to.
-     * Requires either a valid BSONObj or valid RecordId.
-     * Returns true if the fetch and invalidate succeeded, false otherwise.
-     */
-    static bool fetchAndInvalidateRecordId(OperationContext* opCtx,
-                                           WorkingSetMember* member,
-                                           const Collection* collection);
-
-    /**
      * This must be called as part of "saveState" operations after all nodes in the tree save their
      * state.
      *

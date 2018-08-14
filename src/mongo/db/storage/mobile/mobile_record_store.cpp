@@ -112,6 +112,11 @@ public:
         restore();
 
         boost::optional<Record> rec = next();
+        if (rec && rec->id != id) {
+            // The record we found isn't the one the caller asked for.
+            return boost::none;
+        }
+
         return rec;
     }
 

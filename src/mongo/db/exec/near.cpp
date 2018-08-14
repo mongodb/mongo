@@ -57,12 +57,10 @@ NearStage::NearStage(OperationContext* opCtx,
 NearStage::~NearStage() {}
 
 NearStage::CoveredInterval::CoveredInterval(PlanStage* covering,
-                                            bool dedupCovering,
                                             double minDistance,
                                             double maxDistance,
                                             bool inclusiveMax)
     : covering(covering),
-      dedupCovering(dedupCovering),
       minDistance(minDistance),
       maxDistance(maxDistance),
       inclusiveMax(inclusiveMax) {}
@@ -187,7 +185,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     WorkingSetMember* nextMember = _workingSet->get(nextMemberID);
 
     // The child stage may not dedup so we must dedup them ourselves.
-    if (_nextInterval->dedupCovering && nextMember->hasRecordId()) {
+    if (nextMember->hasRecordId()) {
         if (_seenDocuments.end() != _seenDocuments.find(nextMember->recordId)) {
             _workingSet->free(nextMemberID);
             return PlanStage::NEED_TIME;
@@ -212,7 +210,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     nextMember->makeObjOwnedIfNeeded();
     _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
 
-    // Store the member's RecordId, if available, for quick invalidation
+    // Store the member's RecordId, if available, for deduping.
     if (nextMember->hasRecordId()) {
         _seenDocuments.insert(std::make_pair(nextMember->recordId, nextMemberID));
     }
@@ -266,9 +264,10 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
     // The next document in _resultBuffer is in the search interval, so we can return it.
     _resultBuffer.pop();
 
-    // If we're returning something, take it out of our RecordId -> WSID map so that future
-    // calls to invalidate don't cause us to take action for a RecordId we're done with.
     *toReturn = resultID;
+
+    // If we're returning something, take it out of our RecordId -> WSID map. This keeps
+    // '_seenDocuments' in sync with '_resultBuffer'.
     WorkingSetMember* member = _workingSet->get(*toReturn);
     if (member->hasRecordId()) {
         _seenDocuments.erase(member->recordId);
@@ -282,23 +281,6 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
 
 bool NearStage::isEOF() {
     return SearchState_Finished == _searchState;
-}
-
-void NearStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    // If a result is in _resultBuffer and has a RecordId it will be in _seenDocuments as
-    // well. It's safe to return the result w/o the RecordId, so just fetch the result.
-    stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt =
-        _seenDocuments.find(dl);
-
-    if (seenIt != _seenDocuments.end()) {
-        WorkingSetMember* member = _workingSet->get(seenIt->second);
-        verify(member->hasRecordId());
-        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-        verify(!member->hasRecordId());
-
-        // Don't keep it around in the seen map since there's no valid RecordId anymore
-        _seenDocuments.erase(seenIt);
-    }
 }
 
 unique_ptr<PlanStageStats> NearStage::getStats() {

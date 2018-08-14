@@ -103,8 +103,8 @@ public:
         }
 
         _children.push_back(std::move(queuedStage));
-        return StatusWith<CoveredInterval*>(new CoveredInterval(
-            _children.back().get(), true, interval.min, interval.max, lastInterval));
+        return StatusWith<CoveredInterval*>(
+            new CoveredInterval(_children.back().get(), interval.min, interval.max, lastInterval));
     }
 
     StatusWith<double> computeDistance(WorkingSetMember* member) final {

@@ -164,18 +164,6 @@ void FetchStage::doReattachToOperationContext() {
         _cursor->reattachToOperationContext(getOpCtx());
 }
 
-void FetchStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    // It's possible that the recordId getting invalidated is the one we're about to
-    // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
-    if (WorkingSet::INVALID_ID != _idRetrying) {
-        WorkingSetMember* member = _ws->get(_idRetrying);
-        if (member->hasRecordId() && (member->recordId == dl)) {
-            // Fetch it now and kill the recordId.
-            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-        }
-    }
-}
-
 PlanStage::StageState FetchStage::returnIfMatches(WorkingSetMember* member,
                                                   WorkingSetID memberID,
                                                   WorkingSetID* out) {

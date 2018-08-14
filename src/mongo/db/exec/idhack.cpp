@@ -208,23 +208,6 @@ void IDHackStage::doReattachToOperationContext() {
         _recordCursor->reattachToOperationContext(getOpCtx());
 }
 
-void IDHackStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    // Since updates can't mutate the '_id' field, we can ignore mutation invalidations.
-    if (INVALIDATION_MUTATION == type) {
-        return;
-    }
-
-    // It's possible that the RecordId getting invalidated is the one we're about to
-    // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
-    if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
-        WorkingSetMember* member = _workingSet->get(_idBeingPagedIn);
-        if (member->hasRecordId() && (member->recordId == dl)) {
-            // Fetch it now and kill the RecordId.
-            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-        }
-    }
-}
-
 // static
 bool IDHackStage::supportsQuery(Collection* collection, const CanonicalQuery& query) {
     return !query.getQueryRequest().showRecordId() && query.getQueryRequest().getHint().isEmpty() &&

@@ -484,33 +484,6 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
     }
 }
 
-void CursorManager::invalidateDocument(OperationContext* opCtx,
-                                       const RecordId& dl,
-                                       InvalidationType type) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
-    invariant(!isGlobalManager());  // The global cursor manager should never receive invalidations.
-    if (supportsDocLocking()) {
-        // If a storage engine supports doc locking, then we do not need to invalidate.
-        // The transactional boundaries of the operation protect us.
-        return;
-    }
-
-    auto allExecPartitions = _registeredPlanExecutors.lockAllPartitions();
-    for (auto&& partition : allExecPartitions) {
-        for (auto&& exec : partition) {
-            exec->invalidate(opCtx, dl, type);
-        }
-    }
-
-    auto allPartitions = _cursorMap->lockAllPartitions();
-    for (auto&& partition : allPartitions) {
-        for (auto&& entry : partition) {
-            auto exec = entry.second->getExecutor();
-            exec->invalidate(opCtx, dl, type);
-        }
-    }
-}
-
 bool CursorManager::cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now) {
     if (cursor->isNoTimeout() || cursor->_operationUsingCursor) {
         return false;

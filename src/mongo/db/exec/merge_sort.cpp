@@ -166,29 +166,6 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
-
-void MergeSortStage::doInvalidate(OperationContext* opCtx,
-                                  const RecordId& dl,
-                                  InvalidationType type) {
-    // Go through our data and see if we're holding on to the invalidated RecordId.
-    for (list<StageWithValue>::iterator valueIt = _mergingData.begin();
-         valueIt != _mergingData.end();
-         valueIt++) {
-        WorkingSetMember* member = _ws->get(valueIt->id);
-        if (member->hasRecordId() && (dl == member->recordId)) {
-            // Fetch the about-to-be mutated result.
-            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-            ++_specificStats.forcedFetches;
-        }
-    }
-
-    // If we see the deleted RecordId again it is not the same record as it once was so we still
-    // want to return it.
-    if (_dedup && INVALIDATION_DELETION == type) {
-        _seen.erase(dl);
-    }
-}
-
 // Is lhs less than rhs?  Note that priority_queue is a max heap by default so we invert
 // the return from the expected value.
 bool MergeSortStage::StageWithValueComparison::operator()(const MergingRef& lhs,

@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <list>
 #include <memory>
+#include <queue>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
@@ -64,8 +64,6 @@ public:
     bool isEOF() final;
 
     StageState doWork(WorkingSetID* out) final;
-
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_CACHED_PLAN;
@@ -136,7 +134,7 @@ private:
     std::unique_ptr<QuerySolution> _replannedQs;
 
     // Any results produced during trial period execution are kept here.
-    std::list<WorkingSetID> _results;
+    std::queue<WorkingSetID> _results;
 
     // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
     // to use to pull the record into memory. We take ownership of the RecordFetcher here,

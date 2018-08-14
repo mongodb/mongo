@@ -330,7 +330,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->appendNumber("saveState", stats.common.yields);
         bob->appendNumber("restoreState", stats.common.unyields);
         bob->appendNumber("isEOF", stats.common.isEOF);
-        bob->appendNumber("invalidates", stats.common.invalidates);
     }
 
     // Stage-specific stats
@@ -341,8 +340,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
             bob->appendNumber("memUsage", spec->memUsage);
             bob->appendNumber("memLimit", spec->memLimit);
 
-            bob->appendNumber("flaggedButPassed", spec->flaggedButPassed);
-            bob->appendNumber("flaggedInProgress", spec->flaggedInProgress);
             for (size_t i = 0; i < spec->mapAfterChild.size(); ++i) {
                 bob->appendNumber(string(stream() << "mapAfterChild_" << i),
                                   spec->mapAfterChild[i]);
@@ -352,7 +349,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         AndSortedStats* spec = static_cast<AndSortedStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("flagged", spec->flagged);
             for (size_t i = 0; i < spec->failedAnd.size(); ++i) {
                 bob->appendNumber(string(stream() << "failedAnd_" << i), spec->failedAnd[i]);
             }
@@ -405,7 +401,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("nWouldDelete", spec->docsDeleted);
-            bob->appendNumber("nInvalidateSkips", spec->nInvalidateSkips);
         }
     } else if (STAGE_DISTINCT_SCAN == stats.stageType) {
         DistinctScanStats* spec = static_cast<DistinctScanStats*>(stats.specific.get());
@@ -507,7 +502,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
             bob->appendNumber("seeks", spec->seeks);
             bob->appendNumber("dupsTested", spec->dupsTested);
             bob->appendNumber("dupsDropped", spec->dupsDropped);
-            bob->appendNumber("seenInvalidated", spec->seenInvalidated);
         }
     } else if (STAGE_OR == stats.stageType) {
         OrStats* spec = static_cast<OrStats*>(stats.specific.get());
@@ -515,7 +509,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("dupsTested", spec->dupsTested);
             bob->appendNumber("dupsDropped", spec->dupsDropped);
-            bob->appendNumber("recordIdsForgotten", spec->recordIdsForgotten);
         }
     } else if (STAGE_LIMIT == stats.stageType) {
         LimitStats* spec = static_cast<LimitStats*>(stats.specific.get());
@@ -577,7 +570,6 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("nMatched", spec->nMatched);
             bob->appendNumber("nWouldModify", spec->nModified);
-            bob->appendNumber("nInvalidateSkips", spec->nInvalidateSkips);
             bob->appendBool("wouldInsert", spec->inserted);
             bob->appendBool("fastmodinsert", spec->fastmodinsert);
         }

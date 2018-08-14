@@ -100,7 +100,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             WorkingSetMember* member = _ws->get(id);
             // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
             member->makeObjOwnedIfNeeded();
-            _results.push_back(id);
+            _results.push(id);
 
             if (_results.size() >= numResults) {
                 // Once a plan returns enough results, stop working. Update cache with stats
@@ -194,7 +194,10 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
 
 Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
     // We're going to start over with a new plan. Clear out info from our old plan.
-    _results.clear();
+    {
+        std::queue<WorkingSetID> emptyQueue;
+        _results.swap(emptyQueue);
+    }
     _ws->clear();
     _children.clear();
 
@@ -287,23 +290,12 @@ PlanStage::StageState CachedPlanStage::doWork(WorkingSetID* out) {
     // First exhaust any results buffered during the trial period.
     if (!_results.empty()) {
         *out = _results.front();
-        _results.pop_front();
+        _results.pop();
         return PlanStage::ADVANCED;
     }
 
     // Nothing left in trial period buffer.
     return child()->work(out);
-}
-
-void CachedPlanStage::doInvalidate(OperationContext* opCtx,
-                                   const RecordId& dl,
-                                   InvalidationType type) {
-    for (auto it = _results.begin(); it != _results.end(); ++it) {
-        WorkingSetMember* member = _ws->get(*it);
-        if (member->hasRecordId() && member->recordId == dl) {
-            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-        }
-    }
 }
 
 std::unique_ptr<PlanStageStats> CachedPlanStage::getStats() {

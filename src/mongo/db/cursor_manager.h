@@ -34,7 +34,6 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/generic_cursor.h"
-#include "mongo/db/invalidation_type.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
@@ -125,12 +124,6 @@ public:
                        const std::string& reason);
 
     /**
-     * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
-     * must called *before* the provided RecordId is about to be deleted or mutated.
-     */
-    void invalidateDocument(OperationContext* opCtx, const RecordId& dl, InvalidationType type);
-
-    /**
      * Destroys cursors that have been inactive for too long.
      *
      * Returns the number of cursors that were timed out.
@@ -138,10 +131,10 @@ public:
     std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
     /**
-     * Register an executor so that it can be notified of deletions, invalidations, collection
-     * drops, or the like during yields. Must be called before an executor yields. Registration
-     * happens automatically for yielding PlanExecutors, so this should only be called by a
-     * PlanExecutor itself. Returns a token that must be stored for use during deregistration.
+     * Register an executor so that it can be notified of events that cause the PlanExecutor to be
+     * killed. Must be called before an executor yields. Registration happens automatically for
+     * yielding PlanExecutors, so this should only be called by a PlanExecutor itself. Returns a
+     * token that must be stored for use during deregistration.
      */
     Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId registerExecutor(
         PlanExecutor* exec);
@@ -284,7 +277,7 @@ private:
     // pointers to PlanExecutors are unowned, and a PlanExecutor will notify the CursorManager when
     // it is being destroyed. ClientCursors are owned by the CursorManager, except when they are in
     // use by a ClientCursorPin. When in use by a pin, an unowned pointer remains to ensure they
-    // still receive invalidations while in use.
+    // still receive kill notifications while in use.
     //
     // There are several mutexes at work to protect concurrent access to data structures managed by
     // this cursor manager. The two registration data structures '_registeredPlanExecutors' and

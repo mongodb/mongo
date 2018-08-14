@@ -60,7 +60,6 @@ public:
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     // Returns empty PlanStageStats object
     std::unique_ptr<PlanStageStats> getStats() final;
