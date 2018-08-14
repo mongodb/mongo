@@ -58,15 +58,15 @@ CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCt
     return checked_cast<CollectionShardingRuntime*>(css);
 }
 
-void CollectionShardingRuntime::refreshMetadata(OperationContext* opCtx,
-                                                std::unique_ptr<CollectionMetadata> newMetadata) {
+void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
+                                                     CollectionMetadata newMetadata) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
 
-    _metadataManager->refreshActiveMetadata(std::move(newMetadata));
+    _metadataManager->setFilteringMetadata(std::move(newMetadata));
 }
 
-void CollectionShardingRuntime::markNotShardedAtStepdown() {
-    _metadataManager->refreshActiveMetadata(nullptr);
+void CollectionShardingRuntime::clearFilteringMetadata() {
+    _metadataManager->clearFilteringMetadata();
 }
 
 auto CollectionShardingRuntime::beginReceive(ChunkRange const& range) -> CleanupNotification {
@@ -98,9 +98,13 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
             {
                 // First, see if collection was dropped, but do it in a separate scope in order to
                 // not hold reference on it, which would make it appear in use
-                auto metadata =
+                const auto optMetadata =
                     self->_metadataManager->getActiveMetadata(self->_metadataManager, boost::none);
+                if (!optMetadata)
+                    return {ErrorCodes::ConflictingOperationInProgress,
+                            "Collection being migrated had its metadata reset"};
 
+                const auto& metadata = *optMetadata;
                 if (!metadata->isSharded() || metadata->getCollVersion().epoch() != epoch) {
                     return {ErrorCodes::ConflictingOperationInProgress,
                             "Collection being migrated was dropped"};
@@ -137,8 +141,8 @@ boost::optional<ChunkRange> CollectionShardingRuntime::getNextOrphanRange(BSONOb
     return _metadataManager->getNextOrphanRange(from);
 }
 
-ScopedCollectionMetadata CollectionShardingRuntime::_getMetadata(OperationContext* opCtx) {
-    auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+boost::optional<ScopedCollectionMetadata> CollectionShardingRuntime::_getMetadata(
+    const boost::optional<mongo::LogicalTime>& atClusterTime) {
     return _metadataManager->getActiveMetadata(_metadataManager, atClusterTime);
 }
 

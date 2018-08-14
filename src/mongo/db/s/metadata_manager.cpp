@@ -197,7 +197,7 @@ public:
     }
 
 private:
-    friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(
+    friend boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
         std::shared_ptr<MetadataManager>, const boost::optional<LogicalTime>&);
 
     std::shared_ptr<MetadataManager> _metadataManager;
@@ -213,9 +213,7 @@ MetadataManager::MetadataManager(ServiceContext* serviceContext,
       _receivingChunks(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {}
 
 MetadataManager::~MetadataManager() {
-    stdx::lock_guard<stdx::mutex> lg(_managerLock);
-    _clearAllCleanups(lg);
-    _metadata.clear();
+    clearFilteringMetadata();
 }
 
 void MetadataManager::_clearAllCleanups(WithLock lock) {
@@ -233,17 +231,18 @@ void MetadataManager::_clearAllCleanups(WithLock, Status status) {
     _rangesToClean.clear(status);
 }
 
-ScopedCollectionMetadata MetadataManager::getActiveMetadata(
+boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
     std::shared_ptr<MetadataManager> self, const boost::optional<LogicalTime>& atClusterTime) {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
 
     if (_metadata.empty()) {
-        return {kUnshardedCollection};
+        return boost::none;
     }
 
     auto metadataTracker = _metadata.back();
     if (!atClusterTime) {
-        return {std::make_shared<RangePreserver>(lg, std::move(self), std::move(metadataTracker))};
+        return ScopedCollectionMetadata(
+            std::make_shared<RangePreserver>(lg, std::move(self), std::move(metadataTracker)));
     }
 
     auto chunkManager = metadataTracker->metadata.getChunkManager();
@@ -262,8 +261,8 @@ ScopedCollectionMetadata MetadataManager::getActiveMetadata(
         CollectionMetadata _metadata;
     };
 
-    return {std::make_shared<MetadataAtTimestamp>(
-        CollectionMetadata(chunkManagerAtClusterTime, metadataTracker->metadata.shardId()))};
+    return ScopedCollectionMetadata(std::make_shared<MetadataAtTimestamp>(
+        CollectionMetadata(chunkManagerAtClusterTime, metadataTracker->metadata.shardId())));
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {
@@ -274,70 +273,53 @@ size_t MetadataManager::numberOfMetadataSnapshots() const {
     return _metadata.size() - 1;
 }
 
-void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> remoteMetadata) {
+void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
 
-    // Collection was never sharded in the first place. This check is necessary in order to avoid
-    // extraneous logging in the not-a-shard case, because all call sites always try to get the
-    // collection sharding information regardless of whether the node is sharded or not.
-    if (!remoteMetadata && _metadata.empty()) {
+    // Collection is becoming sharded
+    if (_metadata.empty()) {
+        LOG(0) << "Marking collection " << _nss.ns() << " as " << remoteMetadata.toStringBasic();
+
         invariant(_receivingChunks.empty());
         invariant(_rangesToClean.isEmpty());
+
+        _setActiveMetadata(lg, std::move(remoteMetadata));
         return;
     }
 
-    // Collection is becoming unsharded
-    if (!remoteMetadata) {
-        log() << "Marking collection " << _nss.ns() << " with "
-              << redact(_metadata.back()->metadata.toStringBasic()) << " as unsharded";
+    const auto& activeMetadata = _metadata.back()->metadata;
+
+    // If the metadata being installed has a different epoch from ours, this means the collection
+    // was dropped and recreated, so we must entirely reset the metadata state
+    if (activeMetadata.getCollVersion().epoch() != remoteMetadata.getCollVersion().epoch()) {
+        LOG(0) << "Updating metadata for collection " << _nss.ns() << " from "
+               << activeMetadata.toStringBasic() << " to " << remoteMetadata.toStringBasic()
+               << " due to epoch change";
 
         _receivingChunks.clear();
         _clearAllCleanups(lg);
         _metadata.clear();
+
+        _setActiveMetadata(lg, std::move(remoteMetadata));
         return;
     }
 
-    // Collection is becoming sharded
-    if (_metadata.empty()) {
-        log() << "Marking collection " << _nss.ns() << " as sharded with "
-              << remoteMetadata->toStringBasic();
-
-        invariant(_receivingChunks.empty());
-        _setActiveMetadata(lg, std::move(*remoteMetadata));
-        invariant(_rangesToClean.isEmpty());
+    // We already have the same or newer version
+    if (activeMetadata.getCollVersion() >= remoteMetadata.getCollVersion()) {
+        LOG(1) << "Ignoring update of active metadata " << activeMetadata.toStringBasic()
+               << " with an older " << remoteMetadata.toStringBasic();
         return;
     }
 
-    auto* const activeMetadata = &_metadata.back()->metadata;
-
-    // If the metadata being installed has a different epoch from ours, this means the collection
-    // was dropped and recreated, so we must entirely reset the metadata state
-    if (activeMetadata->getCollVersion().epoch() != remoteMetadata->getCollVersion().epoch()) {
-        log() << "Overwriting metadata for collection " << _nss.ns() << " from "
-              << activeMetadata->toStringBasic() << " to " << remoteMetadata->toStringBasic()
-              << " due to epoch change";
-
-        _receivingChunks.clear();
-        _setActiveMetadata(lg, std::move(*remoteMetadata));
-        _clearAllCleanups(lg);
-        return;
-    }
-
-    // We already have newer version
-    if (activeMetadata->getCollVersion() >= remoteMetadata->getCollVersion()) {
-        LOG(1) << "Ignoring update of active metadata " << activeMetadata->toStringBasic()
-               << " with an older " << remoteMetadata->toStringBasic();
-        return;
-    }
-
-    log() << "Updating collection metadata for " << _nss.ns() << " from "
-          << activeMetadata->toStringBasic() << " to " << remoteMetadata->toStringBasic();
+    LOG(0) << "Updating metadata for collection " << _nss.ns() << " from "
+           << activeMetadata.toStringBasic() << " to " << remoteMetadata.toStringBasic()
+           << " due to version change";
 
     // Resolve any receiving chunks, which might have completed by now
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end();) {
         const ChunkRange receivingRange(it->first, it->second);
 
-        if (!remoteMetadata->rangeOverlapsChunk(receivingRange)) {
+        if (!remoteMetadata.rangeOverlapsChunk(receivingRange)) {
             ++it;
             continue;
         }
@@ -351,7 +333,14 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
         it = _receivingChunks.begin();
     }
 
-    _setActiveMetadata(lg, std::move(*remoteMetadata));
+    _setActiveMetadata(lg, std::move(remoteMetadata));
+}
+
+void MetadataManager::clearFilteringMetadata() {
+    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+    _receivingChunks.clear();
+    _clearAllCleanups(lg);
+    _metadata.clear();
 }
 
 void MetadataManager::_setActiveMetadata(WithLock wl, CollectionMetadata newMetadata) {
@@ -362,8 +351,9 @@ void MetadataManager::_setActiveMetadata(WithLock wl, CollectionMetadata newMeta
 void MetadataManager::_retireExpiredMetadata(WithLock lock) {
     while (_metadata.size() > 1 && !_metadata.front()->usageCounter) {
         if (!_metadata.front()->orphans.empty()) {
-            log() << "Queries possibly dependent on " << _nss.ns()
-                  << " range(s) finished; scheduling ranges for deletion";
+            LOG(0) << "Queries possibly dependent on " << _nss.ns()
+                   << " range(s) finished; scheduling ranges for deletion";
+
             // It is safe to push orphan ranges from _metadata.back(), even though new queries might
             // start any time, because any request to delete a range it maps is rejected.
             _pushListToClean(lock, std::move(_metadata.front()->orphans));
@@ -427,7 +417,6 @@ void MetadataManager::_pushListToClean(WithLock, std::list<Deletion> ranges) {
         scheduleCleanup(
             _executor, _nss, _metadata.back()->metadata.getCollVersion().epoch(), *when);
     }
-    invariant(ranges.empty());
 }
 
 auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotification {
@@ -499,6 +488,7 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
     auto& orphans = overlapMetadata->orphans;
     orphans.emplace_back(ChunkRange(range.getMin().getOwned(), range.getMax().getOwned()),
                          whenToDelete);
+
     return orphans.back().notification;
 }
 

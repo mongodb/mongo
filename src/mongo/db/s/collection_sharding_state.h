@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
@@ -112,8 +113,12 @@ private:
     // Tracks the migration critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;
 
-    // Obtains the current metadata for the collection
-    virtual ScopedCollectionMetadata _getMetadata(OperationContext* opCtx) = 0;
+    /**
+     * Obtains the current metadata for the collection or boost::none if the metadata is not yet
+     * known
+     */
+    virtual boost::optional<ScopedCollectionMetadata> _getMetadata(
+        const boost::optional<mongo::LogicalTime>& atClusterTime) = 0;
 };
 
 /**

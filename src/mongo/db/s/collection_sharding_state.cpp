@@ -93,6 +93,20 @@ const ServiceContext::Decoration<boost::optional<CollectionShardingStateMap>>
     CollectionShardingStateMap::get =
         ServiceContext::declareDecoration<boost::optional<CollectionShardingStateMap>>();
 
+class UnshardedCollection : public ScopedCollectionMetadata::Impl {
+public:
+    UnshardedCollection() = default;
+
+    const CollectionMetadata& get() override {
+        return _metadata;
+    }
+
+private:
+    CollectionMetadata _metadata;
+};
+
+const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
+
 }  // namespace
 
 CollectionShardingState::CollectionShardingState(NamespaceString nss) : _nss(std::move(nss)) {}
@@ -112,7 +126,12 @@ void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* bu
 }
 
 ScopedCollectionMetadata CollectionShardingState::getMetadata(OperationContext* opCtx) {
-    return _getMetadata(opCtx);
+    const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    auto optMetadata = _getMetadata(atClusterTime);
+    if (!optMetadata)
+        return {kUnshardedCollection};
+
+    return std::move(*optMetadata);
 }
 
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {

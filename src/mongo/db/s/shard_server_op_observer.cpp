@@ -75,10 +75,9 @@ public:
 
         CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(_nss);
 
-        // This is a hack to get around CollectionShardingState::refreshMetadata() requiring the X
-        // lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary measure until
-        // SERVER-31595 removes the X lock requirement.
-        CollectionShardingRuntime::get(_opCtx, _nss)->markNotShardedAtStepdown();
+        // Force subsequent uses of the namespace to refresh the filtering metadata so they can
+        // synchronize with any work happening on the primary (e.g., migration critical section).
+        CollectionShardingRuntime::get(_opCtx, _nss)->clearFilteringMetadata();
     }
 
     void rollback() override {}
@@ -283,10 +282,10 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             }
 
             if (setField.hasField(ShardCollectionType::enterCriticalSectionCounter.name())) {
-                // This is a hack to get around CollectionShardingState::refreshMetadata() requiring
-                // the X lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary
-                // measure until SERVER-31595 removes the X lock requirement.
-                CollectionShardingRuntime::get(opCtx, updatedNss)->markNotShardedAtStepdown();
+                // Force subsequent uses of the namespace to refresh the filtering metadata so they
+                // can synchronize with any work happening on the primary (e.g., migration critical
+                // section).
+                CollectionShardingRuntime::get(opCtx, updatedNss)->clearFilteringMetadata();
             }
         }
     }

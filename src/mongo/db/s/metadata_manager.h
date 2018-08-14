@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/collection_range_deleter.h"
@@ -60,14 +61,17 @@ public:
     ~MetadataManager();
 
     /**
-     * An ActiveMetadata must be set before this function can be called.
+     * If there is no filtering metadata set yet (setFilteringMetadata has not been called) returns
+     * boost::none. Otherwise increments the usage counter of the active metadata and returns an
+     * RAII object, which corresponds to it.
      *
-     * Increments the usage counter of the active metadata and returns an RAII object, which
-     * contains the currently active metadata.  When the usageCounter goes to zero, the RAII
-     * object going out of scope will call _removeMetadata.
+     * Holding a reference on a particular instance of the metadata means that orphan cleanup is not
+     * allowed to run and delete chunks which are covered by that metadata. When the returned
+     * ScopedCollectionMetadata goes out of scope, the reference counter on the metadata will be
+     * decremented and if it reaches to zero, orphan cleanup may proceed.
      */
-    ScopedCollectionMetadata getActiveMetadata(std::shared_ptr<MetadataManager> self,
-                                               const boost::optional<LogicalTime>& atClusterTime);
+    boost::optional<ScopedCollectionMetadata> getActiveMetadata(
+        std::shared_ptr<MetadataManager> self, const boost::optional<LogicalTime>& atClusterTime);
 
     /**
      * Returns the number of CollectionMetadata objects being maintained on behalf of running
@@ -76,10 +80,9 @@ public:
      */
     size_t numberOfMetadataSnapshots() const;
 
-    /**
-     * Uses the contents of the specified metadata as a way to purge any pending chunks.
-     */
-    void refreshActiveMetadata(std::unique_ptr<CollectionMetadata> newMetadata);
+    void setFilteringMetadata(CollectionMetadata newMetadata);
+
+    void clearFilteringMetadata();
 
     void toBSONPending(BSONArrayBuilder& bb) const;
 
@@ -230,10 +233,10 @@ private:
     // Mutex to protect the state below
     mutable stdx::mutex _managerLock;
 
-    // Contains a list of collection metadata ordered in chronological order based on the refreshes
-    // that occurred. The entry at _metadata.back() is the most recent metadata and is what is
-    // returned to new queries. The rest are previously active collection metadata instances still
-    // in use by active server operations or cursors.
+    // Contains a list of collection metadata for the same collection epoch, ordered in
+    // chronological order based on the refreshes that occurred. The entry at _metadata.back() is
+    // the most recent metadata and is what is returned to new queries. The rest are previously
+    // active collection metadata instances still in use by active server operations or cursors.
     std::list<std::shared_ptr<CollectionMetadataTracker>> _metadata;
 
     // Chunk ranges being migrated into to the shard. Indexed by the min key of the range.
