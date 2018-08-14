@@ -180,23 +180,8 @@ public:
     }
 
     /**
-     * Returns true if this pipeline is the part of a split pipeline which should be targeted to the
-     * shards.
-     */
-    bool isSplitForShards() const {
-        return _splitState == SplitState::kSplitForShards;
-    }
-
-    /**
-     * Returns true if this pipeline is the part of a split pipeline which is responsible for
-     * merging the results from the shards.
-     */
-    bool isSplitForMerge() const {
-        return _splitState == SplitState::kSplitForMerge;
-    }
-
-    /** If the pipeline starts with a $match, return its BSON predicate.
-     *  Returns empty BSON if the first stage isn't $match.
+     * If the pipeline starts with a stage which is or includes a query predicate (e.g. a $match),
+     * returns a BSON object representing that query. Otherwise, returns an empty BSON object.
      */
     BSONObj getInitialQuery() const;
 
