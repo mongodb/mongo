@@ -126,8 +126,7 @@ public:
     virtual Status updateRecord(OperationContext* opCtx,
                                 const RecordId& oldLocation,
                                 const char* data,
-                                int len,
-                                UpdateNotifier* notifier) {
+                                int len) {
         return Status::OK();
     }
 

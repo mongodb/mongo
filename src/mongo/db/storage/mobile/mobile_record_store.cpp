@@ -351,8 +351,7 @@ Status MobileRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
 Status MobileRecordStore::updateRecord(OperationContext* opCtx,
                                        const RecordId& recId,
                                        const char* data,
-                                       int len,
-                                       UpdateNotifier* notifier) {
+                                       int len) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
     std::string dataSizeQuery =
         "SELECT IFNULL(LENGTH(data), 0) FROM \"" + _ident + "\" WHERE rec_id = ?;";
@@ -362,10 +361,6 @@ Status MobileRecordStore::updateRecord(OperationContext* opCtx,
 
     int64_t dataSizeBefore = dataSizeStmt.getColInt(0);
     _changeDataSize(opCtx, -dataSizeBefore + len);
-
-    if (notifier) {
-        fassert(37054, notifier->recordStoreGoingToUpdateInPlace(opCtx, recId));
-    }
 
     std::string updateQuery = "UPDATE \"" + _ident + "\" SET data = ? " + "WHERE rec_id = ?;";
     SqliteStatement updateStmt(*session, updateQuery);

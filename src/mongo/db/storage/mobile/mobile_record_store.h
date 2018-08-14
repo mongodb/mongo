@@ -74,8 +74,7 @@ public:
     Status updateRecord(OperationContext* opCtx,
                         const RecordId& oldLocation,
                         const char* data,
-                        int len,
-                        UpdateNotifier* notifier) override;
+                        int len) override;
 
     bool updateWithDamagesSupported() const override;
 

@@ -73,19 +73,6 @@ protected:
 };
 
 /**
- * @see RecordStore::updateRecord
- *
- * TODO SERVER-36662: Without MMAPv1 diskloc invalidations, this interface is no longer necessary.
- * This callback's entire role was to issue INVALIDATION_MUTATION notifications.
- */
-class UpdateNotifier {
-public:
-    virtual ~UpdateNotifier() {}
-    virtual Status recordStoreGoingToUpdateInPlace(OperationContext* opCtx,
-                                                   const RecordId& loc) = 0;
-};
-
-/**
  * The data items stored in a RecordStore.
  */
 struct Record {
@@ -413,15 +400,13 @@ public:
     }
 
     /**
-     * @param notifier - Only used by record stores which do not support doc-locking. Called only
-     *                   in the case of an in-place update. Called just before the in-place write
-     *                   occurs.
+     * Updates the record with id 'recordId', replacing its contents with those described by
+     * 'data' and 'len'.
      */
     virtual Status updateRecord(OperationContext* opCtx,
-                                const RecordId& oldLocation,
+                                const RecordId& recordId,
                                 const char* data,
-                                int len,
-                                UpdateNotifier* notifier) = 0;
+                                int len) = 0;
 
     /**
      * @return Returns 'false' if this record store does not implement

@@ -310,9 +310,7 @@ void KVCatalog::FeatureTracker::putInfo(OperationContext* opCtx, const FeatureBi
         fassert(40113, rid.getStatus());
         _rid = rid.getValue();
     } else {
-        UpdateNotifier* notifier = nullptr;
-        auto status =
-            _catalog->_rs->updateRecord(opCtx, _rid, obj.objdata(), obj.objsize(), notifier);
+        auto status = _catalog->_rs->updateRecord(opCtx, _rid, obj.objdata(), obj.objsize());
         fassert(40114, status);
     }
 }
@@ -517,7 +515,7 @@ void KVCatalog::putMetaData(OperationContext* opCtx,
     }
 
     LOG(3) << "recording new metadata: " << obj;
-    Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize(), NULL);
+    Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize());
     fassert(28521, status.isOK());
 }
 
@@ -542,7 +540,7 @@ Status KVCatalog::renameCollection(OperationContext* opCtx,
         b.appendElementsUnique(old);
 
         BSONObj obj = b.obj();
-        Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize(), NULL);
+        Status status = _rs->updateRecord(opCtx, loc, obj.objdata(), obj.objsize());
         fassert(28522, status.isOK());
     }
 

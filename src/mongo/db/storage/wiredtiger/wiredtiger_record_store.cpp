@@ -1425,8 +1425,7 @@ Status WiredTigerRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx
 Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
                                            const RecordId& id,
                                            const char* data,
-                                           int len,
-                                           UpdateNotifier* notifier) {
+                                           int len) {
     dassert(opCtx->lockState()->isWriteLocked());
 
     WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);

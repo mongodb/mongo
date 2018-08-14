@@ -30,9 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/record_store_test_updaterecord.h"
-
-
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -80,7 +77,7 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            Status res = rs->updateRecord(opCtx.get(), loc, data.c_str(), data.size() + 1, NULL);
+            Status res = rs->updateRecord(opCtx.get(), loc, data.c_str(), data.size() + 1);
             ASSERT_OK(res);
 
             uow.commit();
@@ -138,8 +135,7 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
             string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
-            Status res =
-                rs->updateRecord(opCtx.get(), locs[i], data.c_str(), data.size() + 1, NULL);
+            Status res = rs->updateRecord(opCtx.get(), locs[i], data.c_str(), data.size() + 1);
             ASSERT_OK(res);
 
             uow.commit();
@@ -156,61 +152,6 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
             RecordData record = rs->dataFor(opCtx.get(), locs[i]);
             ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
             ASSERT_EQUALS(data, record.data());
-        }
-    }
-}
-
-// Insert a record, try to update it, and examine how the UpdateNotifier is called.
-TEST(RecordStoreTestHarness, UpdateRecordWithMoveNotifier) {
-    const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
-    }
-
-    string oldData = "my record";
-    RecordId loc;
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), oldData.c_str(), oldData.size() + 1, Timestamp());
-            ASSERT_OK(res.getStatus());
-            loc = res.getValue();
-            uow.commit();
-        }
-    }
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
-    }
-
-    string newData = "my updated record--";
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            UpdateNotifierSpy umn(opCtx.get(), loc, oldData.c_str(), oldData.size());
-
-            WriteUnitOfWork uow(opCtx.get());
-            Status res =
-                rs->updateRecord(opCtx.get(), loc, newData.c_str(), newData.size() + 1, &umn);
-            ASSERT_OK(res);
-            ASSERT_GTE(1, umn.numInPlaceCallbacks());
-
-            uow.commit();
-        }
-    }
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            RecordData record = rs->dataFor(opCtx.get(), loc);
-            ASSERT_EQUALS(newData.size() + 1, static_cast<size_t>(record.size()));
-            ASSERT_EQUALS(newData, record.data());
         }
     }
 }

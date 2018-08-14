@@ -328,7 +328,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto doc = BSON("_id" << 1 << "a" << 9);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize(), NULL);
+            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
 
             ASSERT_OK(updateStatus);
             wunit.commit();
@@ -379,7 +379,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto doc = BSON("_id" << 9);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize(), NULL);
+            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
@@ -392,7 +392,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto doc = BSON("_id" << 1);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize(), NULL);
+            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
@@ -484,8 +484,7 @@ public:
         // Update a document's indexed field without updating the index.
         {
             WriteUnitOfWork wunit(&_opCtx);
-            auto updateStatus =
-                rs->updateRecord(&_opCtx, id1, doc1_b.objdata(), doc1_b.objsize(), NULL);
+            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc1_b.objdata(), doc1_b.objsize());
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
@@ -498,8 +497,7 @@ public:
         // Index validation should still be valid.
         {
             WriteUnitOfWork wunit(&_opCtx);
-            auto updateStatus =
-                rs->updateRecord(&_opCtx, id1, doc1_c.objdata(), doc1_c.objsize(), NULL);
+            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc1_c.objdata(), doc1_c.objsize());
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
@@ -567,7 +565,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto doc = BSON("_id" << 2 << "a" << 3);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize(), NULL);
+            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
@@ -640,7 +638,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto doc = BSON("_id" << 1);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize(), NULL);
+            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
             wunit.commit();
         }
@@ -802,7 +800,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto doc = BSON("_id" << 1 << "a" << 1 << "b" << 3);
-            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize(), NULL);
+            auto updateStatus = rs->updateRecord(&_opCtx, id1, doc.objdata(), doc.objsize());
             ASSERT_OK(updateStatus);
             wunit.commit();
         }

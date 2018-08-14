@@ -181,13 +181,13 @@ private:
  * this is NOT safe through a yield right now.
  * not sure if it will be, or what yet.
  */
-class Collection final : CappedCallback, UpdateNotifier {
+class Collection final : CappedCallback {
 public:
     enum ValidationAction { WARN, ERROR_V };
     enum ValidationLevel { OFF, MODERATE, STRICT_V };
     enum class StoreDeletedDoc { Off, On };
 
-    class Impl : virtual CappedCallback, virtual UpdateNotifier {
+    class Impl : virtual CappedCallback {
     public:
         virtual ~Impl() = 0;
 
@@ -202,9 +202,6 @@ public:
         virtual Status aboutToDeleteCapped(OperationContext* opCtx,
                                            const RecordId& loc,
                                            RecordData data) = 0;
-
-        virtual Status recordStoreGoingToUpdateInPlace(OperationContext* opCtx,
-                                                       const RecordId& loc) = 0;
 
     public:
         virtual bool ok() const = 0;
@@ -742,11 +739,6 @@ private:
                                       const RecordId& loc,
                                       const RecordData data) final {
         return this->_impl().aboutToDeleteCapped(opCtx, loc, data);
-    }
-
-    inline Status recordStoreGoingToUpdateInPlace(OperationContext* const opCtx,
-                                                  const RecordId& loc) final {
-        return this->_impl().recordStoreGoingToUpdateInPlace(opCtx, loc);
     }
 
     // This structure exists to give us a customization point to decide how to force users of this

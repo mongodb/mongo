@@ -192,8 +192,7 @@ Status RecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
 Status RecordStore::updateRecord(OperationContext* opCtx,
                                  const RecordId& oldLocation,
                                  const char* data,
-                                 int len,
-                                 UpdateNotifier* notifier) {
+                                 int len) {
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
     std::string key = createKey(_ident, oldLocation.repr());
     StringStore::const_iterator it = workingCopy->find(key);

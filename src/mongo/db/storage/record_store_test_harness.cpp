@@ -264,7 +264,7 @@ TEST(RecordStoreTestHarness, Update1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            Status status = rs->updateRecord(opCtx.get(), loc, s2.c_str(), s2.size() + 1, NULL);
+            Status status = rs->updateRecord(opCtx.get(), loc, s2.c_str(), s2.size() + 1);
             ASSERT_OK(status);
 
             uow.commit();

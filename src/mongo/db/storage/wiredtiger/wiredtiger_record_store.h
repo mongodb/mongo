@@ -157,10 +157,9 @@ public:
                                               RecordId* idsOut);
 
     virtual Status updateRecord(OperationContext* opCtx,
-                                const RecordId& oldLocation,
+                                const RecordId& recordId,
                                 const char* data,
-                                int len,
-                                UpdateNotifier* notifier);
+                                int len);
 
     virtual bool updateWithDamagesSupported() const;
 

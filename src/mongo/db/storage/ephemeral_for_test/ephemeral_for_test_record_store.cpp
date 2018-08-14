@@ -474,23 +474,13 @@ Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext*
 Status EphemeralForTestRecordStore::updateRecord(OperationContext* opCtx,
                                                  const RecordId& loc,
                                                  const char* data,
-                                                 int len,
-                                                 UpdateNotifier* notifier) {
+                                                 int len) {
     stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
     EphemeralForTestRecord* oldRecord = recordFor(loc);
     int oldLen = oldRecord->size;
 
     // Documents in capped collections cannot change size. We check that above the storage layer.
     invariant(!_isCapped || len == oldLen);
-
-    if (notifier) {
-        // The in-memory KV engine uses the invalidation framework (does not support
-        // doc-locking), and therefore must notify that it is updating a document.
-        Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace(opCtx, loc);
-        if (!callbackStatus.isOK()) {
-            return callbackStatus;
-        }
-    }
 
     EphemeralForTestRecord newRecord(len);
     memcpy(newRecord.data.get(), data, len);

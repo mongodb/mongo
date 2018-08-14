@@ -119,7 +119,7 @@ public:
         auto op = makeOperation();
         WriteUnitOfWork wuow(op);
         ASSERT_OK(op->recoveryUnit()->setTimestamp(_counter));
-        ASSERT_OK(rs->updateRecord(op, id, contents.c_str(), contents.length() + 1, nullptr));
+        ASSERT_OK(rs->updateRecord(op, id, contents.c_str(), contents.length() + 1));
         wuow.commit();
     }
 

@@ -646,7 +646,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     args->preImageDoc = oldDoc.value().getOwned();
 
     Status updateStatus =
-        _recordStore->updateRecord(opCtx, oldLocation, newDoc.objdata(), newDoc.objsize(), this);
+        _recordStore->updateRecord(opCtx, oldLocation, newDoc.objdata(), newDoc.objsize());
 
     // Update each index with each respective UpdateTicket.
     if (indexesAffected) {
@@ -674,11 +674,6 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, entryArgs);
 
     return {oldLocation};
-}
-
-Status CollectionImpl::recordStoreGoingToUpdateInPlace(OperationContext* opCtx,
-                                                       const RecordId& loc) {
-    return Status::OK();
 }
 
 bool CollectionImpl::updateWithDamagesSupported() const {
