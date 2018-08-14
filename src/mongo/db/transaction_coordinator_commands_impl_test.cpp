@@ -154,8 +154,8 @@ protected:
     void expectSendCommitAndReturnRetryableError() {
         for (int i = 0; i <= kMaxNumFailedHostRetryAttempts; i++) {
             onCommand([](const executor::RemoteCommandRequest& request) -> Status {
-                IDLParserErrorContext ctx("expectSendCommitAndReturnRetryableError");
-                const auto cmd = CommitTransaction::parse(ctx, request.cmdObj);
+                ASSERT_EQUALS("commitTransaction",
+                              request.cmdObj.firstElement().fieldNameStringData());
                 return {ErrorCodes::HostUnreachable, ""};
             });
         }
@@ -163,8 +163,7 @@ protected:
 
     void expectSendCommitAndReturnSuccess() {
         onCommand([](const executor::RemoteCommandRequest& request) {
-            const IDLParserErrorContext ctx("expectSendCommitAndReturnSuccess");
-            const auto cmd = CommitTransaction::parse(ctx, request.cmdObj);
+            ASSERT_EQUALS("commitTransaction", request.cmdObj.firstElement().fieldNameStringData());
             return BSON("ok" << 1);
         });
     }
