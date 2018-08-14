@@ -78,9 +78,6 @@ public:
 
         radix_iterator() : _root(nullptr), _current(nullptr) {}
 
-        radix_iterator(const radix_iterator& other)
-            : _root(other._root), _current(other._current) {}
-
         ~radix_iterator() = default;
 
         radix_iterator& operator++() {
@@ -93,8 +90,6 @@ public:
             ++*this;
             return old;
         }
-
-        radix_iterator& operator=(const radix_iterator& other) = default;
 
         bool operator==(const radix_iterator& other) const {
             return this->_current == other._current;
@@ -244,11 +239,6 @@ public:
             }
         }
 
-        reverse_radix_iterator(const reverse_radix_iterator& other)
-            : _root(other._root), _current(other._current) {}
-
-        reverse_radix_iterator& operator=(const reverse_radix_iterator& other) = default;
-
         ~reverse_radix_iterator() = default;
 
         reverse_radix_iterator& operator++() {
@@ -357,12 +347,6 @@ public:
     using const_reverse_iterator = reverse_radix_iterator<const_pointer, const value_type&>;
 
     // Constructor
-    RadixStore(const RadixStore& other) {
-        _root = other._root;
-        _numElems = other._numElems;
-        _sizeElems = other._sizeElems;
-    }
-
     RadixStore() {
         _root = std::make_shared<RadixStore::Node>();
         _numElems = 0;
