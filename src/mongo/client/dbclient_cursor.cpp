@@ -451,7 +451,7 @@ void DBClientCursor::attach(AScopedConnection* conn) {
 }
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
-                               const std::string& ns,
+                               const NamespaceStringOrUUID& nsOrUuid,
                                const BSONObj& query,
                                int nToReturn,
                                int nToSkip,
@@ -459,7 +459,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                                int queryOptions,
                                int batchSize)
     : DBClientCursor(client,
-                     ns,
+                     nsOrUuid,
                      query,
                      0,  // cursorId
                      nToReturn,
@@ -470,13 +470,13 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      {}) {}
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
-                               const std::string& ns,
+                               const NamespaceStringOrUUID& nsOrUuid,
                                long long cursorId,
                                int nToReturn,
                                int queryOptions,
                                std::vector<BSONObj> initialBatch)
     : DBClientCursor(client,
-                     ns,
+                     nsOrUuid,
                      BSONObj(),  // query
                      cursorId,
                      nToReturn,
@@ -487,7 +487,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
                      std::move(initialBatch)) {}  // batchSize
 
 DBClientCursor::DBClientCursor(DBClientBase* client,
-                               const std::string& ns,
+                               const NamespaceStringOrUUID& nsOrUuid,
                                const BSONObj& query,
                                long long cursorId,
                                int nToReturn,
@@ -499,8 +499,8 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
     : batch{std::move(initialBatch)},
       _client(client),
       _originalHost(_client->getServerAddress()),
-      ns(ns),
-      _isCommand(nsIsFull(ns) ? nsToCollectionSubstring(ns) == "$cmd" : false),
+      ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbname())),
+      _isCommand(ns.isCommand()),
       query(query),
       nToReturn(nToReturn),
       haveLimit(nToReturn > 0 && !(queryOptions & QueryOption_CursorTailable)),

@@ -126,7 +126,7 @@ public:
 
         auto query = makeQuery(opCtx->getServiceContext()->getFastClockSource()->now());
         auto cursor = client.query(
-            NamespaceString::kSessionTransactionsTableNamespace.ns(), query, 0, 0, &kIdProjection);
+            NamespaceString::kSessionTransactionsTableNamespace, query, 0, 0, &kIdProjection);
 
         while (cursor->more()) {
             auto transactionSession = SessionsCollectionFetchResultIndividualResult::parse(

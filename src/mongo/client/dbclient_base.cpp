@@ -613,7 +613,7 @@ void DBClientBase::findN(vector<BSONObj>& out,
     out.reserve(nToReturn);
 
     unique_ptr<DBClientCursor> c =
-        this->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
+        this->query(NamespaceString(ns), query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
 
     uassert(10276,
             str::stream() << "DBClientBase::findN: transport error: " << getServerAddress()
@@ -682,7 +682,7 @@ std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(const std::strin
 
 const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME = std::numeric_limits<uint64_t>::max();
 
-unique_ptr<DBClientCursor> DBClientBase::query(const string& ns,
+unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOrUuid,
                                                Query query,
                                                int nToReturn,
                                                int nToSkip,
@@ -690,7 +690,7 @@ unique_ptr<DBClientCursor> DBClientBase::query(const string& ns,
                                                int queryOptions,
                                                int batchSize) {
     unique_ptr<DBClientCursor> c(new DBClientCursor(
-        this, ns, query.obj, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize));
+        this, nsOrUuid, query.obj, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize));
     if (c->init())
         return c;
     return nullptr;
@@ -700,7 +700,8 @@ unique_ptr<DBClientCursor> DBClientBase::getMore(const string& ns,
                                                  long long cursorId,
                                                  int nToReturn,
                                                  int options) {
-    unique_ptr<DBClientCursor> c(new DBClientCursor(this, ns, cursorId, nToReturn, options));
+    unique_ptr<DBClientCursor> c(
+        new DBClientCursor(this, NamespaceString(ns), cursorId, nToReturn, options));
     if (c->init())
         return c;
     return nullptr;
@@ -716,25 +717,25 @@ struct DBClientFunConvertor {
 };
 
 unsigned long long DBClientBase::query(stdx::function<void(const BSONObj&)> f,
-                                       const string& ns,
+                                       const NamespaceStringOrUUID& nsOrUuid,
                                        Query query,
                                        const BSONObj* fieldsToReturn,
                                        int queryOptions) {
     DBClientFunConvertor fun;
     fun._f = f;
     stdx::function<void(DBClientCursorBatchIterator&)> ptr(fun);
-    return this->query(ptr, ns, query, fieldsToReturn, queryOptions);
+    return this->query(ptr, nsOrUuid, query, fieldsToReturn, queryOptions);
 }
 
 unsigned long long DBClientBase::query(stdx::function<void(DBClientCursorBatchIterator&)> f,
-                                       const string& ns,
+                                       const NamespaceStringOrUUID& nsOrUuid,
                                        Query query,
                                        const BSONObj* fieldsToReturn,
                                        int queryOptions) {
     // mask options
     queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SlaveOk);
 
-    unique_ptr<DBClientCursor> c(this->query(ns, query, 0, 0, fieldsToReturn, queryOptions));
+    unique_ptr<DBClientCursor> c(this->query(nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions));
     uassert(16090, "socket error for mapping query", c.get());
 
     unsigned long long n = 0;

@@ -206,7 +206,7 @@ protected:
                          repl::OpTime opTime,
                          boost::optional<DurableTxnStateEnum> txnState) {
         DBDirectClient client(opCtx());
-        auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
                                    {BSON("_id" << session->getSessionId().toBSON())});
         ASSERT(cursor);
         ASSERT(cursor->more());
@@ -243,7 +243,7 @@ TEST_F(SessionTest, SessionEntryNotWrittenOnBegin) {
     ASSERT(session.getLastWriteOpTime(txnNum).isNull());
 
     DBDirectClient client(opCtx());
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
                                {BSON("_id" << sessionId.toBSON())});
     ASSERT(cursor);
     ASSERT(!cursor->more());
@@ -260,7 +260,7 @@ TEST_F(SessionTest, SessionEntryWrittenAtFirstWrite) {
     const auto opTime = writeTxnRecord(&session, txnNum, 0, {}, boost::none);
 
     DBDirectClient client(opCtx());
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
                                {BSON("_id" << sessionId.toBSON())});
     ASSERT(cursor);
     ASSERT(cursor->more());
@@ -284,7 +284,7 @@ TEST_F(SessionTest, StartingNewerTransactionUpdatesThePersistedSession) {
     const auto secondOpTime = writeTxnRecord(&session, 200, 1, firstOpTime, boost::none);
 
     DBDirectClient client(opCtx());
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
                                {BSON("_id" << sessionId.toBSON())});
     ASSERT(cursor);
     ASSERT(cursor->more());

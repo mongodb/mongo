@@ -36,7 +36,7 @@ namespace mongo {
 class DBClientMockCursor : public DBClientCursor {
 public:
     DBClientMockCursor(mongo::DBClientBase* client, const BSONArray& mockCollection)
-        : mongo::DBClientCursor(client, "", 0, 0, 0),
+        : mongo::DBClientCursor(client, NamespaceString(), 0, 0, 0),
           _collectionArray(mockCollection),
           _iter(_collectionArray) {}
 

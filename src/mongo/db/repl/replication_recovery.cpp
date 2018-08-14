@@ -105,7 +105,7 @@ public:
 
     void startup(OperationContext* opCtx) final {
         _client = std::make_unique<DBDirectClient>(opCtx);
-        _cursor = _client->query(NamespaceString::kRsOplogNamespace.ns(),
+        _cursor = _client->query(NamespaceString::kRsOplogNamespace,
                                  QUERY("ts" << BSON("$gte" << _oplogApplicationStartPoint)),
                                  /*batchSize*/ 0,
                                  /*skip*/ 0,

@@ -135,7 +135,7 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
 
     try {
         std::unique_ptr<DBClientCursor> cursor =
-            client.query(nss.ns().c_str(), fullQuery, limit.get_value_or(0));
+            client.query(nss, fullQuery, limit.get_value_or(0));
 
         if (!cursor) {
             return {ErrorCodes::OperationFailed,

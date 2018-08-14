@@ -168,7 +168,7 @@ TEST_F(ShardConnFixture, InvalidateBadConnInPool) {
     killServer();
 
     try {
-        conn2.get()->query("test.user", mongo::Query());
+        conn2.get()->query(NamespaceString("test.user"), mongo::Query());
     } catch (const mongo::NetworkException&) {
     }
 
@@ -187,7 +187,7 @@ TEST_F(ShardConnFixture, DontReturnKnownBadConnToPool) {
     killServer();
 
     try {
-        conn3.get()->query("test.user", mongo::Query());
+        conn3.get()->query(NamespaceString("test.user"), mongo::Query());
     } catch (const mongo::NetworkException&) {
     }
 
@@ -210,7 +210,7 @@ TEST_F(ShardConnFixture, BadConnClearsPoolWhenKilled) {
     killServer();
 
     try {
-        conn3.get()->query("test.user", mongo::Query());
+        conn3.get()->query(NamespaceString("test.user"), mongo::Query());
     } catch (const mongo::NetworkException&) {
     }
 
@@ -263,7 +263,7 @@ TEST_F(ShardConnFixture, InvalidateBadConnEvenWhenPoolIsFull) {
     killServer();
 
     try {
-        conn2.get()->query("test.user", mongo::Query());
+        conn2.get()->query(NamespaceString("test.user"), mongo::Query());
     } catch (const mongo::NetworkException&) {
     }
 

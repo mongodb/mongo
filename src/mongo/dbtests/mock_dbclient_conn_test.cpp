@@ -45,6 +45,7 @@ using mongo::BSONObj;
 using mongo::ConnectionString;
 using mongo::MockDBClientConnection;
 using mongo::MockRemoteDBServer;
+using mongo::NamespaceString;
 using mongo::Query;
 
 using std::string;
@@ -67,14 +68,14 @@ TEST(MockDBClientConnTest, QueryCount) {
         MockDBClientConnection conn(&server);
 
         ASSERT_EQUALS(0U, server.getQueryCount());
-        conn.query("foo.bar");
+        conn.query(NamespaceString("foo.bar"));
     }
 
     ASSERT_EQUALS(1U, server.getQueryCount());
 
     {
         MockDBClientConnection conn(&server);
-        conn.query("foo.bar");
+        conn.query(NamespaceString("foo.bar"));
         ASSERT_EQUALS(2U, server.getQueryCount());
     }
 }
@@ -85,7 +86,7 @@ TEST(MockDBClientConnTest, InsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
         ASSERT(!cursor->more());
 
         server.insert(ns, BSON("x" << 1));
@@ -94,7 +95,7 @@ TEST(MockDBClientConnTest, InsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -110,7 +111,7 @@ TEST(MockDBClientConnTest, InsertAndQuery) {
     // Make sure that repeated calls will still give you the same result
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -132,7 +133,7 @@ TEST(MockDBClientConnTest, InsertAndQueryTwice) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -143,7 +144,7 @@ TEST(MockDBClientConnTest, InsertAndQueryTwice) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -163,7 +164,7 @@ TEST(MockDBClientConnTest, QueryWithNoResults) {
 
     server.insert(ns, BSON("x" << 1));
     MockDBClientConnection conn(&server);
-    std::unique_ptr<mongo::DBClientCursor> cursor = conn.query("other.ns");
+    std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString("other.ns"));
 
     ASSERT(!cursor->more());
 }
@@ -194,7 +195,7 @@ TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns1);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns1));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -209,7 +210,7 @@ TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns2);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns2));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -228,7 +229,7 @@ TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns3);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns3));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -244,7 +245,7 @@ TEST(MockDBClientConnTest, SimpleRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
         ASSERT(!cursor->more());
 
         conn.insert(ns, BSON("x" << 1));
@@ -258,7 +259,7 @@ TEST(MockDBClientConnTest, SimpleRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(!cursor->more());
     }
@@ -266,7 +267,7 @@ TEST(MockDBClientConnTest, SimpleRemove) {
     // Make sure that repeated calls will still give you the same result
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(!cursor->more());
     }
@@ -300,13 +301,13 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
         MockDBClientConnection conn(&server);
         conn.remove(ns2, Query(), false);
 
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns2);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns2));
         ASSERT(!cursor->more());
     }
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns1);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns1));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -321,7 +322,7 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns3);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns3));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -356,7 +357,7 @@ TEST(MockDBClientConnTest, InsertAfterRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+        std::unique_ptr<mongo::DBClientCursor> cursor = conn.query(NamespaceString(ns));
 
         ASSERT(cursor->more());
         BSONObj firstDoc = cursor->next();
@@ -533,7 +534,7 @@ TEST(MockDBClientConnTest, Shutdown) {
         server.shutdown();
         ASSERT(!server.isRunning());
 
-        ASSERT_THROWS(conn.query("test.user"), mongo::NetworkException);
+        ASSERT_THROWS(conn.query(NamespaceString("test.user")), mongo::NetworkException);
     }
 
     {
@@ -555,16 +556,16 @@ TEST(MockDBClientConnTest, Restart) {
 
     // Do some queries and commands then check the counters later that
     // new instance still has it
-    conn1.query("test.user");
+    conn1.query(NamespaceString("test.user"));
     BSONObj response;
     conn1.runCommand("test.user", BSON("serverStatus" << 1), response);
 
     server.shutdown();
-    ASSERT_THROWS(conn1.query("test.user"), mongo::NetworkException);
+    ASSERT_THROWS(conn1.query(NamespaceString("test.user")), mongo::NetworkException);
 
     // New connections shouldn't work either
     MockDBClientConnection conn2(&server);
-    ASSERT_THROWS(conn2.query("test.user"), mongo::NetworkException);
+    ASSERT_THROWS(conn2.query(NamespaceString("test.user")), mongo::NetworkException);
 
     ASSERT_EQUALS(1U, server.getQueryCount());
     ASSERT_EQUALS(1U, server.getCmdCount());
@@ -574,12 +575,12 @@ TEST(MockDBClientConnTest, Restart) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.query("test.user");
+        conn.query(NamespaceString("test.user"));
     }
 
     // Old connections still shouldn't work
-    ASSERT_THROWS(conn1.query("test.user"), mongo::NetworkException);
-    ASSERT_THROWS(conn2.query("test.user"), mongo::NetworkException);
+    ASSERT_THROWS(conn1.query(NamespaceString("test.user")), mongo::NetworkException);
+    ASSERT_THROWS(conn2.query(NamespaceString("test.user")), mongo::NetworkException);
 
     ASSERT_EQUALS(2U, server.getQueryCount());
     ASSERT_EQUALS(1U, server.getCmdCount());
@@ -590,7 +591,7 @@ TEST(MockDBClientConnTest, ClearCounter) {
     server.setCommandReply("serverStatus", BSON("ok" << 1));
 
     MockDBClientConnection conn(&server);
-    conn.query("test.user");
+    conn.query(NamespaceString("test.user"));
     BSONObj response;
     conn.runCommand("test.user", BSON("serverStatus" << 1), response);
 
@@ -608,7 +609,7 @@ TEST(MockDBClientConnTest, Delay) {
 
     {
         mongo::Timer timer;
-        conn.query("x.x");
+        conn.query(NamespaceString("x.x"));
         const int nowInMilliSec = timer.millis();
         // Use a more lenient lower bound since some platforms like Windows
         // don't guarantee that sleeps will not wake up earlier (unlike

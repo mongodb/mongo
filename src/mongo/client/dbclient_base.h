@@ -71,7 +71,7 @@ std::string nsGetCollection(const std::string& ns);
  * them as "final" or "override" as appropriate.
  */
 class DBClientQueryInterface {
-    virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
+    virtual std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
                                                   Query query,
                                                   int nToReturn = 0,
                                                   int nToSkip = 0,
@@ -80,13 +80,13 @@ class DBClientQueryInterface {
                                                   int batchSize = 0) = 0;
 
     virtual unsigned long long query(stdx::function<void(const BSONObj&)> f,
-                                     const std::string& ns,
+                                     const NamespaceStringOrUUID& nsOrUuid,
                                      Query query,
                                      const BSONObj* fieldsToReturn = 0,
                                      int queryOptions = 0) = 0;
 
     virtual unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
-                                     const std::string& ns,
+                                     const NamespaceStringOrUUID& nsOrUuid,
                                      Query query,
                                      const BSONObj* fieldsToReturn = 0,
                                      int queryOptions = 0) = 0;
@@ -572,7 +572,7 @@ public:
      @return    cursor.   0 if error (connection failure)
      @throws AssertionException
     */
-    std::unique_ptr<DBClientCursor> query(const std::string& ns,
+    std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
                                           Query query,
                                           int nToReturn = 0,
                                           int nToSkip = 0,
@@ -590,13 +590,13 @@ public:
         blocks, perhaps to avoid granular locking and such.
      */
     unsigned long long query(stdx::function<void(const BSONObj&)> f,
-                             const std::string& ns,
+                             const NamespaceStringOrUUID& nsOrUuid,
                              Query query,
                              const BSONObj* fieldsToReturn = 0,
                              int queryOptions = 0) final;
 
     unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
-                             const std::string& ns,
+                             const NamespaceStringOrUUID& nsOrUuid,
                              Query query,
                              const BSONObj* fieldsToReturn = 0,
                              int queryOptions = 0) override;

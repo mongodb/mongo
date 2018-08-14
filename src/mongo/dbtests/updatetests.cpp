@@ -438,7 +438,8 @@ class MultiInc : public SetBase {
 public:
     string s() {
         stringstream ss;
-        unique_ptr<DBClientCursor> cc = _client.query(ns(), Query().sort(BSON("_id" << 1)));
+        unique_ptr<DBClientCursor> cc =
+            _client.query(NamespaceString(ns()), Query().sort(BSON("_id" << 1)));
         bool first = true;
         while (cc->more()) {
             if (first)

@@ -725,7 +725,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
             curOp->setMessage_inlock(
                 "m/r: merge post processing", "M/R Merge Post Processing Progress", count);
         }
-        unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace.ns(), BSONObj());
+        unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace, BSONObj());
         while (cursor->more()) {
             Lock::DBLock lock(opCtx, _config.outputOptions.finalNamespace.db(), MODE_X);
             BSONObj o = cursor->nextSafe();
@@ -744,7 +744,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
             curOp->setMessage_inlock(
                 "m/r: reduce post processing", "M/R Reduce Post Processing Progress", count);
         }
-        unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace.ns(), BSONObj());
+        unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace, BSONObj());
         while (cursor->more()) {
             // This must be global because we may write across different databases.
             Lock::GlobalWrite lock(opCtx);

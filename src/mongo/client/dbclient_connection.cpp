@@ -477,19 +477,19 @@ uint64_t DBClientConnection::getSockCreationMicroSec() const {
 }
 
 unsigned long long DBClientConnection::query(stdx::function<void(DBClientCursorBatchIterator&)> f,
-                                             const string& ns,
+                                             const NamespaceStringOrUUID& nsOrUuid,
                                              Query query,
                                              const BSONObj* fieldsToReturn,
                                              int queryOptions) {
     if (!(availableOptions() & QueryOption_Exhaust)) {
-        return DBClientBase::query(f, ns, query, fieldsToReturn, queryOptions);
+        return DBClientBase::query(f, nsOrUuid, query, fieldsToReturn, queryOptions);
     }
 
     // mask options
     queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SlaveOk);
     queryOptions |= (int)QueryOption_Exhaust;
 
-    unique_ptr<DBClientCursor> c(this->query(ns, query, 0, 0, fieldsToReturn, queryOptions));
+    unique_ptr<DBClientCursor> c(this->query(nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions));
     uassert(13386, "socket error for mapping query", c.get());
 
     unsigned long long n = 0;

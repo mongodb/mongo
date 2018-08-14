@@ -146,7 +146,7 @@ public:
      */
     void logout(const std::string& dbname, BSONObj& info) override;
 
-    std::unique_ptr<DBClientCursor> query(const std::string& ns,
+    std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
                                           Query query = Query(),
                                           int nToReturn = 0,
                                           int nToSkip = 0,
@@ -155,11 +155,11 @@ public:
                                           int batchSize = 0) override {
         checkConnection();
         return DBClientBase::query(
-            ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
+            nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
     }
 
     unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
-                             const std::string& ns,
+                             const NamespaceStringOrUUID& nsOrUuid,
                              Query query,
                              const BSONObj* fieldsToReturn,
                              int queryOptions) override;

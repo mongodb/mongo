@@ -504,7 +504,7 @@ void DBClientReplicaSet::update(const string& ns, Query query, BSONObj obj, int 
     return checkMaster()->update(ns, query, obj, flags);
 }
 
-unique_ptr<DBClientCursor> DBClientReplicaSet::query(const string& ns,
+unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID& nsOrUuid,
                                                      Query query,
                                                      int nToReturn,
                                                      int nToSkip,
@@ -512,6 +512,8 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const string& ns,
                                                      int queryOptions,
                                                      int batchSize) {
     shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj, queryOptions));
+    invariant(nsOrUuid.nss());
+    const string ns = nsOrUuid.nss()->ns();
     if (_isSecondaryQuery(ns, query.obj, *readPref)) {
         LOG(3) << "dbclient_rs query using secondary or tagged node selection in "
                << _getMonitor()->getName() << ", read pref is " << readPref->toString()
@@ -533,7 +535,7 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const string& ns,
                 }
 
                 unique_ptr<DBClientCursor> cursor = conn->query(
-                    ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
+                    nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
 
                 return checkSlaveQueryResult(std::move(cursor));
             } catch (const DBException& ex) {
@@ -556,7 +558,7 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const string& ns,
     LOG(3) << "dbclient_rs query to primary node in " << _getMonitor()->getName() << endl;
 
     return checkMaster()->query(
-        ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
+        nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
 }
 
 BSONObj DBClientReplicaSet::findOne(const string& ns,

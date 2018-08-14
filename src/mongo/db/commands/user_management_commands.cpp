@@ -252,7 +252,7 @@ Status queryAuthzDocument(OperationContext* opCtx,
                           const stdx::function<void(const BSONObj&)>& resultProcessor) {
     try {
         DBDirectClient client(opCtx);
-        client.query(resultProcessor, collectionName.ns(), query, &projection);
+        client.query(resultProcessor, collectionName, query, &projection);
         return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();
@@ -1383,12 +1383,8 @@ public:
             CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
             bodyBuilder.doneFast();
             auto response = CursorResponse::parseFromBSONThrowing(replyBuilder.releaseBody());
-            DBClientCursor cursor(&client,
-                                  response.getNSS().toString(),
-                                  response.getCursorId(),
-                                  0,
-                                  0,
-                                  response.releaseBatch());
+            DBClientCursor cursor(
+                &client, response.getNSS(), response.getCursorId(), 0, 0, response.releaseBatch());
 
             while (cursor.more()) {
                 usersArrayBuilder.append(cursor.next());

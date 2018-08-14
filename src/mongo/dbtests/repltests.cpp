@@ -186,7 +186,7 @@ protected:
         check(o, one(o));
     }
     void checkAll(const BSONObj& o) const {
-        unique_ptr<DBClientCursor> c = _client.query(ns(), o);
+        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns()), o);
         verify(c->more());
         while (c->more()) {
             check(o, c->next());
@@ -221,14 +221,14 @@ protected:
         return count;
     }
     int opCount() {
-        return DBDirectClient(&_opCtx).query(cllNS(), BSONObj())->itcount();
+        return DBDirectClient(&_opCtx).query(NamespaceString(cllNS()), BSONObj())->itcount();
     }
     void applyAllOperations() {
         Lock::GlobalWrite lk(&_opCtx);
         vector<BSONObj> ops;
         {
             DBDirectClient db(&_opCtx);
-            auto cursor = db.query(cllNS(), BSONObj());
+            auto cursor = db.query(NamespaceString(cllNS()), BSONObj());
             while (cursor->more()) {
                 ops.push_back(cursor->nextSafe());
             }
@@ -762,7 +762,8 @@ class MultiInc : public Base {
 public:
     string s() const {
         stringstream ss;
-        unique_ptr<DBClientCursor> cc = _client.query(ns(), Query().sort(BSON("_id" << 1)));
+        unique_ptr<DBClientCursor> cc =
+            _client.query(NamespaceString(ns()), Query().sort(BSON("_id" << 1)));
         bool first = true;
         while (cc->more()) {
             if (first)

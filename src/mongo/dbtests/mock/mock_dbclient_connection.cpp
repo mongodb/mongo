@@ -74,18 +74,22 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
 }
 
 
-std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(const string& ns,
-                                                                     mongo::Query query,
-                                                                     int nToReturn,
-                                                                     int nToSkip,
-                                                                     const BSONObj* fieldsToReturn,
-                                                                     int queryOptions,
-                                                                     int batchSize) {
+std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
+    const NamespaceStringOrUUID& nsOrUuid,
+    mongo::Query query,
+    int nToReturn,
+    int nToSkip,
+    const BSONObj* fieldsToReturn,
+    int queryOptions,
+    int batchSize) {
+    // The mock client does not support UUIDs.
+    invariant(nsOrUuid.nss());
+
     checkConnection();
 
     try {
         mongo::BSONArray result(_remoteServer->query(_remoteServerInstanceID,
-                                                     ns,
+                                                     nsOrUuid.nss()->ns(),
                                                      query,
                                                      nToReturn,
                                                      nToSkip,
@@ -123,7 +127,7 @@ string MockDBClientConnection::toString() const {
 
 unsigned long long MockDBClientConnection::query(
     stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
-    const std::string& ns,
+    const NamespaceStringOrUUID& nsOrUuid,
     mongo::Query query,
     const mongo::BSONObj* fieldsToReturn,
     int queryOptions) {

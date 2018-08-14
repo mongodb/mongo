@@ -94,7 +94,8 @@ void OplogReader::tailCheck() {
 void OplogReader::tailingQuery(const char* ns, const BSONObj& query) {
     verify(!haveCursor());
     LOG(2) << ns << ".find(" << redact(query) << ')' << endl;
-    cursor.reset(_conn->query(ns, query, 0, 0, nullptr, _tailingQueryOptions).release());
+    cursor.reset(
+        _conn->query(NamespaceString(ns), query, 0, 0, nullptr, _tailingQueryOptions).release());
 }
 
 }  // namespace repl

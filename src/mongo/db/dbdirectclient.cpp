@@ -159,7 +159,7 @@ void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
     invariant(dbResponse.response.empty());
 }
 
-unique_ptr<DBClientCursor> DBDirectClient::query(const string& ns,
+unique_ptr<DBClientCursor> DBDirectClient::query(const NamespaceStringOrUUID& nsOrUuid,
                                                  Query query,
                                                  int nToReturn,
                                                  int nToSkip,
@@ -167,7 +167,7 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const string& ns,
                                                  int queryOptions,
                                                  int batchSize) {
     return DBClientBase::query(
-        ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
+        nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
 }
 
 unsigned long long DBDirectClient::count(

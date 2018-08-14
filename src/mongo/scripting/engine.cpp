@@ -215,7 +215,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         return;
 
     _loadedVersion = lastVersion;
-    string coll = _localDBName + ".system.js";
+    NamespaceString coll(_localDBName, "system.js");
 
     auto directDBClient = DBDirectClientFactory::get(opCtx).create(opCtx);
 

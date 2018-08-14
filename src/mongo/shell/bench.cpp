@@ -1108,14 +1108,14 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     stdx::function<void(const BSONObj&)> castedDoNothing(doNothing);
                     count =
                         conn->query(castedDoNothing,
-                                    this->ns,
+                                    NamespaceString(this->ns),
                                     fixedQuery,
                                     &this->projection,
                                     this->options | DBClientCursor::QueryOptionLocal_forceOpQuery);
                 } else {
                     BenchRunEventTrace _bret(&state->stats->queryCounter);
                     std::unique_ptr<DBClientCursor> cursor(
-                        conn->query(this->ns,
+                        conn->query(NamespaceString(this->ns),
                                     fixedQuery,
                                     this->limit,
                                     this->skip,

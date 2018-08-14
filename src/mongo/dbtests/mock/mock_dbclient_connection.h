@@ -70,7 +70,7 @@ public:
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
 
-    std::unique_ptr<mongo::DBClientCursor> query(const std::string& ns,
+    std::unique_ptr<mongo::DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
                                                  mongo::Query query = mongo::Query(),
                                                  int nToReturn = 0,
                                                  int nToSkip = 0,
@@ -101,7 +101,7 @@ public:
     //
 
     unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
-                             const std::string& ns,
+                             const NamespaceStringOrUUID& nsOrUuid,
                              mongo::Query query,
                              const mongo::BSONObj* fieldsToReturn = 0,
                              int queryOptions = 0) override;

@@ -126,7 +126,7 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
     query.sort(BSON("_id" << 1));
 
     DBDirectClient client(opCtx);
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace.ns(), query);
+    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace, query);
 
     while (cursor->more()) {
         auto nextSession = SessionTxnRecord::parse(

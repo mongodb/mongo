@@ -142,7 +142,7 @@ public:
     enum { QueryOptionLocal_forceOpQuery = 1 << 30 };
 
     DBClientCursor(DBClientBase* client,
-                   const std::string& ns,
+                   const NamespaceStringOrUUID& nsOrUuid,
                    const BSONObj& query,
                    int nToReturn,
                    int nToSkip,
@@ -151,7 +151,7 @@ public:
                    int bs);
 
     DBClientCursor(DBClientBase* client,
-                   const std::string& ns,
+                   const NamespaceStringOrUUID& nsOrUuid,
                    long long cursorId,
                    int nToReturn,
                    int options,
@@ -220,7 +220,7 @@ public:
 
 private:
     DBClientCursor(DBClientBase* client,
-                   const std::string& ns,
+                   const NamespaceStringOrUUID& nsOrUuid,
                    const BSONObj& query,
                    long long cursorId,
                    int nToReturn,

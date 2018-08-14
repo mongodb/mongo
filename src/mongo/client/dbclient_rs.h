@@ -83,7 +83,7 @@ public:
     // ----------- simple functions --------------
 
     /** throws userassertion "no master found" */
-    std::unique_ptr<DBClientCursor> query(const std::string& ns,
+    std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
                                           Query query,
                                           int nToReturn = 0,
                                           int nToSkip = 0,

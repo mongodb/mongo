@@ -34,7 +34,7 @@
 namespace mongo {
 MockDBClientCursor::MockDBClientCursor(mongo::DBClientBase* client,
                                        const mongo::BSONArray& resultSet)
-    : mongo::DBClientCursor(client, "", 0, 0, 0) {
+    : mongo::DBClientCursor(client, NamespaceString(), 0, 0, 0) {
     _resultSet = resultSet.copy();
     _cursor.reset(new mongo::DBClientMockCursor(client, BSONArray(_resultSet)));
 }

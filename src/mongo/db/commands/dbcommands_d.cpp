@@ -347,7 +347,7 @@ public:
         DBDirectClient client(opCtx);
         Query q(query);
         q.sort(sort);
-        unique_ptr<DBClientCursor> c = client.query(ns, q);
+        unique_ptr<DBClientCursor> c = client.query(NamespaceString(ns), q);
         while (c->more()) {
             log() << c->nextSafe();
         }

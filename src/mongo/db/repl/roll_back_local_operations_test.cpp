@@ -412,7 +412,7 @@ public:
 
     using DBClientConnection::query;
 
-    std::unique_ptr<DBClientCursor> query(const std::string& ns,
+    std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
                                           Query query,
                                           int nToReturn,
                                           int nToSkip,

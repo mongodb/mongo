@@ -546,7 +546,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
 
                     state->cursor.reset(new DBClientCursor(
                         state->conn->get(),
-                        ns,
+                        NamespaceString(ns),
                         _qSpec.query(),
                         isCommand() ? 1 : 0,  // nToReturn (0 if query indicates multi)
                         0,                    // nToSkip
@@ -573,7 +573,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
 
                     state->cursor.reset(new DBClientCursor(
                         state->conn->get(),
-                        ns,
+                        NamespaceString(ns),
                         _qSpec.query(),
                         _qSpec.ntoreturn(),  // nToReturn
                         _qSpec.ntoskip(),    // nToSkip
@@ -1002,7 +1002,7 @@ void ParallelSortClusteredCursor::_oldInit() {
             if (!_cursors[i].get())
                 _cursors[i].reset(
                     new DBClientCursor(conns[i]->get(),
-                                       _ns,
+                                       NamespaceString(_ns),
                                        _query,
                                        0,                                 // nToReturn
                                        0,                                 // nToSkip
