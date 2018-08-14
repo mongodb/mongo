@@ -4146,6 +4146,38 @@ TEST_F(StableOpTimeTest, OpTimeCandidatesAreNotAddedWhenStateIsNotConsistent) {
     ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, repl->getStableOpTimeCandidates_forTest());
 }
 
+TEST_F(StableOpTimeTest, OpTimeCandidatesAreNotAddedForPV0Secondaries) {
+
+    initReplSetMode();
+    auto repl = getReplCoord();
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id"
+                                                  << 1))
+                            << "protocolVersion"
+                            << 0),
+                       HostAndPort("node1", 12345));
+    ASSERT_FALSE(repl->isV1ElectionProtocol());
+    ASSERT_OK(repl->setFollowerMode(MemberState::RS_SECONDARY));
+    long long term = 0;
+
+    OpTime opTime = OpTime({1, 1}, term);
+    std::set<OpTime> expectedOpTimeCandidates = {};
+
+    repl->setMyLastAppliedOpTimeForward(opTime,
+                                        ReplicationCoordinator::DataConsistency::Consistent);
+    ASSERT_EQUALS(opTime, repl->getMyLastAppliedOpTime());
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, repl->getStableOpTimeCandidates_forTest());
+}
 
 TEST_F(ReplCoordTest, NodeReturnsShutdownInProgressWhenWaitingUntilAnOpTimeDuringShutdown) {
     assertStartSuccess(BSON("_id"

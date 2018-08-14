@@ -1153,6 +1153,13 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
         return;
     }
 
+    // On PV0 secondaries, we do not track the commit point, so we do not use the commit point to
+    // set the stable timestamp. Instead, we always set the stable timestamp to the last applied
+    // write, to ensure that timestamp history can be purged. This means we do not need to track
+    // stable optime candidates (and we should not track them, since we only purge the candidate
+    // list when setting the stable timestamp due to the commit point advancing).
+    const bool opTimeIsStableCandidate = isV1ElectionProtocol() || _memberState.primary();
+
     // Add the new applied optime to the list of stable optime candidates and then set the last
     // stable optime. Stable optimes are used to determine the last optime that it is safe to revert
     // the database to, in the event of a rollback via the 'recover to timestamp' method. If we are
@@ -1163,7 +1170,9 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     if (consistency == DataConsistency::Consistent) {
         invariant(opTime.getTimestamp().getInc() > 0,
                   str::stream() << "Impossible optime received: " << opTime.toString());
-        _stableOpTimeCandidates.insert(opTime);
+        if (opTimeIsStableCandidate) {
+            _stableOpTimeCandidates.insert(opTime);
+        }
         // If we are lagged behind the commit optime, set a new stable timestamp here.
         if (opTime <= _topCoord->getLastCommittedOpTime()) {
             _setStableTimestampForStorage_inlock();
@@ -1174,15 +1183,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
         // last applied optime here will permit WiredTiger to evict this data as it sees fit.
         _service->getGlobalStorageEngine()->setOldestTimestamp(opTime.getTimestamp());
     }
-    // If we are in pv0, we do not set the stable timestamp on secondaries, and thus do not set the
-    // oldest timestamp either.  This can cause timestamp history to accrue in the storage engine
-    // and never be purged.
-    // To solve this, we manually set the oldest timestamp here to the last applied write, so that
-    // oplog visibility will continue to operate properly (it uses timestamps).  Inside
-    // setOldestTimestamp(), it takes the minimum of the oplog read timestamp and the proposed
-    // oldest_timestamp value, to ensure that oplog reads are never impacted by an oldest_timestamp
-    // value that is too high.
-    if (!isV1ElectionProtocol() && !_memberState.primary()) {
+    if (!opTimeIsStableCandidate) {
         auto storageEngine = _service->getGlobalStorageEngine();
         if (storageEngine) {
             auto newOldestTimestamp = opTime.getTimestamp();
