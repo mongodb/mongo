@@ -87,6 +87,12 @@ union __wt_lsn {
 #define	WT_LOGC_KEY_FORMAT	WT_UNCHECKED_STRING(III)
 #define	WT_LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
+/*
+ * Size range for the log files.
+ */
+#define	WT_LOG_FILE_MAX ((int64_t)2 * WT_GIGABYTE)
+#define	WT_LOG_FILE_MIN (100 * WT_KILOBYTE)
+
 #define	WT_LOG_SKIP_HEADER(data)					\
     ((const uint8_t *)(data) + offsetof(WT_LOG_RECORD, record))
 #define	WT_LOG_REC_SIZE(size)						\

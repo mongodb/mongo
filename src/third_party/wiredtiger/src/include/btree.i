@@ -1668,7 +1668,7 @@ static inline int
 __wt_page_swap_func(
     WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
+    , const char *func, int line
 #endif
     )
 {
@@ -1691,7 +1691,7 @@ __wt_page_swap_func(
 	/* Get the wanted page. */
 	ret = __wt_page_in_func(session, want, flags
 #ifdef HAVE_DIAGNOSTIC
-	    , file, line
+	    , func, line
 #endif
 	    );
 

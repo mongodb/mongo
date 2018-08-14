@@ -139,8 +139,10 @@ class test_las01(wttest.WiredTigerTestCase):
         session2 = self.conn.open_session()
         session2.begin_transaction('isolation=snapshot')
         # Apply two modify operations - replacing the first two items with 'A'
+        self.session.begin_transaction()
         self.large_modifies(self.session, uri, 0, ds, nrows)
         self.large_modifies(self.session, uri, 1, ds, nrows)
+        self.session.commit_transaction()
         # Check to see the value after recovery
         self.durable_check(bigvalue3, uri, ds, nrows)
         session2.rollback_transaction()

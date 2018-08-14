@@ -194,12 +194,14 @@ class test_cursor12(wttest.WiredTigerTestCase):
             self.assertEquals(c.update(), 0)
             c.reset()
 
+            self.session.begin_transaction()
             c.set_key(ds.key(row))
             mods = []
             for j in i['mods']:
                 mod = wiredtiger.Modify(j[0], j[1], j[2])
                 mods.append(mod)
             self.assertEquals(c.modify(mods), 0)
+            self.session.commit_transaction()
             c.reset()
 
             c.set_key(ds.key(row))
@@ -288,6 +290,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         ds.populate()
 
         c = self.session.open_cursor(self.uri, None)
+        self.session.begin_transaction()
         c.set_key(ds.key(10))
         orig = 'abcdefghijklmnopqrstuvwxyz'
         c.set_value(orig)
@@ -299,6 +302,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
             mod = wiredtiger.Modify(new, 10, 5)
             mods.append(mod)
             self.assertEquals(c.modify(mods), 0)
+        self.session.commit_transaction()
 
         c.set_key(ds.key(10))
         self.assertEquals(c.search(), 0)
@@ -314,12 +318,14 @@ class test_cursor12(wttest.WiredTigerTestCase):
         c.set_key(ds.key(10))
         self.assertEquals(c.remove(), 0)
 
+        self.session.begin_transaction()
         mods = []
         mod = wiredtiger.Modify('ABCD', 3, 3)
         mods.append(mod)
 
         c.set_key(ds.key(10))
         self.assertEqual(c.modify(mods), wiredtiger.WT_NOTFOUND)
+        self.session.commit_transaction()
 
     # Check that modify returns not-found when an insert is not yet committed
     # and after it's aborted.
@@ -347,6 +353,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         # Test that another transaction cannot modify our uncommitted record.
         xs = self.conn.open_session()
         xc = xs.open_cursor(self.uri, None)
+        xs.begin_transaction()
         xc.set_key(ds.key(30))
         xc.set_value(ds.value(30))
         mods = []
@@ -354,16 +361,19 @@ class test_cursor12(wttest.WiredTigerTestCase):
         mods.append(mod)
         xc.set_key(ds.key(30))
         self.assertEqual(xc.modify(mods), wiredtiger.WT_NOTFOUND)
+        xs.rollback_transaction()
 
         # Rollback our transaction.
         self.session.rollback_transaction()
 
         # Test that we can't modify our aborted insert.
+        self.session.begin_transaction()
         mods = []
         mod = wiredtiger.Modify('ABCD', 3, 3)
         mods.append(mod)
         c.set_key(ds.key(30))
         self.assertEqual(c.modify(mods), wiredtiger.WT_NOTFOUND)
+        self.session.rollback_transaction()
 
 if __name__ == '__main__':
     wttest.run()

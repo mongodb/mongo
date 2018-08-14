@@ -208,7 +208,7 @@ __log_fs_write(WT_SESSION_IMPL *session,
 		WT_RET(__wt_log_force_sync(session, &slot->slot_release_lsn));
 	}
 	if ((ret = __wt_write(session, slot->slot_fh, offset, len, buf)) != 0)
-		WT_PANIC_MSG(session, ret,
+		WT_PANIC_RET(session, ret,
 		    "%s: fatal log failure", slot->slot_fh->name);
 	return (ret);
 }
@@ -674,11 +674,15 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 		return (__log_zero(session, fh,
 		    WT_LOG_END_HEADER, conn->log_file_max));
 
+	/* If configured to not extend the file, we're done. */
+	if (conn->log_extend_len == 0)
+		return (0);
+
 	/*
 	 * We have exclusive access to the log file and there are no other
 	 * writes happening concurrently, so there are no locking issues.
 	 */
-	ret = __wt_fextend(session, fh, conn->log_file_max);
+	ret = __wt_fextend(session, fh, conn->log_extend_len);
 	return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);
 }
 
@@ -1862,7 +1866,7 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size,
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	wt_off_t off, remainder;
-	size_t buf_left, bufsz, rdlen;
+	size_t allocsize, buf_left, bufsz, rdlen;
 	char *buf, *p, *zerobuf;
 	bool corrupt;
 
@@ -1898,6 +1902,7 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size,
 	    remainder -= (wt_off_t)rdlen, off += (wt_off_t)rdlen) {
 		rdlen = WT_MIN(bufsz, (size_t)remainder);
 		WT_ERR(__wt_read(session, fh, off, rdlen, buf));
+		allocsize = (log == NULL ? WT_LOG_ALIGN : log->allocsize);
 		if (memcmp(buf, zerobuf, rdlen) != 0) {
 			/*
 			 * Find where the next log record starts after the
@@ -1905,7 +1910,7 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size,
 			 */
 			for (p = buf, buf_left = rdlen; buf_left > 0;
 			     buf_left -= rdlen, p += rdlen) {
-				rdlen = WT_MIN(log->allocsize, buf_left);
+				rdlen = WT_MIN(allocsize, buf_left);
 				if (memcmp(p, zerobuf, rdlen) != 0)
 					break;
 			}
@@ -1915,14 +1920,21 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size,
 			 * present in the buffer, we either have a valid header
 			 * or corruption.  Verify the header of this record to
 			 * determine whether it is just a hole or corruption.
+			 *
+			 * We don't bother making this check for backup copies,
+			 * as records may have their beginning zeroed, hence
+			 * the part after a hole may in fact be the middle of
+			 * the record.
 			 */
-			logrec = (WT_LOG_RECORD *)p;
-			if (buf_left >= sizeof(WT_LOG_RECORD)) {
-				off += p - buf;
-				WT_ERR(__log_record_verify(session, fh,
-				    (uint32_t)off, logrec, &corrupt));
-				if (corrupt)
-					*error_offset = off;
+			if (!F_ISSET(conn, WT_CONN_WAS_BACKUP)) {
+				logrec = (WT_LOG_RECORD *)p;
+				if (buf_left >= sizeof(WT_LOG_RECORD)) {
+					off += p - buf;
+					WT_ERR(__log_record_verify(session, fh,
+					    (uint32_t)off, logrec, &corrupt));
+					if (corrupt)
+						*error_offset = off;
+				}
 			}
 			*hole = true;
 			break;
@@ -1945,12 +1957,6 @@ err:	__wt_free(session, buf);
  *	padded with zeroes before writing). The only way we have any certainty
  *	is if the last byte is non-zero, when that happens, we know that
  *	the write cannot be partial.
- *
- *	When we have a checksum mismatch, it is important to know that whether
- *	it may be 1) the result of a partial write or 2) the result of
- *	corruption. The former can happen in normal operations, and we
- *	will silently truncate the log when it occurs. The latter will
- *	result in an error during recovery, and requires salvage to fix.
  */
 static bool
 __log_check_partial_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
@@ -2480,7 +2486,30 @@ advance:
 			 */
 			if (log != NULL)
 				log->trunc_lsn = rd_lsn;
-			/* Make a check to see if it may be a partial write. */
+			/*
+			 * If the user asked for a specific LSN and it is not
+			 * a valid LSN, return WT_NOTFOUND.
+			 */
+			if (LF_ISSET(WT_LOGSCAN_ONE))
+				ret = WT_NOTFOUND;
+
+			/*
+			 * When we have a checksum mismatch, we determine
+			 * whether it may be the result of:
+			 *  1) some expected corruption that can occur during
+			 *     backups
+			 *  2) a partial write that can naturally occur when
+			 *     an application crashes
+			 *  3) some other corruption
+			 *
+			 * As the first and second happen commonly in normal
+			 * operations, we will silently truncate the log when
+			 * it occurs. The third will result in an error during
+			 * recovery, and requires salvage to fix.
+			 */
+			if (F_ISSET(conn, WT_CONN_WAS_BACKUP))
+				break;
+
 			if (!__log_check_partial_write(session, buf, reclen)) {
 				/*
 				 * It's not a partial write, and we have a bad
@@ -2505,12 +2534,6 @@ advance:
 					    log_fh->name, "", rd_lsn.l.offset));
 				}
 			}
-			/*
-			 * If the user asked for a specific LSN and it is not
-			 * a valid LSN, return WT_NOTFOUND.
-			 */
-			if (LF_ISSET(WT_LOGSCAN_ONE))
-				ret = WT_NOTFOUND;
 			break;
 		}
 		__wt_log_record_byteswap(logrec);

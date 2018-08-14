@@ -1,4 +1,20 @@
 /*! @page upgrading Upgrading WiredTiger applications
+
+</dl><hr>
+@section version_311 Upgrading to Version 3.1.1
+<dl>
+
+<dt>WT_CURSOR::modify transaction requirements</dt>
+<dd>
+In previous releases of WiredTiger, it was possible to use implicit
+transactions in combination with WT_CURSOR::modify operations. This
+requires applications be extraordinarily careful to avoid multiple
+threads which are changing the same values racing with each other. In
+the 3.1.1 release, WT_CURSOR::modify operations must be performed in an
+explicit transaction, and will fail if that's not the case.
+</dd>
+
+</dl><hr>
 @section version_310 Upgrading to Version 3.1.0
 <dl>
 

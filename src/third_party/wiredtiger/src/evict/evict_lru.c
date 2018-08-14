@@ -318,7 +318,7 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 		WT_ERR(__evict_lru_pages(session, false));
 
 	if (0) {
-err:		WT_PANIC_MSG(session, ret, "cache eviction thread error");
+err:		WT_PANIC_RET(session, ret, "cache eviction thread error");
 	}
 	return (ret);
 }
@@ -357,7 +357,7 @@ __wt_evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
 	    WT_VERB_EVICTSERVER, "%s", "cache eviction thread exiting");
 
 	if (0) {
-err:		WT_PANIC_MSG(session, ret, "cache eviction thread error");
+err:		WT_PANIC_RET(session, ret, "cache eviction thread error");
 	}
 	return (ret);
 }
@@ -810,10 +810,8 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_PASS));
-	if (session->dhandle == cache->walk_tree) {
+	if (session->dhandle == cache->walk_tree)
 		cache->walk_tree = NULL;
-		cache->walk_target = 0;
-	}
 
 	if ((ref = btree->evict_ref) == NULL)
 		return (0);
@@ -1414,10 +1412,8 @@ retry:	while (slot < max_entries) {
 			 */
 			if ((dhandle = cache->walk_tree) != NULL)
 				cache->walk_tree = NULL;
-			else {
+			else
 				dhandle = TAILQ_FIRST(&conn->dhqh);
-				cache->walk_target = 0;
-			}
 		} else {
 			if (incr) {
 				WT_ASSERT(session, dhandle->session_inuse > 0);
@@ -1427,7 +1423,6 @@ retry:	while (slot < max_entries) {
 				cache->walk_tree = NULL;
 			}
 			dhandle = TAILQ_NEXT(dhandle, q);
-			cache->walk_target = 0;
 		}
 
 		/* If we reach the end of the list, we're done. */
@@ -1601,8 +1596,7 @@ __evict_push_candidate(WT_SESSION_IMPL *session,
  *	Calculate how many pages to queue for a given tree.
  */
 static uint32_t
-__evict_walk_target(
-    WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_entries)
+__evict_walk_target(WT_SESSION_IMPL *session, u_int max_entries)
 {
 	WT_CACHE *cache;
 	uint64_t btree_inuse, bytes_per_slot, cache_inuse;
@@ -1611,7 +1605,7 @@ __evict_walk_target(
 
 	cache = S2C(session)->cache;
 	target_pages_clean = target_pages_dirty = 0;
-	total_slots = max_entries - queue->evict_entries;
+	total_slots = max_entries;
 
 	/*
 	 * The number of times we should fill the queue by the end of
@@ -1717,14 +1711,13 @@ __evict_walk_tree(WT_SESSION_IMPL *session,
 	 */
 	start = queue->evict_queue + *slotp;
 	remaining_slots = max_entries - *slotp;
-	if (cache->walk_target != 0) {
-		WT_ASSERT(session, cache->walk_progress <= cache->walk_target);
-		target_pages = cache->walk_target - cache->walk_progress;
-	} else {
-		target_pages = cache->walk_target =
-		    __evict_walk_target(session, queue, max_entries);
-		cache->walk_progress = 0;
+	if (btree->evict_walk_progress >= btree->evict_walk_target) {
+		btree->evict_walk_target =
+		    __evict_walk_target(session, max_entries);
+		btree->evict_walk_progress = 0;
 	}
+	target_pages = WT_MIN(btree->evict_walk_target / QUEUE_FILLS_PER_PASS,
+	    btree->evict_walk_target - btree->evict_walk_progress);
 
 	if (target_pages > remaining_slots)
 		target_pages = remaining_slots;
@@ -2017,7 +2010,7 @@ fast:		/* If the page can't be evicted, give up. */
 			continue;
 		++evict;
 		++pages_queued;
-		++cache->walk_progress;
+		++btree->evict_walk_progress;
 
 		__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "select: %p, size %" WT_SIZET_FMT,

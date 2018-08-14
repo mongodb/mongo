@@ -254,12 +254,11 @@ ContextInternal::~ContextInternal() {
 }
 
 int ContextInternal::create_all() {
-    if (_runtime_alloced != _tint_last) {
+    if (_runtime_alloced < _tint_last) {
         // The array references are 1-based, we'll waste one entry.
         TableRuntime *new_table_runtime = new TableRuntime[_tint_last + 1];
-        memcpy(new_table_runtime, _table_runtime, sizeof(uint64_t) * _runtime_alloced);
-        memset(&new_table_runtime[_runtime_alloced], 0,
-          sizeof(uint64_t) * (_tint_last - _runtime_alloced + 1));
+        for (int i = 0; i < _runtime_alloced; i++)
+            new_table_runtime[i + 1] = _table_runtime[i + 1];
         delete _table_runtime;
         _table_runtime = new_table_runtime;
         _runtime_alloced = _tint_last;

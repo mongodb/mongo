@@ -553,7 +553,7 @@ err:	/*
 int
 __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
+    , const char *func, int line
 #endif
     )
 {
@@ -683,7 +683,7 @@ read:			/*
 			 */
 #ifdef HAVE_DIAGNOSTIC
 			WT_RET(
-			    __wt_hazard_set(session, ref, &busy, file, line));
+			    __wt_hazard_set(session, ref, &busy, func, line));
 #else
 			WT_RET(__wt_hazard_set(session, ref, &busy));
 #endif

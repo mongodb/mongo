@@ -1414,10 +1414,6 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 	/* Save the cursor state. */
 	__cursor_state_save(cursor, &state);
 
-	if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
-		WT_ERR_MSG(session, ENOTSUP,
-		    "not supported in read-uncommitted transactions");
-
 	/*
 	 * Get the current value and apply the modification to it, for a few
 	 * reasons: first, we set the updated value so the application can
@@ -1428,7 +1424,23 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 	 * trouble if we attempt to modify a value that doesn't exist. For the
 	 * fifth reason, verify we're not in a read-uncommitted transaction,
 	 * that implies a value that might disappear out from under us.
+	 *
+	 * Also, an application might read a value outside of a transaction and
+	 * then call modify. For that to work, the read must be part of the
+	 * transaction that performs the update for correctness, otherwise we
+	 * could race with another thread and end up modifying the wrong value.
+	 * A clever application could get this right (imagine threads that only
+	 * updated non-overlapping, fixed-length byte strings), but it's unsafe
+	 * because it will work most of the time and the failure is unlikely to
+	 * be detected. Require explicit transactions for modify operations.
 	 */
+	if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
+		WT_ERR_MSG(session, ENOTSUP,
+		    "not supported in read-uncommitted transactions");
+	if (F_ISSET(&session->txn, WT_TXN_AUTOCOMMIT))
+		WT_ERR_MSG(session, ENOTSUP,
+		    "not supported in implicit transactions");
+
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_INT) ||
 	    !F_ISSET(cursor, WT_CURSTD_VALUE_INT))
 		WT_ERR(__wt_btcur_search(cbt));

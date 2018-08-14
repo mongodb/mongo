@@ -101,8 +101,7 @@ main(int argc, char *argv[])
 	    "key_format=Q,value_format=u,"
 	    "leaf_item_max=64M,leaf_page_max=32k,memory_page_max=1M"));
 
-	testutil_check(
-	    session->open_cursor(session, uri, NULL, NULL, &c));
+	testutil_check(session->open_cursor(session, uri, NULL, NULL, &c));
 
 	/* Value is initialized with 'v' and has not significance to it. */
 	large_doc = dmalloc(DATASIZE);
@@ -137,6 +136,8 @@ main(int argc, char *argv[])
 	while (++j < MODIFY_COUNT) {
 		for (i = 0; i < NUM_DOCS; i++) {
 			/* Position the cursor. */
+			testutil_check(
+			    session2->begin_transaction(session2, NULL));
 			c->set_key(c, i);
 			modify_entry.data.data =
 			    "abcdefghijklmnopqrstuvwxyz";
@@ -146,6 +147,8 @@ main(int argc, char *argv[])
 			(void)alarm(1);
 			testutil_check(c->modify(c, &modify_entry, 1));
 			(void)alarm(0);
+			testutil_check(
+			    session2->commit_transaction(session2, NULL));
 		}
 		/*
 		 * Modify operations are done similar to append sequence.
