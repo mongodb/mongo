@@ -3553,7 +3553,6 @@ tasks:
       vars:
         targets: install-embedded-dev
         task_compile_flags: &embedded_sdk_compile_flags >-
-          --disable-warnings-as-errors
           --install-mode=hygienic
           --js-engine=none
           --link-model=dynamic

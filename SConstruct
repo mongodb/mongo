@@ -1707,6 +1707,29 @@ if env.ToolchainIs('msvc'):
 
 if env.TargetOSIs('posix'):
 
+    # On linux, C code compiled with gcc/clang -std=c11 causes
+    # __STRICT_ANSI__ to be set, and that drops out all of the feature
+    # test definitions, resulting in confusing errors when we run C
+    # language configure checks and expect to be able to find newer
+    # POSIX things. Explicitly enabling _XOPEN_SOURCE fixes that, and
+    # should be mostly harmless as on Linux, these macros are
+    # cumulative. The C++ compiler already sets _XOPEN_SOURCE, and,
+    # notably, setting it again does not disable any other feature
+    # test macros, so this is safe to do. Other platforms like macOS
+    # and BSD have crazy rules, so don't try this there.
+    #
+    # Furthermore, as both C++ compilers appears to unconditioanlly
+    # define _GNU_SOURCE (because libstdc++ requires it), it seems
+    # prudent to explicitly add that too, so that C language checks
+    # see a consistent set of definitions.
+    if env.TargetOSIs('linux'):
+        env.AppendUnique(
+            CPPDEFINES=[
+                ('_XOPEN_SOURCE', 700),
+                '_GNU_SOURCE',
+            ],
+        )
+
     # Everything on OS X is position independent by default. Solaris doesn't support PIE.
     if not env.TargetOSIs('darwin', 'solaris'):
         if get_option('runtime-hardening') == "on":
@@ -2093,6 +2116,11 @@ def doConfigure(myenv):
 
         # As of clang-3.4, this warning appears in v8, and gets escalated to an error.
         AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-constant-out-of-range-compare")
+
+        # As of clang in Android NDK 17, these warnings appears in boost and/or ICU, and get escalated to errors
+        AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-constant-compare")
+        AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-unsigned-zero-compare")
+        AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-unsigned-enum-zero-compare")
 
         # New in clang-3.4, trips up things mostly in third_party, but in a few places in the
         # primary mongo sources as well.

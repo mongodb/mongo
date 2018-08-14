@@ -156,7 +156,7 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
     // This throws away all but the first address.
     // Use SockAddr::createAll() to get all addresses.
     const auto* addrs = addrErr.second.get();
-    fassert(16501, addrs->ai_addrlen <= sizeof(sa));
+    fassert(16501, static_cast<size_t>(addrs->ai_addrlen) <= sizeof(sa));
     memcpy(&sa, addrs->ai_addr, addrs->ai_addrlen);
     addressSize = addrs->ai_addrlen;
     _isValid = true;
@@ -183,7 +183,7 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
     struct sockaddr_storage storage;
     memset(&storage, 0, sizeof(storage));
     for (const auto* addrs = addrErr.second.get(); addrs; addrs = addrs->ai_next) {
-        fassert(40594, addrs->ai_addrlen <= sizeof(struct sockaddr_storage));
+        fassert(40594, static_cast<size_t>(addrs->ai_addrlen) <= sizeof(struct sockaddr_storage));
         // Make a temp copy in a local sockaddr_storage so that the
         // SockAddr constructor below can copy the entire buffer
         // without over-running addrinfo's storage
