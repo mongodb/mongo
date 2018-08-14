@@ -45,7 +45,9 @@ MemberData::MemberData() : _health(-1), _authIssue(false), _configIndex(-1), _is
     _lastResponse.setAppliedOpTime(OpTime());
 }
 
-bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) {
+bool MemberData::setUpValues(Date_t now,
+                             ReplSetHeartbeatResponse&& hbResponse,
+                             OpTime lastOpCommitted) {
     _health = 1;
     if (_upSince == Date_t()) {
         _upSince = now;
@@ -56,6 +58,10 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
     _lastUpdateStale = false;
     _updatedSinceRestart = true;
     _lastHeartbeatMessage.clear();
+
+    if (!lastOpCommitted.isNull()) {
+        _lastOpCommitted = lastOpCommitted;
+    }
 
     if (!hbResponse.hasState()) {
         hbResponse.setState(MemberState::RS_UNKNOWN);

@@ -1239,17 +1239,10 @@ var ReplSetTest = function(opts) {
         let master = rst.getPrimary();
         let id = tojson(rst.nodeList());
 
-        // Algorithm precondition: All nodes must be in primary/secondary state.
-        //
-        // 1) Perform a majority write. This will guarantee the primary updates its commit point
-        //    to the value of this write.
-        //
-        // 2) Perform a second write. This will guarantee that all nodes will update their commit
-        //    point to a time that is >= the previous write. That will trigger a stable checkpoint
-        //    on all persisted storage engine nodes.
-        // TODO(SERVER-33248): Remove this block. We should not need to prod the replica set to
-        // advance the commit point if the commit point being lagged is sufficient to choose a
-        // sync source.
+        // All nodes must be in primary/secondary state prior to this point. Perform a majority
+        // write to ensure there is a committed operation on the set. The commit point will
+        // propagate to all members and trigger a stable checkpoint on all persisted storage engines
+        // nodes.
         function advanceCommitPoint(master) {
             // Shadow 'db' so that we can call 'advanceCommitPoint' directly on the primary node.
             let db = master.getDB('admin');
@@ -1259,6 +1252,10 @@ var ReplSetTest = function(opts) {
                     "data": {"awaitLastStableRecoveryTimestamp": 1},
                     "writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}
                 }));
+
+                // TODO(SERVER-36758): Remove the second write. We should not need to prod the
+                // replica set to advance the commit point once all nodes are running a version with
+                // SERVER-33248. This can be removed once the last stable version includes the fix.
                 assert.commandWorked(db.adminCommand(
                     {"appendOplogNote": 1, "data": {"awaitLastStableRecoveryTimestamp": 2}}));
             };
