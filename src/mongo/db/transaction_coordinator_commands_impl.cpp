@@ -45,14 +45,12 @@ namespace {
 
 std::vector<ShardId> sendCommit(OperationContext* opCtx, std::set<ShardId>& nonAckedParticipants) {
     std::vector<AsyncRequestsSender::Request> requests;
-    for_each(nonAckedParticipants.begin(),
-             nonAckedParticipants.end(),
-             [&requests](const ShardId& shardId) {
-                 // TODO (SERVER-36584): Use the commitTransaction IDL to create the command BSON.
-                 requests.emplace_back(shardId,
-                                       BSON("commitTransaction" << 1 << "$db"
-                                                                << "admin"));
-             });
+    for (const auto& shardId : nonAckedParticipants) {
+        // TODO (SERVER-36584): Use the commitTransaction IDL to create the command BSON.
+        requests.emplace_back(shardId,
+                              BSON("commitTransaction" << 1 << "$db"
+                                                       << "admin"));
+    }
 
     // TODO (SERVER-36638): Change to arbitrary task executor? Unit test only supports fixed
     // executor.
@@ -77,14 +75,12 @@ std::vector<ShardId> sendCommit(OperationContext* opCtx, std::set<ShardId>& nonA
 
 std::vector<ShardId> sendAbort(OperationContext* opCtx, std::set<ShardId>& nonAckedParticipants) {
     std::vector<AsyncRequestsSender::Request> requests;
-    for_each(nonAckedParticipants.begin(),
-             nonAckedParticipants.end(),
-             [&requests](const ShardId& shardId) {
-                 // TODO Use IDL to create command BSON.
-                 requests.emplace_back(shardId,
-                                       BSON("abortTransaction" << 1 << "$db"
-                                                               << "admin"));
-             });
+    for (const auto& shardId : nonAckedParticipants) {
+        // TODO Use IDL to create command BSON.
+        requests.emplace_back(shardId,
+                              BSON("abortTransaction" << 1 << "$db"
+                                                      << "admin"));
+    }
 
     // TODO (SERVER-36638): Change to arbitrary task executor? Unit test only supports fixed
     // executor.

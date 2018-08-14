@@ -287,27 +287,23 @@ bool TransactionCoordinator::ParticipantList::allParticipantsAckedCommit() const
 
 std::set<ShardId> TransactionCoordinator::ParticipantList::getNonAckedCommitParticipants() const {
     std::set<ShardId> nonAckedCommitParticipants;
-    for_each(_participants.begin(),
-             _participants.end(),
-             [&nonAckedCommitParticipants](const std::pair<ShardId, Participant>& i) {
-                 if (i.second.ack != Participant::Ack::kCommit) {
-                     invariant(i.second.ack == Participant::Ack::kNone);
-                     nonAckedCommitParticipants.insert(i.first);
-                 }
-             });
+    for (const auto& kv : _participants) {
+        if (kv.second.ack != Participant::Ack::kCommit) {
+            invariant(kv.second.ack == Participant::Ack::kNone);
+            nonAckedCommitParticipants.insert(kv.first);
+        }
+    }
     return nonAckedCommitParticipants;
 }
 
 std::set<ShardId> TransactionCoordinator::ParticipantList::getNonAckedAbortParticipants() const {
     std::set<ShardId> nonAckedAbortParticipants;
-    for_each(_participants.begin(),
-             _participants.end(),
-             [&nonAckedAbortParticipants](const std::pair<ShardId, Participant>& i) {
-                 if (i.second.ack != Participant::Ack::kAbort) {
-                     invariant(i.second.ack == Participant::Ack::kNone);
-                     nonAckedAbortParticipants.insert(i.first);
-                 }
-             });
+    for (const auto& kv : _participants) {
+        if (kv.second.ack != Participant::Ack::kAbort) {
+            invariant(kv.second.ack == Participant::Ack::kNone);
+            nonAckedAbortParticipants.insert(kv.first);
+        }
+    }
     return nonAckedAbortParticipants;
 }
 
