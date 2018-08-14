@@ -352,7 +352,7 @@ union __wt_rand_state {
 	 * buffer. If not concatenating, clear the size so we don't use	\
 	 * any existing contents.					\
 	 */								\
-	if (!concatenate)						\
+	if (!(concatenate))						\
 		(buf)->size = 0;					\
 	for (;;) {							\
 		WT_ASSERT(session, (buf)->memsize >= (buf)->size);	\

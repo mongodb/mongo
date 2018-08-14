@@ -537,7 +537,6 @@ thread_ckpt_run(void *arg)
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 	first_ckpt = true;
 	ts = 0;
-	__wt_epoch(NULL, &start);
 	for (i = 0; ;++i) {
 		sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
 		sleep(sleep_time);
@@ -555,9 +554,12 @@ thread_ckpt_run(void *arg)
 		/*
 		 * Create the checkpoint file so that the parent process knows
 		 * at least one checkpoint has finished and can start its
-		 * timer.
+		 * timer. Start the timer for stable after the first checkpoint
+		 * completes because a slow I/O lag during the checkpoint can
+		 * cause a false positive for a timeout.
 		 */
 		if (first_ckpt) {
+			__wt_epoch(NULL, &start);
 			testutil_checksys((fp = fopen(ckpt_file, "w")) == NULL);
 			first_ckpt = false;
 			testutil_checksys(fclose(fp) != 0);

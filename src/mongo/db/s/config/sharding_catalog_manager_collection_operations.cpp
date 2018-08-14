@@ -140,7 +140,6 @@ ChunkVersion createFirstChunks(OperationContext* opCtx,
                                const ShardId& primaryShardId,
                                const std::vector<BSONObj>& initPoints,
                                const bool distributeInitialChunks) {
-
     const KeyPattern keyPattern = shardKeyPattern.getKeyPattern();
 
     vector<BSONObj> splitPoints;

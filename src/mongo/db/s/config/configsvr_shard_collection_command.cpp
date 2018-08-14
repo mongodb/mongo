@@ -637,7 +637,6 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
         }
     }
 }
-
 boost::optional<UUID> getUUIDFromPrimaryShard(const NamespaceString& nss,
                                               ScopedDbConnection& conn) {
     // Obtain the collection's UUID from the primary shard's listCollections response.
@@ -682,7 +681,7 @@ boost::optional<UUID> getUUIDFromPrimaryShard(const NamespaceString& nss,
 }
 
 /**
- * Internal sharding command run on config servers to add a shard to the cluster.
+ * Internal sharding command run on config servers to shard a collection.
  */
 class ConfigSvrShardCollectionCommand : public BasicCommand {
 public:
@@ -830,20 +829,69 @@ public:
             return true;
         }
 
+        bool isEmpty = (conn->count(nss.ns()) == 0);
+        boost::optional<UUID> uuid;
+
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+
+            // The primary shard will read the config.tags collection so we need to lock the zone
+            // mutex.
+            Lock::ExclusiveLock lk = catalogManager->lockZoneMutex(opCtx);
+
+            ShardsvrShardCollection shardsvrShardCollectionRequest;
+            shardsvrShardCollectionRequest.set_shardsvrShardCollection(nss);
+            shardsvrShardCollectionRequest.setKey(request.getKey());
+            shardsvrShardCollectionRequest.setUnique(request.getUnique());
+            shardsvrShardCollectionRequest.setNumInitialChunks(request.getNumInitialChunks());
+            shardsvrShardCollectionRequest.setInitialSplitPoints(request.getInitialSplitPoints());
+            shardsvrShardCollectionRequest.setCollation(request.getCollation());
+            shardsvrShardCollectionRequest.setGetUUIDfromPrimaryShard(
+                request.getGetUUIDfromPrimaryShard());
+
+            auto cmdResponse = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                "admin",
+                CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
+                    cmdObj, shardsvrShardCollectionRequest.toBSON())),
+                Shard::RetryPolicy::kIdempotent));
+
+            CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+
+            auto shardCollResponse = ShardsvrShardCollectionResponse::parse(
+                IDLParserErrorContext("ShardsvrShardCollectionResponse"), cmdResponse.response);
+
+            // Make sure the cached metadata for the collection knows that we are now sharded
+            catalogCache->invalidateShardedCollection(nss);
+
+            // Free the distlocks to allow the splits and migrations below to proceed.
+            collDistLock.reset();
+            dbDistLock.reset();
+            lk.unlock();
+
+            // Step 7. Migrate initial chunks to distribute them across shards.
+            migrateAndFurtherSplitInitialChunks(opCtx,
+                                                nss,
+                                                numShards,
+                                                shardIds,
+                                                isEmpty,
+                                                shardKeyPattern,
+                                                std::move(shardCollResponse.getAllSplits()));
+
+            return true;
+        }
+
         // Step 3.
         validateShardKeyAgainstExistingIndexes(
             opCtx, nss, proposedKey, shardKeyPattern, primaryShard, conn, request);
 
         // Step 4.
-        boost::optional<UUID> uuid;
         if (request.getGetUUIDfromPrimaryShard()) {
             uuid = getUUIDFromPrimaryShard(nss, conn);
         } else {
             uuid = UUID::gen();
         }
-
-        // isEmpty is used by multiple steps below.
-        bool isEmpty = (conn->count(nss.ns()) == 0);
 
         // Step 5.
         std::vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
@@ -856,6 +904,7 @@ public:
                                     request,
                                     &initSplits,
                                     &allSplits);
+
 
         LOG(0) << "CMD: shardcollection: " << cmdObj;
 

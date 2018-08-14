@@ -933,8 +933,9 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          BSONObj& cmd,
          const OpTime& opTime,
          OplogApplication::Mode mode) -> Status {
-         return convertToCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd["size"].number());
-     }}},
+          return convertToCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd["size"].number());
+      },
+      {ErrorCodes::NamespaceNotFound}}},
     {"emptycapped",
      {[](OperationContext* opCtx,
          const char* ns,
@@ -942,8 +943,9 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          BSONObj& cmd,
          const OpTime& opTime,
          OplogApplication::Mode mode) -> Status {
-         return emptyCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd));
-     }}},
+          return emptyCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd));
+      },
+      {ErrorCodes::NamespaceNotFound}}},
 };
 
 }  // namespace

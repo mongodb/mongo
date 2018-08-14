@@ -67,7 +67,7 @@ hazard_grow(WT_SESSION_IMPL *session)
 int
 __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 #ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
+    , const char *func, int line
 #endif
     )
 {
@@ -146,7 +146,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 	 */
 	hp->ref = ref;
 #ifdef HAVE_DIAGNOSTIC
-	hp->file = file;
+	hp->func = func;
 	hp->line = line;
 #endif
 	/* Publish the hazard pointer before reading page's state. */
@@ -419,7 +419,7 @@ __wt_hazard_check_assert(WT_SESSION_IMPL *session, void *ref, bool waitfor)
 	}
 	__wt_errx(session,
 	    "hazard pointer reference to discarded object: (%p: %s, line %d)",
-	    (void *)hp->ref, hp->file, hp->line);
+	    (void *)hp->ref, hp->func, hp->line);
 	return (false);
 }
 
@@ -438,6 +438,6 @@ __hazard_dump(WT_SESSION_IMPL *session)
 			__wt_errx(session,
 			    "session %p: hazard pointer %p: %s, line %d",
 			    (void *)session,
-			    (void *)hp->ref, hp->file, hp->line);
+			    (void *)hp->ref, hp->func, hp->line);
 }
 #endif

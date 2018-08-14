@@ -234,6 +234,8 @@ private:
 
     // The statistics about a chunk migration to be included in moveChunk.commit
     BSONObj _recipientCloneCounts;
+
+    boost::optional<CollectionCriticalSection> _critSec;
 };
 
 }  // namespace mongo

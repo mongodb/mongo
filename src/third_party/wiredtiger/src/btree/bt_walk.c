@@ -443,8 +443,8 @@ restart:		/*
 					goto done;
 				}
 
-				 WT_ASSERT(session, ret == WT_NOTFOUND);
-				 WT_ERR_NOTFOUND_OK(ret);
+				WT_ASSERT(session, ret == WT_NOTFOUND);
+				WT_ERR_NOTFOUND_OK(ret);
 
 				__wt_spin_backoff(&yield_count, &sleep_usecs);
 			}

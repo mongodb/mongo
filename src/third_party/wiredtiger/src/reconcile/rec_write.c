@@ -595,8 +595,6 @@ static int
 __rec_write_check_complete(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, int tret, bool *lookaside_retryp)
 {
-	WT_UNUSED(session);
-
 	/*
 	 * Tests in this function are lookaside tests and tests to decide if
 	 * rewriting a page in memory is worth doing. In-memory configurations

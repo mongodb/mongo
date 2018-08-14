@@ -156,9 +156,4 @@ currently open in the database, nor will any statistics requiring the
 traversal of a tree (as if the \c statistics_fast configuration string
 were set).
 
-A Python script that parses the default logging output and uses the
-<a href="http://www.gnuplot.info/">gnuplot</a>, utility to generate
-Portable Network Graphics (PNG) format graphs is included in the
-WiredTiger distribution in the file \c tools/statlog.py.
-
 */

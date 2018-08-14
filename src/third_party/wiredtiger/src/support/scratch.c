@@ -242,7 +242,7 @@ __wt_buf_set_size(
 int
 __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 #ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
+    , const char *func, int line
 #endif
     )
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
@@ -330,15 +330,14 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 	F_SET(*best, WT_ITEM_INUSE);
 
 #ifdef HAVE_DIAGNOSTIC
-	session->scratch_track[best - session->scratch].file = file;
+	session->scratch_track[best - session->scratch].func = func;
 	session->scratch_track[best - session->scratch].line = line;
 #endif
 
 	*scratchp = *best;
 	return (0);
 
-err:	WT_RET_MSG(session, ret,
-	    "session unable to allocate a scratch buffer");
+err:	WT_RET_MSG(session, ret, "session unable to allocate a scratch buffer");
 }
 
 /*
@@ -361,7 +360,7 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 			    "scratch buffer allocated and never discarded"
 			    ": %s: %d",
 			    session->
-			    scratch_track[bufp - session->scratch].file,
+			    scratch_track[bufp - session->scratch].func,
 			    session->
 			    scratch_track[bufp - session->scratch].line
 			    );

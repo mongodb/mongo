@@ -25,7 +25,7 @@ struct __wt_data_handle_cache {
 struct __wt_hazard {
 	WT_REF *ref;			/* Page reference */
 #ifdef HAVE_DIAGNOSTIC
-	const char *file;		/* File/line where hazard acquired */
+	const char *func;		/* Function/line hazard acquired */
 	int	    line;
 #endif
 };
@@ -120,7 +120,7 @@ struct __wt_session_impl {
 	 * to applications, create a parallel structure instead.
 	 */
 	struct __wt_scratch_track {
-		const char *file;	/* Allocating file, line */
+		const char *func;	/* Allocating function, line */
 		int line;
 	} *scratch_track;
 #endif

@@ -407,6 +407,7 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 {
 	WT_LSM_TREE *lsm_tree;
 
+	*treep = NULL;
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 
 	/* See if the tree is already open. */

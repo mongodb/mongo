@@ -104,6 +104,7 @@ _wiredtiger.pyd
 **/test/checkpoint/t
 **/test/csuite/test_random_abort
 **/test/csuite/test_rwlock
+**/test/csuite/test_schema_abort
 **/test/csuite/test_scope
 **/test/csuite/test_timestamp_abort
 **/test/csuite/test_truncated_log
