@@ -63,11 +63,11 @@ class ConnectionPool : public EgressTagCloser {
     class SpecificPool;
 
 public:
-    class ConnectionHandleDeleter;
     class ConnectionInterface;
     class DependentTypeFactoryInterface;
     class TimerInterface;
 
+    using ConnectionHandleDeleter = stdx::function<void(ConnectionInterface* connection)>;
     using ConnectionHandle = std::unique_ptr<ConnectionInterface, ConnectionHandleDeleter>;
 
     using GetConnectionCallback = stdx::function<void(StatusWith<ConnectionHandle>)>;
@@ -170,20 +170,6 @@ private:
     stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
 
     EgressTagCloserManager* _manager;
-};
-
-class ConnectionPool::ConnectionHandleDeleter {
-public:
-    ConnectionHandleDeleter() = default;
-    ConnectionHandleDeleter(ConnectionPool* pool) : _pool(pool) {}
-
-    void operator()(ConnectionInterface* connection) const {
-        if (_pool && connection)
-            _pool->returnConnection(connection);
-    }
-
-private:
-    ConnectionPool* _pool = nullptr;
 };
 
 /**

@@ -98,8 +98,7 @@ class HangingHook : public executor::NetworkConnectionHook {
             return response.status;
         }
 
-        return {ErrorCodes::NetworkInterfaceExceededTimeLimit,
-                "No ping command. Simulating timeout"};
+        return {ErrorCodes::ExceededTimeLimit, "No ping command. Returning pseudo-timeout."};
     }
 };
 
@@ -108,8 +107,19 @@ class HangingHook : public executor::NetworkConnectionHook {
 TEST_F(NetworkInterfaceIntegrationFixture, HookHangs) {
     startNet(stdx::make_unique<HangingHook>());
 
-    assertCommandFailsOnClient(
-        "admin", BSON("ping" << 1), ErrorCodes::NetworkInterfaceExceededTimeLimit, Seconds(1));
+    /**
+     *  Since mongos's have no ping command, we effectively skip this test by returning
+     *  ExceededTimeLimit above. (That ErrorCode is used heavily in repl and sharding code.)
+     *  If we return NetworkInterfaceExceededTimeLimit, it will make the ConnectionPool
+     *  attempt to reform the connection, which can lead to an accepted but unfortunate
+     *  race between TLConnection::setup and TLTypeFactory::shutdown.
+     *  We assert here that the error code we get is in the error class of timeouts,
+     *  which covers both NetworkInterfaceExceededTimeLimit and ExceededTimeLimit.
+     */
+    RemoteCommandRequest request{
+        fixture().getServers()[0], "admin", BSON("ping" << 1), BSONObj(), nullptr, Seconds(1)};
+    auto res = runCommandSync(request);
+    ASSERT(ErrorCodes::isExceededTimeLimitError(res.status.code()));
 }
 
 using ResponseStatus = TaskExecutor::ResponseStatus;
