@@ -263,7 +263,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
         const setUpInitialState = function setUpInitialState() {
             assert.commandWorked(mainDB.dropDatabase());
             test.prepare(mainDB);
-            mainDB.getLastError('majority', 60 * 1000);
+            replTest.awaitReplication();
             // Do some sanity checks.
             assertReadsSucceed(otherDBCollection);
             test.blockedCollections.forEach((name) => assertReadsSucceed(mainDB[name]));
@@ -325,7 +325,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
             // unblocked.
             assert.commandWorked(
                 secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
-            mainDB.getLastError("majority", 60 * 1000);
+            replTest.awaitReplication();
             test.blockedCollections.forEach((name) => assertReadsSucceed(mainDB[name]));
 
             // Wait for the threads to complete and report any errors encountered from running them.
