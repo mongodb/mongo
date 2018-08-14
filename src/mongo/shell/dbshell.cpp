@@ -910,7 +910,7 @@ int _main(int argc, char* argv[], char** envp) {
     unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
     shellMainScope = scope.get();
 
-    if (shellGlobalParams.runShell && !mongo::serverGlobalParams.quiet.load())
+    if (shellGlobalParams.runShell)
         cout << "type \"help\" for help" << endl;
 
     // Load and execute /etc/mongorc.js before starting shell
