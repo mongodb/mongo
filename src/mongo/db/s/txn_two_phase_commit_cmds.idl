@@ -46,7 +46,6 @@ commands:
                 type: shard_id
             prepareTimestamp:
                 description: "Timestamp at which the sender prepared the transaction"
-                optional: true
                 type: timestamp
 
     voteAbortTransaction:
