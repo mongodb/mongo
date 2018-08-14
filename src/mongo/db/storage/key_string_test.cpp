@@ -1431,10 +1431,8 @@ TEST_F(KeyStringTest, InvalidDecimalContinuation) {
 
 TEST_F(KeyStringTest, RandomizedInputsForToBsonSafe) {
     std::mt19937 gen(newSeed());
-    std::uniform_int_distribution<uint32_t> randomNum(std::numeric_limits<uint32_t>::min(),
-                                                      std::numeric_limits<uint32_t>::max());
-    std::uniform_int_distribution<uint8_t> randomByte(std::numeric_limits<uint8_t>::min(),
-                                                      std::numeric_limits<uint8_t>::max());
+    std::uniform_int_distribution<unsigned int> randomNum(std::numeric_limits<unsigned int>::min(),
+                                                          std::numeric_limits<unsigned int>::max());
 
     const auto interestingElements = getInterestingElements(KeyString::Version::V1);
     for (auto elem : interestingElements) {
@@ -1448,12 +1446,12 @@ TEST_F(KeyStringTest, RandomizedInputsForToBsonSafe) {
         // Select a random byte to change, except for the first byte as it will likely become an
         // invalid CType and not test anything interesting.
         auto offset = randomNum(gen) % (ks.getSize() - 1);
-        auto newValue = randomByte(gen);
+        uint8_t newValue = randomNum(gen) % std::numeric_limits<uint8_t>::max();
         ksBuffer.get()[offset + 1] = newValue;
 
         // Ditto for the type bits buffer.
         offset = randomNum(gen) % ks.getTypeBits().getSize();
-        newValue = randomByte(gen);
+        newValue = randomNum(gen) % std::numeric_limits<uint8_t>::max();
         tbBuffer.get()[offset] = newValue;
 
         // Build the new TypeBits.
