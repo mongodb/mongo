@@ -34,7 +34,7 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/session_catalog.h"
-#include "mongo/db/transaction_coordinator_io.h"
+#include "mongo/db/transaction_coordinator_commands_impl.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/shard_server_test_fixture.h"

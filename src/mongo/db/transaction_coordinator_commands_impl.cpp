@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator_io.h"
+#include "mongo/db/transaction_coordinator_commands_impl.h"
 
 #include "mongo/db/session_catalog.h"
 #include "mongo/executor/task_executor_pool.h"
