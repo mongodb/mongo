@@ -293,8 +293,9 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     std::vector<std::string> dbNames;
     storageEngine->listDatabases(&dbNames);
 
-    // Rebuilding indexes must be done before a database can be opened.
-    if (!storageGlobalParams.readOnly) {
+    // Rebuilding indexes must be done before a database can be opened, except when using repair,
+    // which rebuilds all indexes when it is done.
+    if (!storageGlobalParams.readOnly && !storageGlobalParams.repair) {
         rebuildIndexes(opCtx, storageEngine);
     }
 
