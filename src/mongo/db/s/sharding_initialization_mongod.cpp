@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
@@ -361,7 +362,8 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     auto shardFactory =
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    auto service = opCtx->getServiceContext();
+    auto const service = opCtx->getServiceContext();
+
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (storageGlobalParams.readOnly) {
             CatalogCacheLoader::set(service, stdx::make_unique<ReadOnlyCatalogCacheLoader>());
@@ -392,6 +394,12 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         // We only need one task executor here because sharding task executors aren't used for user
         // queries in mongod.
         1));
+
+    auto const replCoord = repl::ReplicationCoordinator::get(service);
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        replCoord->getMemberState().primary()) {
+        LogicalTimeValidator::get(opCtx)->enableKeyGenerator(opCtx, true);
+    }
 
     Grid::get(opCtx)->setShardingInitialized();
 }

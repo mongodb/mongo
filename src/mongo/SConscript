@@ -422,7 +422,6 @@ mongos = env.Program(
         'db/server_options',
         'db/startup_warnings_common',
         'db/stats/counters',
-        's/client/sharding_connection_hook',
         's/commands/cluster_commands',
         's/commands/shared_cluster_commands',
         's/committed_optime_metadata_hook',

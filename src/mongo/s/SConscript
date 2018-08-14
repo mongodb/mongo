@@ -69,26 +69,29 @@ env.Library(
     ],
 )
 
-# Functionality for initializing global sharding state
+# Functionality for initializing all the services used by sharding, which are common between MongoS
+# and MongoD
 env.Library(
     target='sharding_initialization',
     source=[
         'sharding_initialization.cpp',
+        'client/sharding_connection_hook.cpp',
+        'client/sharding_network_connection_hook.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_cache_factory_mongos',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_impl',
         '$BUILD_DIR/mongo/s/catalog/replset_dist_lock_manager',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
-        'client/sharding_connection_hook',
+        'sharding_legacy_api',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         'coreshard',
         'sharding_task_executor',
     ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-    ]
 )
 
 env.Library(
@@ -468,7 +471,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/util/net/network',
-        'client/sharding_connection_hook',
         'sharding_legacy_api',
     ]
 )
