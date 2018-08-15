@@ -106,7 +106,7 @@ public:
         }
 
         // Add prepareTimestamp to the command response.
-        auto timestamp = txnParticipant->prepareTransaction(opCtx);
+        auto timestamp = txnParticipant->prepareTransaction(opCtx, {});
         result.append("prepareTimestamp", timestamp);
 
         return true;
@@ -273,7 +273,7 @@ public:
                     txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
                 });
 
-                txnParticipant->prepareTransaction(opCtx);
+                txnParticipant->prepareTransaction(opCtx, {});
 
                 txnParticipant->stashTransactionResources(opCtx);
                 guard.Dismiss();

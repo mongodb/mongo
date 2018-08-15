@@ -940,6 +940,10 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     try {
         // We are only given an oplog slot for prepared transactions.
         auto prepare = !prepareOplogSlot.opTime.isNull();
+        if (prepare) {
+            // TODO: SERVER-36814 Remove "prepare" field on applyOps.
+            applyOpsBuilder.append("prepare", true);
+        }
         auto applyOpCmd = applyOpsBuilder.done();
         auto times = replLogApplyOps(
             opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink, prepare, prepareOplogSlot);
@@ -1014,6 +1018,11 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx, const OplogSl
     invariant(!prepareOpTime.opTime.isNull());
     auto stmts = txnParticipant->endTransactionAndRetrieveOperations(opCtx);
 
+    // Don't write oplog entry on secondaries.
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
     // We write the oplog entry in a side transaction so that we do not commit the now-prepared
     // transaction.
     // We write an empty 'applyOps' entry if there were no writes to choose a prepare timestamp
@@ -1035,6 +1044,10 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx, const OplogSl
 }
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
     invariant(opCtx->getTxnNumber());
     Session* const session = OperationContextSession::get(opCtx);
     invariant(session);

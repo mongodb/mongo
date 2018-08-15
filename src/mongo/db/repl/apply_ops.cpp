@@ -50,6 +50,7 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -259,6 +260,40 @@ Status _applyOps(OperationContext* opCtx,
     return Status::OK();
 }
 
+Status _applyPrepareTransaction(OperationContext* opCtx,
+                                const std::string& dbName,
+                                const BSONObj& applyOpCmd,
+                                const ApplyOpsCommandInfo& info,
+                                repl::OplogApplication::Mode oplogApplicationMode,
+                                BSONObjBuilder* result,
+                                int* numApplied,
+                                BSONArrayBuilder* opsBuilder,
+                                const OpTime& optime) {
+    // Only run on secondary.
+    uassert(50945,
+            "applyOps with prepared flag is only used internally by secondaries.",
+            oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
+    uassert(
+        50946,
+        "applyOps with prepared must only include CRUD operations and cannot have precondition.",
+        !info.getPreCondition() && info.areOpsCrudOnly());
+
+    // Session has been checked out by sync_tail.
+    auto transaction = TransactionParticipant::get(opCtx);
+    invariant(transaction);
+
+    transaction->unstashTransactionResources(opCtx, "prepareTransaction");
+
+    // Abort transaction unconditionally for now.
+    // TODO: SERVER-35875 / SERVER-35877 Abort or commit transactions on secondaries accordingly.
+    ScopeGuard abortGuard = MakeGuard([&] { transaction->abortActiveTransaction(opCtx); });
+
+    _applyOps(
+        opCtx, dbName, applyOpCmd, info, oplogApplicationMode, result, numApplied, opsBuilder);
+    transaction->prepareTransaction(opCtx, optime);
+    return Status::OK();
+}
+
 Status _checkPrecondition(OperationContext* opCtx,
                           const std::vector<BSONObj>& preConditions,
                           BSONObjBuilder* result) {
@@ -340,6 +375,7 @@ Status applyOps(OperationContext* opCtx,
                 const std::string& dbName,
                 const BSONObj& applyOpCmd,
                 repl::OplogApplication::Mode oplogApplicationMode,
+                boost::optional<OpTime> optime,
                 BSONObjBuilder* result) {
     auto info = ApplyOpsCommandInfo::parse(applyOpCmd);
 
@@ -347,8 +383,9 @@ Status applyOps(OperationContext* opCtx,
     boost::optional<Lock::DBLock> dbWriteLock;
 
     // There's only one case where we are allowed to take the database lock instead of the global
-    // lock - no preconditions; only CRUD ops; and non-atomic mode.
-    if (!info.getPreCondition() && info.areOpsCrudOnly() && !info.getAllowAtomic()) {
+    // lock - no preconditions; only CRUD ops; non-atomic mode; and not for transaction prepare.
+    if (!info.getPreCondition() && info.areOpsCrudOnly() && !info.getAllowAtomic() &&
+        !info.getPrepare()) {
         dbWriteLock.emplace(opCtx, dbName, MODE_IX);
     } else {
         globalWriteLock.emplace(opCtx);
@@ -371,6 +408,21 @@ Status applyOps(OperationContext* opCtx,
     }
 
     int numApplied = 0;
+
+    // Apply prepare transaction operation if "prepare" is true.
+    if (info.getPrepare().get_value_or(false)) {
+        invariant(optime);
+        return _applyPrepareTransaction(opCtx,
+                                        dbName,
+                                        applyOpCmd,
+                                        info,
+                                        oplogApplicationMode,
+                                        result,
+                                        &numApplied,
+                                        nullptr,
+                                        *optime);
+    }
+
     if (!info.isAtomic()) {
         return _applyOps(
             opCtx, dbName, applyOpCmd, info, oplogApplicationMode, result, &numApplied, nullptr);

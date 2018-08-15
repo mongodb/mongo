@@ -67,4 +67,21 @@ OperationContextSessionMongod::OperationContextSessionMongod(OperationContext* o
     }
 }
 
+OperationContextSessionMongodWithoutRefresh::OperationContextSessionMongodWithoutRefresh(
+    OperationContext* opCtx)
+    : _operationContextSession(opCtx, true /* checkout */) {
+    invariant(!opCtx->getClient()->isInDirectClient());
+    auto session = OperationContextSession::get(opCtx);
+    invariant(session);
+
+    auto clientTxnNumber = *opCtx->getTxnNumber();
+    // Session is refreshed, but the transaction participant isn't.
+    session->refreshFromStorageIfNeeded(opCtx);
+    session->beginOrContinueTxn(opCtx, clientTxnNumber);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    invariant(txnParticipant);
+    txnParticipant->beginTransactionUnconditionally(clientTxnNumber);
+}
+
 }  // namespace mongo

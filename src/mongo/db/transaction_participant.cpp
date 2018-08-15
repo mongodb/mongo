@@ -178,31 +178,6 @@ void TransactionParticipant::_continueMultiDocumentTransaction(WithLock wl, TxnN
 }
 
 void TransactionParticipant::_beginMultiDocumentTransaction(WithLock wl, TxnNumber txnNumber) {
-    // Servers in a sharded cluster can start a new transaction at the active transaction number to
-    // allow internal retries by routers on re-targeting errors, like StaleShardVersion or
-    // SnapshotTooOld.
-    if (txnNumber == _activeTxnNumber) {
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                "Only servers in a sharded cluster can start a new transaction at the active "
-                "transaction number",
-                serverGlobalParams.clusterRole != ClusterRole::None);
-
-        // The active transaction number can only be reused if the transaction is not in a state
-        // that indicates it has been involved in a two phase commit. In normal operation this check
-        // should never fail.
-        //
-        // TODO SERVER-36639: Ensure the active transaction number cannot be reused if the
-        // transaction is in the abort after prepare state (or any state indicating the participant
-        // has been involved in a two phase commit).
-        const auto restartableStates = TransactionState::kInProgress | TransactionState::kAborted;
-        uassert(50911,
-                str::stream() << "Cannot start a transaction at given transaction number "
-                              << txnNumber
-                              << " a transaction with the same number is in state "
-                              << _txnState.toString(),
-                _txnState.isInSet(wl, restartableStates));
-    }
-
     // Aborts any in-progress txns.
     _setNewTxnNumber(wl, txnNumber);
     _autoCommit = false;
@@ -257,6 +232,36 @@ void TransactionParticipant::beginOrContinue(TxnNumber txnNumber,
     // earlier when parsing the request.
     invariant(*startTransaction);
 
+    // Servers in a sharded cluster can start a new transaction at the active transaction number to
+    // allow internal retries by routers on re-targeting errors, like StaleShardVersion or
+    // SnapshotTooOld.
+    if (txnNumber == _activeTxnNumber) {
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "Only servers in a sharded cluster can start a new transaction at the active "
+                "transaction number",
+                serverGlobalParams.clusterRole != ClusterRole::None);
+
+        // The active transaction number can only be reused if the transaction is not in a state
+        // that indicates it has been involved in a two phase commit. In normal operation this check
+        // should never fail.
+        //
+        // TODO SERVER-36639: Ensure the active transaction number cannot be reused if the
+        // transaction is in the abort after prepare state (or any state indicating the participant
+        // has been involved in a two phase commit).
+        const auto restartableStates = TransactionState::kInProgress | TransactionState::kAborted;
+        uassert(50911,
+                str::stream() << "Cannot start a transaction at given transaction number "
+                              << txnNumber
+                              << " a transaction with the same number is in state "
+                              << _txnState.toString(),
+                _txnState.isInSet(lg, restartableStates));
+    }
+
+    _beginMultiDocumentTransaction(lg, txnNumber);
+}
+
+void TransactionParticipant::beginTransactionUnconditionally(TxnNumber txnNumber) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _beginMultiDocumentTransaction(lg, txnNumber);
 }
 
@@ -522,7 +527,8 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
     }
 }
 
-Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx) {
+Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
+                                                     boost::optional<repl::OpTime> prepareOptime) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     // Always check session's txnNumber and '_txnState', since they can be modified by
     // session kill and migration, which do not check out the session.
@@ -534,6 +540,9 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx) {
          "cannot change transaction number while the session has a prepared transaction"});
 
     ScopeGuard abortGuard = MakeGuard([&] {
+        // Prepare transaction on secondaries should always succeed.
+        invariant(!prepareOptime);
+
         if (lk.owns_lock()) {
             lk.unlock();
         }
@@ -542,36 +551,41 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx) {
 
     _txnState.transitionTo(lk, TransactionState::kPrepared);
 
-    // Reserve an optime for the 'prepareTimestamp'. This will create a hole in the oplog and cause
-    // 'snapshot' and 'afterClusterTime' readers to block until this transaction is done being
-    // prepared. When the OplogSlotReserver goes out of scope and is destroyed, the
-    // storage-transaction it uses to keep the hole open will abort and the slot (and corresponding
-    // oplog hole) will vanish.
-    OplogSlotReserver oplogSlotReserver(opCtx);
-    const auto prepareOplogSlot = oplogSlotReserver.getReservedOplogSlot();
-    const auto prepareTimestamp = prepareOplogSlot.opTime.getTimestamp();
-    invariant(_prepareOpTime.isNull(),
-              str::stream() << "This transaction has already reserved a prepareOpTime at: "
-                            << _prepareOpTime.toString());
-    _prepareOpTime = prepareOplogSlot.opTime;
+    boost::optional<OplogSlotReserver> oplogSlotReserver;
+    OplogSlot prepareOplogSlot;
+    if (prepareOptime) {
+        // On secondary, we just prepare the transaction and discard the buffered ops.
+        prepareOplogSlot = OplogSlot(*prepareOptime, 0);
+    } else {
+        // On primary, we reserve an optime, prepare the transaction and write the oplog entry.
+        //
+        // Reserve an optime for the 'prepareTimestamp'. This will create a hole in the oplog and
+        // cause 'snapshot' and 'afterClusterTime' readers to block until this transaction is done
+        // being prepared. When the OplogSlotReserver goes out of scope and is destroyed, the
+        // storage-transaction it uses to keep the hole open will abort and the slot (and
+        // corresponding oplog hole) will vanish.
+        oplogSlotReserver.emplace(opCtx);
+        prepareOplogSlot = oplogSlotReserver->getReservedOplogSlot();
+        invariant(_prepareOpTime.isNull(),
+                  str::stream() << "This transaction has already reserved a prepareOpTime at: "
+                                << _prepareOpTime.toString());
+        _prepareOpTime = prepareOplogSlot.opTime;
 
-    if (MONGO_FAIL_POINT(hangAfterReservingPrepareTimestamp)) {
-        // This log output is used in js tests so please leave it.
-        log() << "transaction - hangAfterReservingPrepareTimestamp fail point "
-                 "enabled. Blocking until fail point is disabled. Prepare OpTime: "
-              << prepareOplogSlot.opTime;
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterReservingPrepareTimestamp);
+        if (MONGO_FAIL_POINT(hangAfterReservingPrepareTimestamp)) {
+            // This log output is used in js tests so please leave it.
+            log() << "transaction - hangAfterReservingPrepareTimestamp fail point "
+                     "enabled. Blocking until fail point is disabled. Prepare OpTime: "
+                  << prepareOplogSlot.opTime;
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterReservingPrepareTimestamp);
+        }
     }
-
-    opCtx->recoveryUnit()->setPrepareTimestamp(prepareTimestamp);
+    opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.opTime.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();
 
     // We need to unlock the session to run the opObserver onTransactionPrepare, which calls back
     // into the session.
     lk.unlock();
-    auto opObserver = opCtx->getServiceContext()->getOpObserver();
-    invariant(opObserver);
-    opObserver->onTransactionPrepare(opCtx, prepareOplogSlot);
+    opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(opCtx, prepareOplogSlot);
 
     // After the oplog entry is written successfully, it is illegal to implicitly abort or fail.
     try {
@@ -590,7 +604,7 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx) {
         fassertFailedWithStatus(50906, exceptionToStatus());
     }
 
-    return prepareTimestamp;
+    return prepareOplogSlot.opTime.getTimestamp();
 }
 
 void TransactionParticipant::addTransactionOperation(OperationContext* opCtx,

@@ -89,11 +89,14 @@ private:
  * the given command object. This function may be called as part of a direct user invocation of the
  * 'applyOps' command, or as part of the application of an 'applyOps' oplog operation. In either
  * case, the mode can be set to determine how the internal ops are executed.
+ *
+ * For oplog application, the optime of the oplog entry will be given as the "optime" argument.
  */
 Status applyOps(OperationContext* opCtx,
                 const std::string& dbName,
                 const BSONObj& applyOpCmd,
                 repl::OplogApplication::Mode oplogApplicationMode,
+                boost::optional<OpTime> optime,
                 BSONObjBuilder* result);
 
 }  // namespace repl

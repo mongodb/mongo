@@ -55,6 +55,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/applier_helpers.h"
 #include "mongo/db/repl/apply_ops.h"
@@ -534,11 +535,8 @@ void fillWriterVectors(OperationContext* opCtx,
 
         // Extract applyOps operations and fill writers with extracted operations using this
         // function.
-        if (op.isCommand() && op.getCommandType() == OplogEntry::CommandType::kApplyOps) {
-            if (op.shouldPrepare()) {
-                // TODO (SERVER-35307) mark operations as needing prepare.
-                continue;
-            }
+        if (op.isCommand() && op.getCommandType() == OplogEntry::CommandType::kApplyOps &&
+            !op.shouldPrepare()) {
             try {
                 derivedOps->emplace_back(ApplyOps::extractOperations(op));
 
@@ -930,7 +928,8 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     // Oplog entries on 'system.views' should also be processed one at a time. View catalog
     // immediately reflects changes for each oplog entry so we can see inconsistent view catalog if
     // multiple oplog entries on 'system.views' are being applied out of the original order.
-    if ((entry.isCommand() && entry.getCommandType() != OplogEntry::CommandType::kApplyOps) ||
+    if ((entry.isCommand() &&
+         (entry.getCommandType() != OplogEntry::CommandType::kApplyOps || entry.shouldPrepare())) ||
         entry.getNamespace().isSystemDotViews()) {
         if (ops->getCount() == 1) {
             // apply commands one-at-a-time
@@ -1165,6 +1164,22 @@ Status multiSyncApply(OperationContext* opCtx,
 
             // If we didn't create a group, try to apply the op individually.
             try {
+                // The write on transaction table may be applied concurrently, so refreshing state
+                // from disk may read that write, causing starting a new transaction on an existing
+                // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+                boost::optional<OperationContextSessionMongodWithoutRefresh> sessionTxnState;
+                if (entry.shouldPrepare()) {
+                    // Prepare transaction is in its own batch. We cannot modify the opCtx for other
+                    // ops.
+                    // The update on transaction table may be scheduled to the same writer.
+                    invariant(ops->size() <= 2);
+                    invariant(entry.getSessionId());
+                    invariant(entry.getTxnNumber());
+                    opCtx->setLogicalSessionId(*entry.getSessionId());
+                    opCtx->setTxnNumber(*entry.getTxnNumber());
+                    // Check out the session, with autoCommit = false and startMultiDocTxn = true.
+                    sessionTxnState.emplace(opCtx);
+                }
                 const Status status = SyncTail::syncApply(opCtx, entry.raw, oplogApplicationMode);
 
                 if (!status.isOK()) {

@@ -287,6 +287,7 @@ public:
                                  dbName,
                                  BSON("applyOps" << applyOpsList),
                                  repl::OplogApplication::Mode::kApplyOpsCmd,
+                                 {},
                                  &result);
         if (!status.isOK()) {
             return status;
@@ -305,6 +306,7 @@ public:
                                  dbName,
                                  BSON("applyOps" << applyOpsList << "allowAtomic" << false),
                                  repl::OplogApplication::Mode::kApplyOpsCmd,
+                                 {},
                                  &result);
         if (!status.isOK()) {
             return status;
@@ -645,6 +647,7 @@ public:
                                       << "o"
                                       << BSON("applyOps" << BSONArrayBuilder().obj())))),
                 repl::OplogApplication::Mode::kApplyOpsCmd,
+                {},
                 &result));
         }
 
@@ -721,6 +724,7 @@ public:
                            nss.db().toString(),
                            fullCommand.done(),
                            repl::OplogApplication::Mode::kApplyOpsCmd,
+                           {},
                            &result));
 
 
@@ -2624,7 +2628,7 @@ public:
         }
         txnParticipant->unstashTransactionResources(_opCtx, "insert");
 
-        txnParticipant->prepareTransaction(_opCtx);
+        txnParticipant->prepareTransaction(_opCtx, {});
 
         txnParticipant->stashTransactionResources(_opCtx);
         {

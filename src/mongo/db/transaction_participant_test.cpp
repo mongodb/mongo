@@ -644,7 +644,7 @@ TEST_F(TxnParticipantTest, CommitTransactionSetsCommitTimestampOnPreparedTransac
 
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
     txnParticipant->commitPreparedTransaction(opCtx(), commitTimestamp);
 
     ASSERT_EQ(commitTimestamp, actualCommitTimestamp);
@@ -704,7 +704,7 @@ TEST_F(TxnParticipantTest, CommitTransactionWithoutCommitTimestampFailsOnPrepare
 
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_THROWS_CODE(txnParticipant->commitUnpreparedTransaction(opCtx()),
                        AssertionException,
                        ErrorCodes::InvalidOptions);
@@ -718,7 +718,7 @@ TEST_F(TxnParticipantTest, CommitTransactionWithNullCommitTimestampFailsOnPrepar
 
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_THROWS_CODE(txnParticipant->commitPreparedTransaction(opCtx(), Timestamp()),
                        AssertionException,
                        ErrorCodes::InvalidOptions);
@@ -933,7 +933,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfActivePreparedAbortAndArbitraryAbort) {
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     ASSERT(txnParticipant->inMultiDocumentTransaction());
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
 
     // The transaction may be aborted without checking out the txnParticipant.
     txnParticipant->abortArbitraryTransaction();
@@ -956,7 +956,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfPrepareTransactionAndAbort) {
     ASSERT(txnParticipant->transactionIsAborted());
 
     // A prepareTransaction() after an abort should uassert.
-    ASSERT_THROWS_CODE(txnParticipant->prepareTransaction(opCtx()),
+    ASSERT_THROWS_CODE(txnParticipant->prepareTransaction(opCtx(), {}),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
     ASSERT_FALSE(_opObserver->transactionPrepared);
@@ -983,7 +983,7 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
     };
 
     // Check that prepareTimestamp gets set.
-    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx());
+    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
     ASSERT(_opObserver->transactionPrepared);
     ASSERT_FALSE(txnParticipant->transactionIsAborted());
@@ -1003,7 +1003,7 @@ DEATH_TEST_F(TxnParticipantTest, AbortDuringPrepareIsFatal, "Invariant") {
         ASSERT(txnParticipant->transactionIsAborted());
     };
 
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
 }
 
 TEST_F(TxnParticipantTest, ThrowDuringOnTransactionPrepareAbortsTransaction) {
@@ -1014,7 +1014,7 @@ TEST_F(TxnParticipantTest, ThrowDuringOnTransactionPrepareAbortsTransaction) {
 
     _opObserver->onTransactionPrepareThrowsException = true;
 
-    ASSERT_THROWS_CODE(txnParticipant->prepareTransaction(opCtx()),
+    ASSERT_THROWS_CODE(txnParticipant->prepareTransaction(opCtx(), {}),
                        AssertionException,
                        ErrorCodes::OperationFailed);
     ASSERT_FALSE(_opObserver->transactionPrepared);
@@ -1037,7 +1037,7 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPreparedCommitDoesNotAbortTransacti
         ASSERT_FALSE(txnParticipant->transactionIsAborted());
     };
 
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
     txnParticipant->commitPreparedTransaction(opCtx(), commitTimestamp);
 
     ASSERT(_opObserver->transactionCommitted);
@@ -1063,7 +1063,7 @@ TEST_F(TxnParticipantTest, AbortDuringPreparedCommitDoesNotAbortTransaction) {
         ASSERT_FALSE(txnParticipant->transactionIsAborted());
     };
 
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
     txnParticipant->commitPreparedTransaction(opCtx(), commitTimestamp);
 
     ASSERT(_opObserver->transactionCommitted);
@@ -1079,7 +1079,7 @@ TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionCommitDoesNothing) {
 
     const auto commitTimestamp = Timestamp(1, 1);
     _opObserver->onTransactionCommitThrowsException = true;
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
 
     ASSERT_THROWS_CODE(txnParticipant->commitPreparedTransaction(opCtx(), commitTimestamp),
                        AssertionException,
@@ -1141,7 +1141,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfPrepareTransactionAndMigration) {
 
     // A prepareTransaction() after a migration that bumps the active transaction number should
     // uassert.
-    ASSERT_THROWS_CODE(txnParticipant->prepareTransaction(opCtx()),
+    ASSERT_THROWS_CODE(txnParticipant->prepareTransaction(opCtx(), {}),
                        AssertionException,
                        ErrorCodes::ConflictingOperationInProgress);
     ASSERT_FALSE(_opObserver->transactionPrepared);
@@ -1169,7 +1169,7 @@ TEST_F(TxnParticipantTest, KillSessionsDoesNotAbortPreparedTransactions) {
     };
 
     // Check that prepareTimestamp gets set.
-    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx());
+    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
     txnParticipant->stashTransactionResources(opCtx());
 
@@ -1193,7 +1193,7 @@ TEST_F(TxnParticipantTest, TransactionTimeoutDoesNotAbortPreparedTransactions) {
     };
 
     // Check that prepareTimestamp gets set.
-    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx());
+    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
     txnParticipant->stashTransactionResources(opCtx());
 
@@ -1218,7 +1218,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
     };
 
     // Check that prepareTimestamp gets set.
-    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx());
+    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
 
     txnParticipant->stashTransactionResources(opCtx());
@@ -1251,7 +1251,7 @@ TEST_F(TxnParticipantTest, CannotInsertInPreparedTransaction) {
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
     txnParticipant->addTransactionOperation(opCtx(), operation);
 
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
 
     ASSERT_THROWS_CODE(txnParticipant->unstashTransactionResources(opCtx(), "insert"),
                        AssertionException,
@@ -1269,7 +1269,7 @@ TEST_F(TxnParticipantTest, MigrationThrowsOnPreparedTransaction) {
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
     txnParticipant->addTransactionOperation(opCtx(), operation);
 
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
 
     // A migration may bump the active transaction number without checking out the session.
     auto higherTxnNum = *opCtx()->getTxnNumber() + 1;
@@ -1289,7 +1289,7 @@ TEST_F(TxnParticipantTest, ImplictAbortDoesNotAbortPreparedTransaction) {
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
     txnParticipant->addTransactionOperation(opCtx(), operation);
 
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
 
     // The next command throws an exception and wants to abort the transaction.
     // This is a no-op.
@@ -1305,7 +1305,7 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
     txnParticipant->addTransactionOperation(opCtx(), operation);
-    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx());
+    auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
 
     auto sessionId = *opCtx()->getLogicalSessionId();
     auto txnNum = *opCtx()->getTxnNumber();
@@ -1490,7 +1490,7 @@ protected:
         txnParticipant->unstashTransactionResources(opCtx(), "insert");
         auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
         txnParticipant->addTransactionOperation(opCtx(), operation);
-        txnParticipant->prepareTransaction(opCtx());
+        txnParticipant->prepareTransaction(opCtx(), {});
 
         ASSERT_THROWS_CODE(
             txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction),
@@ -1656,7 +1656,7 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPreparedAbortFails) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
 
     auto originalFn = _opObserver->onTransactionAbortFn;
     _opObserver->onTransactionAbortFn = [&] {
@@ -1678,7 +1678,7 @@ TEST_F(TxnParticipantTest, ActiveAbortSucceedsDuringPreparedAbort) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
 
     auto sessionId = *opCtx()->getLogicalSessionId();
     auto txnNumber = *opCtx()->getTxnNumber();
@@ -1707,7 +1707,7 @@ TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionAbortIsFatal) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
-    txnParticipant->prepareTransaction(opCtx());
+    txnParticipant->prepareTransaction(opCtx(), {});
 
     _opObserver->onTransactionAbortThrowsException = true;
 

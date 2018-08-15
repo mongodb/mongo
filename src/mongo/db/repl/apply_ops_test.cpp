@@ -154,7 +154,7 @@ TEST_F(ApplyOpsTest, CommandInNestedApplyOpsReturnsSuccess) {
                                  << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
     auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
 
-    ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, {}, &resultBuilder));
     ASSERT_BSONOBJ_EQ({}, _opObserver->onApplyOpsCmdObj);
 }
 
@@ -184,7 +184,7 @@ TEST_F(ApplyOpsTest, InsertInNestedApplyOpsReturnsSuccess) {
     auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
 
     ASSERT_OK(_storage->createCollection(opCtx.get(), nss, options));
-    ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, {}, &resultBuilder));
     ASSERT_BSONOBJ_EQ(BSON("applyOps" << BSON_ARRAY(innerCmdObj)), _opObserver->onApplyOpsCmdObj);
 }
 
@@ -193,7 +193,7 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsWithNoOpsReturnsSuccess) {
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
     BSONObjBuilder resultBuilder;
     auto cmdObj = BSON("applyOps" << BSONArray());
-    ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+    ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, mode, {}, &resultBuilder));
     ASSERT_BSONOBJ_EQ(cmdObj, _opObserver->onApplyOpsCmdObj);
 }
 
@@ -229,7 +229,7 @@ TEST_F(ApplyOpsTest,
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
     BSONObjBuilder resultBuilder;
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+                  applyOps(opCtx.get(), "test", cmdObj, mode, {}, &resultBuilder));
     auto result = resultBuilder.obj();
     auto status = getStatusFromApplyOpsResult(result);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
@@ -250,7 +250,7 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithUuid) {
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, uuid, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+    ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, mode, {}, &resultBuilder));
     ASSERT_BSONOBJ_EQ(cmdObj, _opObserver->onApplyOpsCmdObj);
 }
 
@@ -273,7 +273,7 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithOtherUuid) {
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, applyOpsUuid, documentToInsert);
     BSONObjBuilder resultBuilder;
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+                  applyOps(opCtx.get(), "test", cmdObj, mode, {}, &resultBuilder));
     auto result = resultBuilder.obj();
     auto status = getStatusFromApplyOpsResult(result);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
@@ -293,7 +293,7 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithoutUuidIntoCollectionWithUuid) {
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+    ASSERT_OK(applyOps(opCtx.get(), "test", cmdObj, mode, {}, &resultBuilder));
 
     // Insert operation provided by caller did not contain collection uuid but applyOps() should add
     // the uuid to the oplog entry.
@@ -330,6 +330,7 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
                        nss.coll().toString(),
                        cmdObj,
                        OplogApplication::Mode::kInitialSync,
+                       {},
                        &resultBuilder));
     ASSERT_EQUALS(1, countLogLinesContaining("oplog application mode: InitialSync"));
 
@@ -340,6 +341,7 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
                        nss.coll().toString(),
                        cmdObj,
                        OplogApplication::Mode::kSecondary,
+                       {},
                        &resultBuilder));
     ASSERT_EQUALS(1, countLogLinesContaining("oplog application mode: Secondary"));
 
@@ -502,7 +504,7 @@ TEST_F(ApplyOpsTest, ApplyOpsFailsToDropAdmin) {
     auto dropDatabaseCmdObj = BSON("applyOps" << BSON_ARRAY(dropDatabaseOp));
     BSONObjBuilder resultBuilder;
     auto status =
-        applyOps(opCtx.get(), nss.db().toString(), dropDatabaseCmdObj, mode, &resultBuilder);
+        applyOps(opCtx.get(), nss.db().toString(), dropDatabaseCmdObj, mode, {}, &resultBuilder);
     ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
 }
 

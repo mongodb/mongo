@@ -53,4 +53,19 @@ private:
     OperationContextSession _operationContextSession;
 };
 
+/**
+ * Similar to OperationContextSessionMongod, but this starts a new transaction unconditionally
+ * without refreshing the state from disk. The session reloads the state from disk but
+ * the transaction participant will not use the on-disk state to refresh its in-memory state.
+ *
+ * This is used for transaction secondary application and recovery.
+ */
+class OperationContextSessionMongodWithoutRefresh {
+public:
+    OperationContextSessionMongodWithoutRefresh(OperationContext* opCtx);
+
+private:
+    OperationContextSession _operationContextSession;
+};
+
 }  // namespace mongo

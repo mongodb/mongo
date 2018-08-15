@@ -963,7 +963,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const OpTime& opTime,
          OplogApplication::Mode mode) -> Status {
          BSONObjBuilder resultWeDontCareAbout;
-         return applyOps(opCtx, nsToDatabase(ns), cmd, mode, &resultWeDontCareAbout);
+         return applyOps(opCtx, nsToDatabase(ns), cmd, mode, opTime, &resultWeDontCareAbout);
      }}},
     {"convertToCapped",
      {[](OperationContext* opCtx,
@@ -985,14 +985,20 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           return emptyCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd));
       },
       {ErrorCodes::NamespaceNotFound}}},
+    {"commitTransaction",
+     {[](OperationContext* opCtx,
+         const char* ns,
+         const BSONElement& ui,
+         BSONObj& cmd,
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status { return Status::OK(); }}},
     {"abortTransaction",
      {[](OperationContext* opCtx,
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
-         OplogApplication::Mode mode) -> Status { return Status::OK(); },
-      {}}},
+         OplogApplication::Mode mode) -> Status { return Status::OK(); }}},
 };
 
 }  // namespace
@@ -1561,30 +1567,32 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    const bool assignCommandTimestamp = [opCtx, mode] {
+    const bool assignCommandTimestamp = [opCtx, mode, &op] {
         const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
         if (opCtx->writesAreReplicated()) {
             // We do not assign timestamps on replicated writes since they will get their oplog
             // timestamp once they are logged.
             return false;
-        } else {
-            switch (replMode) {
-                case ReplicationCoordinator::modeReplSet: {
-                    // The 'applyOps' command never logs 'applyOps' oplog entries with nested
-                    // command operations, so this code will never be run from inside the 'applyOps'
-                    // command on secondaries. Thus, the timestamps in the command oplog
-                    // entries are always real timestamps from this oplog and we should
-                    // timestamp our writes with them.
-                    return true;
-                }
-                case ReplicationCoordinator::modeNone: {
-                    // Only assign timestamps on standalones during replication recovery when
-                    // started with 'recoverFromOplogAsStandalone'.
-                    return mode == OplogApplication::Mode::kRecovering;
-                }
-            }
-            MONGO_UNREACHABLE;
         }
+
+        switch (replMode) {
+            case ReplicationCoordinator::modeReplSet: {
+                // The 'applyOps' command never logs 'applyOps' oplog entries with nested
+                // command operations, so this code will never be run from inside the 'applyOps'
+                // command on secondaries. Thus, the timestamps in the command oplog
+                // entries are always real timestamps from this oplog and we should
+                // timestamp our writes with them.
+                //
+                // However, if "prepare" is specified, don't assign commit timestamp.
+                return !op.getBoolField("prepare");
+            }
+            case ReplicationCoordinator::modeNone: {
+                // Only assign timestamps on standalones during replication recovery when
+                // started with 'recoverFromOplogAsStandalone'.
+                return mode == OplogApplication::Mode::kRecovering;
+            }
+        }
+        MONGO_UNREACHABLE;
     }();
     invariant(!assignCommandTimestamp || !opTime.isNull(),
               str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));

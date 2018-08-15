@@ -184,8 +184,11 @@ public:
 
     /**
      * Puts a transaction into a prepared state and returns the prepareTimestamp.
+     *
+     * On secondary, the "prepareTimestamp" will be given in the oplog.
      */
-    Timestamp prepareTransaction(OperationContext* opCtx);
+    Timestamp prepareTransaction(OperationContext* opCtx,
+                                 boost::optional<repl::OpTime> prepareOptime);
 
     /**
      * Returns whether we are in a multi-document transaction, which means we have an active
@@ -342,6 +345,8 @@ public:
     void beginOrContinue(TxnNumber txnNumber,
                          boost::optional<bool> autocommit,
                          boost::optional<bool> startTransaction);
+
+    void beginTransactionUnconditionally(TxnNumber txnNumber);
 
     static Status isValid(StringData dbName, StringData cmdName);
 

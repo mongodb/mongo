@@ -638,7 +638,9 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
                                                            << "ui"
                                                            << uuid1
                                                            << "o"
-                                                           << BSON("_id" << 0))));
+                                                           << BSON("_id" << 0)))
+                                     << "prepare"
+                                     << true);
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT(oplogEntry.getPrepare());
     ASSERT(oplogEntry.getPrepare().get());
@@ -699,7 +701,9 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
                                                             << "ui"
                                                             << uuid
                                                             << "o"
-                                                            << doc)));
+                                                            << doc))
+                                         << "prepare"
+                                         << true);
         ASSERT_BSONOBJ_EQ(oExpected, o);
         ASSERT(oplogEntry.getPrepare());
     }
@@ -757,7 +761,7 @@ TEST_F(OpObserverTransactionTest, PreparingEmptyTransactionLogsEmptyApplyOps) {
     checkCommonFields(oplogEntryObj);
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
     auto o = oplogEntry.getObject();
-    auto oExpected = BSON("applyOps" << BSONArray());
+    auto oExpected = BSON("applyOps" << BSONArray() << "prepare" << true);
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT(oplogEntry.getPrepare());
     ASSERT(oplogEntry.getPrepare().get());

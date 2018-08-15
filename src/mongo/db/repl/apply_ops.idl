@@ -66,3 +66,8 @@ structs:
                 description: "applyOps supports checking the documents of existing collections
                               before proceeding to execute the given operations. This flag is set to
                               true if the 'preCondition' option is provided."
+
+            prepare:
+                type: bool
+                optional: true
+                description: "Specifies that this operation should be put into a 'prepare' state"

@@ -262,7 +262,6 @@ bool OplogEntry::isCrudOpType() const {
 }
 
 bool OplogEntry::shouldPrepare() const {
-    invariant(getCommandType() == OplogEntry::CommandType::kApplyOps);
     return getPrepare() && *getPrepare();
 }
 
