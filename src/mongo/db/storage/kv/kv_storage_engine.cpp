@@ -141,10 +141,11 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
     std::vector<std::string> collectionsKnownToCatalog;
     _catalog->getAllCollections(&collectionsKnownToCatalog);
 
-    if (loadingFromUncleanShutdownOrRepair) {
-        // If we are loading the catalog after an unclean shutdown or during repair, it's possible
-        // that there are collection files on disk that are unknown to the catalog. If we can't find
-        // an ident in the catalog, we generate a catalog entry for it.
+    if (_options.forRepair) {
+        // It's possible that there are collection files on disk that are unknown to the catalog. In
+        // a repair context, if we can't find an ident in the catalog, we generate a catalog entry
+        // 'local.system.orphan-xxxxx' for it. However, in a nonrepair context, the orphaned idents
+        // will be dropped in reconcileCatalogAndIdents().
         for (const auto& ident : identsKnownToStorageEngine) {
             if (_catalog->isCollectionIdent(ident)) {
                 bool isOrphan = !std::any_of(collectionsKnownToCatalog.begin(),

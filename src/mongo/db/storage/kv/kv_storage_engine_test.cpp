@@ -313,10 +313,13 @@ TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     AutoGetDb db(opCtx.get(), collNs.db(), LockMode::MODE_X);
+    // Only drop the catalog entry; storage engine still knows about this ident.
+    // This simulates an unclean shutdown happening between dropping the catalog entry and
+    // the actual drop in storage engine.
     ASSERT_OK(_storageEngine->getCatalog()->dropCollection(opCtx.get(), collNs.ns()));
     ASSERT(!collectionExists(opCtx.get(), collNs));
 
-    // When in a repair context, loadCatalog recreates catalog entries for orphaned idents.
+    // When in a repair context, loadCatalog() recreates catalog entries for orphaned idents.
     _storageEngine->loadCatalog(opCtx.get());
     NamespaceString orphanNs = NamespaceString("local.system.orphan-" + swIdentName.getValue());
 
@@ -324,5 +327,30 @@ TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     ASSERT(collectionExists(opCtx.get(), orphanNs));
 }
 
+TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphans) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString collNs("db.coll1");
+    auto swIdentName = createCollection(opCtx.get(), collNs);
+    ASSERT_OK(swIdentName);
+    ASSERT(collectionExists(opCtx.get(), collNs));
+
+    AutoGetDb db(opCtx.get(), collNs.db(), LockMode::MODE_X);
+    // Only drop the catalog entry; storage engine still knows about this ident.
+    // This simulates an unclean shutdown happening between dropping the catalog entry and
+    // the actual drop in storage engine.
+    ASSERT_OK(_storageEngine->getCatalog()->dropCollection(opCtx.get(), collNs.ns()));
+    ASSERT(!collectionExists(opCtx.get(), collNs));
+
+    // When in a normal startup context, loadCatalog() does not recreate catalog entries for
+    // orphaned idents.
+    _storageEngine->loadCatalog(opCtx.get());
+    // reconcileCatalogAndIdents() drops orphaned idents.
+    _storageEngine->reconcileCatalogAndIdents(opCtx.get());
+
+    ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
+    NamespaceString orphanNs = NamespaceString("local.system.orphan-" + swIdentName.getValue());
+    ASSERT(!collectionExists(opCtx.get(), orphanNs));
+}
 }  // namespace
 }  // namespace mongo
