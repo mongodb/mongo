@@ -80,6 +80,8 @@ public:
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final;
 
+        bool allowShardedForeignCollection(NamespaceString nss) const final;
+
     private:
         const std::vector<LiteParsedPipeline> _liteParsedPipelines;
         const PrivilegeVector _requiredPrivileges;

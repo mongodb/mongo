@@ -40,7 +40,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::vector;
 
-std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::liteParse(
+std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
     const AggregationRequest& request, const BSONElement& spec) {
 
     uassert(ErrorCodes::TypeMismatch,
@@ -79,11 +79,13 @@ std::unique_ptr<LiteParsedDocumentSourceForeignCollections> DocumentSourceOut::l
 
     PrivilegeVector privileges{Privilege(ResourcePattern::forExactNamespace(targetNss), actions)};
 
-    return stdx::make_unique<LiteParsedDocumentSourceForeignCollections>(
+    return stdx::make_unique<DocumentSourceOut::LiteParsed>(
         std::move(targetNss), std::move(privileges), allowSharded);
 }
 
-REGISTER_DOCUMENT_SOURCE(out, DocumentSourceOut::liteParse, DocumentSourceOut::createFromBson);
+REGISTER_DOCUMENT_SOURCE(out,
+                         DocumentSourceOut::LiteParsed::parse,
+                         DocumentSourceOut::createFromBson);
 
 const char* DocumentSourceOut::getSourceName() const {
     return "$out";

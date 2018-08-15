@@ -751,7 +751,7 @@ StringMap<ExpressionContext::ResolvedNamespace> resolveInvolvedNamespaces(
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         uassert(28769,
                 str::stream() << nss.ns() << " cannot be sharded",
-                !resolvedNsRoutingInfo.cm() || litePipe.allowShardedForeignCollections());
+                !resolvedNsRoutingInfo.cm() || litePipe.allowShardedForeignCollection(nss));
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
     return resolvedNamespaces;

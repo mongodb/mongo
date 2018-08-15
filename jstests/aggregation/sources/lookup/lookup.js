@@ -1122,5 +1122,27 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
                     }],
                     28769);
 
+    // Test that a $lookup from an unsharded collection followed by an $out to a sharded collection
+    // is allowed.
+    const sourceColl = sharded.getDB("test").lookUp;
+    sourceColl.drop();
+    assert(sharded.adminCommand({shardCollection: sourceColl.getFullName(), key: {_id: "hashed"}}));
+    assert.commandWorked(sourceColl.insert({_id: 0, a: 0}));
+
+    const outColl = sharded.getDB("test").out;
+    outColl.drop();
+    assert(sharded.adminCommand({shardCollection: outColl.getFullName(), key: {_id: "hashed"}}));
+
+    const fromColl = sharded.getDB("test").from;
+    fromColl.drop();
+    assert.commandWorked(fromColl.insert({_id: 0, b: 0}));
+
+    sourceColl.aggregate([
+        {$lookup: {localField: "a", foreignField: "b", from: fromColl.getName(), as: "same"}},
+        {$out: {to: outColl.getName(), mode: "insertDocuments"}}
+    ]);
+
+    assert.eq([{a: 0, same: [{_id: 0, b: 0}]}], outColl.find({}, {_id: 0}).toArray());
+
     sharded.stop();
 }());

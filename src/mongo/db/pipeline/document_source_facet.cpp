@@ -141,6 +141,13 @@ stdx::unordered_set<NamespaceString> DocumentSourceFacet::LiteParsed::getInvolve
     return involvedNamespaces;
 }
 
+bool DocumentSourceFacet::LiteParsed::allowShardedForeignCollection(NamespaceString nss) const {
+    return std::all_of(
+        _liteParsedPipelines.begin(), _liteParsedPipelines.end(), [&nss](auto&& pipeline) {
+            return pipeline.allowShardedForeignCollection(nss);
+        });
+}
+
 REGISTER_DOCUMENT_SOURCE(facet,
                          DocumentSourceFacet::LiteParsed::parse,
                          DocumentSourceFacet::createFromBson);

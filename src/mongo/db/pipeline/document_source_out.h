@@ -38,8 +38,26 @@ namespace mongo {
  */
 class DocumentSourceOut : public DocumentSource, public NeedsMergerDocumentSource {
 public:
-    static std::unique_ptr<LiteParsedDocumentSourceForeignCollections> liteParse(
-        const AggregationRequest& request, const BSONElement& spec);
+    /**
+     * A "lite parsed" $out stage is similar to other stages involving foreign collections except in
+     * some cases the foreign collection is allowed to be sharded.
+     */
+    class LiteParsed final : public LiteParsedDocumentSourceForeignCollections {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+                                                 const BSONElement& spec);
+
+        LiteParsed(NamespaceString outNss, PrivilegeVector privileges, bool allowShardedOutNss)
+            : LiteParsedDocumentSourceForeignCollections(outNss, privileges),
+              _allowShardedOutNss(allowShardedOutNss) {}
+
+        bool allowShardedForeignCollection(NamespaceString nss) const final {
+            return _allowShardedOutNss ? true : (_foreignNssSet.find(nss) == _foreignNssSet.end());
+        }
+
+    private:
+        bool _allowShardedOutNss;
+    };
 
     DocumentSourceOut(const NamespaceString& outputNs,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -82,8 +82,8 @@ public:
         /**
          * Lookup from a sharded collection is not allowed.
          */
-        bool allowShardedForeignCollections() const final {
-            return false;
+        bool allowShardedForeignCollection(NamespaceString nss) const final {
+            return (_foreignNssSet.find(nss) == _foreignNssSet.end());
         }
 
     private:

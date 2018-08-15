@@ -128,10 +128,10 @@ public:
     }
 
     /**
-     * Returns true if the involved namespaces for this aggregation are allowed to be sharded.
+     * Returns true if the involved namespace 'nss' is allowed to be sharded.
      */
-    virtual bool allowShardedForeignCollections() const {
-        return false;
+    virtual bool allowShardedForeignCollection(NamespaceString nss) const {
+        return true;
     }
 
     /**
@@ -170,18 +170,12 @@ public:
 class LiteParsedDocumentSourceForeignCollections : public LiteParsedDocumentSource {
 public:
     LiteParsedDocumentSourceForeignCollections(NamespaceString foreignNss,
-                                               PrivilegeVector privileges,
-                                               bool allowSharded)
-        : _foreignNssSet{std::move(foreignNss)},
-          _requiredPrivileges(std::move(privileges)),
-          _allowSharded(allowSharded) {}
+                                               PrivilegeVector privileges)
+        : _foreignNssSet{std::move(foreignNss)}, _requiredPrivileges(std::move(privileges)) {}
 
     LiteParsedDocumentSourceForeignCollections(stdx::unordered_set<NamespaceString> foreignNssSet,
-                                               PrivilegeVector privileges,
-                                               bool allowSharded)
-        : _foreignNssSet(std::move(foreignNssSet)),
-          _requiredPrivileges(std::move(privileges)),
-          _allowSharded(allowSharded) {}
+                                               PrivilegeVector privileges)
+        : _foreignNssSet(std::move(foreignNssSet)), _requiredPrivileges(std::move(privileges)) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return {_foreignNssSet};
@@ -191,13 +185,18 @@ public:
         return _requiredPrivileges;
     }
 
-    bool allowShardedForeignCollections() const final {
-        return _allowSharded;
+    /**
+     * Returns true if 'nss' is in the list of foreign namespaces for this DocumentSource. By
+     * default, no involved namespace is allowed to be sharded.
+     */
+    bool allowShardedForeignCollection(NamespaceString nss) const {
+        return (_foreignNssSet.find(nss) == _foreignNssSet.end());
     }
 
-private:
+protected:
     stdx::unordered_set<NamespaceString> _foreignNssSet;
+
+private:
     PrivilegeVector _requiredPrivileges;
-    bool _allowSharded;
 };
 }  // namespace mongo

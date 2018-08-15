@@ -119,12 +119,12 @@ public:
     }
 
     /**
-     * Returns false if at least one of the stages does not allow an involved namespace to be
+     * Returns false if at least one of the stages does not allow the involved namespace 'nss' to be
      * sharded.
      */
-    bool allowShardedForeignCollections() const {
-        return std::all_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
-            return spec->allowShardedForeignCollections();
+    bool allowShardedForeignCollection(NamespaceString nss) const {
+        return std::all_of(_stageSpecs.begin(), _stageSpecs.end(), [&nss](auto&& spec) {
+            return spec->allowShardedForeignCollection(nss);
         });
     }
 
