@@ -100,7 +100,9 @@ const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"insert", 1},
                                         {"killCursors", 1},
                                         {"prepareTransaction", 1},
-                                        {"update", 1}};
+                                        {"update", 1},
+                                        {"voteAbortTransaction", 1},
+                                        {"voteCommitTransaction", 1}};
 
 // The command names that are allowed in a multi-document transaction only when test commands are
 // enabled.
@@ -111,7 +113,9 @@ const StringMap<int> txnAdminCommands = {{"abortTransaction", 1},
                                          {"commitTransaction", 1},
                                          {"coordinateCommitTransaction", 1},
                                          {"doTxn", 1},
-                                         {"prepareTransaction", 1}};
+                                         {"prepareTransaction", 1},
+                                         {"voteAbortTransaction", 1},
+                                         {"voteCommitTransaction", 1}};
 
 }  // unnamed namespace
 
