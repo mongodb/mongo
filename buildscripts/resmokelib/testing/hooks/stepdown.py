@@ -177,25 +177,31 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             self.logger.warning("No replica set on which to run stepdowns.")
             return
 
-        while True:
-            if self._is_stopped():
-                break
-            self._wait_for_permission_or_resume()
-            now = time.time()
-            if now - self._last_exec > self._stepdown_interval_secs:
-                self.logger.info("Starting stepdown of all primaries")
-                self._step_down_all()
-                # Wait until each replica set has a primary, so the test can make progress.
-                self._await_primaries()
-                self._last_exec = time.time()
-                self.logger.info("Completed stepdown of all primaries in %0d ms",
-                                 (self._last_exec - now) * 1000)
-            now = time.time()
-            if self._is_permitted():
-                # The 'wait_secs' is used to wait 'self._stepdown_interval_secs' from the moment
-                # the last stepdown command was sent.
-                wait_secs = max(0, self._stepdown_interval_secs - (now - self._last_exec))
-                self._wait(wait_secs)
+        try:
+            while True:
+                if self._is_stopped():
+                    break
+                self._wait_for_permission_or_resume()
+                now = time.time()
+                if now - self._last_exec > self._stepdown_interval_secs:
+                    self.logger.info("Starting stepdown of all primaries")
+                    self._step_down_all()
+                    # Wait until each replica set has a primary, so the test can make progress.
+                    self._await_primaries()
+                    self._last_exec = time.time()
+                    self.logger.info("Completed stepdown of all primaries in %0d ms",
+                                     (self._last_exec - now) * 1000)
+                now = time.time()
+                if self._is_permitted():
+                    # The 'wait_secs' is used to wait 'self._stepdown_interval_secs' from the moment
+                    # the last stepdown command was sent.
+                    wait_secs = max(0, self._stepdown_interval_secs - (now - self._last_exec))
+                    self._wait(wait_secs)
+
+        except Exception:  # pylint: disable=W0703
+            # Proactively log the exception when it happens so it will be
+            # flushed immediately.
+            self.logger.exception("Stepdown Thread threw exception")
 
     def stop(self):
         """Stop the thread."""
