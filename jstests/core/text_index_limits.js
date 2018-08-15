@@ -1,4 +1,10 @@
-// There is no limit for the total size or the number of unique terms for text index.
+/**
+ * There is no limit for the total size or the number of unique terms for text index.
+ *
+ * Each insert involves creating big text index which runs slowly enough to get
+ * killed by a stepdown before any attempt can finish on slower variants.
+ * @tags: [does_not_support_stepdowns]
+ */
 (function() {
     "use strict";
 
