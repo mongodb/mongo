@@ -458,6 +458,14 @@ public:
      */
     void notifyOfIndexEntries(const std::vector<IndexEntry>& indexEntries);
 
+    /**
+     * Iterates over the plan cache. For each entry, serializes the PlanCacheEntry according to
+     * 'serializationFunc'. Returns a vector of all serialized entries which match 'filterFunc'.
+     */
+    std::vector<BSONObj> getMatchingStats(
+        const std::function<BSONObj(const PlanCacheEntry&)>& serializationFunc,
+        const std::function<bool(const BSONObj&)>& filterFunc) const;
+
 private:
     struct NewEntryState {
         bool shouldBeCreated = false;

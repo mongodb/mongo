@@ -995,4 +995,44 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
     }
 }
 
+void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out) {
+    BSONObjBuilder shapeBuilder(out->subobjStart("createdFromQuery"));
+    shapeBuilder.append("query", entry.query);
+    shapeBuilder.append("sort", entry.sort);
+    shapeBuilder.append("projection", entry.projection);
+    if (!entry.collation.isEmpty()) {
+        shapeBuilder.append("collation", entry.collation);
+    }
+    shapeBuilder.doneFast();
+    out->append("queryHash", unsignedIntToFixedLengthHex(entry.queryHash));
+
+    // Append whether or not the entry is active.
+    out->append("isActive", entry.isActive);
+    out->append("works", static_cast<long long>(entry.works));
+
+    BSONObjBuilder cachedPlanBob(out->subobjStart("cachedPlan"));
+    Explain::statsToBSON(
+        *entry.decision->stats[0], &cachedPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
+    cachedPlanBob.doneFast();
+
+    out->append("timeOfCreation", entry.timeOfCreation);
+
+    BSONArrayBuilder creationBuilder(out->subarrayStart("creationExecStats"));
+    for (auto&& stat : entry.decision->stats) {
+        BSONObjBuilder planBob(creationBuilder.subobjStart());
+        Explain::generateSinglePlanExecutionInfo(
+            stat.get(), ExplainOptions::Verbosity::kExecAllPlans, boost::none, &planBob);
+        planBob.doneFast();
+    }
+    creationBuilder.doneFast();
+
+    BSONArrayBuilder scoresBuilder(out->subarrayStart("candidatePlanScores"));
+    for (double score : entry.decision->scores) {
+        scoresBuilder.append(score);
+    }
+    scoresBuilder.doneFast();
+
+    out->append("indexFilterSet", entry.plannerData[0]->indexFilterApplied);
+}
+
 }  // namespace mongo

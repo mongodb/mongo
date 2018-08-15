@@ -451,35 +451,7 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
     auto entry = uassertStatusOK(planCache.getEntry(*cq));
 
     // internalQueryCacheDisableInactiveEntries is True and we should use the new output format.
-    BSONObjBuilder shapeBuilder(bob->subobjStart("createdFromQuery"));
-    shapeBuilder.append("query", entry->query);
-    shapeBuilder.append("sort", entry->sort);
-    shapeBuilder.append("projection", entry->projection);
-    if (!entry->collation.isEmpty()) {
-        shapeBuilder.append("collation", entry->collation);
-    }
-    shapeBuilder.doneFast();
-    bob->append("queryHash", unsignedIntToFixedLengthHex(entry->queryHash));
-
-    // Append whether or not the entry is active.
-    bob->append("isActive", entry->isActive);
-    bob->append("works", static_cast<long long>(entry->works));
-
-    BSONObjBuilder cachedPlanBob(bob->subobjStart("cachedPlan"));
-    Explain::statsToBSON(
-        *entry->decision->stats[0], &cachedPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
-    cachedPlanBob.doneFast();
-
-    bob->append("timeOfCreation", entry->timeOfCreation);
-
-    BSONArrayBuilder creationBuilder(bob->subarrayStart("creationExecStats"));
-    for (auto&& stat : entry->decision->stats) {
-        BSONObjBuilder planBob(creationBuilder.subobjStart());
-        Explain::generateSinglePlanExecutionInfo(
-            stat.get(), ExplainOptions::Verbosity::kExecAllPlans, boost::none, &planBob);
-        planBob.doneFast();
-    }
-    creationBuilder.doneFast();
+    Explain::planCacheEntryToBSON(*entry, bob);
     return Status::OK();
 }
 

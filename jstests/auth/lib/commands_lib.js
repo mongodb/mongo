@@ -1168,6 +1168,31 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_planCacheStats",
+          command: {aggregate: "foo", pipeline: [{$planCacheStats: {}}], cursor: {}},
+          skipSharded: true,
+          setup: function(db) {
+              db.createCollection("foo");
+          },
+          teardown: function(db) {
+              db.foo.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_readDbAdmin,
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["planCacheRead"]}],
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_readDbAdminAny,
+                privileges:
+                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["planCacheRead"]}],
+              },
+          ]
+        },
+        {
           testname: "aggregate_currentOp_allUsers_true",
           command: {aggregate: 1, pipeline: [{$currentOp: {allUsers: true}}], cursor: {}},
           testcases: [

@@ -762,6 +762,44 @@ TEST(PlanCacheTest, DeactivateCacheEntry) {
     ASSERT_EQ(entry->works, 20U);
 }
 
+TEST(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
+    PlanCache planCache;
+
+    // Create a cache entry with 5 works.
+    {
+        unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
+        auto qs = getQuerySolutionForCaching();
+        std::vector<QuerySolution*> solns = {qs.get()};
+        ASSERT_OK(planCache.set(*cq, solns, createDecision(1U, 5), Date_t{}));
+    }
+
+    // Create a second cache entry with 3 works.
+    {
+        unique_ptr<CanonicalQuery> cq(canonicalize("{b: 1}"));
+        auto qs = getQuerySolutionForCaching();
+        std::vector<QuerySolution*> solns = {qs.get()};
+        ASSERT_OK(planCache.set(*cq, solns, createDecision(1U, 3), Date_t{}));
+    }
+
+    // Verify that the cache entries have been created.
+    ASSERT_EQ(2U, planCache.size());
+
+    // Define a serialization function which just serializes the number of works.
+    const auto serializer = [](const PlanCacheEntry& entry) {
+        return BSON("works" << static_cast<int>(entry.works));
+    };
+
+    // Define a matcher which matches if the number of works exceeds 4.
+    const auto matcher = [](const BSONObj& serializedEntry) {
+        BSONElement worksElt = serializedEntry["works"];
+        return worksElt && worksElt.number() > 4;
+    };
+
+    // Verify the output of getMatchingStats().
+    auto getStatsResult = planCache.getMatchingStats(serializer, matcher);
+    ASSERT_EQ(1U, getStatsResult.size());
+    ASSERT_BSONOBJ_EQ(BSON("works" << 5), getStatsResult[0]);
+}
 
 /**
  * Each test in the CachePlanSelectionTest suite goes through

@@ -38,6 +38,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/generic_cursor.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -235,6 +236,15 @@ public:
     virtual BackupCursorState openBackupCursor(OperationContext* opCtx) = 0;
 
     virtual void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) = 0;
+
+    /**
+     * Returns a vector of BSON objects, where each entry in the vector describes a plan cache entry
+     * inside the cache for the given namespace. Only those entries which match the supplied
+     * MatchExpression are returned.
+     */
+    virtual std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
+                                                                const NamespaceString&,
+                                                                const MatchExpression*) const = 0;
 };
 
 }  // namespace mongo

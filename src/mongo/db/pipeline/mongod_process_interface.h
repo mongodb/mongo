@@ -98,6 +98,10 @@ public:
     BackupCursorState openBackupCursor(OperationContext* opCtx) final;
     void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) final;
 
+    std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
+                                                        const NamespaceString&,
+                                                        const MatchExpression*) const final;
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

@@ -154,6 +154,17 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    /**
+     * Mongos does not have a plan cache, so this method should never be called on mongos. Upstream
+     * checks are responsible for generating an error if a user attempts to introspect the plan
+     * cache on mongos.
+     */
+    std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
+                                                        const NamespaceString&,
+                                                        const MatchExpression*) const final {
+        MONGO_UNREACHABLE;
+    }
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

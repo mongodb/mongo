@@ -180,6 +180,13 @@ public:
                                                 boost::optional<long long> totalTimeMillis,
                                                 BSONObjBuilder* out);
 
+    /**
+     * Serializes a PlanCacheEntry to the provided BSON object builder. The output format is
+     * intended to be human readable, and useful for debugging query performance problems related to
+     * the plan cache.
+     */
+    static void planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out);
+
 private:
     /**
      * Adds the 'queryPlanner' explain section to the BSON object being built

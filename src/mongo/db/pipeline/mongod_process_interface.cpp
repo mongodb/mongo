@@ -418,6 +418,31 @@ void MongoDInterface::closeBackupCursor(OperationContext* opCtx, std::uint64_t c
     backupCursorService->closeBackupCursor(opCtx, cursorId);
 }
 
+std::vector<BSONObj> MongoDInterface::getMatchingPlanCacheEntryStats(
+    OperationContext* opCtx, const NamespaceString& nss, const MatchExpression* matchExp) const {
+    const auto serializer = [](const PlanCacheEntry& entry) {
+        BSONObjBuilder out;
+        Explain::planCacheEntryToBSON(entry, &out);
+        return out.obj();
+    };
+
+    const auto predicate = [&matchExp](const BSONObj& obj) {
+        return !matchExp ? true : matchExp->matchesBSON(obj);
+    };
+
+    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+    const auto collection = autoColl.getCollection();
+    uassert(
+        50933, str::stream() << "collection '" << nss.toString() << "' does not exist", collection);
+
+    const auto infoCache = collection->infoCache();
+    invariant(infoCache);
+    const auto planCache = infoCache->getPlanCache();
+    invariant(planCache);
+
+    return planCache->getMatchingStats(serializer, predicate);
+}
+
 BSONObj MongoDInterface::_reportCurrentOpForClient(OperationContext* opCtx,
                                                    Client* client,
                                                    CurrentOpTruncateMode truncateOps) const {

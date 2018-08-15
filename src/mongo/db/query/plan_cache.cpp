@@ -992,4 +992,21 @@ void PlanCache::notifyOfIndexEntries(const std::vector<IndexEntry>& indexEntries
     _indexabilityState.updateDiscriminators(indexEntries);
 }
 
+std::vector<BSONObj> PlanCache::getMatchingStats(
+    const std::function<BSONObj(const PlanCacheEntry&)>& serializationFunc,
+    const std::function<bool(const BSONObj&)>& filterFunc) const {
+    std::vector<BSONObj> results;
+    stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
+
+    for (auto&& cacheEntry : _cache) {
+        const auto entry = cacheEntry.second;
+        auto serializedEntry = serializationFunc(*entry);
+        if (filterFunc(serializedEntry)) {
+            results.push_back(serializedEntry);
+        }
+    }
+
+    return results;
+}
+
 }  // namespace mongo
