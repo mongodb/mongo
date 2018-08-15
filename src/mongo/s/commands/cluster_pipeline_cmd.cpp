@@ -33,7 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/commands/cluster_aggregate.h"
+#include "mongo/s/query/cluster_aggregate.h"
 
 namespace mongo {
 namespace {

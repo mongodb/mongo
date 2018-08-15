@@ -37,11 +37,11 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

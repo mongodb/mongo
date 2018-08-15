@@ -34,7 +34,6 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/cluster_aggregation_planner.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/s/query/cluster_aggregation_planner.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {

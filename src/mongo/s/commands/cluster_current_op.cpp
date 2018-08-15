@@ -37,7 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/s/commands/cluster_aggregate.h"
+#include "mongo/s/query/cluster_aggregate.h"
 
 namespace mongo {
 namespace {

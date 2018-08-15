@@ -35,7 +35,6 @@ env.Library(
         'cluster_abort_transaction_cmd.cpp',
         'cluster_add_shard_cmd.cpp',
         'cluster_add_shard_to_zone_cmd.cpp',
-        'cluster_aggregate.cpp',
         'cluster_available_query_options_cmd.cpp',
         'cluster_build_info.cpp',
         'cluster_coll_stats_cmd.cpp',
@@ -118,12 +117,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/handle_request_response',
         '$BUILD_DIR/mongo/db/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/pipeline/aggregation',
-        '$BUILD_DIR/mongo/db/pipeline/mongos_process_interface',
-        '$BUILD_DIR/mongo/db/pipeline/cluster_aggregation_planner',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
         '$BUILD_DIR/mongo/s/sharding_api',
         '$BUILD_DIR/mongo/s/sharding_legacy_api',
@@ -171,19 +169,6 @@ env.Library(
         'cluster_commands',
         '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
     ]
-)
-
-env.CppUnitTest(
-    target="cluster_aggregate_test",
-    source=[
-        "cluster_aggregate_test.cpp",
-    ],
-    LIBDEPS=[
-        'cluster_commands',
-        'cluster_command_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/auth/saslauth',
-    ],
 )
 
 env.CppUnitTest(

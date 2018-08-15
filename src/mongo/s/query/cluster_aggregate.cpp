@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/commands/cluster_aggregate.h"
+#include "mongo/s/query/cluster_aggregate.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <mongo/rpc/op_msg_rpc_impls.h>
@@ -42,7 +42,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/cluster_aggregation_planner.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/document_source_out.h"
@@ -61,6 +60,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_aggregation_planner.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_cursor_manager.h"

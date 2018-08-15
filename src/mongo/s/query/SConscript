@@ -22,6 +22,34 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='cluster_aggregate',
+    source=[
+        'cluster_aggregate.cpp',
+        'cluster_aggregation_planner.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
+        '$BUILD_DIR/mongo/db/pipeline/mongos_process_interface',
+        '$BUILD_DIR/mongo/db/views/views',
+        'cluster_query',
+    ]
+)
+
+env.CppUnitTest(
+    target="cluster_aggregate_test",
+    source=[
+        "cluster_aggregate_test.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/saslauth',
+        '$BUILD_DIR/mongo/s/commands/cluster_command_test_fixture',
+        'cluster_aggregate',
+    ],
+)
+
 env.CppUnitTest(
     target="cluster_find_test",
     source=[
