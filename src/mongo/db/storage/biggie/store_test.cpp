@@ -1450,7 +1450,7 @@ TEST_F(RadixStoreTest, PathCompressionTest) {
               "\n   er*"
               "\n   y*"
               "\n food*\n");
-    
+
     // Add a key that has a prefix already in the tree with a value
     thisStore.insert(value_type(value7));
     ASSERT_EQ(thisStore.to_string_for_test(),
