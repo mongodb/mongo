@@ -320,6 +320,9 @@ TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
 }
 
 TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, bool keepTicket) {
+    // We must lock the Client to change the Locker on the OperationContext.
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+
     _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
 
@@ -365,6 +368,9 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     // We intentionally do not capture the return value of swapLockState(), which is just an empty
     // locker. At the end of the operation, if the transaction is not complete, we will stash the
     // operation context's locker and replace it with a new empty locker.
+
+    // It is necessary to lock the client to change the Locker on the OperationContext.
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     invariant(opCtx->lockState()->getClientState() == Locker::ClientState::kInactive);
     opCtx->swapLockState(std::move(_locker));
     opCtx->lockState()->updateThreadIdToCurrentThread();
@@ -383,17 +389,13 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
 TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationContext* opCtx)
     : _opCtx(opCtx) {
     if (_opCtx->getWriteUnitOfWork()) {
-        // This must be done under the client lock, since we are modifying '_opCtx'.
-        stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
         _txnResources = TransactionParticipant::TxnResources(_opCtx, true /* keepTicket*/);
     }
 }
 
 TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
     if (_txnResources) {
-        // Restore the transaction state onto '_opCtx'. This must be done under the
-        // client lock, since we are modifying '_opCtx'.
-        stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
+        // Restore the transaction state onto '_opCtx'.
         _txnResources->release(_opCtx);
     }
 }
@@ -419,13 +421,6 @@ void TransactionParticipant::stashTransactionResources(OperationContext* opCtx) 
     }
 
     invariant(opCtx->getTxnNumber());
-
-    // We must lock the Client to change the Locker on the OperationContext and the Session mutex to
-    // access Session state. We must lock the Client before the Session mutex, since the Client
-    // effectively owns the Session. That is, a user might lock the Client to ensure it doesn't go
-    // away, and then lock the Session owned by that client. We rely on the fact that we are not
-    // using the DefaultLockerImpl to avoid deadlock.
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
     stdx::unique_lock<stdx::mutex> lg(_mutex);
 
     // Always check session's txnNumber, since it can be modified by migration, which does not
@@ -450,11 +445,6 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
     invariant(opCtx->getTxnNumber());
 
     {
-        // We must lock the Client to change the Locker on the OperationContext and the Session
-        // mutex to access Session state. We must lock the Client before the Session mutex, since
-        // the Client effectively owns the Session. That is, a user might lock the Client to ensure
-        // it doesn't go away, and then lock the Session owned by that client.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
         // Always check session's txnNumber and '_txnState', since they can be modified by session
@@ -487,7 +477,7 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
 
         // If we have no transaction resources then we cannot be prepared. If we're not in progress,
         // we don't do anything else.
-        invariant(!_txnState.isPrepared(lk));
+        invariant(!_txnState.isPrepared(lg));
         if (!_txnState.isInProgress(lg)) {
             // At this point we're either committed and this is a 'commitTransaction' command, or we
             // are in the process of committing.

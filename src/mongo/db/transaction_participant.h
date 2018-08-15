@@ -69,6 +69,7 @@ public:
     public:
         /**
          * Stashes transaction state from 'opCtx' in the newly constructed TxnResources.
+         * Ephemerally holds the Client lock associated with opCtx.
          */
         TxnResources(OperationContext* opCtx, bool keepTicket = false);
 
@@ -88,6 +89,7 @@ public:
 
         /**
          * Releases stashed transaction state onto 'opCtx'. Must only be called once.
+         * Ephemerally holds the Client lock associated with opCtx.
          */
         void release(OperationContext* opCtx);
 
