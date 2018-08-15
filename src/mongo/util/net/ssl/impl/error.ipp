@@ -37,6 +37,9 @@ public:
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
     std::string message(int value) const {
+        if (value == asio::ssl::error::no_renegotiation) {
+            return "peer requested renegotiation, which is not supported";
+        }
         return mongo::errnoWithDescription(value);
     }
 #elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL

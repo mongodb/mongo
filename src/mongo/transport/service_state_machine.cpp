@@ -308,7 +308,8 @@ void ServiceStateMachine::_sourceCallback(Status status) {
                                       transport::ServiceExecutorTaskName::kSSMProcessMessage);
     } else if (ErrorCodes::isInterruption(status.code()) ||
                ErrorCodes::isNetworkError(status.code())) {
-        LOG(2) << "Session from " << remote << " encountered a network error during SourceMessage";
+        LOG(2) << "Session from " << remote
+               << " encountered a network error during SourceMessage: " << status;
         _state.store(State::EndSession);
     } else if (status == TransportLayer::TicketSessionClosedStatus) {
         // Our session may have been closed internally.

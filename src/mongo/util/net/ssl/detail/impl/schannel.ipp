@@ -608,7 +608,7 @@ ssl_want SSLReadManager::decryptBuffer(asio::error_code& ec, DecryptState* pDecr
             *pDecryptState = DecryptState::Renegotiate;
 
             // Fail the connection on SSL renegotiations
-            ec = asio::ssl::error::stream_truncated;
+            ec = asio::ssl::error::no_renegotiation;
             return ssl_want::want_nothing;
         }
 
