@@ -495,6 +495,7 @@ env.Library(
     target='parsed_aggregation_projection',
     source=[
         'parsed_aggregation_projection.cpp',
+        'parsed_aggregation_projection_node.cpp',
         'parsed_exclusion_projection.cpp',
         'parsed_inclusion_projection.cpp',
         'parsed_add_fields.cpp',

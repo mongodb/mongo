@@ -58,10 +58,12 @@ public:
      * applicable to the $addFields "projection" stage. We make them non-configurable here.
      */
     ParsedAddFields(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : ParsedAggregationProjection(expCtx,
-                                      ProjectionDefaultIdPolicy::kIncludeId,
-                                      ProjectionArrayRecursionPolicy::kRecurseNestedArrays),
-          _root(new InclusionNode(_arrayRecursionPolicy)) {}
+        : ParsedAggregationProjection(
+              expCtx,
+              {ProjectionPolicies::DefaultIdPolicy::kIncludeId,
+               ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays,
+               ProjectionPolicies::ComputedFieldsPolicy::kAllowComputedFields}),
+          _root(new InclusionNode(_policies)) {}
 
     /**
      * Creates the data needed to perform an AddFields.
@@ -82,9 +84,7 @@ public:
 
     Document serializeTransformation(
         boost::optional<ExplainOptions::Verbosity> explain) const final {
-        MutableDocument output;
-        _root->serialize(&output, explain);
-        return output.freeze();
+        return _root->serialize(explain);
     }
 
     /**
@@ -95,14 +95,14 @@ public:
     }
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
-        _root->addDependencies(deps);
+        _root->reportDependencies(deps);
         return DepsTracker::State::SEE_NEXT;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> computedPaths;
         StringMap<std::string> renamedPaths;
-        _root->addComputedPaths(&computedPaths, &renamedPaths);
+        _root->reportComputedPaths(&computedPaths, &renamedPaths);
         return {DocumentSource::GetModPathsReturn::Type::kFiniteSet,
                 std::move(computedPaths),
                 std::move(renamedPaths)};

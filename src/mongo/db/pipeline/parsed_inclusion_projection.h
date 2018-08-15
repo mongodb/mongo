@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
+#include "mongo/db/pipeline/parsed_aggregation_projection_node.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -52,134 +53,28 @@ namespace parsed_aggregation_projection {
  * level inclusions or additions, with any child InclusionNodes representing dotted or nested
  * inclusions or additions.
  */
-class InclusionNode {
+class InclusionNode final : public ProjectionNode {
 public:
-    using ProjectionArrayRecursionPolicy =
-        ParsedAggregationProjection::ProjectionArrayRecursionPolicy;
+    InclusionNode(ProjectionPolicies policies, std::string pathToNode = "");
 
-    InclusionNode(ProjectionArrayRecursionPolicy recursionPolicy, std::string pathToNode = "");
+    InclusionNode* addOrGetChild(const std::string& field);
 
-    /**
-     * Optimize any computed expressions.
-     */
-    void optimize();
+    void reportDependencies(DepsTracker* deps) const final;
 
-    /**
-     * Serialize this projection.
-     */
-    void serialize(MutableDocument* output,
-                   boost::optional<ExplainOptions::Verbosity> explain) const;
-
-    /**
-     * Adds dependencies of any fields that need to be included, or that are used by any
-     * expressions.
-     */
-    void addDependencies(DepsTracker* deps) const;
-
-    /**
-     * Loops over 'inputDoc', extracting and appending any included fields into 'outputDoc'. This
-     * will also copy over enough information to preserve the structure of the incoming document for
-     * all the fields this projection cares about.
-     *
-     * For example, given an InclusionNode tree representing this projection:
-     *   {a: {b: 1, c: <exp>}, "d.e": <exp>}
-     * calling applyInclusions() with an 'inputDoc' of
-     *   {a: [{b: 1, d: 1}, {b: 2, d: 2}], d: [{e: 1, f: 1}, {e: 1, f: 1}]}
-     * and an empty 'outputDoc' will leave 'outputDoc' representing the document
-     *   {a: [{b: 1}, {b: 2}], d: [{}, {}]}.
-     */
-    void applyInclusions(const Document& inputDoc, MutableDocument* outputDoc) const;
-
-    /**
-     * Add computed fields to 'outputDoc'.
-     */
-    void addComputedFields(MutableDocument* outputDoc, const Document& root) const;
-
-    /**
-     * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted.
-     */
-    InclusionNode* addOrGetChild(std::string field);
-
-    /**
-     * Recursively adds 'path' into the tree as a computed field, creating any child nodes if
-     * necessary.
-     *
-     * 'path' is allowed to be dotted, and is assumed not to conflict with another path already in
-     * the tree. For example, it is an error to add the path "a.b" as a computed field to a tree
-     * which has already included the field "a".
-     */
-    void addComputedField(const FieldPath& path, boost::intrusive_ptr<Expression> expr);
-
-    /**
-     * Recursively adds 'path' into the tree as an included field, creating any child nodes if
-     * necessary.
-     *
-     * 'path' is allowed to be dotted, and is assumed not to conflict with another path already in
-     * the tree. For example, it is an error to include the path "a.b" from a tree which has already
-     * added a computed field "a".
-     */
-    void addIncludedField(const FieldPath& path);
-
-    std::string getPath() const {
-        return _pathToNode;
+protected:
+    std::unique_ptr<ProjectionNode> makeChild(std::string fieldName) const final {
+        return std::make_unique<InclusionNode>(
+            _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
     }
-
-    /**
-     * Recursively add all paths that are preserved by this inclusion projection.
-     */
-    void addPreservedPaths(std::set<std::string>* preservedPaths) const;
-
-    /**
-     * Recursively adds all paths that are purely computed in this inclusion projection to
-     * 'computedPaths'.
-     *
-     * Computed paths that are identified as the result of a simple rename are instead filled out in
-     * 'renamedPaths'. Each entry in 'renamedPaths' maps from the path's new name to its old name
-     * prior to application of this inclusion projection.
-     */
-    void addComputedPaths(std::set<std::string>* computedPaths,
-                          StringMap<std::string>* renamedPaths) const;
-
-private:
-    // Helpers for the Document versions above. These will apply the transformation recursively to
-    // each element of any arrays, and ensure non-documents are handled appropriately.
-    Value applyInclusionsToValue(Value inputVal) const;
-    Value addComputedFields(Value inputVal, const Document& root) const;
-
-    /**
-     * Returns nullptr if no such child exists.
-     */
-    InclusionNode* getChild(std::string field) const;
-
-    /**
-     * Adds a new InclusionNode as a child. 'field' cannot be dotted.
-     */
-    InclusionNode* addChild(std::string field);
-
-    /**
-     * Returns true if this node or any child of this node contains a computed field.
-     */
-    bool subtreeContainsComputedFields() const;
-
-    ProjectionArrayRecursionPolicy _arrayRecursionPolicy;
-
-    std::string _pathToNode;
-
-    // Our projection semantics are such that all field additions need to be processed in the order
-    // specified. '_orderToProcessAdditionsAndChildren' tracks that order.
-    //
-    // For example, for the specification {a: <expression>, "b.c": <expression>, d: <expression>},
-    // we need to add the top level fields in the order "a", then "b", then "d". This ordering
-    // information needs to be tracked separately, since "a" and "d" will be tracked via
-    // '_expressions', and "b.c" will be tracked as a child InclusionNode in '_children'. For the
-    // example above, '_orderToProcessAdditionsAndChildren' would be ["a", "b", "d"].
-    std::vector<std::string> _orderToProcessAdditionsAndChildren;
-
-    StringMap<boost::intrusive_ptr<Expression>> _expressions;
-    stdx::unordered_set<std::string> _inclusions;
-
-    // TODO use StringMap once SERVER-23700 is resolved.
-    stdx::unordered_map<std::string, std::unique_ptr<InclusionNode>> _children;
+    Document initializeOutputDocument(const Document& inputDoc) const final {
+        return {};
+    }
+    Value applyLeafProjectionToValue(const Value& value) const final {
+        return value;
+    }
+    Value transformSkippedValueForOutput(const Value& value) const final {
+        return Value();
+    }
 };
 
 /**
@@ -192,10 +87,8 @@ private:
 class ParsedInclusionProjection : public ParsedAggregationProjection {
 public:
     ParsedInclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              ProjectionDefaultIdPolicy defaultIdPolicy,
-                              ProjectionArrayRecursionPolicy arrayRecursionPolicy)
-        : ParsedAggregationProjection(expCtx, defaultIdPolicy, arrayRecursionPolicy),
-          _root(new InclusionNode(_arrayRecursionPolicy)) {}
+                              ProjectionPolicies policies)
+        : ParsedAggregationProjection(expCtx, policies), _root(new InclusionNode(policies)) {}
 
     TransformerType getType() const final {
         return TransformerType::kInclusionProjection;
@@ -215,7 +108,7 @@ public:
         if (_idExcluded) {
             output.addField("_id", Value(false));
         }
-        _root->serialize(&output, explain);
+        _root->serialize(explain, &output);
         return output.freeze();
     }
 
@@ -227,17 +120,17 @@ public:
     }
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {
-        _root->addDependencies(deps);
+        _root->reportDependencies(deps);
         return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> preservedPaths;
-        _root->addPreservedPaths(&preservedPaths);
+        _root->reportProjectedPaths(&preservedPaths);
 
         std::set<std::string> computedPaths;
         StringMap<std::string> renamedPaths;
-        _root->addComputedPaths(&computedPaths, &renamedPaths);
+        _root->reportComputedPaths(&computedPaths, &renamedPaths);
 
         return {DocumentSource::GetModPathsReturn::Type::kAllExcept,
                 std::move(preservedPaths),

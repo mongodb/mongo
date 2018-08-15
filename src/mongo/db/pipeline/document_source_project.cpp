@@ -41,10 +41,8 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using parsed_aggregation_projection::ParsedAggregationProjection;
-
-using ProjectionArrayRecursionPolicy = ParsedAggregationProjection::ProjectionArrayRecursionPolicy;
-using ProjectionDefaultIdPolicy = ParsedAggregationProjection::ProjectionDefaultIdPolicy;
+using ParsedAggregationProjection = parsed_aggregation_projection::ParsedAggregationProjection;
+using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
 
 REGISTER_DOCUMENT_SOURCE(project,
                          LiteParsedDocumentSourceDefault::parse,
@@ -55,10 +53,11 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
     const bool isIndependentOfAnyCollection = false;
     intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
         expCtx,
-        ParsedAggregationProjection::create(expCtx,
-                                            projectSpec,
-                                            ProjectionDefaultIdPolicy::kIncludeId,
-                                            ProjectionArrayRecursionPolicy::kRecurseNestedArrays),
+        ParsedAggregationProjection::create(
+            expCtx,
+            projectSpec,
+            {ProjectionPolicies::DefaultIdPolicy::kIncludeId,
+             ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays}),
         "$project",
         isIndependentOfAnyCollection));
     return project;

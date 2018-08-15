@@ -41,7 +41,8 @@ namespace mongo {
 class ProjectionExecAgg::ProjectionExecutor {
 public:
     using ParsedAggregationProjection = parsed_aggregation_projection::ParsedAggregationProjection;
-    using ProjectionParseMode = ParsedAggregationProjection::ProjectionParseMode;
+    using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
+
     using TransformerType = TransformerInterface::TransformerType;
 
     ProjectionExecutor(BSONObj projSpec,
@@ -52,27 +53,34 @@ public:
         // ban computed fields from the projection, the ExpressionContext will never be used.
         boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(nullptr, nullptr));
 
+        // Create a ProjectionPolicies object, to be populated based on the passed arguments.
+        ParsedAggregationProjection::ProjectionPolicies projectionPolicies;
+
         // Default projection behaviour is to include _id if the projection spec omits it. If the
         // caller has specified that we should *exclude* _id by default, do so here. We translate
-        // DefaultIdPolicy to ParsedAggregationProjection::ProjectionDefaultIdPolicy in order to
-        // avoid exposing internal aggregation types to the query system.
-        ParsedAggregationProjection::ProjectionDefaultIdPolicy idPolicy =
+        // DefaultIdPolicy to ProjectionPolicies::DefaultIdPolicy in order to avoid exposing
+        // internal aggregation types to the query system.
+        projectionPolicies.idPolicy =
             (defaultIdPolicy == ProjectionExecAgg::DefaultIdPolicy::kIncludeId
-                 ? ParsedAggregationProjection::ProjectionDefaultIdPolicy::kIncludeId
-                 : ParsedAggregationProjection::ProjectionDefaultIdPolicy::kExcludeId);
+                 ? ProjectionPolicies::DefaultIdPolicy::kIncludeId
+                 : ProjectionPolicies::DefaultIdPolicy::kExcludeId);
 
         // By default, $project will recurse through nested arrays. If the caller has specified that
         // it should not, we inhibit it from doing so here. We separate this class' internal enum
-        // ArrayRecursionPolicy from ParsedAggregationProjection::ProjectionArrayRecursionPolicy
-        // in order to avoid exposing aggregation types to the query system.
-        ParsedAggregationProjection::ProjectionArrayRecursionPolicy recursionPolicy =
+        // ArrayRecursionPolicy from ProjectionPolicies::ArrayRecursionPolicy in order to avoid
+        // exposing aggregation types to the query system.
+        projectionPolicies.arrayRecursionPolicy =
             (arrayRecursionPolicy == ArrayRecursionPolicy::kRecurseNestedArrays
-                 ? ParsedAggregationProjection::ProjectionArrayRecursionPolicy::kRecurseNestedArrays
-                 : ParsedAggregationProjection::ProjectionArrayRecursionPolicy::
-                       kDoNotRecurseNestedArrays);
+                 ? ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays
+                 : ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays);
 
-        _projection = ParsedAggregationProjection::create(
-            expCtx, projSpec, idPolicy, recursionPolicy, ProjectionParseMode::kBanComputedFields);
+        // Inclusion projections permit computed fields by default, so we must explicitly ban them.
+        // Computed fields are implicitly banned for exclusions.
+        projectionPolicies.computedFieldsPolicy =
+            ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields;
+
+        // Construct a ParsedAggregationProjection for the given projection spec and policies.
+        _projection = ParsedAggregationProjection::create(expCtx, projSpec, projectionPolicies);
 
         // For an inclusion, record the exhaustive set of fields retained by the projection.
         if (getType() == ProjectionType::kInclusionProjection) {

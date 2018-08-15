@@ -34,6 +34,7 @@
 #include <string>
 
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
+#include "mongo/db/pipeline/parsed_aggregation_projection_node.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -49,50 +50,37 @@ namespace parsed_aggregation_projection {
  * represents one 'level' of the parsed specification. The root ExclusionNode represents all top
  * level exclusions, with any child ExclusionNodes representing dotted or nested exclusions.
  */
-class ExclusionNode {
+class ExclusionNode final : public ProjectionNode {
 public:
-    using ProjectionArrayRecursionPolicy =
-        ParsedAggregationProjection::ProjectionArrayRecursionPolicy;
+    ExclusionNode(ProjectionPolicies policies, std::string pathToNode = "")
+        : ProjectionNode(policies, std::move(pathToNode)) {
+        // Computed fields are not supported by exclusion projections.
+        invariant(_policies.computedFieldsPolicy ==
+                  ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields);
+    }
 
-    ExclusionNode(ProjectionArrayRecursionPolicy recursionPolicy, std::string pathToNode = "");
+    ExclusionNode* addOrGetChild(const std::string& field) {
+        return static_cast<ExclusionNode*>(ProjectionNode::addOrGetChild(field));
+    }
 
-    /**
-     * Serialize this exclusion.
-     */
-    Document serialize() const;
+    void reportDependencies(DepsTracker* deps) const final {
+        // We have no dependencies on specific fields, since we only know the fields to be removed.
+    }
 
-    /**
-     * Mark this path to be excluded. 'path' is allowed to be dotted.
-     */
-    void excludePath(FieldPath path);
-
-    /**
-     * Applies this tree of exclusions to the input document.
-     */
-    Document applyProjection(const Document& input) const;
-
-    /**
-     * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted.
-     */
-    ExclusionNode* addOrGetChild(FieldPath field);
-
-    void addModifiedPaths(std::set<std::string>* modifiedPaths) const;
-
-private:
-    // Helpers for addOrGetChild above.
-    ExclusionNode* getChild(std::string field) const;
-    ExclusionNode* addChild(std::string field);
-
-    // Helper for applyProjection above.
-    Value applyProjectionToValue(Value val) const;
-
-    // Fields excluded at this level.
-    stdx::unordered_set<std::string> _excludedFields;
-
-    ProjectionArrayRecursionPolicy _arrayRecursionPolicy;
-
-    std::string _pathToNode;
-    stdx::unordered_map<std::string, std::unique_ptr<ExclusionNode>> _children;
+protected:
+    std::unique_ptr<ProjectionNode> makeChild(std::string fieldName) const final {
+        return std::make_unique<ExclusionNode>(
+            _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
+    }
+    Document initializeOutputDocument(const Document& inputDoc) const final {
+        return inputDoc;
+    }
+    Value applyLeafProjectionToValue(const Value& value) const final {
+        return Value();
+    }
+    Value transformSkippedValueForOutput(const Value& value) const final {
+        return value;
+    }
 };
 
 /**
@@ -105,10 +93,13 @@ private:
 class ParsedExclusionProjection : public ParsedAggregationProjection {
 public:
     ParsedExclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              ProjectionDefaultIdPolicy defaultIdPolicy,
-                              ProjectionArrayRecursionPolicy arrayRecursionPolicy)
-        : ParsedAggregationProjection(expCtx, defaultIdPolicy, arrayRecursionPolicy),
-          _root(new ExclusionNode(_arrayRecursionPolicy)) {}
+                              ProjectionPolicies policies)
+        : ParsedAggregationProjection(
+              expCtx,
+              {policies.idPolicy,
+               policies.arrayRecursionPolicy,
+               ProjectionPolicies::ComputedFieldsPolicy::kBanComputedFields}),
+          _root(new ExclusionNode(_policies)) {}
 
     TransformerType getType() const final {
         return TransformerType::kExclusionProjection;
@@ -135,7 +126,7 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> modifiedPaths;
-        _root->addModifiedPaths(&modifiedPaths);
+        _root->reportProjectedPaths(&modifiedPaths);
         return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
     }
 

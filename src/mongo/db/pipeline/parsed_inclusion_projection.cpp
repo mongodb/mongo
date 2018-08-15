@@ -38,56 +38,19 @@ namespace mongo {
 
 namespace parsed_aggregation_projection {
 
-using std::string;
-using std::unique_ptr;
-
 //
 // InclusionNode
 //
 
-InclusionNode::InclusionNode(ProjectionArrayRecursionPolicy recursionPolicy, std::string pathToNode)
-    : _arrayRecursionPolicy(recursionPolicy), _pathToNode(std::move(pathToNode)) {}
+InclusionNode::InclusionNode(ProjectionPolicies policies, std::string pathToNode)
+    : ProjectionNode(policies, std::move(pathToNode)) {}
 
-void InclusionNode::optimize() {
-    for (auto&& expressionIt : _expressions) {
-        _expressions[expressionIt.first] = expressionIt.second->optimize();
-    }
-    for (auto&& childPair : _children) {
-        childPair.second->optimize();
-    }
+InclusionNode* InclusionNode::addOrGetChild(const std::string& field) {
+    return static_cast<InclusionNode*>(ProjectionNode::addOrGetChild(field));
 }
 
-void InclusionNode::serialize(MutableDocument* output,
-                              boost::optional<ExplainOptions::Verbosity> explain) const {
-    // Always put "_id" first if it was included (implicitly or explicitly).
-    if (_inclusions.find("_id") != _inclusions.end()) {
-        output->addField("_id", Value(true));
-    }
-
-    for (auto&& includedField : _inclusions) {
-        if (includedField == "_id") {
-            // Handled above.
-            continue;
-        }
-        output->addField(includedField, Value(true));
-    }
-
-    for (auto&& field : _orderToProcessAdditionsAndChildren) {
-        auto childIt = _children.find(field);
-        if (childIt != _children.end()) {
-            MutableDocument subDoc;
-            childIt->second->serialize(&subDoc, explain);
-            output->addField(field, subDoc.freezeToValue());
-        } else {
-            auto expressionIt = _expressions.find(field);
-            invariant(expressionIt != _expressions.end());
-            output->addField(field, expressionIt->second->serialize(static_cast<bool>(explain)));
-        }
-    }
-}
-
-void InclusionNode::addDependencies(DepsTracker* deps) const {
-    for (auto&& includedField : _inclusions) {
+void InclusionNode::reportDependencies(DepsTracker* deps) const {
+    for (auto&& includedField : _projectedFields) {
         deps->fields.insert(FieldPath::getFullyQualifiedPath(_pathToNode, includedField));
     }
 
@@ -102,166 +65,7 @@ void InclusionNode::addDependencies(DepsTracker* deps) const {
         expressionPair.second->addDependencies(deps);
     }
     for (auto&& childPair : _children) {
-        childPair.second->addDependencies(deps);
-    }
-}
-
-void InclusionNode::applyInclusions(const Document& inputDoc, MutableDocument* outputDoc) const {
-    auto it = inputDoc.fieldIterator();
-    while (it.more()) {
-        auto fieldPair = it.next();
-        auto fieldName = fieldPair.first.toString();
-        if (_inclusions.find(fieldName) != _inclusions.end()) {
-            outputDoc->addField(fieldName, fieldPair.second);
-            continue;
-        }
-
-        auto childIt = _children.find(fieldName);
-        if (childIt != _children.end()) {
-            outputDoc->addField(fieldName,
-                                childIt->second->applyInclusionsToValue(fieldPair.second));
-        }
-    }
-}
-
-Value InclusionNode::applyInclusionsToValue(Value inputValue) const {
-    if (inputValue.getType() == BSONType::Object) {
-        MutableDocument output;
-        applyInclusions(inputValue.getDocument(), &output);
-        return output.freezeToValue();
-    } else if (inputValue.getType() == BSONType::Array) {
-        std::vector<Value> values = inputValue.getArray();
-        for (auto it = values.begin(); it != values.end(); ++it) {
-            // If this is a nested array and our policy is to not recurse, remove the array.
-            // Otherwise, descend into the array and project each element individually.
-            const bool shouldSkip = it->isArray() &&
-                _arrayRecursionPolicy == ProjectionArrayRecursionPolicy::kDoNotRecurseNestedArrays;
-            *it = (shouldSkip ? Value() : applyInclusionsToValue(*it));
-        }
-        return Value(std::move(values));
-    } else {
-        // This represents the case where we are including children of a field which does not have
-        // any children. e.g. applying the projection {"a.b": true} to the document {a: 2}. It is
-        // somewhat weird, but our semantics are to return a document without the field "a". To do
-        // so, we return the "missing" value here.
-        return Value();
-    }
-}
-
-void InclusionNode::addComputedFields(MutableDocument* outputDoc, const Document& root) const {
-    for (auto&& field : _orderToProcessAdditionsAndChildren) {
-        auto childIt = _children.find(field);
-        if (childIt != _children.end()) {
-            outputDoc->setField(field,
-                                childIt->second->addComputedFields(outputDoc->peek()[field], root));
-        } else {
-            auto expressionIt = _expressions.find(field);
-            invariant(expressionIt != _expressions.end());
-            outputDoc->setField(field, expressionIt->second->evaluate(root));
-        }
-    }
-}
-
-Value InclusionNode::addComputedFields(Value inputValue, const Document& root) const {
-    if (inputValue.getType() == BSONType::Object) {
-        MutableDocument outputDoc(inputValue.getDocument());
-        addComputedFields(&outputDoc, root);
-        return outputDoc.freezeToValue();
-    } else if (inputValue.getType() == BSONType::Array) {
-        std::vector<Value> values = inputValue.getArray();
-        for (auto it = values.begin(); it != values.end(); ++it) {
-            *it = addComputedFields(*it, root);
-        }
-        return Value(std::move(values));
-    } else {
-        if (subtreeContainsComputedFields()) {
-            // Our semantics in this case are to replace whatever existing value we find with a new
-            // document of all the computed values. This case represents applying a projection like
-            // {"a.b": {$literal: 1}} to the document {a: 1}. This should yield {a: {b: 1}}.
-            MutableDocument outputDoc;
-            addComputedFields(&outputDoc, root);
-            return outputDoc.freezeToValue();
-        }
-        // We didn't have any expressions, so just return the missing value.
-        return Value();
-    }
-}
-
-bool InclusionNode::subtreeContainsComputedFields() const {
-    return (!_expressions.empty()) ||
-        std::any_of(
-               _children.begin(),
-               _children.end(),
-               [](const std::pair<const std::string, std::unique_ptr<InclusionNode>>& childPair) {
-                   return childPair.second->subtreeContainsComputedFields();
-               });
-}
-
-void InclusionNode::addComputedField(const FieldPath& path, boost::intrusive_ptr<Expression> expr) {
-    if (path.getPathLength() == 1) {
-        auto fieldName = path.fullPath();
-        _expressions[fieldName] = expr;
-        _orderToProcessAdditionsAndChildren.push_back(fieldName);
-        return;
-    }
-    addOrGetChild(path.getFieldName(0).toString())->addComputedField(path.tail(), expr);
-}
-
-void InclusionNode::addIncludedField(const FieldPath& path) {
-    if (path.getPathLength() == 1) {
-        _inclusions.insert(path.fullPath());
-        return;
-    }
-    addOrGetChild(path.getFieldName(0).toString())->addIncludedField(path.tail());
-}
-
-InclusionNode* InclusionNode::addOrGetChild(std::string field) {
-    auto child = getChild(field);
-    return child ? child : addChild(field);
-}
-
-InclusionNode* InclusionNode::getChild(string field) const {
-    auto childIt = _children.find(field);
-    return childIt == _children.end() ? nullptr : childIt->second.get();
-}
-
-InclusionNode* InclusionNode::addChild(string field) {
-    invariant(!str::contains(field, "."));
-    _orderToProcessAdditionsAndChildren.push_back(field);
-    auto childPath = FieldPath::getFullyQualifiedPath(_pathToNode, field);
-    auto insertedPair = _children.emplace(std::make_pair(
-        std::move(field),
-        stdx::make_unique<InclusionNode>(_arrayRecursionPolicy, std::move(childPath))));
-    return insertedPair.first->second.get();
-}
-
-void InclusionNode::addPreservedPaths(std::set<std::string>* preservedPaths) const {
-    // Only our inclusion paths are preserved. This inclusion node may also have paths with
-    // associated expressions, but those paths are modified and therefore are not considered
-    // "preserved".
-    for (auto&& includedField : _inclusions) {
-        preservedPaths->insert(FieldPath::getFullyQualifiedPath(_pathToNode, includedField));
-    }
-    for (auto&& childPair : _children) {
-        childPair.second->addPreservedPaths(preservedPaths);
-    }
-}
-
-void InclusionNode::addComputedPaths(std::set<std::string>* computedPaths,
-                                     StringMap<std::string>* renamedPaths) const {
-    for (auto&& computedPair : _expressions) {
-        // The expression's path is the concatenation of the path to this inclusion node,
-        // plus the field name associated with the expression.
-        auto exprPath = FieldPath::getFullyQualifiedPath(_pathToNode, computedPair.first);
-        auto exprComputedPaths = computedPair.second->getComputedPaths(exprPath);
-        computedPaths->insert(exprComputedPaths.paths.begin(), exprComputedPaths.paths.end());
-
-        for (auto&& rename : exprComputedPaths.renames) {
-            (*renamedPaths)[rename.first] = rename.second;
-        }
-    }
-    for (auto&& childPair : _children) {
-        childPair.second->addComputedPaths(computedPaths, renamedPaths);
+        childPair.second->reportDependencies(deps);
     }
 }
 
@@ -300,7 +104,7 @@ void ParsedInclusionProjection::parse(const BSONObj& spec) {
             case BSONType::NumberDecimal: {
                 // This is an inclusion specification.
                 invariant(elem.trueValue());
-                _root->addIncludedField(FieldPath(elem.fieldName()));
+                _root->addProjectionForPath(FieldPath(elem.fieldName()));
                 break;
             }
             case BSONType::Object: {
@@ -313,7 +117,7 @@ void ParsedInclusionProjection::parse(const BSONObj& spec) {
                 // The field name might be a dotted path. If so, we need to keep adding children
                 // to our tree until we create a child that represents that path.
                 auto remainingPath = FieldPath(elem.fieldName());
-                auto child = _root.get();
+                auto* child = _root.get();
                 while (remainingPath.getPathLength() > 1) {
                     child = child->addOrGetChild(remainingPath.getFieldName(0).toString());
                     remainingPath = remainingPath.tail();
@@ -327,7 +131,7 @@ void ParsedInclusionProjection::parse(const BSONObj& spec) {
             }
             default: {
                 // This is a literal value.
-                _root->addComputedField(
+                _root->addExpressionForPath(
                     FieldPath(elem.fieldName()),
                     Expression::parseOperand(_expCtx, elem, _expCtx->variablesParseState));
             }
@@ -336,11 +140,11 @@ void ParsedInclusionProjection::parse(const BSONObj& spec) {
 
     if (!idSpecified) {
         // _id wasn't specified, so apply the default _id projection policy here.
-        if (_defaultIdPolicy == ProjectionDefaultIdPolicy::kExcludeId) {
+        if (_policies.idPolicy == ProjectionPolicies::DefaultIdPolicy::kExcludeId) {
             _idExcluded = true;
         } else {
             atLeastOneFieldInOutput = true;
-            _root->addIncludedField(FieldPath("_id"));
+            _root->addProjectionForPath(FieldPath("_id"));
         }
     }
 
@@ -352,13 +156,7 @@ void ParsedInclusionProjection::parse(const BSONObj& spec) {
 Document ParsedInclusionProjection::applyProjection(const Document& inputDoc) const {
     // All expressions will be evaluated in the context of the input document, before any
     // transformations have been applied.
-    MutableDocument output;
-    _root->applyInclusions(inputDoc, &output);
-    _root->addComputedFields(&output, inputDoc);
-
-    // Always pass through the metadata.
-    output.copyMetaDataFrom(inputDoc);
-    return output.freeze();
+    return _root->applyToDocument(inputDoc);
 }
 
 bool ParsedInclusionProjection::parseObjectAsExpression(
@@ -369,8 +167,8 @@ bool ParsedInclusionProjection::parseObjectAsExpression(
         // This is an expression like {$add: [...]}. We have already verified that it has only one
         // field.
         invariant(objSpec.nFields() == 1);
-        _root->addComputedField(pathToObject,
-                                Expression::parseExpression(_expCtx, objSpec, variablesParseState));
+        _root->addExpressionForPath(
+            pathToObject, Expression::parseExpression(_expCtx, objSpec, variablesParseState));
         return true;
     }
     return false;
@@ -393,7 +191,7 @@ void ParsedInclusionProjection::parseSubObject(const BSONObj& subObj,
             case BSONType::NumberDecimal: {
                 // This is an inclusion specification.
                 invariant(elem.trueValue());
-                node->addIncludedField(FieldPath(elem.fieldName()));
+                node->addProjectionForPath(FieldPath(elem.fieldName()));
                 break;
             }
             case BSONType::Object: {
@@ -405,13 +203,13 @@ void ParsedInclusionProjection::parseSubObject(const BSONObj& subObj,
                         variablesParseState)) {
                     break;
                 }
-                auto child = node->addOrGetChild(fieldName);
+                auto* child = node->addOrGetChild(fieldName);
                 parseSubObject(elem.Obj(), variablesParseState, child);
                 break;
             }
             default: {
                 // This is a literal value.
-                node->addComputedField(
+                node->addExpressionForPath(
                     FieldPath(elem.fieldName()),
                     Expression::parseOperand(_expCtx, elem, variablesParseState));
             }
@@ -421,7 +219,7 @@ void ParsedInclusionProjection::parseSubObject(const BSONObj& subObj,
 
 bool ParsedInclusionProjection::isSubsetOfProjection(const BSONObj& proj) const {
     std::set<std::string> preservedPaths;
-    _root->addPreservedPaths(&preservedPaths);
+    _root->reportProjectedPaths(&preservedPaths);
     for (auto&& includedField : preservedPaths) {
         if (!proj.hasField(includedField))
             return false;
@@ -430,7 +228,7 @@ bool ParsedInclusionProjection::isSubsetOfProjection(const BSONObj& proj) const 
     // If the inclusion has any computed fields or renamed fields, then it's not a subset.
     std::set<std::string> computedPaths;
     StringMap<std::string> renamedPaths;
-    _root->addComputedPaths(&computedPaths, &renamedPaths);
+    _root->reportComputedPaths(&computedPaths, &renamedPaths);
     return computedPaths.empty() && renamedPaths.empty();
 }
 

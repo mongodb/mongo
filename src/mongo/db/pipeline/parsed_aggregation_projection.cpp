@@ -151,7 +151,8 @@ void ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
 
 namespace {
 
-using ProjectionParseMode = ParsedAggregationProjection::ProjectionParseMode;
+using ProjectionPolicies = ParsedAggregationProjection::ProjectionPolicies;
+using ComputedFieldsPolicy = ProjectionPolicies::ComputedFieldsPolicy;
 
 std::string makeBannedComputedFieldsErrorMessage(BSONObj projSpec) {
     return str::stream() << "Bad projection specification, cannot use computed fields when parsing "
@@ -169,16 +170,16 @@ public:
      * fields (ones which are defined by an expression or a literal) are treated as inclusion
      * projections for in this context of the $project stage.
      */
-    static TransformerType parse(const BSONObj& spec, ProjectionParseMode parseMode) {
-        ProjectTypeParser parser(spec, parseMode);
+    static TransformerType parse(const BSONObj& spec, ProjectionPolicies policies) {
+        ProjectTypeParser parser(spec, policies);
         parser.parse();
         invariant(parser._parsedType);
         return *(parser._parsedType);
     }
 
 private:
-    ProjectTypeParser(const BSONObj& spec, ProjectionParseMode parseMode)
-        : _rawObj(spec), _parseMode(parseMode) {}
+    ProjectTypeParser(const BSONObj& spec, ProjectionPolicies policies)
+        : _rawObj(spec), _policies(policies) {}
 
     /**
      * Parses a single BSONElement, with 'fieldName' representing the path used for projection
@@ -223,8 +224,8 @@ private:
      * appropriate.
      *
      * Throws a AssertionException if this element represents a mix of projection types. If we are
-     * parsing in ProjectionParseMode::kBanComputedFields mode, an inclusion projection which
-     * contains computed fields will also be rejected.
+     * parsing in ComputedFieldsPolicy::kBanComputedFields mode, an inclusion projection
+     * which contains computed fields will also be rejected.
      */
     void parseElement(const BSONElement& elem, const FieldPath& pathToElem) {
         if (elem.type() == BSONType::Object) {
@@ -236,7 +237,7 @@ private:
         uassert(ErrorCodes::FailedToParse,
                 makeBannedComputedFieldsErrorMessage(_rawObj),
                 elem.isBoolean() || elem.isNumber() ||
-                    _parseMode != ProjectionParseMode::kBanComputedFields);
+                    _policies.computedFieldsPolicy != ComputedFieldsPolicy::kBanComputedFields);
 
         if (pathToElem.fullPath() == "_id") {
             // If the _id field is a computed value, then this must be an inclusion projection. If
@@ -280,8 +281,8 @@ private:
      * Traverses 'thisLevelSpec', parsing each element in turn.
      *
      * Throws a AssertionException if 'thisLevelSpec' represents an invalid mix of projections. If
-     * we are parsing in ProjectionParseMode::kBanComputedFields mode, an inclusion projection which
-     * contains computed fields will also be rejected.
+     * we are parsing in ComputedFieldsPolicy::kBanComputedFields mode, an inclusion
+     * projection which contains computed fields will also be rejected.
      */
     void parseNestedObject(const BSONObj& thisLevelSpec, const FieldPath& prefix) {
 
@@ -293,7 +294,7 @@ private:
                 // specified, validate that computed projections are legal, and skip it.
                 uassert(ErrorCodes::FailedToParse,
                         makeBannedComputedFieldsErrorMessage(_rawObj),
-                        _parseMode != ProjectionParseMode::kBanComputedFields);
+                        _policies.computedFieldsPolicy != ComputedFieldsPolicy::kBanComputedFields);
                 uassert(40182,
                         str::stream() << "Bad projection specification, cannot include fields or "
                                          "add computed fields during an exclusion projection: "
@@ -314,8 +315,8 @@ private:
     // This will be populated during parse().
     boost::optional<TransformerType> _parsedType;
 
-    // Determines whether an inclusion projection is permitted to contain computed fields.
-    ProjectionParseMode _parseMode;
+    // Policies associated with the projection which determine its runtime behaviour.
+    ProjectionPolicies _policies;
 };
 
 }  // namespace
@@ -323,16 +324,14 @@ private:
 std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& spec,
-    ProjectionDefaultIdPolicy defaultIdPolicy,
-    ProjectionArrayRecursionPolicy arrayRecursionPolicy,
-    ProjectionParseMode parseMode) {
+    ProjectionPolicies policies) {
     // Check that the specification was valid. Status returned is unspecific because validate()
     // is used by the $addFields stage as well as $project.
     // If there was an error, uassert with a $project-specific message.
     ProjectionSpecValidator::uassertValid(spec, "$project");
 
     // Check for any conflicting specifications, and determine the type of the projection.
-    auto projectionType = ProjectTypeParser::parse(spec, parseMode);
+    auto projectionType = ProjectTypeParser::parse(spec, policies);
     // kComputed is a projection type reserved for $addFields, and should never be detected by the
     // ProjectTypeParser.
     invariant(projectionType != TransformerType::kComputedProjection);
@@ -341,9 +340,9 @@ std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create
     std::unique_ptr<ParsedAggregationProjection> parsedProject(
         projectionType == TransformerType::kInclusionProjection
             ? static_cast<ParsedAggregationProjection*>(
-                  new ParsedInclusionProjection(expCtx, defaultIdPolicy, arrayRecursionPolicy))
+                  new ParsedInclusionProjection(expCtx, policies))
             : static_cast<ParsedAggregationProjection*>(
-                  new ParsedExclusionProjection(expCtx, defaultIdPolicy, arrayRecursionPolicy)));
+                  new ParsedExclusionProjection(expCtx, policies)));
 
     // Actually parse the specification.
     parsedProject->parse(spec);

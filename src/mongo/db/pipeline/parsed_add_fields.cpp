@@ -63,7 +63,7 @@ void ParsedAddFields::parse(const BSONObj& spec) {
                 // The field name might be a dotted path. If so, we need to keep adding children
                 // to our tree until we create a child that represents that path.
                 auto remainingPath = FieldPath(elem.fieldName());
-                auto child = _root.get();
+                auto* child = _root.get();
                 while (remainingPath.getPathLength() > 1) {
                     child = child->addOrGetChild(remainingPath.getFieldName(0).toString());
                     remainingPath = remainingPath.tail();
@@ -75,7 +75,7 @@ void ParsedAddFields::parse(const BSONObj& spec) {
             }
         } else {
             // This is a literal or regular value.
-            _root->addComputedField(
+            _root->addExpressionForPath(
                 FieldPath(elem.fieldName()),
                 Expression::parseOperand(_expCtx, elem, _expCtx->variablesParseState));
         }
@@ -85,7 +85,7 @@ void ParsedAddFields::parse(const BSONObj& spec) {
 Document ParsedAddFields::applyProjection(const Document& inputDoc) const {
     // The output doc is the same as the input doc, with the added fields.
     MutableDocument output(inputDoc);
-    _root->addComputedFields(&output, inputDoc);
+    _root->applyExpressions(inputDoc, &output);
 
     // Pass through the metadata.
     output.copyMetaDataFrom(inputDoc);
@@ -96,11 +96,10 @@ bool ParsedAddFields::parseObjectAsExpression(StringData pathToObject,
                                               const BSONObj& objSpec,
                                               const VariablesParseState& variablesParseState) {
     if (objSpec.firstElementFieldName()[0] == '$') {
-        // This is an expression like {$add: [...]}. We have already verified that it has only one
-        // field.
+        // This is an expression like {$add: [...]}. We already verified that it has only one field.
         invariant(objSpec.nFields() == 1);
-        _root->addComputedField(pathToObject,
-                                Expression::parseExpression(_expCtx, objSpec, variablesParseState));
+        _root->addExpressionForPath(
+            pathToObject, Expression::parseExpression(_expCtx, objSpec, variablesParseState));
         return true;
     }
     return false;
@@ -123,13 +122,14 @@ void ParsedAddFields::parseSubObject(const BSONObj& subObj,
                     elem.Obj(),
                     variablesParseState)) {
                 // It was a nested subobject
-                auto child = node->addOrGetChild(fieldName);
+                auto* child = node->addOrGetChild(fieldName);
                 parseSubObject(elem.Obj(), variablesParseState, child);
             }
         } else {
             // This is a literal or regular value.
-            node->addComputedField(FieldPath(elem.fieldName()),
-                                   Expression::parseOperand(_expCtx, elem, variablesParseState));
+            node->addExpressionForPath(
+                FieldPath(elem.fieldName()),
+                Expression::parseOperand(_expCtx, elem, variablesParseState));
         }
     }
 }
