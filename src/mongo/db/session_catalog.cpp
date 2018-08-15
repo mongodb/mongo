@@ -279,6 +279,7 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx,
         checkedOutSession->get()->beginOrContinueTxn(
             opCtx, *opCtx->getTxnNumber(), autocommit, startTransaction, dbName, cmdName);
     }
+    session->setCurrentOperation(opCtx);
 }
 
 OperationContextSession::~OperationContextSession() {
@@ -289,6 +290,9 @@ OperationContextSession::~OperationContextSession() {
     }
 
     auto& checkedOutSession = operationSessionDecoration(_opCtx);
+    if (checkedOutSession) {
+        checkedOutSession->get()->clearCurrentOperation();
+    }
     // We acquire a Client lock here to guard the destruction of this session so that references to
     // this session are safe to use while the lock is held.
     stdx::lock_guard<Client> lk(*_opCtx->getClient());

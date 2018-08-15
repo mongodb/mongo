@@ -292,6 +292,18 @@ const BSONObj Session::kDeadEndSentinel(BSON("$incompleteOplogHistory" << 1));
 
 Session::Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
 
+void Session::setCurrentOperation(OperationContext* currentOperation) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(!_currentOperation);
+    _currentOperation = currentOperation;
+}
+
+void Session::clearCurrentOperation() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(_currentOperation);
+    _currentOperation = nullptr;
+}
+
 void Session::refreshFromStorageIfNeeded(OperationContext* opCtx) {
     if (opCtx->getClient()->isInDirectClient()) {
         return;
@@ -838,21 +850,33 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
 
 void Session::abortArbitraryTransaction() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _abortArbitraryTransaction(lock);
+
+    if (_txnState != MultiDocumentTransactionState::kInProgress) {
+        return;
+    }
+
+    _abortTransaction(lock);
 }
 
 void Session::abortArbitraryTransactionIfExpired() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    if (!_transactionExpireDate || _transactionExpireDate >= Date_t::now()) {
+    if (_txnState != MultiDocumentTransactionState::kInProgress || !_transactionExpireDate ||
+        _transactionExpireDate >= Date_t::now()) {
         return;
     }
-    _abortArbitraryTransaction(lock);
-}
 
-void Session::_abortArbitraryTransaction(WithLock lock) {
-    if (_txnState != MultiDocumentTransactionState::kInProgress) {
-        return;
+    if (_currentOperation) {
+        // If an operation is still running for this transaction when it expires, kill the currently
+        // running operation.
+        stdx::lock_guard<Client> clientLock(*_currentOperation->getClient());
+        getGlobalServiceContext()->killOperation(_currentOperation, ErrorCodes::ExceededTimeLimit);
     }
+
+    // Log after killing the current operation because jstests may wait to see this log message to
+    // imply that the operation has been killed.
+    log() << "Aborting transaction with txnNumber " << _activeTxnNumber << " on session with lsid "
+          << _sessionId.getId()
+          << " because it has been running for longer than 'transactionLifetimeLimitSeconds'";
 
     _abortTransaction(lock);
 }

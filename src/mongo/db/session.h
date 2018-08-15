@@ -378,6 +378,16 @@ public:
     }
 
     /**
+      * Sets the current operation running on this Session.
+      */
+    void setCurrentOperation(OperationContext* currentOperation);
+
+    /**
+     * Clears the current operation running on this Session.
+     */
+    void clearCurrentOperation();
+
+    /**
      * Returns a new oplog entry if the given entry has transaction state embedded within in.
      * The new oplog entry will contain the operation needed to replicate the transaction
      * table.
@@ -430,8 +440,6 @@ private:
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
 
-    void _abortArbitraryTransaction(WithLock);
-
     // Releases stashed transaction resources to abort the transaction.
     void _abortTransaction(WithLock);
 
@@ -456,6 +464,10 @@ private:
 
     // Condition variable notified when we finish an attempt to commit the global WUOW.
     stdx::condition_variable _commitcv;
+
+    // A pointer back to the currently running operation on this Session, or nullptr if there
+    // is no operation currently running for the Session.
+    OperationContext* _currentOperation{nullptr};
 
     // Specifies whether the session information needs to be refreshed from storage
     bool _isValid{false};
