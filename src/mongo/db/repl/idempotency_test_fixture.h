@@ -94,7 +94,7 @@ protected:
     OplogEntry insert(const BSONObj& obj);
     template <class IdType>
     OplogEntry update(IdType _id, const BSONObj& obj);
-    OplogEntry buildIndex(const BSONObj& indexSpec, const BSONObj& options = BSONObj());
+    OplogEntry buildIndex(const BSONObj& indexSpec, const BSONObj& options, UUID uuid);
     OplogEntry dropIndex(const std::string& indexName);
     virtual Status resetState();
 
@@ -125,7 +125,6 @@ protected:
     CollectionState validate();
 
     NamespaceString nss{"test.foo"};
-    NamespaceString nssIndex{"test.system.indexes"};
 };
 
 OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
@@ -148,9 +147,13 @@ OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
 OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                                      const NamespaceString& nss,
                                      const std::string& indexName,
-                                     const BSONObj& keyPattern);
+                                     const BSONObj& keyPattern,
+                                     const UUID& uuid);
 
-OplogEntry makeCommandOplogEntry(OpTime opTime, const NamespaceString& nss, const BSONObj& command);
+OplogEntry makeCommandOplogEntry(OpTime opTime,
+                                 const NamespaceString& nss,
+                                 const BSONObj& command,
+                                 boost::optional<UUID> uuid = boost::none);
 
 OplogEntry makeInsertDocumentOplogEntryWithSessionInfo(OpTime opTime,
                                                        const NamespaceString& nss,

@@ -138,6 +138,8 @@ protected:
     Status runOpsSteadyState(std::vector<OplogEntry> ops);
     Status runOpInitialSync(const OplogEntry& entry);
     Status runOpsInitialSync(std::vector<OplogEntry> ops);
+
+    UUID kUuid{UUID::gen()};
 };
 
 Status failedApplyCommand(OperationContext* opCtx,

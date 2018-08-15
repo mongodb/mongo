@@ -71,12 +71,13 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<BSONObj> object2 = boost::none,
                                 OperationSessionInfo sessionInfo = {},
                                 boost::optional<Date_t> wallClockTime = boost::none,
-                                boost::optional<StmtId> stmtId = boost::none) {
+                                boost::optional<StmtId> stmtId = boost::none,
+                                boost::optional<UUID> uuid = boost::none) {
     return repl::OplogEntry(opTime,                           // optime
                             1LL,                              // hash
                             opType,                           // opType
                             nss,                              // namespace
-                            boost::none,                      // uuid
+                            uuid,                             // uuid
                             boost::none,                      // fromMigrate
                             repl::OplogEntry::kOplogVersion,  // version
                             object,                           // o
@@ -197,12 +198,21 @@ StringBuilderImpl<SharedBufferAllocator>& operator<<(StringBuilderImpl<SharedBuf
 const auto kCollectionDoesNotExist = CollectionState();
 
 /**
- * Creates a command oplog entry with given optime and namespace.
+ * Creates an oplog entry for 'command' with the given 'optime', 'namespace' and optional 'uuid'.
  */
 OplogEntry makeCommandOplogEntry(OpTime opTime,
                                  const NamespaceString& nss,
-                                 const BSONObj& command) {
-    return makeOplogEntry(opTime, OpTypeEnum::kCommand, nss.getCommandNS(), command);
+                                 const BSONObj& command,
+                                 boost::optional<UUID> uuid) {
+    return makeOplogEntry(opTime,
+                          OpTypeEnum::kCommand,
+                          nss.getCommandNS(),
+                          command,
+                          boost::none /* o2 */,
+                          {} /* sessionInfo */,
+                          boost::none /* wallClockTime*/,
+                          boost::none /* stmtId */,
+                          uuid);
 }
 
 /**
@@ -269,14 +279,14 @@ OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
 OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                                      const NamespaceString& nss,
                                      const std::string& indexName,
-                                     const BSONObj& keyPattern) {
+                                     const BSONObj& keyPattern,
+                                     const UUID& uuid) {
     BSONObjBuilder indexInfoBob;
+    indexInfoBob.append("createIndexes", nss.coll());
     indexInfoBob.append("v", 2);
     indexInfoBob.append("key", keyPattern);
     indexInfoBob.append("name", indexName);
-    indexInfoBob.append("ns", nss.ns());
-    return makeInsertDocumentOplogEntry(
-        opTime, NamespaceString(nss.getSystemIndexesCollection()), indexInfoBob.obj());
+    return makeCommandOplogEntry(opTime, nss, indexInfoBob.obj(), uuid);
 }
 
 /**
@@ -373,14 +383,16 @@ OplogEntry IdempotencyTest::update(IdType _id, const BSONObj& obj) {
     return makeUpdateDocumentOplogEntry(nextOpTime(), nss, BSON("_id" << _id), obj);
 }
 
-OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec, const BSONObj& options) {
+OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec,
+                                       const BSONObj& options,
+                                       UUID uuid) {
     BSONObjBuilder bob;
+    bob.append("createIndexes", nss.coll());
     bob.append("v", 2);
     bob.append("key", indexSpec);
     bob.append("name", std::string(indexSpec.firstElementFieldName()) + "_index");
-    bob.append("ns", nss.ns());
     bob.appendElementsUnique(options);
-    return makeInsertDocumentOplogEntry(nextOpTime(), nssIndex, bob.obj());
+    return makeCommandOplogEntry(nextOpTime(), nss, bob.obj(), uuid);
 }
 
 OplogEntry IdempotencyTest::dropIndex(const std::string& indexName) {
