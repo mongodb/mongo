@@ -3391,7 +3391,7 @@ tasks:
           VERSION=${version}
           WORKDIR=${workdir}
 
-          CDRIVER_VERSION=1.10.3
+          CDRIVER_VERSION=1.12.0
           rm -rf mongo-c-driver-$CDRIVER_VERSION
           rm -rf mongo-c-driver
           curl -LO https://github.com/mongodb/mongo-c-driver/releases/download/$CDRIVER_VERSION/mongo-c-driver-$CDRIVER_VERSION.tar.gz
@@ -3421,6 +3421,7 @@ tasks:
           --enable-free-mon=off
           --use-system-mongo-c=on
           --wiredtiger=off
+          --allocator=system
           CPPPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libbson-1.0 $BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libmongoc-1.0'
 
 - name: embedded_sdk_s3_put
@@ -9735,6 +9736,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_macos.vars
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
         -DCMAKE_SYSTEM_PROCESSOR=x86_64
@@ -9744,7 +9746,7 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_C_FLAGS="-arch x86_64 -isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
-        -DCMAKE_LINKER_FLAGS="-arch x86_64 -isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
+        -DCMAKE_SHARED_LINKER_FLAGS="-arch x86_64 -isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
     enable_embedded_tests: native
@@ -9766,6 +9768,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_ios.vars
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
         -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk iphoneos --show-sdk-path);$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
@@ -9774,7 +9777,7 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_C_FLAGS="-arch arm64 -fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2"
-        -DCMAKE_LINKER_FLAGS="-arch arm64 -fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2"
+        -DCMAKE_SHARED_LINKER_FLAGS="-arch arm64 -fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
     dump_scons_config_on_failure: true
@@ -9795,6 +9798,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_ios_sim.vars
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
         -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk iphonesimulator --show-sdk-path);$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
@@ -9803,7 +9807,7 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_C_FLAGS="-arch x86_64 -fembed-bitcode -isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
-        -DCMAKE_LINKER_FLAGS="-arch x86_64 -fembed-bitcode -isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
+        -DCMAKE_SHARED_LINKER_FLAGS="-arch x86_64 -fembed-bitcode -isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
@@ -9827,6 +9831,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos.vars
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
         -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk appletvos --show-sdk-path);$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
@@ -9835,7 +9840,7 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_C_FLAGS="-arch arm64 -fembed-bitcode -isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.2"
-        -DCMAKE_LINKER_FLAGS="-arch arm64 -fembed-bitcode -isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.2"
+        -DCMAKE_SHARED_LINKER_FLAGS="-arch arm64 -fembed-bitcode -isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
     dump_scons_config_on_failure: true
@@ -9856,6 +9861,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos_sim.vars
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
         -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk appletvsimulator --show-sdk-path);$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
@@ -9864,7 +9870,7 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_C_FLAGS="-arch x86_64 -fembed-bitcode -isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.2"
-        -DCMAKE_LINKER_FLAGS="-arch x86_64 -fembed-bitcode -isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.2"
+        -DCMAKE_SHARED_LINKER_FLAGS="-arch x86_64 -fembed-bitcode -isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
@@ -9885,13 +9891,10 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
       --variables-files=etc/scons/xcode_watchos.vars
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
         -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk watchos --show-sdk-path);$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
@@ -9900,7 +9903,7 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_C_FLAGS="-arch armv7k -fembed-bitcode -isysroot $(xcrun --sdk watchos --show-sdk-path) -mwatchos-version-min=4.2"
-        -DCMAKE_LINKER_FLAGS="-arch armv7k -fembed-bitcode -isysroot $(xcrun --sdk watchos --show-sdk-path) -mwatchos-version-min=4.2"
+        -DCMAKE_SHARED_LINKER_FLAGS="-arch armv7k -fembed-bitcode -isysroot $(xcrun --sdk watchos --show-sdk-path) -mwatchos-version-min=4.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
     dump_scons_config_on_failure: true
@@ -9918,13 +9921,10 @@ buildvariants:
     compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
-      --dbg=off
-      --opt=size
-      --enable-free-mon=off
       --variables-files=etc/scons/xcode_watchos_sim.vars
-      --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
         -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk watchsimulator --show-sdk-path);$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
@@ -9933,7 +9933,7 @@ buildvariants:
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_C_FLAGS="-arch i386 -fembed-bitcode -isysroot $(xcrun --sdk watchsimulator --show-sdk-path) -mwatchos-version-min=4.2"
-        -DCMAKE_LINKER_FLAGS="-arch i386 -fembed-bitcode -isysroot $(xcrun --sdk watchsimulator --show-sdk-path) -mwatchos-version-min=4.2"
+        -DCMAKE_SHARED_LINKER_FLAGS="-arch i386 -fembed-bitcode -isysroot $(xcrun --sdk watchsimulator --show-sdk-path) -mwatchos-version-min=4.2"
         -DCMAKE_INSTALL_NAME_DIR=@rpath
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
@@ -9954,9 +9954,9 @@ buildvariants:
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-      --allocator=system
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    cdriver_cmake_flags:
+    cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_C_COMPILER=/opt/mongodbtoolchain/v2/bin/gcc
         -DCMAKE_CXX_COMPILER=/opt/mongodbtoolchain/v2/bin/g++
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
@@ -9981,6 +9981,7 @@ buildvariants:
       LIBS=clang_rt.builtins-arm-android
       LIBPATH="$(dirname $($(dirname $(pwd))/android_toolchain-arm-21/bin/clang -print-file-name=libclang_rt.builtins-arm-android.a)) \$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=armeabi-v7a
         -DTHREADS_PTHREAD_ARG=2
@@ -10016,6 +10017,7 @@ buildvariants:
       --variables-files=etc/scons/android_toolchain.vars
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=arm64-v8a
         -DTHREADS_PTHREAD_ARG=2
@@ -10051,6 +10053,7 @@ buildvariants:
       --variables-files=etc/scons/android_toolchain.vars
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=x86_64
         -DTHREADS_PTHREAD_ARG=2
