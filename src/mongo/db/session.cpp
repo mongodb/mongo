@@ -611,7 +611,9 @@ void Session::_beginOrContinueTxn(WithLock wl,
             Date_t::fromMillisSinceEpoch(_singleTransactionStats->getStartTime() / 1000) +
             stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalStarted();
+        // The transaction is considered open here and stays inactive until its first unstash event.
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentOpen();
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentInactive();
     } else {
         // Execute a retryable write.
         invariant(startTransaction == boost::none);
@@ -803,6 +805,7 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
         }
         opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentActive();
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
 
         // Set the starting active time for this transaction.
         _singleTransactionStats->setActive(curTimeMicros64());

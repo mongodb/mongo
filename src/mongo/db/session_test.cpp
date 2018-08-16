@@ -1419,8 +1419,13 @@ TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithCommit) {
     unsigned long long beforeInactiveCounter =
         ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
 
-    // Tests that the first unstash only increments the active counter only.
+    // Starting the transaction should put it into an inactive state.
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactiveCounter + 1);
+
+    // Tests that the first unstash increments the active counter and decrements the inactive
+    // counter.
     session.unstashTransactionResources(opCtx(), "insert");
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
               beforeActiveCounter + 1U);
@@ -1461,8 +1466,13 @@ TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithStashedAbort) {
     unsigned long long beforeInactiveCounter =
         ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
 
-    // Tests that the first unstash only increments the active counter only.
+    // Starting the transaction should put it into an inactive state.
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactiveCounter + 1);
+
+    // Tests that the first unstash increments the active counter and decrements the inactive
+    // counter.
     session.unstashTransactionResources(opCtx(), "insert");
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
               beforeActiveCounter + 1U);
@@ -1496,8 +1506,13 @@ TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithUnstashedAbort) {
     unsigned long long beforeInactiveCounter =
         ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
 
-    // Tests that the first unstash only increments the active counter only.
+    // Starting the transaction should put it into an inactive state.
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactiveCounter + 1);
+
+    // Tests that the first unstash increments the active counter and decrements the inactive
+    // counter.
     session.unstashTransactionResources(opCtx(), "insert");
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
               beforeActiveCounter + 1U);
