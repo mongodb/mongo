@@ -1054,6 +1054,12 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
                 // Update the LastClientInfo object stored in the SingleTransactionStats instance on
                 // the Session with this Client's information.
                 _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
+
+                // Log the transaction if its duration is longer than the slowMS command threshold.
+                _logSlowTransaction(lk,
+                                    &(opCtx->lockState()->getLockerInfo())->stats,
+                                    MultiDocumentTransactionState::kAborted,
+                                    repl::ReadConcernArgs::get(opCtx));
             }
         }
         // We must clear the recovery unit and locker so any post-transaction writes can run without
