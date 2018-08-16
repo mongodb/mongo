@@ -657,6 +657,7 @@ env.Library(
         'namespace_string',
         'repl/oplog_entry',
         's/sharding_api_d',
+        "stats/top",
         'views/views',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ],

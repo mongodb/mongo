@@ -112,11 +112,16 @@ public:
     void appendLatencyStats(StringData ns, bool includeHistograms, BSONObjBuilder* builder);
 
     /**
-     * Increments the global histogram.
+     * Increments the global histogram only if the operation came from a user.
      */
     void incrementGlobalLatencyStats(OperationContext* opCtx,
                                      uint64_t latency,
                                      Command::ReadWriteType readWriteType);
+
+    /**
+     * Increments the global transactions histogram.
+     */
+    void incrementGlobalTransactionLatencyStats(uint64_t latency);
 
     /**
      * Appends the global latency statistics.

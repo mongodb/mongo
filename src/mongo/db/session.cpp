@@ -52,6 +52,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/stats/fill_locker_info.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/transport_layer.h"
@@ -899,8 +900,8 @@ void Session::_abortTransaction(WithLock wl) {
         return;
     }
 
+    auto curTime = curTimeMicros64();
     if (_txnState == MultiDocumentTransactionState::kInProgress) {
-        auto curTime = curTimeMicros64();
         _singleTransactionStats->setEndTime(curTime);
         if (_singleTransactionStats->isActive()) {
             _singleTransactionStats->setInactive(curTime);
@@ -924,6 +925,9 @@ void Session::_abortTransaction(WithLock wl) {
     _speculativeTransactionReadOpTime = repl::OpTime();
     ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
+
+    Top::get(getGlobalServiceContext())
+        .incrementGlobalTransactionLatencyStats(_singleTransactionStats->getDuration(curTime));
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
@@ -1071,7 +1075,6 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
     _txnState = MultiDocumentTransactionState::kCommitted;
-    ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
     // After the transaction has been committed, we must update the end time and mark it as
     // inactive.
     auto curTime = curTimeMicros64();
@@ -1079,8 +1082,12 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     if (_singleTransactionStats->isActive()) {
         _singleTransactionStats->setInactive(curTime);
     }
+    ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
     ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
+    Top::get(getGlobalServiceContext())
+        .incrementGlobalTransactionLatencyStats(_singleTransactionStats->getDuration(curTime));
+
     // Add the latest operation stats to the aggregate OpDebug object stored in the
     // SingleTransactionStats instance on the Session.
     _singleTransactionStats->getOpDebug()->additiveMetrics.add(
