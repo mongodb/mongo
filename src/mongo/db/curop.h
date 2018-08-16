@@ -98,6 +98,13 @@ public:
          */
         void incrementPrepareReadConflicts(long long n);
 
+        /**
+         * Generates a string showing all non-empty fields. For every non-empty field field1,
+         * field2, ..., with corresponding values value1, value2, ..., we will output a string in
+         * the format: "<field1>:<value1> <field2>:<value2> ...".
+         */
+        std::string report();
+
         boost::optional<long long> keysExamined;
         boost::optional<long long> docsExamined;
 
