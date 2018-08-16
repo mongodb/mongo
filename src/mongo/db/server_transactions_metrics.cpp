@@ -112,6 +112,8 @@ void ServerTransactionsMetrics::incrementTotalCommitted() {
 }
 
 void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
+    stats->setTotalAborted(_totalAborted.load());
+    stats->setTotalCommitted(_totalCommitted.load());
     stats->setTotalStarted(_totalStarted.load());
 }
 
