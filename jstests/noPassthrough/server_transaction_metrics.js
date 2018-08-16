@@ -8,6 +8,13 @@
         assert(serverStatusResponse.hasOwnProperty("transactions"),
                "Expected the serverStatus response to have a 'transactions' field\n" +
                    serverStatusResponse);
+        assert(serverStatusResponse.transactions.hasOwnProperty("currentActive"),
+               "The 'transactions' field in serverStatus did not have the 'currentActive' field\n" +
+                   serverStatusResponse.transactions);
+        assert(
+            serverStatusResponse.transactions.hasOwnProperty("currentInactive"),
+            "The 'transactions' field in serverStatus did not have the 'currentInactive' field\n" +
+                serverStatusResponse.transactions);
         assert(serverStatusResponse.transactions.hasOwnProperty("currentOpen"),
                "The 'transactions' field in serverStatus did not have the 'currentOpen' field\n" +
                    serverStatusResponse.transactions);
@@ -41,6 +48,7 @@
     const dbName = "test";
     const collName = "server_transactions_metrics";
     const testDB = primary.getDB(dbName);
+    const adminDB = rst.getPrimary().getDB('admin');
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
@@ -62,8 +70,13 @@
     assert.commandWorked(sessionColl.insert({_id: "insert-1"}));
     let newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
-    // Test that the open transaction counter is incremented while inside the transaction.
+    // Verify that the open transaction counter is incremented while inside the transaction.
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 1);
+    // Verify that when not running an operation, the transaction is inactive.
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentActive", 0);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentInactive", 1);
 
     // Compare server status after the transaction commit with the server status before.
     session.commitTransaction();
@@ -72,8 +85,13 @@
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalStarted", 1);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalCommitted", 1);
-    // Test that current open counter is decremented on commit.
+    // Verify that current open counter is decremented on commit.
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 0);
+    // Verify that both active and inactive are 0 on commit.
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentActive", 0);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
 
     // This transaction will abort.
     jsTest.log("Start a transaction and then abort it.");
@@ -83,8 +101,13 @@
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
-    // Test that the open transaction counter is incremented while inside the transaction.
+    // Verify that the open transaction counter is incremented while inside the transaction.
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 1);
+    // Verify that when not running an operation, the transaction is inactive.
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentActive", 0);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentInactive", 1);
 
     // Compare server status after the transaction abort with the server status before.
     session.abortTransaction();
@@ -94,8 +117,13 @@
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalCommitted", 1);
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalAborted", 1);
-    // Test that current open counter is decremented on abort.
+    // Verify that current open counter is decremented on abort.
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 0);
+    // Verify that both active and inactive are 0 on abort.
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentActive", 0);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
 
     // This transaction will abort due to a duplicate key insert.
     jsTest.log("Start a transaction that will abort on a duplicated key error.");
@@ -106,8 +134,13 @@
     assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
-    // Test that the open transaction counter is incremented while inside the transaction.
+    // Verify that the open transaction counter is incremented while inside the transaction.
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 1);
+    // Verify that when not running an operation, the transaction is inactive.
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentActive", 0);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentInactive", 1);
 
     // Compare server status after the transaction abort with the server status before.
     // The duplicated insert will fail, causing the transaction to abort.
@@ -121,8 +154,64 @@
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalCommitted", 1);
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalAborted", 2);
-    // Test that current open counter is decremented on abort caused by an error.
+    // Verify that current open counter is decremented on abort caused by an error.
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 0);
+    // Verify that both active and inactive are 0 on abort.
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentActive", 0);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
+
+    // Hang the transaction on a failpoint in the middle of an operation to check active and
+    // inactive counters while operation is running inside a transaction.
+    jsTest.log(
+        "Start a transaction that will hang in the middle of an operation due to a fail point.");
+    assert.commandWorked(testDB.adminCommand(
+        {configureFailPoint: 'setInterruptOnlyPlansCheckForInterruptHang', mode: 'alwaysOn'}));
+    assert.commandWorked(
+        testDB.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+
+    const transactionFn = function() {
+        const collName = 'server_transactions_metrics';
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase('test');
+        const sessionColl = sessionDb[collName];
+
+        session.startTransaction({readConcern: {level: 'snapshot'}});
+        assert.commandWorked(sessionColl.update({}, {"update-1": 2}));
+        session.commitTransaction();
+    };
+    const transactionProcess = startParallelShell(transactionFn, primary.port);
+
+    // Keep running currentOp() until we see the transaction subdocument.
+    assert.soon(function() {
+        const transactionFilter =
+            {active: true, 'lsid': {$exists: true}, 'transaction.parameters.txnNumber': {$eq: 0}};
+        return 1 === adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).itcount();
+    });
+    newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+    verifyServerStatusFields(newStatus);
+    // Verify that the open transaction counter is incremented while inside the transaction.
+    verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 1);
+    // Verify that the metrics show that the transaction is active while inside the operation.
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentActive", 1);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
+
+    // Now the transaction can proceed.
+    assert.commandWorked(testDB.adminCommand(
+        {configureFailPoint: 'setInterruptOnlyPlansCheckForInterruptHang', mode: 'off'}));
+    transactionProcess();
+    newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+    verifyServerStatusFields(newStatus);
+    // Verify that current open counter is decremented on commit.
+    verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 0);
+    // Verify that both active and inactive are 0 after the transaction finishes.
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentActive", 0);
+    verifyServerStatusChange(
+        initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
 
     // End the session and stop the replica set.
     session.endSession();
