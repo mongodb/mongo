@@ -36,6 +36,7 @@
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -856,6 +857,7 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
     stdx::unique_lock<Client> clientLock(*opCtx->getClient());
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
+    invariant(!_txnResourceStash);
     if (_txnState != MultiDocumentTransactionState::kInProgress) {
         return;
     }
@@ -880,6 +882,11 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
     // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
     // with this Client's information.
     _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
+
+    // Log the transaction if its duration is longer than the slowMS command threshold.
+    _logSlowTransaction(lock,
+                        &(opCtx->lockState()->getLockerInfo())->stats,
+                        MultiDocumentTransactionState::kAborted);
 }
 
 void Session::_abortTransaction(WithLock wl) {
@@ -890,10 +897,20 @@ void Session::_abortTransaction(WithLock wl) {
         _txnState == MultiDocumentTransactionState::kCommitted) {
         return;
     }
-    const bool isMultiDocumentTransaction = _txnState == MultiDocumentTransactionState::kInProgress;
+
+    if (_txnState == MultiDocumentTransactionState::kInProgress) {
+        auto curTime = curTimeMicros64();
+        _singleTransactionStats->setEndTime(curTime);
+        if (_singleTransactionStats->isActive()) {
+            _singleTransactionStats->setInactive(curTime);
+        }
+    }
 
     // If the transaction is stashed, then we have aborted an inactive transaction.
     if (_txnResourceStash) {
+        _logSlowTransaction(wl,
+                            &(_txnResourceStash->locker()->getLockerInfo())->stats,
+                            MultiDocumentTransactionState::kAborted);
         ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
     } else {
         ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
@@ -904,13 +921,6 @@ void Session::_abortTransaction(WithLock wl) {
     _txnState = MultiDocumentTransactionState::kAborted;
     _speculativeTransactionReadOpTime = repl::OpTime();
     ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
-    if (isMultiDocumentTransaction) {
-        auto curTime = curTimeMicros64();
-        _singleTransactionStats->setEndTime(curTime);
-        if (_singleTransactionStats->isActive()) {
-            _singleTransactionStats->setInactive(curTime);
-        }
-    }
     ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
 }
 
@@ -1076,6 +1086,11 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
     // with this Client's information.
     _singleTransactionStats->updateLastClientInfo(opCtx->getClient());
+
+    // Log the transaction if its duration is longer than the slowMS command threshold.
+    _logSlowTransaction(lk,
+                        &(opCtx->lockState()->getLockerInfo())->stats,
+                        MultiDocumentTransactionState::kCommitted);
 }
 
 BSONObj Session::reportStashedState() const {
@@ -1158,12 +1173,11 @@ void Session::_reportTransactionStats(WithLock wl,
     }
 }
 
-std::string Session::transactionInfoForLog(const SingleThreadedLockStats* lockStats) {
-    // Need to lock because this function checks the state of _txnState.
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-
+std::string Session::_transactionInfoForLog(const SingleThreadedLockStats* lockStats,
+                                            MultiDocumentTransactionState terminationCause) {
     invariant(lockStats);
-    invariant(_txnState.isCommitted(lg) || _txnState.isAborted(lg));
+    invariant(terminationCause == MultiDocumentTransactionState::kCommitted ||
+              terminationCause == MultiDocumentTransactionState::kAborted);
 
     StringBuilder s;
 
@@ -1181,8 +1195,9 @@ std::string Session::transactionInfoForLog(const SingleThreadedLockStats* lockSt
 
     s << _singleTransactionStats->getOpDebug()->additiveMetrics.report();
 
-    std::string terminationCause = _txnState.isCommitted(lg) ? "committed" : "aborted";
-    s << " terminationCause:" << terminationCause;
+    std::string terminationCauseString =
+        terminationCause == MultiDocumentTransactionState::kCommitted ? "committed" : "aborted";
+    s << " terminationCause:" << terminationCauseString;
 
     auto curTime = curTimeMicros64();
     s << " timeActiveMicros:"
@@ -1204,6 +1219,20 @@ std::string Session::transactionInfoForLog(const SingleThreadedLockStats* lockSt
       << Milliseconds{static_cast<long long>(_singleTransactionStats->getDuration(curTime)) / 1000};
 
     return s.str();
+}
+
+void Session::_logSlowTransaction(WithLock wl,
+                                  const SingleThreadedLockStats* lockStats,
+                                  MultiDocumentTransactionState terminationCause) {
+    // Only log multi-document transactions.
+    if (_txnState != MultiDocumentTransactionState::kNone) {
+        // Log the transaction if its duration is longer than the slowMS command threshold.
+        if (_singleTransactionStats->getDuration(curTimeMicros64()) >
+            serverGlobalParams.slowMS * 1000ULL) {
+            log(logger::LogComponent::kCommand)
+                << _transactionInfoForLog(lockStats, terminationCause);
+        }
+    }
 }
 
 void Session::_checkValid(WithLock) const {

@@ -334,6 +334,12 @@ public:
         return _speculativeTransactionReadOpTime;
     }
 
+    const Locker* getTxnResourceStashLockerForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        invariant(_txnResourceStash);
+        return _txnResourceStash->locker();
+    }
+
     /**
      * If this session is holding stashed locks in _txnResourceStash, reports the current state of
      * the session using the provided builder. Locks the session object's mutex while running.
@@ -353,13 +359,14 @@ public:
      */
     BSONObj reportStashedState() const;
 
-    /**
-     * This method returns a string with information about a slow transaction. The format of the
-     * logging string produced should match the format used for slow operation logging. A
-     * transaction must be completed (committed or aborted) and a valid LockStats reference must be
-     * passed in order for this method to be called.
-     */
-    std::string transactionInfoForLog(const SingleThreadedLockStats* lockStats);
+    std::string transactionInfoForLogForTest(const SingleThreadedLockStats* lockStats,
+                                             bool committed) {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        MultiDocumentTransactionState terminationCause = committed
+            ? MultiDocumentTransactionState::kCommitted
+            : MultiDocumentTransactionState::kAborted;
+        return _transactionInfoForLog(lockStats, terminationCause);
+    }
 
     void addMultikeyPathInfo(MultikeyPathInfo info) {
         _multikeyPathInfo.push_back(std::move(info));
@@ -460,6 +467,29 @@ private:
     // truncated because it was too old.
     bool _hasIncompleteHistory{false};
 
+    // Indicates the state of the current multi-document transaction or snapshot read, if any.  If
+    // the transaction is in any state but kInProgress, no more operations can be collected.
+    enum class MultiDocumentTransactionState {
+        kNone,
+        kInProgress,
+        kCommitting,
+        kCommitted,
+        kAborted
+    } _txnState = MultiDocumentTransactionState::kNone;
+
+    // Logs the transaction information if it has run slower than the global parameter slowMS. The
+    // transaction must be committed or aborted when this function is called.
+    void _logSlowTransaction(WithLock wl,
+                             const SingleThreadedLockStats* lockStats,
+                             MultiDocumentTransactionState terminationCause);
+
+    // This method returns a string with information about a slow transaction. The format of the
+    // logging string produced should match the format used for slow operation logging. A
+    // transaction must be completed (committed or aborted) and a valid LockStats reference must be
+    // passed in order for this method to be called.
+    std::string _transactionInfoForLog(const SingleThreadedLockStats* lockStats,
+                                       MultiDocumentTransactionState terminationCause);
+
     // Reports transaction stats for both active and inactive transactions using the provided
     // builder.
     void _reportTransactionStats(WithLock wl,
@@ -476,16 +506,6 @@ private:
 
     // Holds transaction resources between network operations.
     boost::optional<TxnResources> _txnResourceStash;
-
-    // Indicates the state of the current multi-document transaction or snapshot read, if any.  If
-    // the transaction is in any state but kInProgress, no more operations can be collected.
-    enum class MultiDocumentTransactionState {
-        kNone,
-        kInProgress,
-        kCommitting,
-        kCommitted,
-        kAborted
-    } _txnState = MultiDocumentTransactionState::kNone;
 
     // Holds oplog data for operations which have been applied in the current multi-document
     // transaction.  Not used for retryable writes.
