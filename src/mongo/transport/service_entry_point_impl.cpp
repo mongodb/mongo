@@ -46,38 +46,6 @@
 #endif
 
 namespace mongo {
-
-bool shouldOverrideMaxConns(const transport::SessionHandle& session,
-                            const std::vector<stdx::variant<CIDR, std::string>>& exemptions) {
-    const auto& remoteAddr = session->remote().sockAddr();
-    const auto& localAddr = session->local().sockAddr();
-    boost::optional<CIDR> remoteCIDR;
-
-    if (remoteAddr && remoteAddr->isIP()) {
-        remoteCIDR = uassertStatusOK(CIDR::parse(remoteAddr->getAddr()));
-    }
-    for (const auto& exemption : exemptions) {
-        // If this exemption is a CIDR range, then we check that the remote IP is in the
-        // CIDR range
-        if ((stdx::holds_alternative<CIDR>(exemption)) && (remoteCIDR)) {
-            if (stdx::get<CIDR>(exemption).contains(*remoteCIDR)) {
-                return true;
-            }
-// Otherwise the exemption is a UNIX path and we should check the local path
-// (the remoteAddr == "anonymous unix socket") against the exemption string
-//
-// On Windows we don't check this at all and only CIDR ranges are supported
-#ifndef _WIN32
-        } else if ((stdx::holds_alternative<std::string>(exemption)) && (localAddr) &&
-                   (localAddr->getAddr() == stdx::get<std::string>(exemption))) {
-            return true;
-#endif
-        }
-    }
-
-    return false;
-}
-
 ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(svcCtx) {
 
     const auto supportedMax = [] {
@@ -103,18 +71,6 @@ ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(s
     }
 
     _maxNumConnections = supportedMax;
-
-    if (serverGlobalParams.reservedAdminThreads) {
-        _adminInternalPool = std::make_unique<transport::ServiceExecutorReserved>(
-            _svcCtx, "admin/internal connections", serverGlobalParams.reservedAdminThreads);
-    }
-}
-
-Status ServiceEntryPointImpl::start() {
-    if (_adminInternalPool)
-        return _adminInternalPool->start();
-    else
-        return Status::OK();
 }
 
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
@@ -133,16 +89,10 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     auto transportMode = _svcCtx->getServiceExecutor()->transportMode();
 
     auto ssm = ServiceStateMachine::create(_svcCtx, session, transportMode);
-    auto usingMaxConnOverride = false;
     {
         stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
         connectionCount = _sessions.size() + 1;
-        if (connectionCount > _maxNumConnections) {
-            usingMaxConnOverride =
-                shouldOverrideMaxConns(session, serverGlobalParams.maxConnsOverride);
-        }
-
-        if (connectionCount <= _maxNumConnections || usingMaxConnOverride) {
+        if (connectionCount <= _maxNumConnections) {
             ssmIt = _sessions.emplace(_sessions.begin(), ssm);
             _currentConnections.store(connectionCount);
             _createdConnections.addAndFetch(1);
@@ -151,13 +101,11 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
 
     // Checking if we successfully added a connection above. Separated from the lock so we don't log
     // while holding it.
-    if (connectionCount > _maxNumConnections && !usingMaxConnOverride) {
+    if (connectionCount > _maxNumConnections) {
         if (!quiet) {
             log() << "connection refused because too many open connections: " << connectionCount;
         }
         return;
-    } else if (usingMaxConnOverride && _adminInternalPool) {
-        ssm->setServiceExecutor(_adminInternalPool.get());
     }
 
     if (!quiet) {
@@ -235,18 +183,15 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     return result;
 }
 
-void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
+ServiceEntryPoint::Stats ServiceEntryPointImpl::sessionStats() const {
 
     size_t sessionCount = _currentConnections.load();
 
-    bob->append("current", static_cast<int>(sessionCount));
-    bob->append("available", static_cast<int>(_maxNumConnections - sessionCount));
-    bob->append("totalCreated", static_cast<int>(_createdConnections.load()));
-
-    if (_adminInternalPool) {
-        BSONObjBuilder section(bob->subobjStart("adminConnections"));
-        _adminInternalPool->appendStats(&section);
-    }
+    ServiceEntryPoint::Stats ret;
+    ret.numOpenSessions = sessionCount;
+    ret.numCreatedSessions = _createdConnections.load();
+    ret.numAvailableSessions = _maxNumConnections - sessionCount;
+    return ret;
 }
 
 }  // namespace mongo

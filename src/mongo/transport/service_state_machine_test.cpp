@@ -84,15 +84,13 @@ public:
 
     void endAllSessions(transport::Session::TagMask tags) override {}
 
-    Status start() override {
-        return Status::OK();
-    }
-
     bool shutdown(Milliseconds timeout) override {
         return true;
     }
 
-    void appendStats(BSONObjBuilder*) const override {}
+    Stats sessionStats() const override {
+        return {};
+    }
 
     size_t numOpenSessions() const override {
         return 0ULL;

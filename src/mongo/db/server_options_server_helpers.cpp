@@ -120,24 +120,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
         "net.maxIncomingConnections", "maxConns", moe::Int, maxConnInfoBuilder.str().c_str());
 
     options
-        ->addOptionChaining(
-            "net.maxIncomingConnectionsOverride",
-            "",
-            moe::StringVector,
-            "CIDR ranges that do not count towards the maxIncomingConnections limit")
-        .hidden()
-        .setSources(moe::SourceYAMLConfig);
-
-    options
-        ->addOptionChaining(
-            "net.reservedAdminThreads",
-            "",
-            moe::Int,
-            "number of worker threads to reserve for admin and internal connections")
-        .hidden()
-        .setSources(moe::SourceYAMLConfig);
-
-    options
         ->addOptionChaining("net.transportLayer",
                             "transportLayer",
                             moe::String,
@@ -599,22 +581,6 @@ Status storeServerOptions(const moe::Environment& params) {
         if (serverGlobalParams.maxConns < 5) {
             return Status(ErrorCodes::BadValue, "maxConns has to be at least 5");
         }
-    }
-
-    if (params.count("net.maxIncomingConnectionsOverride")) {
-        auto ranges = params["net.maxIncomingConnectionsOverride"].as<std::vector<std::string>>();
-        for (const auto& range : ranges) {
-            auto swr = CIDR::parse(range);
-            if (!swr.isOK()) {
-                serverGlobalParams.maxConnsOverride.push_back(range);
-            } else {
-                serverGlobalParams.maxConnsOverride.push_back(std::move(swr.getValue()));
-            }
-        }
-    }
-
-    if (params.count("net.reservedAdminThreads")) {
-        serverGlobalParams.reservedAdminThreads = params["net.reservedAdminThreads"].as<int>();
     }
 
     if (params.count("net.wireObjectCheck")) {

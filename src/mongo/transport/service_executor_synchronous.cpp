@@ -142,8 +142,9 @@ Status ServiceExecutorSynchronous::schedule(Task task,
 }
 
 void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
-    *bob << kExecutorLabel << kExecutorName << kThreadsRunning
-         << static_cast<int>(_numRunningWorkerThreads.loadRelaxed());
+    BSONObjBuilder section(bob->subobjStart("serviceExecutorTaskStats"));
+    section << kExecutorLabel << kExecutorName << kThreadsRunning
+            << static_cast<int>(_numRunningWorkerThreads.loadRelaxed());
 }
 
 }  // namespace transport

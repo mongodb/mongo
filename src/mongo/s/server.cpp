@@ -446,12 +446,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         return EXIT_NET_ERROR;
     }
 
-    status = serviceContext->getServiceEntryPoint()->start();
-    if (!status.isOK()) {
-        error() << "Failed to start the service entry point: " << redact(status);
-        return EXIT_NET_ERROR;
-    }
-
     status = serviceContext->getTransportLayer()->start();
     if (!status.isOK()) {
         error() << "Failed to start the transport layer: " << redact(status);

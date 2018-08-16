@@ -63,15 +63,13 @@ public:
         old_sessions.clear();
     }
 
-    Status start() override {
-        return Status::OK();
-    }
-
     bool shutdown(Milliseconds timeout) override {
         return true;
     }
 
-    void appendStats(BSONObjBuilder*) const override {}
+    Stats sessionStats() const override {
+        return {};
+    }
 
     size_t numOpenSessions() const override {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
@@ -171,11 +169,9 @@ public:
         return true;
     }
 
-    Status start() override {
-        return Status::OK();
+    Stats sessionStats() const override {
+        return {};
     }
-
-    void appendStats(BSONObjBuilder*) const override {}
 
     size_t numOpenSessions() const override {
         return 0;

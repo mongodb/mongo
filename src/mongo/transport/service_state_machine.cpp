@@ -226,7 +226,6 @@ ServiceStateMachine::ServiceStateMachine(ServiceContext* svcContext,
       _sep{svcContext->getServiceEntryPoint()},
       _transportMode(transportMode),
       _serviceContext(svcContext),
-      _serviceExecutor(_serviceContext->getServiceExecutor()),
       _sessionHandle(session),
       _threadName{str::stream() << "conn" << _session()->id()},
       _dbClient{svcContext->makeClient(_threadName, std::move(session))},
@@ -470,10 +469,6 @@ void ServiceStateMachine::start(Ownership ownershipModel) {
                            ownershipModel);
 }
 
-void ServiceStateMachine::setServiceExecutor(ServiceExecutor* executor) {
-    _serviceExecutor = executor;
-}
-
 void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
                                                  transport::ServiceExecutor::ScheduleFlags flags,
                                                  transport::ServiceExecutorTaskName taskName,
@@ -485,7 +480,8 @@ void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
         ssm->_runNextInGuard(std::move(guard));
     };
     guard.release();
-    Status status = _serviceExecutor->schedule(std::move(func), flags, taskName);
+    Status status =
+        _serviceContext->getServiceExecutor()->schedule(std::move(func), flags, taskName);
     if (status.isOK()) {
         return;
     }

@@ -664,19 +664,20 @@ StringData ServiceExecutorAdaptive::_threadStartedByToString(
 
 void ServiceExecutorAdaptive::appendStats(BSONObjBuilder* bob) const {
     stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
-    *bob << kExecutorLabel << kExecutorName                                                //
-         << kTotalQueued << _totalQueued.load()                                            //
-         << kTotalExecuted << _totalExecuted.load()                                        //
-         << kThreadsInUse << _threadsInUse.load()                                          //
-         << kTotalTimeRunningUs                                                            //
-         << ticksToMicros(_getThreadTimerTotal(ThreadTimer::kRunning, lk), _tickSource)    //
-         << kTotalTimeExecutingUs                                                          //
-         << ticksToMicros(_getThreadTimerTotal(ThreadTimer::kExecuting, lk), _tickSource)  //
-         << kTotalTimeQueuedUs << ticksToMicros(_totalSpentQueued.load(), _tickSource)     //
-         << kThreadsRunning << _threadsRunning.load()                                      //
-         << kThreadsPending << _threadsPending.load();
+    BSONObjBuilder section(bob->subobjStart("serviceExecutorTaskStats"));
+    section << kExecutorLabel << kExecutorName                                                //
+            << kTotalQueued << _totalQueued.load()                                            //
+            << kTotalExecuted << _totalExecuted.load()                                        //
+            << kThreadsInUse << _threadsInUse.load()                                          //
+            << kTotalTimeRunningUs                                                            //
+            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::kRunning, lk), _tickSource)    //
+            << kTotalTimeExecutingUs                                                          //
+            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::kExecuting, lk), _tickSource)  //
+            << kTotalTimeQueuedUs << ticksToMicros(_totalSpentQueued.load(), _tickSource)     //
+            << kThreadsRunning << _threadsRunning.load()                                      //
+            << kThreadsPending << _threadsPending.load();
 
-    BSONObjBuilder threadStartReasons(bob->subobjStart(kThreadReasons));
+    BSONObjBuilder threadStartReasons(section.subobjStart(kThreadReasons));
     for (size_t i = 0; i < _threadStartCounters.size(); i++) {
         threadStartReasons << _threadStartedByToString(static_cast<ThreadCreationReason>(i))
                            << _threadStartCounters[i];
@@ -684,7 +685,7 @@ void ServiceExecutorAdaptive::appendStats(BSONObjBuilder* bob) const {
 
     threadStartReasons.doneFast();
 
-    BSONObjBuilder metricsByTask(bob->subobjStart("metricsByTask"));
+    BSONObjBuilder metricsByTask(section.subobjStart("metricsByTask"));
     MetricsArray totalMetrics;
     _accumulateAllTaskMetrics(&totalMetrics, lk);
     lk.unlock();
@@ -702,6 +703,7 @@ void ServiceExecutorAdaptive::appendStats(BSONObjBuilder* bob) const {
         subSection.doneFast();
     }
     metricsByTask.doneFast();
+    section.doneFast();
 }
 
 }  // namespace transport

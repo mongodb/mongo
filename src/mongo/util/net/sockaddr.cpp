@@ -133,7 +133,7 @@ SockAddr::SockAddr(StringData target, int port, sa_family_t familyHint)
         _hostOrIp = "127.0.0.1";
     }
 
-    if (mongoutils::str::contains(_hostOrIp, '/') || familyHint == AF_UNIX) {
+    if (mongoutils::str::contains(_hostOrIp, '/')) {
         initUnixDomainSocket(_hostOrIp, port);
         return;
     }
