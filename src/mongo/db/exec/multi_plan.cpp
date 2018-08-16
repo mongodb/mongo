@@ -240,7 +240,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     const auto& bestSolution = bestCandidate.solution;
 
     LOG(5) << "Winning solution:\n" << redact(bestSolution->toString());
-    LOG(2) << "Winning plan: " << redact(Explain::getPlanSummary(bestCandidate.root));
+    LOG(2) << "Winning plan: " << Explain::getPlanSummary(bestCandidate.root);
 
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
@@ -277,10 +277,10 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             LOG(1) << "Winning plan tied with runner-up. Not caching."
                    << " ns: " << _collection->ns() << " " << redact(_query->toStringShort())
-                   << " winner score: " << ranking->scores[0] << " winner summary: "
-                   << redact(Explain::getPlanSummary(_candidates[winnerIdx].root))
+                   << " winner score: " << ranking->scores[0]
+                   << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root)
                    << " runner-up score: " << ranking->scores[1] << " runner-up summary: "
-                   << redact(Explain::getPlanSummary(_candidates[runnerUpIdx].root));
+                   << Explain::getPlanSummary(_candidates[runnerUpIdx].root);
         }
 
         if (alreadyProduced.empty()) {
@@ -291,8 +291,8 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             size_t winnerIdx = ranking->candidateOrder[0];
             LOG(1) << "Winning plan had zero results. Not caching."
                    << " ns: " << _collection->ns() << " " << redact(_query->toStringShort())
-                   << " winner score: " << ranking->scores[0] << " winner summary: "
-                   << redact(Explain::getPlanSummary(_candidates[winnerIdx].root));
+                   << " winner score: " << ranking->scores[0]
+                   << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root);
         }
     }
 
