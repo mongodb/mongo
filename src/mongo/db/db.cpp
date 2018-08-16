@@ -490,6 +490,9 @@ ExitCode _initAndListen(int listenPort) {
                   << "User and role management commands require auth data to have "
                   << "at least schema version " << AuthorizationManager::schemaVersion26Final
                   << " but startup could not verify schema version: " << status;
+            log() << "To manually repair the 'authSchema' document in the admin.system.version "
+                     "collection, start up with --setParameter "
+                     "startupAuthSchemaValidation=false to disable validation.";
             exitCleanly(EXIT_NEED_UPGRADE);
         }
 
