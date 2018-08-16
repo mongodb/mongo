@@ -74,22 +74,22 @@ void DocumentSourceOutReplaceColl::initializeWriteNs() {
                 conn->runCommand(outputNs.db().toString(), cmd.done(), info));
     }
 
-    // Copy the indexes of the output collection to the temp collection.
-    for (auto indexSpec : _originalIndexes) {
-        MutableDocument index((Document(indexSpec)));
-        index.remove("_id");  // indexes shouldn't have _ids but some existing ones do
-        index["ns"] = Value(_tempNs.ns());
+    if (_originalIndexes.empty()) {
+        return;
+    }
 
-        BSONObj indexBson = index.freeze().toBson();
-        conn->insert(_tempNs.getSystemIndexesCollection(), indexBson);
-        BSONObj err = conn->getLastErrorDetailed();
-        uassert(16995,
-                str::stream() << "copying index for $out failed."
-                              << " index: "
-                              << indexBson
-                              << " error: "
-                              << err,
-                DBClientBase::getLastErrorString(err).empty());
+    // Copy the indexes of the output collection to the temp collection.
+    std::vector<BSONObj> tempNsIndexes;
+    for (const auto& indexSpec : _originalIndexes) {
+        // Replace the spec's 'ns' field value, which is the original collection, with the temp
+        // collection.
+        tempNsIndexes.push_back(indexSpec.addField(BSON("ns" << _tempNs.ns()).firstElement()));
+    }
+    try {
+        conn->createIndexes(_tempNs.ns(), tempNsIndexes);
+    } catch (DBException& ex) {
+        ex.addContext("Copying indexes for $out failed");
+        throw;
     }
 };
 

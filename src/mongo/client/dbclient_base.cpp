@@ -903,6 +903,25 @@ void DBClientBase::createIndexes(StringData ns, const std::vector<const IndexSpe
     }
 }
 
+void DBClientBase::createIndexes(StringData ns, const std::vector<BSONObj>& specs) {
+    BSONObjBuilder command;
+    command.append("createIndexes", nsToCollectionSubstring(ns));
+    {
+        BSONArrayBuilder indexes(command.subarrayStart("indexes"));
+        for (const auto& spec : specs) {
+            indexes.append(spec);
+        }
+    }
+    const BSONObj commandObj = command.done();
+
+    BSONObj infoObj;
+    if (!runCommand(nsToDatabase(ns), commandObj, infoObj)) {
+        Status runCommandStatus = getStatusFromCommandResult(infoObj);
+        invariant(!runCommandStatus.isOK());
+        uassertStatusOK(runCommandStatus);
+    }
+}
+
 BSONElement getErrField(const BSONObj& o) {
     return o["$err"];
 }

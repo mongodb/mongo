@@ -497,6 +497,13 @@ public:
 
     virtual void createIndexes(StringData ns, const std::vector<const IndexSpec*>& descriptor);
 
+    /**
+     * Creates indexes on the collection 'ns' as described by 'specs'.
+     *
+     * Failure to construct the indexes is reported by throwing an AssertionException.
+     */
+    virtual void createIndexes(StringData ns, const std::vector<BSONObj>& specs);
+
     virtual std::list<BSONObj> getIndexSpecs(const std::string& ns, int options = 0);
 
     virtual void dropIndex(const std::string& ns, BSONObj keys);
