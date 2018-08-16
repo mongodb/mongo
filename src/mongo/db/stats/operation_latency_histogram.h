@@ -36,7 +36,8 @@ namespace mongo {
 class BSONObjBuilder;
 
 /**
- * Stores statistics for latencies of read, write, and command operations.
+ * Stores statistics for latencies of read, write, command, and multi-document transaction
+ * operations.
  *
  * Note: This class is not thread-safe.
  */
@@ -53,7 +54,7 @@ public:
     void increment(uint64_t latency, Command::ReadWriteType type);
 
     /**
-     * Appends the three histograms with latency totals and operation counts.
+     * Appends the four histograms with latency totals and operation counts.
      */
     void append(bool includeHistograms, BSONObjBuilder* builder) const;
 
@@ -75,6 +76,6 @@ private:
 
     void _incrementData(uint64_t latency, int bucket, HistogramData* data);
 
-    HistogramData _reads, _writes, _commands;
+    HistogramData _reads, _writes, _commands, _transactions;
 };
 }  // namespace mongo

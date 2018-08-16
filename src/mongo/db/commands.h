@@ -370,12 +370,12 @@ public:
     }
 
     /**
-     * Returns whether this operation is a read, write, or command.
+     * Returns whether this operation is a read, write, command, or multi-document transaction.
      *
      * Commands which implement database read or write logic should override this to return kRead
      * or kWrite as appropriate.
      */
-    enum class ReadWriteType { kCommand, kRead, kWrite };
+    enum class ReadWriteType { kCommand, kRead, kWrite, kTransaction };
     virtual ReadWriteType getReadWriteType() const {
         return ReadWriteType::kCommand;
     }
