@@ -95,7 +95,7 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
         LOG(5) << "Scoring plan " << i << ":" << endl
                << redact(candidates[i].solution->toString()) << "Stats:\n"
                << redact(Explain::statsToBSON(*statTrees[i]).jsonString(Strict, true));
-        LOG(2) << "Scoring query plan: " << redact(Explain::getPlanSummary(candidates[i].root))
+        LOG(2) << "Scoring query plan: " << Explain::getPlanSummary(candidates[i].root)
                << " planHitEOF=" << statTrees[i]->common.isEOF;
 
         double score = scoreTree(statTrees[i].get());
