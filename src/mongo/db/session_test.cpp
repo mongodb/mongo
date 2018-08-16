@@ -1403,6 +1403,110 @@ TEST_F(SessionTest, TrackTotalOpenTransactionsWithCommit) {
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(), beforeTransactionStart);
 }
 
+TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithCommit) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    unsigned long long beforeActiveCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentActive();
+    unsigned long long beforeInactiveCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
+
+    // Tests that the first unstash only increments the active counter only.
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActiveCounter + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
+
+    // Tests that stashing the transaction resources decrements active counter and increments
+    // inactive counter.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    session.stashTransactionResources(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactiveCounter + 1U);
+
+    // Tests that the second unstash increments the active counter and decrements the inactive
+    // counter.
+    session.unstashTransactionResources(opCtx(), "insert");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActiveCounter + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
+
+    // Tests that committing a transaction decrements the active counter only.
+    session.commitTransaction(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
+}
+
+TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithStashedAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    unsigned long long beforeActiveCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentActive();
+    unsigned long long beforeInactiveCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
+
+    // Tests that the first unstash only increments the active counter only.
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActiveCounter + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
+
+    // Tests that stashing the transaction resources decrements active counter and increments
+    // inactive counter.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
+    session.stashTransactionResources(opCtx());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
+              beforeInactiveCounter + 1U);
+
+    // Tests that aborting a stashed transaction decrements the inactive counter only.
+    session.abortArbitraryTransaction();
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
+}
+
+TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithUnstashedAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    unsigned long long beforeActiveCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentActive();
+    unsigned long long beforeInactiveCounter =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentInactive();
+
+    // Tests that the first unstash only increments the active counter only.
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
+              beforeActiveCounter + 1U);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
+
+    // Tests that aborting a stashed transaction decrements the active counter only.
+    session.abortArbitraryTransaction();
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
+}
+
 /**
  * Test fixture for transactions metrics.
  */

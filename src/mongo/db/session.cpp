@@ -727,6 +727,10 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     invariant(!_txnResourceStash);
     _txnResourceStash = TxnResources(opCtx);
 
+    // We accept possible slight inaccuracies in these counters from non-atomicity.
+    ServerTransactionsMetrics::get(opCtx)->decrementCurrentActive();
+    ServerTransactionsMetrics::get(opCtx)->incrementCurrentInactive();
+
     // Update the LastClientInfo object stored in the SingleTransactionStats instance on the Session
     // with this Client's information. This is the last client that ran a transaction operation on
     // the Session.
@@ -784,6 +788,9 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             if (_txnState == MultiDocumentTransactionState::kInProgress) {
                 _singleTransactionStats->setActive(curTimeMicros64());
             }
+            // We accept possible slight inaccuracies in these counters from non-atomicity.
+            ServerTransactionsMetrics::get(opCtx)->incrementCurrentActive();
+            ServerTransactionsMetrics::get(opCtx)->decrementCurrentInactive();
             return;
         }
 
@@ -793,6 +800,7 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             return;
         }
         opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentActive();
 
         // Set the starting active time for this transaction.
         _singleTransactionStats->setActive(curTimeMicros64());
@@ -883,6 +891,13 @@ void Session::_abortTransaction(WithLock wl) {
         return;
     }
     const bool isMultiDocumentTransaction = _txnState == MultiDocumentTransactionState::kInProgress;
+
+    // If the transaction is stashed, then we have aborted an inactive transaction.
+    if (_txnResourceStash) {
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
+    } else {
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
+    }
     _txnResourceStash = boost::none;
     _transactionOperationBytes = 0;
     _transactionOperations.clear();
@@ -1003,6 +1018,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
             // Make sure the transaction didn't change because of chunk migration.
             if (opCtx->getTxnNumber() == _activeTxnNumber) {
                 _txnState = MultiDocumentTransactionState::kAborted;
+                ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
                 // After the transaction has been aborted, we must update the end time and mark it
                 // as inactive.
                 auto curTime = curTimeMicros64();
@@ -1052,6 +1068,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         _singleTransactionStats->setInactive(curTime);
     }
     ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
     // Add the latest operation stats to the aggregate OpDebug object stored in the
     // SingleTransactionStats instance on the Session.
     _singleTransactionStats->getOpDebug()->additiveMetrics.add(

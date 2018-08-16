@@ -51,6 +51,30 @@ ServerTransactionsMetrics* ServerTransactionsMetrics::get(OperationContext* opCt
     return get(opCtx->getServiceContext());
 }
 
+unsigned long long ServerTransactionsMetrics::getCurrentActive() const {
+    return _currentActive.load();
+}
+
+void ServerTransactionsMetrics::decrementCurrentActive() {
+    _currentActive.fetchAndSubtract(1);
+}
+
+void ServerTransactionsMetrics::incrementCurrentActive() {
+    _currentActive.fetchAndAdd(1);
+}
+
+unsigned long long ServerTransactionsMetrics::getCurrentInactive() const {
+    return _currentInactive.load();
+}
+
+void ServerTransactionsMetrics::decrementCurrentInactive() {
+    _currentInactive.fetchAndSubtract(1);
+}
+
+void ServerTransactionsMetrics::incrementCurrentInactive() {
+    _currentInactive.fetchAndAdd(1);
+}
+
 unsigned long long ServerTransactionsMetrics::getCurrentOpen() const {
     return _currentOpen.load();
 }
