@@ -8,6 +8,9 @@
         assert(serverStatusResponse.hasOwnProperty("transactions"),
                "Expected the serverStatus response to have a 'transactions' field\n" +
                    serverStatusResponse);
+        assert(serverStatusResponse.transactions.hasOwnProperty("currentOpen"),
+               "The 'transactions' field in serverStatus did not have the 'currentOpen' field\n" +
+                   serverStatusResponse.transactions);
         assert(serverStatusResponse.transactions.hasOwnProperty("totalAborted"),
                "The 'transactions' field in serverStatus did not have the 'totalAborted' field\n" +
                    serverStatusResponse.transactions);
@@ -28,6 +31,7 @@
                   "expected " + valueName + " to increase by " + expectedIncrement);
     }
 
+    // Set up the replica set.
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
@@ -52,50 +56,75 @@
 
     // This transaction will commit.
     jsTest.log("Start a transaction and then commit it.");
+
+    // Compare server status after starting a transaction with the server status before.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-1"}));
-    session.commitTransaction();
+    let newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+    verifyServerStatusFields(newStatus);
+    // Test that the open transaction counter is incremented while inside the transaction.
+    verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 1);
 
     // Compare server status after the transaction commit with the server status before.
-    let newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+    session.commitTransaction();
+    newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalStarted", 1);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalCommitted", 1);
+    // Test that current open counter is decremented on commit.
+    verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 0);
 
     // This transaction will abort.
     jsTest.log("Start a transaction and then abort it.");
+
+    // Compare server status after starting a transaction with the server status before.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
-    session.abortTransaction();
+    newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+    verifyServerStatusFields(newStatus);
+    // Test that the open transaction counter is incremented while inside the transaction.
+    verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 1);
 
     // Compare server status after the transaction abort with the server status before.
+    session.abortTransaction();
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalStarted", 2);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalCommitted", 1);
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalAborted", 1);
+    // Test that current open counter is decremented on abort.
+    verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 0);
 
     // This transaction will abort due to a duplicate key insert.
     jsTest.log("Start a transaction that will abort on a duplicated key error.");
+
+    // Compare server status after starting a transaction with the server status before.
     session.startTransaction();
     // Inserting a new document will work fine, and the transaction starts.
     assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
+    newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
+    verifyServerStatusFields(newStatus);
+    // Test that the open transaction counter is incremented while inside the transaction.
+    verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 1);
+
+    // Compare server status after the transaction abort with the server status before.
     // The duplicated insert will fail, causing the transaction to abort.
     assert.commandFailedWithCode(sessionColl.insert({_id: "insert-3"}), ErrorCodes.DuplicateKey);
     // Ensure that the transaction was aborted on failure.
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
-
-    // Compare server status after the transaction abort with the server status before.
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalStarted", 3);
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "totalCommitted", 1);
     verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "totalAborted", 2);
+    // Test that current open counter is decremented on abort caused by an error.
+    verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentOpen", 0);
 
+    // End the session and stop the replica set.
     session.endSession();
     rst.stopSet();
 }());
