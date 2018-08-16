@@ -46,6 +46,10 @@ public:
     static ServerTransactionsMetrics* get(ServiceContext* service);
     static ServerTransactionsMetrics* get(OperationContext* opCtx);
 
+    unsigned long long getCurrentOpen() const;
+    void decrementCurrentOpen();
+    void incrementCurrentOpen();
+
     unsigned long long getTotalStarted() const;
     void incrementTotalStarted();
 
@@ -61,6 +65,9 @@ public:
     void updateStats(TransactionsStats* stats);
 
 private:
+    // The total number of open transactions.
+    AtomicUInt64 _currentOpen{0};
+
     // The total number of multi-document transactions started since the last server startup.
     AtomicUInt64 _totalStarted{0};
 

@@ -51,6 +51,18 @@ ServerTransactionsMetrics* ServerTransactionsMetrics::get(OperationContext* opCt
     return get(opCtx->getServiceContext());
 }
 
+unsigned long long ServerTransactionsMetrics::getCurrentOpen() const {
+    return _currentOpen.load();
+}
+
+void ServerTransactionsMetrics::decrementCurrentOpen() {
+    _currentOpen.fetchAndSubtract(1);
+}
+
+void ServerTransactionsMetrics::incrementCurrentOpen() {
+    _currentOpen.fetchAndAdd(1);
+}
+
 unsigned long long ServerTransactionsMetrics::getTotalStarted() const {
     return _totalStarted.load();
 }

@@ -609,6 +609,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
             Date_t::fromMillisSinceEpoch(_singleTransactionStats->getStartTime() / 1000) +
             stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
         ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalStarted();
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementCurrentOpen();
     } else {
         // Execute a retryable write.
         invariant(startTransaction == boost::none);
@@ -895,6 +896,7 @@ void Session::_abortTransaction(WithLock wl) {
             _singleTransactionStats->setInactive(curTime);
         }
     }
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentOpen();
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
@@ -1047,6 +1049,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     if (_singleTransactionStats->isActive()) {
         _singleTransactionStats->setInactive(curTime);
     }
+    ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
     // Add the latest operation stats to the aggregate OpDebug object stored in the
     // SingleTransactionStats instance on the Session.
     _singleTransactionStats->getOpDebug()->additiveMetrics.add(
