@@ -141,7 +141,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             LOG(1) << "Execution of cached plan failed, falling back to replan."
                    << " query: " << redact(_canonicalQuery->toStringShort())
-                   << " planSummary: " << redact(Explain::getPlanSummary(child().get()))
+                   << " planSummary: " << Explain::getPlanSummary(child().get())
                    << " status: " << redact(statusObj);
 
             const bool shouldCache = false;
@@ -153,7 +153,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             LOG(1) << "Execution of cached plan failed: PlanStage died"
                    << ", query: " << redact(_canonicalQuery->toStringShort())
-                   << " planSummary: " << redact(Explain::getPlanSummary(child().get()))
+                   << " planSummary: " << Explain::getPlanSummary(child().get())
                    << " status: " << redact(statusObj);
 
             return WorkingSetCommon::getMemberObjectStatus(statusObj);
@@ -168,7 +168,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
            << " works, but was originally cached with only " << _decisionWorks
            << " works. Evicting cache entry and replanning query: "
            << redact(_canonicalQuery->toStringShort())
-           << " plan summary before replan: " << redact(Explain::getPlanSummary(child().get()));
+           << " plan summary before replan: " << Explain::getPlanSummary(child().get());
 
     const bool shouldCache = true;
     return replan(yieldPolicy, shouldCache);
@@ -237,7 +237,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
         LOG(1)
             << "Replanning of query resulted in single query solution, which will not be cached. "
             << redact(_canonicalQuery->toStringShort())
-            << " plan summary after replan: " << redact(Explain::getPlanSummary(child().get()))
+            << " plan summary after replan: " << Explain::getPlanSummary(child().get())
             << " previous cache entry evicted: " << (shouldCache ? "yes" : "no");
         return Status::OK();
     }
@@ -270,7 +270,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
     }
 
     LOG(1) << "Replanning " << redact(_canonicalQuery->toStringShort())
-           << " resulted in plan with summary: " << redact(Explain::getPlanSummary(child().get()))
+           << " resulted in plan with summary: " << Explain::getPlanSummary(child().get())
            << ", which " << (shouldCache ? "has" : "has not") << " been written to the cache";
     return Status::OK();
 }

@@ -423,7 +423,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                 root.reset(rawRoot);
 
                 LOG(2) << "Using fast count: " << redact(canonicalQuery->toStringShort())
-                       << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
+                       << ", planSummary: " << Explain::getPlanSummary(root.get());
 
                 return PrepareExecutionResult(
                     std::move(canonicalQuery), std::move(solutions[i]), std::move(root));
@@ -440,7 +440,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
         LOG(2) << "Only one plan is available; it will be run but will not be cached. "
                << redact(canonicalQuery->toStringShort())
-               << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
+               << ", planSummary: " << Explain::getPlanSummary(root.get());
 
         return PrepareExecutionResult(
             std::move(canonicalQuery), std::move(solutions[0]), std::move(root));
@@ -1528,7 +1528,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
         unique_ptr<PlanStage> root(rawRoot);
 
         LOG(2) << "Using fast distinct: " << redact(cq->toStringShort())
-               << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
+               << ", planSummary: " << Explain::getPlanSummary(root.get());
 
         return PlanExecutor::make(opCtx,
                                   std::move(ws),
@@ -1558,7 +1558,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
             unique_ptr<PlanStage> root(rawRoot);
 
             LOG(2) << "Using fast distinct: " << redact(cq->toStringShort())
-                   << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
+                   << ", planSummary: " << Explain::getPlanSummary(root.get());
 
             return PlanExecutor::make(opCtx,
                                       std::move(ws),

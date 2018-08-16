@@ -543,7 +543,7 @@ string OpDebug::report(Client* client,
     }
 
     if (!curop.getPlanSummary().empty()) {
-        s << " planSummary: " << redact(curop.getPlanSummary().toString());
+        s << " planSummary: " << curop.getPlanSummary().toString();
     }
 
     OPDEBUG_TOSTRING_HELP(nShards);
