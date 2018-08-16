@@ -1303,6 +1303,46 @@ TEST_F(SessionTest, IncrementTotalStartedUponStartTransaction) {
               beforeTransactionStart + 1U);
 }
 
+TEST_F(SessionTest, IncrementTotalCommittedOnCommit) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
+    session.unstashTransactionResources(opCtx(), "commitTransaction");
+
+    unsigned long long beforeCommitCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalCommitted();
+
+    session.commitTransaction(opCtx());
+
+    // Assert that the committed counter is incremented by 1.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalCommitted(), beforeCommitCount + 1U);
+}
+
+TEST_F(SessionTest, IncrementTotalAbortedUponAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 1;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+
+    unsigned long long beforeAbortCount =
+        ServerTransactionsMetrics::get(opCtx())->getTotalAborted();
+
+    session.abortArbitraryTransaction();
+
+    // Assert that the aborted counter is incremented by 1.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAborted(), beforeAbortCount + 1U);
+}
+
 /**
  * Test fixture for transactions metrics.
  */

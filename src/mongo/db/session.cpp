@@ -887,6 +887,7 @@ void Session::_abortTransaction(WithLock wl) {
     _transactionOperations.clear();
     _txnState = MultiDocumentTransactionState::kAborted;
     _speculativeTransactionReadOpTime = repl::OpTime();
+    ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalAborted();
     if (isMultiDocumentTransaction) {
         auto curTime = curTimeMicros64();
         _singleTransactionStats->setEndTime(curTime);
@@ -1038,6 +1039,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
     _txnState = MultiDocumentTransactionState::kCommitted;
+    ServerTransactionsMetrics::get(opCtx)->incrementTotalCommitted();
     // After the transaction has been committed, we must update the end time and mark it as
     // inactive.
     auto curTime = curTimeMicros64();
