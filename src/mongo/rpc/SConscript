@@ -80,7 +80,7 @@ env.Library(
     ],
     LIBDEPS=[
         'client_metadata',
-        'audit_metadata',
+        'metadata_impersonated_user',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
@@ -90,20 +90,21 @@ env.Library(
     ],
 )
 
-env.Clone().InjectModule("enterprise").Library(
+env.Library(
     target=[
-        'audit_metadata',
+        'metadata_impersonated_user'
     ],
     source=[
-        'metadata/audit_metadata.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/auth/auth_rolename',
-        '$BUILD_DIR/mongo/db/auth/user_name',
+        'metadata/impersonated_user_metadata.cpp',
+        env.Idlc('metadata/impersonated_user_metadata.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/server_options',
     ],
 )
 

@@ -1,0 +1,35 @@
+# Copyright (C) 2018 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+global:
+  cpp_namespace: "mongo::rpc"
+
+imports:
+  - "mongo/idl/basic_types.idl"
+  - "mongo/db/auth/auth_types.idl"
+
+structs:
+  # This is the IDL version of the old enterprise-only Audit metadata struct
+  ImpersonatedUserMetadata:
+    description: "A struct representing the impersonated users from a mongos"
+    strict: true
+    fields:
+      "$impersonatedUsers":
+        type: array<UserName>
+        cpp_name: "users"
+      "$impersonatedRoles":
+        type: array<RoleName>
+        cpp_name: "roles"
+

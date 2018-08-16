@@ -171,7 +171,4 @@ void mongo::audit::logShardCollection(Client* client,
                                       const BSONObj& keyPattern,
                                       bool unique) {}
 
-void mongo::audit::writeImpersonatedUsersToMetadata(OperationContext* opCtx,
-                                                    BSONObjBuilder* metadata) {}
-
 #endif

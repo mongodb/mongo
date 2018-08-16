@@ -36,6 +36,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 
@@ -53,6 +55,13 @@ public:
      * Parses a string of the form "db.username" into a UserName object.
      */
     static StatusWith<UserName> parse(StringData userNameStr);
+
+    /*
+     * These methods support parsing usernames from IDL
+     */
+    static UserName parseFromBSON(const BSONElement& elem);
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(BSONArrayBuilder* bob) const;
 
     /**
      * Gets the user part of a UserName.
@@ -95,6 +104,8 @@ public:
     }
 
 private:
+    void _serializeToSubObj(BSONObjBuilder* sub) const;
+
     std::string _fullName;  // The full name, stored as a string.  "user@db".
     size_t _splitPoint;     // The index of the "@" separating the user and db name parts.
 };

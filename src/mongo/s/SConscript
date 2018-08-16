@@ -333,7 +333,6 @@ env.Library(
         'sharding_egress_metadata_hook.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'grid',
     ],

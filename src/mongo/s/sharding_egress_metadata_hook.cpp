@@ -33,10 +33,10 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/client/shard_registry.h"
@@ -55,7 +55,7 @@ ShardingEgressMetadataHook::ShardingEgressMetadataHook(ServiceContext* serviceCo
 Status ShardingEgressMetadataHook::writeRequestMetadata(OperationContext* opCtx,
                                                         BSONObjBuilder* metadataBob) {
     try {
-        audit::writeImpersonatedUsersToMetadata(opCtx, metadataBob);
+        writeAuthDataToImpersonatedUserMetadata(opCtx, metadataBob);
         ClientMetadataIsMasterState::writeToMetadata(opCtx, metadataBob);
         rpc::ConfigServerMetadata(_getConfigServerOpTime()).writeToMetadata(metadataBob);
         return Status::OK();

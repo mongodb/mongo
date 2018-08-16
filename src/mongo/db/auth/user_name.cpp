@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -60,6 +61,49 @@ StatusWith<UserName> UserName::parse(StringData userNameStr) {
     StringData userNamePortion = userNameStr.substr(splitPoint + 1);
 
     return UserName(userNamePortion, userDBPortion);
+}
+
+UserName UserName::parseFromBSON(const BSONElement& elem) {
+    if (elem.type() == String) {
+        return uassertStatusOK(UserName::parse(elem.valueStringData()));
+    } else if (elem.type() == Object) {
+        const auto obj = elem.embeddedObject();
+        std::array<BSONElement, 2> fields;
+        obj.getFields(
+            {AuthorizationManager::USER_NAME_FIELD_NAME, AuthorizationManager::USER_DB_FIELD_NAME},
+            &fields);
+
+        const auto& nameField = fields[0];
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "username must contain a string field named: "
+                              << AuthorizationManager::USER_NAME_FIELD_NAME,
+                nameField.type() == String);
+
+        const auto& dbField = fields[1];
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "username must contain a string field named: "
+                              << AuthorizationManager::USER_DB_FIELD_NAME,
+                dbField.type() == String);
+
+        return UserName(nameField.valueStringData(), dbField.valueStringData());
+    } else {
+        uasserted(ErrorCodes::BadValue, "username must be either a string or an object");
+    }
+}
+
+void UserName::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+    BSONObjBuilder sub(bob->subobjStart(fieldName));
+    _serializeToSubObj(&sub);
+}
+
+void UserName::serializeToBSON(BSONArrayBuilder* bab) const {
+    BSONObjBuilder sub(bab->subobjStart());
+    _serializeToSubObj(&sub);
+}
+
+void UserName::_serializeToSubObj(BSONObjBuilder* sub) const {
+    *sub << AuthorizationManager::USER_NAME_FIELD_NAME << getUser()
+         << AuthorizationManager::USER_DB_FIELD_NAME << getDB();
 }
 
 std::ostream& operator<<(std::ostream& os, const UserName& name) {

@@ -111,7 +111,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/auth_rolename',
+        '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/third_party/shim_asio',
         'network',
         'socket',

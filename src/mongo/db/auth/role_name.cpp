@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -51,5 +52,42 @@ RoleName::RoleName(StringData role, StringData dbname) {
 std::ostream& operator<<(std::ostream& os, const RoleName& name) {
     return os << name.getFullName();
 }
+
+RoleName RoleName::parseFromBSON(const BSONElement& elem) {
+    auto obj = elem.embeddedObjectUserCheck();
+    std::array<BSONElement, 2> fields;
+    obj.getFields(
+        {AuthorizationManager::ROLE_NAME_FIELD_NAME, AuthorizationManager::ROLE_DB_FIELD_NAME},
+        &fields);
+    const auto& nameField = fields[0];
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "user name must contain a string field named: "
+                          << AuthorizationManager::ROLE_NAME_FIELD_NAME,
+            nameField.type() == String);
+
+    const auto& dbField = fields[1];
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "role name must contain a string field named: "
+                          << AuthorizationManager::ROLE_DB_FIELD_NAME,
+            nameField.type() == String);
+
+    return RoleName(nameField.valueStringData(), dbField.valueStringData());
+}
+
+void RoleName::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+    BSONObjBuilder sub(bob->subobjStart(fieldName));
+    _serializeToSubObj(&sub);
+}
+
+void RoleName::serializeToBSON(BSONArrayBuilder* bob) const {
+    BSONObjBuilder sub(bob->subobjStart());
+    _serializeToSubObj(&sub);
+}
+
+void RoleName::_serializeToSubObj(BSONObjBuilder* sub) const {
+    sub->append(AuthorizationManager::ROLE_NAME_FIELD_NAME, getRole());
+    sub->append(AuthorizationManager::ROLE_DB_FIELD_NAME, getDB());
+}
+
 
 }  // namespace mongo

@@ -36,9 +36,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
@@ -53,18 +53,16 @@ BSONObj makeEmptyMetadata() {
 
 void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bool requiresAuth) {
     BSONElement readPreferenceElem;
-    BSONElement auditElem;
     BSONElement configSvrElem;
     BSONElement trackingElem;
     BSONElement clientElem;
     BSONElement logicalTimeElem;
+    BSONElement impersonationElem;
 
     for (const auto& metadataElem : metadataObj) {
         auto fieldName = metadataElem.fieldNameStringData();
         if (fieldName == "$readPreference") {
             readPreferenceElem = metadataElem;
-        } else if (fieldName == AuditMetadata::fieldName()) {
-            auditElem = metadataElem;
         } else if (fieldName == ConfigServerMetadata::fieldName()) {
             configSvrElem = metadataElem;
         } else if (fieldName == ClientMetadata::fieldName()) {
@@ -73,6 +71,8 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bo
             trackingElem = metadataElem;
         } else if (fieldName == LogicalTimeMetadata::fieldName()) {
             logicalTimeElem = metadataElem;
+        } else if (fieldName == kImpersonationMetadataSectionName) {
+            impersonationElem = metadataElem;
         }
     }
 
@@ -81,7 +81,7 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bo
             uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(readPreferenceElem));
     }
 
-    AuditMetadata::get(opCtx) = uassertStatusOK(AuditMetadata::readFromMetadata(auditElem));
+    readImpersonatedUserMetadata(impersonationElem, opCtx);
 
     uassertStatusOK(ClientMetadataIsMasterState::readFromMetadata(opCtx, clientElem));
 

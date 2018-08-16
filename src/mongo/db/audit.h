@@ -311,13 +311,5 @@ void logRemoveShard(Client* client, StringData shardname);
  */
 void logShardCollection(Client* client, StringData ns, const BSONObj& keyPattern, bool unique);
 
-
-/*
- * Appends an array of user/db pairs and an array of role/db pairs
- * to the provided metadata builder. The users and roles are extracted from the current client.
- * They are to be the impersonated users and roles for a Command run by an internal user.
- */
-void writeImpersonatedUsersToMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob);
-
 }  // namespace audit
 }  // namespace mongo

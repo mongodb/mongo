@@ -38,6 +38,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
@@ -248,6 +250,32 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     infoBuilder->appendBool("active", static_cast<bool>(clientOpCtx));
     infoBuilder->append("currentOpTime",
                         opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
+
+    auto authSession = AuthorizationSession::get(client);
+    // Depending on whether we're impersonating or not, this might be "effectiveUsers" or
+    // "userImpersonators".
+    const auto serializeAuthenticatedUsers = [&](StringData name) {
+        if (authSession->isAuthenticated()) {
+            BSONArrayBuilder users(infoBuilder->subarrayStart(name));
+            for (auto userIt = authSession->getAuthenticatedUserNames(); userIt.more();
+                 userIt.next()) {
+                userIt->serializeToBSON(&users);
+            }
+        }
+    };
+
+    auto maybeImpersonationData = rpc::getImpersonatedUserMetadata(clientOpCtx);
+    if (maybeImpersonationData) {
+        BSONArrayBuilder users(infoBuilder->subarrayStart("effectiveUsers"));
+        for (const auto& user : maybeImpersonationData->getUsers()) {
+            user.serializeToBSON(&users);
+        }
+
+        users.doneFast();
+        serializeAuthenticatedUsers("userImpersonators"_sd);
+    } else {
+        serializeAuthenticatedUsers("effectiveUsers"_sd);
+    }
 
     if (clientOpCtx) {
         infoBuilder->append("opid", clientOpCtx->getOpID());

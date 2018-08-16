@@ -27,6 +27,7 @@
  */
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 
 namespace mongo {
 class OperationContext;
@@ -43,6 +44,7 @@ public:
     ~ImpersonationSessionGuard();
 
 private:
+    rpc::MaybeImpersonatedUserMetadata _oldImpersonationData;
     OperationContext* _opCtx;
     bool _active{false};
 };

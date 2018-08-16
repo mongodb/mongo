@@ -36,6 +36,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/hash_namespace.h"
 #include "mongo/util/assert_util.h"
 
@@ -50,6 +52,11 @@ class RoleName {
 public:
     RoleName() : _splitPoint(0) {}
     RoleName(StringData role, StringData dbname);
+
+    // Added for IDL support
+    static RoleName parseFromBSON(const BSONElement& elem);
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+    void serializeToBSON(BSONArrayBuilder* bob) const;
 
     /**
      * Gets the name of the role excluding the "@dbname" component.
@@ -88,6 +95,8 @@ public:
 private:
     std::string _fullName;  // The full name, stored as a string.  "role@db".
     size_t _splitPoint;     // The index of the "@" separating the role and db name parts.
+
+    void _serializeToSubObj(BSONObjBuilder* sub) const;
 };
 
 static inline bool operator==(const RoleName& lhs, const RoleName& rhs) {
@@ -211,6 +220,15 @@ RoleNameIterator makeRoleNameIterator(const ContainerIterator& begin,
 template <typename Container>
 RoleNameIterator makeRoleNameIteratorForContainer(const Container& container) {
     return makeRoleNameIterator(container.begin(), container.end());
+}
+
+template <typename Container>
+Container roleNameIteratorToContainer(RoleNameIterator it) {
+    Container container;
+    while (it.more()) {
+        container.emplace_back(it.next());
+    }
+    return container;
 }
 
 }  // namespace mongo
