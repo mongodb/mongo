@@ -49,6 +49,7 @@
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/stdx/memory.h"
@@ -607,6 +608,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
         _transactionExpireDate =
             Date_t::fromMillisSinceEpoch(_singleTransactionStats->getStartTime() / 1000) +
             stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
+        ServerTransactionsMetrics::get(getGlobalServiceContext())->incrementTotalStarted();
     } else {
         // Execute a retryable write.
         invariant(startTransaction == boost::none);
