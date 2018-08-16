@@ -346,7 +346,7 @@ TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphans) {
     // orphaned idents.
     _storageEngine->loadCatalog(opCtx.get());
     // reconcileCatalogAndIdents() drops orphaned idents.
-    _storageEngine->reconcileCatalogAndIdents(opCtx.get());
+    ASSERT_OK(reconcile(opCtx.get()).getStatus());
 
     ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
     NamespaceString orphanNs = NamespaceString("local.system.orphan-" + swIdentName.getValue());
