@@ -1010,6 +1010,8 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
                 if (_singleTransactionStats->isActive()) {
                     _singleTransactionStats->setInactive(curTime);
                 }
+                ServerTransactionsMetrics::get(opCtx)->incrementTotalAborted();
+                ServerTransactionsMetrics::get(opCtx)->decrementCurrentOpen();
                 // Add the latest operation stats to the aggregate OpDebug object stored in the
                 // SingleTransactionStats instance on the Session.
                 _singleTransactionStats->getOpDebug()->additiveMetrics.add(
