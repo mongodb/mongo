@@ -64,6 +64,13 @@ DocumentSourceBackupCursor::~DocumentSourceBackupCursor() {
 DocumentSource::GetNextResult DocumentSourceBackupCursor::getNext() {
     pExpCtx->checkForInterrupt();
 
+    if (_backupCursorState.preamble) {
+        Document doc = _backupCursorState.preamble.get();
+        _backupCursorState.preamble = boost::none;
+
+        return std::move(doc);
+    }
+
     if (!_backupCursorState.filenames.empty()) {
         Document doc = {{"filename", _backupCursorState.filenames.back()}};
         _backupCursorState.filenames.pop_back();

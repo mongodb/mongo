@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/pipeline/document.h"
 
 #include "mongo/stdx/mutex.h"
 
@@ -44,6 +45,7 @@ class StorageEngine;
 
 struct BackupCursorState {
     std::uint64_t cursorId;
+    boost::optional<Document> preamble;
     std::vector<std::string> filenames;
 };
 

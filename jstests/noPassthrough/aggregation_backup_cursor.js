@@ -66,4 +66,45 @@
     });
 
     MongoRunner.stopMongod(conn);
+
+    if (jsTest.options().noJournal) {
+        print("This test is being run with nojournal. Skipping ReplicaSet part.");
+        return;
+    }
+
+    // Run a replica set to verify the contents of the `metadata` document.
+    let rst = new ReplSetTest({name: "aggBackupCursor", nodes: 1});
+    rst.startSet();
+    rst.initiate();
+    db = rst.getPrimary().getDB("test");
+
+    backupCursor = db.aggregate([{$backupCursor: {}}]);
+    // The metadata document should be returned first.
+    let metadataDocEnvelope = backupCursor.next();
+    assert(metadataDocEnvelope.hasOwnProperty("metadata"));
+
+    let metadataDoc = metadataDocEnvelope["metadata"];
+    let oplogStart = metadataDoc["oplogStart"];
+    let oplogEnd = metadataDoc["oplogEnd"];
+    let checkpointTimestamp = metadataDoc["checkpointTimestamp"];
+
+    // When replication is run, there will always be an oplog with a start/end.
+    assert(oplogStart);
+    assert(oplogEnd);
+    // The first opTime will likely have term -1 (repl initiation).
+    assert.gte(oplogStart["t"], -1);
+    // The last opTime's term must be a positive value larger than the first.
+    assert.gte(oplogEnd["t"], oplogStart["t"]);
+    assert.gte(oplogEnd["t"], 1);
+    // The timestamp of the last optime must be larger than the first.
+    assert.gte(oplogEnd["ts"], oplogStart["ts"]);
+
+    // The checkpoint timestamp may or may not exist. If it exists, it must be between the start
+    // and end.
+    if (checkpointTimestamp != null) {
+        assert.gte(checkpointTimestamp, oplogStart["ts"]);
+        assert.gte(oplogEnd["ts"], checkpointTimestamp);
+    }
+
+    rst.stopSet();
 })();
