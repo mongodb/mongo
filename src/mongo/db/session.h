@@ -360,12 +360,13 @@ public:
     BSONObj reportStashedState() const;
 
     std::string transactionInfoForLogForTest(const SingleThreadedLockStats* lockStats,
-                                             bool committed) {
+                                             bool committed,
+                                             repl::ReadConcernArgs readConcernArgs) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         MultiDocumentTransactionState terminationCause = committed
             ? MultiDocumentTransactionState::kCommitted
             : MultiDocumentTransactionState::kAborted;
-        return _transactionInfoForLog(lockStats, terminationCause);
+        return _transactionInfoForLog(lockStats, terminationCause, readConcernArgs);
     }
 
     void addMultikeyPathInfo(MultikeyPathInfo info) {
@@ -481,14 +482,16 @@ private:
     // transaction must be committed or aborted when this function is called.
     void _logSlowTransaction(WithLock wl,
                              const SingleThreadedLockStats* lockStats,
-                             MultiDocumentTransactionState terminationCause);
+                             MultiDocumentTransactionState terminationCause,
+                             repl::ReadConcernArgs readConcernArgs);
 
     // This method returns a string with information about a slow transaction. The format of the
     // logging string produced should match the format used for slow operation logging. A
     // transaction must be completed (committed or aborted) and a valid LockStats reference must be
     // passed in order for this method to be called.
     std::string _transactionInfoForLog(const SingleThreadedLockStats* lockStats,
-                                       MultiDocumentTransactionState terminationCause);
+                                       MultiDocumentTransactionState terminationCause,
+                                       repl::ReadConcernArgs readConcernArgs);
 
     // Reports transaction stats for both active and inactive transactions using the provided
     // builder.

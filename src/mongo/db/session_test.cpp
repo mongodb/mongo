@@ -2270,11 +2270,13 @@ void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
  */
 void buildParametersInfoString(StringBuilder* sb,
                                LogicalSessionId sessionId,
-                               const TxnNumber txnNum) {
+                               const TxnNumber txnNum,
+                               const repl::ReadConcernArgs readConcernArgs) {
     BSONObjBuilder lsidBuilder;
     sessionId.serialize(&lsidBuilder);
     (*sb) << "parameters:{ lsid: " << lsidBuilder.done().toString() << ", txnNumber: " << txnNum
-          << ", autocommit: false },";
+          << ", autocommit: false"
+          << ", readConcern: " << readConcernArgs.toBSON().getObjectField("readConcern") << " },";
 }
 
 /*
@@ -2321,7 +2323,8 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
 
     // Building expected transaction info string.
     StringBuilder parametersInfo;
-    buildParametersInfoString(&parametersInfo, sessionId, txnNum);
+    buildParametersInfoString(
+        &parametersInfo, sessionId, txnNum, repl::ReadConcernArgs::get(opCtx));
 
     StringBuilder readTimestampInfo;
     readTimestampInfo
@@ -2372,6 +2375,15 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
     const TxnNumber txnNum = 1;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
@@ -2384,7 +2396,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
     std::string testTransactionInfo =
-        session.transactionInfoForLogForTest(&lockerInfo->stats, true);
+        session.transactionInfoForLogForTest(&lockerInfo->stats, true, readConcernArgs);
 
     std::string expectedTransactionInfo =
         buildTransactionInfoString(opCtx(), &session, "committed", sessionId, txnNum, metricValue);
@@ -2399,6 +2411,15 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
     const TxnNumber txnNum = 1;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "abortTransaction");
 
     // Initialize SingleTransactionStats AdditiveMetrics objects.
@@ -2411,7 +2432,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
     std::string testTransactionInfo =
-        session.transactionInfoForLogForTest(&lockerInfo->stats, false);
+        session.transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
 
     std::string expectedTransactionInfo =
         buildTransactionInfoString(opCtx(), &session, "aborted", sessionId, txnNum, metricValue);
@@ -2426,12 +2447,21 @@ DEATH_TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogWithNoLockerInfoS
     const TxnNumber txnNum = 1;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "commitTransaction");
     session.commitTransaction(opCtx());
 
-    session.transactionInfoForLogForTest(nullptr, true);
+    session.transactionInfoForLogForTest(nullptr, true, readConcernArgs);
 }
 
 TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
@@ -2442,6 +2472,15 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
     const TxnNumber txnNum = 1;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
@@ -2459,7 +2498,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
     std::string expectedTransactionInfo =
-        session.transactionInfoForLogForTest(&lockerInfo->stats, true);
+        session.transactionInfoForLogForTest(&lockerInfo->stats, true, readConcernArgs);
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
 
@@ -2471,6 +2510,15 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
     const TxnNumber txnNum = 1;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "abortTransaction");
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
@@ -2488,7 +2536,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
     std::string expectedTransactionInfo =
-        session.transactionInfoForLogForTest(&lockerInfo->stats, false);
+        session.transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
 
@@ -2500,6 +2548,15 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     const TxnNumber txnNum = 1;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "abortTransaction");
     // Initialize SingleTransactionStats AdditiveMetrics objects.
     const int metricValue = 1;
@@ -2520,7 +2577,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     stopCapturingLogMessages();
 
     std::string expectedTransactionInfo =
-        session.transactionInfoForLogForTest(&lockerInfo->stats, false);
+        session.transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
 

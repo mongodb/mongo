@@ -886,7 +886,8 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
     // Log the transaction if its duration is longer than the slowMS command threshold.
     _logSlowTransaction(lock,
                         &(opCtx->lockState()->getLockerInfo())->stats,
-                        MultiDocumentTransactionState::kAborted);
+                        MultiDocumentTransactionState::kAborted,
+                        repl::ReadConcernArgs::get(opCtx));
 }
 
 void Session::_abortTransaction(WithLock wl) {
@@ -910,7 +911,8 @@ void Session::_abortTransaction(WithLock wl) {
     if (_txnResourceStash) {
         _logSlowTransaction(wl,
                             &(_txnResourceStash->locker()->getLockerInfo())->stats,
-                            MultiDocumentTransactionState::kAborted);
+                            MultiDocumentTransactionState::kAborted,
+                            _txnResourceStash->getReadConcernArgs());
         ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
     } else {
         ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentActive();
@@ -1090,7 +1092,8 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     // Log the transaction if its duration is longer than the slowMS command threshold.
     _logSlowTransaction(lk,
                         &(opCtx->lockState()->getLockerInfo())->stats,
-                        MultiDocumentTransactionState::kCommitted);
+                        MultiDocumentTransactionState::kCommitted,
+                        repl::ReadConcernArgs::get(opCtx));
 }
 
 BSONObj Session::reportStashedState() const {
@@ -1174,7 +1177,8 @@ void Session::_reportTransactionStats(WithLock wl,
 }
 
 std::string Session::_transactionInfoForLog(const SingleThreadedLockStats* lockStats,
-                                            MultiDocumentTransactionState terminationCause) {
+                                            MultiDocumentTransactionState terminationCause,
+                                            repl::ReadConcernArgs readConcernArgs) {
     invariant(lockStats);
     invariant(terminationCause == MultiDocumentTransactionState::kCommitted ||
               terminationCause == MultiDocumentTransactionState::kAborted);
@@ -1187,8 +1191,8 @@ std::string Session::_transactionInfoForLog(const SingleThreadedLockStats* lockS
     _sessionId.serialize(&lsidBuilder);
     lsidBuilder.doneFast();
     parametersBuilder.append("txnNumber", _activeTxnNumber);
-    // TODO: SERVER-35174 Add readConcern to parameters here once pushed.
     parametersBuilder.append("autocommit", _autocommit);
+    readConcernArgs.appendInfo(&parametersBuilder);
     s << "parameters:" << parametersBuilder.obj().toString() << ",";
 
     s << " readTimestamp:" << _speculativeTransactionReadOpTime.getTimestamp().toString() << ",";
@@ -1223,14 +1227,15 @@ std::string Session::_transactionInfoForLog(const SingleThreadedLockStats* lockS
 
 void Session::_logSlowTransaction(WithLock wl,
                                   const SingleThreadedLockStats* lockStats,
-                                  MultiDocumentTransactionState terminationCause) {
+                                  MultiDocumentTransactionState terminationCause,
+                                  repl::ReadConcernArgs readConcernArgs) {
     // Only log multi-document transactions.
     if (_txnState != MultiDocumentTransactionState::kNone) {
         // Log the transaction if its duration is longer than the slowMS command threshold.
         if (_singleTransactionStats->getDuration(curTimeMicros64()) >
             serverGlobalParams.slowMS * 1000ULL) {
             log(logger::LogComponent::kCommand)
-                << _transactionInfoForLog(lockStats, terminationCause);
+                << _transactionInfoForLog(lockStats, terminationCause, readConcernArgs);
         }
     }
 }
