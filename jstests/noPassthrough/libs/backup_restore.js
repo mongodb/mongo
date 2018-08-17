@@ -167,6 +167,7 @@ var BackupRestoreTest = function(options) {
                 'sharded_splitChunk_partitioned.js',
                 'snapshot_read_catalog_operations.js',
                 'snapshot_read_kill_operations.js',
+                'snapshot_read_kill_op_only.js',
                 'update_rename.js',
                 'update_rename_noindex.js',
                 'yield_sort.js',
