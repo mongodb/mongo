@@ -103,6 +103,8 @@ TEST_F(PeriodicRunnerImplTest, OneJobTest) {
             cv.wait(lk, [&count, &i] { return count > i; });
         }
     }
+
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, OnePausableJobDoesNotRunWithoutStart) {
@@ -126,6 +128,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobDoesNotRunWithoutStart) {
     auto handle = runner().makeJob(std::move(job));
     clockSource().advance(interval);
     ASSERT_EQ(count, 0);
+
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, OnePausableJobRunsCorrectlyWithStart) {
@@ -156,6 +160,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobRunsCorrectlyWithStart) {
             cv.wait(lk, [&count, &i] { return count > i; });
         }
     }
+
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
@@ -193,6 +199,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
         clockSource().advance(interval);
     }
     ASSERT_TRUE(count == numExecutionsBeforePause || count == numExecutionsBeforePause + 1);
+
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
@@ -245,6 +253,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
     // This is slightly racy so once in a while count will be one extra
     ASSERT_TRUE(count == numFastForwardsForIterationWhileActive * 2 ||
                 count == numFastForwardsForIterationWhileActive * 2 + 1);
+
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTestNoSetup, ScheduleBeforeStartupTest) {
@@ -274,6 +284,8 @@ TEST_F(PeriodicRunnerImplTestNoSetup, ScheduleBeforeStartupTest) {
 
     stdx::unique_lock<stdx::mutex> lk(mutex);
     cv.wait(lk, [&count] { return count > 0; });
+
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
@@ -317,6 +329,7 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
             cv.wait(lk, [&countA, &countB, &i] { return (countA > i && countB >= i / 2); });
         }
     }
+
     tearDown();
 }
 
