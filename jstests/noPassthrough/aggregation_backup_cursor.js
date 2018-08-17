@@ -58,7 +58,22 @@
     assert.commandFailed(
         db.runCommand({aggregate: 1, pipeline: [{$backupCursor: {}}], cursor: {}}));
 
+    // Close the cursor to reset state.
+    response = assert.commandWorked(
+        db.runCommand({killCursors: "$cmd.aggregate", cursors: [response.cursor.id]}));
+    assert.eq(1, response.cursorsKilled.length);
+
+    // Set a failpoint which will generate a uassert after the backup cursor is open.
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "backupCursorErrorAfterOpen", mode: "alwaysOn"}));
+    assert.commandFailed(
+        db.runCommand({aggregate: 1, pipeline: [{$backupCursor: {}}], cursor: {}}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "backupCursorErrorAfterOpen", mode: "off"}));
+
     // Demonstrate query cursor timeouts will kill backup cursors, closing the underlying resources.
+    assert.commandWorked(
+        db.runCommand({aggregate: 1, pipeline: [{$backupCursor: {}}], cursor: {}}));
     assert.commandWorked(db.adminCommand({setParameter: 1, cursorTimeoutMillis: 1}));
     assert.soon(() => {
         return db.runCommand({aggregate: 1, pipeline: [{$backupCursor: {}}], cursor: {}})['ok'] ==

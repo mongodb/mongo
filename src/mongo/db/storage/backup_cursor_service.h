@@ -34,8 +34,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/pipeline/document.h"
-
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
 
@@ -101,6 +101,8 @@ public:
     void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId);
 
 private:
+    void _closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId, WithLock);
+
     StorageEngine* _storageEngine;
 
     enum State { kInactive, kFsyncLocked, kBackupCursorOpened };

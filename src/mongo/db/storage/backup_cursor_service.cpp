@@ -38,11 +38,14 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(backupCursorErrorAfterOpen);
 
 const auto getBackupCursorService =
     ServiceContext::declareDecoration<std::unique_ptr<BackupCursorService>>();
@@ -119,7 +122,11 @@ BackupCursorState BackupCursorService::openBackupCursor(OperationContext* opCtx)
     // A backup cursor is open. Any exception code path must leave the BackupCursorService in an
     // inactive state.
     auto closeCursorGuard =
-        MakeGuard([this, opCtx] { closeBackupCursor(opCtx, _openCursor.get()); });
+        MakeGuard([this, opCtx, &lk] { _closeBackupCursor(opCtx, _openCursor.get(), lk); });
+
+    uassert(50919,
+            "Failpoint hit after opening the backup cursor.",
+            !MONGO_FAIL_POINT(backupCursorErrorAfterOpen));
 
     // Ensure the checkpointTimestamp hasn't moved. A subtle case to catch is the first stable
     // checkpoint coming out of initial sync racing with opening the backup cursor.
@@ -174,6 +181,12 @@ BackupCursorState BackupCursorService::openBackupCursor(OperationContext* opCtx)
 
 void BackupCursorService::closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _closeBackupCursor(opCtx, cursorId, lk);
+}
+
+void BackupCursorService::_closeBackupCursor(OperationContext* opCtx,
+                                             std::uint64_t cursorId,
+                                             WithLock) {
     uassert(50880, "There is no backup cursor to close.", _state == kBackupCursorOpened);
     uassert(50879,
             str::stream() << "Can only close the running backup cursor. To close: " << cursorId
