@@ -76,3 +76,13 @@ env.Library(
         "$BUILD_DIR/mongo/base",
     ],
 )
+
+env.CppUnitTest(
+    target='shell_options_test',
+    source=[
+        "shell_options_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/shell_core",
+    ],
+)

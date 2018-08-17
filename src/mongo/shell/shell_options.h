@@ -94,4 +94,6 @@ bool handlePreValidationMongoShellOptions(const moe::Environment& params,
                                           const std::vector<std::string>& args);
 
 Status storeMongoShellOptions(const moe::Environment& params, const std::vector<std::string>& args);
+
+void redactPasswordOptions(int argc, char** argv);
 }
