@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -57,50 +58,6 @@ static const std::string kRepairIncompleteFileName = "_repair_incomplete";
 
 const auto getRepairObserver =
     ServiceContext::declareDecoration<std::unique_ptr<StorageRepairObserver>>();
-
-Status fsyncFile(const boost::filesystem::path& path) {
-    File file;
-    file.open(path.string().c_str(), /*read-only*/ false, /*direct-io*/ false);
-    if (!file.is_open()) {
-        return {ErrorCodes::FileOpenFailed,
-                str::stream() << "Failed to open file " << path.string()};
-    }
-    file.fsync();
-    return Status::OK();
-}
-
-Status fsyncParentDirectory(const boost::filesystem::path& file) {
-#ifdef __linux__  // this isn't needed elsewhere
-    if (!file.has_parent_path()) {
-        return {ErrorCodes::InvalidPath,
-                str::stream() << "Couldn't find parent directory for file: " << file.string()};
-    }
-
-    boost::filesystem::path dir = file.parent_path();
-
-    LOG(1) << "flushing directory " << dir.string();
-
-    int fd = ::open(dir.string().c_str(), O_RDONLY);
-    if (fd < 0) {
-        return {ErrorCodes::FileOpenFailed,
-                str::stream() << "Failed to open directory " << dir.string() << " for flushing: "
-                              << errnoWithDescription()};
-    }
-    if (fsync(fd) != 0) {
-        int e = errno;
-        if (e == EINVAL) {
-            warning() << "Could not fsync directory because this file system is not supported.";
-        } else {
-            close(fd);
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to fsync directory '" << dir.string() << "': "
-                                  << errnoWithDescription(e)};
-        }
-    }
-    close(fd);
-#endif
-    return Status::OK();
-}
 
 }  // namespace
 
