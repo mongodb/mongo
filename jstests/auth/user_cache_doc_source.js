@@ -30,7 +30,7 @@
     newConn.close();
     */
 
-    startParallelShell(function() {
+    var awaitShell = startParallelShell(function() {
         assert.eq(db.getSisterDB("admin").auth("readOnlyUser", "foobar"), 1);
     }, mongod.port);
 
@@ -43,4 +43,5 @@
     });
 
     MongoRunner.stopMongod(mongod);
+    awaitShell({checkExitSuccess: false});
 })();
