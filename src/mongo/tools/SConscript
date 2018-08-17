@@ -47,7 +47,7 @@ mongoebench = yamlEnv.Program(
         '$BUILD_DIR/mongo/util/signal_handlers',
     ],
     INSTALL_ALIAS=[
-        'mobile-test',
+        'embedded-test',
         'tools',
     ],
 )
