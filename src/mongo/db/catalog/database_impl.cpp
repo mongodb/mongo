@@ -219,10 +219,11 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
     auto uuid = cce->getCollectionOptions(opCtx).uuid;
 
     unique_ptr<RecordStore> rs(_dbEntry->getRecordStore(nss.ns()));
-    invariant(
-        rs.get(),
-        str::stream() << "Record store did not exist. Collection: " << nss.ns() << " UUID: "
-                      << (uuid ? uuid->toString() : "none"));  // if cce exists, so should this
+    if (rs.get() == nullptr) {
+        severe() << "Record store did not exist. Collection: " << nss.ns() << " UUID: "
+                 << (uuid ? uuid->toString() : "none");  // if cce exists, so should this
+        fassertFailedNoTrace(50936);
+    }
 
     // Not registering AddCollectionChange since this is for collections that already exist.
     Collection* coll = new Collection(opCtx, nss.ns(), uuid, cce.release(), rs.release(), _dbEntry);

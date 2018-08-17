@@ -190,7 +190,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 #endif
 }
 
-TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesFailGracefully) {
+TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     auto opCtxPtr = makeOperationContext();
 
     std::string ns = "a.b";
@@ -238,8 +238,17 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesFailGracefull
 
     ASSERT(boost::filesystem::exists(*dataFilePath));
 
-    // This should fail gracefully and not cause any crashing.
-    ASSERT_NOT_OK(_engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options));
+    // This should recreate an empty data file successfully and move the old one to a name that ends
+    // in ".corrupt".
+    auto status = _engine->recoverOrphanedIdent(opCtxPtr.get(), ns, ident, options);
+    ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code()) << status.reason();
+
+    boost::filesystem::path corruptFile = (dataFilePath->string() + ".corrupt");
+    ASSERT(boost::filesystem::exists(corruptFile));
+
+    rs = _engine->getRecordStore(opCtxPtr.get(), ns, ident, options);
+    RecordData data;
+    ASSERT_FALSE(rs->findRecord(opCtxPtr.get(), loc, &data));
 #endif
 }
 

@@ -24,11 +24,42 @@ let corruptFile = function(file) {
 };
 
 /**
+ * Starts a mongod on the provided data path without clearing data. Accepts 'options' as parameters
+ * to runMongod.
+ */
+let startMongodOnExistingPath = function(dbpath, options) {
+    let args = {dbpath: dbpath, noCleanData: true};
+    for (let attr in options) {
+        if (options.hasOwnProperty(attr))
+            args[attr] = options[attr];
+    }
+    return MongoRunner.runMongod(args);
+};
+
+let assertQueryUsesIndex = function(coll, query, indexName) {
+    let res = coll.find(query).explain();
+    assert.commandWorked(res);
+
+    let inputStage = res.queryPlanner.winningPlan.inputStage;
+    assert.eq(inputStage.stage, "IXSCAN");
+    assert.eq(inputStage.indexName, indexName);
+};
+
+/**
  * Assert that running MongoDB with --repair on the provided dbpath exits cleanly.
  */
-let assertRepairSucceeds = function(dbpath, port) {
+let assertRepairSucceeds = function(dbpath, port, opts) {
+    let args = ["mongod", "--repair", "--port", port, "--dbpath", dbpath];
+    for (let a in opts) {
+        if (opts.hasOwnProperty(a))
+            args.push("--" + a);
+
+        if (opts[a].length > 0) {
+            args.push(a);
+        }
+    }
     jsTestLog("Repairing the node");
-    assert.eq(0, runMongoProgram("mongod", "--repair", "--port", port, "--dbpath", dbpath));
+    assert.eq(0, runMongoProgram.apply(this, args));
 };
 
 let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {

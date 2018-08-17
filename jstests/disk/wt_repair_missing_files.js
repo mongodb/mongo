@@ -20,11 +20,11 @@
      * re-creating it. The collection should be visible on normal startup.
      */
 
-    let mongod = MongoRunner.runMongod({dbpath: dbpath});
+    let mongod = startMongodOnExistingPath(dbpath);
     let testColl = mongod.getDB(baseName)[collName];
 
     const doc = {a: 1};
-    assert.writeOK(testColl.insert(doc));
+    assert.commandWorked(testColl.insert(doc));
 
     let testCollUri = getUriForColl(testColl);
     let testCollFile = dbpath + testCollUri + ".wt";
@@ -34,9 +34,9 @@
     jsTestLog("deleting collection file: " + testCollFile);
     removeFile(testCollFile);
 
-    assert.eq(0, runMongoProgram("mongod", "--repair", "--port", mongod.port, "--dbpath", dbpath));
+    assertRepairSucceeds(dbpath, mongod.port);
 
-    mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
+    mongod = startMongodOnExistingPath(dbpath);
     testColl = mongod.getDB(baseName)[collName];
 
     assert.eq(testCollUri, getUriForColl(testColl));
@@ -48,16 +48,7 @@
      * normally.
      */
 
-    let assertQueryUsesIndex = function(coll, query, indexName) {
-        let res = coll.find(query).explain();
-        assert.commandWorked(res);
-
-        let inputStage = res.queryPlanner.winningPlan.inputStage;
-        assert.eq(inputStage.stage, "IXSCAN");
-        assert.eq(inputStage.indexName, indexName);
-    };
-
-    assert.writeOK(testColl.insert(doc));
+    assert.commandWorked(testColl.insert(doc));
 
     const indexName = "a_1";
     assert.commandWorked(testColl.createIndex({a: 1}, {name: indexName}));
@@ -71,8 +62,8 @@
     jsTestLog("deleting index file: " + indexFile);
     removeFile(indexFile);
 
-    assert.eq(0, runMongoProgram("mongod", "--repair", "--port", mongod.port, "--dbpath", dbpath));
-    mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
+    assertRepairSucceeds(dbpath, mongod.port);
+    mongod = startMongodOnExistingPath(dbpath);
     testColl = mongod.getDB(baseName)[collName];
 
     // Repair creates new idents.
@@ -93,9 +84,9 @@
     jsTestLog("deleting catalog file: " + mdbCatalogFile);
     removeFile(mdbCatalogFile);
 
-    assert.eq(0, runMongoProgram("mongod", "--repair", "--port", mongod.port, "--dbpath", dbpath));
+    assertRepairSucceeds(dbpath, mongod.port);
 
-    mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
+    mongod = startMongodOnExistingPath(dbpath);
     testColl = mongod.getDB(baseName)[collName];
     assert.isnull(testColl.exists());
 
@@ -110,10 +101,10 @@
     MongoRunner.stopMongod(mongod);
     resetDbpath(dbpath);
 
-    mongod = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: "", noCleanData: true});
+    mongod = startMongodOnExistingPath(dbpath, {directoryperdb: ""});
     testColl = mongod.getDB(baseName)[collName];
 
-    assert.writeOK(testColl.insert(doc));
+    assert.commandWorked(testColl.insert(doc));
 
     testCollUri = getUriForColl(testColl);
 
@@ -123,12 +114,9 @@
     jsTestLog("deleting data directory: " + dataDir);
     removeFile(dataDir);
 
-    assert.eq(
-        0,
-        runMongoProgram(
-            "mongod", "--repair", "--directoryperdb", "--port", mongod.port, "--dbpath", dbpath));
+    assertRepairSucceeds(dbpath, mongod.port, {directoryperdb: ""});
 
-    mongod = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: "", noCleanData: true});
+    mongod = startMongodOnExistingPath(dbpath, {directoryperdb: ""});
     testColl = mongod.getDB(baseName)[collName];
 
     assert.eq(testCollUri, getUriForColl(testColl));

@@ -311,6 +311,15 @@ private:
     Status _salvageIfNeeded(const char* uri);
     void _ensureIdentPath(StringData ident);
 
+    /**
+     * Recreates a WiredTiger ident from the provided URI by dropping and recreating the ident.
+     * This moves aside the existing data file, if one exists, with an added ".corrupt" suffix.
+     *
+     * Returns DataModifiedByRepair if the rebuild was successful, and any other error on failure.
+     * This will never return Status::OK().
+     */
+    Status _rebuildIdent(WT_SESSION* session, const char* uri);
+
     bool _hasUri(WT_SESSION* session, const std::string& uri) const;
 
     std::string _uri(StringData ident) const;

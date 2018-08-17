@@ -249,6 +249,16 @@ env.Library(
 )
 
 env.Library(
+    target='storage_file_util',
+    source=[
+        'storage_file_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='storage_repair_observer',
     source=[
         'storage_repair_observer.cpp',
@@ -258,6 +268,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
+        'storage_file_util',
     ],
 )
 
