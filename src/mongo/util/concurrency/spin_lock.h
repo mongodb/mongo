@@ -37,6 +37,7 @@
 #endif
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/config.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/mutex.h"
 
@@ -69,6 +70,27 @@ private:
 
 #else
 
+#if MONGO_CONFIG_DEBUG_BUILD
+class SpinLock {
+    MONGO_DISALLOW_COPYING(SpinLock);
+
+public:
+    SpinLock() = default;
+
+    void lock() {
+        _mutex.lock();
+    }
+
+    void unlock() {
+        _mutex.unlock();
+    }
+
+private:
+    stdx::mutex _mutex;
+};
+
+#else
+
 class SpinLock {
     MONGO_DISALLOW_COPYING(SpinLock);
 
@@ -96,6 +118,9 @@ private:
     // Initializes to the cleared state.
     std::atomic_flag _locked = ATOMIC_FLAG_INIT;  // NOLINT
 };
+
+#endif
+
 #endif
 
 using scoped_spinlock = stdx::lock_guard<SpinLock>;

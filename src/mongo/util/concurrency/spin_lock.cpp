@@ -27,16 +27,17 @@
  *    then also delete it in the license file.
  */
 
-#if !defined(_WIN32)
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/platform/pause.h"
-#include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/config.h"
+
+#if !(defined(_WIN32) || MONGO_CONFIG_DEBUG_BUILD)
 
 #include <sched.h>
 #include <time.h>
 
+#include "mongo/platform/pause.h"
+#include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
 
