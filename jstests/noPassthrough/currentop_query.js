@@ -104,7 +104,11 @@
             // Force queries to hang on yield to allow for currentOp capture.
             FixtureHelpers.runCommandOnEachPrimary({
                 db: conn.getDB("admin"),
-                cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}
+                cmdObj: {
+                    configureFailPoint: "setYieldAllLocksHang",
+                    mode: "alwaysOn",
+                    data: {namespace: mongosColl.getFullName()}
+                }
             });
 
             // Set the test configuration in TestData for the parallel shell test.
@@ -459,8 +463,11 @@
                         // Set yields to hang so that we can check currentOp output.
                         FixtureHelpers.runCommandOnEachPrimary({
                             db: db.getSiblingDB("admin"),
-                            cmdObj:
-                                {configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}
+                            cmdObj: {
+                                configureFailPoint: "setYieldAllLocksHang",
+                                mode: "alwaysOn",
+                                data: {namespace: db.currentop_query.getFullName()}
+                            }
                         });
 
                         assert.eq(cursor.itcount(), 8);
