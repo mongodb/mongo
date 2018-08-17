@@ -11,15 +11,7 @@
 
     load("jstests/libs/index_bigkeys.js");
 
-    // Case 1
-    runTest({unique: true}, bigStringKeys, bigStringCheck);
-    runTest({}, bigStringKeys, bigStringCheck);
+    const collName = "index_bigkeys_foreground_test";
 
-    // Case 2
-    runTest({unique: true}, docArrayKeys, docArrayCheck);
-    runTest({}, docArrayKeys, docArrayCheck);
-
-    // Case 3
-    runTest({unique: true}, arrayArrayKeys, arrayArrayCheck);
-    runTest({}, arrayArrayKeys, arrayArrayCheck);
+    testAllInteractionsWithBigIndexKeys(db, collName, false);
 }());

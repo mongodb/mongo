@@ -1,86 +1,9 @@
 /*
- * Shared functions and constants between index_bigkeys.js and index_bigkeys_background.js
+ * Helper functions for testing big index keys.
  */
 "use strict";
 
-var createCheckFunc = function(keyPattern) {
-    return (testColl, numItems, numIndexes) => {
-        assert(testColl.validate().valid);
-        assert.eq(numItems, testColl.count());
-        // Find by index
-        var c = testColl.find({k: keyPattern}).count();
-        assert.eq(numItems, c);
-        assert.eq(numIndexes, testColl.getIndexes().length);
-    };
-};
-
-function doInsert(collName, keys, expectDupError = false) {
-    for (let i = 0; i < keys.length; i++) {
-        let res = db.runCommand({insert: collName, documents: [{_id: i, k: keys[i], c: 0}]});
-        if (!expectDupError)
-            assert.commandWorked(res);
-        else
-            assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
-    }
-}
-
-function doUpdate(collName, keys) {
-    for (let key of keys) {
-        let res = db.runCommand({update: collName, updates: [{q: {k: key}, u: {$inc: {c: 1}}}]});
-        assert.commandWorked(res);
-        assert.eq(1, res.nModified);
-    }
-}
-
-function doDelete(collName, keys) {
-    for (let key of keys) {
-        let res = db.runCommand({delete: collName, deletes: [{q: {k: key}, limit: 0}]});
-        assert.commandWorked(res);
-        assert.eq(1, res.n);
-    }
-}
-
-function runTest(createIndexOpts, keys, checkFunc) {
-    const collName = "big_keys_index_test";
-    const testColl = db[collName];
-
-    // 1. Insert documents when index exists.
-    testColl.drop();
-    assert.commandWorked(testColl.createIndex({k: 1}, createIndexOpts));
-    doInsert(collName, keys);
-    checkFunc(testColl, keys.length, 2);
-
-    // Make sure unique index works.
-    if ("unique" in createIndexOpts) {
-        doInsert(collName, keys, true);
-        checkFunc(testColl, keys.length, 2);
-    }
-
-    // 2. Reindex when documents exist.
-    assert.commandWorked(testColl.dropIndex({k: 1}));
-    assert.commandWorked(testColl.createIndex({k: 1}, createIndexOpts));
-    checkFunc(testColl, keys.length, 2);
-
-    // 3. Create the index when documents exist.
-    testColl.drop();
-    doInsert(collName, keys);
-    assert.eq(1, testColl.getIndexes().length);
-    assert.commandWorked(testColl.createIndex({k: 1}, createIndexOpts));
-    checkFunc(testColl, keys.length, 2);
-
-    // 4. Update the documents.
-    doUpdate(collName, keys);
-    checkFunc(testColl, keys.length, 2);
-
-    // 5. Remove all the documents.
-    doDelete(collName, keys);
-    checkFunc(testColl, 0, 2);
-
-    // 6. Drop the index when documents exist.
-    doInsert(collName, keys);
-    assert.commandWorked(db.runCommand({dropIndexes: collName, index: {k: 1}}));
-    checkFunc(testColl, keys.length, 1);
-}
+///////////////////////////////////////////////////////////////////////////////
 
 // Case 1: Big string as key
 var bigStringKeys = (() => {
@@ -92,7 +15,6 @@ var bigStringKeys = (() => {
     }
     return keys;
 })();
-var bigStringCheck = createCheckFunc(/^a/);
 
 // Case 2: Document containing large array as key
 var docArrayKeys = (() => {
@@ -101,7 +23,6 @@ var docArrayKeys = (() => {
     keys.push({a: Array.apply(null, {length: 10000}).map(Number.call, Number)});
     return keys;
 })();
-var docArrayCheck = createCheckFunc(docArrayKeys[0]);
 
 // Case 3: Array containing large array as key
 var arrayArrayKeys = (() => {
@@ -110,4 +31,112 @@ var arrayArrayKeys = (() => {
     keys.push([Array.apply(null, {length: 10000}).map(Number.call, Number)]);
     return keys;
 })();
-var arrayArrayCheck = createCheckFunc(arrayArrayKeys[0]);
+
+var bigKeyGroups = [bigStringKeys, docArrayKeys, arrayArrayKeys];
+var bigKeyPatterns = [/^a/, docArrayKeys[0], arrayArrayKeys[0]];
+
+///////////////////////////////////////////////////////////////////////////////
+
+function readIndexKeysByQueryDocs(testColl, keyPattern, numFoundExpected) {
+    assert(testColl.validate().valid);
+    assert.eq(numFoundExpected, testColl.find({k: keyPattern}).count());
+}
+
+function insertIndexKeysByInsertDocs(testColl, keys) {
+    for (let i = 0; i < keys.length; i++) {
+        assert.commandWorked(testColl.insert({k: keys[i]}));
+    }
+}
+
+function insertIndexKeysByUpdateDocs(testDB, collName, keys) {
+    for (let i = 0; i < keys.length; i++) {
+        assert.commandWorked(testDB[collName].insert({_id: i, k: i}));
+    }
+    for (let i = 0; i < keys.length; i++) {
+        let res = testDB.runCommand(
+            {update: collName, updates: [{q: {_id: i}, u: {$set: {k: keys[i]}}}]});
+        assert.commandWorked(res);
+        assert.eq(1, res.nModified);
+    }
+}
+
+function deleteIndexKeysByRemoveDocs(testDB, collName, keys) {
+    for (let key of keys) {
+        let res = testDB.runCommand({delete: collName, deletes: [{q: {k: key}, limit: 1}]});
+        assert.commandWorked(res);
+        assert.eq(1, res.n);
+    }
+}
+
+function deleteIndexKeysByUpdateDocs(testDB, collName, keys) {
+    for (let i = 0; i < keys.length; i++) {
+        let res =
+            testDB.runCommand({update: collName, updates: [{q: {k: keys[i]}, u: {$set: {k: i}}}]});
+        assert.commandWorked(res);
+        assert.eq(1, res.nModified);
+
+        // Delete the doc to make the collection clean.
+        assert.commandWorked(testDB[collName].remove({k: i}));
+    }
+}
+
+function createIndex(testColl, background, unique) {
+    let numIndexesBefore = testColl.getIndexes().length;
+    if (background)
+        assert.commandWorked(
+            testColl.createIndex({k: 1}, {background: background, unique: unique}));
+    else
+        assert.commandWorked(testColl.createIndex({k: 1}, {unique: unique}));
+    assert.eq(numIndexesBefore + 1, testColl.getIndexes().length);
+}
+
+function dropIndex(testColl) {
+    let numIndexesBefore = testColl.getIndexes().length;
+    assert.commandWorked(testColl.dropIndex({k: 1}));
+    assert.eq(numIndexesBefore - 1, testColl.getIndexes().length);
+}
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * This test makes sure we can insert, read, update and delete big index keys.
+ */
+function testAllInteractionsWithBigIndexKeys(testDB, collName, backgroundIndexBuild) {
+    [true, false].forEach(function(uniqueIndex) {
+        [true, false].forEach(function(createIndexFirst) {
+            for (let i = 0; i < bigKeyGroups.length; i++) {
+                let keys = bigKeyGroups[i];
+                let keyPattern = bigKeyPatterns[i];
+                testDB[collName].drop();
+                assert.commandWorked(testDB.runCommand({create: collName}));
+                let testColl = testDB[collName];
+
+                // Test that we can insert big index keys.
+                if (createIndexFirst) {
+                    createIndex(testColl, backgroundIndexBuild, uniqueIndex);
+                    insertIndexKeysByInsertDocs(testColl, keys);
+                } else {
+                    insertIndexKeysByInsertDocs(testColl, keys);
+                    createIndex(testColl, backgroundIndexBuild, uniqueIndex);
+                }
+
+                // Test that we can read big index keys by querying with keys.
+                readIndexKeysByQueryDocs(testColl, keyPattern, keys.length);
+
+                // Test that we can delete big index keys by removing the documents.
+                deleteIndexKeysByRemoveDocs(testDB, collName, keys);
+
+                // Insert big index keys again, this time by updating documents with bigger indexed
+                // value.
+                insertIndexKeysByUpdateDocs(testDB, collName, keys);
+
+                // Test that we can delete big index keys by updating the documents with smaller
+                // indexed value.
+                deleteIndexKeysByUpdateDocs(testDB, collName, keys);
+
+                // Test dropIndex.
+                dropIndex(testColl);
+            }
+        });
+    });
+    testDB[collName].drop();
+}
