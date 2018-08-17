@@ -118,6 +118,7 @@ void OperationLatencyHistogram::append(bool includeHistograms, BSONObjBuilder* b
     _append(_reads, "reads", includeHistograms, builder);
     _append(_writes, "writes", includeHistograms, builder);
     _append(_commands, "commands", includeHistograms, builder);
+    _append(_transactions, "transactions", includeHistograms, builder);
 }
 
 // Computes the log base 2 of value, and checks for cases of split buckets.
@@ -164,6 +165,9 @@ void OperationLatencyHistogram::increment(uint64_t latency, Command::ReadWriteTy
             break;
         case Command::ReadWriteType::kCommand:
             _incrementData(latency, bucket, &_commands);
+            break;
+        case Command::ReadWriteType::kTransaction:
+            _incrementData(latency, bucket, &_transactions);
             break;
         default:
             MONGO_UNREACHABLE;

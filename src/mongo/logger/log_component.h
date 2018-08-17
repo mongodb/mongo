@@ -64,6 +64,7 @@ public:
         kASIO,
         kBridge,
         kTracking,
+        kTransaction,
         kNumLogComponents
     };
 

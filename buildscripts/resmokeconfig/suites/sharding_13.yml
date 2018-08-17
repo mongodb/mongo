@@ -13,7 +13,7 @@ selector:
   roots:
   - jstests/sharding/fts_score_sort_sharded.js
   - jstests/sharding/uuid_propagated_to_config_server_on_shardCollection.js
-  - jstests/sharding/hash_skey_split.js
+  - jstests/sharding/initial_split_validate_shard_collections.js
   - jstests/sharding/exact_shard_key_target.js
   - jstests/sharding/trace_missing_docs_test.js
   - jstests/sharding/cursor_cleanup.js

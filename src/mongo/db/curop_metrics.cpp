@@ -64,21 +64,21 @@ void recordCurOpMetrics(OperationContext* opCtx) {
     const OpDebug& debug = CurOp::get(opCtx)->debug();
     if (debug.nreturned > 0)
         returnedCounter.increment(debug.nreturned);
-    if (debug.ninserted > 0)
-        insertedCounter.increment(debug.ninserted);
-    if (debug.nMatched > 0)
-        updatedCounter.increment(debug.nMatched);
-    if (debug.ndeleted > 0)
-        deletedCounter.increment(debug.ndeleted);
-    if (debug.keysExamined > 0)
-        scannedCounter.increment(debug.keysExamined);
-    if (debug.docsExamined > 0)
-        scannedObjectCounter.increment(debug.docsExamined);
+    if (debug.additiveMetrics.ninserted)
+        insertedCounter.increment(*debug.additiveMetrics.ninserted);
+    if (debug.additiveMetrics.nMatched)
+        updatedCounter.increment(*debug.additiveMetrics.nMatched);
+    if (debug.additiveMetrics.ndeleted)
+        deletedCounter.increment(*debug.additiveMetrics.ndeleted);
+    if (debug.additiveMetrics.keysExamined)
+        scannedCounter.increment(*debug.additiveMetrics.keysExamined);
+    if (debug.additiveMetrics.docsExamined)
+        scannedObjectCounter.increment(*debug.additiveMetrics.docsExamined);
 
     if (debug.hasSortStage)
         scanAndOrderCounter.increment();
-    if (debug.writeConflicts)
-        writeConflictsCounter.increment(debug.writeConflicts);
+    if (debug.additiveMetrics.writeConflicts)
+        writeConflictsCounter.increment(*debug.additiveMetrics.writeConflicts);
 }
 
 }  // namespace mongo

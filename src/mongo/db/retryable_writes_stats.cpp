@@ -68,23 +68,4 @@ void RetryableWritesStats::updateStats(TransactionsStats* stats) {
     stats->setTransactionsCollectionWriteCount(_transactionsCollectionWriteCount.load());
 }
 
-class TransactionsSSS : public ServerStatusSection {
-public:
-    TransactionsSSS() : ServerStatusSection("transactions") {}
-
-    virtual ~TransactionsSSS() {}
-
-    virtual bool includeByDefault() const {
-        return true;
-    }
-
-    virtual BSONObj generateSection(OperationContext* opCtx,
-                                    const BSONElement& configElement) const {
-        TransactionsStats stats;
-        RetryableWritesStats::get(opCtx)->updateStats(&stats);
-        return stats.toBSON();
-    }
-
-} transactionsSSS;
-
 }  // namespace mongo

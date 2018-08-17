@@ -17,6 +17,18 @@
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert.commandWorked(testDB[collName].insert({x: 1}, {writeConcern: {w: "majority"}}));
 
+    // Run an operation prior to starting the transaction and save its operation time. We will use
+    // this later to assert that our subsequent transaction's readTimestamp is greater than or equal
+    // to this operation time.
+    const res = assert.commandWorked(testDB.runCommand({insert: collName, documents: [{x: 1}]}));
+    const operationTime = res.operationTime;
+
+    // Set and save the transaction's lifetime. We will use this later to assert that our
+    // transaction's expiry time is equal to its start time + lifetime.
+    const transactionLifeTime = 10;
+    assert.commandWorked(testDB.adminCommand(
+        {setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
+
     // This will make the transaction hang.
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: 'setInterruptOnlyPlansCheckForInterruptHang', mode: 'alwaysOn'}));
@@ -32,14 +44,41 @@
         sessionDB[collName].update({}, {x: 2});
         session.commitTransaction();
     };
+
+    const timeBeforeTransactionStarts = new ISODate();
     const transactionProcess = startParallelShell(transactionFn, rst.ports[0]);
+
+    const transactionFilter = {
+        active: true,
+        'lsid': {$exists: true},
+        'transaction.parameters.txnNumber': {$eq: 0},
+        'transaction.parameters.autocommit': {$eq: false}
+    };
 
     // Keep running currentOp() until we see the transaction subdocument.
     assert.soon(function() {
-        const transactionFilter =
-            {active: true, 'lsid': {$exists: true}, 'transaction.parameters.txnNumber': {$eq: 0}};
         return 1 === adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).itcount();
     });
+
+    const timeAfterTransactionStarts = new ISODate();
+    // Sleep here to allow some time between timeAfterTransactionStarts and timeBeforeCurrentOp to
+    // elapse.
+    sleep(100);
+    const timeBeforeCurrentOp = new ISODate();
+    // Check that the currentOp's transaction subdocument's fields align with our expectations.
+    let currentOp = adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).toArray();
+    let transactionDocument = currentOp[0].transaction;
+    assert.eq(transactionDocument.parameters.autocommit, false);
+    assert.eq(transactionDocument.parameters.readConcern, {level: 'snapshot'});
+    assert.gte(transactionDocument.readTimestamp, operationTime);
+    assert.gte(ISODate(transactionDocument.startWallClockTime), timeBeforeTransactionStarts);
+    assert.gt(transactionDocument.timeOpenMicros,
+              (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
+    assert.gte(transactionDocument.timeActiveMicros, 0);
+    assert.gte(transactionDocument.timeInactiveMicros, 0);
+    assert.eq(
+        ISODate(transactionDocument.expiryTime).getTime(),
+        ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000);
 
     // Now the transaction can proceed.
     assert.commandWorked(testDB.adminCommand(

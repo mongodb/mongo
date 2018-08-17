@@ -1,4 +1,4 @@
-/**
+/*
  *    Copyright (C) 2017 MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -39,6 +39,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/single_transaction_stats.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
@@ -91,6 +92,13 @@ public:
          * Releases stashed transaction state onto 'opCtx'. Must only be called once.
          */
         void release(OperationContext* opCtx);
+
+        /**
+         * Returns the read concern arguments.
+         */
+        repl::ReadConcernArgs getReadConcernArgs() const {
+            return _readConcernArgs;
+        }
 
     private:
         bool _released = false;
@@ -317,6 +325,21 @@ public:
         return _activeTxnNumber;
     }
 
+    boost::optional<SingleTransactionStats> getSingleTransactionStats() const {
+        return _singleTransactionStats;
+    }
+
+    repl::OpTime getSpeculativeTransactionReadOpTimeForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _speculativeTransactionReadOpTime;
+    }
+
+    const Locker* getTxnResourceStashLockerForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        invariant(_txnResourceStash);
+        return _txnResourceStash->locker();
+    }
+
     /**
      * If this session is holding stashed locks in _txnResourceStash, reports the current state of
      * the session using the provided builder. Locks the session object's mutex while running.
@@ -324,10 +347,27 @@ public:
     void reportStashedState(BSONObjBuilder* builder) const;
 
     /**
+     * If this session is not holding stashed locks in _txnResourceStash (transaction is active),
+     * reports the current state of the session using the provided builder. Locks the session
+     * object's mutex while running.
+     */
+    void reportUnstashedState(repl::ReadConcernArgs readConcernArgs, BSONObjBuilder* builder) const;
+
+    /**
      * Convenience method which creates and populates a BSONObj containing the stashed state.
      * Returns an empty BSONObj if this session has no stashed resources.
      */
     BSONObj reportStashedState() const;
+
+    std::string transactionInfoForLogForTest(const SingleThreadedLockStats* lockStats,
+                                             bool committed,
+                                             repl::ReadConcernArgs readConcernArgs) {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        MultiDocumentTransactionState terminationCause = committed
+            ? MultiDocumentTransactionState::kCommitted
+            : MultiDocumentTransactionState::kAborted;
+        return _transactionInfoForLog(lockStats, terminationCause, readConcernArgs);
+    }
 
     void addMultikeyPathInfo(MultikeyPathInfo info) {
         _multikeyPathInfo.push_back(std::move(info));
@@ -428,6 +468,37 @@ private:
     // truncated because it was too old.
     bool _hasIncompleteHistory{false};
 
+    // Indicates the state of the current multi-document transaction or snapshot read, if any.  If
+    // the transaction is in any state but kInProgress, no more operations can be collected.
+    enum class MultiDocumentTransactionState {
+        kNone,
+        kInProgress,
+        kCommitting,
+        kCommitted,
+        kAborted
+    } _txnState = MultiDocumentTransactionState::kNone;
+
+    // Logs the transaction information if it has run slower than the global parameter slowMS. The
+    // transaction must be committed or aborted when this function is called.
+    void _logSlowTransaction(WithLock wl,
+                             const SingleThreadedLockStats* lockStats,
+                             MultiDocumentTransactionState terminationCause,
+                             repl::ReadConcernArgs readConcernArgs);
+
+    // This method returns a string with information about a slow transaction. The format of the
+    // logging string produced should match the format used for slow operation logging. A
+    // transaction must be completed (committed or aborted) and a valid LockStats reference must be
+    // passed in order for this method to be called.
+    std::string _transactionInfoForLog(const SingleThreadedLockStats* lockStats,
+                                       MultiDocumentTransactionState terminationCause,
+                                       repl::ReadConcernArgs readConcernArgs);
+
+    // Reports transaction stats for both active and inactive transactions using the provided
+    // builder.
+    void _reportTransactionStats(WithLock wl,
+                                 BSONObjBuilder* builder,
+                                 repl::ReadConcernArgs readConcernArgs) const;
+
     // Caches what is known to be the last written transaction record for the session
     boost::optional<SessionTxnRecord> _lastWrittenSessionRecord;
 
@@ -438,16 +509,6 @@ private:
 
     // Holds transaction resources between network operations.
     boost::optional<TxnResources> _txnResourceStash;
-
-    // Indicates the state of the current multi-document transaction or snapshot read, if any.  If
-    // the transaction is in any state but kInProgress, no more operations can be collected.
-    enum class MultiDocumentTransactionState {
-        kNone,
-        kInProgress,
-        kCommitting,
-        kCommitted,
-        kAborted
-    } _txnState = MultiDocumentTransactionState::kNone;
 
     // Holds oplog data for operations which have been applied in the current multi-document
     // transaction.  Not used for retryable writes.
@@ -478,6 +539,9 @@ private:
     // This member is only applicable to operations running in a transaction. It is reset when a
     // transaction state resets.
     std::vector<MultikeyPathInfo> _multikeyPathInfo;
+
+    // Tracks metrics for a single multi-document transaction. Not used for retryable writes.
+    boost::optional<SingleTransactionStats> _singleTransactionStats;
 };
 
 }  // namespace mongo

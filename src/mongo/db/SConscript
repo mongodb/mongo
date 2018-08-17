@@ -213,6 +213,16 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='curop_test',
+    source=[
+        'curop_test.cpp',
+    ],
+    LIBDEPS=[
+        'curop',
+    ],
+)
+
 env.Library(
     target='curop_failpoint_helpers',
     source=[
@@ -624,8 +634,10 @@ env.Library(
     source=[
         'catalog_raii.cpp',
         'retryable_writes_stats.cpp',
+        'server_transactions_metrics.cpp',
         'session.cpp',
         'session_catalog.cpp',
+        'single_transaction_stats.cpp',
         'transaction_history_iterator.cpp',
         env.Idlc('session_txn_record.idl')[0],
         env.Idlc('transactions_stats.idl')[0],
@@ -645,6 +657,7 @@ env.Library(
         'namespace_string',
         'repl/oplog_entry',
         's/sharding_api_d',
+        "stats/top",
         'views/views',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ],

@@ -1,0 +1,102 @@
+/**
+ *    Copyright (C) 2018 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
+ */
+ 
+apply plugin: 'java-library'
+apply plugin: 'osgi'
+apply plugin: 'maven-publish'
+apply plugin: 'optional-base'
+
+sourceCompatibility = JavaVersion.VERSION_1_7
+targetCompatibility = JavaVersion.VERSION_1_7
+
+jar {
+    sourceSets {
+        main {
+            java.srcDir '../src'
+            resources.srcDirs '../jniLibs'
+        }
+    }
+
+    manifest {
+        instruction 'Automatic-Module-Name', 'org.mongodb.driver.embedded.client.capi'
+        instruction 'Build-Version', getGitVersion()
+        instruction 'Import-Package',
+                     'com.mongodb.*'
+    }
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allJava
+    classifier = 'sources'
+}
+
+task javadocJar(type: Jar) {
+    from javadoc
+    classifier = 'javadoc'
+}
+
+dependencies {
+    api "net.java.dev.jna:jna:$jnaVersion"
+    api 'org.slf4j:slf4j-api:1.7.6', optional
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifactId = libraryName
+
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+
+            pom {
+                name = pomName
+                description = pomDescription
+                url = pomUrl
+                licenses {
+                    license {
+                        name = pomLicenseName
+                        url = pomLicenseUrl
+                    }
+                }
+                scm {
+                    connection = pomScmConnection
+                    developerConnection = pomScmDevConnection
+                    url = pomScmUrl
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = 'local'
+            url = "$buildDir/repo"
+        }
+    }
+}

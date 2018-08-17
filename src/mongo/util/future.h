@@ -493,8 +493,8 @@ using future_details::Future;
  *
  * Only one thread can use a given Promise at a time. It is legal to have different threads setting
  * the value/error and extracting the Future, but it is the user's responsibility to ensure that
- * those calls are strictly synchronized. This is usually easiest to achieve by extracting the
- * Future, then passing a SharedPromise to the completing threads.
+ * those calls are strictly synchronized. This is usually easiest to achieve by calling
+ * makePromiseFuture<T>() then passing a SharedPromise to the completing threads.
  *
  * If the result is ready when producing the Future, it is more efficient to use
  * makeReadyFutureWith() or Future<T>::makeReady() than to use a Promise<T>.
@@ -576,6 +576,9 @@ public:
      */
     SharedPromise<T> share() noexcept;
 
+    /**
+     * Prefer using makePromiseFuture<T>() over constructing a promise and calling this method.
+     */
     Future<T> getFuture() noexcept;
 
 private:
@@ -895,13 +898,11 @@ public:
      * general error handler for the entire chain.
      */
     template <typename Func,  // Status -> T or Status -> StatusWith<T>
-              typename RawResult = NormalizedCallResult<Func, Status>,
-              typename = std::enable_if_t<!isFuture<RawResult>>>
+              typename Result = RawNormalizedCallResult<Func, Status>,
+              typename = std::enable_if_t<!isFuture<Result>>>
         Future<T> onError(Func&& func) && noexcept {
         static_assert(
-            std::is_same<RawResult, T>::value || std::is_same<RawResult, StatusWith<T>>::value ||
-                (std::is_same<T, FakeVoid>::value &&
-                 (std::is_same<RawResult, void>::value || std::is_same<RawResult, Status>::value)),
+            std::is_same<Result, T>::value,
             "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
 
         return generalImpl(
@@ -927,13 +928,13 @@ public:
      * Same as above onError() but for case where func returns a Future that needs to be unwrapped.
      */
     template <typename Func,  // Status -> Future<T>
-              typename RawResult = NormalizedCallResult<Func, Status>,
-              typename = std::enable_if_t<isFuture<RawResult>>,
+              typename Result = RawNormalizedCallResult<Func, Status>,
+              typename = std::enable_if_t<isFuture<Result>>,
               typename = void>
         Future<T> onError(Func&& func) && noexcept {
         static_assert(
-            std::is_same<RawResult, Future<T>>::value ||
-                (std::is_same<T, FakeVoid>::value && std::is_same<RawResult, Future<void>>::value),
+            std::is_same<Result, Future<T>>::value ||
+                (std::is_same<T, FakeVoid>::value && std::is_same<Result, Future<void>>::value),
             "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
 
         return generalImpl(
@@ -961,6 +962,31 @@ public:
                     }
                 });
             });
+    }
+
+    /**
+     * Same as the other two onErrors but only calls the callback if the code matches the template
+     * parameter. Otherwise lets the error propagate unchanged.
+     */
+    template <ErrorCodes::Error code, typename Func>
+        Future<T> onError(Func&& func) && noexcept {
+        using Result = RawNormalizedCallResult<Func, Status>;
+        static_assert(
+            std::is_same<Result, T>::value || std::is_same<Result, Future<T>>::value ||
+                (std::is_same<T, FakeVoid>::value && std::is_same<Result, Future<void>>::value),
+            "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
+
+        if (immediate || (isReady() && shared->status.isOK()))
+            return std::move(*this);  // Avoid copy/moving func if we know we won't call it.
+
+        // TODO in C++17 with constexpr if this can be done cleaner and more efficiently by not
+        // throwing.
+        return std::move(*this).onError([func =
+                                             std::forward<Func>(func)](Status && status) mutable {
+            if (status != code)
+                uassertStatusOK(status);
+            return throwingCall(func, std::move(status));
+        });
     }
 
     /**
@@ -1224,6 +1250,11 @@ public:
         return std::move(inner).onError(std::forward<Func>(func));
     }
 
+    template <ErrorCodes::Error code, typename Func>  // Status -> T or StatusWith<T> or Future<T>
+        Future<void> onError(Func&& func) && noexcept {
+        return std::move(inner).onError<code>(std::forward<Func>(func));
+    }
+
     template <typename Func>  // () -> void
         Future<void> tap(Func&& func) && noexcept {
         return std::move(inner).tap(std::forward<Func>(func));
@@ -1265,11 +1296,6 @@ private:
     Future<FakeVoid> inner;
 };
 
-template <typename T>
-    Future<void> Future<T>::ignoreValue() && noexcept {
-    return std::move(*this).then([](auto&&) {});
-}
-
 /**
  * Makes a ready Future with the return value of a nullary function. This has the same semantics as
  * Promise::setWith, and has the same reasons to prefer it over Future<T>::makeReady(). Also, it
@@ -1278,6 +1304,19 @@ template <typename T>
 template <typename Func>
 auto makeReadyFutureWith(Func&& func) {
     return Future<void>::makeReady().then(std::forward<Func>(func));
+}
+
+/**
+ * Returns a bound Promise and Future in a struct with friendly names (promise and future) that also
+ * works well with C++17 structured bindings.
+ */
+template <typename T>
+inline auto makePromiseFuture() {
+    struct PromiseAndFuture {
+        Promise<T> promise;
+        Future<T> future = promise.getFuture();
+    };
+    return PromiseAndFuture();
 }
 
 /**
@@ -1341,6 +1380,11 @@ template <typename T>
 template <typename Func>
 inline void Promise<T>::setWith(Func&& func) noexcept {
     setFrom(Future<void>::makeReady().then(std::forward<Func>(func)));
+}
+
+template <typename T>
+    Future<void> Future<T>::ignoreValue() && noexcept {
+    return std::move(*this).then([](auto&&) {});
 }
 
 }  // namespace mongo

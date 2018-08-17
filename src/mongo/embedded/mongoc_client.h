@@ -28,6 +28,9 @@
 #ifndef HEADERUUID_8CAAB40D_AC65_46CF_9FA9_B48825C825DC_DEFINED
 #define HEADERUUID_8CAAB40D_AC65_46CF_9FA9_B48825C825DC_DEFINED
 
+// <inttypes.h> is needed to avoid macro redefinition error when compiling on Windows.
+// Should be fixed inside mongoc.h
+#include <inttypes.h>
 #include <mongo/embedded/capi.h>
 #include <mongoc.h>
 

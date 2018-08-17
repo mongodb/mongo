@@ -52,6 +52,7 @@ TEST(OperationLatencyHistogram, EnsureIncrementsStored) {
         hist.increment(i, Command::ReadWriteType::kRead);
         hist.increment(i, Command::ReadWriteType::kWrite);
         hist.increment(i, Command::ReadWriteType::kCommand);
+        hist.increment(i, Command::ReadWriteType::kTransaction);
     }
     BSONObjBuilder outBuilder;
     hist.append(false, &outBuilder);
@@ -59,6 +60,7 @@ TEST(OperationLatencyHistogram, EnsureIncrementsStored) {
     ASSERT_EQUALS(out["reads"]["ops"].Long(), kMaxBuckets);
     ASSERT_EQUALS(out["writes"]["ops"].Long(), kMaxBuckets);
     ASSERT_EQUALS(out["commands"]["ops"].Long(), kMaxBuckets);
+    ASSERT_EQUALS(out["transactions"]["ops"].Long(), kMaxBuckets);
 }
 
 TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatency) {

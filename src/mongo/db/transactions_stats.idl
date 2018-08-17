@@ -39,3 +39,21 @@ structs:
       transactionsCollectionWriteCount:
         type: long
         default: 0
+      currentActive:
+        type: long
+        default: 0
+      currentInactive:
+        type: long
+        default: 0
+      currentOpen:
+        type: long
+        default: 0
+      totalAborted:
+        type: long
+        default: 0
+      totalCommitted:
+        type: long
+        default: 0
+      totalStarted:
+        type: long
+        default: 0

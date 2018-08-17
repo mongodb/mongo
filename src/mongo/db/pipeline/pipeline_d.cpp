@@ -842,8 +842,14 @@ BSONObj PipelineD::MongoDInterface::_reportCurrentOpForClient(
     CurOp::reportCurrentOpForClient(
         opCtx, client, (truncateOps == CurrentOpTruncateMode::kTruncateOps), &builder);
 
-    // Append lock stats before returning.
-    if (auto clientOpCtx = client->getOperationContext()) {
+    OperationContext* clientOpCtx = client->getOperationContext();
+
+    if (clientOpCtx) {
+        if (auto opCtxSession = OperationContextSession::get(clientOpCtx)) {
+            opCtxSession->reportUnstashedState(repl::ReadConcernArgs::get(clientOpCtx), &builder);
+        }
+
+        // Append lock stats before returning.
         if (auto lockerInfo = clientOpCtx->lockState()->getLockerInfo()) {
             fillLockerInfo(*lockerInfo, builder);
         }

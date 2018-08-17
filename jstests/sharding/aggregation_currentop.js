@@ -625,7 +625,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
             opid: {$exists: false},
             desc: "inactive transaction",
             "lsid.id": {$in: sessions.map((session) => session.getSessionId().id)},
-            "transaction.parameters.txnNumber": {$gte: 0, $lt: sessions.length}
+            "transaction.parameters.txnNumber": {$gte: 0, $lt: sessions.length},
         };
     }
 
@@ -720,8 +720,20 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     // disabled, even with 'allUsers:false'.
     const session = shardAdminDB.getMongo().startSession();
 
-    // Start but do not complete a transaction.
+    // Run an operation prior to starting the transaction and save its operation time.
     const sessionDB = session.getDatabase(shardTestDB.getName());
+    const res = assert.commandWorked(sessionDB.runCommand({insert: "test", documents: [{x: 1}]}));
+    const operationTime = res.operationTime;
+
+    // Set and save the transaction's lifetime. We will use this later to assert that our
+    // transaction's expiry time is equal to its start time + lifetime.
+    const transactionLifeTime = 10;
+    assert.commandWorked(sessionDB.adminCommand(
+        {setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
+
+    const timeBeforeTransactionStarts = new ISODate();
+
+    // Start but do not complete a transaction.
     assert.commandWorked(sessionDB.runCommand({
         insert: "test",
         documents: [{_id: `txn-insert-no-auth`}],
@@ -732,6 +744,8 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     }));
     sessionDBs = [sessionDB];
     sessions = [session];
+
+    const timeAfterTransactionStarts = new ISODate();
 
     // Use $currentOp to confirm that the incomplete transaction has stashed its locks.
     assert.eq(shardAdminDB.aggregate([{$currentOp: {allUsers: false}}, {$match: sessionFilter()}])
@@ -745,6 +759,28 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                 [{$currentOp: {allUsers: false, idleSessions: false}}, {$match: sessionFilter()}])
             .itcount(),
         0);
+
+    const timeBeforeCurrentOp = new ISODate();
+
+    // Check that the currentOp's transaction subdocument's fields align with our expectations.
+    let currentOp =
+        shardAdminDB.aggregate([{$currentOp: {allUsers: false}}, {$match: sessionFilter()}])
+            .toArray();
+    let transactionDocument = currentOp[0].transaction;
+    assert.eq(transactionDocument.parameters.autocommit, false);
+    assert.eq(transactionDocument.parameters.readConcern, {level: "snapshot"});
+    assert.gte(transactionDocument.readTimestamp, operationTime);
+    assert.gte(ISODate(transactionDocument.startWallClockTime), timeBeforeTransactionStarts);
+    // We round timeOpenMicros up to the nearest multiple of 1000 to avoid occasional assertion
+    // failures caused by timeOpenMicros having microsecond precision while
+    // timeBeforeCurrentOp/timeAfterTransactionStarts only have millisecond precision.
+    assert.gte(Math.ceil(transactionDocument.timeOpenMicros / 1000) * 1000,
+               (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
+    assert.gte(transactionDocument.timeActiveMicros, 0);
+    assert.gte(transactionDocument.timeInactiveMicros, 0);
+    assert.eq(
+        ISODate(transactionDocument.expiryTime).getTime(),
+        ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000);
 
     // Allow the transactions to complete and close the session.
     assert.commandWorked(sessionDB.adminCommand({
