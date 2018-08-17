@@ -105,6 +105,8 @@ TEST_F(PeriodicRunnerImplTest, OneJobTest) {
             cv.wait(lk, [&count, &i] { return count > i; });
         }
     }
+
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTestNoSetup, ScheduleBeforeStartupTest) {
@@ -134,6 +136,8 @@ TEST_F(PeriodicRunnerImplTestNoSetup, ScheduleBeforeStartupTest) {
 
     stdx::unique_lock<stdx::mutex> lk(mutex);
     cv.wait(lk, [&count] { return count > 0; });
+
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
@@ -177,6 +181,8 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
             cv.wait(lk, [&countA, &countB, &i] { return (countA > i && countB >= i / 2); });
         }
     }
+
+    tearDown();
 }
 
 TEST_F(PeriodicRunnerImplTest, TwoJobsDontDeadlock) {
