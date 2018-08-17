@@ -200,12 +200,6 @@ bool NamespaceDetailsCollectionCatalogEntry::isIndexReady(OperationContext* opCt
     return idxNo < getCompletedIndexCount(opCtx);
 }
 
-bool NamespaceDetailsCollectionCatalogEntry::isIndexPresent(OperationContext* opCtx,
-                                                            StringData idxName) const {
-    int idxNo = _findIndexNumber(opCtx, idxName);
-    return idxNo >= 0;
-}
-
 KVPrefix NamespaceDetailsCollectionCatalogEntry::getIndexPrefix(OperationContext* opCtx,
                                                                 StringData indexName) const {
     return KVPrefix::kNotPrefixed;

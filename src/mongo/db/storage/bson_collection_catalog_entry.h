@@ -72,8 +72,6 @@ public:
 
     virtual bool isIndexReady(OperationContext* opCtx, StringData indexName) const;
 
-    virtual bool isIndexPresent(OperationContext* opCtx, StringData indexName) const;
-
     virtual KVPrefix getIndexPrefix(OperationContext* opCtx, StringData indexName) const;
 
     // ------ for implementors

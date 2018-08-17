@@ -109,8 +109,6 @@ public:
 
     virtual bool isIndexReady(OperationContext* opCtx, StringData indexName) const = 0;
 
-    virtual bool isIndexPresent(OperationContext* opCtx, StringData indexName) const = 0;
-
     virtual KVPrefix getIndexPrefix(OperationContext* opCtx, StringData indexName) const = 0;
 
     virtual Status removeIndex(OperationContext* opCtx, StringData indexName) = 0;
