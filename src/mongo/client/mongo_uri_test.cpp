@@ -871,5 +871,35 @@ TEST(MongoURI, srvRecordTest) {
     }
 }
 
+/*
+ * Checks that redacting various secret info from URIs produces actually redacted URIs.
+ * Also checks that SRV URI's don't turn into non-SRV URIs after redaction.
+ */
+TEST(MongoURI, Redact) {
+    constexpr auto goodWithDBName = "mongodb://admin@localhost/admin"_sd;
+    constexpr auto goodWithoutDBName = "mongodb://admin@localhost"_sd;
+    constexpr auto goodWithOnlyDBAndHost = "mongodb://localhost/admin"_sd;
+    const std::initializer_list<std::pair<StringData, StringData>> testCases = {
+        {"mongodb://admin:password@localhost/admin"_sd, goodWithDBName},
+        {"mongodb://admin@localhost/admin?secretConnectionOption=foo"_sd, goodWithDBName},
+        {"mongodb://admin:password@localhost/admin?secretConnectionOptions"_sd, goodWithDBName},
+        {"mongodb://admin@localhost/admin"_sd, goodWithDBName},
+        {"mongodb://admin@localhost/admin?secretConnectionOptions", goodWithDBName},
+        {"mongodb://admin:password@localhost"_sd, goodWithoutDBName},
+        {"mongodb://admin@localhost", goodWithoutDBName},
+        {"mongodb://localhost/admin?socketTimeoutMS=5", goodWithOnlyDBAndHost},
+        {"mongodb://localhost/admin", goodWithOnlyDBAndHost},
+    };
+
+    for (const auto& testCase : testCases) {
+        ASSERT_TRUE(MongoURI::isMongoURI(testCase.first));
+        ASSERT_EQ(MongoURI::redact(testCase.first), testCase.second);
+    }
+
+    const auto toRedactSRV = "mongodb+srv://admin:password@localhost/admin?secret=foo"_sd;
+    const auto redactedSRV = "mongodb+srv://admin@localhost/admin"_sd;
+    ASSERT_EQ(MongoURI::redact(toRedactSRV), redactedSRV);
+}
+
 }  // namespace
 }  // namespace mongo
