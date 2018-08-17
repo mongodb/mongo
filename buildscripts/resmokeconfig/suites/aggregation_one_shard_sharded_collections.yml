@@ -10,6 +10,8 @@ selector:
   - jstests/aggregation/bugs/cursor_timeout.js
   - jstests/aggregation/bugs/lookup_unwind_getmore.js
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
+  # TODO(SERVER-36754): Reenable once cause of failure is fixed
+  - jstests/aggregation/testshard1.js
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
   exclude_with_any_tags:

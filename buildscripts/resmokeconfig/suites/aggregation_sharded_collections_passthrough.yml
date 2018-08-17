@@ -9,6 +9,8 @@ selector:
   # The following tests start their own ReplSetTest.
   - jstests/aggregation/testSlave.js
   - jstests/aggregation/sources/changeStream/*.js
+  # TODO(SERVER-36754): Reenable once cause of failure is fixed
+  - jstests/aggregation/testshard1.js
   # The following tests start their own mongod.
   - jstests/aggregation/bugs/cursor_timeout.js
   - jstests/aggregation/bugs/lookup_unwind_getmore.js

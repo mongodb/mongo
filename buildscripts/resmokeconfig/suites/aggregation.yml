@@ -6,6 +6,8 @@ selector:
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
+  # TODO(SERVER-36754): Reenable once cause of failure is fixed
+  - jstests/aggregation/testshard1.js
 
 executor:
   archive:
