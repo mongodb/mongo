@@ -81,7 +81,6 @@ TEST_F(ResultsMergerTestFixture, ShouldBeInterruptableDuringBlockingNext) {
     cursors.emplace_back(
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
     auto params = makeARMParamsFromExistingCursors(std::move(cursors));
-    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     BlockingResultsMerger blockingMerger(operationContext(), std::move(params), executor());
 
     // Issue a blocking wait for the next result asynchronously on a different thread.
