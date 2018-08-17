@@ -82,7 +82,7 @@ env.Library(
         'embedded',
     ],
     INSTALL_ALIAS=[
-        'mobile-dev',
+        'embedded-dev',
     ],
 )
 
@@ -91,7 +91,7 @@ if get_option('install-mode') == 'hygienic':
         'include/mongo/embedded-v1/mongo/embedded',
         source=['capi.h'],
         INSTALL_ALIAS=[
-            'mobile-dev',
+            'embedded-dev',
         ],
     )
 
@@ -111,7 +111,7 @@ capiTest = yamlEnv.Program(
         'mongo_embedded_capi',
     ],
     INSTALL_ALIAS=[
-        'mobile-test',
+        'embedded-test',
     ],
 )
 
@@ -134,7 +134,7 @@ mongoed = yamlEnv.Program(
         'embedded_integration_helpers',
     ],
     INSTALL_ALIAS=[
-        'mobile-test',
+        'embedded-test',
     ],
 )
 
@@ -163,7 +163,7 @@ env.Library(
         'bson-1.0',
     ],
     INSTALL_ALIAS=[
-        'mobile-dev',
+        'embedded-dev',
     ],
 )
 
@@ -172,7 +172,7 @@ if get_option('install-mode') == 'hygienic':
         'include/mongo/embedded-v1/mongo/embedded',
         source=['mongoc_client.h'],
         INSTALL_ALIAS=[
-            'mobile-dev',
+            'embedded-dev',
         ],
     )
 
@@ -190,7 +190,7 @@ clientTest = yamlEnv.Program(
         'mongo_embedded_mongoc_client',
     ],
     INSTALL_ALIAS=[
-        'mobile-test',
+        'embedded-test',
     ],
 )
 
