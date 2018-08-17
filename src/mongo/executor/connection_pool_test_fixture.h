@@ -150,9 +150,13 @@ public:
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort, size_t generation) override;
 
-    std::unique_ptr<ConnectionPool::TimerInterface> makeTimer() override;
+    std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
 
     Date_t now() override;
+
+    void shutdown() override {
+        TimerImpl::clear();
+    };
 
     /**
      * setNow() can be used to fire all timers that have passed a point in time

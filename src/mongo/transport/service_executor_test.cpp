@@ -104,6 +104,14 @@ public:
         _ioContext.stop();
     }
 
+    void drain() override final {
+        _ioContext.restart();
+        while (_ioContext.poll()) {
+            LOG(1) << "Draining remaining work in reactor.";
+        }
+        _ioContext.stop();
+    }
+
     std::unique_ptr<ReactorTimer> makeTimer() final {
         MONGO_UNREACHABLE;
     }

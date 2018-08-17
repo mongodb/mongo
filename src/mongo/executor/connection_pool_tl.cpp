@@ -44,15 +44,61 @@ const auto kMaxTimerDuration = Milliseconds::max();
 struct TimeoutHandler {
     AtomicBool done;
     Promise<void> promise;
+
+    explicit TimeoutHandler(Promise<void> p) : promise(std::move(p)) {}
 };
 
 }  // namespace
 
+void TLTypeFactory::shutdown() {
+    // Stop any attempt to schedule timers in the future
+    _inShutdown.store(true);
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    log() << "Killing all outstanding egress activity.";
+    for (auto collar : _collars) {
+        collar->kill();
+    }
+}
+
+void TLTypeFactory::fasten(Type* type) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _collars.insert(type);
+}
+
+void TLTypeFactory::release(Type* type) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _collars.erase(type);
+
+    type->_wasReleased = true;
+}
+
+TLTypeFactory::Type::Type(const std::shared_ptr<TLTypeFactory>& factory) : _factory{factory} {}
+
+TLTypeFactory::Type::~Type() {
+    invariant(_wasReleased);
+}
+
+void TLTypeFactory::Type::release() {
+    _factory->release(this);
+}
+
+bool TLTypeFactory::inShutdown() const {
+    return _inShutdown.load();
+}
+
 void TLTimer::setTimeout(Milliseconds timeoutVal, TimeoutCallback cb) {
+    // We will not wait on a timeout if we are in shutdown.
+    // The clients will be canceled as an inevitable consequence of pools shutting down.
+    if (inShutdown()) {
+        LOG(2) << "Skipping timeout due to impending shutdown.";
+        return;
+    }
+
     _timer->waitFor(timeoutVal).getAsync([cb = std::move(cb)](Status status) {
-        // TODO: verify why we still get broken promises when expliciting call stop and shutting
-        // down NITL's quickly.
-        if (status == ErrorCodes::CallbackCanceled || status == ErrorCodes::BrokenPromise) {
+        // If we get canceled, then we don't worry about the timeout anymore
+        if (status == ErrorCodes::CallbackCanceled) {
             return;
         }
 
@@ -101,19 +147,21 @@ const Status& TLConnection::getStatus() const {
 }
 
 void TLConnection::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
-    _timer.setTimeout(timeout, std::move(cb));
+    auto anchor = shared_from_this();
+    _timer->setTimeout(timeout, [ cb = std::move(cb), anchor = std::move(anchor) ] { cb(); });
 }
 
 void TLConnection::cancelTimeout() {
-    _timer.cancelTimeout();
+    _timer->cancelTimeout();
 }
 
 void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
     auto anchor = shared_from_this();
 
-    auto handler = std::make_shared<TimeoutHandler>();
-    handler->promise.getFuture().getAsync(
-        [ this, cb = std::move(cb) ](Status status) { cb(this, std::move(status)); });
+    auto pf = makePromiseFuture<void>();
+    auto handler = std::make_shared<TimeoutHandler>(std::move(pf.promise));
+    std::move(pf.future).getAsync(
+        [ this, cb = std::move(cb), anchor ](Status status) { cb(this, std::move(status)); });
 
     log() << "Connecting to " << _peer;
     setTimeout(timeout, [this, handler, timeout] {
@@ -166,6 +214,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
                 handler->promise.setError(status);
             }
         });
+    LOG(2) << "Finished connection setup.";
 }
 
 void TLConnection::resetToUnknown() {
@@ -175,9 +224,10 @@ void TLConnection::resetToUnknown() {
 void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
     auto anchor = shared_from_this();
 
-    auto handler = std::make_shared<TimeoutHandler>();
-    handler->promise.getFuture().getAsync(
-        [ this, cb = std::move(cb) ](Status status) { cb(this, status); });
+    auto pf = makePromiseFuture<void>();
+    auto handler = std::make_shared<TimeoutHandler>(std::move(pf.promise));
+    std::move(pf.future).getAsync(
+        [ this, cb = std::move(cb), anchor ](Status status) { cb(this, status); });
 
     setTimeout(timeout, [this, handler] {
         if (handler->done.swap(true)) {
@@ -216,14 +266,27 @@ size_t TLConnection::getGeneration() const {
     return _generation;
 }
 
-std::shared_ptr<ConnectionPool::ConnectionInterface> TLTypeFactory::makeConnection(
-    const HostAndPort& hostAndPort, size_t generation) {
-    return std::make_shared<TLConnection>(
-        _reactor, getGlobalServiceContext(), hostAndPort, generation, _onConnectHook.get());
+void TLConnection::cancelAsync() {
+    if (_client)
+        _client->cancel();
 }
 
-std::unique_ptr<ConnectionPool::TimerInterface> TLTypeFactory::makeTimer() {
-    return std::make_unique<TLTimer>(_reactor);
+std::shared_ptr<ConnectionPool::ConnectionInterface> TLTypeFactory::makeConnection(
+    const HostAndPort& hostAndPort, size_t generation) {
+    auto conn = std::make_shared<TLConnection>(shared_from_this(),
+                                               _reactor,
+                                               getGlobalServiceContext(),
+                                               hostAndPort,
+                                               generation,
+                                               _onConnectHook.get());
+    fasten(conn.get());
+    return conn;
+}
+
+std::shared_ptr<ConnectionPool::TimerInterface> TLTypeFactory::makeTimer() {
+    auto timer = std::make_shared<TLTimer>(shared_from_this(), _reactor);
+    fasten(timer.get());
+    return timer;
 }
 
 Date_t TLTypeFactory::now() {

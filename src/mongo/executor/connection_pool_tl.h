@@ -34,13 +34,17 @@
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 namespace executor {
 namespace connection_pool_tl {
 
-class TLTypeFactory final : public ConnectionPool::DependentTypeFactoryInterface {
+class TLTypeFactory final : public ConnectionPool::DependentTypeFactoryInterface,
+                            public std::enable_shared_from_this<TLTypeFactory> {
 public:
+    class Type;
+
     TLTypeFactory(transport::ReactorHandle reactor,
                   transport::TransportLayer* tl,
                   std::unique_ptr<NetworkConnectionHook> onConnectHook)
@@ -48,42 +52,91 @@ public:
 
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort, size_t generation) override;
-    std::unique_ptr<ConnectionPool::TimerInterface> makeTimer() override;
+    std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
 
     Date_t now() override;
+
+    void shutdown() override;
+    bool inShutdown() const;
+    void fasten(Type* type);
+    void release(Type* type);
 
 private:
     transport::ReactorHandle _reactor;
     transport::TransportLayer* _tl;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
+
+    mutable stdx::mutex _mutex;
+    AtomicBool _inShutdown{false};
+    stdx::unordered_set<Type*> _collars;
 };
 
-class TLTimer final : public ConnectionPool::TimerInterface {
+class TLTypeFactory::Type : public std::enable_shared_from_this<TLTypeFactory::Type> {
+    friend class TLTypeFactory;
+
+    MONGO_DISALLOW_COPYING(Type);
+
 public:
-    explicit TLTimer(const transport::ReactorHandle& reactor)
-        : _reactor(reactor), _timer(_reactor->makeTimer()) {}
+    explicit Type(const std::shared_ptr<TLTypeFactory>& factory);
+    ~Type();
+
+    void release();
+    bool inShutdown() const {
+        return _factory->inShutdown();
+    }
+
+    virtual void kill() = 0;
+
+private:
+    std::shared_ptr<TLTypeFactory> _factory;
+    bool _wasReleased = false;
+};
+
+class TLTimer final : public ConnectionPool::TimerInterface, public TLTypeFactory::Type {
+public:
+    explicit TLTimer(const std::shared_ptr<TLTypeFactory>& factory,
+                     const transport::ReactorHandle& reactor)
+        : TLTypeFactory::Type(factory), _reactor(reactor), _timer(_reactor->makeTimer()) {}
+    ~TLTimer() {
+        // Release must be the first expression of this dtor
+        release();
+    }
+
+    void kill() override {
+        cancelTimeout();
+    }
 
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
     void cancelTimeout() override;
 
 private:
     transport::ReactorHandle _reactor;
-    std::unique_ptr<transport::ReactorTimer> _timer;
+    std::shared_ptr<transport::ReactorTimer> _timer;
 };
 
-class TLConnection final : public ConnectionPool::ConnectionInterface {
+class TLConnection final : public ConnectionPool::ConnectionInterface, public TLTypeFactory::Type {
 public:
-    TLConnection(transport::ReactorHandle reactor,
+    TLConnection(const std::shared_ptr<TLTypeFactory>& factory,
+                 transport::ReactorHandle reactor,
                  ServiceContext* serviceContext,
                  HostAndPort peer,
                  size_t generation,
                  NetworkConnectionHook* onConnectHook)
-        : _reactor(reactor),
+        : TLTypeFactory::Type(factory),
+          _reactor(reactor),
           _serviceContext(serviceContext),
-          _timer(_reactor),
+          _timer(factory->makeTimer()),
           _peer(std::move(peer)),
           _generation(generation),
           _onConnectHook(onConnectHook) {}
+    ~TLConnection() {
+        // Release must be the first expression of this dtor
+        release();
+    }
+
+    void kill() override {
+        cancelAsync();
+    }
 
     void indicateSuccess() override;
     void indicateFailure(Status status) override;
@@ -101,13 +154,15 @@ private:
     void setup(Milliseconds timeout, SetupCallback cb) override;
     void resetToUnknown() override;
     void refresh(Milliseconds timeout, RefreshCallback cb) override;
+    void cancelAsync();
 
     size_t getGeneration() const override;
 
 private:
     transport::ReactorHandle _reactor;
     ServiceContext* const _serviceContext;
-    TLTimer _timer;
+    std::shared_ptr<ConnectionPool::TimerInterface> _timer;
+
     HostAndPort _peer;
     size_t _generation;
     NetworkConnectionHook* const _onConnectHook;

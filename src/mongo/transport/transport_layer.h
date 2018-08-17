@@ -155,6 +155,7 @@ public:
     virtual void run() noexcept = 0;
     virtual void runFor(Milliseconds time) noexcept = 0;
     virtual void stop() = 0;
+    virtual void drain() = 0;
 
     using Task = stdx::function<void()>;
 

@@ -63,11 +63,11 @@ class ConnectionPool : public EgressTagCloser {
     class SpecificPool;
 
 public:
-    class ConnectionHandleDeleter;
     class ConnectionInterface;
     class DependentTypeFactoryInterface;
     class TimerInterface;
 
+    using ConnectionHandleDeleter = stdx::function<void(ConnectionInterface* connection)>;
     using ConnectionHandle = std::unique_ptr<ConnectionInterface, ConnectionHandleDeleter>;
 
     using GetConnectionCallback = stdx::function<void(StatusWith<ConnectionHandle>)>;
@@ -131,7 +131,7 @@ public:
         EgressTagCloserManager* egressTagCloserManager = nullptr;
     };
 
-    explicit ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl,
+    explicit ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> impl,
                             std::string name,
                             Options options = Options{});
 
@@ -163,27 +163,13 @@ private:
     // accessed outside the lock
     const Options _options;
 
-    const std::unique_ptr<DependentTypeFactoryInterface> _factory;
+    const std::shared_ptr<DependentTypeFactoryInterface> _factory;
 
     // The global mutex for specific pool access and the generation counter
     mutable stdx::mutex _mutex;
-    stdx::unordered_map<HostAndPort, std::unique_ptr<SpecificPool>> _pools;
+    stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
 
     EgressTagCloserManager* _manager;
-};
-
-class ConnectionPool::ConnectionHandleDeleter {
-public:
-    ConnectionHandleDeleter() = default;
-    ConnectionHandleDeleter(ConnectionPool* pool) : _pool(pool) {}
-
-    void operator()(ConnectionInterface* connection) const {
-        if (_pool && connection)
-            _pool->returnConnection(connection);
-    }
-
-private:
-    ConnectionPool* _pool = nullptr;
 };
 
 /**
@@ -220,9 +206,7 @@ public:
  * specifically callbacks to set them up (connect + auth + whatever else),
  * refresh them (issue some kind of ping) and manage a timer.
  */
-class ConnectionPool::ConnectionInterface
-    : public TimerInterface,
-      public std::enable_shared_from_this<ConnectionPool::ConnectionInterface> {
+class ConnectionPool::ConnectionInterface : public TimerInterface {
     MONGO_DISALLOW_COPYING(ConnectionInterface);
 
     friend class ConnectionPool;
@@ -336,12 +320,17 @@ public:
     /**
      * Makes a new timer
      */
-    virtual std::unique_ptr<TimerInterface> makeTimer() = 0;
+    virtual std::shared_ptr<TimerInterface> makeTimer() = 0;
 
     /**
      * Returns the current time point
      */
     virtual Date_t now() = 0;
+
+    /**
+     * shutdown
+     */
+    virtual void shutdown() = 0;
 };
 
 }  // namespace executor
