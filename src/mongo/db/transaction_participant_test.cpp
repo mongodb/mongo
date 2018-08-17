@@ -1210,6 +1210,24 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
     ASSERT(_opObserver->transactionPrepared);
 }
 
+TEST_F(TxnParticipantTest, CannotInsertInPreparedTransaction) {
+    OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    txnParticipant->addTransactionOperation(opCtx(), operation);
+
+    txnParticipant->prepareTransaction(opCtx());
+
+    ASSERT_THROWS_CODE(txnParticipant->unstashTransactionResources(opCtx(), "insert"),
+                       AssertionException,
+                       ErrorCodes::PreparedTransactionInProgress);
+
+    ASSERT_FALSE(txnParticipant->transactionIsAborted());
+    ASSERT(_opObserver->transactionPrepared);
+}
+
 TEST_F(TxnParticipantTest, MigrationThrowsOnPreparedTransaction) {
     OperationContextSessionMongod outerScopedSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());

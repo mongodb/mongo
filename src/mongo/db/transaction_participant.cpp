@@ -116,6 +116,10 @@ const StringMap<int> txnAdminCommands = {{"abortTransaction", 1},
                                          {"voteAbortTransaction", 1},
                                          {"voteCommitTransaction", 1}};
 
+// The command names that are allowed in a prepared transaction.
+const StringMap<int> preparedTxnCmdWhitelist = {
+    {"abortTransaction", 1}, {"commitTransaction", 1}, {"prepareTransaction", 1}};
+
 }  // unnamed namespace
 
 TransactionParticipant* TransactionParticipant::get(OperationContext* opCtx) {
@@ -451,16 +455,7 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
             return;
         }
 
-        // Throw NoSuchTransaction error instead of TransactionAborted error since this is the entry
-        // point of transaction execution.
-        uassert(ErrorCodes::NoSuchTransaction,
-                str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
-                !_txnState.isAborted(lg));
-
-        // Cannot change committed transaction but allow retrying commitTransaction command.
-        uassert(ErrorCodes::TransactionCommitted,
-                str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been committed.",
-                cmdName == "commitTransaction" || !_txnState.isCommitted(lg));
+        _checkIsCommandValidWithTxnState(lg, opCtx, cmdName);
 
         if (_txnResourceStash) {
             // Transaction resources already exist for this transaction.  Transfer them from the
@@ -900,6 +895,28 @@ void TransactionParticipant::_checkIsActiveTransaction(WithLock wl,
     uassert(ErrorCodes::NoSuchTransaction,
             str::stream() << "Transaction " << txnNumber << " has been aborted.",
             !checkAbort || !_txnState.isAborted(wl));
+}
+
+void TransactionParticipant::_checkIsCommandValidWithTxnState(WithLock wl,
+                                                              OperationContext* opCtx,
+                                                              const std::string& cmdName) {
+    // Throw NoSuchTransaction error instead of TransactionAborted error since this is the entry
+    // point of transaction execution.
+    uassert(ErrorCodes::NoSuchTransaction,
+            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
+            !_txnState.isAborted(wl));
+
+    // Cannot change committed transaction but allow retrying commitTransaction command.
+    uassert(ErrorCodes::TransactionCommitted,
+            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been committed.",
+            cmdName == "commitTransaction" || !_txnState.isCommitted(wl));
+
+    // Disallow operations other than abort, prepare or commit on a prepared transaction
+    uassert(ErrorCodes::PreparedTransactionInProgress,
+            str::stream() << "Cannot call any operation other than abort, prepare or commit on"
+                          << " a prepared transaction",
+            !_txnState.isPrepared(wl) ||
+                preparedTxnCmdWhitelist.find(cmdName) != preparedTxnCmdWhitelist.cend());
 }
 
 Status TransactionParticipant::isValid(StringData dbName, StringData cmdName) {

@@ -543,6 +543,11 @@ private:
                                    const TxnNumber& requestTxnNumber,
                                    bool checkAbort) const;
 
+    // Checks if the command can be run on this transaction based on the state of the transaction.
+    void _checkIsCommandValidWithTxnState(WithLock,
+                                          OperationContext* opCtx,
+                                          const std::string& cmdName);
+
     // Logs the transaction information if it has run slower than the global parameter slowMS. The
     // transaction must be committed or aborted when this function is called.
     void _logSlowTransaction(WithLock wl,

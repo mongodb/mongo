@@ -2644,7 +2644,7 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitTimestamp, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, false);
         }
-        txnParticipant->unstashTransactionResources(_opCtx, "insert");
+        txnParticipant->unstashTransactionResources(_opCtx, "commitTransaction");
 
         txnParticipant->commitPreparedTransaction(_opCtx, commitTimestamp);
 
