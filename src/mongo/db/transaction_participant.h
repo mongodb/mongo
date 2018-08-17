@@ -41,6 +41,7 @@
 #include "mongo/db/session.h"
 #include "mongo/db/single_transaction_stats.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_metrics_observer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
@@ -281,7 +282,7 @@ public:
     }
 
     SingleTransactionStats getSingleTransactionStats() const {
-        return _singleTransactionStats;
+        return _transactionMetricsObserver.getSingleTransactionStats();
     }
 
     repl::OpTime getSpeculativeTransactionReadOpTimeForTest() const {
@@ -623,11 +624,11 @@ private:
 
     std::vector<MultikeyPathInfo> _multikeyPathInfo;
 
-    // Tracks metrics for a single multi-document transaction.
-    SingleTransactionStats _singleTransactionStats;
-
     // Remembers the refresh count this object has read from Session.
     long long _lastStateRefreshCount{0};
+
+    // Tracks and updates transaction metrics upon the appropriate transaction event.
+    TransactionMetricsObserver _transactionMetricsObserver;
 };
 
 inline StringBuilder& operator<<(StringBuilder& sb,

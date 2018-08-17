@@ -628,6 +628,7 @@ env.Library(
         'single_transaction_stats.cpp',
         'transaction_coordinator.cpp',
         'transaction_coordinator_commands_impl.cpp',
+        'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
         'transaction_history_iterator.cpp',
         env.Idlc('session_txn_record.idl')[0],
