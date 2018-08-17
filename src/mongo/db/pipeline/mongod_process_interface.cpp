@@ -291,6 +291,10 @@ Status MongoDInterface::attachCursorSourceToPipeline(
 
     PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
 
+    // Optimize again, since there may be additional optimizations that can be done after adding
+    // the initial cursor stage.
+    pipeline->optimizePipeline();
+
     return Status::OK();
 }
 
