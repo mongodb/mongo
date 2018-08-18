@@ -4330,7 +4330,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastWaitUntil) {
 
     std::string expectedWhat = str::stream()
         << "No electable secondaries caught up as of " << dateToISOStringLocal(curTime)
-        << "Please use the replSetStepDown command with the argument "
+        << ". Please use the replSetStepDown command with the argument "
         << "{force: true} to force node to step down.";
     ASSERT_THROWS_CODE_AND_WHAT(
         getTopoCoord().attemptStepDown(term, curTime, curTime, futureTime, false),

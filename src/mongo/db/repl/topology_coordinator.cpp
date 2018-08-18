@@ -2176,7 +2176,7 @@ bool TopologyCoordinator::attemptStepDown(
             uasserted(ErrorCodes::ExceededTimeLimit,
                       str::stream() << "No electable secondaries caught up as of "
                                     << dateToISOStringLocal(now)
-                                    << "Please use the replSetStepDown command with the argument "
+                                    << ". Please use the replSetStepDown command with the argument "
                                     << "{force: true} to force node to step down.");
         }
 
