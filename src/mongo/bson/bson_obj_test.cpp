@@ -678,4 +678,46 @@ TEST(BSONObj, addField) {
     ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 2));
 }
 
+TEST(BSONObj, sizeChecks) {
+    auto generateBuffer = [](std::int32_t size) {
+        std::vector<char> buffer(size);
+        DataRange bufferRange(&buffer.front(), &buffer.back());
+        ASSERT_OK(bufferRange.write(LittleEndian<int32_t>(size)));
+
+        return buffer;
+    };
+
+    {
+        // Implicitly assert that BSONObj constructor does not throw
+        // with standard size buffers.
+        auto normalBuffer = generateBuffer(15 * 1024 * 1024);
+        BSONObj obj(normalBuffer.data());
+    }
+
+    // Large buffers cause an exception to be thrown.
+    ASSERT_THROWS_CODE(
+        [&] {
+            auto largeBuffer = generateBuffer(17 * 1024 * 1024);
+            BSONObj obj(largeBuffer.data());
+        }(),
+        DBException,
+        10334);
+
+
+    // Assert that the max size can be increased by passing BSONObj a tag type.
+    {
+        auto largeBuffer = generateBuffer(17 * 1024 * 1024);
+        BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
+    }
+
+    // But a size is in fact being enforced.
+    ASSERT_THROWS_CODE(
+        [&]() {
+            auto hugeBuffer = generateBuffer(70 * 1024 * 1024);
+            BSONObj obj(hugeBuffer.data(), BSONObj::LargeSizeTrait{});
+        }(),
+        DBException,
+        10334);
+}
+
 }  // unnamed namespace

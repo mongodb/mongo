@@ -448,5 +448,68 @@ TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithNonrootedUnownedBsonWorks) {
     ASSERT_NE(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
 }
 
+TEST(BSONObjBuilderTest, SizeChecks) {
+    auto generateBuffer = [](std::int32_t size) {
+        std::vector<char> buffer(size);
+        DataRange bufferRange(&buffer.front(), &buffer.back());
+        ASSERT_OK(bufferRange.write(LittleEndian<int32_t>(size)));
+
+        return buffer;
+    };
+
+    {
+        // Implicitly assert that BSONObjBuilder does not throw
+        // with standard size buffers.
+        auto normalBuffer = generateBuffer(15 * 1024 * 1024);
+        BSONObj obj(normalBuffer.data());
+
+        BSONObjBuilder builder;
+        builder.append("a", obj);
+        BSONObj finalObj = builder.obj();
+    }
+
+    // Large buffers cause an exception to be thrown.
+    ASSERT_THROWS_CODE(
+        [&] {
+            auto largeBuffer = generateBuffer(17 * 1024 * 1024);
+            BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
+
+            BSONObjBuilder builder;
+            builder.append("a", obj);
+            BSONObj finalObj = builder.obj();
+        }(),
+        DBException,
+        10334);
+
+
+    // Assert that the max size can be increased by passing BSONObj a tag type.
+    {
+        auto largeBuffer = generateBuffer(17 * 1024 * 1024);
+        BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
+
+        BSONObjBuilder builder;
+        builder.append("a", obj);
+        BSONObj finalObj = builder.obj<BSONObj::LargeSizeTrait>();
+    }
+
+    // But a size is in fact being enforced.
+    {
+        auto largeBuffer = generateBuffer(40 * 1024 * 1024);
+        BSONObj obj(largeBuffer.data(), BSONObj::LargeSizeTrait{});
+        BSONObjBuilder builder;
+        ASSERT_THROWS(
+            [&]() {
+
+                for (StringData character : {"a", "b", "c"}) {
+                    builder.append(character, obj);
+                }
+                BSONObj finalObj = builder.obj<BSONObj::LargeSizeTrait>();
+
+            }(),
+            DBException);
+    }
+}
+
+
 }  // namespace
 }  // namespace mongo

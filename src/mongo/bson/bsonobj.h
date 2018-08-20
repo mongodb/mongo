@@ -98,6 +98,13 @@ class BSONObjStlIterator;
  */
 class BSONObj {
 public:
+    struct DefaultSizeTrait {
+        constexpr static int MaxSize = BSONObjMaxInternalSize;
+    };
+    struct LargeSizeTrait {
+        constexpr static int MaxSize = BufferMaxSize;
+    };
+
     // Declared in bsonobj_comparator_interface.h.
     class ComparatorInterface;
 
@@ -128,8 +135,9 @@ public:
     /** Construct a BSONObj from data in the proper format.
      *  Use this constructor when something else owns bsonData's buffer
     */
-    explicit BSONObj(const char* bsonData) {
-        init(bsonData);
+    template <typename Traits = DefaultSizeTrait>
+    explicit BSONObj(const char* bsonData, Traits t = Traits{}) {
+        init<Traits>(bsonData);
     }
 
     explicit BSONObj(ConstSharedBuffer ownedBuffer)
@@ -374,9 +382,12 @@ public:
     }
 
     /** performs a cursory check on the object's size only. */
+    template <typename Traits = DefaultSizeTrait>
     bool isValid() const {
+        static_assert(Traits::MaxSize > 0 && Traits::MaxSize <= std::numeric_limits<int>::max(),
+                      "BSONObj maximum size must be within possible limits");
         int x = objsize();
-        return x > 0 && x <= BSONObjMaxInternalSize;
+        return x > 0 && x <= Traits::MaxSize;
     }
 
     /**
@@ -559,12 +570,13 @@ public:
     }
 
 private:
-    void _assertInvalid() const;
+    void _assertInvalid(int maxSize) const;
 
+    template <typename Traits = DefaultSizeTrait>
     void init(const char* data) {
         _objdata = data;
-        if (!isValid())
-            _assertInvalid();
+        if (!isValid<Traits>())
+            _assertInvalid(Traits::MaxSize);
     }
 
     const char* _objdata;
