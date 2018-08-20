@@ -258,12 +258,12 @@ error_code("TransactionTooLarge", 257)
 error_code("UnknownFeatureCompatibilityVersion", 258);
 error_code("KeyedExecutorRetry", 259);
 error_code("InvalidResumeToken", 260);
-error_code("TooManyFilesOpen", 261);
-error_code("FailPointSetFailed", 262)
-error_code("OperationNotSupportedInTransaction", 263)
-error_code("TooManyLogicalSessions", 264);
+error_code("TooManyLogicalSessions", 261);
+error_code("ExceededTimeLimit", 262);
+error_code("OperationNotSupportedInTransaction", 263);
+error_code("TooManyFilesOpen", 264);
 error_code("OrphanedRangeCleanUpFailed", 265);
-error_code("ExceededTimeLimit", 266);
+error_code("FailPointSetFailed", 266);
 error_code("PreparedTransactionInProgress", 267);
 error_code("CannotBackup", 268);
 error_code("DataModifiedByRepair", 269);
