@@ -4,6 +4,7 @@
 from __future__ import absolute_import
 
 import datetime
+import os
 import unittest
 
 import mock
@@ -119,12 +120,13 @@ class TestCombineBenchmarkResults(CombineBenchrunEmbeddedResultsFixture):
         self.assertEqual(self.report["end"], "3000-01-01T00:00:00Z")
 
     def test_parse_report_name(self):
+        self.cber_hook.report_root = os.path.join("benchrun_embedded", "results")
         test_name = "test1"
-        thread_num = "4"
-        file_name = "mongoebench.{}.{}.iter0.json".format(test_name, thread_num)
-        report_name, report_threads = self.cber_hook._parse_report_name(file_name)
-        self.assertEqual(report_name, test_name)
-        self.assertEqual(report_threads, thread_num)
+        thread_num = 3
+        file_name = os.path.join(self.cber_hook.report_root, test_name,
+                                 "thread{}".format(thread_num), "mongoebench.0.json")
+        report_threads = self.cber_hook._parse_report_name(file_name)
+        self.assertEqual(thread_num, int(report_threads))
 
 
 class TestBenchrunEmbeddedThreadsReport(CombineBenchrunEmbeddedResultsFixture):
