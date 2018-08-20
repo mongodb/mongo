@@ -609,6 +609,16 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
         bounds->fields.insert(bounds->fields.begin(), {"$_path"});
         bounds->fields.front().intervals.push_back(
             IndexBoundsBuilder::makePointInterval(nodeIndex->keyPattern.firstElementFieldName()));
+        // If the bounds are [MinKey, MaxKey] then we're querying for any values in the given
+        // path. Therefore we must add bounds that allow subpaths (specifically the bound
+        // ["path.","path/") on "$_path").
+        const auto& intervals = bounds->fields.back().intervals;
+        if (!intervals.empty() && intervals.front().isMinToMaxInclusive()) {
+            bounds->fields.front().intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+                bounds->fields.back().name + '.',
+                bounds->fields.back().name + static_cast<char>('.' + 1),
+                BoundInclusion::kIncludeStartKeyOnly));
+        }
         nodeIndex->keyPattern = BSON("$_path" << nodeIndex->keyPattern.firstElement()
                                               << nodeIndex->keyPattern.firstElement());
         nodeIndex->multikeyPaths.insert(nodeIndex->multikeyPaths.begin(), {});

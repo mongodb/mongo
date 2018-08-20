@@ -21,8 +21,8 @@
     coll.drop();
 
     // Template document which defines the 'schema' of the documents in the test collection.
-    const templateDoc = {a: 0, b: {c: 0, d: {e: 0}}};
-    const pathList = ['a', 'b.c', 'b.d.e'];
+    const templateDoc = {a: 0, b: {c: 0, d: {e: 0}, f: {}, g: []}};
+    const pathList = ['a', 'b.c', 'b.d.e', 'b.f', 'b.g'];
 
     // Insert a set of documents into the collection, based on the template document and populated
     // with an increasing sequence of values. This is to ensure that the range of values present for
@@ -41,8 +41,12 @@
         assert.commandWorked(coll.insert(templateDoc));
     }
 
-    // Set of operations which will be applied to each field in the index in turn.
+    // Set of operations which will be applied to each field in the index in turn. If the 'bounds'
+    // property is null, this indicates that the operation is not supported by $** indexes. The
+    // 'subpathBounds' property indicates whether the bounds for '$_path' are supposed to contain
+    // all subpaths rather than a single point-interval, i.e. ["path.to.field.", "path.to.field/").
     const operationList = [
+        {expression: {$lte: 0, $gte: 50}, bounds: []},
         {expression: {$gte: 50}, bounds: ['[50.0, inf.0]']},
         {expression: {$gt: 50}, bounds: ['(50.0, inf.0]']},
         {expression: {$lt: 150}, bounds: ['[-inf.0, 150.0)']},
@@ -52,6 +56,18 @@
           expression: {$in: [25, 75, 125, 175]},
           bounds: ['[25.0, 25.0]', '[75.0, 75.0]', '[125.0, 125.0]', '[175.0, 175.0]']
         },
+        {expression: {$exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
+        {
+          expression: {$gte: MinKey, $lte: MaxKey},
+          bounds: ['[MinKey, MaxKey]'],
+          subpathBounds: true
+        },
+        {expression: {$exists: false}, bounds: null},
+        {expression: {$eq: null}, bounds: null},
+        {expression: {$ne: null}, bounds: null},
+        {expression: {$ne: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
+        // In principle we could have tighter bounds for this. See SERVER-36765.
+        {expression: {$eq: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
     ];
 
     // Given a keyPattern and (optional) pathProjection, this function builds a $** index on the
@@ -76,8 +92,15 @@
             const orQueryBounds = [];
 
             for (let path of pathList) {
-                // {$_path: ['path.to.field', 'path.to.field'], path.to.field: [[computed bounds]]}
-                const expectedBounds = {$_path: [`["${path}", "${path}"]`], [path]: op.bounds};
+                // The bounds on '$_path' will always include a point-interval on the path, i.e.
+                // ["path.to.field", "path.to.field"]. If 'subpathBounds' is 'true' for this
+                // operation, then we add bounds that include all subpaths as well, i.e.
+                // ["path.to.field.", "path.to.field/")
+                const pointPathBound = `["${path}", "${path}"]`;
+                const pathBounds = op.subpathBounds ? [pointPathBound, `["${path}.", "${path}/")`]
+                                                    : [pointPathBound];
+                // {$_path: pathBounds, path.to.field: [[computed bounds]]}
+                const expectedBounds = {$_path: pathBounds, [path]: op.bounds};
                 const query = {[path]: op.expression};
 
                 // Explain the query, and determine whether an indexed solution is available.
@@ -85,8 +108,9 @@
                     getPlanStages(coll.find(query).explain().queryPlanner.winningPlan, "IXSCAN");
 
                 // If we expect the current path to have been excluded based on the $** keyPattern
-                // or projection, confirm that no indexed solution was found.
-                if (!expectedPaths.includes(path)) {
+                // and projection, or if the current operation is not supported by $** indexes,
+                // confirm that no indexed solution was found.
+                if (!expectedPaths.includes(path) || op.bounds === null) {
                     assert.eq(ixScans.length, 0);
                     continue;
                 }
@@ -103,6 +127,11 @@
                 // Push the query into the $or and $and predicate arrays.
                 orQueryBounds.push(expectedBounds);
                 multiFieldPreds.push(query);
+            }
+
+            // If the current operation could not use the $** index, skip to the next op.
+            if (multiFieldPreds.length === 0) {
+                continue;
             }
 
             // Perform a rooted $or for this operation across all indexed fields; for instance:
@@ -166,27 +195,29 @@
 
     try {
         // Test a $** index that indexes the entire document.
-        runAllPathsIndexTest({'$**': 1}, null, ['a', 'b.c', 'b.d.e']);
+        runAllPathsIndexTest({'$**': 1}, null, ['a', 'b.c', 'b.d.e', 'b.f', 'b.g']);
 
         // Test a $** index on a single subtree.
         runAllPathsIndexTest({'a.$**': 1}, null, ['a']);
-        runAllPathsIndexTest({'b.$**': 1}, null, ['b.c', 'b.d.e']);
+        runAllPathsIndexTest({'b.$**': 1}, null, ['b.c', 'b.d.e', 'b.f', 'b.g']);
         runAllPathsIndexTest({'b.d.$**': 1}, null, ['b.d.e']);
 
         // Test a $** index which includes a subset of paths.
         runAllPathsIndexTest({'$**': 1}, {a: 1}, ['a']);
-        runAllPathsIndexTest({'$**': 1}, {b: 1}, ['b.c', 'b.d.e']);
+        runAllPathsIndexTest({'$**': 1}, {b: 1}, ['b.c', 'b.d.e', 'b.f', 'b.g']);
         runAllPathsIndexTest({'$**': 1}, {'b.d': 1}, ['b.d.e']);
         runAllPathsIndexTest({'$**': 1}, {a: 1, 'b.d': 1}, ['a', 'b.d.e']);
 
         // Test a $** index which excludes a subset of paths.
-        runAllPathsIndexTest({'$**': 1}, {a: 0}, ['b.c', 'b.d.e']);
+        runAllPathsIndexTest({'$**': 1}, {a: 0}, ['b.c', 'b.d.e', 'b.f', 'b.g']);
         runAllPathsIndexTest({'$**': 1}, {b: 0}, ['a']);
-        runAllPathsIndexTest({'$**': 1}, {'b.d': 0}, ['a', 'b.c']);
-        runAllPathsIndexTest({'$**': 1}, {a: 0, 'b.d': 0}, ['b.c']);
+        runAllPathsIndexTest({'$**': 1}, {'b.d': 0}, ['a', 'b.c', 'b.f', 'b.g']);
+        runAllPathsIndexTest({'$**': 1}, {a: 0, 'b.d': 0}, ['b.c', 'b.f', 'b.g']);
     } finally {
         // Disable $** indexes once the tests have either completed or failed.
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false}));
+        // TODO: SERVER-36444 remove this coll.drop because validation should work now.
+        coll.drop();
     }
 })();

@@ -28,13 +28,12 @@
 
 #include "mongo/db/query/interval.h"
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
-
-using mongo::BSONObj;
-using mongo::Interval;
 
 //
 // Comparison
@@ -316,6 +315,23 @@ TEST(Introspection, GetDirection) {
     ASSERT(i->getDirection() == Interval::Direction::kDirectionDescending);
 }
 
+TEST(Introspection, MinToMax) {
+    Interval a(BSON("" << 10 << "" << 20), true, true);
+    ASSERT_FALSE(a.isMinToMaxInclusive());
+
+    Interval b(BSON("" << BSONType::MinKey << "" << BSONType::MaxKey), false, true);
+    ASSERT_FALSE(b.isMinToMaxInclusive());
+
+    Interval c(BSON("" << BSONType::MinKey << "" << BSONType::MaxKey), true, false);
+    ASSERT_FALSE(c.isMinToMaxInclusive());
+
+    BSONObjBuilder builder;
+    builder.appendMinKey("");
+    builder.appendMaxKey("");
+    Interval d(builder.obj(), true, true);
+    ASSERT_TRUE(d.isMinToMaxInclusive());
+}
+
 TEST(Copying, ReverseClone) {
     Interval a(BSON("" << 10 << "" << 20), false, true);
     ASSERT(a.reverseClone() == Interval(BSON("" << 20 << "" << 10), true, false));
@@ -331,3 +347,4 @@ TEST(Copying, ReverseClone) {
 
 
 }  // unnamed namespace
+}  // namespace mongo

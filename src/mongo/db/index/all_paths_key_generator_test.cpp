@@ -83,11 +83,11 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractTopLevelKey) {
     auto expectedMultikeyPaths = makeKeySet();
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractKeysFromNestedObject) {
@@ -100,26 +100,47 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractKeysFromNestedObject) {
     auto expectedMultikeyPaths = makeKeySet();
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
-TEST(AllPathsKeyGeneratorFullDocumentTest, DoNotExtractKeyForEmptyObject) {
+TEST(AllPathsKeyGeneratorFullDocumentTest, ShouldIndexEmptyObject) {
     AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
     auto inputDoc = fromjson("{a: 1, b: {}}");
 
-    auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}")});
+    auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"), fromjson("{'': 'b', '': {}}")});
     auto expectedMultikeyPaths = makeKeySet();
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
+}
+
+TEST(AllPathsKeyGeneratorFullDocumentTest, ShouldIndexNonNestedEmptyArrayAsUndefined) {
+    AllPathsKeyGenerator keyGen{fromjson("{'$**': 1}"), {}, nullptr};
+    auto inputDoc = fromjson("{ a: [], b: {c: []}, d: [[], {e: []}]}");
+
+    auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': undefined}"),
+                                    fromjson("{'': 'b.c', '': undefined}"),
+                                    fromjson("{'': 'd', '': []}"),
+                                    fromjson("{'': 'd.e', '': undefined}")});
+    auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}"),
+                                             fromjson("{'': 1, '': 'b.c'}"),
+                                             fromjson("{'': 1, '': 'd'}"),
+                                             fromjson("{'': 1, '': 'd.e'}")});
+
+    auto outputKeys = makeKeySet();
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
+
+    ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMultikeyPath) {
@@ -135,11 +156,11 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMultikeyPath) {
     auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMultikeyPathAndDedupKeys) {
@@ -155,11 +176,11 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMultikeyPathAndDedupKeys) {
     auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'a'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractZeroElementMultikeyPath) {
@@ -170,17 +191,18 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractZeroElementMultikeyPath) {
                                     fromjson("{'': 'a', '': 2}"),
                                     fromjson("{'': 'a.b', '': 'one'}"),
                                     fromjson("{'': 'a.c', '': 2}"),
-                                    fromjson("{'': 'a.d', '': 3}")});
+                                    fromjson("{'': 'a.d', '': 3}"),
+                                    fromjson("{'': 'e', '': undefined}")});
 
     auto expectedMultikeyPaths =
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractNestedMultikeyPaths) {
@@ -207,11 +229,11 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractNestedMultikeyPaths) {
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMixedPathTypesAndAllSubpaths) {
@@ -244,11 +266,11 @@ TEST(AllPathsKeyGeneratorFullDocumentTest, ExtractMixedPathTypesAndAllSubpaths) 
                                              fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 // Single-subtree implicit projection.
@@ -270,11 +292,11 @@ TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithSinglePathComponen
         makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithMultiplePathComponents) {
@@ -294,11 +316,11 @@ TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithMultiplePathCompon
         makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractMultikeySubtree) {
@@ -316,11 +338,11 @@ TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractMultikeySubtree) {
         makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractNestedMultikeySubtree) {
@@ -332,18 +354,19 @@ TEST(AllPathsKeyGeneratorSingleSubtreeTest, ExtractNestedMultikeySubtree) {
 
     // We project through the 'a' array to the nested 'e' array. Both 'a' and 'a.e' are added as
     // multikey paths.
-    auto expectedKeys =
-        makeKeySet({fromjson("{'': 'a.e', '': 4}"), fromjson("{'': 'a.e', '': 5}")});
+    auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': {}}"),
+                                    fromjson("{'': 'a.e', '': 4}"),
+                                    fromjson("{'': 'a.e', '': 5}")});
 
     auto expectedMultikeyPaths =
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 // Explicit inclusion tests.
@@ -365,11 +388,11 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionSingleSubtree) {
         makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionNestedSubtree) {
@@ -389,11 +412,11 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionNestedSubtree) {
         makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionMultikeySubtree) {
@@ -411,11 +434,11 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionMultikeySubtree) {
         makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionNestedMultikeySubtree) {
@@ -425,18 +448,19 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionNestedMultikeySubtree
         "{a: [1, 2, {b: 'one', c: 2}, {c: 2, d: 3}, {c: 'two', d: 3, e: [4, 5]}, [6, 7, {f: 8}]], "
         "g: {h: {i: 9, j: [10, {k: 11}, {k: [11.5]}], k: 12.0}}, l: 'string'}");
 
-    auto expectedKeys =
-        makeKeySet({fromjson("{'': 'a.e', '': 4}"), fromjson("{'': 'a.e', '': 5}")});
+    auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': {}}"),
+                                    fromjson("{'': 'a.e', '': 4}"),
+                                    fromjson("{'': 'a.e', '': 5}")});
 
     auto expectedMultikeyPaths =
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionMultipleSubtrees) {
@@ -458,11 +482,11 @@ TEST(AllPathsKeyGeneratorInclusionTest, InclusionProjectionMultipleSubtrees) {
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 // Explicit exclusion tests.
@@ -489,11 +513,11 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionSingleSubtree) {
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionNestedSubtree) {
@@ -512,17 +536,18 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionNestedSubtree) {
                                     fromjson("{'': 'a.d', '': 3}"),
                                     fromjson("{'': 'a.e', '': 4}"),
                                     fromjson("{'': 'a.e', '': 5}"),
+                                    fromjson("{'': 'g', '': {}}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
     auto expectedMultikeyPaths =
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionMultikeySubtree) {
@@ -549,11 +574,11 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionMultikeySubtree) {
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionNestedMultikeySubtree) {
@@ -582,11 +607,11 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionNestedMultikeySubtree
                                              fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
@@ -599,6 +624,7 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a', '': 1}"),
                                     fromjson("{'': 'a', '': 2}"),
+                                    fromjson("{'': 'a', '': {}}"),
                                     fromjson("{'': 'a', '': [6, 7, {f: 8}]}"),
                                     fromjson("{'': 'a.d', '': 3}"),
                                     fromjson("{'': 'g.h.j', '': 10}"),
@@ -612,11 +638,11 @@ TEST(AllPathsKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
                                              fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 // Test _id inclusion and exclusion behaviour.
@@ -638,11 +664,11 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldIfProjectionIsEmpty) {
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldForSingleSubtreeKeyPattern) {
@@ -660,11 +686,11 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldForSingleSubtreeKeyPattern) {
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, PermitIdFieldAsSingleSubtreeKeyPattern) {
@@ -679,11 +705,11 @@ TEST(AllPathsKeyGeneratorIdTest, PermitIdFieldAsSingleSubtreeKeyPattern) {
     auto expectedMultikeyPaths = makeKeySet();
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldAsSingleSubtreeKeyPattern) {
@@ -697,11 +723,11 @@ TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldAsSingleSubtreeKeyPattern) {
     auto expectedMultikeyPaths = makeKeySet();
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldByDefaultForInclusionProjection) {
@@ -719,11 +745,11 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldByDefaultForInclusionProjection) 
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldInclusionInExplicitProjection) {
@@ -737,11 +763,11 @@ TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldInclusionInExplicitProjection) 
     auto expectedMultikeyPaths = makeKeySet();
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldByDefaultForExclusionProjection) {
@@ -756,11 +782,11 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldByDefaultForExclusionProjection) 
     auto expectedMultikeyPaths = makeKeySet();
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldExclusionInExplicitProjection) {
@@ -781,11 +807,11 @@ TEST(AllPathsKeyGeneratorIdTest, PermitIdSubfieldExclusionInExplicitProjection) 
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInProjection) {
@@ -805,11 +831,11 @@ TEST(AllPathsKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInProjection
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldIfExplicitlySpecifiedInProjection) {
@@ -827,11 +853,11 @@ TEST(AllPathsKeyGeneratorIdTest, ExcludeIdFieldIfExplicitlySpecifiedInProjection
         makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInExclusionProjection) {
@@ -848,11 +874,11 @@ TEST(AllPathsKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInExclusionP
     auto expectedMultikeyPaths = makeKeySet();
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 // Collation tests.
@@ -895,11 +921,11 @@ TEST(AllPathsKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
                                              fromjson("{'': 1, '': 'g.h.j.k'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
@@ -917,11 +943,11 @@ TEST(AllPathsKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
     auto expectedMultikeyPaths = makeKeySet({fromjson("{'': 1, '': 'b'}")});
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 TEST(AllPathsKeyGeneratorDottedFieldsTest, DoNotIndexDottedFieldsWithSimilarSubpathInKey) {
@@ -934,11 +960,11 @@ TEST(AllPathsKeyGeneratorDottedFieldsTest, DoNotIndexDottedFieldsWithSimilarSubp
     auto expectedMultikeyPaths = makeKeySet();
 
     auto outputKeys = makeKeySet();
-    auto multikeyPathsMock = makeKeySet();
-    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyPathsMock);
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(inputDoc, &outputKeys, &multikeyMetadataKeys);
 
     ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
-    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyPathsMock));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
 }
 
 }  // namespace

@@ -82,6 +82,7 @@ private:
                                const FieldRef& fullPath,
                                bool enclosingObjIsArray,
                                BSONObjSet* keys) const;
+    bool _addKeyForEmptyLeaf(BSONElement elem, const FieldRef& fullPath, BSONObjSet* keys) const;
 
     std::unique_ptr<ProjectionExecAgg> _projExec;
     const CollatorInterface* _collator;

@@ -109,7 +109,7 @@ protected:
                 indexKey = indexCursor->next();
             }
             // Confirm that there are no further keys in the index.
-            ASSERT(!indexCursor->next());
+            ASSERT(!indexKey);
         } catch (const TestAssertionFailureException& ex) {
             log() << "Writing remaining index keys to debug log:";
             while (indexKey) {
@@ -425,9 +425,13 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBulkB
                                 "{d: {e: {f: [5]}}}"});
     assertSetupEnvironment(false, docs, fromjson("{'b.d.$**': 1}"));
 
-    // Verify that the data and multikey path keys are present in the expected order.
+    // Verify that the data and multikey path keys are present in the expected order. Note that
+    // here, as in other tests, the partially-included subpath {b: [{c: 2}]} is projected to
+    // {b: [{}]}, resulting in an index key for {b: {}}.
     std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 1, '': 'b'}"), kMetadataId},
                                                {fromjson("{'': 1, '': 'b.d.e'}"), kMetadataId},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(1)},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)}};
 
@@ -444,6 +448,8 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBackg
     // Verify that the data and multikey path keys are present in the expected order.
     std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 1, '': 'b'}"), kMetadataId},
                                                {fromjson("{'': 1, '': 'b.d.e'}"), kMetadataId},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(1)},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)}};
 
@@ -462,6 +468,8 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBulkBuild
     std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 1, '': 'b'}"), kMetadataId},
                                                {fromjson("{'': 1, '': 'b.d.e'}"), kMetadataId},
                                                {fromjson("{'': 1, '': 'd.e.f'}"), kMetadataId},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(1)},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
@@ -481,6 +489,8 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBackgroun
     std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 1, '': 'b'}"), kMetadataId},
                                                {fromjson("{'': 1, '': 'b.d.e'}"), kMetadataId},
                                                {fromjson("{'': 1, '': 'd.e.f'}"), kMetadataId},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(1)},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
@@ -500,6 +510,8 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsOnUpdate) {
     std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 1, '': 'b'}"), kMetadataId},
                                                {fromjson("{'': 1, '': 'b.d.e'}"), kMetadataId},
                                                {fromjson("{'': 1, '': 'd.e.f'}"), kMetadataId},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(1)},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
@@ -532,11 +544,16 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBulkBuil
         false, docs, fromjson("{'$**': 1}"), fromjson("{b: {d: {e: 0}}, 'd.e': 0}"));
 
     // Verify that the data and multikey path keys are present in the expected order.
-    std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 1, '': 'b'}"), kMetadataId},
-                                               {fromjson("{'': 'a', '': 1}"), RecordId(1)},
-                                               {fromjson("{'': 'a', '': 2}"), RecordId(2)},
-                                               {fromjson("{'': 'b.c', '': 2}"), RecordId(1)},
-                                               {fromjson("{'': 'b.c', '': 3}"), RecordId(2)}};
+    std::vector<IndexKeyEntry> expectedKeys = {
+        {fromjson("{'': 1, '': 'b'}"), kMetadataId},
+        {fromjson("{'': 'a', '': 1}"), RecordId(1)},
+        {fromjson("{'': 'a', '': 2}"), RecordId(2)},
+        {fromjson("{'': 'b.c', '': 2}"), RecordId(1)},
+        {fromjson("{'': 'b.c', '': 3}"), RecordId(2)},
+        {fromjson("{'': 'b.d', '': {}}"), RecordId(1)},
+        {fromjson("{'': 'b.d', '': {}}"), RecordId(2)},
+        {fromjson("{'': 'd', '': {}}"), RecordId(3)},
+    };
 
     assertIndexContentsEquals(expectedKeys);
 }
@@ -550,11 +567,16 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBackgrou
         true, docs, fromjson("{'$**': 1}"), fromjson("{b: {d: {e: 0}}, 'd.e': 0}"));
 
     // Verify that the data and multikey path keys are present in the expected order.
-    std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 1, '': 'b'}"), kMetadataId},
-                                               {fromjson("{'': 'a', '': 1}"), RecordId(1)},
-                                               {fromjson("{'': 'a', '': 2}"), RecordId(2)},
-                                               {fromjson("{'': 'b.c', '': 2}"), RecordId(1)},
-                                               {fromjson("{'': 'b.c', '': 3}"), RecordId(2)}};
+    std::vector<IndexKeyEntry> expectedKeys = {
+        {fromjson("{'': 1, '': 'b'}"), kMetadataId},
+        {fromjson("{'': 'a', '': 1}"), RecordId(1)},
+        {fromjson("{'': 'a', '': 2}"), RecordId(2)},
+        {fromjson("{'': 'b.c', '': 2}"), RecordId(1)},
+        {fromjson("{'': 'b.c', '': 3}"), RecordId(2)},
+        {fromjson("{'': 'b.d', '': {}}"), RecordId(1)},
+        {fromjson("{'': 'b.d', '': {}}"), RecordId(2)},
+        {fromjson("{'': 'd', '': {}}"), RecordId(3)},
+    };
 
     assertIndexContentsEquals(expectedKeys);
 }
@@ -572,7 +594,10 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsOnUpdate) 
                                                {fromjson("{'': 'a', '': 1}"), RecordId(1)},
                                                {fromjson("{'': 'a', '': 2}"), RecordId(2)},
                                                {fromjson("{'': 'b.c', '': 2}"), RecordId(1)},
-                                               {fromjson("{'': 'b.c', '': 3}"), RecordId(2)}};
+                                               {fromjson("{'': 'b.c', '': 3}"), RecordId(2)},
+                                               {fromjson("{'': 'b.d', '': {}}"), RecordId(1)},
+                                               {fromjson("{'': 'b.d', '': {}}"), RecordId(2)},
+                                               {fromjson("{'': 'd', '': {}}"), RecordId(3)}};
 
     assertIndexContentsEquals(expectedKeys);
 
@@ -588,8 +613,8 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsOnUpdate) 
         ASSERT_BSONOBJ_EQ(result.value(), fromjson("{_id: 3, d: {e: {f: [5], g: 6}, h: 7}}"));
     }
 
-    // Verify that only the key {'d.h': 7} has been added to the index.
-    expectedKeys.push_back({fromjson("{'': 'd.h', '': 7}"), RecordId(3)});
+    // The key {d: {}} is no longer present, since it will be replaced by a key for subpath 'd.h'.
+    expectedKeys.back() = {fromjson("{'': 'd.h', '': 7}"), RecordId(3)};
     assertIndexContentsEquals(expectedKeys);
 }
 
@@ -608,6 +633,8 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInInclusio
                                                {fromjson("{'': '_id', '': 1}"), RecordId(1)},
                                                {fromjson("{'': '_id', '': 2}"), RecordId(2)},
                                                {fromjson("{'': '_id', '': 3}"), RecordId(3)},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(1)},
+                                               {fromjson("{'': 'b', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
@@ -631,7 +658,10 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInExclusio
                                                {fromjson("{'': 'a', '': 1}"), RecordId(1)},
                                                {fromjson("{'': 'a', '': 2}"), RecordId(2)},
                                                {fromjson("{'': 'b.c', '': 2}"), RecordId(1)},
-                                               {fromjson("{'': 'b.c', '': 3}"), RecordId(2)}};
+                                               {fromjson("{'': 'b.c', '': 3}"), RecordId(2)},
+                                               {fromjson("{'': 'b.d', '': {}}"), RecordId(1)},
+                                               {fromjson("{'': 'b.d', '': {}}"), RecordId(2)},
+                                               {fromjson("{'': 'd', '': {}}"), RecordId(3)}};
 
     assertIndexContentsEquals(expectedKeys);
 }
@@ -698,6 +728,7 @@ TEST_F(AllPathsMultikeyPersistenceTestFixture, IndexShouldBecomeMultikeyIfArrayI
     // ... and confirm that this has caused the index to become multikey.
     expectIndexIsMultikey = true;
     expectedKeys.insert(expectedKeys.begin(), {fromjson("{'': 1, '': 'g.h'}"), kMetadataId});
+    expectedKeys.push_back({fromjson("{'': 'g.h', '': undefined}"), RecordId(1)});
 
     assertIndexContentsEquals(expectedKeys, expectIndexIsMultikey);
 }

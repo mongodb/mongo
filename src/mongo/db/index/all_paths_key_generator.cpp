@@ -114,10 +114,6 @@ void AllPathsKeyGenerator::_traverseAllPaths(BSONObj obj,
         if (elem.fieldNameStringData().find('.', 0) != std::string::npos)
             continue;
 
-        // If this element is an empty object, fast-path skip it.
-        if (elem.type() == BSONType::Object && elem.Obj().isEmpty())
-            continue;
-
         // Append the element's fieldname to the path, if the enclosing object is not an array.
         pushPathComponent(elem, objIsArray, path);
 
@@ -131,6 +127,9 @@ void AllPathsKeyGenerator::_traverseAllPaths(BSONObj obj,
                 _addMultiKey(*path, multikeyPaths);
 
             case BSONType::Object:
+                if (_addKeyForEmptyLeaf(elem, *path, keys))
+                    break;
+
                 _traverseAllPaths(
                     elem.Obj(), elem.type() == BSONType::Array, path, keys, multikeyPaths);
                 break;
@@ -156,13 +155,30 @@ bool AllPathsKeyGenerator::_addKeyForNestedArray(BSONElement elem,
     return false;
 }
 
+bool AllPathsKeyGenerator::_addKeyForEmptyLeaf(BSONElement elem,
+                                               const FieldRef& fullPath,
+                                               BSONObjSet* keys) const {
+    invariant(elem.isABSONObj());
+    if (elem.embeddedObject().isEmpty()) {
+        // In keeping with the behaviour of regular indexes, an empty object is indexed as-is while
+        // empty arrays are indexed as 'undefined'.
+        _addKey(elem.type() == BSONType::Array ? BSONElement{} : elem, fullPath, keys);
+        return true;
+    }
+    return false;
+}
+
 void AllPathsKeyGenerator::_addKey(BSONElement elem,
                                    const FieldRef& fullPath,
                                    BSONObjSet* keys) const {
-    // AllPaths keys are of the form { "": "path.to.field", "": <collation-aware value> }
+    // AllPaths keys are of the form { "": "path.to.field", "": <collation-aware value> }.
     BSONObjBuilder bob;
     bob.append("", fullPath.dottedField());
-    CollationIndexKey::collationAwareIndexKeyAppend(elem, _collator, &bob);
+    if (elem) {
+        CollationIndexKey::collationAwareIndexKeyAppend(elem, _collator, &bob);
+    } else {
+        bob.appendUndefined("");
+    }
     keys->insert(bob.obj());
 }
 
