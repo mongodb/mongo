@@ -493,20 +493,6 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         BSONObj index;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&index, NULL))) {
-            const BSONObj key = index.getObjectField("key");
-            const auto plugin = IndexNames::findPluginName(key);
-
-            if (db->getDatabaseCatalogEntry()->isOlderThan24(opCtx)) {
-                if (IndexNames::existedBefore24(plugin)) {
-                    continue;
-                }
-
-                log() << "Index " << index << " claims to be of type '" << plugin << "', "
-                      << "which is either invalid or did not exist before v2.4. "
-                      << "See the upgrade section: "
-                      << "http://dochub.mongodb.org/core/upgrade-2.4" << startupWarningsLog;
-            }
-
             if (index["v"].isNumber() && index["v"].numberInt() == 0) {
                 log() << "WARNING: The index: " << index << " was created with the deprecated"
                       << " v:0 format.  This format will not be supported in a future release."

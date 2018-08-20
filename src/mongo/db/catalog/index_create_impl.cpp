@@ -229,14 +229,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
     for (size_t i = 0; i < indexSpecs.size(); i++) {
         BSONObj info = indexSpecs[i];
 
-        string pluginName = IndexNames::findPluginName(info["key"].Obj());
-        if (pluginName.size()) {
-            Status s = _collection->getIndexCatalog()->_upgradeDatabaseMinorVersionIfNeeded(
-                _opCtx, pluginName);
-            if (!s.isOK())
-                return s;
-        }
-
         // Any foreground indexes make all indexes be built in the foreground.
         _buildInBackground = (_buildInBackground && info["background"].trueValue());
     }

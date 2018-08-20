@@ -68,9 +68,7 @@ public:
      *
      * This is a significant leak of index functionality out of the index layer.
      */
-    static BSONObj getMissingField(OperationContext* opCtx,
-                                   Collection* collection,
-                                   const BSONObj& infoObj);
+    static BSONObj getMissingField(Collection* collection, const BSONObj& infoObj);
 };
 
 }  // namespace mongo

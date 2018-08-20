@@ -57,13 +57,11 @@ StatusWith<BSONObj> IndexLegacy::adjustIndexSpecObject(const BSONObj& obj) {
 }
 
 // static
-BSONObj IndexLegacy::getMissingField(OperationContext* opCtx,
-                                     Collection* collection,
-                                     const BSONObj& infoObj) {
+BSONObj IndexLegacy::getMissingField(Collection* collection, const BSONObj& infoObj) {
     BSONObj keyPattern = infoObj.getObjectField("key");
     std::string accessMethodName;
     if (collection)
-        accessMethodName = collection->getIndexCatalog()->getAccessMethodName(opCtx, keyPattern);
+        accessMethodName = collection->getIndexCatalog()->getAccessMethodName(keyPattern);
     else
         accessMethodName = IndexNames::findPluginName(keyPattern);
 

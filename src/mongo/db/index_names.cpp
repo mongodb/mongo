@@ -70,12 +70,6 @@ string IndexNames::findPluginName(const BSONObj& keyPattern) {
 }
 
 // static
-bool IndexNames::existedBefore24(const string& name) {
-    return name == IndexNames::BTREE || name == IndexNames::GEO_2D ||
-        name == IndexNames::GEO_HAYSTACK || name == IndexNames::HASHED;
-}
-
-// static
 bool IndexNames::isKnownName(const string& name) {
     return name == IndexNames::GEO_2D || name == IndexNames::GEO_2DSPHERE ||
         name == IndexNames::GEO_HAYSTACK || name == IndexNames::TEXT ||

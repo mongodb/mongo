@@ -237,11 +237,7 @@ public:
                                    bool noWarn,
                                    int64_t* keysDeletedOut) = 0;
 
-        virtual std::string getAccessMethodName(OperationContext* opCtx,
-                                                const BSONObj& keyPattern) = 0;
-
-        virtual Status _upgradeDatabaseMinorVersionIfNeeded(OperationContext* opCtx,
-                                                            const std::string& newPluginName) = 0;
+        virtual std::string getAccessMethodName(const BSONObj& keyPattern) = 0;
 
     private:
         virtual const Collection* _getCollection() const = 0;
@@ -527,11 +523,8 @@ public:
         return this->_impl().unindexRecord(opCtx, obj, loc, noWarn, keysDeletedOut);
     }
 
-    // ------- temp internal -------
-
-    inline std::string getAccessMethodName(OperationContext* const opCtx,
-                                           const BSONObj& keyPattern) {
-        return this->_impl().getAccessMethodName(opCtx, keyPattern);
+    inline std::string getAccessMethodName(const BSONObj& keyPattern) {
+        return this->_impl().getAccessMethodName(keyPattern);
     }
 
     // public helpers
@@ -569,11 +562,6 @@ private:
 
     inline Status _dropIndex(OperationContext* const opCtx, IndexCatalogEntry* const desc) {
         return this->_impl()._dropIndex(opCtx, desc);
-    }
-
-    inline Status _upgradeDatabaseMinorVersionIfNeeded(OperationContext* const opCtx,
-                                                       const std::string& newPluginName) {
-        return this->_impl()._upgradeDatabaseMinorVersionIfNeeded(opCtx, newPluginName);
     }
 
     inline const IndexCatalogEntryContainer& _getEntries() const {

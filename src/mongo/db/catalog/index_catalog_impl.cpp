@@ -142,8 +142,8 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
         }
 
         BSONObj keyPattern = spec.getObjectField("key");
-        auto descriptor = stdx::make_unique<IndexDescriptor>(
-            _collection, _getAccessMethodName(opCtx, keyPattern), spec);
+        auto descriptor =
+            stdx::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
         const bool initFromDisk = true;
         IndexCatalogEntry* entry =
             _setupInMemoryStructures(opCtx, std::move(descriptor), initFromDisk);
@@ -221,90 +221,22 @@ Status IndexCatalogImpl::checkUnfinished() const {
                                 << _collection->ns().ns());
 }
 
-bool IndexCatalogImpl::_shouldOverridePlugin(OperationContext* opCtx,
-                                             const BSONObj& keyPattern) const {
+string IndexCatalogImpl::_getAccessMethodName(const BSONObj& keyPattern) const {
     string pluginName = IndexNames::findPluginName(keyPattern);
-    bool known = IndexNames::isKnownName(pluginName);
 
-    if (!_collection->dbce()->isOlderThan24(opCtx)) {
-        // RulesFor24+
-        // This assert will be triggered when downgrading from a future version that
-        // supports an index plugin unsupported by this version.
-        uassert(17197,
-                str::stream() << "Invalid index type '" << pluginName << "' "
-                              << "in index "
-                              << keyPattern,
-                known);
-        return false;
-    }
+    // This assert will be triggered when downgrading from a future version that
+    // supports an index plugin unsupported by this version.
+    uassert(17197,
+            str::stream() << "Invalid index type '" << pluginName << "' "
+                          << "in index "
+                          << keyPattern,
+            IndexNames::isKnownName(pluginName));
 
-    // RulesFor22
-    if (!known) {
-        log() << "warning: can't find plugin [" << pluginName << "]";
-        return true;
-    }
-
-    if (!IndexNames::existedBefore24(pluginName)) {
-        warning() << "Treating index " << keyPattern << " as ascending since "
-                  << "it was created before 2.4 and '" << pluginName << "' "
-                  << "was not a valid type at that time.";
-        return true;
-    }
-
-    return false;
-}
-
-string IndexCatalogImpl::_getAccessMethodName(OperationContext* opCtx,
-                                              const BSONObj& keyPattern) const {
-    if (_shouldOverridePlugin(opCtx, keyPattern)) {
-        return "";
-    }
-
-    return IndexNames::findPluginName(keyPattern);
+    return pluginName;
 }
 
 
 // ---------------------------
-
-Status IndexCatalogImpl::_upgradeDatabaseMinorVersionIfNeeded(OperationContext* opCtx,
-                                                              const string& newPluginName) {
-    // first check if requested index requires pdfile minor version to be bumped
-    if (IndexNames::existedBefore24(newPluginName)) {
-        return Status::OK();
-    }
-
-    DatabaseCatalogEntry* dbce = _collection->dbce();
-
-    if (!dbce->isOlderThan24(opCtx)) {
-        return Status::OK();  // these checks have already been done
-    }
-
-    // Everything below is MMAPv1 specific since it was the only storage engine that existed
-    // before 2.4. We look at all indexes in this database to make sure that none of them use
-    // plugins that didn't exist before 2.4. If that holds, we mark the database as "2.4-clean"
-    // which allows creation of indexes using new plugins.
-
-    RecordStore* indexes = dbce->getRecordStore(dbce->name() + ".system.indexes");
-    auto cursor = indexes->getCursor(opCtx);
-    while (auto record = cursor->next()) {
-        const BSONObj index = record->data.releaseToBson();
-        const BSONObj key = index.getObjectField("key");
-        const string plugin = IndexNames::findPluginName(key);
-        if (IndexNames::existedBefore24(plugin))
-            continue;
-
-        const string errmsg = str::stream()
-            << "Found pre-existing index " << index << " with invalid type '" << plugin << "'. "
-            << "Disallowing creation of new index type '" << newPluginName << "'. See "
-            << "http://dochub.mongodb.org/core/index-type-changes";
-
-        return Status(ErrorCodes::CannotCreateIndex, errmsg);
-    }
-
-    dbce->markIndexSafe24AndUp(opCtx);
-
-    return Status::OK();
-}
 
 StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opCtx,
                                                            const BSONObj& original) const {
@@ -349,13 +281,6 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     if (!status.isOK())
         return status;
     spec = statusWithSpec.getValue();
-
-    string pluginName = IndexNames::findPluginName(spec["key"].Obj());
-    if (pluginName.size()) {
-        Status s = _upgradeDatabaseMinorVersionIfNeeded(opCtx, pluginName);
-        if (!s.isOK())
-            return s;
-    }
 
     // now going to touch disk
     IndexBuildBlock indexBuildBlock(opCtx, _collection, spec);
@@ -834,7 +759,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                             << spec);
             }
 
-            IndexDescriptor temp(_collection, _getAccessMethodName(opCtx, key), spec);
+            IndexDescriptor temp(_collection, _getAccessMethodName(key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
                 return Status(ErrorCodes::IndexOptionsConflict,
                               str::stream() << "Index with name: " << name
@@ -856,7 +781,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
             LOG(2) << "index already exists with diff name " << name << " pattern: " << key
                    << " collation: " << collation;
 
-            IndexDescriptor temp(_collection, _getAccessMethodName(opCtx, key), spec);
+            IndexDescriptor temp(_collection, _getAccessMethodName(key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
                 return Status(ErrorCodes::IndexOptionsConflict,
                               str::stream() << "Index: " << spec
@@ -1103,7 +1028,7 @@ vector<BSONObj> IndexCatalogImpl::getAndClearUnfinishedIndexes(OperationContext*
         BSONObj spec = toReturn[i];
 
         BSONObj keyPattern = spec.getObjectField("key");
-        IndexDescriptor desc(_collection, _getAccessMethodName(opCtx, keyPattern), spec);
+        IndexDescriptor desc(_collection, _getAccessMethodName(keyPattern), spec);
 
         _deleteIndexFromDisk(opCtx, desc.indexName(), desc.indexNamespace());
     }
@@ -1373,8 +1298,8 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     BSONObj keyPattern = spec.getObjectField("key");
 
     // Re-register this index in the index catalog with the new spec.
-    auto newDesc = stdx::make_unique<IndexDescriptor>(
-        _collection, _getAccessMethodName(opCtx, keyPattern), spec);
+    auto newDesc =
+        stdx::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
     const bool initFromDisk = false;
     const IndexCatalogEntry* newEntry =
         _setupInMemoryStructures(opCtx, std::move(newDesc), initFromDisk);

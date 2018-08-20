@@ -54,11 +54,6 @@ public:
                           BSONObjBuilder* out,
                           double scale) const override;
 
-    bool isOlderThan24(OperationContext* opCtx) const override {
-        return false;
-    }
-    void markIndexSafe24AndUp(OperationContext* opCtx) override {}
-
     Status currentFilesCompatible(OperationContext* opCtx) const override;
 
     void getCollectionNamespaces(std::list<std::string>* out) const override;

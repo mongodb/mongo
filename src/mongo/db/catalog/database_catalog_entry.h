@@ -67,10 +67,6 @@ public:
                                   BSONObjBuilder* out,
                                   double scale) const = 0;
 
-    // these are hacks :(
-    virtual bool isOlderThan24(OperationContext* opCtx) const = 0;
-    virtual void markIndexSafe24AndUp(OperationContext* opCtx) = 0;
-
     /**
      * Returns whethers the data files are compatible with the current code:
      *
