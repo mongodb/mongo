@@ -506,7 +506,7 @@ private:
                                        repl::ReadConcernArgs readConcernArgs);
 
     // Reports transaction stats for both active and inactive transactions using the provided
-    // builder.
+    // builder.  The lock may be either a lock on _mutex or a lock on _statsMutex.
     void _reportTransactionStats(WithLock wl,
                                  BSONObjBuilder* builder,
                                  repl::ReadConcernArgs readConcernArgs) const;
@@ -552,8 +552,15 @@ private:
     // transaction state resets.
     std::vector<MultikeyPathInfo> _multikeyPathInfo;
 
-    // Tracks metrics for a single multi-document transaction. Not used for retryable writes.
-    boost::optional<SingleTransactionStats> _singleTransactionStats;
+    // Protects _singleTransactionStats.  The concurrency rules are that _singleTransactionStats
+    // may be read under either _mutex or _statsMutex, but to write both mutexes must be held,
+    // with _mutex being taken before _statsMutex.  No other locks, particularly including the
+    // Client lock, may be taken while holding _statsMutex.
+    mutable stdx::mutex _statsMutex;
+
+    // Tracks metrics for a single multi-document transaction.  Contains only txnNumber for
+    // retryable writes.
+    SingleTransactionStats _singleTransactionStats;
 };
 
 }  // namespace mongo

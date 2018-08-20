@@ -92,4 +92,38 @@ void SingleTransactionStats::setInactive(unsigned long long time) {
     _lastTimeActiveStart = 0;
 }
 
+void SingleTransactionStats::report(BSONObjBuilder* builder,
+                                    const repl::ReadConcernArgs& readConcernArgs) const {
+    BSONObjBuilder parametersBuilder(builder->subobjStart("parameters"));
+    parametersBuilder.append("txnNumber", _txnNumber);
+
+    if (!isForMultiDocumentTransaction()) {
+        // For retryable writes, we only include the txnNumber.
+        parametersBuilder.done();
+        return;
+    }
+
+    parametersBuilder.append("autocommit", *_autoCommit);
+    readConcernArgs.appendInfo(&parametersBuilder);
+    parametersBuilder.done();
+
+    builder->append("readTimestamp", _readTimestamp);
+    builder->append("startWallClockTime",
+                    dateToISOStringLocal(Date_t::fromMillisSinceEpoch(getStartTime() / 1000)));
+
+    // We use the same "now" time so that the following time metrics are consistent with each other.
+    auto curTime = curTimeMicros64();
+    builder->append("timeOpenMicros", static_cast<long long>(getDuration(curTime)));
+
+    auto timeActive = durationCount<Microseconds>(getTimeActiveMicros(curTime));
+    auto timeInactive = durationCount<Microseconds>(getTimeInactiveMicros(curTime));
+
+    builder->append("timeActiveMicros", timeActive);
+    builder->append("timeInactiveMicros", timeInactive);
+
+    if (_expireDate != Date_t::max()) {
+        builder->append("expiryTime", dateToISOStringLocal(_expireDate));
+    }
+}
+
 }  // namespace mongo
