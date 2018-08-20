@@ -60,6 +60,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/data_protector.h"
 #include "mongo/db/storage/encryption_hooks.h"
@@ -266,6 +267,10 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
     return kpBuilder.obj();
 }
 
+// After completing internalQueryExecYieldIterations document deletions, the time in millis to wait
+// before continuing deletions.
+MONGO_EXPORT_SERVER_PARAMETER(rangeDeleterBatchDelayMS, int, 20);
+
 long long Helpers::removeRange(OperationContext* txn,
                                const KeyRange& range,
                                BoundInclusion boundInclusion,
@@ -323,7 +328,7 @@ long long Helpers::removeRange(OperationContext* txn,
 
 
     MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
-        << "begin removal of " << min << " to " << max << " in " << ns
+        << "begin removal of " << redact(min) << " to " << redact(max) << " in " << ns
         << " with write concern: " << writeConcern.toBSON() << endl;
 
     long long numDeleted = 0;
@@ -331,20 +336,25 @@ long long Helpers::removeRange(OperationContext* txn,
     replWaitDuration = Milliseconds::zero();
 
     while (1) {
+        long long numDeletedPreviously = numDeleted;
+        long long iterationsBetweenSleeps = internalQueryExecYieldIterations.load();
+        long long batchSize = writeConcern.shouldWaitForOtherNodes() ? 1 : iterationsBetweenSleeps;
+
         // Scoping for write lock.
         {
             ScopedTransaction scopedXact(txn, MODE_IX);
             AutoGetCollection ctx(txn, NamespaceString(ns), MODE_IX, MODE_IX);
             Collection* collection = ctx.getCollection();
-            if (!collection)
+            if (!collection) {
                 break;
+            }
 
             IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn, indexName);
 
             if (!desc) {
                 warning(LogComponent::kSharding) << "shard key index '" << indexName << "' on '"
                                                  << ns << "' was dropped";
-                return -1;
+                break;
             }
 
             unique_ptr<PlanExecutor> exec(
@@ -357,99 +367,153 @@ long long Helpers::removeRange(OperationContext* txn,
                                            PlanExecutor::YIELD_MANUAL,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH));
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
 
-            RecordId rloc;
-            BSONObj obj;
-            PlanExecutor::ExecState state;
-            // This may yield so we cannot touch nsd after this.
-            state = exec->getNext(&obj, &rloc);
-            if (PlanExecutor::IS_EOF == state) {
-                break;
-            }
+            bool errorOccurred = false;
 
-            if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-                warning(LogComponent::kSharding)
-                    << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
-                    << min << " to " << max << " in " << ns << ": "
-                    << WorkingSetCommon::toStatusString(obj)
-                    << ", stats: " << Explain::getWinningPlanStats(exec.get()) << endl;
-                break;
-            }
+            while (numDeleted - numDeletedPreviously < batchSize) {
 
-            verify(PlanExecutor::ADVANCED == state);
-
-            if (onlyRemoveOrphanedDocs) {
-                // Do a final check in the write lock to make absolutely sure that our
-                // collection hasn't been modified in a way that invalidates our migration
-                // cleanup.
-
-                // We should never be able to turn off the sharding state once enabled, but
-                // in the future we might want to.
-                verify(ShardingState::get(txn)->enabled());
-
-                bool docIsOrphan;
-
-                // In write lock, so will be the most up-to-date version
-                auto metadataNow = CollectionShardingState::get(txn, ns)->getMetadata();
-                if (metadataNow) {
-                    ShardKeyPattern kp(metadataNow->getKeyPattern());
-                    BSONObj key = kp.extractShardKeyFromDoc(obj);
-                    docIsOrphan =
-                        !metadataNow->keyBelongsToMe(key) && !metadataNow->keyIsPending(key);
-                } else {
-                    docIsOrphan = false;
-                }
-
-                if (!docIsOrphan) {
-                    warning(LogComponent::kSharding)
-                        << "aborting migration cleanup for chunk " << min << " to " << max
-                        << (metadataNow ? (string) " at document " + obj.toString() : "")
-                        << ", collection " << ns << " has changed " << endl;
+                RecordId rloc;
+                BSONObj obj;
+                PlanExecutor::ExecState state;
+                // This may yield so we cannot touch nsd after this.
+                state = exec->getNext(&obj, &rloc);
+                if (PlanExecutor::IS_EOF == state) {
+                    errorOccurred = true;
                     break;
                 }
-            }
 
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                WriteUnitOfWork wuow(txn);
-                NamespaceString nss(ns);
-                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
-                    warning() << "stepped down from primary while deleting chunk; "
-                              << "orphaning data in " << ns << " in range [" << redact(min) << ", "
-                              << redact(max) << ")";
-                    return numDeleted;
+                if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+                    warning(LogComponent::kSharding)
+                        << PlanExecutor::statestr(state)
+                        << " - cursor error while trying to delete " << redact(min) << " to "
+                        << redact(max) << " in " << ns << ": "
+                        << redact(WorkingSetCommon::toStatusString(obj))
+                        << ", stats: " << Explain::getWinningPlanStats(exec.get()) << endl;
+                    errorOccurred = true;
+                    break;
                 }
 
-                if (callback)
-                    callback->goingToDelete(obj);
+                verify(PlanExecutor::ADVANCED == state);
 
-                OpDebug* const nullOpDebug = nullptr;
-                collection->deleteDocument(txn, rloc, nullOpDebug, fromMigrate);
-                wuow.commit();
+                if (onlyRemoveOrphanedDocs) {
+                    // Do a final check in the write lock to make absolutely sure that our
+                    // collection hasn't been modified in a way that invalidates our migration
+                    // cleanup.
+
+                    // We should never be able to turn off the sharding state once enabled, but
+                    // in the future we might want to.
+                    verify(ShardingState::get(txn)->enabled());
+
+                    bool docIsOrphan;
+
+                    // In write lock, so will be the most up-to-date version
+                    auto metadataNow = CollectionShardingState::get(txn, ns)->getMetadata();
+                    if (metadataNow) {
+                        ShardKeyPattern kp(metadataNow->getKeyPattern());
+                        BSONObj key = kp.extractShardKeyFromDoc(obj);
+                        docIsOrphan =
+                            !metadataNow->keyBelongsToMe(key) && !metadataNow->keyIsPending(key);
+                    } else {
+                        docIsOrphan = false;
+                    }
+
+                    if (!docIsOrphan) {
+                        warning(LogComponent::kSharding)
+                            << "aborting migration cleanup for chunk " << redact(min) << " to "
+                            << redact(max)
+                            << (metadataNow ? (string) " at document " + redact(obj.toString())
+                                            : "")
+                            << ", collection " << ns << " has changed " << endl;
+                        // No chance of success with a new plan, so fully abort.
+                        errorOccurred = true;
+                        break;
+                    }
+                }
+
+                exec->saveState();
+
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    WriteUnitOfWork wuow(txn);
+                    NamespaceString nss(ns);
+                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
+                        warning() << "stepped down from primary while deleting chunk; "
+                                  << "orphaning data in " << ns << " in range [" << redact(min)
+                                  << ", " << redact(max) << ")";
+                        // No chance of success with a new plan, so fully abort.
+                        errorOccurred = true;
+                        break;
+                    }
+
+                    if (callback)
+                        callback->goingToDelete(obj);
+
+                    OpDebug* const nullOpDebug = nullptr;
+                    collection->deleteDocument(txn, rloc, nullOpDebug, fromMigrate);
+                    wuow.commit();
+                }
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "delete range", ns);
+
+                if (!exec->restoreState()) {
+                    MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
+                        << "unable to restore cursor state while trying to delete " << redact(min)
+                        << " to " << redact(max) << " in " << ns
+                        << ", stats: " << Explain::getWinningPlanStats(exec.get())
+                        << ", replanning";
+                    // Try again with a new plan.
+                    break;
+                }
+
+                numDeleted++;
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "delete range", ns);
 
-            numDeleted++;
+            if (errorOccurred) {
+                break;
+            }
+
+        }  // End scope for write lock.
+
+        if (numDeleted > 0) {
+            if (writeConcern.shouldWaitForOtherNodes()) {
+                repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                    repl::getGlobalReplicationCoordinator()->awaitReplication(
+                        txn,
+                        repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+                        writeConcern);
+                if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit ||
+                    replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
+                    warning(LogComponent::kSharding)
+                        << "replication to secondaries for removeRange at "
+                           "least 60 seconds behind";
+                } else {
+                    uassertStatusOK(replStatus.status);
+                }
+                replWaitDuration += replStatus.duration;
+            }
+
+            // The `rangeDeleterBatchDelayMS` parameter is defined as a delay every
+            // `internalQueryExecYieldIterations` (aka `batchSize`) document deletions.
+            //
+            // In v3.6+, this applies regardless of waiting for replication (aka
+            // _secondaryThrottle), because in those versions the replication waits and query
+            // replanning also happen after each batch of `batchSize` deletions.
+            //
+            // However, here in v3.4, when _secondaryThrottle is on it's necessary to preserve the
+            // semantics of waiting for replication after each document deletion.  But it's also
+            // necessary for `rangeDeleterBatchDelayMS` - which is the only wait when
+            // _secondaryThrottle is off - to behave as it does in other versions (despite query
+            // planning still occuring every document deletion in v3.4 when _secondaryThrottle is
+            // on).
+            //
+            // Therefore, we sleep for `rangeDeleterBatchDelayMS` here (every `batchSize`
+            // iterations), even if we have also waited for replication above.  This approach also
+            // makes the RangeDeleter behavior more consistent when enabling/disabling
+            // _secondaryThrottle.
+            if (batchSize != 1 || numDeleted % iterationsBetweenSleeps == 0) {
+                sleepmillis(rangeDeleterBatchDelayMS.load());
+            }
         }
 
-        // TODO remove once the yielding below that references this timer has been removed
-        Timer secondaryThrottleTime;
-
-        if (writeConcern.shouldWaitForOtherNodes() && numDeleted > 0) {
-            repl::ReplicationCoordinator::StatusAndDuration replStatus =
-                repl::getGlobalReplicationCoordinator()->awaitReplication(
-                    txn,
-                    repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
-                    writeConcern);
-            if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit ||
-                replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
-                warning(LogComponent::kSharding) << "replication to secondaries for removeRange at "
-                                                    "least 60 seconds behind";
-            } else {
-                uassertStatusOK(replStatus.status);
-            }
-            replWaitDuration += replStatus.duration;
-        }
+        // Loop back to get a new plan and go again.
     }
 
     if (writeConcern.shouldWaitForOtherNodes())
@@ -457,8 +521,8 @@ long long Helpers::removeRange(OperationContext* txn,
             << "Helpers::removeRangeUnlocked time spent waiting for replication: "
             << durationCount<Milliseconds>(replWaitDuration) << "ms" << endl;
 
-    MONGO_LOG_COMPONENT(1, LogComponent::kSharding) << "end removal of " << min << " to " << max
-                                                    << " in " << ns << " (took "
+    MONGO_LOG_COMPONENT(1, LogComponent::kSharding) << "end removal of " << redact(min) << " to "
+                                                    << redact(max) << " in " << ns << " (took "
                                                     << rangeRemoveTimer.millis() << "ms)" << endl;
 
     return numDeleted;
