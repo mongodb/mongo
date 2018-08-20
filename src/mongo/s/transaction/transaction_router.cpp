@@ -151,15 +151,24 @@ BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
 }  // unnamed namespace
 
 TransactionRouter::Participant::Participant(bool isCoordinator,
-                                            TxnNumber txnNumber,
-                                            repl::ReadConcernArgs readConcernArgs)
-    : _isCoordinator(isCoordinator), _txnNumber(txnNumber), _readConcernArgs(readConcernArgs) {}
+                                            SharedTransactionOptions sharedOptions)
+    : _isCoordinator(isCoordinator), _sharedOptions(sharedOptions) {}
 
 BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(BSONObj cmd) {
     auto isTxnCmd = isTransactionCommand(cmd);  // check first before moving cmd.
 
-    BSONObjBuilder newCmd = (_state == State::kMustStart && !isTxnCmd)
-        ? appendFieldsForStartTransaction(std::move(cmd), _readConcernArgs, _atClusterTime)
+    // The first command sent to a participant must start a transaction, unless it is a transaction
+    // command, which don't support the options that start transactions, i.e. starTransaction and
+    // readConcern. Otherwise the command must not have a read concern.
+    bool mustStartTransaction = _state == State::kMustStart && !isTxnCmd;
+
+    if (!mustStartTransaction) {
+        dassert(!cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
+    }
+
+    BSONObjBuilder newCmd = mustStartTransaction
+        ? appendFieldsForStartTransaction(
+              std::move(cmd), _sharedOptions.readConcernArgs, _sharedOptions.atClusterTime)
         : BSONObjBuilder(std::move(cmd));
 
     if (_isCoordinator) {
@@ -169,22 +178,22 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(BSONObj cmd) {
     newCmd.append(kAutoCommitField, false);
 
     if (!newCmd.hasField(OperationSessionInfo::kTxnNumberFieldName)) {
-        newCmd.append(OperationSessionInfo::kTxnNumberFieldName, _txnNumber);
+        newCmd.append(OperationSessionInfo::kTxnNumberFieldName, _sharedOptions.txnNumber);
     } else {
         auto osi =
             OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, newCmd.asTempObj());
-        invariant(_txnNumber == *osi.getTxnNumber());
+        invariant(_sharedOptions.txnNumber == *osi.getTxnNumber());
     }
 
     return newCmd.obj();
 }
 
-TransactionRouter::Participant::State TransactionRouter::Participant::getState() {
-    return _state;
-}
-
 bool TransactionRouter::Participant::isCoordinator() const {
     return _isCoordinator;
+}
+
+bool TransactionRouter::Participant::mustStartTransaction() const {
+    return _state == State::kMustStart;
 }
 
 void TransactionRouter::Participant::markAsCommandSent() {
@@ -200,10 +209,6 @@ TransactionRouter* TransactionRouter::get(OperationContext* opCtx) {
     }
 
     return opCtxSession.get();
-}
-
-void TransactionRouter::Participant::setAtClusterTime(const LogicalTime atClusterTime) {
-    _atClusterTime = atClusterTime;
 }
 
 TransactionRouter::TransactionRouter(LogicalSessionId sessionId)
@@ -226,9 +231,14 @@ boost::optional<ShardId> TransactionRouter::getCoordinatorId() const {
 }
 
 TransactionRouter::Participant& TransactionRouter::getOrCreateParticipant(const ShardId& shard) {
-    auto iter = _participants.find(shard.toString());
+    // Remove the shard from the abort list if it is present.
+    _orphanedParticipants.erase(shard.toString());
 
+    auto iter = _participants.find(shard.toString());
     if (iter != _participants.end()) {
+        // TODO SERVER-36589: Once mongos aborts transactions by only sending abortTransaction to
+        // shards that have been successfully contacted we should be able to add an invariant here
+        // to ensure the atClusterTime on the participant matches that on the transaction router.
         return iter->second;
     }
 
@@ -242,22 +252,43 @@ TransactionRouter::Participant& TransactionRouter::getOrCreateParticipant(const 
     // The transaction must have been started with a readConcern.
     invariant(!_readConcernArgs.isEmpty());
 
-    auto participant =
-        TransactionRouter::Participant(isFirstParticipant, _txnNumber, _readConcernArgs);
     // TODO SERVER-36589: Once mongos aborts transactions by only sending abortTransaction to shards
     // that have been successfully contacted we should be able to add an invariant here to ensure
     // that an atClusterTime has been chosen if the read concern level is snapshot.
-    if (_atClusterTime) {
-        participant.setAtClusterTime(*_atClusterTime);
-    }
 
-    auto resultPair = _participants.try_emplace(shard.toString(), std::move(participant));
+    auto resultPair = _participants.try_emplace(
+        shard.toString(),
+        TransactionRouter::Participant(
+            isFirstParticipant,
+            SharedTransactionOptions{_txnNumber, _readConcernArgs, _atClusterTime}));
 
     return resultPair.first->second;
 }
 
 const LogicalSessionId& TransactionRouter::getSessionId() const {
     return _sessionId;
+}
+
+bool TransactionRouter::canContinueOnSnapshotError() const {
+    return _latestStmtId == _firstStmtId;
+}
+
+void TransactionRouter::onSnapshotError() {
+    invariant(canContinueOnSnapshotError());
+
+    // Add each participant to the orphaned list because the retry attempt isn't guaranteed to
+    // re-target it.
+    for (const auto& participant : _participants) {
+        _orphanedParticipants.try_emplace(participant.first);
+    }
+
+    // New transactions must be started on each contacted participant since the retry will select a
+    // new read timestamp.
+    _participants.clear();
+    _coordinatorId.reset();
+
+    // Reset the global snapshot timestamp so the retry will select a new one.
+    _atClusterTime.reset();
 }
 
 void TransactionRouter::computeAtClusterTime(OperationContext* opCtx,
@@ -363,6 +394,7 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     }
 
     if (_txnNumber == txnNumber) {
+        ++_latestStmtId;
         return;
     }
 
@@ -370,6 +402,11 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     _participants.clear();
     _coordinatorId.reset();
     _atClusterTime.reset();
+
+    // TODO SERVER-XXXXX: Parse statement ids from the client and remember the statement id of the
+    // command that started the transaction, if one was included.
+    _latestStmtId = kDefaultFirstStmtId;
+    _firstStmtId = kDefaultFirstStmtId;
 }
 
 

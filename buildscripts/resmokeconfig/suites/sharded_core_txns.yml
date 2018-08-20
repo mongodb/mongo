@@ -65,9 +65,6 @@ selector:
   - jstests/core/txns/view_reads_in_transaction.js
   - jstests/core/txns/list_collections_not_blocked_by_txn.js
   - jstests/core/txns/statement_ids_accepted.js
-
-  # TODO SERVER-36591: Allow mongos to retry on snapshot errors when starting a transaction.
-  - jstests/core/txns/concurrent_drops_and_creates.js
 executor:
   archive:
     hooks:

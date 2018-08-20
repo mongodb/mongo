@@ -416,9 +416,21 @@ void runCommand(OperationContext* opCtx,
                     continue;
                 }
                 throw;
-            } catch (const ExceptionForCat<ErrorCategory::SnapshotError>&) {
+            } catch (ExceptionForCat<ErrorCategory::SnapshotError>& ex) {
                 // Simple retry on any type of snapshot error.
                 if (canRetry) {
+                    auto txnRouter = TransactionRouter::get(opCtx);
+                    invariant(txnRouter);
+
+                    if (txnRouter->canContinueOnSnapshotError()) {
+                        txnRouter->onSnapshotError();
+                    } else {
+                        // TODO SERVER-36589: Abort the entire transaction.
+                        ex.addContext(
+                            "Encountered snapshot error on subsequent transaction statement");
+                        throw;
+                    }
+
                     continue;
                 }
                 throw;

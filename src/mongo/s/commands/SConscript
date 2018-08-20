@@ -151,6 +151,7 @@ env.CppUnitTest(
         "cluster_delete_test.cpp",
         "cluster_distinct_test.cpp",
         "cluster_find_and_modify_test.cpp",
+        "cluster_find_test.cpp",
         "cluster_insert_test.cpp",
         "cluster_update_test.cpp",
     ],

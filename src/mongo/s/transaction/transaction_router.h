@@ -47,16 +47,31 @@ namespace mongo {
  */
 class TransactionRouter {
 public:
+    // The default value to use as the statement id of the first command in the transaction if none
+    // was sent.
+    static const StmtId kDefaultFirstStmtId = 0;
+
+    /**
+     * Represents the options for a transaction that are shared across all participants. These
+     * cannot be changed without restarting the transactions that may have already been begun on
+     * every participant, i.e. clearing the current participant list.
+     */
+    struct SharedTransactionOptions {
+        // Set for all distributed transactions.
+        TxnNumber txnNumber;
+        repl::ReadConcernArgs readConcernArgs;
+
+        // Only set for transactions with snapshot level read concern.
+        boost::optional<LogicalTime> atClusterTime;
+    };
+
     /**
      * Represents a shard participant in a distributed transaction. Lives only for the duration of
-     * the
-     * transaction that created it.
+     * the transaction that created it.
      */
     class Participant {
     public:
-        explicit Participant(bool isCoordinator,
-                             TxnNumber txnNumber,
-                             repl::ReadConcernArgs readConcernArgs);
+        explicit Participant(bool isCoordinator, SharedTransactionOptions sharedOptions);
 
         enum class State {
             // Next transaction should include startTransaction.
@@ -70,32 +85,33 @@ public:
          */
         BSONObj attachTxnFieldsIfNeeded(BSONObj cmd);
 
-        State getState();
-
         /**
          * True if the participant has been chosen as the coordinator for its transaction.
          */
         bool isCoordinator() const;
 
         /**
-         * Mark this participant as a node that has been successfully sent a command.
+         * True if the represented shard has not been sent a command with startTransaction=true.
+         */
+        bool mustStartTransaction() const;
+
+        /**
+         * Mark this participant as a node that has been successful sent a command with
+         * startTransaction=true.
          */
         void markAsCommandSent();
-
-        void setAtClusterTime(const LogicalTime atClusterTime);
 
     private:
         State _state{State::kMustStart};
         const bool _isCoordinator{false};
-        const TxnNumber _txnNumber;
-        const repl::ReadConcernArgs _readConcernArgs;
-        boost::optional<LogicalTime> _atClusterTime;
+        const SharedTransactionOptions _sharedOptions;
     };
 
     TransactionRouter(LogicalSessionId sessionId);
 
     /**
-     * Starts a fresh transaction in this session. Also cleans up the previous transaction state.
+     * Starts a fresh transaction in this session or continue an existing one. Also cleans up the
+     * previous transaction state.
      */
     void beginOrContinueTxn(OperationContext* opCtx, TxnNumber txnNumber, bool startTransaction);
 
@@ -106,6 +122,19 @@ public:
 
     void checkIn();
     void checkOut();
+
+    /**
+     * Returns true if the current transaction can retry on a snapshot error. This is only true on
+     * the first command recevied for a transaction.
+     */
+    bool canContinueOnSnapshotError() const;
+
+    /**
+     * Resets the transaction state to allow for a retry attempt. This includes clearing all
+     * participants and adding them to the orphaned list, clearing the coordinator, and resetting
+     * the global read timestamp.
+     */
+    void onSnapshotError();
 
     /**
      * Computes and sets the atClusterTime for the current transaction. Does nothing if the given
@@ -137,6 +166,10 @@ public:
     const LogicalSessionId& getSessionId() const;
 
     boost::optional<ShardId> getCoordinatorId() const;
+
+    const StringMap<bool>& getOrphanedParticipants() const {
+        return _orphanedParticipants;
+    }
 
     /**
      * Commits the transaction. For transactions with multiple participants, this will initiate
@@ -170,6 +203,13 @@ private:
     // Map of current participants of the current transaction.
     StringMap<Participant> _participants;
 
+    // Map of participants that have been sent startTransaction, but are not in the current
+    // participant list.
+    //
+    // TODO SERVER-36589: Send abortTransaction to each shard in the orphaned list when committing
+    // or aborting a transaction to avoid leaving open orphaned transactions.
+    StringMap<bool> _orphanedParticipants;
+
     // The id of coordinator participant, used to construct prepare requests.
     boost::optional<ShardId> _coordinatorId;
 
@@ -178,8 +218,17 @@ private:
 
     // The cluster time of the timestamp all participant shards in the current transaction with
     // snapshot level read concern must read from. Selected during the first statement of the
-    // transaction.
+    // transaction. Should not be changed after the first statement has completed successfully.
     boost::optional<LogicalTime> _atClusterTime;
+
+    // The statement id of the latest received command for this transaction. For batch writes, this
+    // will be the highest stmtId contained in the batch. Incremented by one if new commands do not
+    // contain statement ids.
+    StmtId _latestStmtId = kUninitializedStmtId;
+
+    // The statement id of the command that began this transaction. Defaults to zero if no statement
+    // id was included in the first command.
+    StmtId _firstStmtId = kUninitializedStmtId;
 };
 
 /**

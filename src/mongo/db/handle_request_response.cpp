@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2017 MongoDB Inc.
+ * Copyright (C) 2018 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -40,7 +40,9 @@ BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& se
 
     bool isRetryable = ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code);
     bool isTransientTransactionError = code == ErrorCodes::WriteConflict  //
+        || code == ErrorCodes::SnapshotTooOld                             //
         || code == ErrorCodes::SnapshotUnavailable                        //
+        || code == ErrorCodes::StaleChunkHistory                          //
         || code == ErrorCodes::NoSuchTransaction                          //
         || code == ErrorCodes::LockTimeout                                //
         || code == ErrorCodes::PreparedTransactionInProgress              //

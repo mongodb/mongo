@@ -438,11 +438,10 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                             << " retries");
                 throw;
             } else if (!ErrorCodes::isStaleShardVersionError(ex.code()) &&
-                       !ErrorCodes::isSnapshotError(ex.code()) &&
                        ex.code() != ErrorCodes::ShardNotFound) {
-                // Errors other than stale metadata, snapshot unavailable, or from trying to reach a
-                // non existent shard are fatal to the operation. Network errors and replication
-                // retries happen at the level of the AsyncResultsMerger.
+                // Errors other than stale metadata or from trying to reach a non existent shard are
+                // fatal to the operation. Network errors and replication retries happen at the
+                // level of the AsyncResultsMerger.
                 ex.addContext("Encountered non-retryable error during query");
                 throw;
             }
@@ -450,13 +449,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             LOG(1) << "Received error status for query " << redact(query.toStringShort())
                    << " on attempt " << retries << " of " << kMaxRetries << ": " << redact(ex);
 
-            // Note: there is no need to refresh metadata on snapshot errors since the request
-            // failed because atClusterTime was too low, not because the wrong shards were targeted,
-            // and subsequent attempts will choose a later atClusterTime.
-            if (ErrorCodes::isStaleShardVersionError(ex.code()) ||
-                ex.code() == ErrorCodes::ShardNotFound) {
-                catalogCache->onStaleShardVersion(std::move(routingInfo));
-            }
+            catalogCache->onStaleShardVersion(std::move(routingInfo));
         }
     }
 

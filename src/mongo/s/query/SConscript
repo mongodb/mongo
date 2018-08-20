@@ -51,19 +51,6 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target="cluster_find_test",
-    source=[
-        "cluster_find_test.cpp",
-    ],
-    LIBDEPS=[
-        'cluster_query',
-        '$BUILD_DIR/mongo/db/keys_collection_client_sharded',
-        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
-        '$BUILD_DIR/mongo/s/commands/cluster_commands',
-    ],
-)
-
 env.Library(
     target="cluster_client_cursor",
     source=[

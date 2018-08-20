@@ -92,7 +92,6 @@ TEST_F(TransactionRouterTest, BasicStartTxn) {
                                   << "txnNumber"
                                   << txnNum);
 
-
     {
         auto& participant = txnRouter.getOrCreateParticipant(shard1);
         auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
@@ -124,12 +123,38 @@ TEST_F(TransactionRouterTest, BasicStartTxn) {
     }
 }
 
+TEST_F(TransactionRouterTest, ParticipantMustStartTransactionUntilSentCommand) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        ASSERT(participant.mustStartTransaction());
+    }
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        ASSERT(participant.mustStartTransaction());
+        participant.markAsCommandSent();
+        ASSERT_FALSE(participant.mustStartTransaction());
+    }
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        ASSERT_FALSE(participant.mustStartTransaction());
+    }
+}
+
 TEST_F(TransactionRouterTest, BasicStartTxnWithAtClusterTime) {
     TxnNumber txnNum{3};
 
     TransactionRouter txnRouter({});
     txnRouter.checkOut();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+    txnRouter.computeAtClusterTimeForOneShard(operationContext(), shard1);
 
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
@@ -150,7 +175,6 @@ TEST_F(TransactionRouterTest, BasicStartTxnWithAtClusterTime) {
 
     {
         auto& participant = txnRouter.getOrCreateParticipant(shard1);
-        participant.setAtClusterTime(kInMemoryLogicalTime);
         auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
                                                                << "test"));
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
@@ -779,6 +803,173 @@ TEST_F(TransactionRouterTest, SendPrepareAndCoordinateCommitForMultipleParticipa
     });
 
     future.timed_get(kFutureTimeout);
+}
+
+TEST_F(TransactionRouterTest, SnapshotErrorsResetAtClusterTime) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    txnRouter.setAtClusterTimeToLatestTime(operationContext());
+
+    BSONObj expectedReadConcern = BSON("level"
+                                       << "snapshot"
+                                       << "atClusterTime"
+                                       << kInMemoryLogicalTime.asTimestamp());
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
+        participant.markAsCommandSent();
+    }
+
+    // Advance the latest time in the logical clock so the retry attempt will pick a later time.
+    LogicalTime laterTime(Timestamp(1000, 1));
+    ASSERT_GT(laterTime, kInMemoryLogicalTime);
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
+
+    // Simulate a snapshot error.
+    ASSERT(txnRouter.canContinueOnSnapshotError());
+    txnRouter.onSnapshotError();
+
+    txnRouter.setAtClusterTimeToLatestTime(operationContext());
+
+    expectedReadConcern = BSON("level"
+                               << "snapshot"
+                               << "atClusterTime"
+                               << laterTime.asTimestamp());
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
+    }
+}
+
+TEST_F(TransactionRouterTest, CannotChangeAtClusterTimeWithoutSnapshotError) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    txnRouter.setAtClusterTimeToLatestTime(operationContext());
+
+    BSONObj expectedReadConcern = BSON("level"
+                                       << "snapshot"
+                                       << "atClusterTime"
+                                       << kInMemoryLogicalTime.asTimestamp());
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
+    }
+
+    LogicalTime laterTime(Timestamp(1000, 1));
+    ASSERT_GT(laterTime, kInMemoryLogicalTime);
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
+
+    txnRouter.setAtClusterTimeToLatestTime(operationContext());
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("insert"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
+    }
+}
+
+TEST_F(TransactionRouterTest, SnapshotErrorsAddAllParticipantsToOrphanedList) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    // Successfully start a transaction on two shards, selecting one as the coordinator.
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        participant.markAsCommandSent();
+        ASSERT_FALSE(participant.mustStartTransaction());
+    }
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard2);
+        participant.markAsCommandSent();
+        ASSERT_FALSE(participant.mustStartTransaction());
+    }
+
+    ASSERT(txnRouter.getCoordinatorId());
+    ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
+
+    ASSERT(txnRouter.getOrphanedParticipants().empty());
+
+    // Simulate a snapshot error and an internal retry that only re-targets one of the original two
+    // shards.
+
+    ASSERT(txnRouter.canContinueOnSnapshotError());
+    txnRouter.onSnapshotError();
+
+    ASSERT_FALSE(txnRouter.getCoordinatorId());
+    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 2U);
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard2);
+        ASSERT(participant.mustStartTransaction());
+        participant.markAsCommandSent();
+        ASSERT_FALSE(participant.mustStartTransaction());
+    }
+
+    // There is a new coordinator and shard1 is still in the orphaned list.
+    ASSERT(txnRouter.getCoordinatorId());
+    ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
+    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 1U);
+    ASSERT_EQ(txnRouter.getOrphanedParticipants().count(shard1), 1U);
+
+    {
+        // Shard1 has not started a transaction.
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        ASSERT(participant.mustStartTransaction());
+    }
+}
+
+TEST_F(TransactionRouterTest, CanOnlyContinueOnSnapshotErrorOnFirstCommand) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    ASSERT(txnRouter.canContinueOnSnapshotError());
+
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
+    ASSERT_FALSE(txnRouter.canContinueOnSnapshotError());
+
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
+    ASSERT_FALSE(txnRouter.canContinueOnSnapshotError());
+}
+
+DEATH_TEST_F(TransactionRouterTest, CannotCallOnSnapshotErrorAfterFirstCommand, "invariant") {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
+
+    txnRouter.onSnapshotError();
 }
 
 }  // unnamed namespace

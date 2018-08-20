@@ -153,6 +153,12 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
         auto& participant = txnRouter->getOrCreateParticipant(shard->getId());
         newRequest->cmdObj = participant.attachTxnFieldsIfNeeded(newRequest->cmdObj);
+
+        // The callback only needs a pointer to the transaction router if it attempted to start a
+        // transaction.
+        if (!participant.mustStartTransaction()) {
+            txnRouter = nullptr;
+        }
     }
 
     std::shared_ptr<OperationTimeTracker> timeTracker = OperationTimeTracker::get(request.opCtx);
