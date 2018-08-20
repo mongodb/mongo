@@ -84,7 +84,7 @@
         /**
          * Test 3. Corrupt the _mdb_catalog in an unrecoverable way. Verify that repair suceeds
          * in creating an empty catalog and recovers the orphaned testColl, which will still be
-         * accessible in the 'local.system.orphan-' namespace.
+         * accessible in the 'local.orphan-' namespace.
          */
 
         let mdbCatalogFile = dbpath + "_mdb_catalog.wt";
@@ -100,7 +100,8 @@
         assert.eq(testColl.count(), 0);
 
         // Ensure the collection orphan was created with the existing document.
-        let orphanColl = mongod.getDB('local').getCollection('system.orphan-' + testCollUri);
+        const orphanCollName = "orphan." + testCollUri.replace(/-/g, "_");
+        let orphanColl = mongod.getDB('local').getCollection(orphanCollName);
         assert(orphanColl.exists());
         assert.eq(orphanColl.find(doc).itcount(), 1);
         assert.eq(orphanColl.count(), 1);

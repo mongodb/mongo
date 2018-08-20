@@ -336,7 +336,9 @@ TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
 
     // When in a repair context, loadCatalog() recreates catalog entries for orphaned idents.
     _storageEngine->loadCatalog(opCtx.get());
-    NamespaceString orphanNs = NamespaceString("local.system.orphan-" + swIdentName.getValue());
+    auto identNs = swIdentName.getValue();
+    std::replace(identNs.begin(), identNs.end(), '-', '_');
+    NamespaceString orphanNs = NamespaceString("local.orphan." + identNs);
 
     ASSERT(identExists(opCtx.get(), swIdentName.getValue()));
     ASSERT(collectionExists(opCtx.get(), orphanNs));
@@ -367,7 +369,9 @@ TEST_F(KVStorageEngineTest, LoadCatalogDropsOrphans) {
     ASSERT_OK(reconcile(opCtx.get()).getStatus());
 
     ASSERT(!identExists(opCtx.get(), swIdentName.getValue()));
-    NamespaceString orphanNs = NamespaceString("local.system.orphan-" + swIdentName.getValue());
+    auto identNs = swIdentName.getValue();
+    std::replace(identNs.begin(), identNs.end(), '-', '_');
+    NamespaceString orphanNs = NamespaceString("local.orphan." + identNs);
     ASSERT(!collectionExists(opCtx.get(), orphanNs));
 }
 }  // namespace
