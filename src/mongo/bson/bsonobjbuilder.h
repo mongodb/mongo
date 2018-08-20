@@ -669,9 +669,10 @@ public:
      * The returned BSONObj will free the buffer when it is finished.
      * @return owned BSONObj
     */
+    template <typename BSONTraits = BSONObj::DefaultSizeTrait>
     BSONObj obj() {
         massert(10335, "builder does not own memory", owned());
-        auto out = done();
+        auto out = done<BSONTraits>();
         out.shareOwnershipWith(_b.release());
         return out;
     }
@@ -681,8 +682,9 @@ public:
         scope -- very important to keep in mind.  Use obj() if you
         would like the BSONObj to last longer than the builder.
     */
+    template <typename BSONTraits = BSONObj::DefaultSizeTrait>
     BSONObj done() {
-        return BSONObj(_done());
+        return BSONObj(_done(), BSONTraits{});
     }
 
     // Like 'done' above, but does not construct a BSONObj to return to the caller.
@@ -695,7 +697,7 @@ public:
         Intended use case: append a field if not already there.
     */
     BSONObj asTempObj() {
-        BSONObj temp(_done());
+        BSONObj temp(_done(), BSONObj::LargeSizeTrait{});
         _b.setlen(_b.len() - 1);  // next append should overwrite the EOO
         _b.reserveBytes(1);       // Rereserve room for the real EOO
         _doneCalled = false;

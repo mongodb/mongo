@@ -88,12 +88,12 @@ using namespace std;
 
 /* BSONObj ------------------------------------------------------------*/
 
-void BSONObj::_assertInvalid() const {
+void BSONObj::_assertInvalid(int maxSize) const {
     StringBuilder ss;
     int os = objsize();
     ss << "BSONObj size: " << os << " (0x" << integerToHex(os) << ") is invalid. "
        << "Size must be between 0 and " << BSONObjMaxInternalSize << "("
-       << (BSONObjMaxInternalSize / (1024 * 1024)) << "MB)";
+       << (maxSize / (1024 * 1024)) << "MB)";
     try {
         BSONElement e = firstElement();
         ss << " First element: " << e.toString();

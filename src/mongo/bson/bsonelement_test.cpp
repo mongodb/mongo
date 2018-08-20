@@ -110,5 +110,23 @@ TEST(BSONElement, TimestampToString) {
     ASSERT_EQ(obj["ts3"].toString(false, false), "Timestamp(4294967295, 4294967295)");
 }
 
+TEST(BSONElement, ExtractLargeSubObject) {
+    std::int32_t size = 17 * 1024 * 1024;
+    std::vector<char> buffer(size);
+    DataRange bufferRange(&buffer.front(), &buffer.back());
+    ASSERT_OK(bufferRange.write(LittleEndian<int32_t>(size)));
+
+    BSONObj obj(buffer.data(), BSONObj::LargeSizeTrait{});
+
+    BSONObjBuilder bigObjectBuilder;
+    bigObjectBuilder.append("a", obj);
+    BSONObj bigObj = bigObjectBuilder.obj<BSONObj::LargeSizeTrait>();
+
+    BSONElement element = bigObj["a"];
+    ASSERT_EQ(BSONType::Object, element.type());
+
+    BSONObj subObj = element.Obj();
+}
+
 }  // namespace
 }  // namespace mongo
