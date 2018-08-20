@@ -2,7 +2,7 @@
  * This test corrupts WiredTiger data files on a secondary, repairs the data, and asserts that the
  * node is unable to re-join its original replica set without an initial sync.
  *
- * @tags: [requires_wiredtiger]
+ * @tags: [requires_wiredtiger, requires_replication]
  */
 
 (function() {
