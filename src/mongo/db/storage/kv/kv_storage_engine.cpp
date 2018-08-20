@@ -155,7 +155,7 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
     if (_options.forRepair) {
         // It's possible that there are collection files on disk that are unknown to the catalog. In
         // a repair context, if we can't find an ident in the catalog, we generate a catalog entry
-        // 'local.system.orphan-xxxxx' for it. However, in a nonrepair context, the orphaned idents
+        // 'local.orphan.xxxxx' for it. However, in a nonrepair context, the orphaned idents
         // will be dropped in reconcileCatalogAndIdents().
         for (const auto& ident : identsKnownToStorageEngine) {
             if (_catalog->isCollectionIdent(ident)) {
@@ -171,9 +171,13 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
                     StatusWith<std::string> statusWithNs = _catalog->newOrphanedIdent(opCtx, ident);
                     if (statusWithNs.isOK()) {
                         wuow.commit();
+                        auto orphanCollNs = statusWithNs.getValue();
                         log() << "Successfully created an entry in the catalog for the orphaned "
                                  "collection: "
-                              << statusWithNs.getValue();
+                              << orphanCollNs;
+                        warning() << orphanCollNs
+                                  << " does not have the _id index. Please manually "
+                                     "build the index.";
 
                         StorageRepairObserver::get(getGlobalServiceContext())
                             ->onModification(str::stream() << "Orphan collection created: "
@@ -182,9 +186,10 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
                     } else {
                         // Log an error message if we cannot create the entry.
                         // reconcileCatalogAndIdents() will later drop this ident.
-                        error()
-                            << "Cannot create an entry in the catalog for the orphaned collection: "
-                            << ident << " due to " << statusWithNs.getStatus().reason();
+                        error() << "Cannot create an entry in the catalog for the orphaned "
+                                   "collection ident: "
+                                << ident << " due to " << statusWithNs.getStatus().reason();
+                        error() << "Restarting the server will remove this ident.";
                     }
                 }
             }

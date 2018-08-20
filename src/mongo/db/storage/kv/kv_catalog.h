@@ -106,6 +106,8 @@ public:
     /**
      * Create an entry in the catalog for an orphaned collection found in the
      * storage engine. Return the generated ns of the collection.
+     * Note that this function does not recreate the _id index on the collection because it does not
+     * have access to index catalog.
      */
     StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx, std::string ident);
 

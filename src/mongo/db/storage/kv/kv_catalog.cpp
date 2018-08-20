@@ -632,14 +632,19 @@ bool KVCatalog::isCollectionIdent(StringData ident) const {
 }
 
 StatusWith<std::string> KVCatalog::newOrphanedIdent(OperationContext* opCtx, std::string ident) {
-    // The collection will be named local.system.orphan-xxxxx.
+    // The collection will be named local.orphan.xxxxx.
+    std::string identNs = ident;
+    std::replace(identNs.begin(), identNs.end(), '-', '_');
     std::string ns = NamespaceString(NamespaceString::kOrphanCollectionDb,
-                                     NamespaceString::kOrphanCollectionPrefix + ident)
+                                     NamespaceString::kOrphanCollectionPrefix + identNs)
                          .ns();
 
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
     Entry& old = _idents[ns];
-    invariant(old.ident.empty());
+    if (!old.ident.empty()) {
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream() << ns << " already exists in the catalog");
+    }
     opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
 
     // Generate a new UUID for the orphaned collection.

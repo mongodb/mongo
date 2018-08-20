@@ -61,7 +61,7 @@ public:
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
     // Prefix for orphan collections
-    static constexpr StringData kOrphanCollectionPrefix = "system.orphan-"_sd;
+    static constexpr StringData kOrphanCollectionPrefix = "orphan."_sd;
     static constexpr StringData kOrphanCollectionDb = "local"_sd;
 
     // Namespace for storing configuration data, which needs to be replicated if the server is
