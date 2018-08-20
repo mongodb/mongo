@@ -1504,6 +1504,23 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
 }
 
+BSONObj ReplicationCoordinatorImpl::_getReplicationProgress(WithLock wl) const {
+    BSONObjBuilder progress;
+
+    const auto lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
+    progress.append("lastCommittedOpTime", lastCommittedOpTime.toBSON());
+
+    const auto currentCommittedSnapshotOpTime = _getCurrentCommittedSnapshotOpTime_inlock();
+    progress.append("currentCommittedSnapshotOpTime", currentCommittedSnapshotOpTime.toBSON());
+
+    const auto earliestDropPendingOpTime = _externalState->getEarliestDropPendingOpTime();
+    if (earliestDropPendingOpTime) {
+        progress.append("earliestDropPendingOpTime", earliestDropPendingOpTime->toBSON());
+    }
+
+    _topCoord->fillMemberData(&progress);
+    return progress.obj();
+}
 Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     stdx::unique_lock<stdx::mutex>* lock,
     OperationContext* opCtx,
@@ -1584,6 +1601,15 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     stdx::condition_variable condVar;
     ThreadWaiter waiter(opTime, &writeConcern, &condVar);
     WaiterGuard guard(&_replicationWaiterList, &waiter);
+
+    ScopeGuard failGuard = MakeGuard([&]() {
+        if (getTestCommandsEnabled()) {
+            log() << "Replication failed for write concern: " << writeConcern.toBSON()
+                  << ", waitInfo: " << waiter << ", opID: " << opCtx->getOpID()
+                  << ", progress: " << _getReplicationProgress(*lock);
+        }
+    });
+
     while (!_doneWaitingForReplication_inlock(opTime, writeConcern)) {
 
         if (_inShutdown) {
@@ -1596,23 +1622,6 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         }
 
         if (status.getValue() == stdx::cv_status::timeout) {
-            if (getTestCommandsEnabled()) {
-                // log state of replica set on timeout to help with diagnosis.
-                BSONObjBuilder progress;
-
-                const auto lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
-                progress.append("lastCommittedOpTime", lastCommittedOpTime.toBSON());
-
-                const auto currentCommittedSnapshotOpTime =
-                    _getCurrentCommittedSnapshotOpTime_inlock();
-                progress.append("currentCommittedSnapshotOpTime",
-                                currentCommittedSnapshotOpTime.toBSON());
-
-                _topCoord->fillMemberData(&progress);
-                log() << "Replication for failed WC: " << writeConcern.toBSON()
-                      << ", waitInfo: " << waiter << ", opID: " << opCtx->getOpID()
-                      << ", progress: " << progress.done();
-            }
             return {ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
         }
 
@@ -1622,7 +1631,13 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         }
     }
 
-    return _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
+    auto satisfiableStatus = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
+    if (!satisfiableStatus.isOK()) {
+        return satisfiableStatus;
+    }
+
+    failGuard.Dismiss();
+    return Status::OK();
 }
 
 void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {

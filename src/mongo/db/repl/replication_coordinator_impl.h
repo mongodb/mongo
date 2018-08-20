@@ -608,6 +608,12 @@ private:
                                     const WriteConcernOptions& writeConcern);
 
     /**
+     * Returns an object with all of the information this node knows about the replica set's
+     * progress.
+     */
+    BSONObj _getReplicationProgress(WithLock wl) const;
+
+    /**
      * Returns true if the given writeConcern is satisfied up to "optime" or is unsatisfiable.
      *
      * If the writeConcern is 'majority', also waits for _currentCommittedSnapshot to be newer than
