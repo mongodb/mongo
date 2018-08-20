@@ -568,7 +568,7 @@ bool BSONElement::binaryEqualValues(const BSONElement& rhs) const {
 
 BSONObj BSONElement::embeddedObjectUserCheck() const {
     if (MONGO_likely(isABSONObj()))
-        return BSONObj(value());
+        return BSONObj(value(), BSONObj::LargeSizeTrait{});
     std::stringstream ss;
     ss << "invalid parameter: expected an object (" << fieldName() << ")";
     uasserted(10065, ss.str());
@@ -577,7 +577,7 @@ BSONObj BSONElement::embeddedObjectUserCheck() const {
 
 BSONObj BSONElement::embeddedObject() const {
     verify(isABSONObj());
-    return BSONObj(value());
+    return BSONObj(value(), BSONObj::LargeSizeTrait{});
 }
 
 BSONObj BSONElement::codeWScopeObject() const {
