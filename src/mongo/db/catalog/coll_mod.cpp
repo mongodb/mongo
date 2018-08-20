@@ -474,9 +474,14 @@ Status collMod(OperationContext* opCtx,
 Status collModWithUpgrade(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const BSONObj& cmdObj) {
-    // A cmdObj with an empty collMod, i.e. nFields = 1, implies that it is a Unique Index
-    // upgrade collMod.
-    bool upgradeUniqueIndex = (cmdObj.nFields() == 1);
+    // An empty collMod is used to upgrade unique index during FCV upgrade. If an application
+    // executes the empty collMod when the secondary is upgrading FCV it is fine to upgrade the
+    // unique index becuase the secondary will eventually get the real empty collMod. If the
+    // application issues an empty collMod when FCV is not upgrading or upgraded to 4.2 then the
+    // unique index should not be upgraded due to this collMod on the secondary.
+    bool upgradeUniqueIndex =
+        (cmdObj.nFields() == 1 && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         serverGlobalParams.featureCompatibility.isVersionUpgradingOrUpgraded());
 
     // Update all non-replicated unique indexes on upgrade i.e. setFCV=4.2.
     if (upgradeUniqueIndex && nss == NamespaceString::kServerConfigurationNamespace) {
