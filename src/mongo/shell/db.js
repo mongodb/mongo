@@ -1587,6 +1587,12 @@ var DB;
                 if (!Array.isArray(mechs)) {
                     throw Error("Server replied with invalid saslSupportedMechs response");
                 }
+
+                if ((this._defaultAuthenticationMechanism != null) &&
+                    mechs.includes(this._defaultAuthenticationMechanism)) {
+                    return this._defaultAuthenticationMechanism;
+                }
+
                 // Never include PLAIN in auto-negotiation.
                 const priority = ["GSSAPI", "SCRAM-SHA-256", "SCRAM-SHA-1"];
                 for (var i = 0; i < priority.length; ++i) {

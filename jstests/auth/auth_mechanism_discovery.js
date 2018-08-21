@@ -10,9 +10,7 @@
         admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
         assert(admin.auth('admin', 'pass'));
 
-        // Enable SCRAM-SHA-256.
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: "4.0"}));
-
+        // Verify user mechanism discovery.
         function checkUser(username, mechanism) {
             var createUser = {createUser: username, pwd: 'pwd', roles: []};
             if (mechanism !== undefined) {
@@ -29,6 +27,17 @@
         checkUser('userSha1', 'SCRAM-SHA-1');
         checkUser('userSha256', 'SCRAM-SHA-256');
         checkUser('userAll');
+
+        // Verify override of mechanism discovery.
+        // Depends on 'userAll' user created above.
+        assert.eq(test._getDefaultAuthenticationMechanism('userAll', test.getName()),
+                  'SCRAM-SHA-256');
+        test._defaultAuthenticationMechanism = 'SCRAM-SHA-1';
+        assert.eq(test._getDefaultAuthenticationMechanism('userAll', test.getName()),
+                  'SCRAM-SHA-1');
+        test._defaultAuthenticationMechanism = 'NO-SUCH-MECHANISM';
+        assert.eq(test._getDefaultAuthenticationMechanism('userAll', test.getName()),
+                  'SCRAM-SHA-256');
     }
 
     // Test standalone.
