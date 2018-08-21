@@ -61,13 +61,15 @@ public:
         _sessions.clear();
     }
 
+    Status start() override {
+        return Status::OK();
+    }
+
     bool shutdown(Milliseconds timeout) override {
         return true;
     }
 
-    Stats sessionStats() const override {
-        return {};
-    }
+    void appendStats(BSONObjBuilder*) const override {}
 
     size_t numOpenSessions() const override {
         return 0ULL;
