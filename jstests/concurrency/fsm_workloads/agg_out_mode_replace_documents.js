@@ -22,13 +22,18 @@ var $config = extendWorkload($config, function($config, $super) {
         // subsequent runs.
         const res = db[collName].aggregate([
             {$addFields: {_id: this.tid, count: this.threadRunCount}},
-            {$out: {to: "out_mode_replace_documents", mode: "replaceDocuments"}},
+            {$out: {to: this.collWithMigrations, mode: "replaceDocuments"}},
         ]);
 
         // $out should always return 0 documents.
         assert.eq(0, res.itcount());
-        assert.eq([{_id: this.tid, count: this.threadRunCount}],
-                  db["out_mode_replace_documents"].find({_id: this.tid}).toArray());
+        // If running with causal consistency, the writes may not have propagated to the secondaries
+        // yet.
+        assert.soon(() => {
+            return db[this.collWithMigrations]
+                       .find({_id: this.tid, count: this.threadRunCount})
+                       .itcount() == 1;
+        });
 
         this.threadRunCount += 1;
     };

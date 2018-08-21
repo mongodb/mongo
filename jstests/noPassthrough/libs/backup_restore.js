@@ -132,7 +132,10 @@ var BackupRestoreTest = function(options) {
             var blacklist = [
                 // Disabled due to MongoDB restrictions and/or workload restrictions
                 'agg_group_external.js',  // uses >100MB of data, which can overwhelm test hosts
-                'agg_sort_external.js',   // uses >100MB of data, which can overwhelm test hosts
+                'agg_out_mode_insert_documents.js',
+                'agg_out_mode_replace_documents.js',
+                'agg_sort_external.js',  // uses >100MB of data, which can overwhelm test hosts
+                'agg_with_chunk_migrations.js',
                 'auth_create_role.js',
                 'auth_create_user.js',
                 'auth_drop_role.js',
