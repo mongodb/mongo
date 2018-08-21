@@ -393,8 +393,14 @@ public:
      *
      * This is called outside of any WriteUnitOfWork to allow implementations to split this up
      * into multiple units.
+     *
+     * TODO SERVER-36385: Change the return type from "Status" back to "void" as that was a hack
+     * introduced in SERVER-36280 for detecting long TypeBits in an edge case in one of the unique
+     * index builder implementations.
      */
-    virtual void commit(bool mayInterrupt) {}
+    virtual Status commit(bool mayInterrupt) {
+        return Status::OK();
+    }
 };
 
 }  // namespace mongo

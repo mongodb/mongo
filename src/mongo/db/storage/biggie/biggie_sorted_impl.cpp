@@ -231,10 +231,11 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
       _lastKeyToString(""),
       _lastRID(-1) {}
 
-void SortedDataBuilderInterface::commit(bool mayInterrupt) {
+Status SortedDataBuilderInterface::commit(bool mayInterrupt) {
     biggie::RecoveryUnit* ru = checked_cast<biggie::RecoveryUnit*>(_opCtx->recoveryUnit());
     ru->forkIfNeeded();
     ru->commitUnitOfWork();
+    return Status::OK();
 }
 
 Status SortedDataBuilderInterface::addKey(const BSONObj& key, const RecordId& loc) {

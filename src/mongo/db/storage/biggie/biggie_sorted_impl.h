@@ -43,7 +43,7 @@ public:
                                Ordering order,
                                std::string prefix,
                                std::string identEnd);
-    void commit(bool mayInterrupt) override;
+    Status commit(bool mayInterrupt) override;
     virtual Status addKey(const BSONObj& key, const RecordId& loc);
 
 private:

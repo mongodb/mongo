@@ -626,14 +626,19 @@ public:
 
         invariantWTOK(_cursor->insert(_cursor));
 
+        if (data.getTypeBits().isLongEncoding())
+            return Status(ErrorCodes::KeyStringWithLongTypeBits,
+                          "Inserted KeyString with TypeBits longer than 127 bytes.");
+
         return Status::OK();
     }
 
-    void commit(bool mayInterrupt) override {
+    Status commit(bool mayInterrupt) override {
         // TODO do we still need this?
         // this is bizarre, but required as part of the contract
         WriteUnitOfWork uow(_opCtx);
         uow.commit();
+        return Status::OK();
     }
 
 private:
@@ -666,13 +671,15 @@ public:
         return addKeyTimestampUnsafe(newKey, id);
     }
 
-    void commit(bool mayInterrupt) override {
+    Status commit(bool mayInterrupt) override {
+        Status status = Status::OK();
         WriteUnitOfWork uow(_opCtx);
         if (!_records.empty()) {
             // This handles inserting the last unique key.
-            doInsert();
+            status = doInsert();
         }
         uow.commit();
+        return status;
     }
 
 private:
@@ -706,17 +713,23 @@ private:
         invariantWTOK(_cursor->insert(_cursor));
 
         _previousKey = newKey.getOwned();
+
+        if (_keyString.getTypeBits().isLongEncoding())
+            return Status(ErrorCodes::KeyStringWithLongTypeBits,
+                          "Inserted KeyString with TypeBits longer than 127 bytes.");
+
         return Status::OK();
     }
 
     Status addKeyTimestampUnsafe(const BSONObj& newKey, const RecordId& id) {
+        Status status = Status::OK();
         const int cmp = newKey.woCompare(_previousKey, _ordering);
         if (cmp != 0) {
             if (!_previousKey.isEmpty()) {
                 // _previousKey.isEmpty() is only true on the first call to addKey().
                 invariant(cmp > 0);  // newKey must be > the last key
                 // We are done with dups of the last key so we can insert it now.
-                doInsert();
+                status = doInsert();
             }
             invariant(_records.empty());
         } else {
@@ -734,10 +747,10 @@ private:
         _records.push_back(std::make_pair(id, _keyString.getTypeBits()));
         _previousKey = newKey.getOwned();
 
-        return Status::OK();
+        return status;
     }
 
-    void doInsert() {
+    Status doInsert() {
         invariant(!_records.empty());
 
         KeyString value(_idx->keyStringVersion());
@@ -759,6 +772,12 @@ private:
         invariantWTOK(_cursor->insert(_cursor));
 
         _records.clear();
+
+        if (_keyString.getTypeBits().isLongEncoding() || value.getTypeBits().isLongEncoding())
+            return Status(ErrorCodes::KeyStringWithLongTypeBits,
+                          "Inserted KeyString with TypeBits longer than 127 bytes.");
+
+        return Status::OK();
     }
 
     WiredTigerIndex* _idx;
@@ -1341,6 +1360,10 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
     int ret = WT_OP_CHECK(c->insert(c));
 
     if (ret != WT_DUPLICATE_KEY) {
+        if (ret == 0 && data.getTypeBits().isLongEncoding())
+            return Status(ErrorCodes::KeyStringWithLongTypeBits,
+                          "Inserted KeyString with TypeBits longer than 127 bytes.");
+
         return wtRCToStatus(ret);
     }
 
@@ -1385,7 +1408,16 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
 
     valueItem = WiredTigerItem(value.getBuffer(), value.getSize());
     c->set_value(c, valueItem.Get());
-    return wtRCToStatus(c->update(c));
+    Status status = wtRCToStatus(c->update(c));
+
+    if (!status.isOK())
+        return status;
+
+    if (value.getTypeBits().isLongEncoding())
+        return Status(ErrorCodes::KeyStringWithLongTypeBits,
+                      "Inserted KeyString with TypeBits longer than 127 bytes.");
+
+    return Status::OK();
 }
 
 Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
@@ -1440,10 +1472,12 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
     ret = WT_OP_CHECK(c->insert(c));
 
     // It is possible that this key is already present during a concurrent background index build.
-    if (ret == WT_DUPLICATE_KEY)
-        return Status::OK();
+    if (ret != WT_DUPLICATE_KEY)
+        invariantWTOK(ret);
 
-    invariantWTOK(ret);
+    if (tableKey.getTypeBits().isLongEncoding())
+        return Status(ErrorCodes::KeyStringWithLongTypeBits,
+                      "Inserted KeyString with TypeBits longer than 127 bytes.");
 
     return Status::OK();
 }
@@ -1642,11 +1676,16 @@ Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
     c->set_value(c, valueItem.Get());
     int ret = WT_OP_CHECK(c->insert(c));
 
-    if (ret != WT_DUPLICATE_KEY)
-        return wtRCToStatus(ret);
     // If the record was already in the index, we just return OK.
     // This can happen, for example, when building a background index while documents are being
     // written and reindexed.
+    if (ret != 0 && ret != WT_DUPLICATE_KEY)
+        return wtRCToStatus(ret);
+
+    if (key.getTypeBits().isLongEncoding())
+        return Status(ErrorCodes::KeyStringWithLongTypeBits,
+                      "Inserted KeyString with TypeBits longer than 127 bytes.");
+
     return Status::OK();
 }
 
