@@ -116,10 +116,6 @@ Status initializeOperationSessionInfo(OperationContext* opCtx,
         opCtx->setTxnNumber(*osi.getTxnNumber());
     }
 
-    if (!isFCV36) {
-        log() << "Using sessions while not fully upgraded to FCV3.6";
-    }
-
     return Status::OK();
 }
 
