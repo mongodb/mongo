@@ -53,7 +53,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/scopeguard.h"
 
-mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) {
+namespace mongo {
+
+Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) {
     AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
@@ -103,20 +105,20 @@ mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString&
         return status;
     }
 
-    getGlobalServiceContext()->getOpObserver()->onEmptyCapped(
-        opCtx, collection->ns(), collection->uuid());
+    const auto service = opCtx->getServiceContext();
+    service->getOpObserver()->onEmptyCapped(opCtx, collection->ns(), collection->uuid());
 
     wuow.commit();
 
     return Status::OK();
 }
 
-mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
-                                             Database* db,
-                                             const std::string& shortFrom,
-                                             const std::string& shortTo,
-                                             long long size,
-                                             bool temp) {
+Status cloneCollectionAsCapped(OperationContext* opCtx,
+                               Database* db,
+                               const std::string& shortFrom,
+                               const std::string& shortTo,
+                               long long size,
+                               bool temp) {
     NamespaceString fromNss(db->name(), shortFrom);
     NamespaceString toNss(db->name(), shortTo);
 
@@ -251,9 +253,9 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-mongo::Status mongo::convertToCapped(OperationContext* opCtx,
-                                     const NamespaceString& collectionName,
-                                     long long size) {
+Status convertToCapped(OperationContext* opCtx,
+                       const NamespaceString& collectionName,
+                       long long size) {
     StringData dbname = collectionName.db();
     StringData shortSource = collectionName.coll();
 
@@ -301,3 +303,5 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
     options.stayTemp = false;
     return renameCollection(opCtx, longTmpName, collectionName, options);
 }
+
+}  // namespace mongo
