@@ -70,7 +70,24 @@ env.Library(
     ],
 )
 
-env.Library(
+capiEnv = env.Clone()
+capiEnv.AppendUnique(
+    CPPDEFINES=[
+        'MONGO_EMBEDDED_CAPI_COMPILING',
+    ],
+    SHCCFLAGS=[
+        '-fvisibility=hidden' if env.TargetOSIs('posix') else [],
+    ],
+)
+
+if get_option('link-model') == 'static':
+    capiEnv.AppendUnique(
+        CPPDEFINES=[
+            'MONGO_EMBEDDED_CAPI_STATIC',
+        ],
+    )
+
+capiEnv.Library(
     target='mongo_embedded_capi',
     source=[
         'capi.cpp',
@@ -148,7 +165,24 @@ if not hygienic:
 if not env['MONGO_HAVE_LIBMONGOC']:
     Return()
 
-env.Library(
+mongocClientEnv = env.Clone()
+mongocClientEnv.AppendUnique(
+    CPPDEFINES=[
+        'MONGO_EMBEDDED_MONGOC_CLIENT_COMPILING',
+     ],
+    SHCCFLAGS=[
+        '-fvisibility=hidden' if env.TargetOSIs('posix') else [],
+    ],
+)
+
+if get_option('link-model') == 'static':
+    mongocClientEnv.AppendUnique(
+        CPPDEFINES=[
+            'MONGO_EMBEDDED_MONGOC_CLIENT_STATIC',
+        ],
+    )
+
+mongocClientEnv.Library(
     target='mongo_embedded_mongoc_client',
     source=[
         'mongoc_client.cpp',

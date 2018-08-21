@@ -31,6 +31,38 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#pragma push_macro("MONGO_API_CALL")
+#undef MONGO_API_CALL
+
+#pragma push_macro("MONGO_API_IMPORT")
+#undef MONGO_API_IMPORT
+
+#pragma push_macro("MONGO_API_EXPORT")
+#undef MONGO_API_EXPORT
+
+#pragma push_macro("MONGO_EMBEDDED_CAPI_API")
+#undef MONGO_EMBEDDED_CAPI_API
+
+#if defined(_WIN32)
+#define MONGO_API_CALL __cdecl
+#define MONGO_API_IMPORT __declspec(dllimport)
+#define MONGO_API_EXPORT __declspec(dllexport)
+#else
+#define MONGO_API_CALL
+#define MONGO_API_IMPORT __attribute__((visibility("default")))
+#define MONGO_API_EXPORT __attribute__((used, visibility("default")))
+#endif
+
+#if defined(MONGO_EMBEDDED_CAPI_STATIC)
+#define MONGO_EMBEDDED_CAPI_API
+#else
+#if defined(MONGO_EMBEDDED_CAPI_COMPILING)
+#define MONGO_EMBEDDED_CAPI_API MONGO_API_EXPORT
+#else
+#define MONGO_EMBEDDED_CAPI_API MONGO_API_IMPORT
+#endif
+#endif
+
 #ifdef _DOXYGEN
 /**
  * Embeddable MongoDB Library.
@@ -121,7 +153,8 @@ typedef struct mongo_embedded_v1_status mongo_embedded_v1_status;
  *
  * @note This function may be called before `mongo_embedded_v1_lib_init`.
  */
-mongo_embedded_v1_status* mongo_embedded_v1_status_create(void);
+MONGO_EMBEDDED_CAPI_API mongo_embedded_v1_status* MONGO_API_CALL
+mongo_embedded_v1_status_create(void);
 
 /**
  * Destroys a valid `mongo_embedded_v1_status` object.
@@ -149,7 +182,8 @@ mongo_embedded_v1_status* mongo_embedded_v1_status_create(void);
  * including the storage referenced by functions that returned observable storage buffers from this
  * status, such as strings.
  */
-void mongo_embedded_v1_status_destroy(mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API void MONGO_API_CALL
+mongo_embedded_v1_status_destroy(mongo_embedded_v1_status* status);
 
 /**
  * The error codes reported by `mongo_embedded_v1` functions will be given the symbolic names as
@@ -162,6 +196,7 @@ void mongo_embedded_v1_status_destroy(mongo_embedded_v1_status* status);
 typedef enum {
     MONGO_EMBEDDED_V1_ERROR_IN_REPORTING_ERROR = -2,
     MONGO_EMBEDDED_V1_ERROR_UNKNOWN = -1,
+
     MONGO_EMBEDDED_V1_SUCCESS = 0,
 
     MONGO_EMBEDDED_V1_ERROR_ENOMEM = 1,
@@ -207,7 +242,8 @@ typedef enum {
  * @note This function does not report its own failures.
  * @note This behavior of this function is undefined unless its preconditions are met.
  */
-int mongo_embedded_v1_status_get_error(const mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API int MONGO_API_CALL
+mongo_embedded_v1_status_get_error(const mongo_embedded_v1_status* status);
 
 /**
  * Gets a descriptive error message from a `mongo_embedded_v1_status` object.
@@ -248,7 +284,8 @@ int mongo_embedded_v1_status_get_error(const mongo_embedded_v1_status* status);
  * @note This function does not report its own failures.
  * @note This behavior of this function is undefined unless its preconditions are met.
  */
-const char* mongo_embedded_v1_status_get_explanation(const mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API const char* MONGO_API_CALL
+mongo_embedded_v1_status_get_explanation(const mongo_embedded_v1_status* status);
 
 /**
  * Gets a status code from a `mongo_embedded_v1_status` object.
@@ -283,7 +320,8 @@ const char* mongo_embedded_v1_status_get_explanation(const mongo_embedded_v1_sta
  * @note This function does not report its own failures.
  * @note This behavior of this function is undefined unless its preconditions are met.
  */
-int mongo_embedded_v1_status_get_code(const mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API int MONGO_API_CALL
+mongo_embedded_v1_status_get_code(const mongo_embedded_v1_status* status);
 
 
 /**
@@ -324,7 +362,7 @@ typedef struct mongo_embedded_v1_init_params mongo_embedded_v1_init_params;
  * Log = 0
  * Debug = 1 to 5
  */
-typedef void (*mongo_embedded_v1_log_callback)(
+typedef void(MONGO_API_CALL* mongo_embedded_v1_log_callback)(
     void* user_data, const char* message, const char* component, const char* context, int severity);
 
 /**
@@ -413,8 +451,8 @@ struct mongo_embedded_v1_init_params {
  * @note This function may return diagnosic errors for violations of its preconditions, but this
  * behavior is not guaranteed.
  */
-mongo_embedded_v1_lib* mongo_embedded_v1_lib_init(const mongo_embedded_v1_init_params* params,
-                                                  mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API mongo_embedded_v1_lib* MONGO_API_CALL mongo_embedded_v1_lib_init(
+    const mongo_embedded_v1_init_params* params, mongo_embedded_v1_status* status);
 
 /**
  * Tears down the state of the library, all databases must be closed before calling this.
@@ -459,7 +497,8 @@ mongo_embedded_v1_lib* mongo_embedded_v1_lib_init(const mongo_embedded_v1_init_p
  * function may return diagnosic errors for violations of its preconditions, but this behavior is
  * not guaranteed.
  */
-int mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib* lib, mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API int MONGO_API_CALL
+mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib* lib, mongo_embedded_v1_status* status);
 
 /**
  * An object which represents an instance of an Embedded MongoDB Server.
@@ -515,9 +554,10 @@ typedef struct mongo_embedded_v1_instance mongo_embedded_v1_instance;
  * @note This function may return diagnosic errors for violations of its preconditions, but this
  * behavior is not guaranteed.
  */
-mongo_embedded_v1_instance* mongo_embedded_v1_instance_create(mongo_embedded_v1_lib* lib,
-                                                              const char* yaml_config,
-                                                              mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API mongo_embedded_v1_instance* MONGO_API_CALL
+mongo_embedded_v1_instance_create(mongo_embedded_v1_lib* lib,
+                                  const char* yaml_config,
+                                  mongo_embedded_v1_status* status);
 
 /**
  * Shuts down an embedded MongoDB instance.
@@ -559,8 +599,8 @@ mongo_embedded_v1_instance* mongo_embedded_v1_instance_create(mongo_embedded_v1_
  * @note This function may return diagnosic errors for violations of its precondition, but this
  * behavior is not guaranteed.
  */
-int mongo_embedded_v1_instance_destroy(mongo_embedded_v1_instance* instance,
-                                       mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API int MONGO_API_CALL mongo_embedded_v1_instance_destroy(
+    mongo_embedded_v1_instance* instance, mongo_embedded_v1_status* status);
 
 /**
  * An object which represents "client connection" to an Embedded MongoDB Server.
@@ -598,8 +638,8 @@ typedef struct mongo_embedded_v1_client mongo_embedded_v1_client;
  *
  * @invariant This function is completely threadsafe, as long as its preconditions are met.
  */
-mongo_embedded_v1_client* mongo_embedded_v1_client_create(mongo_embedded_v1_instance* instance,
-                                                          mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API mongo_embedded_v1_client* MONGO_API_CALL mongo_embedded_v1_client_create(
+    mongo_embedded_v1_instance* instance, mongo_embedded_v1_status* status);
 
 /**
  * Destroys an Embedded MongoDB Client.
@@ -634,8 +674,8 @@ mongo_embedded_v1_client* mongo_embedded_v1_client_create(mongo_embedded_v1_inst
  * @note This function may return diagnosic errors for violations of its precondition, but this
  * behavior is not guaranteed.
  */
-int mongo_embedded_v1_client_destroy(mongo_embedded_v1_client* client,
-                                     mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API int MONGO_API_CALL mongo_embedded_v1_client_destroy(
+    mongo_embedded_v1_client* client, mongo_embedded_v1_status* status);
 
 /**
  * Makes an RPC call to the database.
@@ -691,12 +731,13 @@ int mongo_embedded_v1_client_destroy(mongo_embedded_v1_client* client,
  * to be part of the specified `client` object for the purposes of thread-safety and undefined
  * behavior.
  */
-int mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* client,
-                                    const void* input,
-                                    size_t input_size,
-                                    void** output,
-                                    size_t* output_size,
-                                    mongo_embedded_v1_status* status);
+MONGO_EMBEDDED_CAPI_API int MONGO_API_CALL
+mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* client,
+                                const void* input,
+                                size_t input_size,
+                                void** output,
+                                size_t* output_size,
+                                mongo_embedded_v1_status* status);
 
 #ifdef __cplusplus
 }  // extern "C"
@@ -706,5 +747,17 @@ int mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* client,
 }  // namespace embedded
 }  // namespace mongo
 #endif
+
+#undef MONGO_EMBEDDED_CAPI_API
+#pragma pop_macro("MONGO_EMBEDDED_CAPI_API")
+
+#undef MONGO_API_EXPORT
+#pragma push_macro("MONGO_API_EXPORT")
+
+#undef MONGO_API_IMPORT
+#pragma push_macro("MONGO_API_IMPORT")
+
+#undef MONGO_API_CALL
+#pragma pop_macro("MONGO_API_CALL")
 
 #endif  // HEADERUUID_5E967FCD_63BD_4374_88CC_58C091BA61C0_DEFINED
