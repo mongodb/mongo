@@ -416,7 +416,9 @@ TEST_F(ServiceStateMachineFixture, TestOkaySimpleCommand) {
     checkPingOk();
 }
 
-Message getMoreRequestWithExhaust(const std::string& nss, long cursorId, const int32_t requestId) {
+Message getMoreRequestWithExhaust(const std::string& nss,
+                                  long long cursorId,
+                                  const int32_t requestId) {
     Message getMoreMsg = buildOpMsg(BSON("getMore" << cursorId << "collection" << nss));
     getMoreMsg.header().setId(requestId);
     OpMsg::setFlag(&getMoreMsg, OpMsg::kExhaustSupported);
@@ -427,7 +429,7 @@ TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaust) {
 
     // Construct a 'getMore' OP_MSG request with the exhaust flag set.
     const int32_t initRequestId = 1;
-    const long cursorId = 42;
+    const long long cursorId = 42;
     const std::string nss = "test.coll";
     Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
 
@@ -477,7 +479,7 @@ TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaust) {
 TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndEmptyResponseNamespace) {
     // Construct a 'getMore' OP_MSG request with the exhaust flag set.
     const int32_t initRequestId = 1;
-    const long cursorId = 42;
+    const long long cursorId = 42;
     const std::string nss = "test.coll";
     Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
 
@@ -504,7 +506,7 @@ TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndEmptyResponseNamespa
 TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndEmptyCursorObjectInResponse) {
     // Construct a 'getMore' OP_MSG request with the exhaust flag set.
     const int32_t initRequestId = 1;
-    const long cursorId = 42;
+    const long long cursorId = 42;
     const std::string nss = "test.coll";
     Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
 
@@ -528,7 +530,7 @@ TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndEmptyCursorObjectInR
 TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndNoCursorFieldInResponse) {
     // Construct a 'getMore' OP_MSG request with the exhaust flag set.
     const int32_t initRequestId = 1;
-    const long cursorId = 42;
+    const long long cursorId = 42;
     const std::string nss = "test.coll";
     Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
 
@@ -552,7 +554,7 @@ TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndNoCursorFieldInRespo
 TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndNonOKResponse) {
     // Construct a 'getMore' OP_MSG request with the exhaust flag set.
     const int32_t initRequestId = 1;
-    const long cursorId = 42;
+    const long long cursorId = 42;
     const std::string nss = "test.coll";
     Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
 
