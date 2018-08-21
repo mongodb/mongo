@@ -46,6 +46,7 @@ struct OpMsg {
 
     static constexpr uint32_t kChecksumPresent = 1 << 0;
     static constexpr uint32_t kMoreToCome = 1 << 1;
+    static constexpr uint32_t kExhaustSupported = 1 << 16;
 
     /**
      * Returns the unvalidated flags for the given message if it is an OP_MSG message.

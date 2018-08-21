@@ -37,6 +37,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
@@ -54,37 +55,98 @@
 
 namespace mongo {
 namespace {
-// Set up proper headers for formatting an exhaust request, if we need to
-bool setExhaustMessage(Message* m, const DbResponse& dbresponse) {
+/**
+ * Creates and returns a legacy exhaust message, if exhaust is allowed. The returned message is to
+ * be used as the subsequent 'synthetic' exhaust request. Returns an empty message if exhaust is not
+ * allowed. Any messages that do not have an opcode of OP_MSG are considered legacy.
+ */
+Message makeLegacyExhaustMessage(Message* m, const DbResponse& dbresponse) {
+    // OP_QUERY responses are always of type OP_REPLY.
+    invariant(dbresponse.response.operation() == opReply);
+
+    if (dbresponse.exhaustNS.empty()) {
+        return Message();
+    }
+
     MsgData::View header = dbresponse.response.header();
     QueryResult::View qr = header.view2ptr();
     long long cursorid = qr.getCursorId();
 
-    if (!cursorid) {
-        return false;
+    if (cursorid == 0) {
+        return Message();
     }
 
-    invariant(dbresponse.exhaustNS.size() && dbresponse.exhaustNS[0]);
-
-    auto ns = dbresponse.exhaustNS;  // m->reset() will free this so we must cache a copy
-
-    m->reset();
-
-    // Rebuild out the response.
+    // Generate a message that will act as the subsequent 'synthetic' exhaust request.
     BufBuilder b(512);
-    b.appendNum(static_cast<int>(0) /* size set later in setLen() */);
+    b.appendNum(static_cast<int>(0));          // size set later in setLen()
     b.appendNum(header.getId());               // message id
     b.appendNum(header.getResponseToMsgId());  // in response to
     b.appendNum(static_cast<int>(dbGetMore));  // opCode is OP_GET_MORE
     b.appendNum(static_cast<int>(0));          // Must be ZERO (reserved)
-    b.appendStr(ns);                           // Namespace
+    b.appendStr(dbresponse.exhaustNS);         // Namespace
     b.appendNum(static_cast<int>(0));          // ntoreturn
     b.appendNum(cursorid);                     // cursor id from the OP_REPLY
 
     MsgData::View(b.buf()).setLen(b.len());
-    m->setData(b.release());
 
-    return true;
+    return Message(b.release());
+}
+
+/**
+ * Given a request and its already generated response, checks for exhaust flags. If exhaust is
+ * allowed, modifies the given request message to produce the subsequent exhaust message, and
+ * modifies the response message to indicate it is part of an exhaust stream. Returns the modified
+ * request message for it to be used as the subsequent, 'synthetic' exhaust request. Returns an
+ * empty message if exhaust is not allowed.
+ *
+ * Currently only supports exhaust for 'getMore' commands.
+ */
+Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
+    if (requestMsg.operation() == dbQuery) {
+        return makeLegacyExhaustMessage(&requestMsg, *dbresponse);
+    }
+
+    if (!OpMsgRequest::isFlagSet(requestMsg, OpMsg::kExhaustSupported)) {
+        return Message();
+    }
+
+    // Only support exhaust for 'getMore' commands.
+    auto request = OpMsgRequest::parse(requestMsg);
+    if (request.getCommandName() != "getMore"_sd) {
+        return Message();
+    }
+
+    auto reply = OpMsg::parse(dbresponse->response);
+
+    // Check for a non-OK response.
+    auto resOk = reply.body["ok"].number();
+    if (resOk != 1.0) {
+        return Message();
+    }
+
+    // Check the validity of the 'cursor' object in the response.
+    auto cursorObj = reply.body.getObjectField("cursor");
+    if (cursorObj.isEmpty()) {
+        return Message();
+    }
+
+    // A returned cursor id of '0' indicates that the cursor is exhausted and so the exhaust stream
+    // should be terminated. Also make sure the cursor namespace is valid.
+    auto cursorId = cursorObj.getField("id").numberLong();
+    auto cursorNs = cursorObj.getField("ns").str();
+    if (cursorId == 0 || cursorNs.empty()) {
+        return Message();
+    }
+
+    // Indicate that the response is part of an exhaust stream.
+    OpMsg::setFlag(&dbresponse->response, OpMsg::kMoreToCome);
+
+    // Return an augmented form of the initial request, which is to be used as the next request to
+    // be processed by the database. The id of the response is used as the request id of this
+    // 'synthetic' request.
+    requestMsg.header().setId(dbresponse->response.header().getId());
+    requestMsg.header().setResponseToMsgId(dbresponse->response.header().getResponseToMsgId());
+    return requestMsg;
 }
 
 }  // namespace
@@ -387,16 +449,19 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
     Message& toSink = dbresponse.response;
     if (!toSink.empty()) {
         invariant(!OpMsg::isFlagSet(_inMessage, OpMsg::kMoreToCome));
+
+        // Update the header for the response message.
         toSink.header().setId(nextMessageId());
         toSink.header().setResponseToMsgId(_inMessage.header().getId());
 
-        // If this is an exhaust cursor, don't source more Messages
-        if (dbresponse.exhaustNS.size() > 0 && setExhaustMessage(&_inMessage, dbresponse)) {
-            _inExhaust = true;
-        } else {
-            _inExhaust = false;
-            _inMessage.reset();
-        }
+        // If the incoming message has the exhaust flag set and is a 'getMore' command, then we
+        // bypass the normal RPC behavior. We will sink the response to the network, but we also
+        // synthesize a new 'getMore' request, as if we sourced a new message from the network. This
+        // new request is sent to the database once again to be processed. This cycle repeats as
+        // long as the associated cursor is not exhausted. Once it is exhausted, we will send a
+        // final response, terminating the exhaust stream.
+        _inMessage = makeExhaustMessage(_inMessage, &dbresponse);
+        _inExhaust = !_inMessage.empty();
 
         networkCounter.hitLogicalOut(toSink.size());
 

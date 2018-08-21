@@ -58,6 +58,12 @@ std::string stateToString(ServiceStateMachine::State state) {
     return ret;
 }
 
+Message buildOpMsg(BSONObj input) {
+    OpMsgBuilder builder;
+    builder.setBody(input);
+    return builder.finish();
+}
+
 class MockSEP : public ServiceEntryPoint {
 public:
     virtual ~MockSEP() = default;
@@ -69,17 +75,19 @@ public:
         _ranHandler = true;
         ASSERT_TRUE(haveClient());
 
-        auto req = OpMsgRequest::parse(request);
-        ASSERT_BSONOBJ_EQ(BSON("ping" << 1), req.body);
-
-        // Build out a dummy reply
-        OpMsgBuilder builder;
-        builder.setBody(BSON("ok" << 1));
+        // Build out a dummy OK response, if no custom response message was set. Otherwise, use the
+        // custom response message.
+        Message res;
+        if (_responseMessage.empty()) {
+            res = buildOpMsg(BSON("ok" << 1));
+        } else {
+            res = _responseMessage;
+        }
 
         if (_uassertInHandler)
             uassert(40469, "Synthetic uassert failure", false);
 
-        return DbResponse{builder.finish()};
+        return DbResponse{res};
     }
 
     void endAllSessions(transport::Session::TagMask tags) override {}
@@ -102,6 +110,10 @@ public:
         _uassertInHandler = true;
     }
 
+    void setResponseMessage(Message m) {
+        _responseMessage = std::move(m);
+    }
+
     bool ranHandler() {
         bool ret = _ranHandler;
         _ranHandler = false;
@@ -111,6 +123,9 @@ public:
 private:
     bool _uassertInHandler = false;
     bool _ranHandler = false;
+
+    // A custom response message to return from 'handleRequest'.
+    Message _responseMessage;
 };
 
 using namespace transport;
@@ -137,9 +152,10 @@ public:
 
             auto out = MockSession::sourceMessage();
             if (out.isOK()) {
-                OpMsgBuilder builder;
-                builder.setBody(BSON("ping" << 1));
-                out.getValue() = builder.finish();
+                // Source a dummy 'ping' request, if no custom source message was set, if specified.
+                // Otherwise use the custom source message.
+                return tl->_sourceMessage.empty() ? buildOpMsg(BSON("ping" << 1))
+                                                  : tl->_sourceMessage;
             }
             return out;
         }
@@ -197,6 +213,10 @@ public:
         _waitHook = std::move(hook);
     }
 
+    void setSourceMessage(Message m) {
+        _sourceMessage = std::move(m);
+    }
+
 private:
     bool _lastTicketSource = true;
     bool _ranSink = false;
@@ -205,13 +225,10 @@ private:
     Message _lastSunk;
     ServiceStateMachine* _ssm;
     stdx::function<void()> _waitHook;
-};
 
-Message buildRequest(BSONObj input) {
-    OpMsgBuilder builder;
-    builder.setBody(input);
-    return builder.finish();
-}
+    // A custom message for this TransportLayer to source.
+    Message _sourceMessage;
+};
 
 class MockServiceExecutor : public ServiceExecutor {
 public:
@@ -306,6 +323,25 @@ protected:
     void runPingTest(State first, State second);
     void checkPingOk();
 
+    /**
+     * Source a message from the TransportLayer, process it via the ServiceEntryPoint, and sink the
+     * response back to the TransportLayer. Only call this method when SSM state is either 'Source'
+     * or 'Created'.
+     *
+     * @param afterSource the expected state of the SSM after a message has been sourced.
+     * @param afterSink the expected state of the SSM after the response has been sunk.
+     */
+    void sourceAndSink(State afterSource, State afterSink);
+
+    /**
+     * Runs a simple source-sink test. Sources a custom message, given by 'req', and receives and
+     * sinks a custom response from the database, given by 'res'. Uses the given MockTL and MockSEP,
+     * and expects the SSM to be in states 'afterSource' and 'afterSink', after sourcing and sinking
+     * the messages.
+     */
+    void runSourceAndSinkTest(
+        MockTL* tl, MockSEP* sep, Message req, Message res, State afterSource, State afterSink);
+
     MockTL* _tl;
     MockSEP* _sep;
     MockServiceExecutor* _sexec;
@@ -330,6 +366,45 @@ void ServiceStateMachineFixture::runPingTest(State first, State second) {
     ASSERT_EQ(_ssm->state(), second);
 }
 
+void ServiceStateMachineFixture::sourceAndSink(State afterSource, State afterSink) {
+    invariant(_ssm->state() == State::Source || _ssm->state() == State::Created);
+
+    // Source a new message from the network.
+    log() << "(sourceAndSink) runNext to source a message";
+    _ssm->runNext();
+    ASSERT_TRUE(_tl->ranSource());
+    ASSERT_EQ(_ssm->state(), afterSource);
+    ASSERT_FALSE(_tl->ranSink());
+
+    // Let the message be processed by sending it to the database, receiving the response, and then
+    // sinking it.
+    log() << "(sourceAndSink) runNext to process and sink the response message";
+    _ssm->runNext();
+    ASSERT_FALSE(haveClient());
+    ASSERT_TRUE(_tl->ranSink());
+    ASSERT_EQ(_ssm->state(), afterSink);
+}
+
+void ServiceStateMachineFixture::runSourceAndSinkTest(MockTL* tl,
+                                                      MockSEP* sep,
+                                                      Message request,
+                                                      Message response,
+                                                      State afterSource,
+                                                      State afterSink) {
+
+    // Make the TransportLayer source the mock 'getMore' request, and the ServiceEntryPoint respond
+    // with a mock 'getMore' response.
+    tl->setSourceMessage(request);
+    sep->setResponseMessage(response);
+
+    ASSERT_FALSE(haveClient());
+    ASSERT_EQ(_ssm->state(), State::Created);
+
+    // Let the 'getMore' request be sourced from the network, processed in the database, and sunk to
+    // the TransportLayer.
+    sourceAndSink(afterSource, afterSink);
+}
+
 void ServiceStateMachineFixture::checkPingOk() {
     auto msg = _tl->getLastSunk();
     auto reply = OpMsg::parse(msg);
@@ -339,6 +414,188 @@ void ServiceStateMachineFixture::checkPingOk() {
 TEST_F(ServiceStateMachineFixture, TestOkaySimpleCommand) {
     runPingTest(State::Process, State::Source);
     checkPingOk();
+}
+
+Message getMoreRequestWithExhaust(const std::string& nss, long cursorId, const int32_t requestId) {
+    Message getMoreMsg = buildOpMsg(BSON("getMore" << cursorId << "collection" << nss));
+    getMoreMsg.header().setId(requestId);
+    OpMsg::setFlag(&getMoreMsg, OpMsg::kExhaustSupported);
+    return getMoreMsg;
+}
+
+TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaust) {
+
+    // Construct a 'getMore' OP_MSG request with the exhaust flag set.
+    const int32_t initRequestId = 1;
+    const long cursorId = 42;
+    const std::string nss = "test.coll";
+    Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
+
+    // Construct a 'getMore' response, with a non-zero cursor id and an empty batch.
+    BSONObj getMoreResBody =
+        BSON("ok" << 1 << "cursor"
+                  << BSON("id" << cursorId << "ns" << nss << "nextBatch" << BSONArray()));
+    Message getMoreRes = buildOpMsg(getMoreResBody);
+
+    // Let the 'getMore' request be sourced from the network, processed in the database, and sunk to
+    // the TransportLayer. Because the request message should have an exhaust flag, we should end up
+    // back in the 'Process' state, rather than in 'Source' state.
+    runSourceAndSinkTest(_tl, _sep, getMoreWithExhaust, getMoreRes, State::Process, State::Process);
+
+    // Check the last sunk message.
+    auto msg = _tl->getLastSunk();
+    auto firstResponseId = msg.header().getId();
+    ASSERT(!msg.empty());
+    ASSERT_EQ(initRequestId, msg.header().getResponseToMsgId());
+    auto reply = OpMsg::parse(msg);
+    ASSERT(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
+    ASSERT_BSONOBJ_EQ(getMoreResBody, reply.body);
+
+    // Construct a terminal 'getMore' response, indicated by a cursor id equal to zero.
+    BSONObj getMoreTerminalResBody =
+        BSON("ok" << 1 << "cursor" << BSON("id" << 0 << "ns" << nss << "nextBatch" << BSONArray()));
+    Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
+
+    // Process another 'getMore' message. This time the ServiceEntryPoint should respond with a
+    // terminal getMore, indicating that the exhaust stream should be ended.
+    _sep->setResponseMessage(getMoreTerminalRes);
+
+    log() << "runNext to terminate the exhaust stream";
+    _ssm->runNext();
+    ASSERT_FALSE(haveClient());
+    ASSERT_EQ(_ssm->state(), State::Source);
+
+    // Check the final sunk message.
+    msg = _tl->getLastSunk();
+    ASSERT(!msg.empty());
+    reply = OpMsg::parse(msg);
+    ASSERT(!OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
+    ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
+    ASSERT_EQ(firstResponseId, msg.header().getResponseToMsgId());
+}
+
+TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndEmptyResponseNamespace) {
+    // Construct a 'getMore' OP_MSG request with the exhaust flag set.
+    const int32_t initRequestId = 1;
+    const long cursorId = 42;
+    const std::string nss = "test.coll";
+    Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
+
+    // Construct a 'getMore' response with an empty namespace.
+    BSONObj getMoreTerminalResBody = BSON("ok" << 1 << "cursor" << BSON("id" << 42 << "ns"
+                                                                             << ""
+                                                                             << "nextBatch"
+                                                                             << BSONArray()));
+    Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
+
+    // Let the 'getMore' request be sourced from the network, processed in the database, and
+    // and the response sunk to the TransportLayer.
+    runSourceAndSinkTest(
+        _tl, _sep, getMoreWithExhaust, getMoreTerminalRes, State::Process, State::Source);
+
+    // Check the last sunk message.
+    auto msg = _tl->getLastSunk();
+    ASSERT(!msg.empty());
+    auto reply = OpMsg::parse(msg);
+    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
+    ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
+}
+
+TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndEmptyCursorObjectInResponse) {
+    // Construct a 'getMore' OP_MSG request with the exhaust flag set.
+    const int32_t initRequestId = 1;
+    const long cursorId = 42;
+    const std::string nss = "test.coll";
+    Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
+
+    // Construct a 'getMore' response with an empty cursor object.
+    BSONObj getMoreTerminalResBody = BSON("ok" << 1 << "cursor" << BSONObj());
+    Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
+
+    // Let the 'getMore' request be sourced from the network, processed in the database, and
+    // and the response sunk to the TransportLayer.
+    runSourceAndSinkTest(
+        _tl, _sep, getMoreWithExhaust, getMoreTerminalRes, State::Process, State::Source);
+
+    // Check the last sunk message.
+    auto msg = _tl->getLastSunk();
+    ASSERT(!msg.empty());
+    auto reply = OpMsg::parse(msg);
+    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
+    ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
+}
+
+TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndNoCursorFieldInResponse) {
+    // Construct a 'getMore' OP_MSG request with the exhaust flag set.
+    const int32_t initRequestId = 1;
+    const long cursorId = 42;
+    const std::string nss = "test.coll";
+    Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
+
+    // Construct a 'getMore' response with no 'cursor' field.
+    BSONObj getMoreTerminalResBody = BSON("ok" << 1);
+    Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
+
+    // Let the 'getMore' request be sourced from the network, processed in the database, and
+    // and the response sunk to the TransportLayer.
+    runSourceAndSinkTest(
+        _tl, _sep, getMoreWithExhaust, getMoreTerminalRes, State::Process, State::Source);
+
+    // Check the last sunk message.
+    auto msg = _tl->getLastSunk();
+    ASSERT(!msg.empty());
+    auto reply = OpMsg::parse(msg);
+    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
+    ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
+}
+
+TEST_F(ServiceStateMachineFixture, TestGetMoreWithExhaustAndNonOKResponse) {
+    // Construct a 'getMore' OP_MSG request with the exhaust flag set.
+    const int32_t initRequestId = 1;
+    const long cursorId = 42;
+    const std::string nss = "test.coll";
+    Message getMoreWithExhaust = getMoreRequestWithExhaust(nss, cursorId, initRequestId);
+
+    // Construct a 'getMore' response with a non-ok response.
+    BSONObj getMoreTerminalResBody = BSON(
+        "ok" << 0 << "cursor" << BSON("id" << 42 << "ns" << nss << "nextBatch" << BSONArray()));
+    Message getMoreTerminalRes = buildOpMsg(getMoreTerminalResBody);
+
+    // Let the 'getMore' request be sourced from the network, processed in the database, and
+    // and the response sunk to the TransportLayer.
+    runSourceAndSinkTest(
+        _tl, _sep, getMoreWithExhaust, getMoreTerminalRes, State::Process, State::Source);
+
+    // Check the last sunk message.
+    auto msg = _tl->getLastSunk();
+    ASSERT(!msg.empty());
+    auto reply = OpMsg::parse(msg);
+    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
+    ASSERT_BSONOBJ_EQ(getMoreTerminalResBody, reply.body);
+}
+
+
+TEST_F(ServiceStateMachineFixture, TestExhaustOnlySupportedForGetMoreCommand) {
+    // Construct a 'find' OP_MSG request with the exhaust flag set. We should ignore exhaust flags
+    // for non 'getMore' commands.
+    const std::string nss = "test.coll";
+    Message findWithExhaust = buildOpMsg(BSON("find" << nss));
+    OpMsg::setFlag(&findWithExhaust, OpMsg::kExhaustSupported);
+
+    // Construct an OK response.
+    Message findRes = buildOpMsg(BSON(
+        "ok" << 1 << "cursor" << BSON("id" << 42 << "ns" << nss << "firstBatch" << BSONArray())));
+
+    // Let the 'find' request be sourced from the network, processed in the database, and
+    // and the response sunk to the TransportLayer.
+    runSourceAndSinkTest(_tl, _sep, findWithExhaust, findRes, State::Process, State::Source);
+
+    // Check the last sunk message.
+    auto msg = _tl->getLastSunk();
+    ASSERT(!msg.empty());
+    auto reply = OpMsg::parse(msg);
+    ASSERT_FALSE(OpMsg::isFlagSet(msg, OpMsg::kMoreToCome));
+    ASSERT_EQ(1, reply.body.getIntField("ok"));
 }
 
 TEST_F(ServiceStateMachineFixture, TestThrowHandling) {
