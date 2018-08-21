@@ -70,7 +70,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_store.h"
@@ -124,9 +124,10 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
     std::unique_ptr<PlanStage> root = std::make_unique<MultiIteratorStage>(opCtx, ws.get(), coll);
     static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
 
-    // Determine whether this collection is sharded. If so, retrieve its sharding metadata.
+    // If the incoming operation is sharded, use the CSS to infer the filtering metadata for the
+    // collection, otherwise treat it as unsharded
     boost::optional<ScopedCollectionMetadata> shardMetadata =
-        (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, coll->ns().ns())
+        (OperationShardingState::isOperationVersioned(opCtx)
              ? CollectionShardingState::get(opCtx, coll->ns())->getMetadataForOperation(opCtx)
              : boost::optional<ScopedCollectionMetadata>{});
 
@@ -235,7 +236,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         }
     }
 
-    return getExecutorFind(opCtx, collection, nss, std::move(cq.getValue()), plannerOpts);
+    return getExecutorFind(opCtx, collection, std::move(cq.getValue()), plannerOpts);
 }
 
 BSONObj removeSortKeyMetaProjection(BSONObj projectionObj) {

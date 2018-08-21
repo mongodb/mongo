@@ -32,9 +32,9 @@
 #include "mongo/db/s/operation_sharding_state.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/sharded_connection_info.h"
 
 namespace mongo {
-
 namespace {
 
 const OperationContext::Decoration<OperationShardingState> shardingMetadataDecoration =
@@ -48,6 +48,7 @@ const Milliseconds kMaxWaitForMovePrimaryCriticalSection = Minutes(5);
 
 // The name of the field in which the client attaches its database version.
 constexpr auto kDbVersionField = "databaseVersion"_sd;
+
 }  // namespace
 
 OperationShardingState::OperationShardingState() = default;
@@ -58,6 +59,14 @@ OperationShardingState::~OperationShardingState() {
 
 OperationShardingState& OperationShardingState::get(OperationContext* opCtx) {
     return shardingMetadataDecoration(opCtx);
+}
+
+bool OperationShardingState::isOperationVersioned(OperationContext* opCtx) {
+    const auto client = opCtx->getClient();
+
+    // Shard version information received from mongos may either be attached to the Client or
+    // directly to the OperationContext
+    return ShardedConnectionInfo::get(client, false) || get(opCtx).hasShardVersion();
 }
 
 void OperationShardingState::setAllowImplicitCollectionCreation(

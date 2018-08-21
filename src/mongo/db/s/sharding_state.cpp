@@ -33,8 +33,7 @@
 
 #include "mongo/db/s/sharding_state.h"
 
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharded_connection_info.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 
@@ -114,18 +113,6 @@ OID ShardingState::clusterId() {
     invariant(enabled());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _clusterId;
-}
-
-bool ShardingState::needCollectionMetadata(OperationContext* opCtx, const std::string& ns) {
-    if (!enabled())
-        return false;
-
-    Client* client = opCtx->getClient();
-
-    // Shard version information received from mongos may either by attached to the Client or
-    // directly to the OperationContext.
-    return ShardedConnectionInfo::get(client, false) ||
-        OperationShardingState::get(opCtx).hasShardVersion();
 }
 
 void ShardingState::clearForTests() {

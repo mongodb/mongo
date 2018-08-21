@@ -212,8 +212,8 @@ public:
             // execution tree with an EOFStage.
             Collection* const collection = ctx->getCollection();
 
-            // We have a parsed query. Time to get the execution plan for it.
-            auto exec = uassertStatusOK(getExecutorFind(opCtx, collection, nss, std::move(cq)));
+            // Get the execution plan for the query.
+            auto exec = uassertStatusOK(getExecutorFind(opCtx, collection, std::move(cq)));
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
@@ -395,7 +395,7 @@ public:
             }
 
             // Get the execution plan for the query.
-            auto exec = uassertStatusOK(getExecutorFind(opCtx, collection, nss, std::move(cq)));
+            auto exec = uassertStatusOK(getExecutorFind(opCtx, collection, std::move(cq)));
 
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());

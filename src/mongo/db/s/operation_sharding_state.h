@@ -63,6 +63,13 @@ public:
     static OperationShardingState& get(OperationContext* opCtx);
 
     /**
+     * Returns true if the the current operation was sent by the caller with shard version
+     * information attached, meaning that it must perform shard version checking and orphan
+     * filtering.
+     */
+    static bool isOperationVersioned(OperationContext* opCtx);
+
+    /**
      * Requests on a sharded collection that are broadcast without a shardVersion should not cause
      * the collection to be created on a shard that does not know about the collection already,
      * since the collection options will not be propagated. Such requests specify to disallow

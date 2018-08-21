@@ -265,6 +265,9 @@ public:
         const NamespaceString nss(parseNs(dbName, cmdObj));
         const auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        uassert(ErrorCodes::IllegalOperation,
+                "You can't convertToCapped a sharded collection",
+                !routingInfo.cm());
 
         // convertToCapped creates a temp collection and renames it at the end. It will require
         // special handling for create collection.

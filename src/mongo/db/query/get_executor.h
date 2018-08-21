@@ -119,7 +119,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     Collection* collection,
-    const NamespaceString& nss,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
 
@@ -129,7 +128,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorLegacyFind(
     OperationContext* opCtx,
     Collection* collection,
-    const NamespaceString& nss,
     std::unique_ptr<CanonicalQuery> canonicalQuery);
 
 /**

@@ -607,8 +607,8 @@ std::string runQuery(OperationContext* opCtx,
             repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, slaveOK));
     }
 
-    // We have a parsed query. Time to get the execution plan for it.
-    auto exec = uassertStatusOK(getExecutorLegacyFind(opCtx, collection, nss, std::move(cq)));
+    // Get the execution plan for the query.
+    auto exec = uassertStatusOK(getExecutorLegacyFind(opCtx, collection, std::move(cq)));
 
     const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
 
