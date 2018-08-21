@@ -167,7 +167,7 @@ class Graph(object):
         for node_key in self.nodes:
             print("Node", self.nodes[node_key]['node'])
             for to_node in self.nodes[node_key]['next_nodes']:
-                print(" ->", to_node)
+                print(" ->", self.nodes[to_node]['node'])
 
     def to_graph(self, nodes=None, message=None):
         """Return the 'to_graph'."""
@@ -180,7 +180,8 @@ class Graph(object):
         sb.append('digraph "mongod+lock-status" {')
         for node_key in self.nodes:
             for next_node_key in self.nodes[node_key]['next_nodes']:
-                sb.append('    "{}" -> "{}";'.format(node_key, next_node_key))
+                sb.append('    "{}" -> "{}";'.format(self.nodes[node_key]['node'],
+                                                     self.nodes[next_node_key]['node']))
         for node_key in self.nodes:
             color = ""
             if nodes and node_key in nodes:
@@ -190,7 +191,8 @@ class Graph(object):
             # character.
             escaped_label = str(self.nodes[node_key]['node']).replace('"', '\\"')
 
-            sb.append('    "{}" [label="{}" {}]'.format(node_key, escaped_label, color))
+            sb.append('    "{}" [label="{}" {}]'.format(self.nodes[node_key]['node'], escaped_label,
+                                                        color))
         sb.append("}")
         return "\n".join(sb)
 
@@ -345,8 +347,8 @@ def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-
             print("MongoDB Lock at {} ({}) held by {} waited on by {}".format(
                 lock_head, lock_request["mode"], lock_holder, lock_waiter))
         if graph:
-            graph.add_edge(lock_waiter, Lock(long(lock_head), "MongoDB lock"))
-            graph.add_edge(Lock(long(lock_head), "MongoDB lock"), lock_holder)
+            graph.add_edge(lock_waiter, Lock(long(lock_head), lock_request["mode"]))
+            graph.add_edge(Lock(long(lock_head), lock_request["mode"]), lock_holder)
         lock_request_ptr = lock_request["next"]
 
 
