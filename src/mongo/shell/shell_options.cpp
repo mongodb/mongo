@@ -491,16 +491,22 @@ void redactPasswordOptions(int argc, char** argv) {
             }
         }
         if (arg.startsWith(kLongPasswordOption)) {
-            char* toRedact;
+            char* toRedact = nullptr;
             // Handle --password password
             if ((arg == kLongPasswordOption) && (i + 1 < argc)) {
                 toRedact = argv[++i];
                 // Handle --password=password
-            } else {
+            } else if (arg.size() != kLongPasswordOption.size()) {
                 toRedact = argv[i] + kLongPasswordOption.size();
                 // It's not valid to do --passwordpassword, make sure there's an = separator
                 invariant(*(toRedact++) == '=');
             }
+
+            // If there's nothing to redact, just exit
+            if (!toRedact) {
+                continue;
+            }
+
             // The arg should be null-terminated, replace everything up to \0 to 'x'
             while (*toRedact) {
                 *toRedact++ = 'x';
