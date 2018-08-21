@@ -655,13 +655,6 @@ std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getE
 
 Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleTask(
     OperationContext* opCtx, const NamespaceString& nss, Task task) {
-    Status linearizableReadStatus = waitForLinearizableReadConcern(opCtx);
-    if (!linearizableReadStatus.isOK()) {
-        return {linearizableReadStatus.code(),
-                str::stream() << "Unable to schedule routing table update because this is not the"
-                              << " majority primary and may not have the latest data. Error: "
-                              << linearizableReadStatus.reason()};
-    }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     const bool wasEmpty = _taskLists[nss].empty();
