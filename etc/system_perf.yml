@@ -761,7 +761,7 @@ buildvariants:
   depends_on:
       - name: compile_enterprise
         variant: compile-linux-64-amzn
-  tasks: &standalonetasks
+  tasks:
     - name: industry_benchmarks
     - name: crud_workloads
     - name: smoke_test
