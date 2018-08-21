@@ -689,6 +689,14 @@ env_vars.Add('CXXFLAGS',
 env_vars.Add('ENV',
     help='Sets the environment for subprocesses')
 
+env_vars.Add('FRAMEWORKPATH',
+    help='Adds paths to the linker search path for darwin frameworks',
+    converter=variable_shlex_converter)
+
+env_vars.Add('FRAMEWORKS',
+    help='Adds extra darwin frameworks to link against',
+    converter=variable_shlex_converter)
+
 env_vars.Add('HOST_ARCH',
     help='Sets the native architecture of the compiler',
     converter=variable_arch_converter,
@@ -3363,33 +3371,58 @@ def doConfigure(myenv):
  
     def CheckMongoCMinVersion(context):
         compile_test_body = textwrap.dedent("""
-        #include <mongoc.h>
+        #include <mongoc/mongoc.h>
 
-        #if !MONGOC_CHECK_VERSION(1,10,0)
+        #if !MONGOC_CHECK_VERSION(1,13,0)
         #error
         #endif
         """)
 
-        context.Message("Checking if mongoc version is 1.10.0 or newer...")
+        context.Message("Checking if mongoc version is 1.13.0 or newer...")
         result = context.TryCompile(compile_test_body, ".cpp")
         context.Result(result)
         return result
 
     conf.AddTest('CheckMongoCMinVersion', CheckMongoCMinVersion)
+    
+    if env.TargetOSIs('darwin'):
+        def CheckMongoCFramework(context):
+            context.Message("Checking for mongoc_get_major_version() in darwin framework mongoc...")
+            test_body = """
+            #include <mongoc/mongoc.h>
+
+            int main() {
+                mongoc_get_major_version();
+
+                return EXIT_SUCCESS;
+            }
+            """
+
+            lastFRAMEWORKS = context.env['FRAMEWORKS']
+            context.env.Append(FRAMEWORKS=['mongoc'])
+            result = context.TryLink(textwrap.dedent(test_body), ".c")
+            context.Result(result)
+            context.env['FRAMEWORKS'] = lastFRAMEWORKS
+            return result
+        
+        conf.AddTest('CheckMongoCFramework', CheckMongoCFramework)
 
     mongoc_mode = get_option('use-system-mongo-c')
     conf.env['MONGO_HAVE_LIBMONGOC'] = False
     if mongoc_mode != 'off':
-        conf.env['MONGO_HAVE_LIBMONGOC'] = conf.CheckLibWithHeader(
+        if conf.CheckLibWithHeader(
                 ["mongoc-1.0"],
-                ["mongoc.h"],
+                ["mongoc/mongoc.h"],
                 "C",
                 "mongoc_get_major_version();",
-                autoadd=False )
+                autoadd=False ):
+            conf.env['MONGO_HAVE_LIBMONGOC'] = "library" 
+        if not conf.env['MONGO_HAVE_LIBMONGOC'] and env.TargetOSIs('darwin') and conf.CheckMongoCFramework():
+            conf.env['MONGO_HAVE_LIBMONGOC'] = "framework"
         if not conf.env['MONGO_HAVE_LIBMONGOC'] and mongoc_mode == 'on':
             myenv.ConfError("Failed to find the required C driver headers")
         if conf.env['MONGO_HAVE_LIBMONGOC'] and not conf.CheckMongoCMinVersion():
-            myenv.ConfError("Version of mongoc is too old. Version 1.10+ required")
+            myenv.ConfError("Version of mongoc is too old. Version 1.13+ required")
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
@@ -3479,7 +3512,8 @@ if get_option('install-mode') == 'hygienic':
     elif env['PLATFORM'] == 'darwin':
         env.AppendUnique(
             LINKFLAGS=[
-                '-Wl,-rpath,@loader_path/../lib'
+                '-Wl,-rpath,@loader_path/../lib',
+                '-Wl,-rpath,@loader_path/../Frameworks'
             ],
             SHLINKFLAGS=[
                 "-Wl,-install_name,@rpath/${TARGET.file}",

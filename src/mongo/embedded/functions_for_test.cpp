@@ -30,7 +30,6 @@
 
 #include "mongo/embedded/functions_for_test.h"
 
-#include <mongoc.h>
 #include <stdio.h>
 
 #include "mongo/embedded/mongoc_client.h"

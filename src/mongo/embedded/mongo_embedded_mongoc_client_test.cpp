@@ -30,7 +30,7 @@
 
 #include "mongo/embedded/mongoc_client.h"
 
-#include <mongoc.h>
+#include <mongoc/mongoc.h>
 #include <set>
 #include <yaml-cpp/yaml.h>
 
