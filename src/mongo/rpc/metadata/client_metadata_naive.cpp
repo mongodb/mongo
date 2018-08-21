@@ -39,8 +39,8 @@ namespace mongo {
 void logClientMetadata(const Client* const client, const BSONObj& isMasterCmdObj) {
     BSONElement elem = isMasterCmdObj[kMetadataDocumentName];
     if (!elem.eoo()) {
-        log() << "client supplied metadata " << client->getRemote().toString() << " "
-              << client->desc() << ": " << elem.jsonString(Strict);
+        log() << "received client metadata from " << client->getRemote().toString() << " "
+              << client->desc() << ": " << elem.Obj();
     }
 }
 
