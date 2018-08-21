@@ -18,8 +18,6 @@ selector:
   # majority-committed snapshot.
   - jstests/aggregation/mongos_slaveok.js
   - jstests/aggregation/testSlave.js
-  # TODO(SERVER-36754): Reenable once cause of failure is fixed
-  - jstests/aggregation/testshard1.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the

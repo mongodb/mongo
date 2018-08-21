@@ -13,8 +13,6 @@ selector:
   - jstests/aggregation/data/*.js
   # Skip any tests that run with auth explicitly.
   - jstests/aggregation/*[aA]uth*.js
-  # TODO(SERVER-36754): Reenable once cause of failure is fixed
-  - jstests/aggregation/testshard1.js
 
 executor:
   config:

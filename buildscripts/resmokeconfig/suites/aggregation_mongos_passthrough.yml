@@ -12,8 +12,6 @@ selector:
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
-  # TODO(SERVER-36754): Reenable once cause of failure is fixed
-  - jstests/aggregation/testshard1.js
   exclude_with_any_tags:
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding
