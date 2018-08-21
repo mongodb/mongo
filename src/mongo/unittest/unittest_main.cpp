@@ -33,6 +33,7 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/logger/logger.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -66,6 +67,10 @@ int main(int argc, char** argv, char** envp) {
     auto repeatDesc = "Specifies the number of runs for each test.";
     options.addOptionChaining("repeat", "repeat", moe::Int, repeatDesc).setDefault(moe::Value(1));
 
+    auto verboseDesc = "Log more verbose output.  Specify one or more 'v's to increase verbosity.";
+    options.addOptionChaining("verbose", "verbose", moe::String, verboseDesc)
+        .setImplicit(moe::Value(std::string("v")));
+
     std::vector<std::string> argVector(argv, argv + argc);
     Status ret = parser.run(options, argVector, env, &environment);
     if (!ret.isOK()) {
@@ -77,12 +82,23 @@ int main(int argc, char** argv, char** envp) {
     moe::StringVector_t suites;
     std::string filter;
     int repeat = 1;
+    std::string verbose;
     // "list" and "repeat" will be assigned with default values, if not present.
     invariant(environment.get("list", &list));
     invariant(environment.get("repeat", &repeat));
-    // The default values of "suite" and "filter" are empty.
+    // The default values of "suite" "filter" and "verbose" are empty.
     environment.get("suite", &suites).ignore();
     environment.get("filter", &filter).ignore();
+    environment.get("verbose", &verbose).ignore();
+
+    if (std::any_of(verbose.cbegin(), verbose.cend(), [](char ch) { return ch != 'v'; })) {
+        std::cerr << "The string for the --verbose option cannot contain characters other than 'v'"
+                  << std::endl;
+        std::cerr << options.helpString();
+        return EXIT_FAILURE;
+    }
+    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+        ::mongo::logger::LogSeverity::Debug(verbose.length()));
 
     if (list) {
         auto suiteNames = ::mongo::unittest::getAllSuiteNames();
@@ -91,5 +107,6 @@ int main(int argc, char** argv, char** envp) {
         }
         return EXIT_SUCCESS;
     }
+
     return ::mongo::unittest::Suite::run(suites, filter, repeat);
 }
