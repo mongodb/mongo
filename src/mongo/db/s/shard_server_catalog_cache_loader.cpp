@@ -858,12 +858,6 @@ std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getE
 
 Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChunksTask(
     OperationContext* opCtx, const NamespaceString& nss, collAndChunkTask task) {
-    Status linearizableReadStatus = waitForLinearizableReadConcern(opCtx);
-    if (!linearizableReadStatus.isOK()) {
-        return linearizableReadStatus.withContext(
-            "Unable to schedule routing table update because this is not the majority primary and "
-            "may not have the latest data.");
-    }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     const bool wasEmpty = _collAndChunkTaskLists[nss].empty();
@@ -887,12 +881,6 @@ Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndCh
 
 Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
     OperationContext* opCtx, StringData dbName, DBTask task) {
-    Status linearizableReadStatus = waitForLinearizableReadConcern(opCtx);
-    if (!linearizableReadStatus.isOK()) {
-        return linearizableReadStatus.withContext(
-            "Unable to schedule routing table update because this is not the majority primary and "
-            "may not have the latest data.");
-    }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     const bool wasEmpty = _dbTaskLists[dbName.toString()].empty();
