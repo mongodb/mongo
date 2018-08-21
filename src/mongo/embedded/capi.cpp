@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/embedded/capi.h"
 
 #include <cstring>
@@ -48,6 +50,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
+
+#if defined(_WIN32)
+#define MONGO_API_CALL __cdecl
+#else
+#define MONGO_API_CALL
+#endif
 
 struct mongo_embedded_v1_status {
     mongo_embedded_v1_status() noexcept = default;
@@ -563,78 +571,80 @@ auto enterCXX(mongo_embedded_v1_status* const statusPtr, Callable&& c) noexcept
 }  // namespace
 
 extern "C" {
-mongo_embedded_v1_lib* mongo_embedded_v1_lib_init(const mongo_embedded_v1_init_params* const params,
-                                                  mongo_embedded_v1_status* const statusPtr) {
+mongo_embedded_v1_lib* MONGO_API_CALL mongo_embedded_v1_lib_init(
+    const mongo_embedded_v1_init_params* const params, mongo_embedded_v1_status* const statusPtr) {
     return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
         return mongo::capi_lib_init(params, status);
     });
 }
 
-int mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib* const lib,
-                               mongo_embedded_v1_status* const statusPtr) {
+int MONGO_API_CALL mongo_embedded_v1_lib_fini(mongo_embedded_v1_lib* const lib,
+                                              mongo_embedded_v1_status* const statusPtr) {
     return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
         return mongo::capi_lib_fini(lib, status);
     });
 }
 
-mongo_embedded_v1_instance* mongo_embedded_v1_instance_create(
-    mongo_embedded_v1_lib* lib,
-    const char* const yaml_config,
-    mongo_embedded_v1_status* const statusPtr) {
+mongo_embedded_v1_instance* MONGO_API_CALL
+mongo_embedded_v1_instance_create(mongo_embedded_v1_lib* lib,
+                                  const char* const yaml_config,
+                                  mongo_embedded_v1_status* const statusPtr) {
     return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
         return mongo::instance_new(lib, yaml_config, status);
     });
 }
 
-int mongo_embedded_v1_instance_destroy(mongo_embedded_v1_instance* const db,
-                                       mongo_embedded_v1_status* const statusPtr) {
+int MONGO_API_CALL mongo_embedded_v1_instance_destroy(mongo_embedded_v1_instance* const db,
+                                                      mongo_embedded_v1_status* const statusPtr) {
     return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
         return mongo::instance_destroy(db, status);
     });
 }
 
-mongo_embedded_v1_client* mongo_embedded_v1_client_create(
+mongo_embedded_v1_client* MONGO_API_CALL mongo_embedded_v1_client_create(
     mongo_embedded_v1_instance* const db, mongo_embedded_v1_status* const statusPtr) {
     return enterCXX(
         statusPtr, [&](mongo_embedded_v1_status& status) { return mongo::client_new(db, status); });
 }
 
-int mongo_embedded_v1_client_destroy(mongo_embedded_v1_client* const client,
-                                     mongo_embedded_v1_status* const statusPtr) {
+int MONGO_API_CALL mongo_embedded_v1_client_destroy(mongo_embedded_v1_client* const client,
+                                                    mongo_embedded_v1_status* const statusPtr) {
     return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
         return mongo::client_destroy(client, status);
     });
 }
 
-int mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* const client,
-                                    const void* input,
-                                    const size_t input_size,
-                                    void** const output,
-                                    size_t* const output_size,
-                                    mongo_embedded_v1_status* const statusPtr) {
+int MONGO_API_CALL mongo_embedded_v1_client_invoke(mongo_embedded_v1_client* const client,
+                                                   const void* input,
+                                                   const size_t input_size,
+                                                   void** const output,
+                                                   size_t* const output_size,
+                                                   mongo_embedded_v1_status* const statusPtr) {
     return enterCXX(statusPtr, [&](mongo_embedded_v1_status& status) {
         return mongo::client_wire_protocol_rpc(
             client, input, input_size, output, output_size, status);
     });
 }
 
-int mongo_embedded_v1_status_get_error(const mongo_embedded_v1_status* const status) {
+int MONGO_API_CALL
+mongo_embedded_v1_status_get_error(const mongo_embedded_v1_status* const status) {
     return mongo::capi_status_get_error(status);
 }
 
-const char* mongo_embedded_v1_status_get_explanation(const mongo_embedded_v1_status* const status) {
+const char* MONGO_API_CALL
+mongo_embedded_v1_status_get_explanation(const mongo_embedded_v1_status* const status) {
     return mongo::capi_status_get_what(status);
 }
 
-int mongo_embedded_v1_status_get_code(const mongo_embedded_v1_status* const status) {
+int MONGO_API_CALL mongo_embedded_v1_status_get_code(const mongo_embedded_v1_status* const status) {
     return mongo::capi_status_get_code(status);
 }
 
-mongo_embedded_v1_status* mongo_embedded_v1_status_create(void) {
+mongo_embedded_v1_status* MONGO_API_CALL mongo_embedded_v1_status_create(void) {
     return new mongo_embedded_v1_status;
 }
 
-void mongo_embedded_v1_status_destroy(mongo_embedded_v1_status* const status) {
+void MONGO_API_CALL mongo_embedded_v1_status_destroy(mongo_embedded_v1_status* const status) {
     delete status;
 }
 

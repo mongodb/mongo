@@ -34,6 +34,38 @@
 #include <mongo/embedded/capi.h>
 #include <mongoc.h>
 
+#pragma push_macro("MONGO_API_CALL")
+#undef MONGO_API_CALL
+
+#pragma push_macro("MONGO_API_IMPORT")
+#undef MONGO_API_IMPORT
+
+#pragma push_macro("MONGO_API_EXPORT")
+#undef MONGO_API_EXPORT
+
+#pragma push_macro("MONGO_EMBEDDED_MONGOC_CLIENT_API")
+#undef MONGO_EMBEDDED_MONGOC_CLIENT_API
+
+#if defined(_WIN32)
+#define MONGO_API_CALL __cdecl
+#define MONGO_API_IMPORT __declspec(dllimport)
+#define MONGO_API_EXPORT __declspec(dllexport)
+#else
+#define MONGO_API_CALL
+#define MONGO_API_IMPORT __attribute__((visibility("default")))
+#define MONGO_API_EXPORT __attribute__((used, visibility("default")))
+#endif
+
+#if defined(MONGO_EMBEDDED_MONGOC_CLIENT_STATIC)
+#define MONGO_EMBEDDED_MONGOC_CLIENT_API
+#else
+#if defined(MONGO_EMBEDDED_MONGOC_CLIENT_COMPILING)
+#define MONGO_EMBEDDED_MONGOC_CLIENT_API MONGO_API_EXPORT
+#else
+#define MONGO_EMBEDDED_MONGOC_CLIENT_API MONGO_API_IMPORT
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,10 +75,23 @@ extern "C" {
  * @param db must be a valid instance handle created by `mongo_embedded_v1_instance_create`
  * @returns a mongoc client or `NULL` on error
  */
-mongoc_client_t* mongo_embedded_v1_mongoc_client_create(mongo_embedded_v1_instance* instance);
+MONGO_EMBEDDED_MONGOC_CLIENT_API mongoc_client_t* MONGO_API_CALL
+mongo_embedded_v1_mongoc_client_create(mongo_embedded_v1_instance* instance);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif
+
+#undef MONGO_EMBEDDED_MONGOC_CLIENT_API
+#pragma pop_macro("MONGO_EMBEDDED_MONGOC_CLIENT_API")
+
+#undef MONGO_API_EXPORT
+#pragma push_macro("MONGO_API_EXPORT")
+
+#undef MONGO_API_IMPORT
+#pragma push_macro("MONGO_API_IMPORT")
+
+#undef MONGO_API_CALL
+#pragma pop_macro("MONGO_API_CALL")
 
 #endif  // HEADERUUID_8CAAB40D_AC65_46CF_9FA9_B48825C825DC_DEFINED

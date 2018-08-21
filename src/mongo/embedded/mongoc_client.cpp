@@ -41,6 +41,12 @@
 #include "mongo/embedded/capi.h"
 #include "mongo/platform/endian.h"
 
+#if defined(_WIN32)
+#define MONGO_API_CALL __cdecl
+#else
+#define MONGO_API_CALL
+#endif
+
 // Macro to trick the linter into accepting assert.
 #define mongoc_client_assert assert
 
@@ -300,8 +306,8 @@ struct ClientDeleter {
     }
 };
 
-extern "C" mongoc_client_t* mongo_embedded_v1_mongoc_client_create(
-    mongo_embedded_v1_instance* db) try {
+extern "C" mongoc_client_t* MONGO_API_CALL
+mongo_embedded_v1_mongoc_client_create(mongo_embedded_v1_instance* db) try {
     if (!db) {
         errno = EINVAL;
         return nullptr;
