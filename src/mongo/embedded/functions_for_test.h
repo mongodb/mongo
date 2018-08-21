@@ -28,10 +28,7 @@
 
 #pragma once
 
-// <inttypes.h> is needed to avoid macro redefinition error when compiling on Windows.
-// Should be fixed inside mongoc.h
-#include <inttypes.h>
-#include <mongoc.h>
+#include <mongoc/mongoc.h>
 
 namespace mongo {
 
