@@ -1,9 +1,9 @@
 # Jira integration
-cryptography == 1.7.2
+cryptography == 2.0
 jira == 1.0.10
 pyjwt == 1.5.3
 # Other
-pyyaml == 3.11
+pyyaml == 3.13
 unittest-xml-reporting == 2.1.0
 # Linters
 yapf == 0.21.0

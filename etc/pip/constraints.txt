@@ -1,0 +1,62 @@
+# Common requirements
+asn1crypto==0.24.0
+astroid==1.6.5
+boto3==1.5.27
+botocore==1.8.50
+certifi==2018.8.13
+cffi==1.11.5
+chardet==3.0.4
+cryptography==2.0
+defusedxml==0.5.0
+docutils==0.14
+enum34==1.1.6
+idna==2.7
+isort==4.3.4
+Jinja2==2.10
+jira==1.0.10
+jmespath==0.9.3
+lazy-object-proxy==1.3.1
+MarkupSafe==1.0
+mccabe==0.6.1
+mock==2.0.0
+oauthlib==2.1.0
+pbr==4.2.0
+psutil==5.4.3
+pycparser==2.18
+pydocstyle==2.1.1
+PyJWT==1.5.3
+PyKMIP==0.4.0
+pylint==1.8.3
+pymongo==3.6.1
+python-dateutil==2.7.3
+PyYAML==3.13
+requests==2.19.1
+requests-oauthlib==1.0.0
+requests-toolbelt==0.8.0
+s3transfer==0.1.13
+six==1.11.0
+snowballstemmer==1.2.1
+unittest-xml-reporting==2.1.0
+urllib3==1.23
+wrapt==1.10.11
+yapf==0.21.0
+
+# Python2 requirements
+backports.functools-lru-cache==1.5; python_version < "3"
+Cheetah3==3.0.0; python_version < "3"
+configparser==3.5.0; python_version < "3"
+funcsigs==1.0.2; python_version < "3"
+futures==3.2.0; python_version < "3"
+ipaddress==1.0.22; python_version < "3"
+ordereddict==1.1; python_version < "3"
+singledispatch==3.4.0.3; python_version < "3"
+typing==3.6.1; python_version < "3"
+
+# Python3 requirements
+mypy==0.580; python_version > "3"
+typed-ast==1.1.0; python_version > "3"
+
+# Platform-specific components
+pypiwin32==219; sys_platform == "win32" and python_version < "3"
+pypiwin32==223; sys_platform == "win32" and python_version > "3"
+subprocess32==3.5.2; os_name == "posix" and platform_release != "2.6.18-194.el5xen" and platform_release != "2.6.18-274.el5xen" and python_version < "3"
