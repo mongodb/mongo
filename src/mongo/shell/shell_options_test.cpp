@@ -61,6 +61,10 @@ TEST(ShellOptions, RedactPasswords) {
          {"--password=xxx"_sd}},  // NOLINT
         {{"-ppassword"},          // NOLINT
          {"-pxxxxxxxx"}},         // NOLINT
+        // Having --password at the end of the parameters list should do nothing since it means
+        // prompt for password
+        {{"mongodb://admin@localhost/admin", "--password"},         // NOLINT
+         {"mongodb://admin@localhost/admin"_sd, "--password"_sd}},  // NOLINT
     };
 
     for (auto& testCase : testData) {
