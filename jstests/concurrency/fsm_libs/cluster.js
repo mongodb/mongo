@@ -490,9 +490,9 @@ var Cluster = function(options) {
                     return;
                 }
 
-                if (!validateCollections(db.getSiblingDB(dbInfo.name), {full: true})) {
-                    throw new Error(phase + ' collection validation failed');
-                }
+                assert.commandWorked(
+                    validateCollections(db.getSiblingDB(dbInfo.name), {full: true}),
+                    phase + ' collection validation failed');
             });
         };
 

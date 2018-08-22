@@ -26,7 +26,8 @@ function CollectionValidator() {
 
         const full = obj.full;
 
-        let success = true;
+        // Failed collection validation results are saved in failed_res.
+        let full_res = {ok: 1, failed_res: []};
 
         // Don't run validate on view namespaces.
         let filter = {type: "collection"};
@@ -74,11 +75,12 @@ function CollectionValidator() {
                 print('Collection validation failed on host ' + host + ' with response: ' +
                       tojson(res));
                 dumpCollection(coll, 100);
-                success = false;
+                full_res.failed_res.push(res);
+                full_res.ok = 0;
             }
         }
 
-        return success;
+        return full_res;
     };
 
     // Run a separate thread to validate collections on each server in parallel.

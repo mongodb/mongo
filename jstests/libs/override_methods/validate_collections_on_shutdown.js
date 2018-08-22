@@ -77,15 +77,16 @@
         for (let i = 0; i < dbNames.length; ++i) {
             const dbName = dbNames[i];
             cmds.then("validating " + dbName, function(conn) {
-                if (!validateCollections(conn.getDB(dbName), {full: true})) {
-                    return {shouldStop: true, reason: "collection validation failed"};
+                const validate_res = validateCollections(conn.getDB(dbName), {full: true});
+                if (!validate_res.ok) {
+                    return {
+                        shouldStop: true,
+                        reason: "collection validation failed " + tojson(validate_res)
+                    };
                 }
             });
         }
 
-        result = cmds.execute();
-        if (!result.ok) {
-            throw new Error(result.reason);
-        }
+        assert.commandWorked(cmds.execute());
     };
 })();
