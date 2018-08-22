@@ -117,7 +117,7 @@ Message DBClientCursor::_assembleInit() {
                                                 nToSkip,
                                                 nextBatchSize(),
                                                 opts);
-        if (qr.isOK() && !qr.getValue()->isExplain() && !qr.getValue()->isExhaust()) {
+        if (qr.isOK() && !qr.getValue()->isExplain()) {
             BSONObj cmd = qr.getValue()->asFindCommand();
             if (auto readPref = query["$readPreference"]) {
                 // QueryRequest doesn't handle $readPreference.
@@ -144,7 +144,12 @@ Message DBClientCursor::_assembleGetMore() {
                                   boost::none,   // awaitDataTimeout
                                   boost::none,   // term
                                   boost::none);  // lastKnownCommittedOptime
-        return assembleCommandRequest(_client, ns.db(), opts, gmr.toBSON());
+        auto msg = assembleCommandRequest(_client, ns.db(), opts, gmr.toBSON());
+        // Set the exhaust flag if needed.
+        if (opts & QueryOption_Exhaust && msg.operation() == dbMsg) {
+            OpMsg::setFlag(&msg, OpMsg::kExhaustSupported);
+        }
+        return msg;
     } else {
         // Assemble a legacy getMore request.
         return makeGetMoreMessage(ns.ns(), cursorId, nextBatchSize(), opts);
@@ -204,7 +209,10 @@ bool DBClientCursor::initLazyFinish(bool& retry) {
 }
 
 void DBClientCursor::requestMore() {
-    if (opts & QueryOption_Exhaust) {
+    // For exhaust queries, once the stream has been initiated we get data blasted to us
+    // from the remote server, without a need to send any more 'getMore' requests.
+    const auto isExhaust = opts & QueryOption_Exhaust;
+    if (isExhaust && (!_useFindCommand || _connectionHasPendingReplies)) {
         return exhaustReceiveMore();
     }
 
@@ -233,9 +241,13 @@ void DBClientCursor::requestMore() {
     });
 }
 
-/** with QueryOption_Exhaust, the server just blasts data at us (marked at end with cursorid==0). */
+/**
+ * With QueryOption_Exhaust, the server just blasts data at us. The end of a stream is marked with a
+ * cursor id of 0.
+ */
 void DBClientCursor::exhaustReceiveMore() {
-    verify(cursorId && batch.pos == batch.objs.size());
+    verify(cursorId);
+    verify(batch.pos == batch.objs.size());
     uassert(40675, "Cannot have limit for exhaust query", !haveLimit);
     Message response;
     verify(_client);
@@ -248,6 +260,13 @@ void DBClientCursor::exhaustReceiveMore() {
 BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
     int op = reply.operation();
     invariant(op == opReply || op == dbMsg);
+
+    // Check if the reply indicates that it is part of an exhaust stream.
+    const auto isExhaust = OpMsg::isFlagSet(reply, OpMsg::kMoreToCome);
+    _connectionHasPendingReplies = isExhaust;
+    if (isExhaust) {
+        _lastRequestId = reply.header().getId();
+    }
 
     auto commandReply = _client->parseCommandReplyMessage(_client->getServerAddress(), reply);
     auto commandStatus = getStatusFromCommandResult(commandReply->getCommandReply());
@@ -282,6 +301,10 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
         cursorId = 0;  // Don't try to kill cursor if we get back an error.
         auto cr = uassertStatusOK(CursorResponse::parseFromBSON(commandDataReceived(reply)));
         cursorId = cr.getCursorId();
+        uassert(50935,
+                "Received a getMore response with a cursor id of 0 and the moreToCome flag set.",
+                !(_connectionHasPendingReplies && cursorId == 0));
+
         ns = cr.getNSS();  // Unlike OP_REPLY, find command can change the ns to use for getMores.
         batch.objs = cr.releaseBatch();
         return;

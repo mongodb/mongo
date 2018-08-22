@@ -352,3 +352,13 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
+
+env.CppUnitTest(
+    target='dbclient_cursor_test',
+    source=[
+        'dbclient_cursor_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver_network',
+    ],
+)
