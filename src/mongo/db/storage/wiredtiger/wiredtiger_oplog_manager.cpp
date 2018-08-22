@@ -39,6 +39,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -100,7 +101,7 @@ void WiredTigerOplogManager::halt() {
 }
 
 void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
-    const WiredTigerRecordStore* oplogRecordStore, OperationContext* opCtx) const {
+    const WiredTigerRecordStore* oplogRecordStore, OperationContext* opCtx) {
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
     // In order to reliably detect rollback situations, we need to fetch the latestVisibleTimestamp
@@ -122,6 +123,12 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     opCtx->recoveryUnit()->abandonSnapshot();
 
     stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
+
+    // Prevent any scheduled journal flushes from being delayed and blocking this wait excessively.
+    _opsWaitingForVisibility++;
+    invariant(_opsWaitingForVisibility > 0);
+    auto exitGuard = MakeGuard([&] { _opsWaitingForVisibility--; });
+
     opCtx->waitForConditionOrInterrupt(_opsBecameVisibleCV, lk, [&] {
         auto newLatestVisibleTimestamp = getOplogReadTimestamp();
         if (newLatestVisibleTimestamp < currentLatestVisibleTimestamp) {
@@ -177,15 +184,18 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(
             auto now = Date_t::now();
             auto deadline = now + journalDelay;
             auto shouldSyncOpsWaitingForJournal = [&] {
-                return _shuttingDown || oplogRecordStore->haveCappedWaiters();
+                return _shuttingDown || _opsWaitingForVisibility ||
+                    oplogRecordStore->haveCappedWaiters();
             };
 
             // Eventually it would be more optimal to merge this with the normal journal flushing
-            // and block for oplog tailers to show up. For now this loop will poll once a
-            // millisecond up to the journalDelay to see if we have any waiters yet. This reduces
-            // sync-related I/O on the primary when secondaries are lagged, but will avoid
-            // significant delays in confirming majority writes on replica sets with infrequent
-            // writes.
+            // and block for either oplog tailers or operations waiting for oplog visibility. For
+            // now this loop will poll once a millisecond up to the journalDelay to see if we have
+            // any waiters yet. This reduces sync-related I/O on the primary when secondaries are
+            // lagged, but will avoid significant delays in confirming majority writes on replica
+            // sets with infrequent writes.
+            // Callers of waitForAllEarlierOplogWritesToBeVisible() like causally consistent reads
+            // will preempt this delay.
             while (now < deadline &&
                    !_opsWaitingForJournalCV.wait_until(
                        lk, now.toSystemTimePoint(), shouldSyncOpsWaitingForJournal)) {

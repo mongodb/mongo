@@ -76,7 +76,7 @@ public:
     // Waits until all committed writes at this point to become visible (that is, no holes exist in
     // the oplog.)
     void waitForAllEarlierOplogWritesToBeVisible(const WiredTigerRecordStore* oplogRecordStore,
-                                                 OperationContext* opCtx) const;
+                                                 OperationContext* opCtx);
 
     // Returns the all committed timestamp. All transactions with timestamps earlier than the
     // all committed timestamp are committed.
@@ -102,6 +102,10 @@ private:
     // floor in waitForAllEarlierOplogWritesToBeVisible().
     RecordId _oplogMaxAtStartup = RecordId(0);  // Guarded by oplogVisibilityStateMutex.
     bool _opsWaitingForJournal = false;         // Guarded by oplogVisibilityStateMutex.
+
+    // When greater than 0, indicates that there are operations waiting for oplog visibility, and
+    // journal flushing should not be delayed.
+    std::int64_t _opsWaitingForVisibility = 0;  // Guarded by oplogVisibilityStateMutex.
 
     AtomicUInt64 _oplogReadTimestamp;
 };
