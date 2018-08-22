@@ -5006,6 +5006,15 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: integration_tests_standalone_audit
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=integration_tests_standalone_audit --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: integration_tests_replset
   commands:
   - func: "do setup"
@@ -10779,6 +10788,7 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
+  - name: integration_tests_standalone_audit
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_auth

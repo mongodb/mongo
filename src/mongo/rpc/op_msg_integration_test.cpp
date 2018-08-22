@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclient_connection.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -83,6 +84,76 @@ TEST(OpMsg, FireAndForgetInsertWorks) {
     })")));
 
     ASSERT_EQ(conn->count("test.collection"), 1u);
+}
+
+TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
+    std::string errMsg;
+    auto conn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, conn);
+
+    conn->dropCollection("test.collection");
+
+    OpMsgBuilder msgBuilder;
+
+    OpMsgBuilder::DocSequenceBuilder sequenceBuilder = msgBuilder.beginDocSequence("documents");
+    for (size_t docID = 0; docID < 3; docID++) {
+        BSONObjBuilder docBuilder = sequenceBuilder.appendBuilder();
+        docBuilder.appendNumber("_id", docID);
+        std::string data(15000000, 'a');
+        docBuilder.append("data", std::move(data));
+    }
+    sequenceBuilder.done();
+
+
+    msgBuilder.setBody(fromjson(R"({
+        insert: "collection",
+        writeConcern: {w: 0},
+        $db: "test"
+    })"));
+
+    Message request = msgBuilder.finish();
+    Message reply;
+    ASSERT_TRUE(conn->call(request, reply, false));
+
+    ASSERT_EQ(conn->count("test.collection"), 3u);
+    conn->dropCollection("test.collection");
+}
+
+TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
+    std::string errMsg;
+    auto conn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, conn);
+
+    conn->dropCollection("test.collection");
+
+    OpMsgBuilder msgBuilder;
+
+    BSONObj body = fromjson(R"({
+        insert: "collection",
+        writeConcern: {w: 0},
+        $db: "test"
+    })");
+
+    constexpr StringData kSequenceName = "documents"_sd;
+    size_t targetSize = MaxMessageSizeBytes - body.objsize() - 4 - kSequenceName.size();
+    size_t documentSize = targetSize / write_ops::kMaxWriteBatchSize;
+    OpMsgBuilder::DocSequenceBuilder sequenceBuilder = msgBuilder.beginDocSequence(kSequenceName);
+    for (size_t i = 0; i < write_ops::kMaxWriteBatchSize; i++) {
+        BSONObjBuilder docBuilder = sequenceBuilder.appendBuilder();
+        docBuilder.append("a", std::string(documentSize - 13, 'b'));
+    }
+    sequenceBuilder.done();
+
+    msgBuilder.setBody(std::move(body));
+
+    Message request = msgBuilder.finish();
+    Message reply;
+    ASSERT_TRUE(conn->call(request, reply, false));
+
+    ASSERT_EQ(conn->count("test.collection"), write_ops::kMaxWriteBatchSize);
+    conn->dropCollection("test.collection");
 }
 
 TEST(OpMsg, CloseConnectionOnFireAndForgetNotMasterError) {
