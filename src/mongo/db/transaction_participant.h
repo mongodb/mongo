@@ -564,7 +564,7 @@ private:
                                        repl::ReadConcernArgs readConcernArgs);
 
     // Reports transaction stats for both active and inactive transactions using the provided
-    // builder.
+    // builder.  The lock may be either a lock on _mutex or a lock on _metricsMutex.
     void _reportTransactionStats(WithLock wl,
                                  BSONObjBuilder* builder,
                                  repl::ReadConcernArgs readConcernArgs) const;
@@ -631,6 +631,13 @@ private:
 
     // Remembers the refresh count this object has read from Session.
     long long _lastStateRefreshCount{0};
+
+    // Protects _transactionMetricsObserver.  The concurrency rules are that const methods on
+    // _transactionMetricsObserver may be called under either _mutex or _metricsMutex, but for
+    // non-const methods, both mutexes must be held, with _mutex being taken before _metricsMutex.
+    // No other locks, particularly including the Client lock, may be taken while holding
+    // _metricsMutex.
+    mutable stdx::mutex _metricsMutex;
 
     // Tracks and updates transaction metrics upon the appropriate transaction event.
     TransactionMetricsObserver _transactionMetricsObserver;

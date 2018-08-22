@@ -36,11 +36,15 @@
 namespace mongo {
 
 void TransactionMetricsObserver::onStart(ServerTransactionsMetrics* serverTransactionsMetrics,
-                                         unsigned long long curTime) {
+                                         bool isAutoCommit,
+                                         unsigned long long curTime,
+                                         Date_t expireDate) {
     //
     // Per transaction metrics.
     //
     _singleTransactionStats.setStartTime(curTime);
+    _singleTransactionStats.setAutoCommit(isAutoCommit);
+    _singleTransactionStats.setExpireDate(expireDate);
 
     //
     // Server wide transactions metrics.
@@ -48,6 +52,10 @@ void TransactionMetricsObserver::onStart(ServerTransactionsMetrics* serverTransa
     serverTransactionsMetrics->incrementTotalStarted();
     serverTransactionsMetrics->incrementCurrentOpen();
     serverTransactionsMetrics->incrementCurrentInactive();
+}
+
+void TransactionMetricsObserver::onChooseReadTimestamp(Timestamp readTimestamp) {
+    _singleTransactionStats.setReadTimestamp(readTimestamp);
 }
 
 void TransactionMetricsObserver::onStash(ServerTransactionsMetrics* serverTransactionsMetrics,

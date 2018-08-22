@@ -213,11 +213,17 @@ void TransactionParticipant::_beginMultiDocumentTransaction(WithLock wl, TxnNumb
 
     // Start tracking various transactions metrics.
     auto curTime = curTimeMicros64();
-    _transactionMetricsObserver.onStart(ServerTransactionsMetrics::get(getGlobalServiceContext()),
-                                        curTime);
     _transactionExpireDate = Date_t::fromMillisSinceEpoch(curTime / 1000) +
         stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
 
+    {
+        stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+        _transactionMetricsObserver.onStart(
+            ServerTransactionsMetrics::get(getGlobalServiceContext()),
+            *_autoCommit,
+            curTime,
+            *_transactionExpireDate);
+    }
     invariant(_transactionOperations.empty());
 }
 
@@ -267,6 +273,8 @@ void TransactionParticipant::setSpeculativeTransactionOpTimeToLastApplied(Operat
     // Transactions do not survive term changes, so combining "getTerm" here with the
     // recovery unit timestamp does not cause races.
     _speculativeTransactionReadOpTime = {*readTimestamp, replCoord->getTerm()};
+    stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+    _transactionMetricsObserver.onChooseReadTimestamp(*readTimestamp);
 }
 
 TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx) {
@@ -392,9 +400,13 @@ TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
 void TransactionParticipant::_stashActiveTransaction(WithLock, OperationContext* opCtx) {
     invariant(_activeTxnNumber == opCtx->getTxnNumber());
 
-    _transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx), curTimeMicros64());
-    _transactionMetricsObserver.onTransactionOperation(opCtx->getClient(),
-                                                       CurOp::get(opCtx)->debug().additiveMetrics);
+    {
+        stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+        _transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx),
+                                            curTimeMicros64());
+        _transactionMetricsObserver.onTransactionOperation(
+            opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
+    }
 
     invariant(!_txnResourceStash);
     _txnResourceStash = TxnResources(opCtx);
@@ -467,6 +479,7 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
                     readConcernArgs.isEmpty());
             _txnResourceStash->release(opCtx);
             _txnResourceStash = boost::none;
+            stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
             _transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
                                                   curTimeMicros64());
             return;
@@ -485,9 +498,6 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
         // transaction. Set up the transaction resources on the opCtx.
         opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
 
-        _transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
-                                              curTimeMicros64());
-
         // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
         // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
         // to acquire a lock. This is to avoid deadlocks and minimize non-transaction
@@ -496,6 +506,10 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
         if (maxTransactionLockMillis >= 0) {
             opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
         }
+
+        stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+        _transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
+                                              curTimeMicros64());
     }
 
     // Storage engine transactions may be started in a lazy manner. By explicitly
@@ -710,10 +724,13 @@ void TransactionParticipant::_commitTransaction(stdx::unique_lock<stdx::mutex> l
     _txnState.transitionTo(lk, TransactionState::kCommitted);
 
     const auto curTime = curTimeMicros64();
-    _transactionMetricsObserver.onCommit(
-        ServerTransactionsMetrics::get(opCtx), curTime, &Top::get(getGlobalServiceContext()));
-    _transactionMetricsObserver.onTransactionOperation(opCtx->getClient(),
-                                                       CurOp::get(opCtx)->debug().additiveMetrics);
+    {
+        stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+        _transactionMetricsObserver.onCommit(
+            ServerTransactionsMetrics::get(opCtx), curTime, &Top::get(getGlobalServiceContext()));
+        _transactionMetricsObserver.onTransactionOperation(
+            opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
+    }
 
     // Log the transaction if its duration is longer than the slowMS command threshold.
     _logSlowTransaction(lk,
@@ -786,6 +803,7 @@ void TransactionParticipant::_abortActiveTransaction(WithLock lock,
     invariant(!_txnResourceStash);
 
     if (!_txnState.isNone(lock)) {
+        stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onTransactionOperation(
             opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
     }
@@ -831,16 +849,20 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
     // If the transaction is stashed, then we have aborted an inactive transaction.
     if (_txnResourceStash) {
         // The transaction is stashed, so we abort the inactive transaction on session.
-        _transactionMetricsObserver.onAbortInactive(
-            ServerTransactionsMetrics::get(getGlobalServiceContext()),
-            curTime,
-            &Top::get(getGlobalServiceContext()));
+        {
+            stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+            _transactionMetricsObserver.onAbortInactive(
+                ServerTransactionsMetrics::get(getGlobalServiceContext()),
+                curTime,
+                &Top::get(getGlobalServiceContext()));
+        }
         _logSlowTransaction(wl,
                             &(_txnResourceStash->locker()->getLockerInfo())->stats,
                             TransactionState::kAborted,
                             _txnResourceStash->getReadConcernArgs());
         _txnResourceStash = boost::none;
     } else {
+        stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onAbortActive(
             ServerTransactionsMetrics::get(getGlobalServiceContext()),
             curTime,
@@ -950,7 +972,7 @@ BSONObj TransactionParticipant::reportStashedState() const {
 }
 
 void TransactionParticipant::reportStashedState(BSONObjBuilder* builder) const {
-    stdx::lock_guard<stdx::mutex> ls(_mutex);
+    stdx::lock_guard<stdx::mutex> lm(_mutex);
 
     if (_txnResourceStash && _txnResourceStash->locker()) {
         if (auto lockerInfo = _txnResourceStash->locker()->getLockerInfo()) {
@@ -958,7 +980,7 @@ void TransactionParticipant::reportStashedState(BSONObjBuilder* builder) const {
             builder->append("host", getHostNameCachedAndPort());
             builder->append("desc", "inactive transaction");
 
-            auto lastClientInfo =
+            const auto& lastClientInfo =
                 _transactionMetricsObserver.getSingleTransactionStats().getLastClientInfo();
             builder->append("client", lastClientInfo.clientHostAndPort);
             builder->append("connectionId", lastClientInfo.connectionId);
@@ -972,7 +994,7 @@ void TransactionParticipant::reportStashedState(BSONObjBuilder* builder) const {
 
             BSONObjBuilder transactionBuilder;
             _reportTransactionStats(
-                ls, &transactionBuilder, _txnResourceStash->getReadConcernArgs());
+                lm, &transactionBuilder, _txnResourceStash->getReadConcernArgs());
 
             builder->append("transaction", transactionBuilder.obj());
             builder->append("waitingForLock", false);
@@ -985,11 +1007,18 @@ void TransactionParticipant::reportStashedState(BSONObjBuilder* builder) const {
 
 void TransactionParticipant::reportUnstashedState(repl::ReadConcernArgs readConcernArgs,
                                                   BSONObjBuilder* builder) const {
-    stdx::lock_guard<stdx::mutex> ls(_mutex);
+    stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
 
-    if (!_txnResourceStash) {
+    // This method may only take the metrics mutex, as it is called with the Client mutex held.  So
+    // we cannot check the stashed state directly.  Instead, a transaction is considered unstashed
+    // if it is not actually a transaction (retryable write, no stash used), or is active (not
+    // stashed), or has ended (any stash would be cleared).
+
+    const auto& singleTransactionStats = _transactionMetricsObserver.getSingleTransactionStats();
+    if (!singleTransactionStats.isForMultiDocumentTransaction() ||
+        singleTransactionStats.isActive() || singleTransactionStats.isEnded()) {
         BSONObjBuilder transactionBuilder;
-        _reportTransactionStats(ls, &transactionBuilder, readConcernArgs);
+        _reportTransactionStats(lm, &transactionBuilder, readConcernArgs);
         builder->append("transaction", transactionBuilder.obj());
     }
 }
@@ -1095,42 +1124,7 @@ void TransactionParticipant::TransactionState::transitionTo(WithLock,
 void TransactionParticipant::_reportTransactionStats(WithLock wl,
                                                      BSONObjBuilder* builder,
                                                      repl::ReadConcernArgs readConcernArgs) const {
-    BSONObjBuilder parametersBuilder(builder->subobjStart("parameters"));
-    parametersBuilder.append("txnNumber", _activeTxnNumber);
-
-    if (!_txnState.inMultiDocumentTransaction(wl)) {
-        // For retryable writes, we only include the txnNumber.
-        parametersBuilder.done();
-        return;
-    }
-
-    parametersBuilder.append("autocommit", _autoCommit ? *_autoCommit : true);
-    readConcernArgs.appendInfo(&parametersBuilder);
-    parametersBuilder.done();
-
-    builder->append("readTimestamp", _speculativeTransactionReadOpTime.getTimestamp());
-
-    auto singleTransactionStats = _transactionMetricsObserver.getSingleTransactionStats();
-    builder->append("startWallClockTime",
-                    dateToISOStringLocal(Date_t::fromMillisSinceEpoch(
-                        singleTransactionStats.getStartTime() / 1000)));
-
-    // We use the same "now" time so that the following time metrics are consistent with each other.
-    auto curTime = curTimeMicros64();
-    builder->append("timeOpenMicros",
-                    static_cast<long long>(singleTransactionStats.getDuration(curTime)));
-
-    auto timeActive =
-        durationCount<Microseconds>(singleTransactionStats.getTimeActiveMicros(curTime));
-    auto timeInactive =
-        durationCount<Microseconds>(singleTransactionStats.getTimeInactiveMicros(curTime));
-
-    builder->append("timeActiveMicros", timeActive);
-    builder->append("timeInactiveMicros", timeInactive);
-
-    if (_transactionExpireDate) {
-        builder->append("expiryTime", dateToISOStringLocal(*_transactionExpireDate));
-    }
+    _transactionMetricsObserver.getSingleTransactionStats().report(builder, readConcernArgs);
 }
 
 void TransactionParticipant::_updateState(WithLock wl, const Session::RefreshState& newState) {
@@ -1304,7 +1298,10 @@ void TransactionParticipant::_setNewTxnNumber(WithLock wl, const TxnNumber& txnN
 
     _activeTxnNumber = txnNumber;
     _txnState.transitionTo(wl, TransactionState::kNone);
-    _transactionMetricsObserver.resetSingleTransactionStats();
+    {
+        stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
+        _transactionMetricsObserver.resetSingleTransactionStats(txnNumber);
+    }
     _speculativeTransactionReadOpTime = repl::OpTime();
     _multikeyPathInfo.clear();
     _autoCommit = boost::none;

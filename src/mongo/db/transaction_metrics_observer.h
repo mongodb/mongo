@@ -45,7 +45,15 @@ public:
     /**
      * Updates relevant metrics when a transaction begins.
      */
-    void onStart(ServerTransactionsMetrics* serverTransactionMetrics, unsigned long long curTime);
+    void onStart(ServerTransactionsMetrics* serverTransactionMetrics,
+                 bool isAutoCommit,
+                 unsigned long long curTime,
+                 Date_t expireDate);
+
+    /**
+     * Updates relevant metrics when a storage timestamp is chosen for a transaction.
+     */
+    void onChooseReadTimestamp(Timestamp readTimestamp);
 
     /**
      * Updates relevant metrics when a transaction stashes its resources.
@@ -86,17 +94,19 @@ public:
     void onTransactionOperation(Client* client, OpDebug::AdditiveMetrics additiveMetrics);
 
     /**
-     * Returns the SingleTransactionStats object stored in this TransactionMetricsObserver instance.
+     * Returns a read-only reference to the SingleTransactionStats object stored in this
+     * TransactionMetricsObserver instance.
      */
-    SingleTransactionStats getSingleTransactionStats() const {
+    const SingleTransactionStats& getSingleTransactionStats() const {
         return _singleTransactionStats;
     }
 
     /**
-     * Resets the SingleTransactionStats object stored in this TransactionMetricsObserver instance.
+     * Resets the SingleTransactionStats object stored in this TransactionMetricsObserver instance,
+     * preparing it for the new transaction or retryable write with the given number.
      */
-    void resetSingleTransactionStats() {
-        _singleTransactionStats = SingleTransactionStats();
+    void resetSingleTransactionStats(TxnNumber txnNumber) {
+        _singleTransactionStats = SingleTransactionStats(txnNumber);
     }
 
 private:

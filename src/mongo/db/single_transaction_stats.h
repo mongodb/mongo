@@ -61,6 +61,9 @@ public:
         }
     };
 
+    SingleTransactionStats() : _txnNumber(kUninitializedTxnNumber){};
+    SingleTransactionStats(TxnNumber txnNumber) : _txnNumber(txnNumber){};
+
     /**
      * Returns the start time of the transaction in microseconds.
      *
@@ -129,6 +132,20 @@ public:
     }
 
     /**
+     * Returns whether or not the transaction has ended (aborted or committed).
+     */
+    bool isEnded() const {
+        return _endTime != 0;
+    }
+
+    /**
+     * Returns whether these stats are for a multi-document transaction.
+     */
+    bool isForMultiDocumentTransaction() const {
+        return _autoCommit != boost::none;
+    }
+
+    /**
      * Returns the OpDebug object stored in this SingleTransactionStats instance.
      */
     OpDebug* getOpDebug() {
@@ -138,7 +155,7 @@ public:
     /**
      * Returns the LastClientInfo object stored in this SingleTransactionStats instance.
      */
-    LastClientInfo getLastClientInfo() const {
+    const LastClientInfo& getLastClientInfo() const {
         return _lastClientInfo;
     }
 
@@ -150,7 +167,41 @@ public:
         _lastClientInfo.update(client);
     }
 
+    /**
+     * Set the autoCommit field.  If this field is unset, this is not a transaction but a
+     * retryable write and other values will not be meaningful.
+     */
+    void setAutoCommit(boost::optional<bool> autoCommit) {
+        _autoCommit = autoCommit;
+    }
+
+    /**
+     * Set the transaction expiration date.
+     */
+    void setExpireDate(Date_t expireDate) {
+        _expireDate = expireDate;
+    }
+
+    /**
+     * Set the transaction storage read timestamp.
+     */
+    void setReadTimestamp(Timestamp readTimestamp) {
+        _readTimestamp = readTimestamp;
+    }
+
+    /**
+     * Append the stats to the builder.
+     */
+    void report(BSONObjBuilder* builder, const repl::ReadConcernArgs& readConcernArgs) const;
+
 private:
+    // The transaction number of the transaction.
+    TxnNumber _txnNumber;
+
+    // Unset for retryable write, 'false' for multi-document transaction.  Value 'true' is
+    // for future use.
+    boost::optional<bool> _autoCommit;
+
     // The start time of the transaction in microseconds.
     unsigned long long _startTime{0};
 
@@ -163,6 +214,12 @@ private:
     // The time at which the transaction was last marked as active in microseconds. The transaction
     // is considered active if this value is not equal to 0.
     unsigned long long _lastTimeActiveStart{0};
+
+    // The expiration date of the transaction.
+    Date_t _expireDate = Date_t::max();
+
+    // The storage read timestamp of the transaction.
+    Timestamp _readTimestamp;
 
     // Tracks and accumulates stats from all operations that run inside the transaction.
     OpDebug _opDebug;
