@@ -129,208 +129,6 @@ MONGO_STATIC_ASSERT((sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNa
 }  // namespace
 
 /**
- * There is one of these objects for each resource that has a lock request. Empty objects (i.e.
- * LockHead with no requests) are allowed to exist on the lock manager's hash table.
- *
- * The memory and lifetime is controlled entirely by the LockManager class.
- *
- * Not thread-safe and should only be accessed under the LockManager's bucket lock. Must be locked
- * before locking a partition, not after.
- */
-struct LockHead {
-
-    /**
-     * Used for initialization of a LockHead, which might have been retrieved from cache and also in
-     * order to keep the LockHead structure a POD.
-     */
-    void initNew(ResourceId resId) {
-        resourceId = resId;
-
-        grantedList.reset();
-        memset(grantedCounts, 0, sizeof(grantedCounts));
-        grantedModes = 0;
-
-        conflictList.reset();
-        memset(conflictCounts, 0, sizeof(conflictCounts));
-        conflictModes = 0;
-
-        conversionsCount = 0;
-        compatibleFirstCount = 0;
-    }
-
-    /**
-     * True iff there may be partitions with granted requests for this resource.
-     */
-    bool partitioned() const {
-        return !partitions.empty();
-    }
-
-    /**
-     * Locates the request corresponding to the particular locker or returns nullptr. Must be called
-     * with the bucket holding this lock head locked.
-     */
-    LockRequest* findRequest(LockerId lockerId) const {
-        // Check the granted queue first
-        for (LockRequest* it = grantedList._front; it != nullptr; it = it->next) {
-            if (it->locker->getId() == lockerId) {
-                return it;
-            }
-        }
-
-        // Check the conflict queue second
-        for (LockRequest* it = conflictList._front; it != nullptr; it = it->next) {
-            if (it->locker->getId() == lockerId) {
-                return it;
-            }
-        }
-
-        return nullptr;
-    }
-
-    /**
-     * Finish creation of request and put it on the LockHead's conflict or granted queues. Returns
-     * LOCK_WAITING for conflict case and LOCK_OK otherwise.
-     */
-    LockResult newRequest(LockRequest* request) {
-        invariant(!request->partitionedLock);
-        request->lock = this;
-
-        // We cannot set request->partitioned to false, as this might be a migration, in which case
-        // access to that field is not protected. The 'partitioned' member instead indicates if a
-        // request was initially partitioned.
-
-        // New lock request. Queue after all granted modes and after any already requested
-        // conflicting modes
-        if (conflicts(request->mode, grantedModes) ||
-            (!compatibleFirstCount && conflicts(request->mode, conflictModes))) {
-            request->status = LockRequest::STATUS_WAITING;
-
-            // Put it on the conflict queue. Conflicts are granted front to back.
-            if (request->enqueueAtFront) {
-                conflictList.push_front(request);
-            } else {
-                conflictList.push_back(request);
-            }
-
-            incConflictModeCount(request->mode);
-
-            return LOCK_WAITING;
-        }
-
-        // No conflict, new request
-        request->status = LockRequest::STATUS_GRANTED;
-
-        grantedList.push_back(request);
-        incGrantedModeCount(request->mode);
-
-        if (request->compatibleFirst) {
-            compatibleFirstCount++;
-        }
-
-        return LOCK_OK;
-    }
-
-    /**
-     * Lock each partitioned LockHead in turn, and move any (granted) intent mode requests for
-     * lock->resourceId to lock, which must itself already be locked.
-     */
-    void migratePartitionedLockHeads();
-
-    // Methods to maintain the granted queue
-    void incGrantedModeCount(LockMode mode) {
-        invariant(grantedCounts[mode] >= 0);
-        if (++grantedCounts[mode] == 1) {
-            invariant((grantedModes & modeMask(mode)) == 0);
-            grantedModes |= modeMask(mode);
-        }
-    }
-
-    void decGrantedModeCount(LockMode mode) {
-        invariant(grantedCounts[mode] >= 1);
-        if (--grantedCounts[mode] == 0) {
-            invariant((grantedModes & modeMask(mode)) == modeMask(mode));
-            grantedModes &= ~modeMask(mode);
-        }
-    }
-
-    // Methods to maintain the conflict queue
-    void incConflictModeCount(LockMode mode) {
-        invariant(conflictCounts[mode] >= 0);
-        if (++conflictCounts[mode] == 1) {
-            invariant((conflictModes & modeMask(mode)) == 0);
-            conflictModes |= modeMask(mode);
-        }
-    }
-
-    void decConflictModeCount(LockMode mode) {
-        invariant(conflictCounts[mode] >= 1);
-        if (--conflictCounts[mode] == 0) {
-            invariant((conflictModes & modeMask(mode)) == modeMask(mode));
-            conflictModes &= ~modeMask(mode);
-        }
-    }
-
-    // Id of the resource which is protected by this lock. Initialized at construction time and does
-    // not change.
-    ResourceId resourceId;
-
-    //
-    // Granted queue
-    //
-
-    // Doubly-linked list of requests, which have been granted. Newly granted requests go to
-    // the end of the queue. Conversion requests are granted from the beginning forward.
-    LockRequestList grantedList;
-
-    // Counts the grants and conversion counts for each of the supported lock modes. These
-    // counts should exactly match the aggregated modes on the granted list.
-    uint32_t grantedCounts[LockModesCount];
-
-    // Bit-mask of the granted + converting modes on the granted queue. Maintained in lock-step
-    // with the grantedCounts array.
-    uint32_t grantedModes;
-
-    //
-    // Conflict queue
-    //
-
-    // Doubly-linked list of requests, which have not been granted yet because they conflict
-    // with the set of granted modes. Requests are queued at the end of the queue and are
-    // granted from the beginning forward, which gives these locks FIFO ordering. Exceptions
-    // are high-priority locks, such as the MMAP V1 flush lock.
-    LockRequestList conflictList;
-
-    // Counts the conflicting requests for each of the lock modes. These counts should exactly
-    // match the aggregated modes on the conflicts list.
-    uint32_t conflictCounts[LockModesCount];
-
-    // Bit-mask of the conflict modes on the conflict queue. Maintained in lock-step with the
-    // conflictCounts array.
-    uint32_t conflictModes;
-
-    // References partitions that may have PartitionedLockHeads for this LockHead.
-    // Non-empty implies the lock has no conflicts and only has intent modes as grantedModes.
-    // TODO: Remove this vector and make LockHead a POD
-    std::vector<LockManager::Partition*> partitions;
-
-    //
-    // Conversion
-    //
-
-    // Counts the number of requests on the granted queue, which have requested any kind of
-    // conflicting conversion and are blocked (i.e. all requests which are currently
-    // STATUS_CONVERTING). This is an optimization for unlocking in that we do not need to
-    // check the granted queue for requests in STATUS_CONVERTING if this count is zero. This
-    // saves cycles in the regular case and only burdens the less-frequent lock upgrade case.
-    uint32_t conversionsCount;
-
-    // Counts the number of requests on the granted queue, which have requested that the policy
-    // be switched to compatible-first. As long as this value is > 0, the policy will stay
-    // compatible-first.
-    uint32_t compatibleFirstCount;
-};
-
-/**
  * The PartitionedLockHead allows optimizing the case where requests overwhelmingly use
  * the intent lock modes MODE_IS and MODE_IX, which are compatible with each other.
  * Having to use a single LockHead causes contention where none would be needed.
@@ -370,6 +168,85 @@ struct PartitionedLockHead {
     LockRequestList grantedList;
 };
 
+//
+// LockHead
+//
+void LockHead::initNew(ResourceId resId) {
+    resourceId = resId;
+
+    grantedList.reset();
+    memset(grantedCounts, 0, sizeof(grantedCounts));
+    grantedModes = 0;
+
+    conflictList.reset();
+    memset(conflictCounts, 0, sizeof(conflictCounts));
+    conflictModes = 0;
+
+    conversionsCount = 0;
+    compatibleFirstCount = 0;
+}
+
+bool LockHead::partitioned() const {
+    return !partitions.empty();
+}
+
+LockRequest* LockHead::findRequest(LockerId lockerId) const {
+    // Check the granted queue first
+    for (LockRequest* it = grantedList._front; it != nullptr; it = it->next) {
+        if (it->locker->getId() == lockerId) {
+            return it;
+        }
+    }
+
+    // Check the conflict queue second
+    for (LockRequest* it = conflictList._front; it != nullptr; it = it->next) {
+        if (it->locker->getId() == lockerId) {
+            return it;
+        }
+    }
+
+    return nullptr;
+}
+
+LockResult LockHead::newRequest(LockRequest* request) {
+    invariant(!request->partitionedLock);
+    request->lock = this;
+
+    // We cannot set request->partitioned to false, as this might be a migration, in which case
+    // access to that field is not protected. The 'partitioned' member instead indicates if a
+    // request was initially partitioned.
+
+    // New lock request. Queue after all granted modes and after any already requested
+    // conflicting modes
+    if (conflicts(request->mode, grantedModes) ||
+        (!compatibleFirstCount && conflicts(request->mode, conflictModes))) {
+        request->status = LockRequest::STATUS_WAITING;
+
+        // Put it on the conflict queue. Conflicts are granted front to back.
+        if (request->enqueueAtFront) {
+            conflictList.push_front(request);
+        } else {
+            conflictList.push_back(request);
+        }
+
+        incConflictModeCount(request->mode);
+
+        return LOCK_WAITING;
+    }
+
+    // No conflict, new request
+    request->status = LockRequest::STATUS_GRANTED;
+
+    grantedList.push_back(request);
+    incGrantedModeCount(request->mode);
+
+    if (request->compatibleFirst) {
+        compatibleFirstCount++;
+    }
+
+    return LOCK_OK;
+}
+
 void LockHead::migratePartitionedLockHeads() {
     invariant(partitioned());
 
@@ -400,6 +277,38 @@ void LockHead::migratePartitionedLockHeads() {
         // Don't pop-back to early as otherwise the lock will be considered not partitioned in
         // newRequest().
         partitions.pop_back();
+    }
+}
+
+void LockHead::incGrantedModeCount(LockMode mode) {
+    invariant(grantedCounts[mode] >= 0);
+    if (++grantedCounts[mode] == 1) {
+        invariant((grantedModes & modeMask(mode)) == 0);
+        grantedModes |= modeMask(mode);
+    }
+}
+
+void LockHead::decGrantedModeCount(LockMode mode) {
+    invariant(grantedCounts[mode] >= 1);
+    if (--grantedCounts[mode] == 0) {
+        invariant((grantedModes & modeMask(mode)) == modeMask(mode));
+        grantedModes &= ~modeMask(mode);
+    }
+}
+
+void LockHead::incConflictModeCount(LockMode mode) {
+    invariant(conflictCounts[mode] >= 0);
+    if (++conflictCounts[mode] == 1) {
+        invariant((conflictModes & modeMask(mode)) == 0);
+        conflictModes |= modeMask(mode);
+    }
+}
+
+void LockHead::decConflictModeCount(LockMode mode) {
+    invariant(conflictCounts[mode] >= 1);
+    if (--conflictCounts[mode] == 0) {
+        invariant((conflictModes & modeMask(mode)) == modeMask(mode));
+        conflictModes &= ~modeMask(mode);
     }
 }
 
@@ -1202,6 +1111,10 @@ const char* resourceTypeName(ResourceType resourceType) {
 
 const char* lockRequestStatusName(LockRequest::Status status) {
     return LockRequestStatusNames[status];
+}
+
+LockManager::TemporaryResourceQueue::TemporaryResourceQueue(ResourceId resourceId) {
+    _lockHead.initNew(resourceId);
 }
 
 }  // namespace mongo

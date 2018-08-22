@@ -193,6 +193,14 @@ public:
         restoreLockState(nullptr, stateToRestore);
     }
 
+    void restoreLockStateWithTemporaryGlobalResource(
+        OperationContext* opCtx,
+        const LockSnapshot& stateToRestore,
+        LockManager::TemporaryResourceQueue* tempGlobalResource) override;
+
+    void replaceGlobalLockStateWithTemporaryGlobalResource(
+        LockManager::TemporaryResourceQueue* tempGlobalResource) override;
+
     virtual void releaseTicket();
     virtual void reacquireTicket(OperationContext* opCtx);
 

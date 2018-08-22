@@ -34,6 +34,7 @@
 
 #include <vector>
 
+#include "mongo/db/concurrency/replication_lock_manager_manipulator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/compiler.h"
@@ -119,6 +120,12 @@ AtomicUInt64 idCounter(0);
 
 // Partitioned global lock statistics, so we don't hit the same bucket
 PartitionedInstanceWideLockStats globalStats;
+
+// When this is set, lock acquisitions for the global resource go into the TemporaryRequestQueue
+// stored in this decoration instead of letting the LockManager look up and put the requests into
+// the true global resource state.
+OperationContext::Decoration<LockManager::TemporaryResourceQueue*> globalResourceShadow =
+    OperationContext::declareDecoration<LockManager::TemporaryResourceQueue*>();
 
 }  // namespace
 
@@ -263,7 +270,8 @@ LockerImpl::~LockerImpl() {
     invariant(!inAWriteUnitOfWork());
     invariant(_numResourcesToUnlockAtEndUnitOfWork == 0);
     invariant(_requests.empty());
-    invariant(_modeForTicket == MODE_NONE);
+    invariant(_modeForTicket == MODE_NONE,
+              str::stream() << "_modeForTicket found: " << _modeForTicket);
 
     // Reset the locking statistics so the object can be reused
     _stats.reset();
@@ -349,7 +357,7 @@ LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, 
     }
 
     LockMode actualLockMode = mode;
-    if (opCtx) {
+    if (opCtx && opCtx->getServiceContext()) {
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         if (storageEngine && !storageEngine->supportsDBLocking()) {
             actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;
@@ -361,7 +369,7 @@ LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, 
 
     // Currently, deadlock detection does not happen inline with lock acquisition so the only
     // unsuccessful result that the lock manager would return is LOCK_WAITING.
-    invariant(result == LOCK_WAITING);
+    invariant(result == LOCK_WAITING, str::stream() << "Unexpected lock result: " << result);
 
     return result;
 }
@@ -656,6 +664,42 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
     invariant(_modeForTicket != MODE_NONE);
 }
 
+void LockerImpl::restoreLockStateWithTemporaryGlobalResource(
+    OperationContext* opCtx,
+    const LockSnapshot& state,
+    LockManager::TemporaryResourceQueue* tempGlobalResource) {
+    invariant(tempGlobalResource->getResourceId().getType() == ResourceType::RESOURCE_GLOBAL);
+    invariant(globalResourceShadow(opCtx) == nullptr);
+
+    globalResourceShadow(opCtx) = tempGlobalResource;
+    ON_BLOCK_EXIT([&] { globalResourceShadow(opCtx) = nullptr; });
+
+    restoreLockState(opCtx, state);
+}
+
+void LockerImpl::replaceGlobalLockStateWithTemporaryGlobalResource(
+    LockManager::TemporaryResourceQueue* tempGlobalResource) {
+    invariant(tempGlobalResource->getResourceId().getType() == ResourceType::RESOURCE_GLOBAL);
+
+    // Transfer the LockRequests from tempGlobalResource into the true resource for the global lock
+    // that is managed by the LockManager.  This also removes the existing MODE_X LockRequest from
+    // the granted list for the true global resource, but we still need to delete that LockRequest
+    // and remove it from this Locker's _requests list.
+    ReplicationLockManagerManipulator(&globalLockManager)
+        .replaceGlobalLocksWithLocksFromTemporaryGlobalResource(resourceIdGlobal,
+                                                                tempGlobalResource);
+
+    // Release the ticket that this Locker was holding for the global X lock.
+    invariant(_modeForTicket == MODE_X);
+    _releaseTicket();
+    _modeForTicket = MODE_NONE;
+
+    // Now fully delete the LockRequest.
+    auto it = _requests.find(resourceIdGlobal);
+    scoped_spinlock scopedLock(_lock);
+    it.remove();
+}
+
 LockResult LockerImpl::lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode) {
     dassert(!getWaitingResource().isValid());
 
@@ -711,8 +755,21 @@ LockResult LockerImpl::lockBegin(OperationContext* opCtx, ResourceId resId, Lock
     // otherwise we might reset state if the lock becomes granted very fast.
     _notify.clear();
 
-    LockResult result = isNew ? globalLockManager.lock(resId, request, mode)
-                              : globalLockManager.convert(resId, request, mode);
+    LockResult result{LockResult::LOCK_INVALID};
+    if (resType == RESOURCE_GLOBAL && opCtx && globalResourceShadow(opCtx)) {
+        // If we're trying to lock the global resource and we have a temporary global resource
+        // installed, use the temporary resource instead of letting the LockManager look up the
+        // true resource for the global lock.
+        invariant(isNew);
+        ReplicationLockManagerManipulator(&globalLockManager)
+            .lockUncontestedTemporaryGlobalResource(globalResourceShadow(opCtx), request, mode);
+        // lockUncontestedTemporaryGlobalResource can't fail.
+        result = LockResult::LOCK_OK;
+    } else {
+        // Normal case using the true global lock head.
+        result = isNew ? globalLockManager.lock(resId, request, mode)
+                       : globalLockManager.convert(resId, request, mode);
+    }
 
     if (result == LOCK_WAITING) {
         globalStats.recordWait(_id, resId, mode);
