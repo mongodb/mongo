@@ -150,7 +150,8 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const ChunkManager& chunkManager,
                                     const BSONObj& document,
-                                    long dataWritten) {
+                                    long dataWritten,
+                                    bool fromMigrate) {
     const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
 
     // Each inserted/updated document should contain the shard key. The only instance in which a
@@ -171,15 +172,22 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
     auto chunk = chunkManager.findIntersectingChunkWithSimpleCollation(shardKey);
     auto chunkWritesTracker = chunk.getWritesTracker();
     chunkWritesTracker->addBytesWritten(dataWritten);
+    // Don't trigger chunk splits from inserts happening due to migration since
+    // we don't necessarily own that chunk yet
+    if (!fromMigrate) {
+        const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
 
-    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-
-    if (balancerConfig->getShouldAutoSplit() &&
-        chunkWritesTracker->shouldSplit(balancerConfig->getMaxChunkSizeBytes())) {
-        auto chunkSplitStateDriver = ChunkSplitStateDriver::tryInitiateSplit(chunkWritesTracker);
-        if (chunkSplitStateDriver) {
-            ChunkSplitter::get(opCtx).trySplitting(
-                std::move(chunkSplitStateDriver), nss, chunk.getMin(), chunk.getMax(), dataWritten);
+        if (balancerConfig->getShouldAutoSplit() &&
+            chunkWritesTracker->shouldSplit(balancerConfig->getMaxChunkSizeBytes())) {
+            auto chunkSplitStateDriver =
+                ChunkSplitStateDriver::tryInitiateSplit(chunkWritesTracker);
+            if (chunkSplitStateDriver) {
+                ChunkSplitter::get(opCtx).trySplitting(std::move(chunkSplitStateDriver),
+                                                       nss,
+                                                       chunk.getMin(),
+                                                       chunk.getMax(),
+                                                       dataWritten);
+            }
         }
     }
 }
@@ -215,8 +223,12 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
         }
 
         if (metadata->isSharded()) {
-            incrementChunkOnInsertOrUpdate(
-                opCtx, nss, *metadata->getChunkManager(), insertedDoc, insertedDoc.objsize());
+            incrementChunkOnInsertOrUpdate(opCtx,
+                                           nss,
+                                           *metadata->getChunkManager(),
+                                           insertedDoc,
+                                           insertedDoc.objsize(),
+                                           fromMigrate);
         }
     }
 }
@@ -316,7 +328,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                                        args.nss,
                                        *metadata->getChunkManager(),
                                        args.updatedDoc,
-                                       args.updatedDoc.objsize());
+                                       args.updatedDoc.objsize(),
+                                       args.fromMigrate);
     }
 }
 
