@@ -133,6 +133,25 @@
         assert.eq(true, called, 'called should not have been udpated');
     });
 
+    tests.push(function assertShouldAcceptObjectAsMsg() {
+        const objMsg = {someMessage: 1};
+        const err = assert.throws(() => {
+            assert(false, objMsg);
+        });
+
+        assert.neq(-1,
+                   err.message.indexOf(tojson(objMsg)),
+                   'Error message should have included ' + tojson(objMsg));
+    });
+
+    tests.push(function assertShouldNotAcceptNonObjStringFunctionAsMsg() {
+        const err = assert.throws(() => {
+            assert(true, 1234);
+        });
+
+        assert.neq(-1, err.message.indexOf("msg parameter must be a "));
+    });
+
     /* assert.automsg tests */
 
     tests.push(function automsgShouldPassToAssert() {
