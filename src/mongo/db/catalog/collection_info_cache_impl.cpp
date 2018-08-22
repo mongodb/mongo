@@ -40,6 +40,7 @@
 #include "mongo/db/index/all_paths_key_generator.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_legacy.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/service_context.h"
@@ -201,16 +202,7 @@ void CollectionInfoCacheImpl::updatePlanCacheIndexEntries(OperationContext* opCt
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
         const IndexCatalogEntry* ice = ii.catalogEntry(desc);
-        indexEntries.emplace_back(desc->keyPattern(),
-                                  desc->getAccessMethodName(),
-                                  desc->isMultikey(opCtx),
-                                  ice->getMultikeyPaths(opCtx),
-                                  desc->isSparse(),
-                                  desc->unique(),
-                                  IndexEntry::Identifier{desc->indexName()},
-                                  ice->getFilterExpression(),
-                                  desc->infoObj(),
-                                  ice->getCollator());
+        indexEntries.emplace_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
     }
 
     _planCache->notifyOfIndexEntries(indexEntries);

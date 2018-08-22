@@ -30,9 +30,11 @@
 
 #include <atomic>
 #include <memory>
+#include <set>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -326,6 +328,15 @@ public:
      */
     static std::pair<std::vector<BSONObj>, std::vector<BSONObj>> setDifference(
         const BSONObjSet& left, const BSONObjSet& right);
+
+    /**
+     * Returns the set of multikey metadata paths stored in the index. Only index types which can
+     * store metadata describing an arbitrarily large set of multikey paths need to override this
+     * method.
+     */
+    virtual std::set<FieldRef> getMultikeyPathSet(OperationContext* opCtx) const {
+        return {};
+    }
 
 protected:
     /**

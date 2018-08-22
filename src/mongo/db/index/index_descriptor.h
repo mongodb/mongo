@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
@@ -91,6 +92,7 @@ public:
     IndexDescriptor(Collection* collection, const std::string& accessMethodName, BSONObj infoObj)
         : _collection(collection),
           _accessMethodName(accessMethodName),
+          _indexType(IndexNames::nameToType(accessMethodName)),
           _infoObj(infoObj.getOwned()),
           _numFields(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).nFields()),
           _keyPattern(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).getOwned()),
@@ -193,6 +195,11 @@ public:
         return _accessMethodName;
     }
 
+    // Returns the type of the index associated with this descriptor.
+    IndexType getIndexType() const {
+        return _indexType;
+    }
+
     //
     // Properties every index has
     //
@@ -279,6 +286,8 @@ private:
 
     // What access method should we use for this index?
     std::string _accessMethodName;
+
+    IndexType _indexType;
 
     // The BSONObj describing the index.  Accessed through the various members above.
     const BSONObj _infoObj;

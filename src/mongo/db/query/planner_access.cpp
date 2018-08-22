@@ -621,7 +621,7 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
         }
         nodeIndex->keyPattern = BSON("$_path" << nodeIndex->keyPattern.firstElement()
                                               << nodeIndex->keyPattern.firstElement());
-        nodeIndex->multikeyPaths.insert(nodeIndex->multikeyPaths.begin(), {});
+        nodeIndex->multikeyPaths.insert(nodeIndex->multikeyPaths.begin(), std::set<std::size_t>{});
     }
 
     // If the QuerySolutionNode's IndexEntry is available, use its keyPattern.

@@ -1273,9 +1273,10 @@ TEST_F(CachePlanSelectionTest, AndWithinPolygonWithinCenterSphere) {
 // $** index
 TEST_F(CachePlanSelectionTest, AllPathsIxScan) {
     params.indices.push_back(IndexEntry(BSON("$**" << 1),
-                                        IndexNames::ALLPATHS,
+                                        IndexType::INDEX_ALLPATHS,
                                         false,  // multikey
                                         {},     // multikey paths
+                                        {},     // multikeyPathSet
                                         true,   // sparse
                                         false,  // unique
                                         IndexEntry::Identifier{"anIndex"},

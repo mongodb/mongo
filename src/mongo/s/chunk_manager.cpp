@@ -269,15 +269,20 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
     // Consider shard key as an index
     std::string accessMethod = IndexNames::findPluginName(key);
     dassert(accessMethod == IndexNames::BTREE || accessMethod == IndexNames::HASHED);
+    const auto indexType = IndexNames::nameToType(accessMethod);
 
     // Use query framework to generate index bounds
     QueryPlannerParams plannerParams;
     // Must use "shard key" index
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
     IndexEntry indexEntry(key,
-                          accessMethod,
-                          false /* multiKey */,
+                          indexType,
+                          // The shard key index cannot be multikey.
+                          false,
+                          // Empty multikey paths, since the shard key index cannot be multikey.
                           MultikeyPaths{},
+                          // Empty multikey path set, since the shard key index cannot be multikey.
+                          {},
                           false /* sparse */,
                           false /* unique */,
                           IndexEntry::Identifier{"shardkey"},

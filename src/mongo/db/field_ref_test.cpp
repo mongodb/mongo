@@ -799,4 +799,42 @@ TEST(RemoveLastPartLong, AppendThenSetPartThenRemove) {
     ASSERT_EQUALS("a.b.0.d.1.f", path.dottedField());
 }
 
+TEST(RemoveLastPartLong, FieldRefCopyConstructor) {
+    FieldRef original("a.b.c");
+    FieldRef copy = original;
+    ASSERT_EQ(original, copy);
+}
+
+TEST(RemoveLastPartLong, FieldRefCopyAssignment) {
+    FieldRef original("a.b.c");
+    FieldRef other("x.y.z");
+    ASSERT_NE(original, other);
+    other = original;
+    ASSERT_EQ(original, other);
+}
+
+TEST(RemoveLastPartLong, FieldRefFromCopyAssignmentIsValidAfterOriginalIsDeleted) {
+    FieldRef copy("x.y.z");
+    {
+        FieldRef original("a.b.c");
+        ASSERT_NE(original, copy);
+        copy = original;
+    }
+    ASSERT_EQ(copy, FieldRef("a.b.c"));
+}
+
+TEST(RemoveLastPartLong, FieldRefFromCopyAssignmentIsADeepCopy) {
+    FieldRef original("a.b.c");
+    FieldRef other("x.y.z");
+    ASSERT_NE(original, other);
+    other = original;
+    ASSERT_EQ(original, other);
+
+    original.setPart(1u, "foo");
+    original.appendPart("bar");
+    ASSERT_EQ(original, FieldRef("a.foo.c.bar"));
+
+    ASSERT_EQ(other, FieldRef("a.b.c"));
+}
+
 }  // namespace

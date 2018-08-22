@@ -21,8 +21,8 @@
     coll.drop();
 
     // Template document which defines the 'schema' of the documents in the test collection.
-    const templateDoc = {a: 0, b: {c: 0, d: {e: 0}, f: {}, g: []}};
-    const pathList = ['a', 'b.c', 'b.d.e', 'b.f', 'b.g'];
+    const templateDoc = {a: 0, b: {c: 0, d: {e: 0}, f: {}}};
+    const pathList = ['a', 'b.c', 'b.d.e', 'b.f'];
 
     // Insert a set of documents into the collection, based on the template document and populated
     // with an increasing sequence of values. This is to ensure that the range of values present for
@@ -46,7 +46,6 @@
     // 'subpathBounds' property indicates whether the bounds for '$_path' are supposed to contain
     // all subpaths rather than a single point-interval, i.e. ["path.to.field.", "path.to.field/").
     const operationList = [
-        {expression: {$lte: 0, $gte: 50}, bounds: []},
         {expression: {$gte: 50}, bounds: ['[50.0, inf.0]']},
         {expression: {$gt: 50}, bounds: ['(50.0, inf.0]']},
         {expression: {$lt: 150}, bounds: ['[-inf.0, 150.0)']},
@@ -195,24 +194,24 @@
 
     try {
         // Test a $** index that indexes the entire document.
-        runAllPathsIndexTest({'$**': 1}, null, ['a', 'b.c', 'b.d.e', 'b.f', 'b.g']);
+        runAllPathsIndexTest({'$**': 1}, null, ['a', 'b.c', 'b.d.e', 'b.f']);
 
         // Test a $** index on a single subtree.
         runAllPathsIndexTest({'a.$**': 1}, null, ['a']);
-        runAllPathsIndexTest({'b.$**': 1}, null, ['b.c', 'b.d.e', 'b.f', 'b.g']);
+        runAllPathsIndexTest({'b.$**': 1}, null, ['b.c', 'b.d.e', 'b.f']);
         runAllPathsIndexTest({'b.d.$**': 1}, null, ['b.d.e']);
 
         // Test a $** index which includes a subset of paths.
         runAllPathsIndexTest({'$**': 1}, {a: 1}, ['a']);
-        runAllPathsIndexTest({'$**': 1}, {b: 1}, ['b.c', 'b.d.e', 'b.f', 'b.g']);
+        runAllPathsIndexTest({'$**': 1}, {b: 1}, ['b.c', 'b.d.e', 'b.f']);
         runAllPathsIndexTest({'$**': 1}, {'b.d': 1}, ['b.d.e']);
         runAllPathsIndexTest({'$**': 1}, {a: 1, 'b.d': 1}, ['a', 'b.d.e']);
 
         // Test a $** index which excludes a subset of paths.
-        runAllPathsIndexTest({'$**': 1}, {a: 0}, ['b.c', 'b.d.e', 'b.f', 'b.g']);
+        runAllPathsIndexTest({'$**': 1}, {a: 0}, ['b.c', 'b.d.e', 'b.f']);
         runAllPathsIndexTest({'$**': 1}, {b: 0}, ['a']);
-        runAllPathsIndexTest({'$**': 1}, {'b.d': 0}, ['a', 'b.c', 'b.f', 'b.g']);
-        runAllPathsIndexTest({'$**': 1}, {a: 0, 'b.d': 0}, ['b.c', 'b.f', 'b.g']);
+        runAllPathsIndexTest({'$**': 1}, {'b.d': 0}, ['a', 'b.c', 'b.f']);
+        runAllPathsIndexTest({'$**': 1}, {a: 0, 'b.d': 0}, ['b.c', 'b.f']);
     } finally {
         // Disable $** indexes once the tests have either completed or failed.
         assert.commandWorked(

@@ -56,6 +56,23 @@ std::size_t numPathComponents(StringData path) {
 }
 
 /**
+ * Returns a MultikeyPaths which indicates which components of 'indexedPath' are multikey, by
+ * looking up multikeyness in 'multikeyPathSet'.
+ */
+MultikeyPaths buildMultiKeyPathsForExpandedAllPathsIndexEntry(
+    const FieldRef& indexedPath, const std::set<FieldRef>& multikeyPathSet) {
+    FieldRef pathToLookup;
+    std::set<std::size_t> multikeyPathComponents;
+    for (size_t i = 0; i < indexedPath.numParts(); ++i) {
+        pathToLookup.appendPart(indexedPath.getPart(i));
+        if (multikeyPathSet.count(pathToLookup)) {
+            multikeyPathComponents.insert(i);
+        }
+    }
+    return {multikeyPathComponents};
+}
+
+/**
  * Given a single allPaths index, and a set of fields which are being queried, create a virtual
  * IndexEntry for each of the appropriate fields.
  */
@@ -63,6 +80,14 @@ void expandIndex(const IndexEntry& allPathsIndex,
                  const stdx::unordered_set<std::string>& fields,
                  vector<IndexEntry>* out) {
     invariant(out);
+    invariant(allPathsIndex.type == INDEX_ALLPATHS);
+    // Should only have one field of the form {"path.$**" : 1}.
+    invariant(allPathsIndex.keyPattern.nFields() == 1);
+
+    // $** indexes do not keep the multikey metadata inside the index catalog entry, as the amount
+    // of metadata is not bounded. We do not expect IndexEntry objects for $** indexes to have a
+    // fixed-size vector of multikey metadata until after they are expanded.
+    invariant(allPathsIndex.multikeyPaths.empty());
 
     const auto projExec = AllPathsKeyGenerator::createProjectionExec(
         allPathsIndex.keyPattern, allPathsIndex.infoObj.getObjectField("starPathsTempName"));
@@ -71,10 +96,30 @@ void expandIndex(const IndexEntry& allPathsIndex,
 
     out->reserve(out->size() + projectedFields.size());
     for (auto&& fieldName : projectedFields) {
+        // $** indices hold multikey metadata directly in the index keys, rather than in the index
+        // catalog. In turn, the index key data is used to produce a set of multikey paths
+        // in-memory. Here we convert this set of all multikey paths into a MultikeyPaths vector
+        // which will indicate to the downstream planning code which components of 'fieldName' are
+        // multikey.
+        auto multikeyPaths = buildMultiKeyPathsForExpandedAllPathsIndexEntry(
+            FieldRef{fieldName}, allPathsIndex.multikeyPathSet);
+
+        // The expanded IndexEntry is only considered multikey if the particular path represented by
+        // this IndexEntry has a multikey path component. For instance, suppose we have index {$**:
+        // 1} with "a" as the only multikey path. If we have a query on paths "a.b" and "c.d", then
+        // we will generate two expanded index entries: one for "a.b" and "c.d". The "a.b" entry
+        // will be marked as multikey because "a" is multikey, whereas the "c.d" entry will not be
+        // marked as multikey.
+        invariant(multikeyPaths.size() == 1u);
+        const bool isMultikey = !multikeyPaths[0].empty();
+
         IndexEntry entry(BSON(fieldName << allPathsIndex.keyPattern.firstElement()),
-                         IndexNames::ALLPATHS,
-                         false,  // multikey (TODO SERVER-36109)
-                         {},     // multikey paths
+                         IndexType::INDEX_ALLPATHS,
+                         isMultikey,
+                         std::move(multikeyPaths),
+                         // Expanded index entries always use the fixed-size multikey paths
+                         // representation, so we purposefully discard 'multikeyPathSet'.
+                         {},
                          true,   // sparse
                          false,  // unique
                          {allPathsIndex.identifier.catalogName, fieldName},
@@ -285,13 +330,19 @@ std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(
     std::vector<IndexEntry> out;
     for (auto&& entry : allIndexes) {
         if (entry.type == IndexType::INDEX_ALLPATHS) {
-            // Should only have one field of the form {"path.$**" : 1} or {"$**" : 1}.
-            invariant(entry.keyPattern.nFields() == 1);
             expandIndex(entry, fields, &out);
         } else {
             out.push_back(entry);
         }
     }
+
+    // As a post-condition, all expanded index entries must _not_ contain a multikey path set.
+    // Multikey metadata is converted to the fixed-size vector representation as part of expanding
+    // indexes.
+    for (auto&& indexEntry : out) {
+        invariant(indexEntry.multikeyPathSet.empty());
+    }
+
     return out;
 }
 

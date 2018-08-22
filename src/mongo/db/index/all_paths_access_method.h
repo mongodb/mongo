@@ -37,8 +37,11 @@ namespace mongo {
 /**
  * Class which is responsible for generating and providing access to AllPaths index keys. Any index
  * created with { "$**": ±1 } or { "path.$**": ±1 } uses this class.
+ *
+ * $** indexes store a special metadata key for each path in the index that is multikey. This class
+ * provides an interface to access the multikey metadata: see getMultikeyPathSet().
  */
-class AllPathsAccessMethod : public IndexAccessMethod {
+class AllPathsAccessMethod final : public IndexAccessMethod {
 public:
     AllPathsAccessMethod(IndexCatalogEntry* allPathsState, SortedDataInterface* btree);
 
@@ -52,6 +55,11 @@ public:
     bool shouldMarkIndexAsMultikey(const BSONObjSet& keys,
                                    const BSONObjSet& multikeyMetadataKeys,
                                    const MultikeyPaths& multikeyPaths) const final;
+
+    /**
+     * Returns the set of paths included in this $** index that could be multikey.
+     */
+    std::set<FieldRef> getMultikeyPathSet(OperationContext*) const final;
 
 private:
     void doGetKeys(const BSONObj& obj,

@@ -26,6 +26,9 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
@@ -60,6 +63,12 @@ void fillOutPlannerParams(OperationContext* opCtx,
                           Collection* collection,
                           CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams);
+
+/**
+ * Converts the catalog metadata for an index into an IndexEntry, which is a format that is meant to
+ * be consumed by the query planner.
+ */
+IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx, const IndexCatalogEntry& ice);
 
 /**
  * Determines whether or not to wait for oplog visibility for a query. This is only used for

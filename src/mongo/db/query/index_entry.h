@@ -28,8 +28,10 @@
 
 #pragma once
 
+#include <set>
 #include <string>
 
+#include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
@@ -93,9 +95,10 @@ struct IndexEntry {
      * Use this constructor if you're making an IndexEntry from the catalog.
      */
     IndexEntry(const BSONObj& kp,
-               const std::string& accessMethod,
+               IndexType type,
                bool mk,
                const MultikeyPaths& mkp,
+               std::set<FieldRef> multikeyPathSet,
                bool sp,
                bool unq,
                Identifier ident,
@@ -105,13 +108,16 @@ struct IndexEntry {
         : keyPattern(kp),
           multikey(mk),
           multikeyPaths(mkp),
+          multikeyPathSet(std::move(multikeyPathSet)),
           sparse(sp),
           unique(unq),
           identifier(std::move(ident)),
           filterExpr(fe),
           infoObj(io),
+          type(type),
           collator(ci) {
-        type = IndexNames::nameToType(accessMethod);
+        // The caller must not supply multikey metadata in two different formats.
+        invariant(multikeyPaths.empty() || multikeyPathSet.empty());
     }
 
     /**
@@ -148,6 +154,11 @@ struct IndexEntry {
         type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
     }
 
+    ~IndexEntry() {
+        // An IndexEntry should never have both formats of multikey metadata simultaneously.
+        invariant(multikeyPaths.empty() || multikeyPathSet.empty());
+    }
+
     /**
      * Returns true if 'indexedField' has any multikey components. For example, returns true if this
      * index has a multikey component "a", and 'indexedField' is "a.b". Illegal to call unless
@@ -174,7 +185,19 @@ struct IndexEntry {
     // index key pattern. Each element in the vector is an ordered set of positions (starting at 0)
     // into the corresponding indexed field that represent what prefixes of the indexed field cause
     // the index to be multikey.
+    //
+    // An IndexEntry may either represent multikey metadata as a fixed-size MultikeyPaths vector, or
+    // as an arbitrarily large set of field refs, but not both. That is, either 'multikeyPaths' or
+    // 'multikeyPathSet' must be empty.
     MultikeyPaths multikeyPaths;
+
+    // A set of multikey paths. Used instead of 'multikeyPaths' when there could be arbitrarily many
+    // multikey paths associated with this index entry.
+    //
+    // An IndexEntry may either represent multikey metadata as a fixed-size MultikeyPaths vector, or
+    // as an arbitrarily large set of field refs, but not both. That is, either 'multikeyPaths' or
+    // 'multikeyPathSet' must be empty.
+    std::set<FieldRef> multikeyPathSet;
 
     bool sparse;
 

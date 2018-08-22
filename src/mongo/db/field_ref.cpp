@@ -36,8 +36,6 @@ namespace mongo {
 
 const size_t FieldRef::kReserveAhead;
 
-FieldRef::FieldRef() : _size(0), _cachedSize(0) {}
-
 FieldRef::FieldRef(StringData path) {
     parse(path);
 }
@@ -73,10 +71,13 @@ void FieldRef::parse(StringData path) {
         // out of the loop below since we will not execute the guarded 'continue' and will
         // instead reach the break statement.
 
-        if (cur != beg)
-            appendParsedPart(StringData(&*beg, cur - beg));
-        else
-            appendParsedPart(StringData());
+        if (cur != beg) {
+            size_t offset = beg - _dotted.begin();
+            size_t len = cur - beg;
+            appendParsedPart(StringView{offset, len});
+        } else {
+            appendParsedPart(StringView{});
+        }
 
         if (cur != end) {
             beg = ++cur;
@@ -134,7 +135,7 @@ void FieldRef::removeLastPart() {
     _size--;
 }
 
-size_t FieldRef::appendParsedPart(StringData part) {
+size_t FieldRef::appendParsedPart(FieldRef::StringView part) {
     if (_size < kReserveAhead) {
         _fixed[_size] = part;
     } else {
@@ -172,15 +173,20 @@ void FieldRef::reserialize() const {
     std::string::const_iterator where = _dotted.begin();
     const std::string::const_iterator end = _dotted.end();
     for (size_t i = 0; i != _size; ++i) {
-        boost::optional<StringData>& part =
+        boost::optional<StringView>& part =
             (i < kReserveAhead) ? _fixed[i] : _variable[getIndex(i)];
-        const size_t size = part ? part.get().size() : _replacements[i].size();
+        const size_t size = part ? part->len : _replacements[i].size();
 
         // There is one case where we expect to see the "where" iterator to be at "end" here: we
         // are at the last part of the FieldRef and that part is the empty string. In that case, we
         // need to make sure we do not dereference the "where" iterator.
-        dassert(where != end || (size == 0 && i == _size - 1));
-        part = StringData((size > 0) ? &*where : nullptr, size);
+        invariant(where != end || (size == 0 && i == _size - 1));
+        if (!size) {
+            part = StringView{};
+        } else {
+            std::size_t offset = where - _dotted.begin();
+            part = StringView{offset, size};
+        }
         where += size;
         // skip over '.' unless we are at the end.
         if (where != end) {
@@ -194,12 +200,12 @@ void FieldRef::reserialize() const {
 }
 
 StringData FieldRef::getPart(size_t i) const {
-    dassert(i < _size);
+    invariant(i < _size);
 
-    const boost::optional<StringData>& part =
+    const boost::optional<StringView>& part =
         (i < kReserveAhead) ? _fixed[i] : _variable[getIndex(i)];
     if (part) {
-        return part.get();
+        return part->toStringData(_dotted);
     } else {
         return StringData(_replacements[i]);
     }

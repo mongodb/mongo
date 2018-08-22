@@ -1030,12 +1030,16 @@ TEST(QueryPlannerIXSelectTest, NoStringComparisonType) {
     }
 }
 
-IndexEntry makeIndexEntry(BSONObj keyPattern, MultikeyPaths multiKeyPaths) {
+IndexEntry makeIndexEntry(BSONObj keyPattern,
+                          MultikeyPaths multiKeyPaths,
+                          std::set<FieldRef> multikeyPathSet = {}) {
     IndexEntry entry{std::move(keyPattern)};
     entry.multikeyPaths = std::move(multiKeyPaths);
-    entry.multikey = std::any_of(entry.multikeyPaths.cbegin(),
-                                 entry.multikeyPaths.cend(),
-                                 [](const auto& entry) { return !entry.empty(); });
+    entry.multikey =
+        !multikeyPathSet.empty() || std::any_of(entry.multikeyPaths.cbegin(),
+                                                entry.multikeyPaths.cend(),
+                                                [](const auto& entry) { return !entry.empty(); });
+    entry.multikeyPathSet = std::move(multikeyPathSet);
     return entry;
 }
 
@@ -1344,6 +1348,29 @@ TEST(QueryPlannerIXSelectTest, ExpandAllPathsIndicesInPresenceOfOtherIndices) {
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
+TEST(QueryPlannerIXSelectTest, ExpandedIndexEntriesAreCorrectlyMarkedAsMultikeyOrNonMultikey) {
+    auto allPathsIndexEntry = makeIndexEntry(BSON("$**" << 1), {}, {FieldRef{"a"}});
+    const stdx::unordered_set<string> fields = {"a.b", "c.d"};
+    std::vector<BSONObj> expectedKeyPatterns = {BSON("a.b" << 1), BSON("c.d" << 1)};
+
+    auto result = QueryPlannerIXSelect::expandIndexes(fields, {allPathsIndexEntry});
+    ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
+
+    for (auto&& entry : result) {
+        ASSERT_TRUE(entry.multikeyPathSet.empty());
+        ASSERT_EQ(entry.multikeyPaths.size(), 1u);
+
+        if (SimpleBSONObjComparator::kInstance.evaluate(entry.keyPattern == BSON("a.b" << 1))) {
+            ASSERT_TRUE(entry.multikey);
+            ASSERT(entry.multikeyPaths[0] == std::set<std::size_t>{0u});
+        } else {
+            ASSERT_BSONOBJ_EQ(entry.keyPattern, BSON("c.d" << 1));
+            ASSERT_FALSE(entry.multikey);
+            ASSERT_TRUE(entry.multikeyPaths[0].empty());
+        }
+    }
+}
+
 TEST(QueryPlannerIXSelectTest, AllPathsIndexExpansionExcludesIdField) {
     const auto indexEntry = makeIndexEntry(BSON("$**" << 1), {});
 
@@ -1366,8 +1393,12 @@ TEST(QueryPlannerIXSelectTest, AllPathsIndicesExpandedEntryHasCorrectProperties)
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 
     for (auto&& ie : result) {
-        // TODO SERVER-36109. For now we assume allPaths indexes are never multikey.
+        // A $** index entry is only multikey if it has a non-empty 'multikeyPathSet'. No such
+        // multikey path set has been supplied by this test.
         ASSERT_FALSE(ie.multikey);
+        ASSERT_TRUE(ie.multikeyPathSet.empty());
+        ASSERT_EQ(ie.multikeyPaths.size(), 1u);
+        ASSERT_TRUE(ie.multikeyPaths[0].empty());
 
         // AllPaths indices are always sparse.
         ASSERT_TRUE(ie.sparse);

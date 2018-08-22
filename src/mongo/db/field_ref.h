@@ -49,10 +49,8 @@ namespace mongo {
  * The class is not thread safe.
  */
 class FieldRef {
-    MONGO_DISALLOW_COPYING(FieldRef);
-
 public:
-    FieldRef();
+    FieldRef() = default;
 
     explicit FieldRef(StringData path);
 
@@ -150,6 +148,23 @@ private:
     // with allocations.
     static const size_t kReserveAhead = 4;
 
+    // In order to make FieldRef copyable, we use a StringData-like type that stores an offset and
+    // length into the backing string. StringData, in constrast, holds const char* pointers that
+    // would have to be updated to point into the new string on copy.
+    struct StringView {
+        // Constructs an empty StringView.
+        StringView() = default;
+
+        StringView(std::size_t offset, std::size_t len) : offset(offset), len(len){};
+
+        StringData toStringData(const std::string& viewInto) const {
+            return {viewInto.c_str() + offset, len};
+        };
+
+        std::size_t offset = 0;
+        std::size_t len = 0;
+    };
+
     /** Converts the field part index to the variable part equivalent */
     size_t getIndex(size_t i) const {
         return i - kReserveAhead;
@@ -159,7 +174,7 @@ private:
      * Returns the new number of parts after appending 'part' to this field path. This is
      * private, because it is only intended for use by the parse function.
      */
-    size_t appendParsedPart(StringData part);
+    size_t appendParsedPart(StringView part);
 
     /**
      * Re-assemble _dotted from components, including any replacements in _replacements,
@@ -171,25 +186,23 @@ private:
     void reserialize() const;
 
     // number of field parts stored
-    size_t _size;
+    size_t _size = 0u;
 
     // Number of field parts in the cached dotted name (_dotted).
-    mutable size_t _cachedSize;
+    mutable size_t _cachedSize = 0u;
+
+    // First 'kReservedAhead' field components. Each component is either a StringView backed by the
+    // _dotted string or boost::none to indicate that getPart() should read the string from the
+    // _replacements list.
+    mutable boost::optional<StringView> _fixed[kReserveAhead];
+
+    // Remaining field components. Each non-none element is a view backed by '_dotted'. (See comment
+    // above _fixed.)
+    mutable std::vector<boost::optional<StringView>> _variable;
 
     /**
-     * First kResevedAhead field components.
-     *
-     * Each component is either a StringData backed by the _dotted string or boost::none
-     * to indicate that getPart() should read the string from the _replacements list.
-     */
-    mutable boost::optional<StringData> _fixed[kReserveAhead];
-
-    // Remaining field components. (See comment above _fixed.)
-    mutable std::vector<boost::optional<StringData>> _variable;
-
-    /**
-     * Cached copy of the complete dotted name string. The StringData objects in "_fixed"
-     * and "_variable" reference this string.
+     * Cached copy of the complete dotted name string. The StringView objects in "_fixed" and
+     * "_variable" reference this string.
      */
     mutable std::string _dotted;
 
