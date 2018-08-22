@@ -86,4 +86,12 @@ Status EncryptionHooks::unprotectTmpData(
     return Status(ErrorCodes::InternalError,
                   "Encryption hooks must be enabled to use postprocessTmpData.");
 }
+
+StatusWith<std::vector<std::string>> EncryptionHooks::beginNonBlockingBackup() {
+    return std::vector<std::string>();
+}
+
+Status EncryptionHooks::endNonBlockingBackup() {
+    return Status::OK();
+}
 }  // namespace mongo

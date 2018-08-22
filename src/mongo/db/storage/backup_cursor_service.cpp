@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -159,6 +160,12 @@ BackupCursorState BackupCursorService::openBackupCursor(OperationContext* opCtx)
                 oplogStart < oplogEnd);
     }
 
+    auto encHooks = EncryptionHooks::get(opCtx->getServiceContext());
+    if (encHooks->enabled()) {
+        auto eseFiles = uassertStatusOK(encHooks->beginNonBlockingBackup());
+        filesToBackup.insert(filesToBackup.end(), eseFiles.begin(), eseFiles.end());
+    }
+
     BSONObjBuilder builder;
     if (!oplogStart.isNull()) {
         builder << "oplogStart" << oplogStart.toBSON();
@@ -194,6 +201,10 @@ void BackupCursorService::_closeBackupCursor(OperationContext* opCtx,
                           << _openCursor.get(),
             cursorId == _openCursor.get());
     _storageEngine->endNonBlockingBackup(opCtx);
+    auto encHooks = EncryptionHooks::get(opCtx->getServiceContext());
+    if (encHooks->enabled()) {
+        fassert(50934, encHooks->endNonBlockingBackup());
+    }
     log() << "Closed backup cursor. ID: " << cursorId;
     _state = kInactive;
     _openCursor = boost::none;

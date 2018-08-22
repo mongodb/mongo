@@ -31,6 +31,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
@@ -94,6 +95,19 @@ public:
      */
     virtual Status unprotectTmpData(
         const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen);
+
+    /**
+     * Inform the encryption storage system to prepare its data such that its files can be copied
+     * along with MongoDB data files for a backup.
+     */
+    virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup();
+
+    /**
+     * Inform the encryption storage system that it can release resources associated with a
+     * previous call to `beginNonBlockingBackup`. This function may be called without a pairing
+     * `beginNonBlockingBackup`. In that case it must return `Status::OK()`;
+     */
+    virtual Status endNonBlockingBackup();
 };
 
 }  // namespace mongo

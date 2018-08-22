@@ -804,22 +804,21 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
     std::vector<std::string> filesToCopy;
 
     const char* filename;
+    const auto dbPath = boost::filesystem::path(_path);
+    const auto wiredTigerLogFilePrefix = "WiredTigerLog";
     while ((wtRet = cursor->next(cursor)) == 0) {
         invariantWTOK(cursor->get_key(cursor, &filename));
 
         std::string name(filename);
 
-        // WiredTiger backup cursors do not return path information for journal files. If a
-        // filename fits the pattern of a WT log file, add the journal directory to the file being
-        // returned.
-        const auto wiredTigerLogFilePrefix = "WiredTigerLog";
+        auto filePath = dbPath;
         if (name.find(wiredTigerLogFilePrefix) == 0) {
             // TODO SERVER-13455:replace `journal/` with the configurable journal path.
-            auto path = boost::filesystem::path("journal");
-            path /= name;
-            name = path.string();
+            filePath /= boost::filesystem::path("journal");
         }
-        filesToCopy.push_back(std::move(name));
+        filePath /= name;
+
+        filesToCopy.push_back(filePath.string());
     }
     if (wtRet != WT_NOTFOUND) {
         return wtRCToStatus(wtRet, "Error opening backup cursor.");
