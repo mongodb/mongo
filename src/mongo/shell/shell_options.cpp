@@ -42,6 +42,7 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/transport/message_compressor_registry.h"
@@ -59,6 +60,11 @@ using std::string;
 using std::vector;
 
 ShellGlobalParams shellGlobalParams;
+
+// SERVER-36807: Limit --setShellParameter to SetParameters we know we want to expose.
+const std::set<std::string> kSetShellParameterWhitelist = {
+    "disabledSecureAllocatorDomains",
+};
 
 Status addMongoShellOptions(moe::OptionSection* options) {
     options->addOptionChaining(
@@ -226,6 +232,14 @@ Status addMongoShellOptions(moe::OptionSection* options) {
 
     options->addOptionChaining(
         "jsHeapLimitMB", "jsHeapLimitMB", moe::Int, "set the js scope's heap size limit");
+
+    options
+        ->addOptionChaining("setShellParameter",
+                            "setShellParameter",
+                            moe::StringMap,
+                            "Set a configurable parameter")
+        .composing()
+        .hidden();
 
     return Status::OK();
 }
@@ -465,6 +479,31 @@ Status storeMongoShellOptions(const moe::Environment& params,
     auto ret = storeMessageCompressionOptions(params);
     if (!ret.isOK())
         return ret;
+
+    if (params.count("setShellParameter")) {
+        auto ssp = params["setShellParameter"].as<std::map<std::string, std::string>>();
+        auto map = ServerParameterSet::getGlobal()->getMap();
+        for (auto it : ssp) {
+            const auto& name = it.first;
+            auto paramIt = map.find(name);
+            if (paramIt == map.end() || !kSetShellParameterWhitelist.count(name)) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "Unknown --setShellParameter '" << name << "'"};
+            }
+            auto* param = paramIt->second;
+            if (!param->allowedToChangeAtStartup()) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "Cannot use --setShellParameter to set '" << name
+                                      << "' at startup"};
+            }
+            auto status = param->setFromString(it.second);
+            if (!status.isOK()) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "Bad value for parameter '" << name << "': "
+                                      << status.reason()};
+            }
+        }
+    }
 
     return Status::OK();
 }
