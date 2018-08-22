@@ -1841,7 +1841,7 @@ functions:
           --edition ${multiversion_edition|base}             \
           --platform ${multiversion_platform|linux}          \
           --architecture ${multiversion_architecture|x86_64} \
-          --useLatest 3.2 3.4 3.6
+          --useLatest 3.2 3.4 3.6 3.6.7
 
   "do snmp setup" :
     command: shell.exec
