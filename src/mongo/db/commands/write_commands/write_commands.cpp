@@ -310,7 +310,7 @@ private:
         return stdx::make_unique<Invocation>(this, request);
     }
 
-    void redactForLogging(mutablebson::Document* cmdObj) const final {
+    void snipForLogging(mutablebson::Document* cmdObj) const final {
         redactTooLongLog(cmdObj, "documents");
     }
 
@@ -387,7 +387,7 @@ private:
         return stdx::make_unique<Invocation>(this, request);
     }
 
-    void redactForLogging(mutablebson::Document* cmdObj) const final {
+    void snipForLogging(mutablebson::Document* cmdObj) const final {
         redactTooLongLog(cmdObj, "updates");
     }
 
@@ -461,7 +461,7 @@ private:
         return stdx::make_unique<Invocation>(this, request);
     }
 
-    void redactForLogging(mutablebson::Document* cmdObj) const final {
+    void snipForLogging(mutablebson::Document* cmdObj) const final {
         redactTooLongLog(cmdObj, "deletes");
     }
 

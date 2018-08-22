@@ -555,7 +555,7 @@ string OpDebug::report(Client* client,
             const Command* curCommand = curop.getCommand();
             if (curCommand) {
                 mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
-                curCommand->redactForLogging(&cmdToLog);
+                curCommand->snipForLogging(&cmdToLog);
                 s << curCommand->getName() << " ";
                 s << redact(cmdToLog.getObject());
             } else {

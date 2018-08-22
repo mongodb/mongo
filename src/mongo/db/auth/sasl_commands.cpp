@@ -72,7 +72,9 @@ public:
                                        const BSONObj&,
                                        std::vector<Privilege>*) const {}
 
-    void redactForLogging(mutablebson::Document* cmdObj) const override;
+    StringData sensitiveFieldName() const final {
+        return "payload"_sd;
+    }
 
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,
@@ -99,6 +101,10 @@ public:
     virtual void addRequiredPrivileges(const std::string&,
                                        const BSONObj&,
                                        std::vector<Privilege>*) const {}
+
+    StringData sensitiveFieldName() const final {
+        return "payload"_sd;
+    }
 
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,
@@ -260,13 +266,6 @@ CmdSaslStart::~CmdSaslStart() {}
 
 std::string CmdSaslStart::help() const {
     return "First step in a SASL authentication conversation.";
-}
-
-void CmdSaslStart::redactForLogging(mutablebson::Document* cmdObj) const {
-    mutablebson::Element element = mutablebson::findFirstChildNamed(cmdObj->root(), "payload");
-    if (element.ok()) {
-        element.setValueString("xxx").transitional_ignore();
-    }
 }
 
 bool CmdSaslStart::run(OperationContext* opCtx,

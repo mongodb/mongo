@@ -341,13 +341,23 @@ public:
     /**
      * Redacts "cmdObj" in-place to a form suitable for writing to logs.
      *
-     * The default implementation does nothing.
+     * The default implementation removes the field returned by sensitiveFieldName.
      *
      * This is NOT used to implement user-configurable redaction of PII. Instead, that is
      * implemented via the set of redact() free functions, which are no-ops when log redaction is
      * disabled. All PII must pass through one of the redact() overloads before being logged.
      */
-    virtual void redactForLogging(mutablebson::Document* cmdObj) const {}
+    virtual void snipForLogging(mutablebson::Document* cmdObj) const;
+
+    /**
+     * Marks a field name in a cmdObj as sensitive.
+     *
+     * The default snipForLogging shall remove these field names. Auditing shall not
+     * include these fields in audit outputs.
+     */
+    virtual StringData sensitiveFieldName() const {
+        return StringData{};
+    }
 
     /**
      * Return true if a replica set secondary should go into "recovering"

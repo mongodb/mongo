@@ -47,13 +47,6 @@ class OperationContext;
 
 namespace auth {
 
-/**
- * Looks for a field name "pwd" in the given BSONObj and if found replaces its contents with the
- * string "xxx" so that password data on the command object used in executing a user management
- * command isn't exposed in the logs.
- */
-void redactPasswordData(mutablebson::Element parent);
-
 //
 // checkAuthorizedTo* methods
 //

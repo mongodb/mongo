@@ -94,8 +94,8 @@ public:
             &result);
     }
 
-    void redactForLogging(mutablebson::Document* cmdObj) const override {
-        auth::redactPasswordData(cmdObj->root());
+    StringData sensitiveFieldName() const final {
+        return "pwd"_sd;
     }
 
 } cmdCreateUser;
@@ -144,8 +144,8 @@ public:
         return ok;
     }
 
-    void redactForLogging(mutablebson::Document* cmdObj) const override {
-        auth::redactPasswordData(cmdObj->root());
+    StringData sensitiveFieldName() const final {
+        return "pwd"_sd;
     }
 
 } cmdUpdateUser;

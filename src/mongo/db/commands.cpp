@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/audit.h"
@@ -142,10 +143,24 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
         explicit Hook(const CommandInvocation* invocation, const NamespaceString* nss)
             : _invocation(invocation), _nss(nss) {}
 
-        void redactForLogging(mutablebson::Document* cmdObj) const override {
+        void snipForLogging(mutablebson::Document* cmdObj) const override {
             if (_invocation) {
-                _invocation->definition()->redactForLogging(cmdObj);
+                _invocation->definition()->snipForLogging(cmdObj);
             }
+        }
+
+        StringData sensitiveFieldName() const override {
+            if (_invocation) {
+                return _invocation->definition()->sensitiveFieldName();
+            }
+            return StringData{};
+        }
+
+        StringData getName() const override {
+            if (!_invocation) {
+                return "Error"_sd;
+            }
+            return _invocation->definition()->getName();
         }
 
         NamespaceString ns() const override {
@@ -404,7 +419,7 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
             } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
                 namespace mmb = mutablebson;
                 mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
-                c->redactForLogging(&cmdToLog);
+                c->snipForLogging(&cmdToLog);
                 auto dbname = request.getDatabase();
                 uasserted(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized on " << dbname << " to execute command "
@@ -475,6 +490,21 @@ private:
 };
 
 Command::~Command() = default;
+
+void Command::snipForLogging(mutablebson::Document* cmdObj) const {
+    StringData sensitiveField = sensitiveFieldName();
+    if (!sensitiveField.empty()) {
+
+        for (mutablebson::Element pwdElement =
+                 mutablebson::findFirstChildNamed(cmdObj->root(), sensitiveField);
+             pwdElement.ok();
+             pwdElement =
+                 mutablebson::findElementNamed(pwdElement.rightSibling(), sensitiveField)) {
+            uassertStatusOK(pwdElement.setValueString("xxx"));
+        }
+    }
+}
+
 
 std::unique_ptr<CommandInvocation> BasicCommand::parse(OperationContext* opCtx,
                                                        const OpMsgRequest& request) {

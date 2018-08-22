@@ -60,7 +60,9 @@ namespace audit {
 class CommandInterface {
 public:
     virtual ~CommandInterface() = default;
-    virtual void redactForLogging(mutablebson::Document* cmdObj) const = 0;
+    virtual StringData sensitiveFieldName() const = 0;
+    virtual void snipForLogging(mutablebson::Document* cmdObj) const = 0;
+    virtual StringData getName() const = 0;
     virtual NamespaceString ns() const = 0;
     virtual bool redactArgs() const = 0;
 };

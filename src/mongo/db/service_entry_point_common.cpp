@@ -1255,7 +1255,7 @@ DbResponse receivedGetMore(OperationContext* opCtx,
 BSONObj ServiceEntryPointCommon::getRedactedCopyForLogging(const Command* command,
                                                            const BSONObj& cmdObj) {
     mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
-    command->redactForLogging(&cmdToLog);
+    command->snipForLogging(&cmdToLog);
     BSONObjBuilder bob;
     cmdToLog.writeTo(&bob);
     return bob.obj();
