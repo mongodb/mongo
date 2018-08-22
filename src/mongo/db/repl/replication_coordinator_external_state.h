@@ -117,7 +117,7 @@ public:
     /**
      * Waits for all committed writes to be visible in the oplog.  Committed writes will be hidden
      * if there are uncommitted writes ahead of them, and some operations require that all committed
-     * writes are visible before proceeding.
+     * writes are visible before proceeding. Throws if the oplog does not exist.
      */
     virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) = 0;
 

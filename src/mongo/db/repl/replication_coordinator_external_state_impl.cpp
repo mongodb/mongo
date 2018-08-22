@@ -475,6 +475,7 @@ void ReplicationCoordinatorExternalStateImpl::waitForAllEarlierOplogWritesToBeVi
         AutoGetCollection oplogLock(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
         oplog = oplogLock.getCollection();
     }
+    uassert(ErrorCodes::NotYetInitialized, "The oplog does not exist", oplog);
     oplog->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 }
 

@@ -88,6 +88,9 @@ MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeFinish);
 // operation.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeGettingMissingDocument);
 
+// Failpoint which causes the initial sync function to hang before creating the oplog.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCreatingOplog);
+
 // Failpoint which stops the applier.
 MONGO_FAIL_POINT_DEFINE(rsSyncApplyStop);
 
@@ -506,7 +509,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
     std::uint32_t chooseSyncSourceAttempt,
     std::uint32_t chooseSyncSourceMaxAttempts,
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     // Cancellation should be treated the same as other errors. In this case, the most likely cause
     // of a failed _chooseSyncSourceCallback() task is a cancellation triggered by
     // InitialSyncer::shutdown() or the task executor shutting down.
@@ -553,6 +556,17 @@ void InitialSyncer::_chooseSyncSourceCallback(
             return;
         }
         return;
+    }
+
+    if (MONGO_FAIL_POINT(initialSyncHangBeforeCreatingOplog)) {
+        // This log output is used in js tests so please leave it.
+        log() << "initial sync - initialSyncHangBeforeCreatingOplog fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        lock.unlock();
+        while (MONGO_FAIL_POINT(initialSyncHangBeforeCreatingOplog) && !_isShuttingDown()) {
+            mongo::sleepsecs(1);
+        }
+        lock.lock();
     }
 
     // There is no need to schedule separate task to create oplog collection since we are already in
