@@ -83,8 +83,8 @@ public:
     Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         Pipeline* pipeline) final;
     std::string getShardName(OperationContext* opCtx) const final;
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(OperationContext* opCtx,
-                                                                     UUID uuid) const final;
+    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(
+        OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const final;
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,

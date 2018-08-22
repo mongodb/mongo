@@ -352,6 +352,7 @@ selector:
   - jstests/sharding/out_from_stale_mongos.js
   - jstests/sharding/out_to_existing.js
   - jstests/sharding/out_to_non_existing.js
+  - jstests/sharding/out_unique_key.js
   - jstests/sharding/restart_transactions.js
   - jstests/sharding/shard7.js
   - jstests/sharding/shard_collection_existing_zones.js

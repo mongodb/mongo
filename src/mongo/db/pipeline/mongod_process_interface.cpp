@@ -307,16 +307,22 @@ std::string MongoDInterface::getShardName(OperationContext* opCtx) const {
 }
 
 std::pair<std::vector<FieldPath>, bool> MongoDInterface::collectDocumentKeyFields(
-    OperationContext* opCtx, UUID uuid) const {
+    OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const {
     if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
         return {{"_id"}, false};  // Nothing is sharded.
     }
-
-    // An empty namespace indicates that the collection has been dropped. Treat it as unsharded and
-    // mark the fields as final.
-    auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
-    if (nss.isEmpty()) {
-        return {{"_id"}, true};
+    boost::optional<UUID> uuid;
+    NamespaceString nss;
+    if (nssOrUUID.uuid()) {
+        uuid = *(nssOrUUID.uuid());
+        nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(*uuid);
+        // An empty namespace indicates that the collection has been dropped. Treat it as unsharded
+        // and mark the fields as final.
+        if (nss.isEmpty()) {
+            return {{"_id"}, true};
+        }
+    } else if (nssOrUUID.nss()) {
+        nss = *(nssOrUUID.nss());
     }
 
     // Before taking a collection lock to retrieve the shard key fields, consult the catalog cache
@@ -338,9 +344,10 @@ std::pair<std::vector<FieldPath>, bool> MongoDInterface::collectDocumentKeyField
         return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
-    // Collection is not sharded or UUID mismatch implies collection has been dropped and recreated
-    // as sharded.
-    if (!scm->isSharded() || !scm->uuidMatches(uuid)) {
+    // If the UUID is set in 'nssOrUuid', check that the UUID in the ScopedCollectionMetadata
+    // matches. Otherwise, this implies that the collection has been dropped and recreated as
+    // sharded.
+    if (!scm->isSharded() || (uuid && !scm->uuidMatches(*uuid))) {
         return {{"_id"}, false};
     }
 

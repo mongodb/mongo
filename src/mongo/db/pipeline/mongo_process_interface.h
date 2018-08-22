@@ -205,7 +205,7 @@ public:
      * the given collection, either because the collection was dropped or has become sharded.
      */
     virtual std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(
-        OperationContext* opCtx, UUID uuid) const = 0;
+        OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const = 0;
 
     /**
      * Returns zero or one documents with the document key 'documentKey'. 'documentKey' is treated

@@ -30,10 +30,12 @@
 
 #include "mongo/db/pipeline/mongos_process_interface.h"
 
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
@@ -183,6 +185,36 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
             batch.size() <= 1u);
 
     return (!batch.empty() ? Document(batch.front()) : boost::optional<Document>{});
+}
+
+std::pair<std::vector<FieldPath>, bool> MongoSInterface::collectDocumentKeyFields(
+    OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const {
+
+    invariant(!nssOrUUID.uuid(), "Did not expect to use this method with a UUID on mongos");
+    const NamespaceString& nss = *nssOrUUID.nss();
+
+    auto collRoutInfo = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
+    if (collRoutInfo == ErrorCodes::NamespaceNotFound) {
+        return {{"_id"}, false};
+    }
+    uassertStatusOKWithContext(collRoutInfo, "Collection Routing Info is unavailable");
+
+    auto cm = collRoutInfo.getValue().cm();
+    if (!cm)
+        return {{"_id"}, false};
+
+    // Unpack the shard key.
+    std::vector<FieldPath> result;
+    bool gotId = false;
+    for (auto& field : cm->getShardKeyPattern().getKeyPatternFields()) {
+        result.emplace_back(field->dottedField());
+        gotId |= (result.back().fullPath() == "_id");
+    }
+    if (!gotId) {  // If not part of the shard key, "_id" comes last.
+        result.emplace_back("_id");
+    }
+    // Collection is sharded so the document key fields will never change, mark as final.
+    return {result, true};
 }
 
 BSONObj MongoSInterface::_reportCurrentOpForClient(OperationContext* opCtx,

@@ -210,6 +210,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // Deal with CRUD operations and commands.
     auto opType = repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"), op);
 
+    NamespaceString nss(ns.getString());
     // Ignore commands in the oplog when looking up the document key fields since a command implies
     // that the change stream is about to be invalidated (e.g. collection drop).
     if (!uuid.missing() && opType != repl::OpTypeEnum::kCommand) {
@@ -220,7 +221,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         auto it = _documentKeyCache.find(uuid.getUuid());
         if (it == _documentKeyCache.end() || !it->second.isFinal) {
             auto docKeyFields = pExpCtx->mongoProcessInterface->collectDocumentKeyFields(
-                pExpCtx->opCtx, uuid.getUuid());
+                pExpCtx->opCtx, NamespaceStringOrUUID(nss.db().toString(), uuid.getUuid()));
             if (it == _documentKeyCache.end() || docKeyFields.second) {
                 _documentKeyCache[uuid.getUuid()] = DocumentKeyCacheEntry(docKeyFields);
             }
@@ -228,7 +229,6 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
 
         documentKeyFields = _documentKeyCache.find(uuid.getUuid())->second.documentKeyFields;
     }
-    NamespaceString nss(ns.getString());
     Value id = input.getNestedField("o._id");
     // Non-replace updates have the _id in field "o2".
     StringData operationType;

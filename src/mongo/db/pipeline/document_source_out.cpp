@@ -231,21 +231,22 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
 
         mode = spec.getMode();
 
-        // Convert unique key object to a vector of FieldPaths.
-        if (auto uniqueKeyObj = spec.getUniqueKey()) {
-            uniqueKey = uniqueKeyObj->getFieldNames<std::set<FieldPath>>();
-        } else {
-            // TODO SERVER-35954: If not present, build the unique key from the shard key of the
-            // output collection.
-            uniqueKey.emplace("_id");
-        }
-
         // Retrieve the target database from the user command, otherwise use the namespace from the
         // expression context.
         if (auto targetDb = spec.getTargetDb()) {
             outputNs = NamespaceString(*targetDb, spec.getTargetCollection());
         } else {
             outputNs = NamespaceString(expCtx->ns.db(), spec.getTargetCollection());
+        }
+
+        // Convert unique key object to a vector of FieldPaths.
+        if (auto uniqueKeyObj = spec.getUniqueKey()) {
+            uniqueKey = uniqueKeyObj->getFieldNames<std::set<FieldPath>>();
+        } else {
+            std::vector<FieldPath> docKeyPaths = std::get<0>(
+                expCtx->mongoProcessInterface->collectDocumentKeyFields(expCtx->opCtx, outputNs));
+            uniqueKey = std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
+                                            std::make_move_iterator(docKeyPaths.end()));
         }
     } else {
         uasserted(16990,
