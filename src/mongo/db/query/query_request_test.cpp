@@ -851,6 +851,60 @@ TEST(QueryRequestTest, ParseFromCommandDefaultBatchSize) {
 }
 
 //
+// Test asFindCommand ns and uuid variants.
+//
+
+TEST(QueryRequestTest, AsFindCommandAllNonOptionFields) {
+    BSONObj cmdObj = fromjson(
+        "{find: 'testns',"
+        "filter: {a: 1},"
+        "projection: {c: 1},"
+        "sort: {b: 1},"
+        "hint: {d: 1},"
+        "readConcern: {e: 1},"
+        "collation: {f: 1},"
+        "skip: 5,"
+        "limit: 3,"
+        "batchSize: 90,"
+        "singleBatch: true}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+    ASSERT_BSONOBJ_EQ(cmdObj, qr->asFindCommand());
+}
+
+TEST(QueryRequestTest, AsFindCommandWithUuidAllNonOptionFields) {
+    BSONObj cmdObj = fromjson(
+        // This binary value is UUID("01234567-89ab-cdef-edcb-a98765432101")
+        "{find: { \"$binary\" : \"ASNFZ4mrze/ty6mHZUMhAQ==\", \"$type\" : \"04\" },"
+        "filter: {a: 1},"
+        "projection: {c: 1},"
+        "sort: {b: 1},"
+        "hint: {d: 1},"
+        "readConcern: {e: 1},"
+        "collation: {f: 1},"
+        "skip: 5,"
+        "limit: 3,"
+        "batchSize: 90,"
+        "singleBatch: true}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+    ASSERT_BSONOBJ_EQ(cmdObj, qr->asFindCommandWithUuid());
+}
+
+TEST(QueryRequestTest, AsFindCommandWithUuidNoAvailableNamespace) {
+    BSONObj cmdObj =
+        fromjson("{find: { \"$binary\" : \"ASNFZ4mrze/ty6mHZUMhAQ==\", \"$type\" : \"04\" }}");
+    QueryRequest qr(NamespaceStringOrUUID(
+        "test", UUID::parse("01234567-89ab-cdef-edcb-a98765432101").getValue()));
+    ASSERT_BSONOBJ_EQ(cmdObj, qr.asFindCommandWithUuid());
+}
+
+//
+//
 // Errors checked in QueryRequest::validate().
 //
 

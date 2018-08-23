@@ -595,6 +595,10 @@ public:
 
         Use the DBClientCursorBatchIterator version, below, if you want to do items in large
         blocks, perhaps to avoid granular locking and such.
+
+        Note:
+        The version that takes a BSONObj cannot return the namespace queried when the query is
+        is done by UUID.  If this is required, use the DBClientBatchIterator version.
      */
     unsigned long long query(stdx::function<void(const BSONObj&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,

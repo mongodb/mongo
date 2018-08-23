@@ -408,9 +408,24 @@ BSONObj QueryRequest::asFindCommand() const {
     return bob.obj();
 }
 
+BSONObj QueryRequest::asFindCommandWithUuid() const {
+    BSONObjBuilder bob;
+    asFindCommandWithUuid(&bob);
+    return bob.obj();
+}
+
 void QueryRequest::asFindCommand(BSONObjBuilder* cmdBuilder) const {
     cmdBuilder->append(kFindCommandName, _nss.coll());
+    asFindCommandInternal(cmdBuilder);
+}
 
+void QueryRequest::asFindCommandWithUuid(BSONObjBuilder* cmdBuilder) const {
+    invariant(_uuid);
+    _uuid->appendToBuilder(cmdBuilder, kFindCommandName);
+    asFindCommandInternal(cmdBuilder);
+}
+
+void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
     if (!_filter.isEmpty()) {
         cmdBuilder->append(kFilterField, _filter);
     }
@@ -710,13 +725,13 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQueryMessage(const 
     return std::move(qr);
 }
 
-StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQuery(NamespaceString nss,
+StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQuery(NamespaceStringOrUUID nsOrUuid,
                                                                    const BSONObj& queryObj,
                                                                    const BSONObj& proj,
                                                                    int ntoskip,
                                                                    int ntoreturn,
                                                                    int queryOptions) {
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = stdx::make_unique<QueryRequest>(nsOrUuid);
 
     Status status = qr->init(ntoskip, ntoreturn, queryOptions, queryObj, proj, true);
     if (!status.isOK()) {

@@ -1668,6 +1668,35 @@ public:
     }
 };
 
+class QueryByUuid : public CollectionBase {
+public:
+    QueryByUuid() : CollectionBase("QueryByUuid") {}
+
+    void run() {
+        CollectionOptions coll_opts;
+        coll_opts.uuid = UUID::gen();
+        {
+            Lock::GlobalWrite lk(&_opCtx);
+            OldClientContext context(&_opCtx, ns());
+            WriteUnitOfWork wunit(&_opCtx);
+            context.db()->createCollection(&_opCtx, ns(), coll_opts, false);
+            wunit.commit();
+        }
+        insert(ns(), BSON("a" << 1));
+        insert(ns(), BSON("a" << 2));
+        insert(ns(), BSON("a" << 3));
+        unique_ptr<DBClientCursor> cursor =
+            _client.query(NamespaceStringOrUUID("unittests", *coll_opts.uuid), BSONObj());
+        ASSERT_EQUALS(string(ns()), cursor->getns());
+        for (int i = 1; i <= 3; ++i) {
+            ASSERT(cursor->more());
+            BSONObj obj(cursor->next());
+            ASSERT_EQUALS(obj["a"].Int(), i);
+        }
+        ASSERT(!cursor->more());
+    }
+};
+
 class CollectionInternalBase : public CollectionBase {
 public:
     CollectionInternalBase(const char* nsLeaf)
@@ -1833,6 +1862,7 @@ public:
         add<FindingStartPartiallyFull>();
         add<FindingStartStale>();
         add<WhatsMyUri>();
+        add<QueryByUuid>();
         add<Exhaust>();
         add<QueryReadsAll>();
         add<queryobjecttests::names1>();

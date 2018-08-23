@@ -111,14 +111,19 @@ Message DBClientCursor::_assembleInit() {
             return assembleCommandRequest(_client, ns.db(), opts, query);
         }
     } else if (_useFindCommand) {
-        auto qr = QueryRequest::fromLegacyQuery(ns,
+        // The caller supplies a 'query' object which may have $-prefixed directives in the format
+        // expected for a legacy OP_QUERY. Therefore, we use the legacy parsing code supplied by
+        // QueryRequest. When actually issuing the request to the remote node, we will assemble a
+        // find command.
+        auto qr = QueryRequest::fromLegacyQuery(_nsOrUuid,
                                                 query,
                                                 fieldsToReturn ? *fieldsToReturn : BSONObj(),
                                                 nToSkip,
                                                 nextBatchSize(),
                                                 opts);
         if (qr.isOK() && !qr.getValue()->isExplain()) {
-            BSONObj cmd = qr.getValue()->asFindCommand();
+            BSONObj cmd = _nsOrUuid.uuid() ? qr.getValue()->asFindCommandWithUuid()
+                                           : qr.getValue()->asFindCommand();
             if (auto readPref = query["$readPreference"]) {
                 // QueryRequest doesn't handle $readPreference.
                 cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();
@@ -126,6 +131,13 @@ Message DBClientCursor::_assembleInit() {
             return assembleCommandRequest(_client, ns.db(), opts, std::move(cmd));
         }
         // else use legacy OP_QUERY request.
+        // Legacy OP_QUERY request does not support UUIDs.
+        if (_nsOrUuid.uuid()) {
+            // If there was a problem building the query request, report that.
+            uassertStatusOK(qr.getStatus());
+            // Otherwise it must have been explain.
+            uasserted(50937, "Query by UUID is not supported for explain queries.");
+        }
     }
 
     _useFindCommand = false;  // Make sure we handle the reply correctly.
@@ -522,6 +534,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
     : batch{std::move(initialBatch)},
       _client(client),
       _originalHost(_client->getServerAddress()),
+      _nsOrUuid(nsOrUuid),
       ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbname())),
       _isCommand(ns.isCommand()),
       query(query),
@@ -536,8 +549,11 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _ownCursor(true),
       wasError(false),
       _enabledBSONVersion(Validator<BSONObj>::enabledBSONVersion()) {
-    if (queryOptions & QueryOptionLocal_forceOpQuery)
+    if (queryOptions & QueryOptionLocal_forceOpQuery) {
+        // Legacy OP_QUERY does not support UUIDs.
+        invariant(!_nsOrUuid.uuid());
         _useFindCommand = false;
+    }
 }
 
 DBClientCursor::~DBClientCursor() {
