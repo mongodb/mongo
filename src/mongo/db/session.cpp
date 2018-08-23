@@ -655,6 +655,7 @@ void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {
 }
 
 Session::TxnResources::TxnResources(OperationContext* opCtx) {
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
 
@@ -694,6 +695,8 @@ void Session::TxnResources::release(OperationContext* opCtx) {
     invariant(!_released);
     _released = true;
 
+    // We must take the client lock before changing the locker.
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     // We intentionally do not capture the return value of swapLockState(), which is just an empty
     // locker. At the end of the operation, if the transaction is not complete, we will stash the
     // operation context's locker and replace it with a new empty locker.
@@ -716,14 +719,7 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     }
 
     invariant(opCtx->getTxnNumber());
-
-    // We must lock the Client to change the Locker on the OperationContext and the Session mutex to
-    // access Session state. We must lock the Client before the Session mutex, since the Client
-    // effectively owns the Session. That is, a user might lock the Client to ensure it doesn't go
-    // away, and then lock the Session owned by that client. We rely on the fact that we are not
-    // using the DefaultLockerImpl to avoid deadlock.
     invariant(!isMMAPV1());
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
     stdx::unique_lock<stdx::mutex> lg(_mutex);
 
     // Always check '_activeTxnNumber', since it can be modified by migration, which does not
@@ -775,11 +771,6 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
     }
 
     {
-        // We must lock the Client to change the Locker on the OperationContext and the Session
-        // mutex to access Session state. We must lock the Client before the Session mutex, since
-        // the Client effectively owns the Session. That is, a user might lock the Client to ensure
-        // it doesn't go away, and then lock the Session owned by that client.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
         // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session
@@ -892,7 +883,6 @@ void Session::abortArbitraryTransactionIfExpired() {
 }
 
 void Session::abortActiveTransaction(OperationContext* opCtx) {
-    stdx::unique_lock<Client> clientLock(*opCtx->getClient());
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     invariant(!_txnResourceStash);
@@ -901,17 +891,18 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
     }
 
     _abortTransaction(lock);
-
-    // Abort the WUOW. We should be able to abort empty transactions that don't have WUOW.
-    if (opCtx->getWriteUnitOfWork()) {
-        opCtx->setWriteUnitOfWork(nullptr);
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        // Abort the WUOW. We should be able to abort empty transactions that don't have WUOW.
+        if (opCtx->getWriteUnitOfWork()) {
+            opCtx->setWriteUnitOfWork(nullptr);
+        }
+        // We must clear the recovery unit and locker so any post-transaction writes can run without
+        // transactional settings such as a read timestamp.
+        opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->lockState()->unsetMaxLockTimeout();
     }
-    // We must clear the recovery unit and locker so any post-transaction writes can run without
-    // transactional settings such as a read timestamp.
-    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
-                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    opCtx->lockState()->unsetMaxLockTimeout();
-
     {
         stdx::lock_guard<stdx::mutex> ls(_statsMutex);
         // Add the latest operation stats to the aggregate OpDebug object stored in the

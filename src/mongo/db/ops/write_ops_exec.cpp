@@ -125,16 +125,12 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
             boost::optional<Session::TxnResources> txnResources;
             if (session && session->inMultiDocumentTransaction()) {
                 // Stash the current transaction so that writes to the profile collection are not
-                // done as part of the transaction. This must be done under the client lock, since
-                // we are modifying 'opCtx'.
-                stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+                // done as part of the transaction.
                 txnResources = Session::TxnResources(opCtx);
             }
             ON_BLOCK_EXIT([&] {
                 if (txnResources) {
-                    // Restore the transaction state onto 'opCtx'. This must be done under the
-                    // client lock, since we are modifying 'opCtx'.
-                    stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+                    // Restore the transaction state onto 'opCtx'.
                     txnResources->release(opCtx);
                 }
             });
