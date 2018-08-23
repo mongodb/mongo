@@ -59,6 +59,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -86,9 +87,6 @@ using std::stringstream;
 using std::vector;
 
 namespace {
-
-// Used to obtain mutex that guards modifications to persistent authorization data
-const auto getAuthzDataMutex = ServiceContext::declareDecoration<stdx::mutex>();
 
 Status useDefaultCode(const Status& status, ErrorCodes::Error defaultCode) {
     if (status.code() != ErrorCodes::UnknownError)
@@ -147,7 +145,6 @@ Status getCurrentUserRoles(OperationContext* opCtx,
                            AuthorizationManager* authzManager,
                            const UserName& userName,
                            stdx::unordered_set<RoleName>* roles) {
-    authzManager->invalidateUserByName(userName);  // Need to make sure cache entry is up to date
     auto swUser = authzManager->acquireUser(opCtx, userName);
     if (!swUser.isOK()) {
         return swUser.getStatus();
@@ -565,14 +562,45 @@ Status writeAuthSchemaVersionIfNeeded(OperationContext* opCtx,
     return status;
 }
 
+class AuthzLockGuard {
+    AuthzLockGuard(AuthzLockGuard&) = delete;
+    AuthzLockGuard& operator=(AuthzLockGuard&) = delete;
+
+public:
+    AuthzLockGuard(OperationContext* opCtx, LockMode mode)
+        : _opCtx(opCtx),
+          _lock(_opCtx,
+                AuthorizationManager::usersCollectionNamespace.db(),
+                mode,
+                _opCtx->getDeadline()) {
+        auto authzMgr = AuthorizationManager::get(_opCtx->getServiceContext());
+        authzMgr->setInUserManagementCommand(_opCtx, true);
+    }
+
+    ~AuthzLockGuard() {
+        auto authzMgr = AuthorizationManager::get(_opCtx->getServiceContext());
+        authzMgr->setInUserManagementCommand(_opCtx, false);
+    }
+
+    AuthzLockGuard(AuthzLockGuard&&) = default;
+
+private:
+    OperationContext* _opCtx;
+    Lock::DBLock _lock;
+};
+
 /**
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version
  * for the MongoDB 3.0 SCRAM auth mode.
  * Returns an error otherwise.
  */
-Status requireWritableAuthSchema28SCRAM(OperationContext* opCtx,
-                                        AuthorizationManager* authzManager) {
+StatusWith<AuthzLockGuard> requireWritableAuthSchema28SCRAM(OperationContext* opCtx,
+                                                            AuthorizationManager* authzManager) {
     int foundSchemaVersion;
+    // We take a MODE_X lock during writes because we want to be sure that we can read any pinned
+    // user documents back out of the database after writing them during the user management
+    // commands, and to ensure only one user management command is running at a time.
+    AuthzLockGuard lk(opCtx, MODE_X);
     Status status = authzManager->getAuthorizationVersion(opCtx, &foundSchemaVersion);
     if (!status.isOK()) {
         return status;
@@ -587,7 +615,12 @@ Status requireWritableAuthSchema28SCRAM(OperationContext* opCtx,
                           << " but found "
                           << foundSchemaVersion);
     }
-    return writeAuthSchemaVersionIfNeeded(opCtx, authzManager, foundSchemaVersion);
+    status = writeAuthSchemaVersionIfNeeded(opCtx, authzManager, foundSchemaVersion);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return std::move(lk);
 }
 
 /**
@@ -602,9 +635,10 @@ Status requireWritableAuthSchema28SCRAM(OperationContext* opCtx,
  * If records are added thinking we're at one schema level, then the default is changed,
  * then the auth database would wind up in an inconsistent state.
  */
-Status requireReadableAuthSchema26Upgrade(OperationContext* opCtx,
-                                          AuthorizationManager* authzManager) {
+StatusWith<AuthzLockGuard> requireReadableAuthSchema26Upgrade(OperationContext* opCtx,
+                                                              AuthorizationManager* authzManager) {
     int foundSchemaVersion;
+    AuthzLockGuard lk(opCtx, MODE_IS);
     Status status = authzManager->getAuthorizationVersion(opCtx, &foundSchemaVersion);
     if (!status.isOK()) {
         return status;
@@ -618,7 +652,8 @@ Status requireReadableAuthSchema26Upgrade(OperationContext* opCtx,
                                     << " but found "
                                     << foundSchemaVersion);
     }
-    return Status::OK();
+
+    return std::move(lk);
 }
 
 Status buildCredentials(BSONObjBuilder* builder, const auth::CreateOrUpdateUserArgs& args) {
@@ -802,6 +837,9 @@ public:
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
+
         int authzVersion;
         status = authzManager->getAuthorizationVersion(opCtx, &authzVersion);
         uassertStatusOK(status);
@@ -827,11 +865,6 @@ public:
         status = parser.checkValidUserDocument(userObj);
         uassertStatusOK(status);
 
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
-
         // Role existence has to be checked after acquiring the update lock
         for (size_t i = 0; i < args.roles.size(); ++i) {
             BSONObj ignored;
@@ -846,6 +879,7 @@ public:
                              args.roles,
                              args.authenticationRestrictions);
         status = insertPrivilegeDocument(opCtx, userObj);
+        authzManager->invalidateUserByName(opCtx, args.userName);
         uassertStatusOK(status);
         return true;
     }
@@ -950,11 +984,9 @@ public:
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         // Role existence has to be checked after acquiring the update lock
         if (args.hasRoles) {
@@ -975,7 +1007,7 @@ public:
         status = updatePrivilegeDocument(
             opCtx, args.userName, queryBuilder.done(), updateDocumentBuilder.done());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserByName(args.userName);
+        authzManager->invalidateUserByName(opCtx, args.userName);
         uassertStatusOK(status);
         return true;
     }
@@ -1020,10 +1052,9 @@ public:
         uassertStatusOK(status);
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         audit::logDropUser(Client::getCurrent(), userName);
 
@@ -1035,7 +1066,7 @@ public:
                                                << userName.getDB()),
                                           &nMatched);
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserByName(userName);
+        authzManager->invalidateUserByName(opCtx, userName);
         uassertStatusOK(status);
 
         if (nMatched == 0) {
@@ -1081,11 +1112,9 @@ public:
         Status status = auth::parseAndValidateDropAllUsersFromDatabaseCommand(cmdObj, dbname);
         uassertStatusOK(status);
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         audit::logDropAllUsersFromDatabase(Client::getCurrent(), dbname);
 
@@ -1093,7 +1122,7 @@ public:
         status = removePrivilegeDocuments(
             opCtx, BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname), &numRemoved);
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUsersFromDB(dbname);
+        authzManager->invalidateUsersFromDB(opCtx, dbname);
         uassertStatusOK(status);
 
         result.append("n", numRemoved);
@@ -1139,11 +1168,9 @@ public:
         uassertStatusOK(status);
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         UserName userName(userNameString, dbname);
         stdx::unordered_set<RoleName> userRoles;
@@ -1164,7 +1191,7 @@ public:
         status = updatePrivilegeDocument(
             opCtx, userName, BSON("$set" << BSON("roles" << newRolesBSONArray)));
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserByName(userName);
+        authzManager->invalidateUserByName(opCtx, userName);
         uassertStatusOK(status);
         return true;
     }
@@ -1208,11 +1235,9 @@ public:
         uassertStatusOK(status);
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         UserName userName(userNameString, dbname);
         stdx::unordered_set<RoleName> userRoles;
@@ -1233,7 +1258,7 @@ public:
         status = updatePrivilegeDocument(
             opCtx, userName, BSON("$set" << BSON("roles" << newRolesBSONArray)));
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserByName(userName);
+        authzManager->invalidateUserByName(opCtx, userName);
         uassertStatusOK(status);
         return true;
     }
@@ -1270,8 +1295,8 @@ public:
         Status status = auth::parseUsersInfoCommand(cmdObj, dbname, &args);
         uassertStatusOK(status);
 
-        status = requireReadableAuthSchema26Upgrade(opCtx, getGlobalAuthorizationManager());
-        uassertStatusOK(status);
+        AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+        auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
 
         if ((args.target != auth::UsersInfoArgs::Target::kExplicitUsers || args.filter) &&
             (args.showPrivileges ||
@@ -1289,8 +1314,7 @@ public:
             // user.
             for (size_t i = 0; i < args.userNames.size(); ++i) {
                 BSONObj userDetails;
-                status = getGlobalAuthorizationManager()->getUserDescription(
-                    opCtx, args.userNames[i], &userDetails);
+                status = authzManager->getUserDescription(opCtx, args.userNames[i], &userDetails);
                 if (status.code() == ErrorCodes::UserNotFound) {
                     continue;
                 }
@@ -1475,11 +1499,9 @@ public:
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         // Role existence has to be checked after acquiring the update lock
         status = checkOkayToGrantRolesToRole(opCtx, args.roleName, args.roles, authzManager);
@@ -1564,11 +1586,9 @@ public:
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         // Role existence has to be checked after acquiring the update lock
         BSONObj ignored;
@@ -1603,7 +1623,7 @@ public:
 
         status = updateRoleDocument(opCtx, args.roleName, updateDocumentBuilder.obj());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
         uassertStatusOK(status);
         return true;
     }
@@ -1647,11 +1667,9 @@ public:
         uassertStatusOK(status);
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         if (RoleGraph::isBuiltinRole(roleName)) {
             uasserted(ErrorCodes::InvalidRoleModification,
@@ -1699,7 +1717,7 @@ public:
 
         status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
         uassertStatusOK(status);
         return true;
     }
@@ -1743,11 +1761,8 @@ public:
         uassertStatusOK(status);
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         if (RoleGraph::isBuiltinRole(roleName)) {
             uasserted(ErrorCodes::InvalidRoleModification,
@@ -1800,7 +1815,7 @@ public:
         updateObj.writeTo(&updateBSONBuilder);
         status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
         uassertStatusOK(status);
         return true;
     }
@@ -1851,11 +1866,9 @@ public:
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         // Role existence has to be checked after acquiring the update lock
         BSONObj roleDoc;
@@ -1882,7 +1895,7 @@ public:
         status = updateRoleDocument(
             opCtx, roleName, BSON("$set" << BSON("roles" << rolesVectorToBSONArray(directRoles))));
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
         uassertStatusOK(status);
         return true;
     }
@@ -1926,11 +1939,9 @@ public:
         uassertStatusOK(status);
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         RoleName roleName(roleNameString, dbname);
         if (RoleGraph::isBuiltinRole(roleName)) {
@@ -1961,7 +1972,7 @@ public:
         status = updateRoleDocument(
             opCtx, roleName, BSON("$set" << BSON("roles" << rolesVectorToBSONArray(roles))));
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
         uassertStatusOK(status);
         return true;
     }
@@ -2006,11 +2017,9 @@ public:
         uassertStatusOK(status);
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
         if (RoleGraph::isBuiltinRole(roleName)) {
             uasserted(ErrorCodes::InvalidRoleModification,
@@ -2021,6 +2030,18 @@ public:
         BSONObj roleDoc;
         status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
         uassertStatusOK(status);
+
+        // From here on, we always want to invalidate the user cache before returning.
+        auto invalidateGuard = MakeGuard([&] {
+            try {
+                authzManager->invalidateUserCache(opCtx);
+            } catch (const DBException& e) {
+                // Since this may be called after a uassert, we want to catch any uasserts
+                // that come out of invalidating the user cache and explicitly append it to
+                // the command response.
+                CommandHelpers::appendCommandStatusNoThrow(result, e.toStatus());
+            }
+        });
 
         // Remove this role from all users
         long long nMatched;
@@ -2038,8 +2059,6 @@ public:
             false,
             true,
             &nMatched);
-        // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
         if (!status.isOK()) {
             uassertStatusOK(useDefaultCode(status, ErrorCodes::UserModificationFailed)
                                 .withContext(str::stream() << "Failed to remove role "
@@ -2062,8 +2081,6 @@ public:
             false,
             true,
             &nMatched);
-        // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
         if (!status.isOK()) {
             uassertStatusOK(
                 useDefaultCode(status, ErrorCodes::RoleModificationFailed)
@@ -2080,8 +2097,6 @@ public:
                                           << AuthorizationManager::ROLE_DB_FIELD_NAME
                                           << roleName.getDB()),
                                      &nMatched);
-        // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
         if (!status.isOK()) {
             uassertStatusOK(status.withContext(
                 str::stream() << "Removed role " << roleName.getFullName()
@@ -2138,11 +2153,20 @@ public:
         uassertStatusOK(status);
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
+        // From here on, we always want to invalidate the user cache before returning.
+        auto invalidateGuard = MakeGuard([&] {
+            try {
+                authzManager->invalidateUserCache(opCtx);
+            } catch (const DBException& e) {
+                // Since this may be called after a uassert, we want to catch any uasserts
+                // that come out of invalidating the user cache and explicitly append it to
+                // the command response.
+                CommandHelpers::appendCommandStatusNoThrow(result, e.toStatus());
+            }
+        });
 
         // Remove these roles from all users
         long long nMatched;
@@ -2155,8 +2179,6 @@ public:
             false,
             true,
             &nMatched);
-        // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
         if (!status.isOK()) {
             uassertStatusOK(useDefaultCode(status, ErrorCodes::UserModificationFailed)
                                 .withContext(str::stream() << "Failed to remove roles from \""
@@ -2176,8 +2198,6 @@ public:
             false,
             true,
             &nMatched);
-        // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
         if (!status.isOK()) {
             uassertStatusOK(useDefaultCode(status, ErrorCodes::RoleModificationFailed)
                                 .withContext(str::stream() << "Failed to remove roles from \""
@@ -2189,8 +2209,6 @@ public:
         // Finally, remove the actual role documents
         status = removeRoleDocuments(
             opCtx, BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname), &nMatched);
-        // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-        authzManager->invalidateUserCache();
         if (!status.isOK()) {
             uassertStatusOK(status.withContext(
                 str::stream() << "Removed roles from \"" << dbname
@@ -2259,18 +2277,17 @@ public:
         Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &args);
         uassertStatusOK(status);
 
-        status = requireReadableAuthSchema26Upgrade(opCtx, getGlobalAuthorizationManager());
-        uassertStatusOK(status);
+        AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+        auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
 
         if (args.allForDB) {
             std::vector<BSONObj> rolesDocs;
-            status = getGlobalAuthorizationManager()->getRoleDescriptionsForDB(
-                opCtx,
-                dbname,
-                args.privilegeFormat,
-                args.authenticationRestrictionsFormat,
-                args.showBuiltinRoles,
-                &rolesDocs);
+            status = authzManager->getRoleDescriptionsForDB(opCtx,
+                                                            dbname,
+                                                            args.privilegeFormat,
+                                                            args.authenticationRestrictionsFormat,
+                                                            args.showBuiltinRoles,
+                                                            &rolesDocs);
             uassertStatusOK(status);
 
             if (args.privilegeFormat == PrivilegeFormat::kShowAsUserFragment) {
@@ -2284,12 +2301,11 @@ public:
             result.append("roles", rolesArrayBuilder.arr());
         } else {
             BSONObj roleDetails;
-            status = getGlobalAuthorizationManager()->getRolesDescription(
-                opCtx,
-                args.roleNames,
-                args.privilegeFormat,
-                args.authenticationRestrictionsFormat,
-                &roleDetails);
+            status = authzManager->getRolesDescription(opCtx,
+                                                       args.roleNames,
+                                                       args.privilegeFormat,
+                                                       args.authenticationRestrictionsFormat,
+                                                       &roleDetails);
             uassertStatusOK(status);
 
             if (args.privilegeFormat == PrivilegeFormat::kShowAsUserFragment) {
@@ -2335,7 +2351,8 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        authzManager->invalidateUserCache();
+        auto lk = requireReadableAuthSchema26Upgrade(opCtx, authzManager);
+        authzManager->invalidateUserCache(opCtx);
         return true;
     }
 
@@ -2750,11 +2767,20 @@ public:
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
-        uassertStatusOK(status);
+
+        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
+        // From here on, we always want to invalidate the user cache before returning.
+        auto invalidateGuard = MakeGuard([&] {
+            try {
+                authzManager->invalidateUserCache(opCtx);
+            } catch (const DBException& e) {
+                // Since this may be called after a uassert, we want to catch any uasserts
+                // that come out of invalidating the user cache and explicitly append it to
+                // the command response.
+                CommandHelpers::appendCommandStatusNoThrow(result, e.toStatus());
+            }
+        });
 
         if (!args.usersCollName.empty()) {
             Status status =

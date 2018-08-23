@@ -1115,7 +1115,7 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
     if (rollbackNamespaces.count(AuthorizationManager::versionCollectionNamespace) == 1 ||
         rollbackNamespaces.count(AuthorizationManager::usersCollectionNamespace) == 1 ||
         rollbackNamespaces.count(AuthorizationManager::rolesCollectionNamespace) == 1) {
-        AuthorizationManager::get(opCtx->getServiceContext())->invalidateUserCache();
+        AuthorizationManager::get(opCtx->getServiceContext())->invalidateUserCache(opCtx);
     }
 
     // If there were ops rolled back that were part of operations on a session, then invalidate
