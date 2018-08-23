@@ -197,8 +197,13 @@ Status IndexAccessMethod::insert(OperationContext* opCtx,
         const auto& recordId = (keySet == &keys ? loc : kMultikeyMetadataKeyId);
         for (const auto& key : *keySet) {
             Status status = checkIndexKeySize ? checkKeySize(key) : Status::OK();
-            if (status.isOK())
-                status = _newInterface->insert(opCtx, key, recordId, options.dupsAllowed);
+            if (status.isOK()) {
+                StatusWith<SpecialFormatInserted> ret =
+                    _newInterface->insert(opCtx, key, recordId, options.dupsAllowed);
+                status = ret.getStatus();
+                if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
+                    _btreeState->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+            }
             if (isFatalError(opCtx, status, key)) {
                 return status;
             }
@@ -440,8 +445,13 @@ Status IndexAccessMethod::update(OperationContext* opCtx,
         const auto& recordId = (keySet == &ticket.added ? ticket.loc : kMultikeyMetadataKeyId);
         for (const auto& key : *keySet) {
             Status status = checkIndexKeySize ? checkKeySize(key) : Status::OK();
-            if (status.isOK())
-                status = _newInterface->insert(opCtx, key, recordId, ticket.dupsAllowed);
+            if (status.isOK()) {
+                StatusWith<SpecialFormatInserted> ret =
+                    _newInterface->insert(opCtx, key, recordId, ticket.dupsAllowed);
+                status = ret.getStatus();
+                if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
+                    _btreeState->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+            }
             if (isFatalError(opCtx, status, key)) {
                 return status;
             }
@@ -551,8 +561,12 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
         BulkBuilder::Sorter::Data data = it->next();
 
         Status status = checkIndexKeySize ? checkKeySize(data.first) : Status::OK();
-        if (status.isOK())
-            status = builder->addKey(data.first, data.second);
+        if (status.isOK()) {
+            StatusWith<SpecialFormatInserted> ret = builder->addKey(data.first, data.second);
+            status = ret.getStatus();
+            if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
+                _btreeState->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+        }
 
         if (!status.isOK()) {
             // Overlong key that's OK to skip?
@@ -589,7 +603,14 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     LOG(timer.seconds() > 10 ? 0 : 1) << "\t done building bottom layer, going to commit";
 
-    builder->commit(mayInterrupt);
+    WriteUnitOfWork wunit(opCtx);
+    SpecialFormatInserted specialFormatInserted = builder->commit(mayInterrupt);
+    // It's ok to insert KeyStrings with long TypeBits but we need to mark the feature
+    // tracker bit so that downgrade binary which cannot read the long TypeBits fails to
+    // start up.
+    if (specialFormatInserted == SpecialFormatInserted::LongTypeBitsInserted)
+        _btreeState->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
+    wunit.commit();
     return Status::OK();
 }
 

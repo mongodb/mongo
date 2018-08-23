@@ -47,10 +47,10 @@ public:
 
     virtual ~MobileIndex() {}
 
-    Status insert(OperationContext* opCtx,
-                  const BSONObj& key,
-                  const RecordId& recId,
-                  bool dupsAllowed) override;
+    StatusWith<SpecialFormatInserted> insert(OperationContext* opCtx,
+                                             const BSONObj& key,
+                                             const RecordId& recId,
+                                             bool dupsAllowed) override;
 
     void unindex(OperationContext* opCtx,
                  const BSONObj& key,
@@ -86,10 +86,10 @@ public:
      * Performs the insert into the table with the given key and value.
      */
     template <typename ValueType>
-    Status doInsert(OperationContext* opCtx,
-                    const KeyString& key,
-                    const ValueType& value,
-                    bool isTransactional = true);
+    StatusWith<SpecialFormatInserted> doInsert(OperationContext* opCtx,
+                                               const KeyString& key,
+                                               const ValueType& value,
+                                               bool isTransactional = true);
 
     Ordering getOrdering() const {
         return _ordering;
@@ -117,10 +117,10 @@ protected:
      */
     void _doDelete(OperationContext* opCtx, const KeyString& key, KeyString* value = nullptr);
 
-    virtual Status _insert(OperationContext* opCtx,
-                           const BSONObj& key,
-                           const RecordId& recId,
-                           bool dupsAllowed) = 0;
+    virtual StatusWith<SpecialFormatInserted> _insert(OperationContext* opCtx,
+                                                      const BSONObj& key,
+                                                      const RecordId& recId,
+                                                      bool dupsAllowed) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
                           const BSONObj& key,
@@ -149,10 +149,10 @@ public:
                                                            bool isForward) const override;
 
 protected:
-    Status _insert(OperationContext* opCtx,
-                   const BSONObj& key,
-                   const RecordId& recId,
-                   bool dupsAllowed) override;
+    StatusWith<SpecialFormatInserted> _insert(OperationContext* opCtx,
+                                              const BSONObj& key,
+                                              const RecordId& recId,
+                                              bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   const BSONObj& key,
@@ -172,10 +172,10 @@ public:
                                                            bool isForward) const override;
 
 protected:
-    Status _insert(OperationContext* opCtx,
-                   const BSONObj& key,
-                   const RecordId& recId,
-                   bool dupsAllowed) override;
+    StatusWith<SpecialFormatInserted> _insert(OperationContext* opCtx,
+                                              const BSONObj& key,
+                                              const RecordId& recId,
+                                              bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   const BSONObj& key,

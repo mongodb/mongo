@@ -151,6 +151,15 @@ bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* opCtx,
     return true;
 }
 
+void KVCollectionCatalogEntry::setIndexKeyStringWithLongTypeBitsExistsOnDisk(
+    OperationContext* opCtx) {
+    const auto feature =
+        KVCatalog::FeatureTracker::RepairableFeature::kIndexKeyStringWithLongTypeBits;
+    if (!_catalog->getFeatureTracker()->isRepairableFeatureInUse(opCtx, feature)) {
+        _catalog->getFeatureTracker()->markRepairableFeatureAsInUse(opCtx, feature);
+    }
+}
+
 void KVCollectionCatalogEntry::setIndexHead(OperationContext* opCtx,
                                             StringData indexName,
                                             const RecordId& newHead) {

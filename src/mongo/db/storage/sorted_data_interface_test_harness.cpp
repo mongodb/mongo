@@ -78,7 +78,7 @@ TEST(SortedDataInterface, InsertWithDups1) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 2), true).transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 2), true));
             uow.commit();
         }
     }
@@ -87,7 +87,7 @@ TEST(SortedDataInterface, InsertWithDups1) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(6, 2), true).transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(6, 2), true));
             uow.commit();
         }
     }
@@ -110,7 +110,7 @@ TEST(SortedDataInterface, InsertWithDups2) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true).transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true));
             uow.commit();
         }
     }
@@ -119,7 +119,7 @@ TEST(SortedDataInterface, InsertWithDups2) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 20), true).transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 20), true));
             uow.commit();
         }
     }
@@ -138,7 +138,7 @@ TEST(SortedDataInterface, InsertWithDups3AndRollback) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true).transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true));
             uow.commit();
         }
     }
@@ -147,7 +147,7 @@ TEST(SortedDataInterface, InsertWithDups3AndRollback) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 20), true).transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 20), true));
             // no commit
         }
     }
@@ -166,8 +166,7 @@ TEST(SortedDataInterface, InsertNoDups1) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), false)
-                .transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), false));
             uow.commit();
         }
     }
@@ -176,8 +175,7 @@ TEST(SortedDataInterface, InsertNoDups1) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 2), RecordId(5, 20), false)
-                .transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 2), RecordId(5, 20), false));
             uow.commit();
         }
     }
@@ -196,7 +194,7 @@ TEST(SortedDataInterface, InsertNoDups2) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 2), false).transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 2), false));
             uow.commit();
         }
     }
@@ -205,7 +203,7 @@ TEST(SortedDataInterface, InsertNoDups2) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 4), false).transitional_ignore();
+            ASSERT_NOT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 4), false));
             uow.commit();
         }
     }
@@ -224,7 +222,7 @@ TEST(SortedDataInterface, Unindex1) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true).transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true));
             uow.commit();
         }
     }
@@ -289,7 +287,7 @@ TEST(SortedDataInterface, Unindex2Rollback) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true).transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 1), RecordId(5, 18), true));
             uow.commit();
         }
     }
@@ -351,8 +349,7 @@ TEST(SortedDataInterface, CursorIterate1WithSaveRestore) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << i), RecordId(5, i * 2), true)
-                .transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << i), RecordId(5, i * 2), true));
             uow.commit();
         }
     }
@@ -381,8 +378,7 @@ TEST(SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            sorted->insert(opCtx.get(), BSON("" << 5), RecordId(5, i * 2), true)
-                .transitional_ignore();
+            ASSERT_OK(sorted->insert(opCtx.get(), BSON("" << 5), RecordId(5, i * 2), true));
             uow.commit();
         }
     }
@@ -419,8 +415,7 @@ TEST(SortedDataInterface, Locate1) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            Status res = sorted->insert(opCtx.get(), key, loc, true);
-            ASSERT_OK(res);
+            ASSERT_OK(sorted->insert(opCtx.get(), key, loc, true));
             uow.commit();
         }
     }

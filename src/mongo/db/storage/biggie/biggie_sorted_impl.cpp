@@ -231,13 +231,15 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
       _lastKeyToString(""),
       _lastRID(-1) {}
 
-void SortedDataBuilderInterface::commit(bool mayInterrupt) {
+SpecialFormatInserted SortedDataBuilderInterface::commit(bool mayInterrupt) {
     biggie::RecoveryUnit* ru = checked_cast<biggie::RecoveryUnit*>(_opCtx->recoveryUnit());
     ru->forkIfNeeded();
     ru->commitUnitOfWork();
+    return SpecialFormatInserted::NoSpecialFormatInserted;
 }
 
-Status SortedDataBuilderInterface::addKey(const BSONObj& key, const RecordId& loc) {
+StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONObj& key,
+                                                                     const RecordId& loc) {
     StringStore* workingCopy = getRecoveryUnitBranch_forking(_opCtx);
 
     invariant(loc.isNormal());
@@ -276,7 +278,7 @@ Status SortedDataBuilderInterface::addKey(const BSONObj& key, const RecordId& lo
     _lastKeyToString = newKSToString;
     _lastRID = loc.repr();
 
-    return Status::OK();
+    return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
 }
 
 SortedDataBuilderInterface* SortedDataInterface::getBulkBuilder(OperationContext* opCtx,
@@ -303,10 +305,10 @@ SortedDataInterface::SortedDataInterface(const Ordering& ordering, bool isUnique
     _KSForIdentEnd = combineKeyAndRID(BSONObj(), RecordId::min(), _identEnd, ordering);
 }
 
-Status SortedDataInterface::insert(OperationContext* opCtx,
-                                   const BSONObj& key,
-                                   const RecordId& loc,
-                                   bool dupsAllowed) {
+StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* opCtx,
+                                                              const BSONObj& key,
+                                                              const RecordId& loc,
+                                                              bool dupsAllowed) {
     // The KeyString representation of the key.
     std::unique_ptr<KeyString> workingCopyInternalKs = keyToKeyString(key, _order);
     // The KeyString of prefix (which is ident + \1), key, loc.
@@ -317,7 +319,7 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
     StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
 
     if (workingCopy->find(workingCopyInsertKey) != workingCopy->end()) {
-        return Status::OK();
+        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
     }
 
     // If dups are not allowed, then we need to check that we are not inserting something with an
@@ -350,7 +352,7 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
         std::string(reinterpret_cast<const char*>(workingCopyInternalKs->getTypeBits().getBuffer()),
                     workingCopyInternalKs->getTypeBits().getSize());
     workingCopy->insert(StringStore::value_type(workingCopyInsertKey, internalTbString));
-    return Status::OK();
+    return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
 }
 
 void SortedDataInterface::unindex(OperationContext* opCtx,

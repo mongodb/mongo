@@ -74,10 +74,10 @@ MobileIndex::MobileIndex(OperationContext* opCtx,
                          const std::string& ident)
     : _isUnique(desc->unique()), _ordering(Ordering::make(desc->keyPattern())), _ident(ident) {}
 
-Status MobileIndex::insert(OperationContext* opCtx,
-                           const BSONObj& key,
-                           const RecordId& recId,
-                           bool dupsAllowed) {
+StatusWith<SpecialFormatInserted> MobileIndex::insert(OperationContext* opCtx,
+                                                      const BSONObj& key,
+                                                      const RecordId& recId,
+                                                      bool dupsAllowed) {
     invariant(recId.isValid());
     invariant(!hasFieldNames(key));
 
@@ -85,10 +85,10 @@ Status MobileIndex::insert(OperationContext* opCtx,
 }
 
 template <typename ValueType>
-Status MobileIndex::doInsert(OperationContext* opCtx,
-                             const KeyString& key,
-                             const ValueType& value,
-                             bool isTransactional) {
+StatusWith<SpecialFormatInserted> MobileIndex::doInsert(OperationContext* opCtx,
+                                                        const KeyString& key,
+                                                        const ValueType& value,
+                                                        bool isTransactional) {
     MobileSession* session;
     if (isTransactional) {
         session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
@@ -114,12 +114,16 @@ Status MobileIndex::doInsert(OperationContext* opCtx,
             // A record with same key could already be present in a standard index, that is OK. This
             // can happen when building a background index while documents are being written in
             // parallel.
-            return Status::OK();
+            return StatusWith<SpecialFormatInserted>(
+                SpecialFormatInserted::NoSpecialFormatInserted);
         }
     }
     checkStatus(status, SQLITE_DONE, "sqlite3_step");
 
-    return Status::OK();
+    if (key.getTypeBits().isLongEncoding())
+        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::LongTypeBitsInserted);
+
+    return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
 }
 
 void MobileIndex::unindex(OperationContext* opCtx,
@@ -284,7 +288,7 @@ public:
 
     virtual ~BulkBuilderBase() {}
 
-    Status addKey(const BSONObj& key, const RecordId& recId) override {
+    StatusWith<SpecialFormatInserted> addKey(const BSONObj& key, const RecordId& recId) override {
         invariant(recId.isValid());
         invariant(!hasFieldNames(key));
 
@@ -298,7 +302,9 @@ public:
         return _addKey(key, recId);
     }
 
-    void commit(bool mayInterrupt) override {}
+    SpecialFormatInserted commit(bool mayInterrupt) override {
+        return SpecialFormatInserted::NoSpecialFormatInserted;
+    }
 
 protected:
     /**
@@ -315,7 +321,8 @@ protected:
         return Status::OK();
     }
 
-    virtual Status _addKey(const BSONObj& key, const RecordId& recId) = 0;
+    virtual StatusWith<SpecialFormatInserted> _addKey(const BSONObj& key,
+                                                      const RecordId& recId) = 0;
 
     MobileIndex* _index;
     OperationContext* const _opCtx;
@@ -332,7 +339,7 @@ public:
         : BulkBuilderBase(index, opCtx, dupsAllowed) {}
 
 protected:
-    Status _addKey(const BSONObj& key, const RecordId& recId) override {
+    StatusWith<SpecialFormatInserted> _addKey(const BSONObj& key, const RecordId& recId) override {
         KeyString keyStr(_index->getKeyStringVersion(), key, _index->getOrdering(), recId);
         KeyString::TypeBits value = keyStr.getTypeBits();
         return _index->doInsert(_opCtx, keyStr, value, false);
@@ -351,7 +358,7 @@ public:
     }
 
 protected:
-    Status _addKey(const BSONObj& key, const RecordId& recId) override {
+    StatusWith<SpecialFormatInserted> _addKey(const BSONObj& key, const RecordId& recId) override {
         const KeyString keyStr(_index->getKeyStringVersion(), key, _index->getOrdering());
 
         KeyString value(_index->getKeyStringVersion(), recId);
@@ -653,10 +660,10 @@ std::unique_ptr<SortedDataInterface::Cursor> MobileIndexStandard::newCursor(Oper
     return stdx::make_unique<CursorStandard>(*this, opCtx, isForward);
 }
 
-Status MobileIndexStandard::_insert(OperationContext* opCtx,
-                                    const BSONObj& key,
-                                    const RecordId& recId,
-                                    bool dupsAllowed) {
+StatusWith<SpecialFormatInserted> MobileIndexStandard::_insert(OperationContext* opCtx,
+                                                               const BSONObj& key,
+                                                               const RecordId& recId,
+                                                               bool dupsAllowed) {
     invariant(dupsAllowed);
 
     const KeyString keyStr(_keyStringVersion, key, _ordering, recId);
@@ -691,10 +698,10 @@ std::unique_ptr<SortedDataInterface::Cursor> MobileIndexUnique::newCursor(Operat
     return stdx::make_unique<CursorUnique>(*this, opCtx, isForward);
 }
 
-Status MobileIndexUnique::_insert(OperationContext* opCtx,
-                                  const BSONObj& key,
-                                  const RecordId& recId,
-                                  bool dupsAllowed) {
+StatusWith<SpecialFormatInserted> MobileIndexUnique::_insert(OperationContext* opCtx,
+                                                             const BSONObj& key,
+                                                             const RecordId& recId,
+                                                             bool dupsAllowed) {
     // Replication is not supported so dups are not allowed.
     invariant(!dupsAllowed);
     const KeyString keyStr(_keyStringVersion, key, _ordering);

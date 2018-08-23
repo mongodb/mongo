@@ -268,7 +268,6 @@ error_code("PreparedTransactionInProgress", 267);
 error_code("CannotBackup", 268);
 error_code("DataModifiedByRepair", 269);
 error_code("RepairedReplicaSetNode", 270);
-
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)

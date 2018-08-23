@@ -146,6 +146,10 @@ public:
      */
     void setMultikey(OperationContext* opCtx, const MultikeyPaths& multikeyPaths) final;
 
+    // TODO SERVER-36385 Remove this function: we don't set the feature tracker bit in 4.4 because
+    // 4.4 can only downgrade to 4.2 which can read long TypeBits.
+    void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) final;
+
     // if this ready is ready for queries
     bool isReady(OperationContext* opCtx) const final;
 

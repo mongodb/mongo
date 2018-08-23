@@ -90,10 +90,10 @@ public:
                     KVPrefix prefix,
                     bool readOnly);
 
-    virtual Status insert(OperationContext* opCtx,
-                          const BSONObj& key,
-                          const RecordId& id,
-                          bool dupsAllowed);
+    virtual StatusWith<SpecialFormatInserted> insert(OperationContext* opCtx,
+                                                     const BSONObj& key,
+                                                     const RecordId& id,
+                                                     bool dupsAllowed);
 
     virtual void unindex(OperationContext* opCtx,
                          const BSONObj& key,
@@ -158,11 +158,11 @@ public:
     Status dupKeyError(const BSONObj& key);
 
 protected:
-    virtual Status _insert(OperationContext* opCtx,
-                           WT_CURSOR* c,
-                           const BSONObj& key,
-                           const RecordId& id,
-                           bool dupsAllowed) = 0;
+    virtual StatusWith<SpecialFormatInserted> _insert(OperationContext* opCtx,
+                                                      WT_CURSOR* c,
+                                                      const BSONObj& key,
+                                                      const RecordId& id,
+                                                      bool dupsAllowed) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
                           WT_CURSOR* c,
@@ -214,23 +214,23 @@ public:
                const BSONObj& key,
                const RecordId& id) override;
 
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   const BSONObj& key,
-                   const RecordId& id,
-                   bool dupsAllowed) override;
+    StatusWith<SpecialFormatInserted> _insert(OperationContext* opCtx,
+                                              WT_CURSOR* c,
+                                              const BSONObj& key,
+                                              const RecordId& id,
+                                              bool dupsAllowed) override;
 
-    Status _insertTimestampUnsafe(OperationContext* opCtx,
-                                  WT_CURSOR* c,
-                                  const BSONObj& key,
-                                  const RecordId& id,
-                                  bool dupsAllowed);
+    StatusWith<SpecialFormatInserted> _insertTimestampUnsafe(OperationContext* opCtx,
+                                                             WT_CURSOR* c,
+                                                             const BSONObj& key,
+                                                             const RecordId& id,
+                                                             bool dupsAllowed);
 
-    Status _insertTimestampSafe(OperationContext* opCtx,
-                                WT_CURSOR* c,
-                                const BSONObj& key,
-                                const RecordId& id,
-                                bool dupsAllowed);
+    StatusWith<SpecialFormatInserted> _insertTimestampSafe(OperationContext* opCtx,
+                                                           WT_CURSOR* c,
+                                                           const BSONObj& key,
+                                                           const RecordId& id,
+                                                           bool dupsAllowed);
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
@@ -275,11 +275,11 @@ public:
         return false;
     }
 
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   const BSONObj& key,
-                   const RecordId& id,
-                   bool dupsAllowed) override;
+    StatusWith<SpecialFormatInserted> _insert(OperationContext* opCtx,
+                                              WT_CURSOR* c,
+                                              const BSONObj& key,
+                                              const RecordId& id,
+                                              bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
