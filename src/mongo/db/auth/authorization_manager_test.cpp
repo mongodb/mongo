@@ -78,7 +78,7 @@ class AuthorizationManagerTest : public ServiceContextTest {
 public:
     virtual ~AuthorizationManagerTest() {
         if (authzManager)
-            authzManager->invalidateUserCache();
+            authzManager->invalidateUserCache(opCtx.get());
     }
 
     AuthorizationManagerTest() {
@@ -265,11 +265,6 @@ private:
 
 class AuthorizationManagerWithExplicitUserPrivilegesTest : public ::mongo::unittest::Test {
 public:
-    virtual ~AuthorizationManagerWithExplicitUserPrivilegesTest() {
-        if (authzManager)
-            authzManager->invalidateUserCache();
-    }
-
     virtual void setUp() {
         auto localExternalState =
             stdx::make_unique<AuthzManagerExternalStateMockWithExplicitUserPrivileges>();

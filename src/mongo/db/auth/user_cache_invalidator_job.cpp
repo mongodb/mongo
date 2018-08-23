@@ -172,14 +172,23 @@ void UserCacheInvalidator::run() {
                           << currentGeneration.getStatus();
             }
             // When in doubt, invalidate the cache
-            _authzManager->invalidateUserCache();
+            try {
+                _authzManager->invalidateUserCache(opCtx.get());
+            } catch (const DBException& e) {
+                warning() << "Error invalidating user cache: " << e.toStatus();
+            }
             continue;
         }
 
         if (currentGeneration.getValue() != _previousCacheGeneration) {
             log() << "User cache generation changed from " << _previousCacheGeneration << " to "
                   << currentGeneration.getValue() << "; invalidating user cache";
-            _authzManager->invalidateUserCache();
+            try {
+                _authzManager->invalidateUserCache(opCtx.get());
+            } catch (const DBException& e) {
+                warning() << "Error invalidating user cache: " << e.toStatus();
+            }
+
             _previousCacheGeneration = currentGeneration.getValue();
         }
     }

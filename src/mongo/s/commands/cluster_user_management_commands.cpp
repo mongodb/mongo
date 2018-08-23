@@ -139,7 +139,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserByName(args.userName);
+        authzManager->invalidateUserByName(opCtx, args.userName);
 
         return ok;
     }
@@ -190,7 +190,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserByName(userName);
+        authzManager->invalidateUserByName(opCtx, userName);
 
         return ok;
     }
@@ -232,7 +232,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUsersFromDB(dbname);
+        authzManager->invalidateUsersFromDB(opCtx, dbname);
 
         return ok;
     }
@@ -281,7 +281,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserByName(UserName(userNameString, dbname));
+        authzManager->invalidateUserByName(opCtx, UserName(userNameString, dbname));
 
         return ok;
     }
@@ -330,7 +330,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserByName(UserName(userNameString, dbname));
+        authzManager->invalidateUserByName(opCtx, UserName(userNameString, dbname));
 
         return ok;
     }
@@ -440,7 +440,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
 
         return ok;
     }
@@ -483,7 +483,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
 
         return ok;
     }
@@ -525,7 +525,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
 
         return ok;
     }
@@ -567,7 +567,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
 
         return ok;
     }
@@ -609,7 +609,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
 
         return ok;
     }
@@ -654,7 +654,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
 
         return ok;
     }
@@ -701,7 +701,7 @@ public:
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
 
         return ok;
     }
@@ -773,7 +773,7 @@ public:
              BSONObjBuilder& result) {
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
-        authzManager->invalidateUserCache();
+        authzManager->invalidateUserCache(opCtx);
         return true;
     }
 

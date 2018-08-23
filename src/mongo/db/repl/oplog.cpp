@@ -1668,11 +1668,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    // AuthorizationManager's logOp method registers a RecoveryUnit::Change
-    // and to do so we need to have begun a UnitOfWork
-    WriteUnitOfWork wuow(opCtx);
+
     getGlobalAuthorizationManager()->logOp(opCtx, opType, nss, o, nullptr);
-    wuow.commit();
     return Status::OK();
 }
 

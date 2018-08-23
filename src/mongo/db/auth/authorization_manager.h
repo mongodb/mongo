@@ -264,12 +264,12 @@ public:
     /**
      * Marks the given user as invalid and removes it from the user cache.
      */
-    virtual void invalidateUserByName(const UserName& user) = 0;
+    virtual void invalidateUserByName(OperationContext* opCtx, const UserName& user) = 0;
 
     /**
      * Invalidates all users who's source is "dbname" and removes them from the user cache.
      */
-    virtual void invalidateUsersFromDB(StringData dbname) = 0;
+    virtual void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) = 0;
 
     /**
      * Initializes the authorization manager.  Depending on what version the authorization
@@ -281,7 +281,7 @@ public:
     /**
      * Invalidates all of the contents of the user cache.
      */
-    virtual void invalidateUserCache() = 0;
+    virtual void invalidateUserCache(OperationContext* opCtx) = 0;
 
     /**
      * Parses privDoc and fully initializes the user object (credentials, roles, and privileges)
@@ -311,6 +311,8 @@ public:
     };
 
     virtual std::vector<CachedUserInfo> getUserCacheInfo() const = 0;
+
+    virtual void setInUserManagementCommand(OperationContext* opCtx, bool val) = 0;
 };
 
 }  // namespace mongo

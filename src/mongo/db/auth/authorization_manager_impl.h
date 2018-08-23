@@ -118,13 +118,13 @@ public:
 
     StatusWith<UserHandle> acquireUser(OperationContext* opCtx, const UserName& userName) override;
 
-    void invalidateUserByName(const UserName& user) override;
+    void invalidateUserByName(OperationContext* opCtx, const UserName& user) override;
 
-    void invalidateUsersFromDB(StringData dbname) override;
+    void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) override;
 
     Status initialize(OperationContext* opCtx) override;
 
-    void invalidateUserCache() override;
+    void invalidateUserCache(OperationContext* opCtx) override;
 
     Status _initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc) override;
 
@@ -135,6 +135,8 @@ public:
                const BSONObj* patt) override;
 
     std::vector<CachedUserInfo> getUserCacheInfo() const override;
+
+    void setInUserManagementCommand(OperationContext* opCtx, bool val) override;
 
 private:
     /**
@@ -147,14 +149,15 @@ private:
      * Invalidates all User objects in the cache and removes them from the cache.
      * Should only be called when already holding _cacheMutex.
      */
-    void _invalidateUserCache_inlock();
+    void _invalidateUserCache_inlock(const CacheGuard&);
 
     /**
      * Given the objects describing an oplog entry that affects authorization data, invalidates
      * the portion of the user cache that is affected by that operation.  Should only be called
      * with oplog entries that have been pre-verified to actually affect authorization data.
      */
-    void _invalidateRelevantCacheData(const char* op,
+    void _invalidateRelevantCacheData(OperationContext* opCtx,
+                                      const char* op,
                                       const NamespaceString& ns,
                                       const BSONObj& o,
                                       const BSONObj* o2);
@@ -162,7 +165,14 @@ private:
     /**
      * Updates _cacheGeneration to a new OID
      */
-    void _updateCacheGeneration_inlock();
+    void _updateCacheGeneration_inlock(const CacheGuard&);
+
+
+    void _recachePinnedUsers(CacheGuard& guard, OperationContext* opCtx);
+
+    StatusWith<UserHandle> _acquireUserSlowPath(CacheGuard& guard,
+                                                OperationContext* opCtx,
+                                                const UserName& userName);
 
     /**
      * Fetches user information from a v2-schema user document for the named user,
@@ -219,6 +229,13 @@ private:
     };
 
     InvalidatingLRUCache<UserName, User, UserCacheInvalidator> _userCache;
+    std::vector<UserHandle> _pinnedUsers;
+
+    /**
+     * Protects _cacheGeneration, _version and _isFetchPhaseBusy.  Manipulated
+     * via CacheGuard.
+     */
+    stdx::mutex _cacheWriteMutex;
 
     /**
      * Current generation of cached data.  Updated every time part of the cache gets
@@ -235,15 +252,11 @@ private:
     bool _isFetchPhaseBusy;
 
     /**
-     * Protects _userCache, _cacheGeneration, _version and _isFetchPhaseBusy.  Manipulated
-     * via CacheGuard.
-     */
-    stdx::mutex _cacheMutex;
-
-    /**
      * Condition used to signal that it is OK for another CacheGuard to enter a fetch phase.
      * Manipulated via CacheGuard.
      */
     stdx::condition_variable _fetchPhaseIsReady;
+
+    AtomicBool _inUserManagementCommand{false};
 };
 }  // namespace mongo
