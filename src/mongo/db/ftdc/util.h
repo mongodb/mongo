@@ -168,6 +168,11 @@ StatusWith<BSONObj> getBSONDocumentFromMetadataDoc(const BSONObj& obj);
  */
 StatusWith<std::vector<BSONObj>> getMetricsFromMetricDoc(const BSONObj& obj,
                                                          FTDCDecompressor* decompressor);
+
+/**
+ * Is this a type that FTDC find's interesting? I.e. is this a numeric or container type?
+ */
+bool isFTDCType(BSONType type);
 }  // namespace FTDCBSONUtil
 
 

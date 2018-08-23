@@ -378,11 +378,11 @@ TEST(FTDCFileManagerTest, TestNormalCrashInterim) {
 
     // Validate old file
     std::vector<BSONObj> docs1 = {mdoc1, sdoc1, sdoc1};
-    ValidateDocumentList(files[0], docs1);
+    ValidateDocumentList(files[0], docs1, FTDCValidationMode::kStrict);
 
     // Validate new file
     std::vector<BSONObj> docs2 = {sdoc2, sdoc2, sdoc2, sdoc2};
-    ValidateDocumentList(files[1], docs2);
+    ValidateDocumentList(files[1], docs2, FTDCValidationMode::kStrict);
 }
 
 }  // namespace mongo
