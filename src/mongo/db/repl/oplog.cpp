@@ -440,8 +440,6 @@ OpTime logOp(OperationContext* opCtx,
         return {};
     }
 
-    Lock::DBLock lk(opCtx, NamespaceString::kLocalDb, MODE_IX);
-    Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
     auto const oplog = _localOplogCollection;
 
     OplogSlot slot;
@@ -495,8 +493,6 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     std::vector<OplogDocWriter> writers;
     writers.reserve(count);
     Collection* oplog = _localOplogCollection;
-    Lock::DBLock lk(opCtx, "local", MODE_IX);
-    Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
 
     WriteUnitOfWork wuow(opCtx);
 
