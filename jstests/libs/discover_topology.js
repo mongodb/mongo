@@ -23,7 +23,11 @@ var DiscoverTopology = (function() {
         // The "passives" field contains the list of unelectable (priority=0) secondaries
         // and is omitted from the server's response when there are none.
         res.passives = res.passives || [];
-        return {type: Topology.kReplicaSet, nodes: [...res.hosts, ...res.passives]};
+        return {
+            type: Topology.kReplicaSet,
+            primary: res.primary,
+            nodes: [...res.hosts, ...res.passives]
+        };
     }
 
     function findConnectedNodesViaMongos(conn, options) {
@@ -87,7 +91,11 @@ var DiscoverTopology = (function() {
          * is returned.
          *
          * For a replica set, an object of the form
-         *   {type: Topology.kReplicaSet, nodes: [<conn-string1>, <conn-string2>, ...]}
+         *   {
+         *     type: Topology.kReplicaSet,
+         *     primary: <primary-conn-string>,
+         *     nodes: [<conn-string1>, <conn-string2>, ...],
+         *   }
          * is returned.
          *
          * For a sharded cluster, an object of the form
@@ -96,7 +104,9 @@ var DiscoverTopology = (function() {
          *     configsvr: {nodes: [...]},
          *     shards: {
          *       <shard-name1>: {type: Topology.kStandalone, mongod: ...},
-         *       <shard-name2>: {type: Topology.kReplicaSet, nodes: [...]},
+         *       <shard-name2>: {type: Topology.kReplicaSet,
+         *                       primary: <primary-conn-string>,
+         *                       nodes: [...]},
          *       ...
          *     },
          *     mongos: {

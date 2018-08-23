@@ -30,7 +30,7 @@ function CollectionValidator() {
         let full_res = {ok: 1, failed_res: []};
 
         // Don't run validate on view namespaces.
-        let filter = {type: "collection"};
+        let filter = {type: 'collection'};
         if (jsTest.options().skipValidationOnInvalidViewDefinitions) {
             // If skipValidationOnInvalidViewDefinitions=true, then we avoid resolving the view
             // catalog on the admin database.
@@ -57,7 +57,7 @@ function CollectionValidator() {
 
         let collInfo = db.getCollectionInfos(filter);
         for (let collDocument of collInfo) {
-            const coll = db.getCollection(collDocument["name"]);
+            const coll = db.getCollection(collDocument['name']);
             const res = coll.validate(full);
 
             if (!res.ok || !res.valid) {
@@ -93,6 +93,16 @@ function CollectionValidator() {
             conn.setSlaveOk();
             jsTest.authenticate(conn);
 
+            if (jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
+                let adminDB = conn.getDB('admin');
+                // Make sure this node has the desired FCV.
+                assert.soon(() => {
+                    return adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'})
+                               .version ===
+                        jsTest.options().forceValidationWithFeatureCompatibilityVersion;
+                });
+            }
+
             const dbNames = conn.getDBNames();
             for (let dbName of dbNames) {
                 if (!validatorFunc(conn.getDB(dbName), {full: true})) {
@@ -107,10 +117,25 @@ function CollectionValidator() {
         }
     };
 
-    this.validateNodes = function(hostList) {
+    this.validateNodes = function(hostList, setFCVHost) {
         // We run the scoped threads in a try/finally block in case any thread throws an exception,
         // in which case we want to still join all the threads.
         let threads = [];
+        let adminDB;
+        let originalFCV;
+
+        if (jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
+            let conn = new Mongo(setFCVHost);
+            adminDB = conn.getDB('admin');
+            originalFCV =
+                adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'}).version;
+            if (originalFCV !== jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
+                assert.commandWorked(adminDB.adminCommand({
+                    setFeatureCompatibilityVersion:
+                        jsTest.options().forceValidationWithFeatureCompatibilityVersion
+                }));
+            }
+        }
 
         try {
             hostList.forEach(host => {
@@ -129,6 +154,10 @@ function CollectionValidator() {
             returnData.forEach(res => {
                 assert.commandWorked(res, 'Collection validation failed');
             });
+        }
+
+        if (jsTest.options().forceValidationWithFeatureCompatibilityVersion !== originalFCV) {
+            assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV}));
         }
     };
 }
