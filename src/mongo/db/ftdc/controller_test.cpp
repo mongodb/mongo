@@ -204,7 +204,7 @@ TEST_F(FTDCControllerTest, TestFull) {
 
     auto alog = files[0];
 
-    ValidateDocumentList(alog, allDocs);
+    ValidateDocumentList(alog, allDocs, FTDCValidationMode::kStrict);
 }
 
 // Test we can start and stop the controller in quick succession, make sure it succeeds without
@@ -276,7 +276,7 @@ TEST_F(FTDCControllerTest, TestStartAsDisabled) {
 
     auto alog = files[0];
 
-    ValidateDocumentList(alog, allDocs);
+    ValidateDocumentList(alog, allDocs, FTDCValidationMode::kStrict);
 }
 
 }  // namespace mongo
