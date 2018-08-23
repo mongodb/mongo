@@ -57,7 +57,7 @@ class JsCustomBehavior(interface.CustomBehavior):
             test_report.addFailure(self.hook_test_case, sys.exc_info())
             raise errors.StopExecution(err.args[0])
         except self.hook_test_case.failureException as err:
-            self.hook_test_case.logger.exception("{0} failed".format(description))
+            self.hook_test_case.logger.error("{0} failed".format(description))
             test_report.addFailure(self.hook_test_case, sys.exc_info())
             raise errors.StopExecution(err.args[0])
         else:
