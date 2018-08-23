@@ -542,6 +542,10 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx) {
     OplogSlotReserver oplogSlotReserver(opCtx);
     const auto prepareOplogSlot = oplogSlotReserver.getReservedOplogSlot();
     const auto prepareTimestamp = prepareOplogSlot.opTime.getTimestamp();
+    invariant(_prepareOpTime.isNull(),
+              str::stream() << "This transaction has already reserved a prepareOpTime at: "
+                            << _prepareOpTime.toString());
+    _prepareOpTime = prepareOplogSlot.opTime;
 
     if (MONGO_FAIL_POINT(hangAfterReservingPrepareTimestamp)) {
         // This log output is used in js tests so please leave it.
@@ -862,6 +866,7 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
     _transactionOperationBytes = 0;
     _transactionOperations.clear();
     _txnState.transitionTo(wl, TransactionState::kAborted);
+    _prepareOpTime = repl::OpTime();
     _speculativeTransactionReadOpTime = repl::OpTime();
 
     _getSession()->unlockTxnNumber();
@@ -1292,6 +1297,7 @@ void TransactionParticipant::_setNewTxnNumber(WithLock wl, const TxnNumber& txnN
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.resetSingleTransactionStats(txnNumber);
     }
+    _prepareOpTime = repl::OpTime();
     _speculativeTransactionReadOpTime = repl::OpTime();
     _multikeyPathInfo.clear();
     _autoCommit = boost::none;

@@ -87,8 +87,8 @@ function restartReplicationOnAllShards(st) {
 // Asserts that a writeConcernError was received.
 function assertWriteConcernError(res) {
     assert(res.writeConcernError, "No writeConcernError received, got: " + tojson(res));
-    assert(res.writeConcernError.code);
-    assert(res.writeConcernError.errmsg);
+    assert(res.writeConcernError.code, "No writeConcernError code, got: " + tojson(res));
+    assert(res.writeConcernError.errmsg, "No writeConcernError errmsg, got: " + tojson(res));
 }
 
 // Run the specified command, on the admin database if specified.
@@ -98,4 +98,39 @@ function runCommandCheckAdmin(db, cmd) {
     } else {
         return db.runCommand(cmd.req);
     }
+}
+
+// Asserts that writeConcern timed out.
+function checkWriteConcernTimedOut(res) {
+    assertWriteConcernError(res);
+    const errInfo = res.writeConcernError.errInfo;
+    assert(errInfo, "No writeConcernError errInfo, got: " + tojson(res));
+    assert(errInfo.wtimeout, "No errInfo wtimeout, got: " + tojson(res));
+}
+
+/**
+ * Tests that a command properly waits for writeConcern on retry. Takes an optional
+ * 'setupFunc' that sets up the database state. 'setupFunc' accepts a connection to the
+ * primary.
+ */
+function runWriteConcernRetryabilityTest(priConn, secConn, cmd, kNodes, dbName, setupFunc) {
+    dbName = dbName || "test";
+    jsTestLog(`Testing ${tojson(cmd)} on ${dbName}.`);
+
+    // Send a dummy write to this connection so it will have the Client object initialized.
+    const secondPriConn = new Mongo(priConn.host);
+    const testDB2 = secondPriConn.getDB(dbName);
+    assert.writeOK(testDB2.dummy.insert({x: 1}, {writeConcern: {w: kNodes}}));
+
+    if (setupFunc) {
+        setupFunc(priConn);
+    }
+
+    stopServerReplication(secConn);
+
+    const testDB = priConn.getDB(dbName);
+    checkWriteConcernTimedOut(testDB.runCommand(cmd));
+    checkWriteConcernTimedOut(testDB2.runCommand(cmd));
+
+    restartServerReplication(secConn);
 }

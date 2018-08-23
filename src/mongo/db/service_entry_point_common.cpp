@@ -501,6 +501,7 @@ bool runCommandImpl(OperationContext* opCtx,
                     !txnParticipant->inMultiDocumentTransaction() ||
                     invocation->definition()->getName() == "commitTransaction" ||
                     invocation->definition()->getName() == "abortTransaction" ||
+                    invocation->definition()->getName() == "prepareTransaction" ||
                     invocation->definition()->getName() == "doTxn");
 
         auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();

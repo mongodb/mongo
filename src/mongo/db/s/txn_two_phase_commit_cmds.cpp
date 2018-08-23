@@ -82,9 +82,30 @@ public:
                 "Transaction isn't in progress",
                 txnParticipant->inMultiDocumentTransaction());
 
+        if (txnParticipant->transactionIsPrepared()) {
+            auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+            auto prepareOpTime = txnParticipant->getPrepareOpTime();
+            // Set the client optime to be prepareOpTime if it's not already later than
+            // prepareOpTime.
+            // This ensures that we wait for writeConcern and that prepareOpTime will be committed.
+            if (prepareOpTime > replClient.getLastOp()) {
+                replClient.setLastOp(prepareOpTime);
+            }
+
+            invariant(opCtx->recoveryUnit()->getPrepareTimestamp() == prepareOpTime.getTimestamp(),
+                      str::stream() << "recovery unit prepareTimestamp: "
+                                    << opCtx->recoveryUnit()->getPrepareTimestamp().toString()
+                                    << " participant prepareOpTime: "
+                                    << prepareOpTime.toString());
+
+            result.append("prepareTimestamp", prepareOpTime.getTimestamp());
+            return true;
+        }
+
         // Add prepareTimestamp to the command response.
         auto timestamp = txnParticipant->prepareTransaction(opCtx);
         result.append("prepareTimestamp", timestamp);
+
         return true;
     }
 } prepareTransactionCmd;

@@ -255,6 +255,11 @@ public:
         return _txnState.isAborted(lk);
     }
 
+    bool transactionIsPrepared() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _txnState.isPrepared(lk);
+    }
+
     /**
      * Returns true if we are in an active multi-document transaction or if the transaction has
      * been aborted. This is used to cover the case where a transaction has been aborted, but the
@@ -290,6 +295,11 @@ public:
     repl::OpTime getSpeculativeTransactionReadOpTimeForTest() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _speculativeTransactionReadOpTime;
+    }
+
+    repl::OpTime getPrepareOpTime() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _prepareOpTime;
     }
 
     const Locker* getTxnResourceStashLockerForTest() const {
@@ -624,6 +634,9 @@ private:
     // The autoCommit setting of this transaction. Should always be false for multi-statement
     // transaction. Currently only needed for diagnostics reporting.
     boost::optional<bool> _autoCommit;
+
+    // Track the prepareOpTime, the OpTime of the 'prepare' oplog entry for a transaction.
+    repl::OpTime _prepareOpTime;
 
     // The OpTime a speculative transaction is reading from and also the earliest opTime it
     // should wait for write concern for on commit.
