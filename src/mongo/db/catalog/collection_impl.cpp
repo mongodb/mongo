@@ -299,7 +299,7 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
                                                const DocWriter* const* docs,
                                                Timestamp* timestamps,
                                                size_t nDocs) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
+    dassert(opCtx->lockState()->isWriteLocked());
 
     // Since this is only for the OpLog, we can assume these for simplicity.
     // This also means that we do not need to forward this object to the OpObserver, which is good

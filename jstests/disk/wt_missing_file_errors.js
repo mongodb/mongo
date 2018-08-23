@@ -23,7 +23,7 @@
             MongoRunner.stopMongod(mongod);
             jsTestLog("deleting collection file: " + testCollFile);
             removeFile(testCollFile);
-        }, "Fatal Assertion 50883");
+        }, "Fatal Assertion 50882");
 
     /**
      * Test 2. Delete the _mdb_catalog.
@@ -35,7 +35,7 @@
             let mdbCatalogFile = dbpath + "_mdb_catalog.wt";
             jsTestLog("deleting catalog file: " + mdbCatalogFile);
             removeFile(mdbCatalogFile);
-        }, "Fatal Assertion 50883");
+        }, "Fatal Assertion 50882");
 
     /**
      * Test 3. Delete the WiredTiger.wt.
@@ -73,6 +73,6 @@
                 testColl.insert({a: 1});
             });
         },
-        "Fatal Assertion 50883");
+        "Fatal Assertion 50882");
 
 })();

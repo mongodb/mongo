@@ -983,6 +983,10 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx, bool wasPrepar
         const NamespaceString cmdNss{"admin", "$cmd"};
         const auto cmdObj = BSON("commitTransaction" << 1);
         TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+
+        // Writes to the oplog only require a Global intent lock.
+        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
         WriteUnitOfWork wuow(opCtx);
         logOperation(opCtx,
                      "c",
@@ -1031,6 +1035,10 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx, const OplogSl
     // and allow this transaction to be continued on failover.
     {
         TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+
+        // Writes to the oplog only require a Global intent lock.
+        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
         WriteUnitOfWork wuow(opCtx);
 
         Session* const session = OperationContextSession::get(opCtx);

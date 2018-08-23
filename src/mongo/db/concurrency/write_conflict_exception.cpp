@@ -57,8 +57,10 @@ void WriteConflictException::logAndBackoff(int attempt, StringData operation, St
         sleepmillis(1);
     } else if (attempt < 100) {
         sleepmillis(5);
-    } else {
+    } else if (attempt < 200) {
         sleepmillis(10);
+    } else {
+        sleepmillis(100);
     }
 }
 

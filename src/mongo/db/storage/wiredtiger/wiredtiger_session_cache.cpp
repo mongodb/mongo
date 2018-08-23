@@ -36,6 +36,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_parameters.h"
@@ -123,14 +124,18 @@ WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, boo
     WT_CURSOR* c = NULL;
     int ret = _session->open_cursor(
         _session, uri.c_str(), NULL, forRecordStore ? "" : "overwrite=false", &c);
-    if (ret != ENOENT && ret != 0) {
+    if (ret == EBUSY) {
+        // This can only happen when trying to open a cursor on the oplog and it is currently locked
+        // by a verify or salvage, because we don't employ database locks to protect the oplog.
+        throw WriteConflictException();
+    }
+    if (ret != 0) {
         error() << "Failed to open a WiredTiger cursor: " << uri;
         error() << "This may be due to metadata corruption. " << kWTRepairMsg;
 
         fassertFailedNoTrace(50882);
     }
-    if (c)
-        _cursorsOut++;
+    _cursorsOut++;
     return c;
 }
 
