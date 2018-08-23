@@ -50,9 +50,11 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
 
     NamespaceString targetNss;
     bool allowSharded;
+    WriteModeEnum mode;
     if (spec.type() == BSONType::String) {
         targetNss = NamespaceString(request.getNamespaceString().db(), spec.valueStringData());
         allowSharded = false;
+        mode = WriteModeEnum::kModeReplaceCollection;
     } else if (spec.type() == BSONType::Object) {
         auto outSpec =
             DocumentSourceOutSpec::parse(IDLParserErrorContext("$out"), spec.embeddedObject());
@@ -64,15 +66,30 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
                 NamespaceString(request.getNamespaceString().db(), outSpec.getTargetCollection());
         }
 
+        mode = outSpec.getMode();
+
         // Sharded output collections are not allowed with mode "replaceCollection".
-        allowSharded = outSpec.getMode() != WriteModeEnum::kModeReplaceCollection;
+        allowSharded = mode != WriteModeEnum::kModeReplaceCollection;
     }
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid $out target namespace, " << targetNss.ns(),
             targetNss.isValid());
 
-    ActionSet actions{ActionType::remove, ActionType::insert};
+    // All modes require the "insert" action.
+    ActionSet actions{ActionType::insert};
+    switch (mode) {
+        case WriteModeEnum::kModeReplaceCollection:
+            actions.addAction(ActionType::remove);
+            break;
+        case WriteModeEnum::kModeReplaceDocuments:
+            actions.addAction(ActionType::update);
+            break;
+        case WriteModeEnum::kModeInsertDocuments:
+            // "insertDocuments" mode only requires the "insert" action.
+            break;
+    }
+
     if (request.shouldBypassDocumentValidation()) {
         actions.addAction(ActionType::bypassDocumentValidation);
     }

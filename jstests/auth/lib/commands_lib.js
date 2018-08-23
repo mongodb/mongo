@@ -24,7 +24,7 @@ database, only a user with role "readWriteAnyDatabase" should
 be authorized.
 
     {
-        testname: "aggregate_write",
+        testname: "aggregate_out_legacy",
         command: {aggregate: "foo", pipeline: [ {$out: "foo_out"} ], cursor: {} },
         testcases: [
             { runOnDb: "roles_commands_1", roles: {readWrite: 1, readWriteAnyDatabase: 1} },
@@ -1058,7 +1058,7 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "aggregate_write",
+          testname: "aggregate_out_legacy",
           command: {aggregate: "foo", pipeline: [{$out: "foo_out"}], cursor: {}},
           testcases: [
               {
@@ -1078,7 +1078,89 @@ var authCommandsLib = {
                     {resource: {db: secondDbName, collection: "foo_out"}, actions: ["insert"]},
                     {resource: {db: secondDbName, collection: "foo_out"}, actions: ["remove"]}
                 ]
-              }
+              },
+          ]
+        },
+        {
+          testname: "aggregate_out_replace_collection",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$out: {to: "foo_out", mode: "replaceCollection"}}],
+              cursor: {}
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "foo_out"}, actions: ["insert"]},
+                    {resource: {db: firstDbName, collection: "foo_out"}, actions: ["remove"]}
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "foo_out"}, actions: ["insert"]},
+                    {resource: {db: secondDbName, collection: "foo_out"}, actions: ["remove"]}
+                ]
+              },
+          ]
+        },
+        {
+          testname: "aggregate_out_insert_documents",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$out: {to: "foo_out", mode: "insertDocuments"}}],
+              cursor: {}
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "foo_out"}, actions: ["insert"]},
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "foo_out"}, actions: ["insert"]},
+                ]
+              },
+          ]
+        },
+        {
+          testname: "aggregate_out_replace_documents",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$out: {to: "foo_out", mode: "replaceDocuments"}}],
+              cursor: {}
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {readWrite: 1, readWriteAnyDatabase: 1, dbOwner: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: firstDbName, collection: "foo_out"}, actions: ["insert"]},
+                    {resource: {db: firstDbName, collection: "foo_out"}, actions: ["update"]},
+                ]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                    {resource: {db: secondDbName, collection: "foo_out"}, actions: ["insert"]},
+                    {resource: {db: secondDbName, collection: "foo_out"}, actions: ["update"]},
+                ]
+              },
           ]
         },
         {
