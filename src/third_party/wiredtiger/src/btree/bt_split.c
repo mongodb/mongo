@@ -462,6 +462,9 @@ __split_ref_prepare(WT_SESSION_IMPL *session,
 	 * ascend into the created children, but eventually fail as that parent
 	 * page won't yet know about the created children pages. That's OK, we
 	 * spin there until the parent's page index is updated.
+	 *
+	 * Lock the newly created page to ensure it doesn't split until all
+	 * child pages have been updated.
 	 */
 	for (i = skip_first ? 1 : 0; i < pindex->entries; ++i) {
 		ref = pindex->index[i];
@@ -495,12 +498,14 @@ __split_ref_prepare(WT_SESSION_IMPL *session,
 		 * reading the child's page index structure is safe.
 		 */
 		j = 0;
+		WT_PAGE_LOCK(session, child);
 		WT_ENTER_PAGE_INDEX(session);
 		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
 			child_ref->home = child;
 			child_ref->pindex_hint = j++;
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);
+		WT_PAGE_UNLOCK(session, child);
 
 #ifdef HAVE_DIAGNOSTIC
 		WT_WITH_PAGE_INDEX(session,
