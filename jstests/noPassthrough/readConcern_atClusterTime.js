@@ -118,8 +118,7 @@ function _getClusterTime(rst) {
     session.endSession();
     rst.stopSet();
 
-    // readConcern with 'atClusterTime' should fail when 'enableTestCommands' is set to false.
-    // TODO: SERVER-35643 Allow atClusterTime when enableTestCommands is false.
+    // readConcern with 'atClusterTime' should succeed regardless of value of 'enableTestCommands'.
     {
         jsTest.setOption('enableTestCommands', false);
         let rst = new ReplSetTest({nodes: 1});
@@ -130,10 +129,8 @@ function _getClusterTime(rst) {
         let sessionDb = session.getDatabase(dbName);
         session.startTransaction(
             {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
-        assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
-                                     ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+        assert.commandWorked(sessionDb.runCommand({find: collName}));
+        session.commitTransaction();
         session.endSession();
         rst.stopSet();
 

@@ -62,9 +62,6 @@ void ClusterCommandTestFixture::setUp() {
     LogicalTimeValidator::set(getServiceContext(), std::move(validator));
 
     LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
-
-    // ReadConcern 'snapshot' is only supported with test commands enabled.
-    setTestCommandsEnabled(true);
 }
 
 void ClusterCommandTestFixture::expectReturnsError(ErrorCodes::Error code) {

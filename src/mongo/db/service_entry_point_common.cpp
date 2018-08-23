@@ -804,12 +804,6 @@ void execCommandDatabase(OperationContext* opCtx,
                 _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));
         }
 
-        if (readConcernArgs.getArgsAtClusterTime()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "atClusterTime is only used for testing",
-                    getTestCommandsEnabled());
-        }
-
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot is only valid in multi-statement transactions",
