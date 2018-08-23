@@ -123,6 +123,47 @@ namespace FTDCBSONUtil {
 
 namespace {
 
+/**
+ * Iterate a BSONObj but only return fields that have types that FTDC cares about.
+ */
+class FTDCBSONObjIterator {
+public:
+    FTDCBSONObjIterator(const BSONObj& obj) : _iterator(obj) {
+        advance();
+    }
+
+    bool more() {
+        return !_current.eoo();
+    }
+
+    BSONElement next() {
+        auto ret = _current;
+        advance();
+        return ret;
+    }
+
+private:
+    /**
+     * Find the next element that is a valid FTDC type.
+     */
+    void advance() {
+        _current = BSONElement();
+
+        while (_iterator.more()) {
+
+            auto elem = _iterator.next();
+            if (isFTDCType(elem.type())) {
+                _current = elem;
+                break;
+            }
+        }
+    }
+
+private:
+    BSONObjIterator _iterator;
+    BSONElement _current;
+};
+
 StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
                                             const BSONObj& currentDoc,
                                             std::vector<std::uint64_t>* metrics,
@@ -132,15 +173,14 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
         return {ErrorCodes::BadValue, "Recursion limit reached."};
     }
 
-    BSONObjIterator itCurrent(currentDoc);
-    BSONObjIterator itReference(referenceDoc);
+    FTDCBSONObjIterator itCurrent(currentDoc);
+    FTDCBSONObjIterator itReference(referenceDoc);
 
     while (itCurrent.more()) {
         // Schema mismatch if current document is longer than reference document
         if (matches && !itReference.more()) {
             LOG(4) << "full-time diagnostic data capture schema change: currrent document is "
-                      "longer than "
-                      "reference document";
+                      "longer than reference document";
             matches = false;
         }
 
@@ -229,6 +269,24 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
 }
 
 }  // namespace
+
+bool isFTDCType(BSONType type) {
+    switch (type) {
+        case NumberDouble:
+        case NumberInt:
+        case NumberLong:
+        case NumberDecimal:
+        case Bool:
+        case Date:
+        case bsonTimestamp:
+        case Object:
+        case Array:
+            return true;
+
+        default:
+            return false;
+    }
+}
 
 StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
                                             const BSONObj& currentDoc,

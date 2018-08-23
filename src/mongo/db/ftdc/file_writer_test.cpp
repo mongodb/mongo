@@ -196,7 +196,7 @@ private:
 
         _writer.close();
 
-        ValidateDocumentList(_path, _docs);
+        ValidateDocumentList(_path, _docs, FTDCValidationMode::kStrict);
     }
 
 private:
