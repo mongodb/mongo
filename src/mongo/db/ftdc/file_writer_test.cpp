@@ -198,7 +198,7 @@ private:
 
         _writer.close().transitional_ignore();
 
-        ValidateDocumentList(_path, _docs);
+        ValidateDocumentList(_path, _docs, FTDCValidationMode::kStrict);
     }
 
 private:

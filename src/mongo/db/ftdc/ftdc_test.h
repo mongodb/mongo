@@ -40,18 +40,38 @@ public:
 };
 
 /**
+ * Validation mode for tests, strict by default
+ */
+enum class FTDCValidationMode {
+    /**
+     * Compare BSONObjs exactly.
+     */
+    kStrict,
+
+    /**
+     * Compare BSONObjs by only comparing types FTDC compares about. FTDC ignores somes changes in
+     * the shapes of documents and therefore no longer reconstructs the shapes of documents exactly.
+     */
+    kWeak,
+};
+
+/**
  * Validate the documents in a file match the specified vector.
  *
  * Unit Test ASSERTs if there is mismatch.
  */
-void ValidateDocumentList(const boost::filesystem::path& p, const std::vector<BSONObj>& docs);
+void ValidateDocumentList(const boost::filesystem::path& p,
+                          const std::vector<BSONObj>& docs,
+                          FTDCValidationMode mode);
 
 /**
  * Validate that two lists of documents are equal.
  *
  * Unit Test ASSERTs if there is mismatch.
  */
-void ValidateDocumentList(const std::vector<BSONObj>& docs1, const std::vector<BSONObj>& docs2);
+void ValidateDocumentList(const std::vector<BSONObj>& docs1,
+                          const std::vector<BSONObj>& docs2,
+                          FTDCValidationMode mode);
 
 /**
  * Delete a file if it exists.
