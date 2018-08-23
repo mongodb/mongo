@@ -94,10 +94,6 @@ public:
 
         virtual void setMultikey(OperationContext* opCtx, const MultikeyPaths& multikeyPaths) = 0;
 
-        // TODO SERVER-36385 Remove this function: we don't set the feature tracker bit in 4.4
-        // because 4.4 can only downgrade to 4.2 which can read long TypeBits.
-        virtual void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) = 0;
-
         virtual bool isReady(OperationContext* opCtx) const = 0;
 
         virtual KVPrefix getPrefix() const = 0;
@@ -224,10 +220,6 @@ public:
      */
     void setMultikey(OperationContext* const opCtx, const MultikeyPaths& multikeyPaths) {
         return this->_impl().setMultikey(opCtx, multikeyPaths);
-    }
-
-    void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* const opCtx) {
-        return this->_impl().setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
     }
 
     // if this ready is ready for queries

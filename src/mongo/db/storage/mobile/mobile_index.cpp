@@ -119,10 +119,6 @@ Status MobileIndex::doInsert(OperationContext* opCtx,
     }
     checkStatus(status, SQLITE_DONE, "sqlite3_step");
 
-    if (key.getTypeBits().isLongEncoding())
-        return Status(ErrorCodes::KeyStringWithLongTypeBits,
-                      "Inserted KeyString with TypeBits longer than 127 bytes.");
-
     return Status::OK();
 }
 
@@ -302,9 +298,7 @@ public:
         return _addKey(key, recId);
     }
 
-    Status commit(bool mayInterrupt) override {
-        return Status::OK();
-    }
+    void commit(bool mayInterrupt) override {}
 
 protected:
     /**

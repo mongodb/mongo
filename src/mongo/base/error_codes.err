@@ -268,11 +268,7 @@ error_code("PreparedTransactionInProgress", 267);
 error_code("CannotBackup", 268);
 error_code("DataModifiedByRepair", 269);
 error_code("RepairedReplicaSetNode", 270);
-# TODO SERVER-36385: Mark LongTypeBits as obsolete in 4.4: we don't need
-# to set the feature tracker bit for long TypeBits in 4.4 given that we
-# can't downgrade 4.4 to a version (such as 4.0) which cannot read long
-# TypeBits.
-error_code("KeyStringWithLongTypeBits", 271);
+
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)

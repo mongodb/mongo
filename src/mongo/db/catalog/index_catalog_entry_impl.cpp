@@ -352,10 +352,6 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     }
 }
 
-void IndexCatalogEntryImpl::setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) {
-    _collection->setIndexKeyStringWithLongTypeBitsExistsOnDisk(opCtx);
-}
-
 // ----
 
 bool IndexCatalogEntryImpl::_catalogIsReady(OperationContext* opCtx) const {
