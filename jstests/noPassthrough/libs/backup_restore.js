@@ -149,6 +149,7 @@ var BackupRestoreTest = function(options) {
                 'multi_statement_transaction_atomicity_isolation_multi_db.js',
                 'multi_statement_transaction_atomicity_isolation_repeated_reads.js',
                 'multi_statement_transaction_kill_sessions_atomicity_isolation.js',
+                'multi_statement_transaction_atomicity_isolation_metrics_test.js',
                 'multi_statement_transaction_simple.js',
                 'multi_statement_transaction_simple_repeated_reads.js',
                 'reindex_background.js',
