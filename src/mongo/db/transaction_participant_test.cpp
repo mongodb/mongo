@@ -1868,6 +1868,10 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndStash) 
               Microseconds{0});
 
     txnParticipant->unstashTransactionResources(opCtx(), "insert");
+
+    // Sleep a bit to make sure time active is nonzero.
+    sleepmillis(1);
+
     // The transaction machinery cannot store an empty locker.
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     txnParticipant->stashTransactionResources(opCtx());
@@ -2015,6 +2019,10 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetIfUnstashHasBadRea
 
     // Transaction resources do not exist yet.
     txnParticipant->unstashTransactionResources(opCtx(), "find");
+
+    // Sleep a bit to make sure time active is nonzero.
+    sleepmillis(1);
+
     // The transaction machinery cannot store an empty locker.
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     txnParticipant->stashTransactionResources(opCtx());
