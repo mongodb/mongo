@@ -1,78 +1,82 @@
 // This test expects a function stored in the system.js collection to be available for a map/reduce,
 // which may not be the case if it is implicitly sharded in a passthrough.
 // @tags: [does_not_support_stepdowns, requires_non_retryable_writes, assumes_unsharded_collection]
+(function() {
+    "use strict";
 
-t = db.mr_stored;
-t.drop();
+    // Use a unique database name to avoid conflicts with other tests that directly modify
+    // system.js.
+    const testDB = db.getSiblingDB("mr_stored");
+    const coll = testDB.test;
+    coll.drop();
 
-t.save({"partner": 1, "visits": 9});
-t.save({"partner": 2, "visits": 9});
-t.save({"partner": 1, "visits": 11});
-t.save({"partner": 1, "visits": 30});
-t.save({"partner": 2, "visits": 41});
-t.save({"partner": 2, "visits": 41});
+    assert.commandWorked(coll.insert({"partner": 1, "visits": 9}));
+    assert.commandWorked(coll.insert({"partner": 2, "visits": 9}));
+    assert.commandWorked(coll.insert({"partner": 1, "visits": 11}));
+    assert.commandWorked(coll.insert({"partner": 1, "visits": 30}));
+    assert.commandWorked(coll.insert({"partner": 2, "visits": 41}));
+    assert.commandWorked(coll.insert({"partner": 2, "visits": 41}));
 
-m = function(obj) {
-    emit(obj.partner, {stats: [obj.visits]});
-};
+    let map = function(obj) {
+        emit(obj.partner, {stats: [obj.visits]});
+    };
 
-r = function(k, v) {
-    var stats = [];
-    var total = 0;
-    for (var i = 0; i < v.length; i++) {
-        for (var j in v[i].stats) {
-            stats.push(v[i].stats[j]);
-            total += v[i].stats[j];
+    let reduce = function(k, v) {
+        var stats = [];
+        var total = 0;
+        for (var i = 0; i < v.length; i++) {
+            for (var j in v[i].stats) {
+                stats.push(v[i].stats[j]);
+                total += v[i].stats[j];
+            }
         }
-    }
-    return {stats: stats, total: total};
-};
+        return {stats: stats, total: total};
+    };
 
-// Test that map reduce works with stored javascript
-db.system.js.save({_id: "mr_stored_map", value: m});
-db.system.js.save({_id: "mr_stored_reduce", value: r});
+    // Test that map reduce works with stored javascript
+    assert.commandWorked(testDB.system.js.insert({_id: "mr_stored_map", value: map}));
+    assert.commandWorked(testDB.system.js.insert({_id: "mr_stored_reduce", value: reduce}));
 
-res = t.mapReduce(
-    function() {
-        mr_stored_map(this);
-    },
-    function(k, v) {
-        return mr_stored_reduce(k, v);
-    },
-    {out: "mr_stored_out", scope: {xx: 1}});
-// res.find().forEach( printjson )
+    let res = coll.mapReduce(
+        function() {
+            mr_stored_map(this);
+        },
+        function(k, v) {
+            return mr_stored_reduce(k, v);
+        },
+        {out: "mr_stored_out", scope: {xx: 1}});
 
-z = res.convertToSingleObject();
-assert.eq(2, Object.keySet(z).length, "A1");
-assert.eq([9, 11, 30], z["1"].stats, "A2");
-assert.eq([9, 41, 41], z["2"].stats, "A3");
+    let z = res.convertToSingleObject();
+    assert.eq(2, Object.keySet(z).length);
+    assert.eq([9, 11, 30], z["1"].stats);
+    assert.eq([9, 41, 41], z["2"].stats);
 
-res.drop();
+    res.drop();
 
-m = function(obj) {
-    var x = "partner";
-    var y = "visits";
-    emit(obj[x], {stats: [obj[y]]});
-};
+    map = function(obj) {
+        var x = "partner";
+        var y = "visits";
+        emit(obj[x], {stats: [obj[y]]});
+    };
 
-db.system.js.save({_id: "mr_stored_map", value: m});
+    assert.commandWorked(testDB.system.js.save({_id: "mr_stored_map", value: map}));
 
-res = t.mapReduce(
-    function() {
-        mr_stored_map(this);
-    },
-    function(k, v) {
-        return mr_stored_reduce(k, v);
-    },
-    {out: "mr_stored_out", scope: {xx: 1}});
-// res.find().forEach( printjson )
+    res = coll.mapReduce(
+        function() {
+            mr_stored_map(this);
+        },
+        function(k, v) {
+            return mr_stored_reduce(k, v);
+        },
+        {out: "mr_stored_out", scope: {xx: 1}});
 
-z = res.convertToSingleObject();
-assert.eq(2, Object.keySet(z).length, "B1");
-assert.eq([9, 11, 30], z["1"].stats, "B2");
-assert.eq([9, 41, 41], z["2"].stats, "B3");
+    z = res.convertToSingleObject();
+    assert.eq(2, Object.keySet(z).length);
+    assert.eq([9, 11, 30], z["1"].stats);
+    assert.eq([9, 41, 41], z["2"].stats);
 
-db.system.js.remove({_id: "mr_stored_map"});
-db.system.js.remove({_id: "mr_stored_reduce"});
+    assert.commandWorked(testDB.system.js.remove({_id: "mr_stored_map"}));
+    assert.commandWorked(testDB.system.js.remove({_id: "mr_stored_reduce"}));
 
-res.drop();
+    res.drop();
+}());
