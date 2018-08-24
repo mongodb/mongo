@@ -37,6 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -2366,8 +2367,12 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         newConfigObj = incrementConfigVersionByRandom(newConfigObj);
     }
 
+    BSONObj oldConfigObj = oldConfig.toBSON();
+    audit::logReplSetReconfig(opCtx->getClient(), &newConfigObj, &oldConfigObj);
+
     Status status = newConfig.initialize(
         newConfigObj, oldConfig.getProtocolVersion() == 1, oldConfig.getReplicaSetId());
+
     if (!status.isOK()) {
         error() << "replSetReconfig got " << status << " while parsing " << newConfigObj;
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
