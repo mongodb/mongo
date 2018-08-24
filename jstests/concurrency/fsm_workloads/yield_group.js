@@ -19,7 +19,10 @@ var $config = (function() {
                 if (ex.code === ErrorCodes.OperationNotSupportedInTransaction) {
                     throw ex;
                 }
-                assert.eq(ErrorCodes.CappedPositionLost, ex.code);
+                // TODO We really only expect CappedPositionLost here, but until SERVER-32565 is
+                // resolved there are times when we might get InternalError.
+                assertAlways.contains(ex.code,
+                                      [ErrorCodes.CappedPositionLost, ErrorCodes.InternalError]);
             }
         },
 
