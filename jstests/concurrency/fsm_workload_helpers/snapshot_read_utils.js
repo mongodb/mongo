@@ -149,8 +149,10 @@ var {cleanupOnLastIteration} = (function() {
         } finally {
             if (lastIteration) {
                 // Abort the latest transactions for this session as some may have been skipped due
-                // to incrementing data.txnNumber.
-                for (let i = data.txnNumber; i >= 0; i--) {
+                // to incrementing data.txnNumber. Go in increasing order, so as to avoid bumping
+                // the txnNumber on the server past that of an in-progress transaction. See
+                // SERVER-36847.
+                for (let i = 0; i <= data.txnNumber; i++) {
                     let res = abortTransaction(data.sessionDb, i, abortErrorCodes);
                     if (res.ok === 1) {
                         break;
