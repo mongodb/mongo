@@ -17,10 +17,10 @@ if [ ! -e  $SDK_ROOT ]; then
     mkdir $SDK_ROOT
     (
         cd $SDK_ROOT
-        SDK_PACKAGE=sdk-tools-linux-3859397.zip
+        SDK_PACKAGE=sdk-tools-linux-4333796.zip
         curl -O https://dl.google.com/android/repository/$SDK_PACKAGE
         unzip $SDK_PACKAGE
-        echo y | ./tools/bin/sdkmanager  \
+        yes | ./tools/bin/sdkmanager --channel=1 \
             "platforms;android-28"  \
             "ndk-bundle"  \
             "emulator"  \
