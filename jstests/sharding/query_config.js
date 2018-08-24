@@ -79,14 +79,11 @@
         // This test depends on all the collections in the configCollList being in the config
         // database.
         var configCollList = [
-            "changelog",
             "chunks",
             "collections",
             "databases",
             "lockpings",
             "locks",
-            "mongos",
-            "settings",
             "shards",
             "tags",
             "version"
