@@ -39,6 +39,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -2266,6 +2267,9 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     if (args.force) {
         newConfigObj = incrementConfigVersionByRandom(newConfigObj);
     }
+
+    BSONObj oldConfigObj = oldConfig.toBSON();
+    audit::logReplSetReconfig(opCtx->getClient(), &newConfigObj, &oldConfigObj);
 
     Status status = newConfig.initialize(newConfigObj, oldConfig.getReplicaSetId());
     if (!status.isOK()) {
