@@ -1,7 +1,9 @@
 // Tests the behavior of a change stream on a collection that becomes sharded, however the primary
 // shard is unaware and still sees the collection as unsharded.
 //
-// @tags: [requires_persistence]
+// This test triggers a compiler bug that causes a crash when compiling with optimizations on, see
+// SERVER-36321.
+// @tags: [requires_persistence], [blacklist_from_rhel_67_s390x]
 (function() {
     "use strict";
 
