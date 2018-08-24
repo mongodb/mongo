@@ -196,6 +196,7 @@ bool engine::_initSSL(stream_base::handshake_type type, asio::error_code& ec) {
 }
 
 engine::want engine::handshake(stream_base::handshake_type type, asio::error_code& ec) {
+    ec = asio::error_code();
     if (!_initSSL(type, ec)) {
         // Error happened, ec has been set.
         return want::want_nothing;
@@ -225,6 +226,7 @@ engine::want engine::handshake(stream_base::handshake_type type, asio::error_cod
 }
 
 engine::want engine::shutdown(asio::error_code& ec) {
+    ec = asio::error_code();
     if (_ssl) {
         const auto status = ::SSLClose(_ssl.get());
         if (status == ::errSSLWouldBlock) {
@@ -271,6 +273,7 @@ const asio::error_code& engine::map_error_code(asio::error_code& ec) const {
 engine::want engine::write(const asio::const_buffer& data,
                            asio::error_code& ec,
                            std::size_t& bytes_transferred) {
+    ec = asio::error_code();
     if (!verifyConnected(_ssl.get(), &ec)) {
         return want::want_nothing;
     }
@@ -305,6 +308,7 @@ asio::mutable_buffer engine::get_output(const asio::mutable_buffer& data) {
 engine::want engine::read(const asio::mutable_buffer& data,
                           asio::error_code& ec,
                           std::size_t& bytes_transferred) {
+    ec = asio::error_code();
     if (!verifyConnected(_ssl.get(), &ec)) {
         return want::want_nothing;
     }

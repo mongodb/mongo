@@ -4,25 +4,25 @@
 (function() {
     'use strict';
 
-    var conn = MongoRunner.runMongod({
+    const conn = MongoRunner.runMongod({
         sslMode: "requireSSL",
         sslPEMKeyFile: "jstests/libs/server.pem",
+        networkMessageCompressors: 'disabled',
     });
-
-    var large = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    var s = large;
 
     // SSL packets have a max size of ~16 kb so to test packet fragmentation support, create a
     // string larger then 16kb.
-    for (let i = 0; i < 5 * 1700; i++) {
-        s += large;
+    const chunk = 'E$%G^56w4v5v54Vv$V@#t2#%t56u7B$ub%6 NU@ Y3qv4Yq%yq4C%yx$%zh';  // random data
+    let s = '';
+    while (s.length < (8 * 1024 * 1024)) {
+        s += chunk;
     }
 
-    let ssl_frag = conn.getCollection('test.ssl_frag');
-    assert.writeOK(ssl_frag.insert({_id: large}));
+    const ssl_frag = conn.getCollection('test.ssl_frag');
+    assert.writeOK(ssl_frag.insert({_id: "large_str", foo: s}));
 
-    let docs = ssl_frag.find({});
-    assert.lt(2 * 16 * 1024, Object.bsonsize(docs), "test doc too small");
+    const read = ssl_frag.find({_id: "large_str"}).toArray()[0].foo;
+    assert.eq(s, read, "Did not receive value written");
 
     MongoRunner.stopMongod(conn);
 })();
