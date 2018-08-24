@@ -168,6 +168,8 @@ selector:
   # Checks for an exact number of matching entries in the profiler, which will fail if a command
   # gets retried due to a stepdown.
   - jstests/sharding/database_and_shard_versioning_all_commands.js
+  # Enable when SERVER-36634 is fixed.
+  - jstests/sharding/shard_collection_existing_zones.js
 
 executor:
   config:

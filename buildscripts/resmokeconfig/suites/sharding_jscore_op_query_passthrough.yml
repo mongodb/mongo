@@ -60,6 +60,7 @@ selector:
   # we expect a second drop to return status OK. 
   - jstests/core/drop.js
   - jstests/core/explain_upsert.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
 

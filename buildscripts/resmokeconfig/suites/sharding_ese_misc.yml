@@ -382,6 +382,8 @@ selector:
   - jstests/sharding/movechunk_include.js
   - jstests/sharding/user_flags_sharded.js
   - jstests/sharding/move_chunk_with_session_helper.js
+  # Enable when SERVER-36634 is fixed.
+  - jstests/sharding/shard_collection_existing_zones.js
 
 executor:
   config:

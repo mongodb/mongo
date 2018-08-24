@@ -19,6 +19,9 @@ selector:
 {% endfor %}
 {% if is_misc is defined %}
   - jstests/sharding/*.js
+  exclude_files:
+  # Enable when SERVER-36634 is fixed.
+  - jstests/sharding/shard_collection_existing_zones.js
 {% endif %}
 {% if excluded_tests is defined %}
   exclude_files:

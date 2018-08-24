@@ -53,6 +53,8 @@ selector:
   - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
   # Runs with auth enabled.
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
+  # Enable when SERVER-36634 is fixed.
+  - jstests/sharding/shard_collection_existing_zones.js
 {% if excluded_tests is defined %}
 {% for test in excluded_tests %}
   - {{ test }}

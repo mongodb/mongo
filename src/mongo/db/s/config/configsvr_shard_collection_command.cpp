@@ -755,9 +755,7 @@ public:
         bool isEmpty = (conn->count(nss.ns()) == 0);
         boost::optional<UUID> uuid;
 
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-
+        if (false) {
             // The primary shard will read the config.tags collection so we need to lock the zone
             // mutex.
             Lock::ExclusiveLock lk = catalogManager->lockZoneMutex(opCtx);
