@@ -277,12 +277,17 @@ OperationContextSession::~OperationContextSession() {
     auto& checkedOutSession = operationSessionDecoration(_opCtx);
     if (checkedOutSession) {
         checkedOutSession->get()->clearCurrentOperation();
-    }
 
-    // We acquire a Client lock here to guard the destruction of this session so that references to
-    // this session are safe to use while the lock is held.
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    checkedOutSession.reset();
+        // Removing the checkedOutSession from the OperationContext must be done under the Client
+        // lock, but destruction of the checkedOutSession must not be, as it takes the
+        // SessionCatalog mutex, and other code may take the Client lock while holding that mutex.
+        stdx::unique_lock<Client> lk(*_opCtx->getClient());
+        ScopedCheckedOutSession sessionToDelete(std::move(checkedOutSession.get()));
+        // This destroys the moved-from ScopedCheckedOutSession, and must be done within the client
+        // lock.
+        checkedOutSession = boost::none;
+        lk.unlock();
+    }
 }
 
 Session* OperationContextSession::get(OperationContext* opCtx) {
