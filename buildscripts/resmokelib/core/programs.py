@@ -116,7 +116,7 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
 
 
 def mongo_shell_program(logger, executable=None, connection_string=None, filename=None,
-                        process_kwargs=None, isMainTest=True, **kwargs):
+                        process_kwargs=None, **kwargs):
     """
     Returns a Process instance that starts a mongo shell with arguments
     constructed from 'kwargs'.
@@ -148,7 +148,6 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
             # Only use 'opt_default' if the property wasn't set in the YAML configuration.
             test_data[opt_name] = opt_default
 
-    test_data["isMainTest"] = isMainTest
     global_vars["TestData"] = test_data
 
     # Pass setParameters for mongos and mongod through TestData. The setParameter parsing in
