@@ -7,6 +7,17 @@ Import("get_option")
 
 env = env.Clone()
 
+if get_option('install-mode') == 'hygienic':
+    env.AutoInstall(
+        '',
+        source=[
+            'LICENSE-Embedded.txt',
+        ],
+        INSTALL_ALIAS=[
+            'embedded-dev',
+        ],
+    )
+
 yamlEnv = env.Clone()
 yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
 
