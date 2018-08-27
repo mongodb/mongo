@@ -175,11 +175,12 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
 void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        const BSONObj& max,
                                        std::set<ShardId>* shardIds) const {
+    uassert(ErrorCodes::BadValue,
+            "The range's max value is smaller than its min",
+            SimpleBSONObjComparator::kInstance.evaluate(min <= max));
+
     auto it = _chunkMapViews.chunkRangeMap.upper_bound(min);
     auto end = _chunkMapViews.chunkRangeMap.upper_bound(max);
-
-    // The chunk range map must always cover the entire key space
-    invariant(it != _chunkMapViews.chunkRangeMap.end());
 
     // We need to include the last chunk
     if (end != _chunkMapViews.chunkRangeMap.cend()) {

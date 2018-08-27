@@ -41,6 +41,22 @@ namespace {
 
 const NamespaceString kNss("TestDB", "TestColl");
 
+using ChunkManagerTest = CatalogCacheTestFixture;
+
+TEST_F(ChunkManagerTest, GetShardIdsForRange_MinGreaterThanMax) {
+    auto chunkManager = makeChunkManager(kNss,
+                                         ShardKeyPattern(BSON("a" << 1)),
+                                         nullptr,
+                                         false,
+                                         {BSON("a" << -100), BSON("a" << 0), BSON("a" << 100)});
+    std::set<ShardId> shardIds;
+    ASSERT_THROWS_CODE(
+        chunkManager->getShardIdsForRange(BSON("a" << 200), BSON("a" << -200), &shardIds),
+        AssertionException,
+        ErrorCodes::BadValue);
+}
+
+
 class ChunkManagerQueryTest : public CatalogCacheTestFixture {
 protected:
     void runQueryTest(const BSONObj& shardKey,
@@ -114,6 +130,16 @@ TEST_F(ChunkManagerQueryTest, EqualityRangeSingleShard) {
                       << "x"),
                  BSONObj(),
                  {ShardId("0")});
+}
+
+TEST_F(ChunkManagerQueryTest, EqualityRangeSingleShard_MinKey) {
+    runQueryTest(
+        BSON("a" << 1), nullptr, false, {}, BSON("a" << MINKEY), BSONObj(), {ShardId("0")});
+}
+
+TEST_F(ChunkManagerQueryTest, EqualityRangeSingleShard_MaxKey) {
+    runQueryTest(
+        BSON("a" << 1), nullptr, false, {}, BSON("a" << MAXKEY), BSONObj(), {ShardId("0")});
 }
 
 TEST_F(ChunkManagerQueryTest, EqualityRangeMultiShard) {
