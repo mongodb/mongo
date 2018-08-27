@@ -56,8 +56,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
-    auto const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->canAcceptShardedCommands());
+    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
     LOG(2) << "Metadata refresh requested for " << nss.ns() << " at shard version "
            << shardVersionReceived;
@@ -65,10 +64,9 @@ void onShardVersionMismatch(OperationContext* opCtx,
     ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
 
     // Ensure any ongoing migrations have completed before trying to do the refresh. This wait is
-    // just an optimization so that MongoS does not exhaust its maximum number of StaleConfig retry
-    // attempts while the migration is being committed.
-    auto& oss = OperationShardingState::get(opCtx);
-    oss.waitForMigrationCriticalSectionSignal(opCtx);
+    // just an optimization so that mongos does not exhaust its maximum number of StaleShardVersion
+    // retry attempts while the migration is being committed.
+    OperationShardingState::get(opCtx).waitForMigrationCriticalSectionSignal(opCtx);
 
     const auto currentShardVersion = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
@@ -96,8 +94,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
-    auto const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->canAcceptShardedCommands());
+    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
     if (serverDbVersion && serverDbVersion->getUuid() == clientDbVersion.getUuid() &&
         serverDbVersion->getLastMod() >= clientDbVersion.getLastMod()) {
@@ -105,9 +102,10 @@ void onDbVersionMismatch(OperationContext* opCtx,
         return;
     }
 
-    // TODO SERVER-33773 if the 'waitForMovePrimaryCriticalSection' flag is set on the
-    // OperationShardingState, wait for the movePrimary critical section to complete before
-    // attempting a refresh.
+    // Ensure any ongoing movePrimary's have completed before trying to do the refresh. This wait is
+    // just an optimization so that mongos does not exhaust its maximum number of
+    // StaleDatabaseVersion retry attempts while the movePrimary is being committed.
+    OperationShardingState::get(opCtx).waitForMovePrimaryCriticalSectionSignal(opCtx);
 
     forceDatabaseRefresh(opCtx, dbName);
 }
