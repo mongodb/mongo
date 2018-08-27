@@ -53,10 +53,10 @@ class OperationContext;
  * execution state in the response. This is specifically problematic for write commands, which are
  * expected to return the set of write batch entries that succeeded.
  */
-Status onShardVersionMismatch(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              ChunkVersion shardVersionReceived,
-                              bool forceRefreshFromThisThread = false) noexcept;
+Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      ChunkVersion shardVersionReceived,
+                                      bool forceRefreshFromThisThread = false) noexcept;
 
 /**
  * Unconditionally causes the shard's filtering metadata to be refreshed from the config server and
@@ -75,10 +75,11 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
  * Invalidates the cached database version, schedules a refresh of the database info, waits for the
  * refresh to complete, and updates the cached database version.
  */
-void onDbVersionMismatch(OperationContext* opCtx,
-                         const StringData dbName,
-                         const DatabaseVersion& clientDbVersion,
-                         const boost::optional<DatabaseVersion>& serverDbVersion) noexcept;
+Status onDbVersionMismatchNoExcept(
+    OperationContext* opCtx,
+    const StringData dbName,
+    const DatabaseVersion& clientDbVersion,
+    const boost::optional<DatabaseVersion>& serverDbVersion) noexcept;
 
 void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName);
 

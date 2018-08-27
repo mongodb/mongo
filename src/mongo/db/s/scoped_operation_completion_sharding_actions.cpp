@@ -72,8 +72,8 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
     }
 
     if (auto staleInfo = status->extraInfo<StaleConfigInfo>()) {
-        auto handleMismatchStatus =
-            onShardVersionMismatch(_opCtx, staleInfo->getNss(), staleInfo->getVersionReceived());
+        auto handleMismatchStatus = onShardVersionMismatchNoExcept(
+            _opCtx, staleInfo->getNss(), staleInfo->getVersionReceived());
         if (!handleMismatchStatus.isOK())
             log() << "Failed to handle stale version exception"
                   << causedBy(redact(handleMismatchStatus));
