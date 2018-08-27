@@ -77,25 +77,6 @@ const NamespaceString& BatchedCommandRequest::getNS() const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getNamespace(); });
 }
 
-NamespaceString BatchedCommandRequest::getTargetingNS() const {
-    if (!isInsertIndexRequest()) {
-        return getNS();
-    }
-
-    const auto& documents = _insertReq->getDocuments();
-    invariant(documents.size() == 1);
-
-    return NamespaceString(documents.at(0)["ns"].str());
-}
-
-bool BatchedCommandRequest::isInsertIndexRequest() const {
-    if (_batchType != BatchedCommandRequest::BatchType_Insert) {
-        return false;
-    }
-
-    return getNS().isSystemDotIndexes();
-}
-
 std::size_t BatchedCommandRequest::sizeWriteOps() const {
     struct Visitor {
         auto operator()(const write_ops::Insert& op) const {
@@ -162,10 +143,6 @@ BatchedCommandRequest BatchedCommandRequest::cloneInsertWithIds(
     invariant(origCmdRequest.getBatchType() == BatchedCommandRequest::BatchType_Insert);
 
     BatchedCommandRequest newCmdRequest(std::move(origCmdRequest));
-
-    if (newCmdRequest.isInsertIndexRequest()) {
-        return newCmdRequest;
-    }
 
     const auto& origDocs = newCmdRequest._insertReq->getDocuments();
 

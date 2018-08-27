@@ -97,9 +97,8 @@ public:
 };
 
 /**
- * Check that nIndexes is incremented correctly when an index builds (and that it is not
- * incremented when an index fails to build), system.indexes has an entry added (or not), and
- * system.namespaces has a doc added (or not).
+ * Check that nIndexes is incremented correctly when an index builds, and that it is not
+ * incremented when an index fails to build.
  */
 class BuildIndex : public Base {
 public:

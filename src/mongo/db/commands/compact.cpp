@@ -107,8 +107,7 @@ public:
         }
 
         if (nss.isSystem()) {
-            // items in system.* cannot be moved as there might be pointers to them
-            // i.e. system.indexes entries are pointed to from NamespaceDetails
+            // Items in system.* cannot be moved as there might be pointers to them.
             errmsg = "can't compact a system namespace";
             return false;
         }

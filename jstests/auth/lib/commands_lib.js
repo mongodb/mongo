@@ -4604,34 +4604,24 @@ var authCommandsLib = {
               db.x.drop();
               db.y.drop();
           },
-          testcases: [
-              {
-                runOnDb: firstDbName,
-                roles: {
-                    read: 1,
-                    readAnyDatabase: 1,
-                    readWrite: 1,
-                    readWriteAnyDatabase: 1,
-                    dbAdmin: 1,
-                    dbAdminAnyDatabase: 1,
-                    dbOwner: 1,
-                    backup: 1,
-                    restore: 1,
-                    root: 1,
-                    __system: 1
-                },
-                privileges:
-                    [{resource: {db: firstDbName, collection: ""}, actions: ["listCollections"]}]
+          testcases: [{
+              runOnDb: firstDbName,
+              roles: {
+                  read: 1,
+                  readAnyDatabase: 1,
+                  readWrite: 1,
+                  readWriteAnyDatabase: 1,
+                  dbAdmin: 1,
+                  dbAdminAnyDatabase: 1,
+                  dbOwner: 1,
+                  backup: 1,
+                  restore: 1,
+                  root: 1,
+                  __system: 1
               },
-              // Test legacy (pre 3.0) way of authorizing listCollections.
-              {
-                runOnDb: firstDbName,
-                privileges: [{
-                    resource: {db: firstDbName, collection: "system.namespaces"},
-                    actions: ["find"]
-                }]
-              }
-          ]
+              privileges:
+                  [{resource: {db: firstDbName, collection: ""}, actions: ["listCollections"]}]
+          }]
         },
         {
           testname: "listOwnCollections",
@@ -4667,14 +4657,6 @@ var authCommandsLib = {
                     root: 1,
                     __system: 1
                 },
-              },
-              // Test legacy (pre 3.0) way of authorizing listCollections.
-              {
-                runOnDb: firstDbName,
-                privileges: [{
-                    resource: {db: firstDbName, collection: "system.namespaces"},
-                    actions: ["find"]
-                }]
               },
               {
                 runOnDb: firstDbName,
@@ -4716,33 +4698,23 @@ var authCommandsLib = {
           teardown: function(db) {
               db.x.drop();
           },
-          testcases: [
-              {
-                runOnDb: firstDbName,
-                roles: {
-                    read: 1,
-                    readAnyDatabase: 1,
-                    readWrite: 1,
-                    readWriteAnyDatabase: 1,
-                    dbAdmin: 1,
-                    dbAdminAnyDatabase: 1,
-                    dbOwner: 1,
-                    backup: 1,
-                    root: 1,
-                    __system: 1
-                },
-                privileges:
-                    [{resource: {db: firstDbName, collection: ""}, actions: ["listIndexes"]}]
+          testcases: [{
+              runOnDb: firstDbName,
+              roles: {
+                  read: 1,
+                  readAnyDatabase: 1,
+                  readWrite: 1,
+                  readWriteAnyDatabase: 1,
+                  dbAdmin: 1,
+                  dbAdminAnyDatabase: 1,
+                  dbOwner: 1,
+                  backup: 1,
+                  root: 1,
+                  __system: 1
               },
-              // Test legacy (pre 3.0) way of authorizing listIndexes.
-              {
-                runOnDb: firstDbName,
-                privileges: [{
-                    resource: {db: firstDbName, collection: "system.indexes"},
-                    actions: ["find"]
-                }]
-              }
-          ]
+              privileges:
+                  [{resource: {db: firstDbName, collection: ""}, actions: ["listIndexes"]}]
+          }]
         },
         {
           testname: "listIndexesWithUUID",
@@ -4759,25 +4731,14 @@ var authCommandsLib = {
           teardown: function(db) {
               db.x.drop();
           },
-          testcases: [
-              {
-                runOnDb: firstDbName,
-                roles: {backup: 1, root: 1, __system: 1},
-                privileges: [
-                    {resource: {db: firstDbName, collection: ""}, actions: ["listIndexes"]},
-                    {resource: {cluster: true}, actions: ["useUUID"]}
-                ]
-              },
-              // Test legacy (pre 3.0) way of authorizing listIndexes.
-              {
-                runOnDb: firstDbName,
-                privileges: [
-                    {resource: {db: firstDbName, collection: "system.indexes"}, actions: ["find"]},
-                    {resource: {cluster: true}, actions: ["useUUID"]}
-
-                ]
-              }
-          ]
+          testcases: [{
+              runOnDb: firstDbName,
+              roles: {backup: 1, root: 1, __system: 1},
+              privileges: [
+                  {resource: {db: firstDbName, collection: ""}, actions: ["listIndexes"]},
+                  {resource: {cluster: true}, actions: ["useUUID"]}
+              ]
+          }]
         },
 
         {

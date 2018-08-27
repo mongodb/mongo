@@ -112,7 +112,7 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
  * Uses 'matcher' to determine if the collection's information should be added to 'root'. If so,
  * allocates a WorkingSetMember containing information about 'collection', and adds it to 'root'.
  *
- * Does not add any information about the system.namespaces collection, or non-existent collections.
+ * Does not add any information about non-existent collections.
  */
 void _addWorkingSetMember(OperationContext* opCtx,
                           const BSONObj& maybe,
@@ -161,16 +161,11 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
                             const Collection* collection,
                             bool includePendingDrops,
                             bool nameOnly) {
-
     if (!collection) {
         return {};
     }
-
     auto nss = collection->ns();
     auto collectionName = nss.coll();
-    if (collectionName == "system.namespaces") {
-        return {};
-    }
 
     // Drop-pending collections are replicated collections that have been marked for deletion.
     // These collections are considered dropped and should not be returned in the results for this

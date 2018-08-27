@@ -75,15 +75,14 @@ void ClusterWriter::write(OperationContext* opCtx,
         Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
     } else {
         {
-            ChunkManagerTargeter targeter(request.getTargetingNS());
+            ChunkManagerTargeter targeter(request.getNS());
 
             Status targetInitStatus = targeter.init(opCtx);
             if (!targetInitStatus.isOK()) {
                 toBatchError(targetInitStatus.withContext(
-                                 str::stream() << "unable to initialize targeter for"
-                                               << (request.isInsertIndexRequest() ? " index" : "")
-                                               << " write op for collection "
-                                               << request.getTargetingNS().ns()),
+                                 str::stream()
+                                 << "unable to initialize targeter for write op for collection "
+                                 << request.getNS().ns()),
                              response);
                 return;
             }
@@ -91,10 +90,8 @@ void ClusterWriter::write(OperationContext* opCtx,
             auto swEndpoints = targeter.targetCollection();
             if (!swEndpoints.isOK()) {
                 toBatchError(swEndpoints.getStatus().withContext(
-                                 str::stream() << "unable to target"
-                                               << (request.isInsertIndexRequest() ? " index" : "")
-                                               << " write op for collection "
-                                               << request.getTargetingNS().ns()),
+                                 str::stream() << "unable to target write op for collection "
+                                               << request.getNS().ns()),
                              response);
                 return;
             }

@@ -114,12 +114,7 @@
     // createIndex
     res = assert.commandWorked(testColl.createIndex({x: 1}));
     assertTopDiffEq(testColl, lastTop, "writeLock", 1);
-    // The createIndex shell helper is run as an insert when writeMode is not "commands".
-    if (testDB.getMongo().writeMode() === "commands") {
-        lastTop = assertTopDiffEq(testColl, lastTop, "commands", 1);
-    } else {
-        lastTop = assertTopDiffEq(testColl, lastTop, "insert", 1);
-    }
+    lastTop = assertTopDiffEq(testColl, lastTop, "commands", 1);
 
     // dropIndex
     res = assert.commandWorked(testColl.dropIndex({x: 1}));

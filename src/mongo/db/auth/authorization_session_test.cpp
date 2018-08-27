@@ -149,20 +149,12 @@ const ResourcePattern otherUsersCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("other.system.users")));
 const ResourcePattern thirdUsersCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("third.system.users")));
-const ResourcePattern testIndexesCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("test.system.indexes")));
-const ResourcePattern otherIndexesCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("other.system.indexes")));
-const ResourcePattern thirdIndexesCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("third.system.indexes")));
 const ResourcePattern testProfileCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("test.system.profile")));
 const ResourcePattern otherProfileCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("other.system.profile")));
 const ResourcePattern thirdProfileCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("third.system.profile")));
-const ResourcePattern testSystemNamespacesResource(
-    ResourcePattern::forExactNamespace(NamespaceString("test.system.namespaces")));
 
 TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     // Check that disabling auth checks works
@@ -360,11 +352,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherUsersCollResource, ActionType::find));
     ASSERT_TRUE(
-        authzSession->isAuthorizedForActionsOnResource(testIndexesCollResource, ActionType::find));
-    ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
-    ASSERT_TRUE(
-        authzSession->isAuthorizedForActionsOnResource(otherIndexesCollResource, ActionType::find));
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
 
@@ -379,11 +367,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(otherUsersCollResource, ActionType::find));
     ASSERT_FALSE(
-        authzSession->isAuthorizedForActionsOnResource(testIndexesCollResource, ActionType::find));
-    ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForActionsOnResource(otherIndexesCollResource, ActionType::find));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
 
@@ -399,11 +383,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherUsersCollResource, ActionType::find));
     ASSERT_TRUE(
-        authzSession->isAuthorizedForActionsOnResource(testIndexesCollResource, ActionType::find));
-    ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForActionsOnResource(otherIndexesCollResource, ActionType::find));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
 
@@ -419,11 +399,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherUsersCollResource, ActionType::find));
     ASSERT_FALSE(
-        authzSession->isAuthorizedForActionsOnResource(testIndexesCollResource, ActionType::find));
-    ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForActionsOnResource(otherIndexesCollResource, ActionType::find));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
 }
@@ -1250,19 +1226,6 @@ TEST_F(AuthorizationSessionTest, CannotListCollectionsWithoutListCollectionsPriv
     ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testFooNss.db(), cmd));
     ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testBarNss.db(), cmd));
     ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testQuxNss.db(), cmd));
-}
-
-TEST_F(AuthorizationSessionTest, CanListCollectionsWithLegacySystemNamespacesAccess) {
-    BSONObj cmd = BSON("listCollections" << 1);
-
-    // Deprecated: permissions for the find action on test.system.namespaces allows us to list
-    // collections in the test database.
-    authzSession->assumePrivilegesForDB(
-        Privilege(testSystemNamespacesResource, {ActionType::find}));
-
-    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db(), cmd));
-    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db(), cmd));
-    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db(), cmd));
 }
 
 TEST_F(AuthorizationSessionTest, CanListCollectionsWithListCollectionsPrivilege) {

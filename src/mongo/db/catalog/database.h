@@ -115,8 +115,6 @@ public:
                                         StringData toNS,
                                         bool stayTemp) = 0;
 
-        virtual const NamespaceString& getSystemIndexesName() const = 0;
-
         virtual const std::string& getSystemViewsName() const = 0;
 
         virtual StatusWith<NamespaceString> makeUniqueCollectionNamespace(
@@ -352,10 +350,6 @@ public:
      * Must be called with the specified database locked in X mode.
      */
     static MONGO_DECLARE_SHIM((OperationContext * opCtx, Database* db)->void) dropDatabase;
-
-    inline const NamespaceString& getSystemIndexesName() const {
-        return this->_impl().getSystemIndexesName();
-    }
 
     inline const std::string& getSystemViewsName() const {
         return this->_impl().getSystemViewsName();

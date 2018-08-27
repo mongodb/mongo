@@ -13,10 +13,6 @@ t = new ToolTest("dumprestoreWithNoOptions");
 t.startDB("foo");
 db = t.db;
 
-// We turn this off to prevent the server from touching the 'options' field in system.namespaces.
-// This is important because we check exact values of the 'options' field in this test.
-db.adminCommand({setParameter: 1, newCollectionsUsePowerOf2Sizes: false});
-
 dbname = db.getName();
 dbname2 = "NOT_" + dbname;
 

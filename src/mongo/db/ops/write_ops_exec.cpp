@@ -293,32 +293,6 @@ SingleWriteResult createIndex(OperationContext* opCtx,
     return result;
 }
 
-WriteResult performCreateIndexes(OperationContext* opCtx, const write_ops::Insert& wholeOp) {
-    // Currently this creates each index independently. We could pass multiple indexes to
-    // createIndexes, but there is a lot of complexity involved in doing it correctly. For one
-    // thing, createIndexes only takes indexes to a single collection, but this batch could include
-    // different collections. Additionally, the error handling is different: createIndexes is
-    // all-or-nothing while inserts are supposed to behave like a sequence that either skips over
-    // errors or stops at the first one. These could theoretically be worked around, but it doesn't
-    // seem worth it since users that want faster index builds should just use the createIndexes
-    // command rather than a legacy emulation.
-    LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
-    WriteResult out;
-    for (auto&& spec : wholeOp.getDocuments()) {
-        try {
-            lastOpFixer.startingOp();
-            out.results.emplace_back(createIndex(opCtx, wholeOp.getNamespace(), spec));
-            lastOpFixer.finishedOpSuccessfully();
-        } catch (const DBException& ex) {
-            const bool canContinue =
-                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
-            if (!canContinue)
-                break;
-        }
-    }
-    return out;
-}
-
 void insertDocuments(OperationContext* opCtx,
                      Collection* collection,
                      std::vector<InsertStatement>::iterator begin,
@@ -510,10 +484,6 @@ WriteResult performInserts(OperationContext* opCtx,
     }
 
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
-
-    if (wholeOp.getNamespace().isSystemDotIndexes()) {
-        return performCreateIndexes(opCtx, wholeOp);
-    }
 
     DisableDocumentValidationIfTrue docValidationDisabler(
         opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());

@@ -1118,7 +1118,7 @@ void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, co
 
     for (const auto& obj : insertOp.getDocuments()) {
         Status status =
-            AuthorizationSession::get(opCtx->getClient())->checkAuthForInsert(opCtx, nsString, obj);
+            AuthorizationSession::get(opCtx->getClient())->checkAuthForInsert(opCtx, nsString);
         audit::logInsertAuthzCheck(opCtx->getClient(), nsString, obj, status.code());
         uassertStatusOK(status);
     }

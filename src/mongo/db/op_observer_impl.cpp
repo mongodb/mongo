@@ -325,48 +325,30 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    OptionalCollectionUUID uuid,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
-    const NamespaceString systemIndexes{nss.getSystemIndexesCollection()};
+    // TODO: uuid should no longer be optional (SERVER-36472).
+    invariant(uuid);
 
-    if (uuid) {
-        BSONObjBuilder builder;
-        builder.append("createIndexes", nss.coll());
+    BSONObjBuilder builder;
+    builder.append("createIndexes", nss.coll());
 
-        for (const auto& e : indexDoc) {
-            if (e.fieldNameStringData() != "ns"_sd)
-                builder.append(e);
-        }
-
-        logOperation(opCtx,
-                     "c",
-                     nss.getCommandNS(),
-                     uuid,
-                     builder.done(),
-                     nullptr,
-                     fromMigrate,
-                     getWallClockTimeForOpLog(opCtx),
-                     {},
-                     kUninitializedStmtId,
-                     {},
-                     false /* prepare */,
-                     OplogSlot());
-    } else {
-        logOperation(opCtx,
-                     "i",
-                     systemIndexes,
-                     {},
-                     indexDoc,
-                     nullptr,
-                     fromMigrate,
-                     getWallClockTimeForOpLog(opCtx),
-                     {},
-                     kUninitializedStmtId,
-                     {},
-                     false /* prepare */,
-                     OplogSlot());
+    for (const auto& e : indexDoc) {
+        if (e.fieldNameStringData() != "ns"_sd)
+            builder.append(e);
     }
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "i", systemIndexes, indexDoc, nullptr);
+    logOperation(opCtx,
+                 "c",
+                 nss.getCommandNS(),
+                 uuid,
+                 builder.done(),
+                 nullptr,
+                 fromMigrate,
+                 getWallClockTimeForOpLog(opCtx),
+                 {},
+                 kUninitializedStmtId,
+                 {},
+                 false /* prepare */,
+                 OplogSlot());
 }
 
 void OpObserverImpl::onInserts(OperationContext* opCtx,

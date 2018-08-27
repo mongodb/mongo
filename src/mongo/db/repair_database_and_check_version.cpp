@@ -146,33 +146,6 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
         invariant(db);
         for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
             Collection* coll = *collectionIt;
-            // The presence of system.indexes or system.namespaces on wiredTiger may
-            // have undesirable results (see SERVER-32894, SERVER-34482). It is okay to
-            // drop these collections on wiredTiger because users are not permitted to
-            // store data in them.
-            if (coll->ns().coll() == "system.indexes" || coll->ns().coll() == "system.namespaces") {
-                const auto nssToDrop = coll->ns();
-                LOG(1) << "Attempting to drop invalid system collection " << nssToDrop;
-                if (coll->numRecords(opCtx)) {
-                    severe(LogComponent::kControl) << "Cannot drop non-empty collection "
-                                                   << nssToDrop.ns();
-                    exitCleanly(EXIT_NEED_DOWNGRADE);
-                }
-                repl::UnreplicatedWritesBlock uwb(opCtx);
-                writeConflictRetry(opCtx, "dropSystemIndexes", nssToDrop.ns(), [&] {
-                    WriteUnitOfWork wunit(opCtx);
-                    BSONObjBuilder unusedResult;
-                    fassert(50837,
-                            dropCollection(
-                                opCtx,
-                                nssToDrop,
-                                unusedResult,
-                                {},
-                                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
-                    wunit.commit();
-                });
-                continue;
-            }
 
             // We expect all collections to have UUIDs in MongoDB 4.2
             if (!coll->uuid()) {
@@ -482,29 +455,6 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                 }
             }
         }
-
-        // Major versions match, check indexes
-        const NamespaceString systemIndexes(db->name(), "system.indexes");
-
-        Collection* coll = db->getCollection(opCtx, systemIndexes);
-        auto exec = InternalPlanner::collectionScan(
-            opCtx, systemIndexes.ns(), coll, PlanExecutor::NO_YIELD);
-
-        BSONObj index;
-        PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&index, NULL))) {
-            if (index["v"].isNumber() && index["v"].numberInt() == 0) {
-                log() << "WARNING: The index: " << index << " was created with the deprecated"
-                      << " v:0 format.  This format will not be supported in a future release."
-                      << startupWarningsLog;
-                log() << "\t To fix this, you need to rebuild this index."
-                      << " For instructions, see http://dochub.mongodb.org/core/rebuild-v0-indexes"
-                      << startupWarningsLog;
-            }
-        }
-
-        // Non-yielding collection scans from InternalPlanner will never error.
-        invariant(PlanExecutor::IS_EOF == state);
 
         if (replSettings.usingReplSets()) {
             // We only care about _id indexes and drop-pending collections if we are in a replset.

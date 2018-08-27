@@ -31,7 +31,7 @@
         ],
         txnNumber: NumberLong(txnNumber++)
     }),
-                                 16886);  // nsToCollectionSubstring: no .
+                                 ErrorCodes.InvalidNamespace);
     assert.eq(t.count({x: 1}), 0);
 
     // Operations on non-existent databases cannot be atomic.

@@ -2,7 +2,6 @@
 // on sharded collections.
 // @tags: [assumes_unsharded_collection, requires_non_retryable_commands, requires_fastcount]
 
-// SERVER-24963/SERVER-27930 Missing invalidation for system.indexes writes
 (function() {
     'use strict';
     let collName = 'system_indexes_invalidations';

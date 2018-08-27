@@ -65,13 +65,6 @@ NamespaceString _getIndexedNss(const std::vector<BSONObj>& documents) {
 void fillPrivileges(const write_ops::Insert& op,
                     std::vector<Privilege>* privileges,
                     ActionSet* actions) {
-    if (op.getNamespace().isSystemDotIndexes()) {
-        // Special-case indexes until we have a command
-        privileges->push_back(
-            Privilege(ResourcePattern::forExactNamespace(_getIndexedNss(op.getDocuments())),
-                      ActionType::createIndex));
-        return;
-    }
     actions->addAction(ActionType::insert);
 }
 

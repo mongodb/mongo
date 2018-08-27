@@ -54,7 +54,7 @@
 
     var res = fromShard.getDB('test').runCommand({listCollections: 1});
     assert.commandWorked(res);
-    var collections = res.cursor.firstBatch.filter(coll => coll.name != 'system.indexes');
+    var collections = res.cursor.firstBatch;
 
     collections.sort(sortByName);
     var coll2uuid = collections[1].info.uuid;
@@ -67,7 +67,7 @@
     res = toShard.getDB('test').runCommand({listCollections: 1});
     assert.commandWorked(res);
 
-    collections = res.cursor.firstBatch.filter(coll => coll.name != 'system.indexes');
+    collections = res.cursor.firstBatch;
 
     // There should be 2 collections: coll1, coll2
     assert.eq(collections.length, 2);

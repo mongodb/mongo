@@ -143,11 +143,6 @@ public:
             return false;
         }
 
-        if (source.isSystemDotIndexes() || target.isSystemDotIndexes()) {
-            errmsg = "renaming system.indexes is not allowed";
-            return false;
-        }
-
         if (source.isServerConfigurationCollection()) {
             uasserted(ErrorCodes::IllegalOperation,
                       "renaming the server configuration "

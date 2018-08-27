@@ -99,15 +99,11 @@ public:
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
-        // Check for the listIndexes ActionType on the database, or find on system.indexes for pre
-        // 3.0 systems.
+        // Check for the listIndexes ActionType on the database.
         const auto nss = AutoGetCollection::resolveNamespaceStringOrUUID(
             opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj));
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(nss),
-                                                           ActionType::listIndexes) ||
-            authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.indexes")),
-                ActionType::find)) {
+                                                           ActionType::listIndexes)) {
             return Status::OK();
         }
 

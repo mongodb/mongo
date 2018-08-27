@@ -351,30 +351,14 @@ Status AuthorizationSessionImpl::checkAuthForGetMore(const NamespaceString& ns,
 }
 
 Status AuthorizationSessionImpl::checkAuthForInsert(OperationContext* opCtx,
-                                                    const NamespaceString& ns,
-                                                    const BSONObj& document) {
-    if (ns.coll() == "system.indexes"_sd) {
-        BSONElement nsElement = document["ns"];
-        if (nsElement.type() != String) {
-            return Status(nsElement.type() == BSONType::EOO ? ErrorCodes::NoSuchKey
-                                                            : ErrorCodes::TypeMismatch,
-                          "Cannot authorize inserting into "
-                          "system.indexes documents without a string-typed \"ns\" field.");
-        }
-        NamespaceString indexNS(nsElement.valueStringData());
-        if (!isAuthorizedForActionsOnNamespace(indexNS, ActionType::createIndex)) {
-            return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized to create index on " << indexNS.ns());
-        }
-    } else {
-        ActionSet required{ActionType::insert};
-        if (documentValidationDisabled(opCtx)) {
-            required.addAction(ActionType::bypassDocumentValidation);
-        }
-        if (!isAuthorizedForActionsOnNamespace(ns, required)) {
-            return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized for insert on " << ns.ns());
-        }
+                                                    const NamespaceString& ns) {
+    ActionSet required{ActionType::insert};
+    if (documentValidationDisabled(opCtx)) {
+        required.addAction(ActionType::bypassDocumentValidation);
+    }
+    if (!isAuthorizedForActionsOnNamespace(ns, required)) {
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream() << "not authorized for insert on " << ns.ns());
     }
 
     return Status::OK();
@@ -747,13 +731,9 @@ bool AuthorizationSessionImpl::isAuthorizedToListCollections(StringData dbname,
         return true;
     }
 
-    // Check for the listCollections ActionType on the database or find on system.namespaces for
-    // pre 3.0 systems.
+    // Check for the listCollections ActionType on the database.
     return AuthorizationSessionImpl::isAuthorizedForActionsOnResource(
-               ResourcePattern::forDatabaseName(dbname), ActionType::listCollections) ||
-        AuthorizationSessionImpl::isAuthorizedForActionsOnResource(
-               ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.namespaces")),
-               ActionType::find);
+        ResourcePattern::forDatabaseName(dbname), ActionType::listCollections);
 }
 
 bool AuthorizationSessionImpl::isAuthenticatedAsUserWithRole(const RoleName& roleName) {

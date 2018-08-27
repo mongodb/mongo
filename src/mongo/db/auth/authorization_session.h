@@ -202,12 +202,8 @@ public:
                                       const BSONObj& update,
                                       bool upsert) = 0;
 
-    // Checks if this connection has the privileges necessary to insert the given document
-    // to the given namespace.  Correctly interprets inserts to system.indexes and performs
-    // the proper auth checks for index building.
-    virtual Status checkAuthForInsert(OperationContext* opCtx,
-                                      const NamespaceString& ns,
-                                      const BSONObj& document) = 0;
+    // Checks if this connection has the privileges necessary to insert to the given namespace.
+    virtual Status checkAuthForInsert(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     // Checks if this connection has the privileges necessary to perform a delete on the given
     // namespace.

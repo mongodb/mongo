@@ -70,14 +70,7 @@ MONGO_FAIL_POINT_DEFINE(doTxnPauseBetweenOperations);
  */
 bool _areOpsCrudOnly(const BSONObj& doTxnCmd) {
     for (const auto& elem : doTxnCmd.firstElement().Obj()) {
-        const char* names[] = {"ns", "op"};
-        BSONElement fields[2];
-        elem.Obj().getFields(2, names, fields);
-        BSONElement& fieldNs = fields[0];
-        BSONElement& fieldOp = fields[1];
-
-        const char* opType = fieldOp.valuestrsafe();
-        const StringData ns = fieldNs.valuestrsafe();
+        const char* opType = elem.Obj().getField("op").valuestrsafe();
 
         // All atomic ops have an opType of length 1.
         if (opType[0] == '\0' || opType[1] != '\0')
@@ -89,8 +82,7 @@ bool _areOpsCrudOnly(const BSONObj& doTxnCmd) {
             case 'u':
                 break;
             case 'i':
-                if (nsToCollectionSubstring(ns) != "system.indexes")
-                    break;
+                break;
             // Fallthrough.
             default:
                 return false;

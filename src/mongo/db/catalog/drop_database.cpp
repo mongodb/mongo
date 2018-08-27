@@ -145,7 +145,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
                     latestDropPendingOpTime, uassertStatusOK(nss.getDropPendingNamespaceOpTime()));
                 continue;
             }
-            if (replCoord->isOplogDisabledFor(opCtx, nss) || nss.isSystemDotIndexes()) {
+            if (replCoord->isOplogDisabledFor(opCtx, nss)) {
                 continue;
             }
             collectionsToDrop.push_back(nss);

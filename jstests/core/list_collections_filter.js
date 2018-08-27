@@ -24,16 +24,12 @@
         function stripToName(result) {
             return result.name;
         }
-        function isNotSystemIndexes(result) {
-            return result !== "system.indexes";
-        }
-        var cursorResultNames = cursor.toArray().map(stripToName).filter(isNotSystemIndexes);
+        var cursorResultNames = cursor.toArray().map(stripToName);
 
         assert.eq(cursorResultNames.sort(), expectedNames.sort());
 
         // Assert the shell helper returns the same list, but in sorted order.
-        var shellResultNames =
-            mydb.getCollectionInfos(filter).map(stripToName).filter(isNotSystemIndexes);
+        var shellResultNames = mydb.getCollectionInfos(filter).map(stripToName);
         assert.eq(shellResultNames, expectedNames.sort());
     }
 

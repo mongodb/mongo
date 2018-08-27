@@ -58,8 +58,7 @@ class OperationContext;
  * parent thread, waitForBgIndexStarting() must be called by the same parent thread,
  * before any other thread calls go() on any other IndexBuilder instance.  This is
  * ensured by the replication system, since commands are effectively run single-threaded
- * by the replication applier, and index builds are treated as commands even though they look
- * like inserts on system.indexes.
+ * by the replication applier.
  * The argument "relaxConstraints" specifies whether we should honor or ignore index constraints,
  * The ignoring of constraints is for replication due to idempotency reasons.
  * The argument "initIndexTs" specifies the timestamp to be used to make the initial catalog write.

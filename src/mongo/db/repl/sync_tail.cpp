@@ -271,10 +271,6 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         return applyOp(ctx.db());
-    } else if (opType == OpTypeEnum::kInsert && nss.isSystemDotIndexes()) {
-        Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
-        OldClientContext ctx(opCtx, nss.ns());
-        return applyOp(ctx.db());
     } else if (OplogEntry::isCrudOpType(opType)) {
         return writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
             // Need to throw instead of returning a status for it to be properly ignored.

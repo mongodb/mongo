@@ -1,6 +1,4 @@
 // @tags: [requires_non_retryable_commands, requires_fastcount]
-
-// SERVER-27996/SERVER-28022 Missing invalidation for system.namespaces writes
 (function() {
     'use strict';
     let dbInvalidName = 'system_namespaces_invalidations';

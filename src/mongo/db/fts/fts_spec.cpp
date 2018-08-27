@@ -66,10 +66,9 @@ bool validateOverride(const string& override) {
 }
 
 FTSSpec::FTSSpec(const BSONObj& indexInfo) {
-    // indexInfo is a text index spec.  Text index specs pass through fixSpec() before
-    // being saved to the system.indexes collection.  fixSpec() enforces a schema, such that
-    // required fields must exist and be of the correct type (e.g. weights,
-    // textIndexVersion).
+    // indexInfo is a text index spec.  Text index specs pass through fixSpec() before being
+    // persisted.  fixSpec() enforces a schema, such that required fields must exist and be of the
+    // correct type (e.g. weights, textIndexVersion).
     massert(16739, "found invalid spec for text index", indexInfo["weights"].isABSONObj());
     BSONElement textIndexVersionElt = indexInfo["textIndexVersion"];
     massert(17367,

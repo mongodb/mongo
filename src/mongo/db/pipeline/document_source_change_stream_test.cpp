@@ -983,34 +983,6 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
     checkTransformation(noOp, boost::none);
 }
 
-TEST_F(ChangeStreamStageTest, MatchFiltersCreateIndex) {
-    auto indexSpec = D{{"v", 2}, {"key", D{{"a", 1}}}, {"name", "a_1"_sd}, {"ns", nss.ns()}};
-    NamespaceString indexNs(nss.getSystemIndexesCollection());
-    bool fromMigrate = false;  // At the moment this makes no difference.
-    auto createIndex = makeOplogEntry(OpTypeEnum::kInsert,  // op type
-                                      indexNs,              // namespace
-                                      indexSpec.toBson(),   // o
-                                      boost::none,          // uuid
-                                      fromMigrate,          // fromMigrate
-                                      boost::none);         // o2
-
-    checkTransformation(createIndex, boost::none);
-}
-
-TEST_F(ChangeStreamStageTest, MatchFiltersCreateIndexFromMigrate) {
-    auto indexSpec = D{{"v", 2}, {"key", D{{"a", 1}}}, {"name", "a_1"_sd}, {"ns", nss.ns()}};
-    NamespaceString indexNs(nss.getSystemIndexesCollection());
-    bool fromMigrate = true;
-    auto createIndex = makeOplogEntry(OpTypeEnum::kInsert,  // op type
-                                      indexNs,              // namespace
-                                      indexSpec.toBson(),   // o
-                                      boost::none,          // uuid
-                                      fromMigrate,          // fromMigrate
-                                      boost::none);         // o2
-
-    checkTransformation(createIndex, boost::none);
-}
-
 TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage) {
     auto expCtx = getExpCtx();
 
@@ -1557,13 +1529,6 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersNoOp) {
                                      BSON("msg"
                                           << "new primary"));
     checkTransformation(noOp, boost::none);
-}
-
-TEST_F(ChangeStreamStageDBTest, MatchFiltersCreateIndex) {
-    auto indexSpec = D{{"v", 2}, {"key", D{{"a", 1}}}, {"name", "a_1"_sd}, {"ns", nss.ns()}};
-    NamespaceString indexNs(nss.getSystemIndexesCollection());
-    OplogEntry createIndex = makeOplogEntry(OpTypeEnum::kInsert, indexNs, indexSpec.toBson());
-    checkTransformation(createIndex, boost::none);
 }
 
 TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {

@@ -475,15 +475,11 @@ public:
                                const BSONObj& cmdObj) const override {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
-        // Check for the listIndexes ActionType on the database, or find on system.indexes for pre
-        // 3.0 systems.
+        // Check for the listIndexes ActionType on the database.
         const NamespaceString ns(parseNs(dbname, cmdObj));
 
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns),
-                                                           ActionType::listIndexes) ||
-            authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.indexes")),
-                ActionType::find)) {
+                                                           ActionType::listIndexes)) {
             return Status::OK();
         }
 

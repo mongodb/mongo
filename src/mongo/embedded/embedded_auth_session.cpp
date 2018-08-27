@@ -120,7 +120,7 @@ public:
         return Status::OK();
     }
 
-    Status checkAuthForInsert(OperationContext*, const NamespaceString&, const BSONObj&) override {
+    Status checkAuthForInsert(OperationContext*, const NamespaceString&) override {
         return Status::OK();
     }
 

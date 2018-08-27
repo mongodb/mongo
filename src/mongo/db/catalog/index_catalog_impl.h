@@ -269,12 +269,10 @@ public:
 
     /**
      * disk creation order
-     * 1) system.indexes entry
-     * 2) collection's NamespaceDetails
+     * 1) collection's NamespaceDetails
      *    a) info + head
      *    b) _indexBuildsInProgress++
-     * 3) indexes entry in .ns file
-     * 4) system.namespaces entry for index ns
+     * 2) indexes entry in .ns file
      */
     class IndexBuildBlock {
         MONGO_DISALLOW_COPYING(IndexBuildBlock);

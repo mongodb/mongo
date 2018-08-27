@@ -134,8 +134,6 @@ void IndexBuilder::run() {
     NamespaceString ns(_index["ns"].String());
 
     Lock::DBLock dlk(opCtx.get(), ns.db(), MODE_X);
-    OldClientContext ctx(opCtx.get(), ns.getSystemIndexesCollection());
-
     Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx.get(), ns.db().toString());
 
     Status status = _build(opCtx.get(), db, true, &dlk);

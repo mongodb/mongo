@@ -53,16 +53,8 @@ const WriteErrorDetail& WriteOp::getOpError() const {
 Status WriteOp::targetWrites(OperationContext* opCtx,
                              const NSTargeter& targeter,
                              std::vector<TargetedWrite*>* targetedWrites) {
-    const bool isIndexInsert = _itemRef.getRequest()->isInsertIndexRequest();
-
     auto swEndpoints = [&]() -> StatusWith<std::vector<ShardEndpoint>> {
         if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert) {
-            if (isIndexInsert) {
-                // TODO: Remove the index targeting stuff once there is a command for it?
-                // TODO: Retry index writes with stale version?
-                return targeter.targetCollection();
-            }
-
             auto swEndpoint = targeter.targetInsert(opCtx, _itemRef.getDocument());
             if (!swEndpoint.isOK())
                 return swEndpoint.getStatus();
@@ -82,7 +74,7 @@ Status WriteOp::targetWrites(OperationContext* opCtx,
     //
     // NOTE: Index inserts are currently specially targeted only at the current collection to avoid
     // creating collections everywhere.
-    if (swEndpoints.isOK() && swEndpoints.getValue().size() > 1u && !isIndexInsert) {
+    if (swEndpoints.isOK() && swEndpoints.getValue().size() > 1u) {
         swEndpoints = targeter.targetAllShards(opCtx);
     }
 

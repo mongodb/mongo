@@ -58,20 +58,6 @@
     assert(!collObj.hasOwnProperty("idIndex"), tojson(collObj));
 
     //
-    // Test basic command output for system.indexes.
-    //
-
-    collObj = res.cursor.firstBatch.filter(function(c) {
-        return c.name === "system.indexes";
-    })[0];
-    if (collObj) {
-        assert.eq("object", typeof(collObj.options), tojson(collObj));
-        assert.eq("collection", collObj.type, tojson(collObj));
-        assert.eq(false, collObj.info.readOnly, tojson(collObj));
-        assert(!collObj.hasOwnProperty("idIndex"), tojson(collObj));
-    }
-
-    //
     // Test basic usage with DBCommandCursor.
     //
 

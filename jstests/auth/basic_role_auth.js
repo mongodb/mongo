@@ -120,7 +120,12 @@ var testOps = function(db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty('index_r'), function() {
-        db.system.indexes.findOne();
+        var errorCodeUnauthorized = 13;
+        var res = db.runCommand({"listIndexes": "user"});
+
+        if (res.code == errorCodeUnauthorized) {
+            throw Error("unauthorized listIndexes")
+        }
     });
 
     checkErr(allowedActions.hasOwnProperty('index_w'), function() {

@@ -189,9 +189,6 @@ Status userAllowedWriteNS(StringData db, StringData coll) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "cannot write to '" << db << ".system.profile'");
     }
-    if (coll == "system.indexes") {
-        return Status::OK();
-    }
     return userAllowedCreateNS(db, coll);
 }
 
@@ -222,7 +219,6 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
 
     if (db == "system")
         return Status(ErrorCodes::InvalidNamespace, "cannot use 'system' database");
-
 
     if (coll.startsWith("system.")) {
         if (coll == "system.js")

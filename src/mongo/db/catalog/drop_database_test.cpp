@@ -285,16 +285,6 @@ TEST_F(DropDatabaseTest, DropDatabasePassedThroughAwaitReplicationErrorForDropPe
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, dropDatabase(_opCtx.get(), _nss.db().toString()));
 }
 
-TEST_F(DropDatabaseTest, DropDatabaseSkipsSystemDotIndexesCollectionWhenDroppingCollections) {
-    NamespaceString systemDotIndexesNss(_nss.getSystemIndexesCollection());
-    _testDropDatabase(_opCtx.get(), _opObserver, systemDotIndexesNss, false);
-}
-
-TEST_F(DropDatabaseTest, DropDatabaseSkipsSystemNamespacesCollectionWhenDroppingCollections) {
-    NamespaceString systemNamespacesNss(_nss.getSisterNS("system.namespaces"));
-    _testDropDatabase(_opCtx.get(), _opObserver, systemNamespacesNss, false);
-}
-
 TEST_F(DropDatabaseTest, DropDatabaseSkipsSystemProfileCollectionWhenDroppingCollections) {
     repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
     NamespaceString profileNss(_nss.getSisterNS("system.profile"));

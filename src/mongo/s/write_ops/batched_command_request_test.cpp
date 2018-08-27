@@ -104,7 +104,6 @@ TEST(BatchedCommandRequest, InsertCloneWithIds) {
     const auto clonedRequest(BatchedCommandRequest::cloneInsertWithIds(std::move(batchedRequest)));
 
     ASSERT_EQ("xyz.abc", clonedRequest.getNS().ns());
-    ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNS().ns());
     ASSERT(clonedRequest.getWriteCommandBase().getOrdered());
     ASSERT(clonedRequest.getWriteCommandBase().getBypassDocumentValidation());
     ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
@@ -117,33 +116,6 @@ TEST(BatchedCommandRequest, InsertCloneWithIds) {
 
     ASSERT_EQ(jstOID, insertDocs[1]["_id"].type());
     ASSERT_EQ(2, insertDocs[1]["x"].numberLong());
-}
-
-TEST(BatchedCommandRequest, IndexInsertCloneWithIds) {
-    const auto indexSpec = BSON("v" << 1 << "key" << BSON("x" << -1) << "name"
-                                    << "Test index"
-                                    << "ns"
-                                    << "xyz.abc");
-
-    BatchedCommandRequest batchedRequest([&] {
-        write_ops::Insert insertOp(NamespaceString("xyz.system.indexes"));
-        insertOp.setDocuments({indexSpec});
-        return insertOp;
-    }());
-    batchedRequest.setWriteConcern(BSON("w" << 2));
-
-    const auto clonedRequest(BatchedCommandRequest::cloneInsertWithIds(std::move(batchedRequest)));
-
-    ASSERT_EQ("xyz.system.indexes", clonedRequest.getNS().ns());
-    ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNS().ns());
-    ASSERT(clonedRequest.getWriteCommandBase().getOrdered());
-    ASSERT(!clonedRequest.getWriteCommandBase().getBypassDocumentValidation());
-    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
-
-    const auto& insertDocs = clonedRequest.getInsertRequest().getDocuments();
-    ASSERT_EQ(1u, insertDocs.size());
-
-    ASSERT_BSONOBJ_EQ(indexSpec, insertDocs[0]);
 }
 
 }  // namespace

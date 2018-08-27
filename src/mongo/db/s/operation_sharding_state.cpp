@@ -79,13 +79,7 @@ void OperationShardingState::initializeClientRoutingVersions(NamespaceString nss
 
     const auto shardVersionElem = cmdObj.getField(ChunkVersion::kShardVersionField);
     if (!shardVersionElem.eoo()) {
-        auto shardVersion = uassertStatusOK(ChunkVersion::parseFromCommand(cmdObj));
-
-        if (nss.isSystemDotIndexes()) {
-            _shardVersions[nss.ns()] = ChunkVersion::IGNORED();
-        } else {
-            _shardVersions[nss.ns()] = std::move(shardVersion);
-        }
+        _shardVersions[nss.ns()] = uassertStatusOK(ChunkVersion::parseFromCommand(cmdObj));
     }
 
     const auto dbVersionElem = cmdObj.getField(kDbVersionField);

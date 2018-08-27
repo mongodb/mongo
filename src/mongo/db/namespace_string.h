@@ -228,9 +228,6 @@ public:
     bool isLocal() const {
         return db() == kLocalDb;
     }
-    bool isSystemDotIndexes() const {
-        return coll() == "system.indexes";
-    }
     bool isSystemDotProfile() const {
         return coll() == "system.profile";
     }
@@ -354,10 +351,6 @@ public:
      */
     std::string getSisterNS(StringData local) const;
 
-    std::string getSystemIndexesCollection() const {
-        return db().toString() + ".system.indexes";
-    }
-
     NamespaceString getCommandNS() const {
         return {db(), "$cmd"};
     }
@@ -426,7 +419,7 @@ public:
      * samples:
      *   good:
      *     foo
-     *     system.indexes
+     *     system.views
      *   bad:
      *     $foo
      * @param coll - a collection name component of a namespace

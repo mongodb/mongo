@@ -1,12 +1,6 @@
-// SERVER-16498 d_migrate.cpp should not rely on system.namespaces
-//
 // This test creates a sharded collection with wiredtiger options.
 // When the chunks of this collection get migrated to the other shard,
 // the other shard should create the collection with the same options.
-// However, before SERVER-16498, the receiver relies on checking
-// system.namespaces on the donor, which is empty on wiredtiger.
-// As a result, the new collection created on receiver has different
-// options.
 
 var st = new ShardingTest({shards: 2});
 

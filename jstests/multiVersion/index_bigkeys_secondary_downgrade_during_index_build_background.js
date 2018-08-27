@@ -45,7 +45,16 @@
 
     // Make sure index build starts on the secondary.
     assert.soon(() => {
-        let res = secondaryDB.currentOp({"ns": "test.system.indexes"});
+        // The currentOp entry for createIndexes looks like:
+        // {...,
+        //  "command": {"v": 2,
+        //              "key": {x: 1},
+        //              "name": "x_1",
+        //              "background": true,
+        //              "ns": "test.index_bigkeys_downgrade_during_index_build"},
+        //  ...
+        // }
+        let res = secondaryDB.currentOp({'command.name': "x_1"});
         return res['ok'] === 1 && res["inprog"].length > 0;
     });
 

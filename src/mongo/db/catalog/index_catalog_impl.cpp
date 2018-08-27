@@ -503,10 +503,6 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
                                     << static_cast<int>(indexVersion));
     }
 
-    if (nss.isSystemDotIndexes())
-        return Status(ErrorCodes::CannotCreateIndex,
-                      "cannot have an index on the system.indexes collection");
-
     if (nss.isOplog())
         return Status(ErrorCodes::CannotCreateIndex, "cannot have an index on the oplog");
 
@@ -963,13 +959,6 @@ private:
 }  // namespace
 
 Status IndexCatalogImpl::_dropIndex(OperationContext* opCtx, IndexCatalogEntry* entry) {
-    /**
-     * IndexState in order
-     *  <db>.system.indexes
-     *    NamespaceDetails
-     *      <db>.system.ns
-     */
-
     // ----- SANITY CHECKS -------------
     if (!entry)
         return Status(ErrorCodes::BadValue, "IndexCatalog::_dropIndex passed NULL");

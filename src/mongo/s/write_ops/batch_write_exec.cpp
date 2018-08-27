@@ -208,7 +208,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
             AsyncRequestsSender ars(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                    clientRequest.getTargetingNS().db().toString(),
+                                    clientRequest.getNS().db().toString(),
                                     requests,
                                     kPrimaryOnlyReadPreference,
                                     opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent

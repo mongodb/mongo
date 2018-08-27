@@ -1,6 +1,5 @@
 /* This test ensures that indexes created by running applyOps are successfully replicated (see
- * SERVER-31435). Both insertion into system.indexes and createIndexes style oplog entries are
- * passed to applyOps here.
+ * SERVER-31435).
  */
 (function() {
     "use strict";
@@ -69,34 +68,6 @@
         let secondaryTestDB = secondaries[j].getDB(dbName);
         ensureIndexExists(secondaryTestDB, collName, cmdFormatIndexName, 2);
     }
-
-    // Create an index by inserting into system.indexes in applyOps.
-    let insertFormatIndexName = "b_1";
-    cmd = {
-        applyOps: [{
-            "op": "i",
-            "ns": dbName + ".system.indexes",
-            "o": {
-                ns: dbName + "." + collName,
-                key: {b: 1},
-                name: insertFormatIndexName,
-            }
-        }]
-    };
-    res = primaryTestDB.adminCommand(cmd);
-    assert.commandWorked(res, "could not run " + tojson(cmd));
-    rst.awaitReplication();
-    ensureIndexExists(primaryTestDB, collName, insertFormatIndexName, 3);
-
-    // Make sure the index was replicated to the secondaries.
-    secondaries = rst.getSecondaries();
-    for (let j = 0; j < secondaries.length; j++) {
-        let secondaryTestDB = secondaries[j].getDB(dbName);
-        ensureIndexExists(secondaryTestDB, collName, insertFormatIndexName, 3);
-    }
-
-    localDB = rst.getPrimary().getDB("local");
-    ensureOplogEntryExists(localDB, insertFormatIndexName);
 
     rst.stopSet();
 }());

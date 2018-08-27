@@ -68,12 +68,6 @@ public:
     }
 
     const NamespaceString& getNS() const;
-    NamespaceString getTargetingNS() const;
-
-    /**
-     * Index creation can be expressed as an insert into the 'system.indexes' namespace.
-     */
-    bool isInsertIndexRequest() const;
 
     const auto& getInsertRequest() const {
         invariant(_insertReq);

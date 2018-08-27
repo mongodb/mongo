@@ -118,7 +118,6 @@ selector:
 
   # These include operations the root user auth'd on the test database is not authorized to perform,
   # e.g. dropping or creating system collections.
-  - jstests/core/cannot_create_system_dot_indexes.js
   - jstests/core/list_collections_no_views.js
   - jstests/core/rename8.js
   - jstests/core/views/duplicate_ns.js

@@ -23,11 +23,10 @@ load("jstests/replsets/rslib.js");
     let checkedRunCommand = (db, cmd) =>
         ((res, msg) => (assert.commandWorked(res, msg), res))(db.runCommand(cmd), tojson(cmd));
 
-    // Like db.getCollectionNames, but allows a filter and works without system.namespaces.
+    // Like db.getCollectionNames, but allows a filter.
     let getCollectionNames = (db, filter) => checkedRunCommand(db, {listCollections: 1, filter})
                                                  .cursor.firstBatch.map((entry) => entry.name)
-                                                 .sort()
-                                                 .filter((name) => name != "system.indexes");
+                                                 .sort();
 
     // Function that checks that all array elements are equal, and returns the unique element.
     let checkEqual = (array, what) =>

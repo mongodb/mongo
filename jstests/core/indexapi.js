@@ -43,7 +43,3 @@ idx = t.getIndexes();
 assert.eq(2, idx.length, "M1");
 assert.eq(key, idx[1].key, "M2");
 assert(idx[1].unique, "M3");
-// printjson( idx );
-
-// Test that attempting to create index in an invalid namespace fails.
-assert.writeError(db.system.indexes.insert({ns: "test", key: {x: 1}, name: "x"}));

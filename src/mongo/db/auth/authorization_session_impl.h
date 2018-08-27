@@ -113,9 +113,7 @@ public:
                               const BSONObj& update,
                               bool upsert) override;
 
-    Status checkAuthForInsert(OperationContext* opCtx,
-                              const NamespaceString& ns,
-                              const BSONObj& document) override;
+    Status checkAuthForInsert(OperationContext* opCtx, const NamespaceString& ns) override;
 
     Status checkAuthForDelete(OperationContext* opCtx,
                               const NamespaceString& ns,

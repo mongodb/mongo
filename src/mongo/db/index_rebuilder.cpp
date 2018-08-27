@@ -86,13 +86,12 @@ void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
             WriteUnitOfWork wunit(opCtx);
             vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(opCtx);
 
-            // The indexes have now been removed from system.indexes, so the only record is
-            // in-memory. If there is a journal commit between now and when insert() rewrites
-            // the entry and the db crashes before the new system.indexes entry is journalled,
-            // the index will be lost forever. Thus, we must stay in the same WriteUnitOfWork
-            // to ensure that no journaling will happen between now and the entry being
-            // re-written in MultiIndexBlock::init(). The actual index building is done outside
-            // of this WUOW.
+            // The indexes have now been removed from persisted memory, so the only record is
+            // in-memory. If there is a journal commit between now and when 'indexer.init' rewrites
+            // the entry and the db crashes before the new persisted index state is journalled, the
+            // index will be lost forever. Thus, we must stay in the same WriteUnitOfWork to ensure
+            // that no journaling will happen between now and the entry being re-written in
+            // MultiIndexBlock::init(). The actual index building is done outside of this WUOW.
 
             if (indexesToBuild.empty()) {
                 continue;

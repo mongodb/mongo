@@ -121,12 +121,7 @@
 
     // CreateIndex
     assert.commandWorked(testColl.createIndex({pt: "2dsphere"}));
-    // The createIndex shell helper is run as an insert when writeMode is not "commands".
-    if (testDB.getMongo().writeMode() === "commands") {
-        lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
-    } else {
-        lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 1, 0);
-    }
+    lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
 
     // $geoNear aggregation stage
     assert.commandWorked(testDB.runCommand({

@@ -13,9 +13,7 @@
         var res = toShard.getDB("test1").runCommand({listCollections: 1});
         assert.commandWorked(res);
 
-        // Remove system.indexes collection (which exists in mmap)
-        // Indexes are checked separately below.
-        var collections = res.cursor.firstBatch.filter(coll => coll.name != 'system.indexes');
+        var collections = res.cursor.firstBatch;
 
         // Sort collections by name.
         collections.sort(sortByName);
@@ -145,8 +143,7 @@
         assert.eq(0, toShard.getDB("test1").bar.count(), "to shard has data before move");
 
         var listCollsFrom = fromShard.getDB("test1").runCommand({listCollections: 1});
-        var fromColls =
-            listCollsFrom.cursor.firstBatch.filter(coll => coll.name != 'system.indexes');
+        var fromColls = listCollsFrom.cursor.firstBatch;
         fromColls.sort(sortByName);
         var baruuid = fromColls[0].info.uuid;
         var foouuid = fromColls[1].info.uuid;
@@ -194,8 +191,7 @@
         assert.eq(0, toShard.getDB("test1").bar.count(), "to shard has data before move");
 
         var listCollsFrom = fromShard.getDB("test1").runCommand({listCollections: 1});
-        var fromColls =
-            listCollsFrom.cursor.firstBatch.filter(coll => coll.name != 'system.indexes');
+        var fromColls = listCollsFrom.cursor.firstBatch;
         fromColls.sort(sortByName);
         var baruuid = fromColls[0].info.uuid;
         var foouuid = fromColls[1].info.uuid;

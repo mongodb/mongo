@@ -20,11 +20,6 @@
         ErrorCodes.InvalidNamespace,
         "Created an illegal view named 'system.views'");
 
-    assert.commandFailedWithCode(
-        viewsDB.runCommand({create: "system.indexes", viewOn: "collection"}),
-        ErrorCodes.InvalidNamespace,
-        "Created an illegal view named 'system.indexes'");
-
     // Collections that start with 'system.' that are not special to MongoDB fail with a different
     // error code.
     assert.commandFailedWithCode(viewsDB.runCommand({create: "system.foo", viewOn: "collection"}),

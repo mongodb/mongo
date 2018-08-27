@@ -680,7 +680,7 @@ TEST_F(StorageInterfaceImplTest,
 TEST_F(StorageInterfaceImplTest, CreateCollectionThatAlreadyExistsFails) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
-    NamespaceString nss("test.system.indexes");
+    NamespaceString nss("test.foo");
     createCollection(opCtx, nss);
 
     const CollectionOptions opts = generateOptionsWithUuid();

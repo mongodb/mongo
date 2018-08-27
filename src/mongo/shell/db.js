@@ -858,39 +858,6 @@ var DB;
         return this.runCommand({getpreverror: 1});
     };
 
-    DB.prototype._getCollectionInfosSystemNamespaces = function(filter) {
-        var all = [];
-
-        var dbNamePrefix = this._name + ".";
-
-        // Create a shallow copy of 'filter' in case we modify its 'name' property. Also defaults
-        // 'filter' to {} if the parameter was not specified.
-        filter = Object.extend({}, filter);
-        if (typeof filter.name === "string") {
-            // Queries on the 'name' field need to qualify the namespace with the database name for
-            // consistency with the command variant.
-            filter.name = dbNamePrefix + filter.name;
-        }
-
-        var c = this.getCollection("system.namespaces").find(filter);
-        while (c.hasNext()) {
-            var infoObj = c.next();
-
-            if (infoObj.name.indexOf("$") >= 0 && infoObj.name.indexOf(".oplog.$") < 0)
-                continue;
-
-            // Remove the database name prefix from the collection info object.
-            infoObj.name = infoObj.name.substring(dbNamePrefix.length);
-
-            all.push(infoObj);
-        }
-
-        // Return list of objects sorted by collection name.
-        return all.sort(function(coll1, coll2) {
-            return coll1.name.localeCompare(coll2.name);
-        });
-    };
-
     DB.prototype._getCollectionInfosCommand = function(
         filter, nameOnly = false, authorizedCollections = false) {
         filter = filter || {};
@@ -949,39 +916,28 @@ var DB;
      */
     DB.prototype.getCollectionInfos = function(
         filter, nameOnly = false, authorizedCollections = false) {
-        let oldException;
         try {
             return this._getCollectionInfosCommand(filter, nameOnly, authorizedCollections);
         } catch (ex) {
-            if (ex.code !== ErrorCodes.Unauthorized && ex.code !== ErrorCodes.CommandNotFound &&
-                !ex.message.startsWith("no such cmd")) {
+            if (ex.code !== ErrorCodes.Unauthorized) {
                 // We cannot recover from this error, propagate it.
                 throw ex;
             }
-            oldException = ex;
-        }
 
-        // We have failed to run listCollections. This may be due to the command not
-        // existing, or authorization failing. Try to query the system.namespaces collection.
-        try {
-            return this._getCollectionInfosSystemNamespaces(filter);
-        } catch (ex2) {
-            // Querying the system.namespaces collection has failed. We may be able to compute a
-            // set of *some* collections which exist and we have access to from our privileges.
-            // For this to work, the previous operations must have failed due to authorization,
-            // we must be attempting to recover the names of our own collections,
+            // We may be able to compute a set of *some* collections which exist and we have access
+            // to from our privileges. For this to work, the previous operation must have failed due
+            // to authorization, we must be attempting to recover the names of our own collections,
             // and no filter can have been provided.
 
             if (nameOnly && authorizedCollections &&
                 Object.getOwnPropertyNames(filter).length === 0 &&
-                oldException.code === ErrorCodes.Unauthorized &&
-                ex2.code == ErrorCodes.Unauthorized) {
+                ex.code === ErrorCodes.Unauthorized) {
                 print(
                     "Warning: unable to run listCollections, attempting to approximate collection names by parsing connectionStatus");
                 return this._getCollectionInfosFromPrivileges();
             }
 
-            throw oldException;
+            throw ex;
         }
     };
 

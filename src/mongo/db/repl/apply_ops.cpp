@@ -70,14 +70,7 @@ MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
  */
 bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
     for (const auto& elem : applyOpCmd.firstElement().Obj()) {
-        const char* names[] = {"ns", "op"};
-        BSONElement fields[2];
-        elem.Obj().getFields(2, names, fields);
-        BSONElement& fieldNs = fields[0];
-        BSONElement& fieldOp = fields[1];
-
-        const char* opType = fieldOp.valuestrsafe();
-        const StringData ns = fieldNs.valuestrsafe();
+        const char* opType = elem.Obj().getField("op").valuestrsafe();
 
         // All atomic ops have an opType of length 1.
         if (opType[0] == '\0' || opType[1] != '\0')
@@ -90,8 +83,7 @@ bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
             case 'u':
                 break;
             case 'i':
-                if (nsToCollectionSubstring(ns) != "system.indexes")
-                    break;
+                break;
             // Fallthrough.
             default:
                 return false;
@@ -152,7 +144,7 @@ Status _applyOps(OperationContext* opCtx,
             // NamespaceNotFound.
             // Additionally for inserts, we fail early on non-existent collections.
             auto collection = db->getCollection(opCtx, nss);
-            if (!collection && !nss.isSystemDotIndexes() && (*opType == 'i' || *opType == 'u')) {
+            if (!collection && (*opType == 'i' || *opType == 'u')) {
                 uasserted(
                     ErrorCodes::AtomicityFailure,
                     str::stream()
@@ -210,7 +202,7 @@ Status _applyOps(OperationContext* opCtx,
                         }
 
                         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-                        if (!autoColl.getCollection() && !nss.isSystemDotIndexes()) {
+                        if (!autoColl.getCollection()) {
                             // For idempotency reasons, return success on delete operations.
                             if (*opType == 'd') {
                                 return Status::OK();
@@ -226,54 +218,12 @@ Status _applyOps(OperationContext* opCtx,
 
                         OldClientContext ctx(opCtx, nss.ns());
 
-                        if (!nss.isSystemDotIndexes()) {
-                            // We return the status rather than merely aborting so failure of CRUD
-                            // ops doesn't stop the applyOps from trying to process the rest of the
-                            // ops.  This is to leave the door open to parallelizing CRUD op
-                            // application in the future.
-                            return repl::applyOperation_inlock(
-                                opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
-                        }
-
-                        auto fieldO = opObj["o"];
-                        BSONObj indexSpec;
-                        NamespaceString indexNss;
-                        std::tie(indexSpec, indexNss) =
-                            repl::prepForApplyOpsIndexInsert(fieldO, opObj, nss);
-                        if (!indexSpec["collation"]) {
-                            // If the index spec does not include a collation, explicitly specify
-                            // the simple collation, so the index does not inherit the collection
-                            // default collation.
-                            auto indexVersion = indexSpec["v"];
-                            // The index version is populated by prepForApplyOpsIndexInsert().
-                            invariant(indexVersion);
-                            if (indexVersion.isNumber() &&
-                                (indexVersion.numberInt() >=
-                                 static_cast<int>(IndexDescriptor::IndexVersion::kV2))) {
-                                BSONObjBuilder bob;
-                                bob.append("collation", CollationSpec::kSimpleSpec);
-                                bob.appendElements(indexSpec);
-                                indexSpec = bob.obj();
-                            }
-                        }
-                        BSONObjBuilder command;
-                        command.append("createIndexes", indexNss.coll());
-                        {
-                            BSONArrayBuilder indexes(command.subarrayStart("indexes"));
-                            indexes.append(indexSpec);
-                            indexes.doneFast();
-                        }
-                        const BSONObj commandObj = command.done();
-
-                        DBDirectClient client(opCtx);
-                        BSONObj infoObj;
-                        client.runCommand(nss.db().toString(), commandObj, infoObj);
-
-                        // Uassert to stop applyOps only when building indexes, but not for CRUD
-                        // ops.
-                        uassertStatusOK(getStatusFromCommandResult(infoObj));
-
-                        return Status::OK();
+                        // We return the status rather than merely aborting so failure of CRUD
+                        // ops doesn't stop the applyOps from trying to process the rest of the
+                        // ops.  This is to leave the door open to parallelizing CRUD op
+                        // application in the future.
+                        return repl::applyOperation_inlock(
+                            opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
                     });
             } catch (const DBException& ex) {
                 ab.append(false);

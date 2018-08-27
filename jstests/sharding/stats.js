@@ -84,10 +84,8 @@
            'indexDetails should not be present in s.shard1.shardName: ' +
                tojson(x.shards[s.shard1.shardName]));
 
-    a_extras =
-        a.stats().objects - a.foo.count();  // things like system.namespaces and system.indexes
-    b_extras =
-        b.stats().objects - b.foo.count();  // things like system.namespaces and system.indexes
+    a_extras = a.stats().objects - a.foo.count();
+    b_extras = b.stats().objects - b.foo.count();
     print("a_extras: " + a_extras);
     print("b_extras: " + b_extras);
 

@@ -26,13 +26,10 @@
             indexSpec,
             "Index with key pattern " + tojson(keyPattern) + " not found: " + tojson(allIndexes));
 
-        // Find either the old-style insert into system.indexes index creations, or new-style
-        // createIndexes command entries.
+        // Find the createIndexes command entries.
         const indexCreationOplogQuery = {
-            $or: [
-                {op: "i", ns: testDB.system.indexes.getFullName()},
-                {op: "c", ns: testDB.getName() + ".$cmd", "o.createIndexes": coll.getName()}
-            ]
+            op: "c",
+            ns: testDB.getName() + ".$cmd", "o.createIndexes": coll.getName()
         };
 
         const allOplogEntries = oplogColl.find(indexCreationOplogQuery).toArray();

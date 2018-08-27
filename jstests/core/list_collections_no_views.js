@@ -26,9 +26,6 @@
 
     assert.eq(allExpected,
               all.cursor.firstBatch
-                  .filter(function(c) {
-                      return c.name != "system.indexes";
-                  })
                   .map(function(c) {
                       return {name: c.name, type: c.type};
                   })
@@ -66,9 +63,6 @@
 
     assert.eq(collOnlyExpected,
               collOnly.cursor.firstBatch
-                  .filter(function(c) {
-                      return c.name != "system.indexes";
-                  })
                   .map(function(c) {
                       return {name: c.name, type: c.type};
                   })
@@ -93,9 +87,6 @@
 
     assert.eq(viewOnlyExpected,
               viewOnly.cursor.firstBatch
-                  .filter(function(c) {
-                      return c.name != "system.indexes";
-                  })
                   .map(function(c) {
                       return {name: c.name, type: c.type};
                   })
@@ -117,9 +108,6 @@
     let collOnlyInvalidView = mydb.runCommand(collOnlyCommand);
     assert.eq(collOnlyExpected,
               collOnlyInvalidView.cursor.firstBatch
-                  .filter(function(c) {
-                      return c.name != "system.indexes";
-                  })
                   .map(function(c) {
                       return {name: c.name, type: c.type};
                   })

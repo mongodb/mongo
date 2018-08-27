@@ -27,7 +27,7 @@
     // Database should now be empty.
     let res = viewsDB.runCommand({listCollections: 1});
     assert.commandWorked(res);
-    assert.eq(res.cursor.firstBatch.filter((entry) => entry.name != "system.indexes"),
+    assert.eq(res.cursor.firstBatch,
               [],
               viewsDBName + " is not empty after deleting views and system.views");
 })();

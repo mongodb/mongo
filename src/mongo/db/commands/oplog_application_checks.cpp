@@ -103,7 +103,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
     }
 
     if (opType == "i"_sd) {
-        return authSession->checkAuthForInsert(opCtx, ns, o);
+        return authSession->checkAuthForInsert(opCtx, ns);
     } else if (opType == "u"_sd) {
         BSONElement o2Elem = oplogEntry["o2"];
         checkBSONType(BSONType::Object, o2Elem);

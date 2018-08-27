@@ -16,10 +16,7 @@
             "command.indexes.0.name": indexName
         };
         // TODO SERVER-34830: Add command name filter for secondaries once available.
-        const secondaryIndexBuildFilter = {
-            ns: dbName + ".system.indexes",
-            "command.name": indexName
-        };
+        const secondaryIndexBuildFilter = {"command.name": indexName};
         const curOp = testDB.getSiblingDB("admin").aggregate([
             {$currentOp: {}},
             {$match: {$or: [primaryIndexBuildFilter, secondaryIndexBuildFilter]}}

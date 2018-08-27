@@ -139,8 +139,6 @@ struct Cloner::Fun {
         : lastLog(0), opCtx(opCtx), _dbName(dbName) {}
 
     void operator()(DBClientCursorBatchIterator& i) {
-        invariant(from_collection.coll() != "system.indexes");
-
         // XXX: can probably take dblock instead
         unique_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(opCtx));
         uassert(

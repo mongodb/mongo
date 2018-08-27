@@ -903,9 +903,6 @@ public:
         _client.insert(ns, BSON("a" << 4 << "b" << 3));
         ASSERT_EQUALS(ErrorCodes::DuplicateKey,
                       dbtests::createIndex(&_opCtx, ns, BSON("a" << 1), true));
-        ASSERT_EQUALS(
-            0U,
-            _client.count("unittests.system.indexes", BSON("ns" << ns << "name" << NE << "_id_")));
     }
 };
 

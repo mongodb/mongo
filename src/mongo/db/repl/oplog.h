@@ -164,15 +164,6 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx);
 void establishOplogCollectionForLogging(OperationContext* opCtx, Collection* oplog);
 
 using IncrementOpsAppliedStatsFn = stdx::function<void()>;
-/**
- * Take the object field of a BSONObj, the BSONObj, and the namespace of
- * the operation and perform necessary validation to ensure the BSONObj is a
- * properly-formed command to insert into system.indexes. This is only to
- * be used for insert operations into system.indexes. It is called via applyOps.
- */
-std::pair<BSONObj, NamespaceString> prepForApplyOpsIndexInsert(const BSONElement& fieldO,
-                                                               const BSONObj& op,
-                                                               const NamespaceString& requestNss);
 
 /**
  * This class represents the different modes of oplog application that are used within the

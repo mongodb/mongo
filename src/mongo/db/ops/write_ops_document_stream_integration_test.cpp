@@ -66,39 +66,4 @@ TEST(WriteOpsDocSeq, InsertDocStreamWorks) {
     ASSERT_EQ(conn->count(ns.ns()), 5u);
 }
 
-TEST(WriteOpsDocSeq, InsertDocStreamWorksWithSystemDotIndexes) {
-    std::string errMsg;
-    auto conn = std::unique_ptr<DBClientBase>(
-        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
-    uassert(ErrorCodes::SocketException, errMsg, conn);
-
-    NamespaceString ns("test", "doc_seq");
-    conn->dropCollection(ns.ns());
-    ASSERT_EQ(conn->count(ns.ns()), 0u);
-
-    OpMsgRequest request;
-    request.body = BSON("insert"
-                        << "system.indexes"
-                        << "$db"
-                        << ns.db());
-    request.sequences = {{"documents",
-                          {
-                              BSON("ns" << ns.ns() << "key" << BSON("x" << 1) << "name"
-                                        << "my_special_index"),
-                          }}};
-
-    const auto reply = conn->runCommand(std::move(request));
-    ASSERT_EQ(int(reply->getProtocol()), int(rpc::Protocol::kOpMsg));
-    auto body = reply->getCommandReply();
-    ASSERT_OK(getStatusFromCommandResult(body));
-    ASSERT_EQ(body["n"].Int(), 1);
-
-    auto indexes = conn->getIndexSpecs(ns.ns());
-    ASSERT_EQ(indexes.size(), 2u);  // my_special_index + _id
-
-    indexes.sort([](auto&& l, auto&& r) { return l["name"].String() < r["name"].String(); });
-    ASSERT_EQ(indexes.front()["name"].String(), "_id_");
-    ASSERT_EQ(indexes.back()["name"].String(), "my_special_index");
-}
-
 }  // namespace mongo

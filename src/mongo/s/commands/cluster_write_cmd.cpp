@@ -149,7 +149,7 @@ private:
                                   std::vector<Strategy::CommandResult>* results) {
         // Note that this implementation will not handle targeting retries and does not completely
         // emulate write behavior
-        ChunkManagerTargeter targeter(targetingBatchItem.getRequest()->getTargetingNS());
+        ChunkManagerTargeter targeter(targetingBatchItem.getRequest()->getNS());
         Status status = targeter.init(opCtx);
         if (!status.isOK())
             return status;
