@@ -358,8 +358,7 @@ public:
         auto newDoc = [&](const Snapshotted<BSONObj>& oldDoc) {
             return BSON("_id" << oldDoc.value()["_id"] << "foo" << limit() + 10);
         };
-        OplogUpdateEntryArgs args;
-        args.nss = coll->ns();
+        CollectionUpdateArgs args;
         {
             WriteUnitOfWork wuow(&_opCtx);
             coll->updateDocument(&_opCtx, *it, oldDoc, newDoc(oldDoc), false, NULL, &args);

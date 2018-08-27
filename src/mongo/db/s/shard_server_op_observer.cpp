@@ -261,14 +261,15 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         const auto updatedNss([&] {
             std::string coll;
             fassert(40477,
-                    bsonExtractStringField(args.criteria, ShardCollectionType::ns.name(), &coll));
+                    bsonExtractStringField(
+                        args.updateArgs.criteria, ShardCollectionType::ns.name(), &coll));
             return NamespaceString(coll);
         }());
 
         // Parse the '$set' update
         BSONElement setElement;
         Status setStatus =
-            bsonExtractTypedField(args.update, StringData("$set"), Object, &setElement);
+            bsonExtractTypedField(args.updateArgs.update, StringData("$set"), Object, &setElement);
         if (setStatus.isOK()) {
             BSONObj setField = setElement.Obj();
 
@@ -305,12 +306,14 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 
         // Extract which database was updated
         std::string db;
-        fassert(40478, bsonExtractStringField(args.criteria, ShardDatabaseType::name.name(), &db));
+        fassert(
+            40478,
+            bsonExtractStringField(args.updateArgs.criteria, ShardDatabaseType::name.name(), &db));
 
         // Parse the '$set' update
         BSONElement setElement;
         Status setStatus =
-            bsonExtractTypedField(args.update, StringData("$set"), Object, &setElement);
+            bsonExtractTypedField(args.updateArgs.update, StringData("$set"), Object, &setElement);
         if (setStatus.isOK()) {
             BSONObj setField = setElement.Obj();
 
@@ -327,9 +330,9 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         incrementChunkOnInsertOrUpdate(opCtx,
                                        args.nss,
                                        *metadata->getChunkManager(),
-                                       args.updatedDoc,
-                                       args.updatedDoc.objsize(),
-                                       args.fromMigrate);
+                                       args.updateArgs.updatedDoc,
+                                       args.updateArgs.updatedDoc.objsize(),
+                                       args.updateArgs.fromMigrate);
     }
 }
 

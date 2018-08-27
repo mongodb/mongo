@@ -477,15 +477,16 @@ TEST_F(OpObserverTest, OnRollbackDoesntInvalidateAuthCacheWhenNoAuthNamespaceRol
 }
 
 TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
+    auto uuid = UUID::gen();
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
     NamespaceString nss = {"test", "coll"};
     AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
     opObserver.aboutToDelete(opCtx.get(), nss, BSON("_id" << 1));
-    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+    opObserver.onDelete(opCtx.get(), nss, uuid, {}, false, {});
     opObserver.aboutToDelete(opCtx.get(), nss, BSON("_id" << 1));
-    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+    opObserver.onDelete(opCtx.get(), nss, uuid, {}, false, {});
 }
 
 /**
@@ -573,15 +574,14 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
                                      << "y"));
     opObserver().onInserts(opCtx(), nss1, uuid1, inserts1.begin(), inserts1.end(), false);
 
-    OplogUpdateEntryArgs update2;
-    update2.nss = nss2;
-    update2.uuid = uuid2;
-    update2.stmtId = 1;
-    update2.updatedDoc = BSON("_id" << 0 << "data"
-                                    << "y");
-    update2.update = BSON("$set" << BSON("data"
-                                         << "y"));
-    update2.criteria = BSON("_id" << 0);
+    CollectionUpdateArgs updateArgs2;
+    updateArgs2.stmtId = 1;
+    updateArgs2.updatedDoc = BSON("_id" << 0 << "data"
+                                        << "y");
+    updateArgs2.update = BSON("$set" << BSON("data"
+                                             << "y"));
+    updateArgs2.criteria = BSON("_id" << 0);
+    OplogUpdateEntryArgs update2(std::move(updateArgs2), nss2, uuid2);
     opObserver().onUpdate(opCtx(), update2);
 
     opObserver().aboutToDelete(opCtx(),
@@ -761,25 +761,23 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "update");
 
-    OplogUpdateEntryArgs update1;
-    update1.nss = nss1;
-    update1.uuid = uuid1;
-    update1.stmtId = 0;
-    update1.updatedDoc = BSON("_id" << 0 << "data"
-                                    << "x");
-    update1.update = BSON("$set" << BSON("data"
-                                         << "x"));
-    update1.criteria = BSON("_id" << 0);
+    CollectionUpdateArgs updateArgs1;
+    updateArgs1.stmtId = 0;
+    updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
+                                        << "x");
+    updateArgs1.update = BSON("$set" << BSON("data"
+                                             << "x"));
+    updateArgs1.criteria = BSON("_id" << 0);
+    OplogUpdateEntryArgs update1(std::move(updateArgs1), nss1, uuid1);
 
-    OplogUpdateEntryArgs update2;
-    update2.nss = nss2;
-    update2.uuid = uuid2;
-    update2.stmtId = 1;
-    update2.updatedDoc = BSON("_id" << 1 << "data"
-                                    << "y");
-    update2.update = BSON("$set" << BSON("data"
-                                         << "y"));
-    update2.criteria = BSON("_id" << 1);
+    CollectionUpdateArgs updateArgs2;
+    updateArgs2.stmtId = 1;
+    updateArgs2.updatedDoc = BSON("_id" << 1 << "data"
+                                        << "y");
+    updateArgs2.update = BSON("$set" << BSON("data"
+                                             << "y"));
+    updateArgs2.criteria = BSON("_id" << 1);
+    OplogUpdateEntryArgs update2(std::move(updateArgs2), nss2, uuid2);
 
     WriteUnitOfWork wuow(opCtx());
     AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);

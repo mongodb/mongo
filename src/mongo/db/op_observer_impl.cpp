@@ -1,30 +1,30 @@
 /**
-*    Copyright (C) 2016 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ * Copyright (C) 2018 MongoDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or  modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * As a special exception, the copyright holders give permission to link the
+ * code of portions of this program with the OpenSSL library under certain
+ * conditions as described in each individual source file and distribute
+ * linked combinations including the program with the OpenSSL library. You
+ * must comply with the GNU Affero General Public License in all respects
+ * for all of the code used other than as permitted herein. If you modify
+ * file(s) with this exception, you may extend this exception to your
+ * version of the file(s), but you are not obligated to do so. If you do not
+ * wish to do so, delete this exception statement from your version. If you
+ * delete this exception statement from all source files in the program,
+ * then also delete it in the license file.
+ */
 
 #include "mongo/platform/basic.h"
 
@@ -171,11 +171,11 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                            Session* session,
                            const OplogUpdateEntryArgs& args) {
     BSONObj storeObj;
-    if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
-        invariant(args.preImageDoc);
-        storeObj = *args.preImageDoc;
-    } else if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PostImage) {
-        storeObj = args.updatedDoc;
+    if (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
+        invariant(args.updateArgs.preImageDoc);
+        storeObj = *args.updateArgs.preImageDoc;
+    } else if (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PostImage) {
+        storeObj = args.updateArgs.updatedDoc;
     }
 
     OperationSessionInfo sessionInfo;
@@ -200,16 +200,17 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                              false,
                                              opTimes.wallClockTime,
                                              sessionInfo,
-                                             args.stmtId,
+                                             args.updateArgs.stmtId,
                                              {},
                                              false /* prepare */,
                                              OplogSlot());
 
         opTimes.prePostImageOpTime = noteUpdateOpTime;
 
-        if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
+        if (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
             oplogLink.preImageOpTime = noteUpdateOpTime;
-        } else if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PostImage) {
+        } else if (args.updateArgs.storeDocOption ==
+                   CollectionUpdateArgs::StoreDocOption::PostImage) {
             oplogLink.postImageOpTime = noteUpdateOpTime;
         }
     }
@@ -218,12 +219,12 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                        "u",
                                        args.nss,
                                        args.uuid,
-                                       args.update,
-                                       &args.criteria,
-                                       args.fromMigrate,
+                                       args.updateArgs.update,
+                                       &args.updateArgs.criteria,
+                                       args.updateArgs.fromMigrate,
                                        opTimes.wallClockTime,
                                        sessionInfo,
-                                       args.stmtId,
+                                       args.updateArgs.stmtId,
                                        oplogLink,
                                        false /* prepare */,
                                        OplogSlot());
@@ -458,14 +459,14 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                       str::stream() << "failCollectionUpdates failpoint enabled, namespace: "
                                     << args.nss.ns()
                                     << ", update: "
-                                    << args.update
+                                    << args.updateArgs.update
                                     << " on document with "
-                                    << args.criteria);
+                                    << args.updateArgs.criteria);
         }
     }
 
     // Do not log a no-op operation; see SERVER-21738
-    if (args.update.isEmpty()) {
+    if (args.updateArgs.update.isEmpty()) {
         return;
     }
 
@@ -474,8 +475,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         txnParticipant->inMultiDocumentTransaction();
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
-        auto operation =
-            OplogEntry::makeUpdateOperation(args.nss, args.uuid, args.update, args.criteria);
+        auto operation = OplogEntry::makeUpdateOperation(
+            args.nss, args.uuid, args.updateArgs.update, args.updateArgs.criteria);
         txnParticipant->addTransactionOperation(opCtx, operation);
     } else {
         Session* const session = OperationContextSession::get(opCtx);
@@ -483,20 +484,23 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         onWriteOpCompleted(opCtx,
                            args.nss,
                            session,
-                           std::vector<StmtId>{args.stmtId},
+                           std::vector<StmtId>{args.updateArgs.stmtId},
                            opTime.writeOpTime,
                            opTime.wallClockTime,
                            boost::none);
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "u", args.nss, args.update, &args.criteria);
+        ->logOp(opCtx, "u", args.nss, args.updateArgs.update, &args.updateArgs.criteria);
 
     if (args.nss != NamespaceString::kSessionTransactionsTableNamespace) {
-        if (!args.fromMigrate) {
+        if (!args.updateArgs.fromMigrate) {
             auto* const css = CollectionShardingRuntime::get(opCtx, args.nss);
-            shardObserveUpdateOp(
-                opCtx, css, args.updatedDoc, opTime.writeOpTime, opTime.prePostImageOpTime);
+            shardObserveUpdateOp(opCtx,
+                                 css,
+                                 args.updateArgs.updatedDoc,
+                                 opTime.writeOpTime,
+                                 opTime.prePostImageOpTime);
         }
     }
 
@@ -507,10 +511,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     } else if (args.nss == NamespaceString::kServerConfigurationNamespace) {
         // We must check server configuration collection writes for featureCompatibilityVersion
         // document changes.
-        FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, args.updatedDoc);
+        FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, args.updateArgs.updatedDoc);
     } else if (args.nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
-        SessionCatalog::get(opCtx)->invalidateSessions(opCtx, args.updatedDoc);
+        SessionCatalog::get(opCtx)->invalidateSessions(opCtx, args.updateArgs.updatedDoc);
     }
 }
 

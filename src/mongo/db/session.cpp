@@ -198,9 +198,7 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
         throw WriteConflictException();
     }
 
-    OplogUpdateEntryArgs args;
-    args.nss = NamespaceString::kSessionTransactionsTableNamespace;
-    args.uuid = collection->uuid();
+    CollectionUpdateArgs args;
     args.update = updateRequest.getUpdates();
     args.criteria = toUpdateIdDoc;
     args.fromMigrate = false;

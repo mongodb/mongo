@@ -130,9 +130,9 @@ std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
 }
 }  // namespace
 
-using std::unique_ptr;
 using std::endl;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 using logger::LogComponent;
@@ -574,7 +574,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
                                         const BSONObj& newDoc,
                                         bool indexesAffected,
                                         OpDebug* opDebug,
-                                        OplogUpdateEntryArgs* args) {
+                                        CollectionUpdateArgs* args) {
     {
         auto status = checkValidation(opCtx, newDoc);
         if (!status.isOK()) {
@@ -675,7 +675,9 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
     args->updatedDoc = newDoc;
 
-    getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, *args);
+    invariant(uuid());
+    OplogUpdateEntryArgs entryArgs(*args, ns(), *uuid());
+    getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, entryArgs);
 
     return {oldLocation};
 }
@@ -701,7 +703,7 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     const Snapshotted<RecordData>& oldRec,
     const char* damageSource,
     const mutablebson::DamageVector& damages,
-    OplogUpdateEntryArgs* args) {
+    CollectionUpdateArgs* args) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(oldRec.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
     invariant(updateWithDamagesSupported());
@@ -715,7 +717,9 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     if (newRecStatus.isOK()) {
         args->updatedDoc = newRecStatus.getValue().toBson();
 
-        getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, *args);
+        invariant(uuid());
+        OplogUpdateEntryArgs entryArgs(*args, ns(), *uuid());
+        getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, entryArgs);
     }
     return newRecStatus;
 }

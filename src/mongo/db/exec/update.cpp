@@ -142,17 +142,17 @@ const std::vector<std::unique_ptr<FieldRef>>* getImmutableFields(OperationContex
     return NULL;
 }
 
-OplogUpdateEntryArgs::StoreDocOption getStoreDocMode(const UpdateRequest& updateRequest) {
+CollectionUpdateArgs::StoreDocOption getStoreDocMode(const UpdateRequest& updateRequest) {
     if (updateRequest.shouldReturnNewDocs()) {
-        return OplogUpdateEntryArgs::StoreDocOption::PostImage;
+        return CollectionUpdateArgs::StoreDocOption::PostImage;
     }
 
     if (updateRequest.shouldReturnOldDocs()) {
-        return OplogUpdateEntryArgs::StoreDocOption::PreImage;
+        return CollectionUpdateArgs::StoreDocOption::PreImage;
     }
 
     invariant(!updateRequest.shouldReturnAnyDocs());
-    return OplogUpdateEntryArgs::StoreDocOption::None;
+    return CollectionUpdateArgs::StoreDocOption::None;
 }
 
 }  // namespace
@@ -284,12 +284,10 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         WriteUnitOfWork wunit(getOpCtx());
 
         RecordId newRecordId;
-        OplogUpdateEntryArgs args;
+        CollectionUpdateArgs args;
         if (!request->isExplain()) {
             invariant(_collection);
             auto* css = CollectionShardingState::get(getOpCtx(), _collection->ns());
-            args.nss = _collection->ns();
-            args.uuid = _collection->uuid();
             args.stmtId = request->getStmtId();
             args.update = logObj;
             auto metadata = css->getMetadata(getOpCtx());
@@ -299,7 +297,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     !request->isMulti() || args.criteria.hasField("_id"_sd));
             args.fromMigrate = request->isFromMigration();
             args.storeDocOption = getStoreDocMode(*request);
-            if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
+            if (args.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
                 args.preImageDoc = oldObj.value().getOwned();
             }
         }

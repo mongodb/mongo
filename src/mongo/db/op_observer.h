@@ -52,31 +52,13 @@ class OpTime;
  * Holds document update information used in logging.
  */
 struct OplogUpdateEntryArgs {
-    enum class StoreDocOption { None, PreImage, PostImage };
+    CollectionUpdateArgs updateArgs;
 
-    // Name of the collection in which document is being updated.
     NamespaceString nss;
+    CollectionUUID uuid;
 
-    OptionalCollectionUUID uuid;
-
-    StmtId stmtId = kUninitializedStmtId;
-
-    // The document before modifiers were applied.
-    boost::optional<BSONObj> preImageDoc;
-
-    // Fully updated document with damages (update modifiers) applied.
-    BSONObj updatedDoc;
-
-    // Document containing update modifiers -- e.g. $set and $unset
-    BSONObj update;
-
-    // Document containing the _id field of the doc being updated.
-    BSONObj criteria;
-
-    // True if this update comes from a chunk migration.
-    bool fromMigrate = false;
-
-    StoreDocOption storeDocOption = StoreDocOption::None;
+    OplogUpdateEntryArgs(CollectionUpdateArgs updateArgs, NamespaceString nss, CollectionUUID uuid)
+        : updateArgs(std::move(updateArgs)), nss(std::move(nss)), uuid(std::move(uuid)) {}
 };
 
 struct TTLCollModInfo {

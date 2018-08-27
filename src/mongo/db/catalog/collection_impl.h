@@ -203,7 +203,7 @@ public:
                             const BSONObj& newDoc,
                             bool indexesAffected,
                             OpDebug* opDebug,
-                            OplogUpdateEntryArgs* args) final;
+                            CollectionUpdateArgs* args) final;
 
     bool updateWithDamagesSupported() const final;
 
@@ -219,7 +219,7 @@ public:
                                                      const Snapshotted<RecordData>& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages,
-                                                     OplogUpdateEntryArgs* args) final;
+                                                     CollectionUpdateArgs* args) final;
 
     // -----------
 

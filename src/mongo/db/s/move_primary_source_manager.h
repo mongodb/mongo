@@ -31,6 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/s/request_types/move_primary_gen.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

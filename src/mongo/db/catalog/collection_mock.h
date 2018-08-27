@@ -163,7 +163,7 @@ public:
                             const BSONObj& newDoc,
                             bool indexesAffected,
                             OpDebug* opDebug,
-                            OplogUpdateEntryArgs* args) {
+                            CollectionUpdateArgs* args) {
         std::abort();
     }
 
@@ -176,7 +176,7 @@ public:
                                                      const Snapshotted<RecordData>& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages,
-                                                     OplogUpdateEntryArgs* args) {
+                                                     CollectionUpdateArgs* args) {
         std::abort();
     }
 

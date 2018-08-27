@@ -267,7 +267,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
             WriteUnitOfWork wuow(_opCtx.get());
             const bool indexesAffected = true;
             OpDebug* opDebug = nullptr;
-            OplogUpdateEntryArgs args;
+            CollectionUpdateArgs args;
             collection->updateDocument(
                 _opCtx.get(),
                 record->id,

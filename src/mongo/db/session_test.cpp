@@ -53,7 +53,6 @@ namespace mongo {
 namespace {
 
 const NamespaceString kNss("TestDB", "TestColl");
-const OptionalCollectionUUID kUUID;
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
@@ -148,14 +147,16 @@ protected:
 
     static repl::OpTime logOp(OperationContext* opCtx,
                               const NamespaceString& nss,
+                              UUID uuid,
                               const LogicalSessionId& lsid,
                               TxnNumber txnNumber,
                               StmtId stmtId) {
-        return logOp(opCtx, nss, lsid, txnNumber, stmtId, {});
+        return logOp(opCtx, nss, uuid, lsid, txnNumber, stmtId, {});
     }
 
     static repl::OpTime logOp(OperationContext* opCtx,
                               const NamespaceString& nss,
+                              UUID uuid,
                               const LogicalSessionId& lsid,
                               TxnNumber txnNumber,
                               StmtId stmtId,
@@ -170,7 +171,7 @@ protected:
         return repl::logOp(opCtx,
                            "n",
                            nss,
-                           kUUID,
+                           uuid,
                            BSON("TestValue" << 0),
                            nullptr,
                            false,
@@ -187,12 +188,13 @@ protected:
                                 StmtId stmtId,
                                 repl::OpTime prevOpTime,
                                 boost::optional<DurableTxnStateEnum> txnState) {
+        const auto uuid = UUID::gen();
         session->beginOrContinueTxn(opCtx(), txnNum);
 
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
         const auto opTime =
-            logOp(opCtx(), kNss, session->getSessionId(), txnNum, stmtId, prevOpTime);
+            logOp(opCtx(), kNss, uuid, session->getSessionId(), txnNum, stmtId, prevOpTime);
         session->onWriteOpCompletedOnPrimary(
             opCtx(), txnNum, {stmtId}, opTime, Date_t::now(), txnState);
         wuow.commit();
@@ -335,6 +337,7 @@ TEST_F(SessionTest, StartingOldTxnShouldAssert) {
 }
 
 TEST_F(SessionTest, SessionTransactionsCollectionNotDefaultCreated) {
+    const auto uuid = UUID::gen();
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
@@ -350,7 +353,7 @@ TEST_F(SessionTest, SessionTransactionsCollectionNotDefaultCreated) {
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
-    const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
+    const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, 0);
     ASSERT_THROWS(session.onWriteOpCompletedOnPrimary(
                       opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none),
                   AssertionException);
@@ -411,6 +414,7 @@ TEST_F(SessionTest, CheckStatementExecutedForInvalidatedTransactionThrows) {
 }
 
 TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
+    const auto uuid = UUID::gen();
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
@@ -421,7 +425,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
+        const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, 0);
         session.onWriteOpCompletedOnPrimary(
             opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none);
         wuow.commit();
@@ -430,7 +434,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum - 1, 0);
+        const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum - 1, 0);
         ASSERT_THROWS_CODE(session.onWriteOpCompletedOnPrimary(
                                opCtx(), txnNum - 1, {0}, opTime, Date_t::now(), boost::none),
                            AssertionException,
@@ -439,6 +443,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
 }
 
 TEST_F(SessionTest, WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
+    const auto uuid = UUID::gen();
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
@@ -448,7 +453,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
-    const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
+    const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, 0);
 
     session.invalidate();
 
@@ -459,6 +464,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
 }
 
 TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
+    const auto uuid = UUID::gen();
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
@@ -469,7 +475,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, sessionId, txnNum, 0);
+        const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, 0);
         session.onWriteOpCompletedOnPrimary(
             opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none);
 
@@ -551,6 +557,7 @@ TEST_F(SessionTest, IncompleteHistoryDueToOpLogTruncation) {
 }
 
 TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
+    const auto uuid = UUID::gen();
     const auto sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNum = 2;
 
@@ -571,7 +578,7 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
         auto opTime = repl::logOp(opCtx(),
                                   "i",
                                   kNss,
-                                  kUUID,
+                                  uuid,
                                   BSON("x" << 1),
                                   &Session::kDeadEndSentinel,
                                   false,
@@ -600,7 +607,7 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
         auto opTime = repl::logOp(opCtx(),
                                   "n",
                                   kNss,
-                                  kUUID,
+                                  uuid,
                                   {},
                                   &Session::kDeadEndSentinel,
                                   false,

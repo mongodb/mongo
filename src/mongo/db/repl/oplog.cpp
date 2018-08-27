@@ -435,6 +435,16 @@ OpTime logOp(OperationContext* opCtx,
              const OplogLink& oplogLink,
              bool prepare,
              const OplogSlot& oplogSlot) {
+    // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
+    // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
+    invariant(uuid || 'n' == *opstr || 'c' == *opstr,
+              str::stream() << "Expected uuid for logOp with opstr: " << opstr << ", nss: "
+                            << nss.ns()
+                            << ", obj: "
+                            << obj
+                            << ", os: "
+                            << o2);
+
     auto replCoord = ReplicationCoordinator::get(opCtx);
     // For commands, the test below is on the command ns and therefore does not check for
     // specific namespaces such as system.profile. This is the caller's responsibility.
