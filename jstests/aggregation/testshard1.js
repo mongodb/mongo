@@ -196,7 +196,8 @@ function testSample() {
         assert.eq(res.length, Math.min(nItems, size));
     });
 }
-testSample();
+// TODO: Enable after fixing SERVER-36871
+// testSample();
 
 jsTestLog('test $out by copying source collection verbatim to output');
 var outCollection = db.ts1_out;
