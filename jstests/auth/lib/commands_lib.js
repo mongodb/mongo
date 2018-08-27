@@ -6,9 +6,8 @@ of all database commands.
 This file contains an array of test definitions, as well as
 some shared test logic.
 
-See jstests/auth/commands_builtinRoles.js and
-jstests/auth/commands_userDefinedRoles.js for two separate implementations
-of the test logic, respectively to test authorization with builtin roles
+See jstests/auth/commands_builtin_roles.js and jstests/auth/commands_user_defined_roles.js for two
+separate implementations of the test logic, respectively to test authorization with builtin roles
 and authorization with user-defined roles.
 
 Example test definition:
@@ -1153,6 +1152,98 @@ var authCommandsLib = {
                     {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
                     {resource: {db: secondDbName, collection: "foo_out"}, actions: ["insert"]},
                     {resource: {db: secondDbName, collection: "foo_out"}, actions: ["update"]},
+                ]
+              },
+          ]
+        },
+        {
+          testname: "aggregate_out_legacy_bypass_doc_validation",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$out: "foo_out"}],
+              cursor: {},
+              bypassDocumentValidation: true,
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                // Note that the built-in role must have 'bypassDocumentValidation' for this test.
+                roles: {dbOwner: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "foo_out"},
+                      actions: ["insert", "remove", "bypassDocumentValidation"]
+                    },
+                ]
+              },
+          ]
+        },
+        {
+          testname: "aggregate_out_replace_collection_bypass_doc_validation",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$out: {to: "foo_out", mode: "replaceCollection"}}],
+              cursor: {},
+              bypassDocumentValidation: true,
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                // Note that the built-in role must have 'bypassDocumentValidation' for this test.
+                roles: {dbOwner: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "foo_out"},
+                      actions: ["insert", "remove", "bypassDocumentValidation"]
+                    },
+                ]
+              },
+          ]
+        },
+        {
+          testname: "aggregate_out_replace_documents_bypass_doc_validation",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$out: {to: "foo_out", mode: "replaceDocuments"}}],
+              cursor: {},
+              bypassDocumentValidation: true,
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                // Note that the built-in role must have 'bypassDocumentValidation' for this test.
+                roles: {dbOwner: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "foo_out"},
+                      actions: ["insert", "update", "bypassDocumentValidation"]
+                    },
+                ]
+              },
+          ]
+        },
+        {
+          testname: "aggregate_out_insert_documents_bypass_doc_validation",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$out: {to: "foo_out", mode: "insertDocuments"}}],
+              cursor: {},
+              bypassDocumentValidation: true,
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                // Note that the built-in role must have 'bypassDocumentValidation' for this test.
+                roles: {dbOwner: 1, root: 1, __system: 1},
+                privileges: [
+                    {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                    {
+                      resource: {db: firstDbName, collection: "foo_out"},
+                      actions: ["insert", "bypassDocumentValidation"]
+                    },
                 ]
               },
           ]

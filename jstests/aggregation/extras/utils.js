@@ -238,13 +238,17 @@ function orderedArrayEq(al, ar, verbose = false) {
 /**
  * Asserts that the given aggregation fails with a specific code. Error message is optional.
  */
-function assertErrorCode(coll, pipe, code, errmsg) {
+function assertErrorCode(coll, pipe, code, errmsg, options = {}) {
     if (!Array.isArray(pipe)) {
         pipe = [pipe];
     }
 
     let cmd = {pipeline: pipe};
     cmd.cursor = {batchSize: 0};
+
+    for (let opt of Object.keys(options)) {
+        cmd[opt] = options[opt];
+    }
 
     let cursorRes = coll.runCommand("aggregate", cmd);
     if (cursorRes.ok) {
