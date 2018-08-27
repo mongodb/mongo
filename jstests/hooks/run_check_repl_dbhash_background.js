@@ -250,7 +250,8 @@
                 }
             } catch (e) {
                 for (let session of sessions) {
-                    if (session.getSessionId() !== commitErrorSessionId) {
+                    if ((commitErrorSessionId === undefined) ||
+                        bsonWoCompare(session.getSessionId(), commitErrorSessionId) !== 0) {
                         session.abortTransaction();
                     }
                 }
