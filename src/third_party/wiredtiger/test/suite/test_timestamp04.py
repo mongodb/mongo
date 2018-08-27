@@ -70,8 +70,8 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         if missing == False:
             actual = dict((k, v) for k, v in cur if v != 0)
             if actual != expected:
-                print "missing: ", sorted(set(expected) - set(actual))
-                print "extras: ", sorted(set(actual) - set(expected))
+                print "missing: ", sorted(set(expected.items()) - set(actual.items()))
+                print "extras: ", sorted(set(actual.items()) - set(expected.items()))
             self.assertTrue(actual == expected)
 
         # Search for the expected items as well as iterating.
@@ -167,7 +167,8 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.rollback_to_stable()
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rollback_to_stable][2]
-        upd_aborted = stat_cursor[stat.conn.txn_rollback_upd_aborted][2]
+        upd_aborted = (stat_cursor[stat.conn.txn_rollback_upd_aborted][2] +
+            stat_cursor[stat.conn.txn_rollback_las_removed][2])
         stat_cursor.close()
         self.assertEqual(calls, 1)
         self.assertTrue(upd_aborted >= key_range/2)
@@ -237,7 +238,8 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.rollback_to_stable()
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rollback_to_stable][2]
-        upd_aborted = stat_cursor[stat.conn.txn_rollback_upd_aborted][2]
+        upd_aborted = (stat_cursor[stat.conn.txn_rollback_upd_aborted][2] +
+            stat_cursor[stat.conn.txn_rollback_las_removed][2])
         stat_cursor.close()
         self.assertEqual(calls, 2)
         #

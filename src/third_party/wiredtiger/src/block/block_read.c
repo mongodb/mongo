@@ -181,39 +181,35 @@ err:	__wt_scr_free(session, &tmp);
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_block_read_off_blind --
- *	Read the block at an offset, try to figure out what it looks like,
- * debugging only.
+ *	Read the block at an offset, return the size and checksum, debugging
+ * only.
  */
 int
-__wt_block_read_off_blind(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t offset)
+__wt_block_read_off_blind(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, wt_off_t offset, uint32_t *sizep, uint32_t *checksump)
 {
 	WT_BLOCK_HEADER *blk;
-	uint32_t checksum, size;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+
+	*sizep = 0;
+	*checksump = 0;
 
 	/*
 	 * Make sure the buffer is large enough for the header and read the
 	 * the first allocation-size block.
 	 */
-	WT_RET(__wt_buf_init(session, buf, block->allocsize));
-	WT_RET(__wt_read(
-	    session, block->fh, offset, (size_t)block->allocsize, buf->mem));
-	blk = WT_BLOCK_HEADER_REF(buf->mem);
+	WT_RET(__wt_scr_alloc(session, block->allocsize, &tmp));
+	WT_ERR(__wt_read(
+	    session, block->fh, offset, (size_t)block->allocsize, tmp->mem));
+	blk = WT_BLOCK_HEADER_REF(tmp->mem);
 	__wt_block_header_byteswap(blk);
 
-	/*
-	 * Copy out the size and checksum (we're about to re-use the buffer),
-	 * and if the size isn't insane, read the rest of the block.
-	 */
-	size = blk->disk_size;
-	checksum = blk->checksum;
-	if (__wt_block_offset_invalid(block, offset, size))
-		WT_RET_MSG(session, EINVAL,
-		    "block at offset %" PRIuMAX " cannot be a valid block, no "
-		    "read attempted",
-		    (uintmax_t)offset);
-	return (
-	    __wt_block_read_off(session, block, buf, offset, size, checksum));
+	*sizep = blk->disk_size;
+	*checksump = blk->checksum;
+
+err:	__wt_scr_free(session, &tmp);
+	return (ret);
 }
 #endif
 

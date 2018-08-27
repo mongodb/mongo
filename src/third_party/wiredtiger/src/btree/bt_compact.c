@@ -16,7 +16,6 @@ static int
 __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
 	WT_BM *bm;
-	WT_DECL_RET;
 	WT_MULTI *multi;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
@@ -28,13 +27,8 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 
 	bm = S2BT(session)->bm;
 	page = ref->page;
-	mod = page->modify;
 
-	/*
-	 * If the page is clean, test the original addresses.
-	 * If the page is a replacement, test the replacement addresses.
-	 * Ignore empty pages, they get merged into the parent.
-	 */
+	/* If the page is clean, test the original addresses. */
 	if (__wt_page_evict_clean(page)) {
 		__wt_ref_info(ref, &addr, &addr_size, NULL);
 		if (addr == NULL)
@@ -44,34 +38,31 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	}
 
 	/*
-	 * The page's modification information can change underfoot if the page
-	 * is being reconciled, serialize with reconciliation.
+	 * If the page is a replacement, test the replacement addresses.
+	 * Ignore empty pages, they get merged into the parent.
+	 *
+	 * Page-modify variable initialization done here because the page could
+	 * be modified while we're looking at it, so the page modified structure
+	 * may appear at any time (but cannot disappear). We've confirmed there
+	 * is a page modify structure, it's OK to look at it.
 	 */
-	if (mod->rec_result == WT_PM_REC_REPLACE ||
-	    mod->rec_result == WT_PM_REC_MULTIBLOCK)
-		WT_PAGE_LOCK(session, page);
-
+	mod = page->modify;
 	if (mod->rec_result == WT_PM_REC_REPLACE)
-		ret = bm->compact_page_skip(bm, session,
-		    mod->mod_replace.addr, mod->mod_replace.size, skipp);
+		return (bm->compact_page_skip(bm, session,
+		    mod->mod_replace.addr, mod->mod_replace.size, skipp));
 
 	if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
 		for (multi = mod->mod_multi,
 		    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
 			if (multi->addr.addr == NULL)
 				continue;
-			if ((ret = bm->compact_page_skip(bm, session,
-			    multi->addr.addr, multi->addr.size, skipp)) != 0)
-				break;
+			WT_RET(bm->compact_page_skip(bm, session,
+			    multi->addr.addr, multi->addr.size, skipp));
 			if (!*skipp)
 				break;
 		}
 
-	if (mod->rec_result == WT_PM_REC_REPLACE ||
-	    mod->rec_result == WT_PM_REC_MULTIBLOCK)
-		WT_PAGE_UNLOCK(session, page);
-
-	return (ret);
+	return (0);
 }
 
 /*
@@ -98,10 +89,9 @@ __compact_rewrite_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	 * There are two ways we call reconciliation: checkpoints and eviction.
 	 * Get the tree's flush lock which blocks threads writing pages for
 	 * checkpoints. If checkpoint is holding the lock, quit working this
-	 * file, we'll visit it again in our next pass.
-	 *
-	 * Serializing with eviction is not quite as simple, and it gets done
-	 * in the underlying function that checks modification information.
+	 * file, we'll visit it again in our next pass. We don't have to worry
+	 * about eviction, we're holding a hazard pointer on the WT_REF, it's
+	 * not going anywhere.
 	 */
 	WT_RET(__wt_spin_trylock(session, &btree->flush_lock));
 

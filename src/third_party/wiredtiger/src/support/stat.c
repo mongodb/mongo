@@ -1018,6 +1018,7 @@ static const char * const __stats_connection_desc[] = {
 	"reconciliation: split objects currently awaiting free",
 	"session: open cursor count",
 	"session: open session count",
+	"session: session query timestamp calls",
 	"session: table alter failed calls",
 	"session: table alter successful calls",
 	"session: table alter unchanged and skipped",
@@ -1055,8 +1056,9 @@ static const char * const __stats_connection_desc[] = {
 	"thread-yield: page acquire time sleeping (usecs)",
 	"thread-yield: page delete rollback time sleeping for state change (usecs)",
 	"thread-yield: page reconciliation yielded due to child modification",
+	"transaction: commit timestamp queue entries walked",
 	"transaction: commit timestamp queue insert to empty",
-	"transaction: commit timestamp queue inserts to tail",
+	"transaction: commit timestamp queue inserts to head",
 	"transaction: commit timestamp queue inserts total",
 	"transaction: commit timestamp queue length",
 	"transaction: number of named snapshots created",
@@ -1066,6 +1068,7 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: prepared transactions currently active",
 	"transaction: prepared transactions rolled back",
 	"transaction: query timestamp calls",
+	"transaction: read timestamp queue entries walked",
 	"transaction: read timestamp queue insert to empty",
 	"transaction: read timestamp queue inserts to head",
 	"transaction: read timestamp queue inserts total",
@@ -1417,6 +1420,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing rec_split_stashed_objects */
 		/* not clearing session_cursor_open */
 		/* not clearing session_open */
+	stats->session_query_ts = 0;
 		/* not clearing session_table_alter_fail */
 		/* not clearing session_table_alter_success */
 		/* not clearing session_table_alter_skip */
@@ -1454,8 +1458,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->page_sleep = 0;
 	stats->page_del_rollback_blocked = 0;
 	stats->child_modify_blocked_page = 0;
+	stats->txn_commit_queue_walked = 0;
 	stats->txn_commit_queue_empty = 0;
-	stats->txn_commit_queue_tail = 0;
+	stats->txn_commit_queue_head = 0;
 	stats->txn_commit_queue_inserts = 0;
 	stats->txn_commit_queue_len = 0;
 	stats->txn_snapshots_created = 0;
@@ -1465,6 +1470,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->txn_prepare_active = 0;
 	stats->txn_prepare_rollback = 0;
 	stats->txn_query_ts = 0;
+	stats->txn_read_queue_walked = 0;
 	stats->txn_read_queue_empty = 0;
 	stats->txn_read_queue_head = 0;
 	stats->txn_read_queue_inserts = 0;
@@ -1919,6 +1925,7 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, rec_split_stashed_objects);
 	to->session_cursor_open += WT_STAT_READ(from, session_cursor_open);
 	to->session_open += WT_STAT_READ(from, session_open);
+	to->session_query_ts += WT_STAT_READ(from, session_query_ts);
 	to->session_table_alter_fail +=
 	    WT_STAT_READ(from, session_table_alter_fail);
 	to->session_table_alter_success +=
@@ -1984,10 +1991,12 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, page_del_rollback_blocked);
 	to->child_modify_blocked_page +=
 	    WT_STAT_READ(from, child_modify_blocked_page);
+	to->txn_commit_queue_walked +=
+	    WT_STAT_READ(from, txn_commit_queue_walked);
 	to->txn_commit_queue_empty +=
 	    WT_STAT_READ(from, txn_commit_queue_empty);
-	to->txn_commit_queue_tail +=
-	    WT_STAT_READ(from, txn_commit_queue_tail);
+	to->txn_commit_queue_head +=
+	    WT_STAT_READ(from, txn_commit_queue_head);
 	to->txn_commit_queue_inserts +=
 	    WT_STAT_READ(from, txn_commit_queue_inserts);
 	to->txn_commit_queue_len += WT_STAT_READ(from, txn_commit_queue_len);
@@ -2000,6 +2009,8 @@ __wt_stat_connection_aggregate(
 	to->txn_prepare_active += WT_STAT_READ(from, txn_prepare_active);
 	to->txn_prepare_rollback += WT_STAT_READ(from, txn_prepare_rollback);
 	to->txn_query_ts += WT_STAT_READ(from, txn_query_ts);
+	to->txn_read_queue_walked +=
+	    WT_STAT_READ(from, txn_read_queue_walked);
 	to->txn_read_queue_empty += WT_STAT_READ(from, txn_read_queue_empty);
 	to->txn_read_queue_head += WT_STAT_READ(from, txn_read_queue_head);
 	to->txn_read_queue_inserts +=

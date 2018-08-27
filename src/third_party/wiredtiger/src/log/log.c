@@ -2145,18 +2145,16 @@ err:	if (locked)
 }
 
 /*
- * __log_salvageable_error --
- *	Show error messages consistently for a salvageable error.
+ * __log_salvage_message --
+ *	Show messages consistently for a salvageable error.
  */
 static int
-__log_salvageable_error(WT_SESSION_IMPL *session, const char *log_name,
+__log_salvage_message(WT_SESSION_IMPL *session, const char *log_name,
     const char *extra_msg, wt_off_t offset)
 {
-	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_RECOVER_SALVAGE))
-		WT_PANIC_RET(session, WT_ERROR,
-		    "log file %s corrupted%s at position %" PRIuMAX
-		    ", use salvage to fix", log_name, extra_msg,
-		    (uintmax_t)offset);
+	WT_RET(__wt_msg(session,
+	    "log file %s corrupted%s at position %" PRIuMAX
+	    ", truncated", log_name, extra_msg, (uintmax_t)offset));
 	return (WT_ERROR);
 }
 
@@ -2324,7 +2322,7 @@ advance:
 				    &partial_record));
 				if (bad_offset != 0) {
 					need_salvage = true;
-					WT_ERR(__log_salvageable_error(session,
+					WT_ERR(__log_salvage_message(session,
 					    log_fh->name, "", bad_offset));
 				}
 			}
@@ -2440,7 +2438,7 @@ advance:
 			    &bad_offset, &eol));
 			if (bad_offset != 0) {
 				need_salvage = true;
-				WT_ERR(__log_salvageable_error(session,
+				WT_ERR(__log_salvage_message(session,
 				    log_fh->name, "", bad_offset));
 			}
 			if (eol)
@@ -2494,18 +2492,20 @@ advance:
 				ret = WT_NOTFOUND;
 
 			/*
-			 * When we have a checksum mismatch, we determine
-			 * whether it may be the result of:
+			 * When we have a checksum mismatch, we would like
+			 * to determine whether it may be the result of:
 			 *  1) some expected corruption that can occur during
 			 *     backups
 			 *  2) a partial write that can naturally occur when
 			 *     an application crashes
 			 *  3) some other corruption
-			 *
-			 * As the first and second happen commonly in normal
-			 * operations, we will silently truncate the log when
-			 * it occurs. The third will result in an error during
-			 * recovery, and requires salvage to fix.
+			 * so that we can (in case 3) flag cases of file system
+			 * or hardware failures. Unfortunately, we have found
+			 * on some systems that file system writes may in fact
+			 * be lost, and this can readily be triggered with
+			 * normal operations. Rather than force users to
+			 * salvage in these situations, we merely truncate the
+			 * log at this point and issue a message.
 			 */
 			if (F_ISSET(conn, WT_CONN_WAS_BACKUP))
 				break;
@@ -2517,7 +2517,7 @@ advance:
 				 * must be salvaged.
 				 */
 				need_salvage = true;
-				WT_ERR(__log_salvageable_error(session,
+				WT_ERR(__log_salvage_message(session,
 				    log_fh->name, ", bad checksum",
 				    rd_lsn.l.offset));
 			} else {
@@ -2530,7 +2530,7 @@ advance:
 				    rd_lsn.l.offset, logrec, &corrupt));
 				if (corrupt) {
 					need_salvage = true;
-					WT_ERR(__log_salvageable_error(session,
+					WT_ERR(__log_salvage_message(session,
 					    log_fh->name, "", rd_lsn.l.offset));
 				}
 			}

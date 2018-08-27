@@ -510,6 +510,10 @@ __wt_txn_visible_all(
 static inline bool
 __wt_txn_upd_visible_all(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
+	if (upd->prepare_state == WT_PREPARE_LOCKED ||
+	    upd->prepare_state == WT_PREPARE_INPROGRESS)
+		return (false);
+
 	return (__wt_txn_visible_all(
 	    session, upd->txnid, WT_TIMESTAMP_NULL(&upd->timestamp)));
 }
@@ -901,8 +905,8 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 		return (0);
 
 	/*
-	 * Clear the ignore prepare setting of txn, as it is not supposed, to
-	 * affect the visibility for update operations.
+	 * Always include prepared transactions in this check: they are not
+	 * supposed to affect visibility for update operations.
 	 */
 	ignore_prepare_set = F_ISSET(txn, WT_TXN_IGNORE_PREPARE);
 	F_CLR(txn, WT_TXN_IGNORE_PREPARE);

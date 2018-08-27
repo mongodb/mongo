@@ -537,11 +537,40 @@ thread_ckpt_run(void *arg)
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 	first_ckpt = true;
 	ts = 0;
-	for (i = 0; ;++i) {
+	/*
+	 * Keep writing checkpoints until killed by parent.
+	 */
+	__wt_epoch(NULL, &start);
+	i = 0;
+	while (true) {
 		sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
 		sleep(sleep_time);
-		if (use_ts)
+		if (use_ts) {
 			ts = global_ts;
+			/*
+			 * If we're using timestamps wait for the stable
+			 * timestamp to get set the first time.
+			 */
+			if (!stable_set) {
+				__wt_epoch(NULL, &now);
+				if (WT_TIMEDIFF_SEC(now, start) >= 1)
+					printf("CKPT: !stable_set time %"
+					    PRIu64 "\n",
+					    WT_TIMEDIFF_SEC(now, start));
+				if (WT_TIMEDIFF_SEC(now, start) > 10) {
+					fprintf(stderr,
+					    "After 10 seconds stable still "
+					    "not set. Aborting.\n");
+					/*
+					 * For the checkpoint thread the info
+					 * contains the number of threads.
+					 */
+					dump_ts(td->info);
+					abort();
+				}
+				continue;
+			}
+		}
 		/*
 		 * Since this is the default, send in this string even if
 		 * running without timestamps.
@@ -549,7 +578,7 @@ thread_ckpt_run(void *arg)
 		testutil_check(session->checkpoint(
 		    session, "use_timestamp=true"));
 		printf("Checkpoint %d complete.  Minimum ts %" PRIu64 "\n",
-		    i, ts);
+		    ++i, ts);
 		fflush(stdout);
 		/*
 		 * Create the checkpoint file so that the parent process knows
@@ -559,24 +588,9 @@ thread_ckpt_run(void *arg)
 		 * cause a false positive for a timeout.
 		 */
 		if (first_ckpt) {
-			__wt_epoch(NULL, &start);
 			testutil_checksys((fp = fopen(ckpt_file, "w")) == NULL);
 			first_ckpt = false;
 			testutil_checksys(fclose(fp) != 0);
-		}
-
-		__wt_epoch(NULL, &now);
-		printf("CKPT: stable_set %d, time %" PRIu64 "\n",
-		    stable_set, WT_TIMEDIFF_SEC(now, start));
-		if (use_ts && !stable_set && WT_TIMEDIFF_SEC(now, start) > 2) {
-			fprintf(stderr,
-			    "After 2 seconds ckpt stable still not set\n");
-			/*
-			 * For the checkpoint thread the info contains the
-			 * number of threads.
-			 */
-			dump_ts(td->info);
-			abort();
 		}
 	}
 	/* NOTREACHED */

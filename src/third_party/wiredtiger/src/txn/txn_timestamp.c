@@ -221,10 +221,19 @@ __txn_get_pinned_timestamp(
 
 	/* Look for the oldest ordinary reader. */
 	__wt_readlock(session, &txn_global->read_timestamp_rwlock);
-	txn = TAILQ_FIRST(&txn_global->read_timestamph);
-	if (txn != NULL &&
-	    __wt_timestamp_cmp(&txn->read_timestamp, tsp) < 0)
-		__wt_timestamp_set(tsp, &txn->read_timestamp);
+	TAILQ_FOREACH(txn, &txn_global->read_timestamph, read_timestampq) {
+		/*
+		 * Skip any transactions on the queue that are not active.
+		 */
+		if (txn->clear_read_q)
+			continue;
+		if (__wt_timestamp_cmp(&txn->read_timestamp, tsp) < 0)
+			__wt_timestamp_set(tsp, &txn->read_timestamp);
+		/*
+		 * We break on the first active txn on the list.
+		 */
+		break;
+	}
 	__wt_readunlock(session, &txn_global->read_timestamp_rwlock);
 
 	return (0);
@@ -232,7 +241,7 @@ __txn_get_pinned_timestamp(
 
 /*
  * __txn_global_query_timestamp --
- *	Query a timestamp.
+ *	Query a timestamp on the global transaction.
  */
 static int
 __txn_global_query_timestamp(
@@ -264,7 +273,7 @@ __txn_global_query_timestamp(
 		__wt_readlock(session, &txn_global->commit_timestamp_rwlock);
 		TAILQ_FOREACH(txn, &txn_global->commit_timestamph,
 		    commit_timestampq) {
-			if (txn->clear_ts_queue)
+			if (txn->clear_commit_q)
 				continue;
 
 			__wt_timestamp_set(
@@ -302,24 +311,63 @@ __txn_global_query_timestamp(
 done:	__wt_timestamp_set(tsp, &ts);
 	return (0);
 }
+
+/*
+ * __txn_query_timestamp --
+ *	Query a timestamp within this session's transaction.
+ */
+static int
+__txn_query_timestamp(
+    WT_SESSION_IMPL *session, wt_timestamp_t *tsp, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval;
+	WT_TXN *txn;
+
+	txn = &session->txn;
+
+	WT_STAT_CONN_INCR(session, session_query_ts);
+	if (!F_ISSET(txn, WT_TXN_RUNNING))
+		return (WT_NOTFOUND);
+
+	WT_RET(__wt_config_gets(session, cfg, "get", &cval));
+	if (WT_STRING_MATCH("commit", cval.str, cval.len))
+		__wt_timestamp_set(tsp, &txn->commit_timestamp);
+	else if (WT_STRING_MATCH("first_commit", cval.str, cval.len))
+		__wt_timestamp_set(tsp, &txn->first_commit_timestamp);
+	else if (WT_STRING_MATCH("prepare", cval.str, cval.len))
+		__wt_timestamp_set(tsp, &txn->prepare_timestamp);
+	else if (WT_STRING_MATCH("read", cval.str, cval.len))
+		__wt_timestamp_set(tsp, &txn->read_timestamp);
+	else
+		WT_RET_MSG(session, EINVAL,
+		    "unknown timestamp query %.*s", (int)cval.len, cval.str);
+
+	return (0);
+}
 #endif
 
 /*
- * __wt_txn_global_query_timestamp --
- *	Query a timestamp.
+ * __wt_txn_query_timestamp --
+ *	Query a timestamp. The caller may query the global transaction or the
+ *      session's transaction.
  */
 int
-__wt_txn_global_query_timestamp(
-    WT_SESSION_IMPL *session, char *hex_timestamp, const char *cfg[])
+__wt_txn_query_timestamp(WT_SESSION_IMPL *session,
+    char *hex_timestamp, const char *cfg[], bool global_txn)
 {
 #ifdef HAVE_TIMESTAMPS
 	wt_timestamp_t ts;
 
-	WT_RET(__txn_global_query_timestamp(session, &ts, cfg));
+	if (global_txn)
+		WT_RET(__txn_global_query_timestamp(session, &ts, cfg));
+	else
+		WT_RET(__txn_query_timestamp(session, &ts, cfg));
+
 	return (__wt_timestamp_to_hex_string(session, hex_timestamp, &ts));
 #else
 	WT_UNUSED(hex_timestamp);
 	WT_UNUSED(cfg);
+	WT_UNUSED(global_txn);
 
 	WT_RET_MSG(session, ENOTSUP,
 	    "requires a version of WiredTiger built with timestamp support");
@@ -741,16 +789,27 @@ __wt_txn_parse_prepare_timestamp(
 		__wt_readlock(session, &txn_global->read_timestamp_rwlock);
 		prev = TAILQ_LAST(&txn_global->read_timestamph,
 		    __wt_txn_rts_qh);
-		if (prev != NULL &&
-		    __wt_timestamp_cmp(&prev->read_timestamp, timestamp) >= 0) {
-			__wt_readunlock(session,
-			    &txn_global->read_timestamp_rwlock);
-			WT_RET(__wt_timestamp_to_hex_string(session,
-			    hex_timestamp, &prev->read_timestamp));
-			WT_RET_MSG(session, EINVAL,
-			    "prepare timestamp %.*s not later than an active "
-			    "read timestamp %s ", (int)cval.len, cval.str,
-			    hex_timestamp);
+		while (prev != NULL) {
+			/*
+			 * Skip any transactions that are not active.
+			 */
+			if (prev->clear_read_q) {
+				prev = TAILQ_PREV(
+				    prev, __wt_txn_rts_qh, read_timestampq);
+				continue;
+			}
+			if (__wt_timestamp_cmp(
+			    &prev->read_timestamp, timestamp) >= 0) {
+				__wt_readunlock(session,
+				    &txn_global->read_timestamp_rwlock);
+				WT_RET(__wt_timestamp_to_hex_string(session,
+				    hex_timestamp, &prev->read_timestamp));
+				WT_RET_MSG(session, EINVAL,
+				    "prepare timestamp %.*s not later than "
+				    "an active read timestamp %s ",
+				    (int)cval.len, cval.str, hex_timestamp);
+			}
+			break;
 		}
 		__wt_readunlock(session, &txn_global->read_timestamp_rwlock);
 
@@ -901,6 +960,7 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session)
 	WT_TXN *qtxn, *txn, *txn_tmp;
 	WT_TXN_GLOBAL *txn_global;
 	wt_timestamp_t ts;
+	uint64_t walked;
 
 	txn = &session->txn;
 	txn_global = &S2C(session)->txn_global;
@@ -922,10 +982,10 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session)
 	 * finding where to insert ourselves (which would result in a list
 	 * loop) and we don't want to walk more of the list than needed.
 	 */
-	if (txn->clear_ts_queue) {
+	if (txn->clear_commit_q) {
 		TAILQ_REMOVE(&txn_global->commit_timestamph,
 		    txn, commit_timestampq);
-		WT_PUBLISH(txn->clear_ts_queue, false);
+		WT_PUBLISH(txn->clear_commit_q, false);
 		--txn_global->commit_timestampq_len;
 	}
 	/*
@@ -938,39 +998,48 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session)
 		    &txn_global->commit_timestamph, txn, commit_timestampq);
 		WT_STAT_CONN_INCR(session, txn_commit_queue_empty);
 	} else {
+		/* Walk from the start, removing cleared entries. */
+		walked = 0;
 		TAILQ_FOREACH_SAFE(qtxn, &txn_global->commit_timestamph,
 		    commit_timestampq, txn_tmp) {
-			if (qtxn->clear_ts_queue) {
-				TAILQ_REMOVE(&txn_global->commit_timestamph,
-				    qtxn, commit_timestampq);
-				WT_PUBLISH(qtxn->clear_ts_queue, false);
-				--txn_global->commit_timestampq_len;
-				continue;
-			}
+			++walked;
 			/*
-			 * Only walk the list up until we get to the place where
-			 * we want to insert our timestamp. Some other thread
-			 * will remove any later transactions.
+			 * Stop on the first entry that we cannot clear.
 			 */
-			if (__wt_timestamp_cmp(
-			    &qtxn->first_commit_timestamp, &ts) > 0)
+			if (!qtxn->clear_commit_q)
 				break;
+
+			TAILQ_REMOVE(&txn_global->commit_timestamph,
+			    qtxn, commit_timestampq);
+			WT_PUBLISH(qtxn->clear_commit_q, false);
+			--txn_global->commit_timestampq_len;
 		}
+
 		/*
-		 * If we got to the end, then our timestamp is larger than
-		 * the last element's timestamp. Insert at the end.
+		 * Now walk backwards from the end to find the correct position
+		 * for the insert.
 		 */
+		qtxn = TAILQ_LAST(
+		     &txn_global->commit_timestamph, __wt_txn_cts_qh);
+		while (qtxn != NULL && __wt_timestamp_cmp(
+		    &qtxn->first_commit_timestamp, &ts) > 0) {
+			++walked;
+			qtxn = TAILQ_PREV(
+			    qtxn, __wt_txn_cts_qh, commit_timestampq);
+		}
 		if (qtxn == NULL) {
-			TAILQ_INSERT_TAIL(&txn_global->commit_timestamph,
-			    txn, commit_timestampq);
-			WT_STAT_CONN_INCR(session, txn_commit_queue_tail);
+			TAILQ_INSERT_HEAD(&txn_global->commit_timestamph,
+			   txn, commit_timestampq);
+			WT_STAT_CONN_INCR(session, txn_commit_queue_head);
 		} else
-			TAILQ_INSERT_BEFORE(qtxn, txn, commit_timestampq);
+			TAILQ_INSERT_AFTER(&txn_global->commit_timestamph,
+			    qtxn, txn, commit_timestampq);
+		WT_STAT_CONN_INCRV(session, txn_commit_queue_walked, walked);
 	}
 	__wt_timestamp_set(&txn->first_commit_timestamp, &ts);
 	++txn_global->commit_timestampq_len;
 	WT_STAT_CONN_INCR(session, txn_commit_queue_inserts);
-	txn->clear_ts_queue = false;
+	txn->clear_commit_q = false;
 	F_SET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_PUBLIC_TS_COMMIT);
 	__wt_writeunlock(session, &txn_global->commit_timestamp_rwlock);
 }
@@ -997,7 +1066,7 @@ __wt_txn_clear_commit_timestamp(WT_SESSION_IMPL *session)
 	 * cleaned up safely from the commit timestamp queue whenever the next
 	 * thread walks the queue. We do not need to remove it now.
 	 */
-	WT_PUBLISH(txn->clear_ts_queue, true);
+	WT_PUBLISH(txn->clear_commit_q, true);
 	WT_PUBLISH(txn->flags, flags);
 }
 
@@ -1008,8 +1077,9 @@ __wt_txn_clear_commit_timestamp(WT_SESSION_IMPL *session)
 void
 __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session)
 {
-	WT_TXN *prev, *txn;
+	WT_TXN *qtxn, *txn, *txn_tmp;
 	WT_TXN_GLOBAL *txn_global;
+	uint64_t walked;
 
 	txn = &session->txn;
 	txn_global = &S2C(session)->txn_global;
@@ -1018,24 +1088,73 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session)
 		return;
 
 	__wt_writelock(session, &txn_global->read_timestamp_rwlock);
-	prev = TAILQ_LAST(&txn_global->read_timestamph, __wt_txn_rts_qh);
-	if (prev == NULL)
-		WT_STAT_CONN_INCR(session, txn_read_queue_empty);
-	for (; prev != NULL && __wt_timestamp_cmp(
-	    &prev->read_timestamp, &txn->read_timestamp) > 0;
-	    prev = TAILQ_PREV(prev, __wt_txn_rts_qh, read_timestampq))
-		;
-	if (prev == NULL) {
+	/*
+	 * If our transaction is on the queue remove it first. The timestamp
+	 * may move earlier so we otherwise might not remove ourselves before
+	 * finding where to insert ourselves (which would result in a list
+	 * loop) and we don't want to walk more of the list than needed.
+	 */
+	if (txn->clear_read_q) {
+		TAILQ_REMOVE(&txn_global->read_timestamph,
+		    txn, read_timestampq);
+		WT_PUBLISH(txn->clear_read_q, false);
+		--txn_global->read_timestampq_len;
+	}
+	/*
+	 * Walk the list to look for where to insert our own transaction
+	 * and remove any transactions that are not active.  We stop when
+	 * we get to the location where we want to insert.
+	 */
+	if (TAILQ_EMPTY(&txn_global->read_timestamph)) {
 		TAILQ_INSERT_HEAD(
 		    &txn_global->read_timestamph, txn, read_timestampq);
-		WT_STAT_CONN_INCR(session, txn_read_queue_head);
-	 } else
-		TAILQ_INSERT_AFTER(
-		    &txn_global->read_timestamph, prev, txn, read_timestampq);
+		WT_STAT_CONN_INCR(session, txn_read_queue_empty);
+	} else {
+		/* Walk from the start, removing cleared entries. */
+		walked = 0;
+		TAILQ_FOREACH_SAFE(qtxn, &txn_global->read_timestamph,
+		    read_timestampq, txn_tmp) {
+			++walked;
+			if (!qtxn->clear_read_q)
+				break;
+
+			TAILQ_REMOVE(&txn_global->read_timestamph,
+			    qtxn, read_timestampq);
+			WT_PUBLISH(qtxn->clear_read_q, false);
+			--txn_global->read_timestampq_len;
+		}
+
+		/*
+		 * Now walk backwards from the end to find the correct position
+		 * for the insert.
+		 */
+		qtxn = TAILQ_LAST(
+		     &txn_global->read_timestamph, __wt_txn_rts_qh);
+		while (qtxn != NULL &&
+		    __wt_timestamp_cmp(&qtxn->read_timestamp,
+		    &txn->read_timestamp) > 0) {
+			++walked;
+			qtxn = TAILQ_PREV(
+			    qtxn, __wt_txn_rts_qh, read_timestampq);
+		}
+		if (qtxn == NULL) {
+			TAILQ_INSERT_HEAD(&txn_global->read_timestamph,
+			   txn, read_timestampq);
+			WT_STAT_CONN_INCR(session, txn_read_queue_head);
+		} else
+			TAILQ_INSERT_AFTER(&txn_global->read_timestamph,
+			    qtxn, txn, read_timestampq);
+		WT_STAT_CONN_INCRV(session, txn_read_queue_walked, walked);
+	}
+	/*
+	 * We do not set the read timestamp here. It has been set in the caller
+	 * because special processing for round to oldest.
+	 */
 	++txn_global->read_timestampq_len;
 	WT_STAT_CONN_INCR(session, txn_read_queue_inserts);
-	__wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
+	txn->clear_read_q = false;
 	F_SET(txn, WT_TXN_HAS_TS_READ | WT_TXN_PUBLIC_TS_READ);
+	__wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
 }
 
 /*
@@ -1046,29 +1165,80 @@ void
 __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
+	uint32_t flags;
 
 	txn = &session->txn;
-	txn_global = &S2C(session)->txn_global;
 
 	if (!F_ISSET(txn, WT_TXN_PUBLIC_TS_READ))
 		return;
 
 #ifdef HAVE_DIAGNOSTIC
 	{
+	WT_TXN_GLOBAL *txn_global;
 	wt_timestamp_t pinned_ts;
 
+	txn_global = &S2C(session)->txn_global;
 	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
 	    __wt_timestamp_set(&pinned_ts, &txn_global->pinned_timestamp));
 	WT_ASSERT(session,
 	    __wt_timestamp_cmp(&txn->read_timestamp, &pinned_ts) >= 0);
 	}
 #endif
+	flags = txn->flags;
+	LF_CLR(WT_TXN_PUBLIC_TS_READ);
 
-	__wt_writelock(session, &txn_global->read_timestamp_rwlock);
-	TAILQ_REMOVE(&txn_global->read_timestamph, txn, read_timestampq);
-	--txn_global->read_timestampq_len;
-	__wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
-	F_CLR(txn, WT_TXN_PUBLIC_TS_READ);
+	/*
+	 * Notify other threads that our transaction is inactive and can be
+	 * cleaned up safely from the read timestamp queue whenever the
+	 * next thread walks the queue. We do not need to remove it now.
+	 */
+	WT_PUBLISH(txn->clear_read_q, true);
+	WT_PUBLISH(txn->flags, flags);
 }
 #endif
+
+/*
+ * __wt_txn_clear_timestamp_queues --
+ *	We're about to clear the session and overwrite the txn structure.
+ *	Remove ourselves from the commit timestamp queue and the read
+ *	timestamp queue if we're on either of them.
+ */
+void
+__wt_txn_clear_timestamp_queues(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+
+	txn = &session->txn;
+	txn_global = &S2C(session)->txn_global;
+
+	if (!txn->clear_commit_q && !txn->clear_read_q)
+		return;
+
+	if (txn->clear_commit_q) {
+		__wt_writelock(session, &txn_global->commit_timestamp_rwlock);
+		/*
+		 * Recheck after acquiring the lock.
+		 */
+		if (txn->clear_commit_q) {
+			TAILQ_REMOVE(&txn_global->commit_timestamph,
+			    txn, commit_timestampq);
+			--txn_global->commit_timestampq_len;
+			txn->clear_commit_q = false;
+		}
+		__wt_writeunlock(session, &txn_global->commit_timestamp_rwlock);
+	}
+	if (txn->clear_read_q) {
+		__wt_writelock(session, &txn_global->read_timestamp_rwlock);
+		/*
+		 * Recheck after acquiring the lock.
+		 */
+		if (txn->clear_read_q) {
+			TAILQ_REMOVE(
+			    &txn_global->read_timestamph, txn, read_timestampq);
+			--txn_global->read_timestampq_len;
+			txn->clear_read_q = false;
+		}
+		__wt_writeunlock(session, &txn_global->read_timestamp_rwlock);
+	}
+}

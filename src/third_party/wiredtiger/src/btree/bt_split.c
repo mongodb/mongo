@@ -67,8 +67,8 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ITEM *next, _next, *last, _last, *tmp;
 	WT_REF *ref;
 	uint64_t recno;
+	uint32_t slot;
 	int cmp;
-	bool first;
 
 	btree = S2BT(session);
 
@@ -88,20 +88,19 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 		last = &_last;
 		WT_CLEAR(_last);
 
-		first = true;
+		slot = 0;
 		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			WT_ASSERT(session, ref->home == page);
 
+			/*
+			 * Don't compare the first slot with any other slot,
+			 * it's ignored on row-store internal pages.
+			 */
 			__wt_ref_key(page, ref, &next->data, &next->size);
-			if (last->size == 0) {
-				if (first)
-					first = false;
-				else {
-					WT_ASSERT(session, __wt_compare(
-					    session, btree->collator, last,
-					    next, &cmp) == 0);
-					WT_ASSERT(session, cmp < 0);
-				}
+			if (++slot > 2) {
+				WT_ASSERT(session, __wt_compare(session,
+				    btree->collator, last, next, &cmp) == 0);
+				WT_ASSERT(session, cmp < 0);
 			}
 			tmp = last;
 			last = next;

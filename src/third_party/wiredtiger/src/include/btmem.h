@@ -205,8 +205,8 @@ struct __wt_ovfl_reuse {
  * this way so that overall the lookaside table is append-mostly), a counter
  * (used to ensure the update records remain in the original order), and the
  * record's key (byte-string for row-store, record number for column-store).
- * The value is the WT_UPDATE structure's transaction ID, timestamp, update
- * type and value.
+ * The value is the WT_UPDATE structure's transaction ID, timestamp, update's
+ * prepare state, update type and value.
  *
  * As the key for the lookaside table is different for row- and column-store, we
  * store both key types in a WT_ITEM, building/parsing them in the code, because
@@ -223,7 +223,7 @@ struct __wt_ovfl_reuse {
 #endif
 #define	WT_LAS_CONFIG							\
     "key_format=" WT_UNCHECKED_STRING(QIQu)				\
-    ",value_format=" WT_UNCHECKED_STRING(QuBu)				\
+    ",value_format=" WT_UNCHECKED_STRING(QuBBu)				\
     ",block_compressor=" WT_LOOKASIDE_COMPRESSOR			\
     ",leaf_value_max=64MB"						\
     ",prefix_compression=true"
@@ -239,7 +239,6 @@ struct __wt_page_lookaside {
 	WT_DECL_TIMESTAMP(max_timestamp)/* Maximum timestamp */
 	WT_DECL_TIMESTAMP(unstable_timestamp)/* First timestamp not on page */
 	bool eviction_to_lookaside;	/* Revert to lookaside on eviction */
-	bool invalid;			/* History is required correct reads */
 	bool skew_newest;		/* Page image has newest versions */
 };
 

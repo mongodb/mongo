@@ -457,6 +457,14 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_prepare_transaction[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
+static const WT_CONFIG_CHECK confchk_WT_SESSION_query_timestamp[] = {
+	{ "get", "string",
+	    NULL, "choices=[\"commit\",\"first_commit\",\"prepare\","
+	    "\"read\"]",
+	    NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
 static const WT_CONFIG_CHECK confchk_WT_SESSION_reconfigure[] = {
 	{ "cache_cursors", "boolean", NULL, NULL, NULL, 0 },
 	{ "ignore_cache_size", "boolean", NULL, NULL, NULL, 0 },
@@ -1379,6 +1387,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "WT_SESSION.prepare_transaction",
 	  "prepare_timestamp=",
 	  confchk_WT_SESSION_prepare_transaction, 1
+	},
+	{ "WT_SESSION.query_timestamp",
+	  "get=read",
+	  confchk_WT_SESSION_query_timestamp, 1
 	},
 	{ "WT_SESSION.rebalance",
 	  "",

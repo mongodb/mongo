@@ -220,11 +220,12 @@ struct __wt_btree {
 #define	WT_BTREE_LOOKASIDE	0x002000u	/* Look-aside table */
 #define	WT_BTREE_NO_CHECKPOINT	0x004000u	/* Disable checkpoints */
 #define	WT_BTREE_NO_LOGGING	0x008000u	/* Disable logging */
-#define	WT_BTREE_REBALANCE	0x010000u	/* Handle is for rebalance */
-#define	WT_BTREE_SALVAGE	0x020000u	/* Handle is for salvage */
-#define	WT_BTREE_SKIP_CKPT	0x040000u	/* Handle skipped checkpoint */
-#define	WT_BTREE_UPGRADE	0x080000u	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x100000u	/* Handle is for verify */
+#define	WT_BTREE_READONLY	0x010000u	/* Handle is readonly */
+#define	WT_BTREE_REBALANCE	0x020000u	/* Handle is for rebalance */
+#define	WT_BTREE_SALVAGE	0x040000u	/* Handle is for salvage */
+#define	WT_BTREE_SKIP_CKPT	0x080000u	/* Handle skipped checkpoint */
+#define	WT_BTREE_UPGRADE	0x100000u	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x200000u	/* Handle is for verify */
 	uint32_t flags;
 };
 

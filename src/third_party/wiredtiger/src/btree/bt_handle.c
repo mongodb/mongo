@@ -68,7 +68,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	size_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 	const char *filename;
-	bool creation, forced_salvage, readonly;
+	bool creation, forced_salvage;
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
@@ -86,9 +86,10 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	/* Set the data handle first, our called functions reasonably use it. */
 	btree->dhandle = dhandle;
 
-	/* Checkpoint files are readonly. */
-	readonly = dhandle->checkpoint != NULL ||
-	    F_ISSET(S2C(session), WT_CONN_READONLY);
+	/* Checkpoint and verify files are readonly. */
+	if (dhandle->checkpoint != NULL || F_ISSET(btree, WT_BTREE_VERIFY) ||
+	    F_ISSET(S2C(session), WT_CONN_READONLY))
+		F_SET(btree, WT_BTREE_READONLY);
 
 	/* Get the checkpoint information for this name/checkpoint pair. */
 	WT_CLEAR(ckpt);
@@ -120,7 +121,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
 
 	WT_ERR(__wt_block_manager_open(session, filename, dhandle->cfg,
-	    forced_salvage, readonly, btree->allocsize, &btree->bm));
+	    forced_salvage, F_ISSET(btree, WT_BTREE_READONLY),
+	    btree->allocsize, &btree->bm));
 	bm = btree->bm;
 
 	/*
@@ -150,7 +152,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		 */
 		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt.raw.data, ckpt.raw.size,
-		    root_addr, &root_addr_size, readonly));
+		    root_addr, &root_addr_size,
+		    F_ISSET(btree, WT_BTREE_READONLY)));
 		if (creation || root_addr_size == 0)
 			WT_ERR(__btree_tree_open_empty(session, creation));
 		else {

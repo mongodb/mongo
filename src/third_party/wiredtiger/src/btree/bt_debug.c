@@ -253,24 +253,25 @@ static int
 __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 
 	memset(ds, 0, sizeof(WT_DBG));
 
 	ds->session = session;
 
-	WT_RET(__wt_scr_alloc(session, 512, &ds->t1));
-	WT_RET(__wt_scr_alloc(session, 512, &ds->t2));
+	WT_ERR(__wt_scr_alloc(session, 512, &ds->t1));
+	WT_ERR(__wt_scr_alloc(session, 512, &ds->t2));
 
 	/*
 	 * If we weren't given a file, we use the default event handler, and
 	 * we'll have to buffer messages.
 	 */
 	if (ofile == NULL) {
-		WT_RET(__wt_scr_alloc(session, 512, &ds->msg));
+		WT_ERR(__wt_scr_alloc(session, 512, &ds->msg));
 		ds->f = __dmsg_event;
 	} else {
 		if ((ds->fp = fopen(ofile, "w")) == NULL)
-			return (__wt_set_return(session, EIO));
+			WT_ERR(__wt_set_return(session, EIO));
 		__wt_stream_set_line_buffer(ds->fp);
 		ds->f = __dmsg_file;
 	}
@@ -279,6 +280,9 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 	ds->key_format = btree->key_format;
 	ds->value_format = btree->value_format;
 	return (0);
+
+err:	WT_TRET(__debug_wrapup(ds));
+	return (ret);
 }
 
 /*
@@ -366,25 +370,18 @@ int
 __wt_debug_offset_blind(
     WT_SESSION_IMPL *session, wt_off_t offset, const char *ofile)
 {
-	WT_DECL_ITEM(buf);
-	WT_DECL_RET;
+	uint32_t checksum, size;
 
 	WT_ASSERT(session, S2BT_SAFE(session) != NULL);
 
 	/*
 	 * This routine depends on the default block manager's view of files,
 	 * where an address consists of a file offset, length, and checksum.
-	 * This is for debugging only.  Other block managers might not see a
-	 * file or address the same way, that's why there's no block manager
-	 * method.
+	 * This is for debugging only.
 	 */
-	WT_RET(__wt_scr_alloc(session, 1024, &buf));
-	WT_ERR(__wt_block_read_off_blind(
-	    session, S2BT(session)->bm->block, buf, offset));
-	ret = __wt_debug_disk(session, buf->mem, ofile);
-
-err:	__wt_scr_free(session, &buf);
-	return (ret);
+	WT_RET(__wt_block_read_off_blind(
+	    session, S2BT(session)->bm->block, offset, &size, &checksum));
+	return (__wt_debug_offset(session, offset, size, checksum, ofile));
 }
 
 /*

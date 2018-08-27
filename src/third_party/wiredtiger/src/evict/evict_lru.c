@@ -628,11 +628,10 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	 * (3) the cache is more than half way from the dirty target to the
 	 *     dirty trigger.
 	 */
-	if (!F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE) &&
-	    (__wt_cache_stuck(session) ||
+	if (__wt_cache_stuck(session) ||
 	    (__wt_cache_lookaside_score(cache) > 80 &&
 	    dirty_inuse >
-	    (uint64_t)((dirty_target + dirty_trigger) * bytes_max) / 200)))
+	    (uint64_t)((dirty_target + dirty_trigger) * bytes_max) / 200))
 		F_SET(cache, WT_CACHE_EVICT_LOOKASIDE);
 
 	/*

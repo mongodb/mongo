@@ -241,11 +241,17 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
     def log_corrupt_but_valid(self):
         if self.corrupt_last_file() and self.kind == 'removal':
             return True
-        # Certain corruptions in the last file can be detected.
-        if self.corrupt_hole_in_last_file():
-            return False
         if self.kind == 'truncate-middle' or \
+           self.kind == 'garbage-middle' or \
            self.kind == 'garbage-end':
+            return True
+        return False
+
+    # In certain cases, we detect log corruption, but just issue warnings.
+    def expect_warning_corruption(self):
+        if self.kind == 'garbage-middle' and self.chkpt <= self.corruptpos:
+            return True
+        if self.corrupt_hole_in_last_file():
             return True
         return False
 
@@ -306,6 +312,8 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
             ['/log file.*corrupted/', 'WT_ERROR: non-specific WiredTiger error'])
         else:
             self.check_empty_file(errfile)
+            if self.expect_warning_corruption():
+                self.check_file_contains(outfile, '/log file .* corrupted/')
             self.check_file_contains(outfile, self.uri)
 
         found_records = self.recovered_records()
