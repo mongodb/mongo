@@ -59,7 +59,7 @@ private:
     Status _generateIndexesIfNeeded(OperationContext* opCtx);
 
     stdx::mutex _mutex;
-    bool _collectionSetUp;
+    bool _collectionSetUp{false};
 };
 
 }  // namespace mongo
