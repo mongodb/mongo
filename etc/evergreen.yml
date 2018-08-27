@@ -1366,6 +1366,14 @@ functions:
               esac
             fi
 
+            # Reduce the number of available jobs by two-thirds when running the
+            # secondary_reads_passthrough task on the Enterprise RHEL 6.2 InMemory build variant.
+            if [[ "${build_variant}" = "enterprise-rhel-62-64-bit-inmem" \
+                  && "${task_name}" = "secondary_reads_passthrough" ]]; then
+              num_jobs_available=$((${num_jobs_available|3} / 3))
+              echo "Reducing jobs from ${num_jobs_available|1} to $num_jobs_available"
+            fi
+
             if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt $num_jobs_available ]; then
               extra_args="$extra_args --jobs=${max_jobs}"
             else
@@ -12775,6 +12783,8 @@ buildvariants:
   - name: update_fuzzer_replication
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough
+    distros:
+    - rhel62-large
 
 - name: enterprise-rhel-62-64-bit-required-inmem
   display_name: "! Enterprise RHEL 6.2 (inMemory)"
