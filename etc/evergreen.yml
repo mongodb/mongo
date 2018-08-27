@@ -11585,8 +11585,6 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-    distros:
-    - rhel72-zseries-build
   - name: ese
   - name: failpoints
   - name: failpoints_auth
