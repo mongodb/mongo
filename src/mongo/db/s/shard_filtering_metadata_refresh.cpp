@@ -89,6 +89,29 @@ void onShardVersionMismatch(OperationContext* opCtx,
     forceShardFilteringMetadataRefresh(opCtx, nss, forceRefreshFromThisThread);
 }
 
+void onDbVersionMismatch(OperationContext* opCtx,
+                         const StringData dbName,
+                         const DatabaseVersion& clientDbVersion,
+                         const boost::optional<DatabaseVersion>& serverDbVersion) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->getClient()->isInDirectClient());
+
+    auto const shardingState = ShardingState::get(opCtx);
+    invariant(shardingState->canAcceptShardedCommands());
+
+    if (serverDbVersion && serverDbVersion->getUuid() == clientDbVersion.getUuid() &&
+        serverDbVersion->getLastMod() >= clientDbVersion.getLastMod()) {
+        // The client was stale; do not trigger server-side refresh.
+        return;
+    }
+
+    // TODO SERVER-33773 if the 'waitForMovePrimaryCriticalSection' flag is set on the
+    // OperationShardingState, wait for the movePrimary critical section to complete before
+    // attempting a refresh.
+
+    forceDatabaseRefresh(opCtx, dbName);
+}
+
 }  // namespace
 
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
@@ -167,37 +190,18 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     return css->getMetadata(opCtx)->getShardVersion();
 }
 
-void onDbVersionMismatch(OperationContext* opCtx,
-                         const StringData dbName,
-                         const DatabaseVersion& clientDbVersion,
-                         const boost::optional<DatabaseVersion>& serverDbVersion) noexcept {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-
-    auto const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->canAcceptShardedCommands());
-
-    if (serverDbVersion && serverDbVersion->getUuid() == clientDbVersion.getUuid() &&
-        serverDbVersion->getLastMod() >= clientDbVersion.getLastMod()) {
-        // The client was stale; do not trigger server-side refresh.
-        return;
-    }
-
+Status onDbVersionMismatchNoExcept(
+    OperationContext* opCtx,
+    const StringData dbName,
+    const DatabaseVersion& clientDbVersion,
+    const boost::optional<DatabaseVersion>& serverDbVersion) noexcept {
     try {
-        // TODO SERVER-33773 if the 'waitForMovePrimaryCriticalSection' flag is set on the
-        // OperationShardingState, wait for the movePrimary critical section to complete before
-        // attempting a refresh.
-    } catch (const DBException& ex) {
-        log() << "Failed to wait for movePrimary critical section to complete "
-              << causedBy(redact(ex));
-        return;
-    }
-
-    try {
-        forceDatabaseRefresh(opCtx, dbName);
+        onDbVersionMismatch(opCtx, dbName, clientDbVersion, serverDbVersion);
+        return Status::OK();
     } catch (const DBException& ex) {
         log() << "Failed to refresh databaseVersion for database " << dbName
               << causedBy(redact(ex));
+        return ex.toStatus();
     }
 }
 

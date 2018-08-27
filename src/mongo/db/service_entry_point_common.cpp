@@ -893,8 +893,9 @@ void execCommandDatabase(OperationContext* opCtx,
             }
         } else if (auto sce = e.extraInfo<StaleDbRoutingVersion>()) {
             if (!opCtx->getClient()->isInDirectClient()) {
-                onDbVersionMismatch(
-                    opCtx, sce->getDb(), sce->getVersionReceived(), sce->getVersionWanted());
+                onDbVersionMismatchNoExcept(
+                    opCtx, sce->getDb(), sce->getVersionReceived(), sce->getVersionWanted())
+                    .ignore();
             }
         } else if (auto cannotImplicitCreateCollInfo =
                        e.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {

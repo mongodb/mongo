@@ -75,10 +75,11 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
  * Invalidates the cached database version, schedules a refresh of the database info, waits for the
  * refresh to complete, and updates the cached database version.
  */
-void onDbVersionMismatch(OperationContext* opCtx,
-                         const StringData dbName,
-                         const DatabaseVersion& clientDbVersion,
-                         const boost::optional<DatabaseVersion>& serverDbVersion) noexcept;
+Status onDbVersionMismatchNoExcept(
+    OperationContext* opCtx,
+    const StringData dbName,
+    const DatabaseVersion& clientDbVersion,
+    const boost::optional<DatabaseVersion>& serverDbVersion) noexcept;
 
 void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName);
 
