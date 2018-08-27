@@ -409,10 +409,9 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                         pass
                     retarget_time = time.time() - start_time
                     if retarget_time >= 60:
-                        self.logger.exception(
-                            "Timeout waiting for mongos: %s to retarget to db: %s", mongos_conn_str,
-                            db)
-                        raise  # pylint: disable=misplaced-bare-raise
+                        raise RuntimeError(
+                            "Timeout waiting for mongos: {} to retarget to db: {}".format(
+                                mongos_conn_str, db))
                     time.sleep(0.2)
                 for coll in coll_names:
                     while True:
@@ -423,10 +422,9 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                             pass
                         retarget_time = time.time() - start_time
                         if retarget_time >= 60:
-                            self.logger.exception(
-                                "Timeout waiting for mongos: %s to retarget to db: %s",
-                                mongos_conn_str, db)
-                            raise  # pylint: disable=misplaced-bare-raise
+                            raise RuntimeError(
+                                "Timeout waiting for mongos: {} to retarget to db: {}".format(
+                                    mongos_conn_str, db))
                         time.sleep(0.2)
                 retarget_time = time.time() - start_time
                 self.logger.info("Finished waiting for mongos: %s to retarget db: %s, in %d ms",
@@ -445,7 +443,8 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         """Create self._stepping_down_file, if specified."""
         if self._stepping_down_file:
             if os.path.isfile(self._stepping_down_file):
-                raise  # pylint: disable=misplaced-bare-raise
+                raise RuntimeError("Stepping down file {} already exists".format(
+                    self._stepping_down_file))
             with open(self._stepping_down_file, "w") as fh:
                 fh.write("")
 
