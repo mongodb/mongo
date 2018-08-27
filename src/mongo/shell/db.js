@@ -1891,25 +1891,12 @@ var DB;
 
     DB.prototype.watch = function(pipeline, options) {
         pipeline = pipeline || [];
-        options = options || {};
         assert(pipeline instanceof Array, "'pipeline' argument must be an array");
-        assert(options instanceof Object, "'options' argument must be an object");
 
-        let changeStreamStage = {fullDocument: options.fullDocument || "default"};
-        delete options.fullDocument;
-
-        if (options.hasOwnProperty("resumeAfter")) {
-            changeStreamStage.resumeAfter = options.resumeAfter;
-            delete options.resumeAfter;
-        }
-
-        if (options.hasOwnProperty("startAtOperationTime")) {
-            changeStreamStage.startAtOperationTime = options.startAtOperationTime;
-            delete options.startAtOperationTime;
-        }
-
-        pipeline.unshift({$changeStream: changeStreamStage});
-        return this._runAggregate({aggregate: 1, pipeline: pipeline}, options);
+        let changeStreamStage;
+        [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
+        pipeline.unshift(changeStreamStage);
+        return this._runAggregate({aggregate: 1, pipeline: pipeline}, aggOptions);
     };
 
     DB.prototype.getFreeMonitoringStatus = function() {

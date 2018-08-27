@@ -485,29 +485,43 @@ Mongo.prototype.waitForClusterTime = function waitForClusterTime(maxRetries = 10
     throw new Error("failed waiting for non default clusterTime");
 };
 
-Mongo.prototype.watch = function(pipeline, options) {
-    pipeline = pipeline || [];
+/**
+ * Given the options object for a 'watch' helper, determines which options apply to the change
+ * stream stage, and which apply to the aggregate overall. Returns two objects: the change
+ * stream stage specification and the options for the aggregate command, respectively.
+ */
+Mongo.prototype._extractChangeStreamOptions = function(options) {
     options = options || {};
-    assert(pipeline instanceof Array, "'pipeline' argument must be an array");
     assert(options instanceof Object, "'options' argument must be an object");
 
-    let changeStreamStage = {
-        allChangesForCluster: true,
-        fullDocument: options.fullDocument || "default"
-    };
-    delete options.allChangesForCluster;
+    let changeStreamOptions = {fullDocument: options.fullDocument || "default"};
     delete options.fullDocument;
 
     if (options.hasOwnProperty("resumeAfter")) {
-        changeStreamStage.resumeAfter = options.resumeAfter;
+        changeStreamOptions.resumeAfter = options.resumeAfter;
         delete options.resumeAfter;
     }
 
+    if (options.hasOwnProperty("startAfter")) {
+        changeStreamOptions.startAfter = options.startAfter;
+        delete options.startAfter;
+    }
+
     if (options.hasOwnProperty("startAtOperationTime")) {
-        changeStreamStage.startAtOperationTime = options.startAtOperationTime;
+        changeStreamOptions.startAtOperationTime = options.startAtOperationTime;
         delete options.startAtOperationTime;
     }
 
-    pipeline.unshift({$changeStream: changeStreamStage});
-    return this.getDB("admin")._runAggregate({aggregate: 1, pipeline: pipeline}, options);
+    return [{$changeStream: changeStreamOptions}, options];
+};
+
+Mongo.prototype.watch = function(pipeline, options) {
+    pipeline = pipeline || [];
+    assert(pipeline instanceof Array, "'pipeline' argument must be an array");
+
+    let changeStreamStage;
+    [changeStreamStage, aggOptions] = this._extractChangeStreamOptions(options);
+    changeStreamStage.$changeStream.allChangesForCluster = true;
+    pipeline.unshift(changeStreamStage);
+    return this.getDB("admin")._runAggregate({aggregate: 1, pipeline: pipeline}, aggOptions);
 };

@@ -44,15 +44,19 @@ const runCommandChangeStreamPassthroughAware =
  *     - single collection streams: drop, rename, and dropDatabase.
  *     - whole DB streams: dropDatabase.
  *     - whole cluster streams: none.
+ * Returns the invalidate document if there was one, or null otherwise.
  */
 function assertInvalidateOp({cursor, opType}) {
     if (!isChangeStreamPassthrough() ||
         (changeStreamPassthroughType() == ChangeStreamWatchMode.kDb && opType == "dropDatabase")) {
         assert.soon(() => cursor.hasNext());
-        assert.eq(cursor.next().operationType, "invalidate");
+        const invalidate = cursor.next();
+        assert.eq(invalidate.operationType, "invalidate");
         assert(cursor.isExhausted());
         assert(cursor.isClosed());
+        return invalidate;
     }
+    return null;
 }
 
 function ChangeStreamTest(_db, name = "ChangeStreamTest") {
