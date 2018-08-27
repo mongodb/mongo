@@ -457,8 +457,16 @@ OpTime logOp(OperationContext* opCtx,
     }
 
     const auto& oplogInfo = localOplogInfo(opCtx->getServiceContext());
-    auto const oplog = oplogInfo.oplog;
 
+    // Obtain Collection exclusive intent write lock for non-document-locking storage engines.
+    boost::optional<Lock::DBLock> dbWriteLock;
+    boost::optional<Lock::CollectionLock> collWriteLock;
+    if (!opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
+        dbWriteLock.emplace(opCtx, NamespaceString::kLocalDb, MODE_IX);
+        collWriteLock.emplace(opCtx->lockState(), oplogInfo.oplogName, MODE_IX);
+    }
+
+    auto const oplog = oplogInfo.oplog;
     OplogSlot slot;
     WriteUnitOfWork wuow(opCtx);
     if (oplogSlot.opTime.isNull()) {
@@ -511,8 +519,16 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     std::vector<OplogDocWriter> writers;
     writers.reserve(count);
     const auto& oplogInfo = localOplogInfo(opCtx->getServiceContext());
-    auto oplog = oplogInfo.oplog;
 
+    // Obtain Collection exclusive intent write lock for non-document-locking storage engines.
+    boost::optional<Lock::DBLock> dbWriteLock;
+    boost::optional<Lock::CollectionLock> collWriteLock;
+    if (!opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
+        dbWriteLock.emplace(opCtx, NamespaceString::kLocalDb, MODE_IX);
+        collWriteLock.emplace(opCtx->lockState(), oplogInfo.oplogName, MODE_IX);
+    }
+
+    auto oplog = oplogInfo.oplog;
     WriteUnitOfWork wuow(opCtx);
 
     OperationSessionInfo sessionInfo;
