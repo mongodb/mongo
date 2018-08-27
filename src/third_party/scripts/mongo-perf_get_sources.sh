@@ -26,7 +26,7 @@ fi
 NAME=mongo-perf
 SRC_ROOT=$(mktemp -d /tmp/$NAME.XXXXXX)
 trap "rm -rf $SRC_ROOT" EXIT
-DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME
+DEST_DIR=$(git rev-parse --show-toplevel)/benchrun_embedded/testcases
 
 git clone --branch=master https://github.com/mongodb/mongo-perf.git $SRC_ROOT
 
@@ -55,6 +55,6 @@ find testcases -type f -print0 | xargs -0 -I% -n1 -P$NUM_CPUS  \
 popd
 
 test -d $DEST_DIR && rm -r $DEST_DIR
-mkdir -p $DEST_DIR
+mkdir -p $(dirname $DEST_DIR)
 
-mv $SRC_ROOT/mongoebench/ $DEST_DIR/
+mv $SRC_ROOT/mongoebench $DEST_DIR
