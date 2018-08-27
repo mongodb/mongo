@@ -290,6 +290,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
 
     b.append("ns", _nss.ns());
     b.append("from", _fromShardConnString.toString());
+    b.append("fromShardId", _fromShard.toString());
     b.append("min", _min);
     b.append("max", _max);
     b.append("shardKeyPattern", _shardKeyPattern);
