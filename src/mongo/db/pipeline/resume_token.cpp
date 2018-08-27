@@ -45,13 +45,18 @@ constexpr StringData ResumeToken::kDataFieldName;
 constexpr StringData ResumeToken::kTypeBitsFieldName;
 
 bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
-    return clusterTime == other.clusterTime &&
+    return clusterTime == other.clusterTime && version == other.version &&
+        fromInvalidate == other.fromInvalidate &&
         (Value::compare(this->documentKey, other.documentKey, nullptr) == 0) && uuid == other.uuid;
 }
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
-    return out << "{clusterTime: " << tokenData.clusterTime.toString()
-               << "  documentKey: " << tokenData.documentKey << "  uuid: " << tokenData.uuid << "}";
+    out << "{clusterTime: " << tokenData.clusterTime.toString()
+        << ", version: " << tokenData.version << ", applyOpsIndex" << tokenData.applyOpsIndex;
+    if (tokenData.version > 0) {
+        out << ", fromInvalidate: " << (tokenData.fromInvalidate ? "0" : "1");
+    }
+    return out << ", documentKey: " << tokenData.documentKey << ", uuid: " << tokenData.uuid << "}";
 }
 
 ResumeToken::ResumeToken(const Document& resumeDoc) {
@@ -77,7 +82,9 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
     builder.append("", data.clusterTime);
     builder.append("", data.version);
     builder.appendNumber("", data.applyOpsIndex);
-    builder.appendBool("", data.fromInvalidate);
+    if (data.version >= 1) {
+        builder.appendBool("", data.fromInvalidate);
+    }
     uassert(50788,
             "Unexpected resume token with a documentKey but no UUID",
             data.uuid || data.documentKey.missing());
@@ -137,7 +144,9 @@ ResumeTokenData ResumeToken::getData() const {
             "Invalid resume token: wrong type for version",
             versionElt.type() == BSONType::NumberInt);
     result.version = versionElt.numberInt();
-    uassert(50795, "Invalid Resume Token: only supports version 0", result.version == 0);
+    uassert(50795,
+            "Invalid Resume Token: only supports version 0 or 1",
+            result.version == 0 || result.version == 1);
 
     // Next comes the applyOps index.
     uassert(50793, "Resume Token does not contain applyOpsIndex", i.more());
@@ -149,12 +158,16 @@ ResumeTokenData ResumeToken::getData() const {
     uassert(50794, "Invalid Resume Token: applyOpsIndex should be non-negative", applyOpsInd >= 0);
     result.applyOpsIndex = applyOpsInd;
 
-    uassert(50872, "Resume Token does not contain fromInvalidate", i.more());
-    auto fromInvalidate = i.next();
-    uassert(50870,
-            "Resume Token fromInvalidate is not a boolean.",
-            fromInvalidate.type() == BSONType::Bool);
-    result.fromInvalidate = ResumeTokenData::FromInvalidate(fromInvalidate.boolean());
+    if (result.version >= 1) {
+        // The 'fromInvalidate' bool was added in version 1 resume tokens. We don't expect to see it
+        // on version 0 tokens. After this bool, the remaining fields should be the same.
+        uassert(50872, "Resume Token does not contain fromInvalidate", i.more());
+        auto fromInvalidate = i.next();
+        uassert(50870,
+                "Resume Token fromInvalidate is not a boolean.",
+                fromInvalidate.type() == BSONType::Bool);
+        result.fromInvalidate = ResumeTokenData::FromInvalidate(fromInvalidate.boolean());
+    }
 
     // The UUID and documentKey are not required.
     if (!i.more()) {

@@ -68,16 +68,21 @@ constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
 }  // namespace
 
 boost::intrusive_ptr<DocumentSourceChangeStreamTransform>
-DocumentSourceChangeStreamTransform::create(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            BSONObj changeStreamSpec) {
-    return new DocumentSourceChangeStreamTransform(expCtx, changeStreamSpec);
+DocumentSourceChangeStreamTransform::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ServerGlobalParams::FeatureCompatibility::Version& fcv,
+    BSONObj changeStreamSpec) {
+    return new DocumentSourceChangeStreamTransform(expCtx, fcv, changeStreamSpec);
 }
 
 DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONObj changeStreamSpec)
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ServerGlobalParams::FeatureCompatibility::Version& fcv,
+    BSONObj changeStreamSpec)
     : DocumentSource(expCtx),
       _changeStreamSpec(changeStreamSpec.getOwned()),
-      _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()) {
+      _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()),
+      _fcv(fcv) {
 
     _nsRegex.emplace(DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns));
 
@@ -173,6 +178,10 @@ ResumeTokenData DocumentSourceChangeStreamTransform::getResumeToken(Value ts,
     resumeTokenData.documentKey = documentKey;
     if (!uuid.missing())
         resumeTokenData.uuid = uuid.getUuid();
+
+    if (_fcv < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+        resumeTokenData.version = 0;
+    }
 
     return resumeTokenData;
 }

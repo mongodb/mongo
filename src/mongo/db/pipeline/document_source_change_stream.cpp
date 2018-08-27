@@ -386,7 +386,9 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
             expCtx));
     }
 
-    stages.push_back(DocumentSourceChangeStreamTransform::create(expCtx, elem.embeddedObject()));
+    const auto fcv = serverGlobalParams.featureCompatibility.getVersion();
+    stages.push_back(
+        DocumentSourceChangeStreamTransform::create(expCtx, fcv, elem.embeddedObject()));
     stages.push_back(DocumentSourceCheckInvalidate::create(expCtx, ignoreFirstInvalidate));
 
     // The resume stage must come after the check invalidate stage to allow the check invalidate

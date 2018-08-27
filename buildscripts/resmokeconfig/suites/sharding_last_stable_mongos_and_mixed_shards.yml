@@ -43,24 +43,6 @@ selector:
   - jstests/sharding/shard_collection_existing_zones.js
   - jstests/sharding/snapshot_cursor_commands_mongos.js
   - jstests/sharding/update_sharded.js
-  # SERVER-35977
-  - jstests/sharding/change_stream_lookup_single_shard_cluster.js
-  - jstests/sharding/change_stream_metadata_notifications.js
-  - jstests/sharding/change_stream_read_preference.js
-  - jstests/sharding/change_stream_resume_from_different_mongos.js
-  - jstests/sharding/change_streams.js
-  - jstests/sharding/change_stream_shard_failover.js
-  - jstests/sharding/change_streams_primary_shard_unaware.js
-  - jstests/sharding/change_streams_unsharded_becomes_sharded.js
-  - jstests/sharding/change_streams_whole_db.js
-  - jstests/sharding/change_stream_update_lookup_collation.js
-  - jstests/sharding/change_stream_update_lookup_read_concern.js
-  - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js
-  - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
-  - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
-  - jstests/sharding/resume_change_stream.js
-  - jstests/sharding/resume_change_stream_from_stale_mongos.js
-  - jstests/sharding/resume_change_stream_on_subset_of_shards.js
   # Enable if SERVER-20865 is backported or 4.2 becomes last-stable
   - jstests/sharding/sharding_statistics_server_status.js
 executor:

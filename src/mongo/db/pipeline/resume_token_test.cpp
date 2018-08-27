@@ -206,14 +206,24 @@ TEST(ResumeToken, WrongVersionToken) {
     ResumeTokenData resumeTokenDataIn;
     resumeTokenDataIn.clusterTime = ts;
     resumeTokenDataIn.version = 0;
+    resumeTokenDataIn.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
 
-    // This one with version 0 should succeed.
+    // This one with version 0 should succeed. Version 0 cannot encode the fromInvalidate bool, so
+    // we expect it to be set to the default 'kNotFromInvalidate' after serialization.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
     ResumeTokenData tokenData = rtToken.getData();
+    ASSERT_NE(resumeTokenDataIn, tokenData);
+    tokenData.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 
-    // With version 1 it should fail.
+    // Version 1 should include the 'fromInvalidate' bool through serialization.
     resumeTokenDataIn.version = 1;
+    rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
+    tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+
+    // With version 2 it should fail - the maximum supported version is 1.
+    resumeTokenDataIn.version = 2;
     rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
 
     ASSERT_THROWS(rtToken.getData(), AssertionException);
