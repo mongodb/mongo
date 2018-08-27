@@ -888,7 +888,8 @@ void execCommandDatabase(OperationContext* opCtx,
             if (!opCtx->getClient()->isInDirectClient()) {
                 // We already have the StaleConfig exception, so just swallow any errors due to
                 // refresh
-                onShardVersionMismatch(opCtx, sce->getNss(), sce->getVersionReceived()).ignore();
+                onShardVersionMismatchNoExcept(opCtx, sce->getNss(), sce->getVersionReceived())
+                    .ignore();
             }
         } else if (auto sce = e.extraInfo<StaleDbRoutingVersion>()) {
             if (!opCtx->getClient()->isInDirectClient()) {
@@ -1072,7 +1073,8 @@ DbResponse receivedQuery(OperationContext* opCtx,
             if (!opCtx->getClient()->isInDirectClient()) {
                 // We already have the StaleConfig exception, so just swallow any errors due to
                 // refresh
-                onShardVersionMismatch(opCtx, sce->getNss(), sce->getVersionReceived()).ignore();
+                onShardVersionMismatchNoExcept(opCtx, sce->getNss(), sce->getVersionReceived())
+                    .ignore();
             }
         }
 

@@ -47,10 +47,12 @@
 
 namespace mongo {
 
-Status onShardVersionMismatch(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              ChunkVersion shardVersionReceived,
-                              bool forceRefreshFromThisThread) noexcept {
+namespace {
+
+void onShardVersionMismatch(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            ChunkVersion shardVersionReceived,
+                            bool forceRefreshFromThisThread) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
@@ -65,12 +67,8 @@ Status onShardVersionMismatch(OperationContext* opCtx,
     // Ensure any ongoing migrations have completed before trying to do the refresh. This wait is
     // just an optimization so that MongoS does not exhaust its maximum number of StaleConfig retry
     // attempts while the migration is being committed.
-    try {
-        auto& oss = OperationShardingState::get(opCtx);
-        oss.waitForMigrationCriticalSectionSignal(opCtx);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
+    auto& oss = OperationShardingState::get(opCtx);
+    oss.waitForMigrationCriticalSectionSignal(opCtx);
 
     const auto currentShardVersion = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
@@ -86,11 +84,19 @@ Status onShardVersionMismatch(OperationContext* opCtx,
         currentShardVersion.majorVersion() >= shardVersionReceived.majorVersion()) {
         // Don't need to remotely reload if we're in the same epoch and the requested version is
         // smaller than the one we know about. This means that the remote side is behind.
-        return Status::OK();
     }
 
+    forceShardFilteringMetadataRefresh(opCtx, nss, forceRefreshFromThisThread);
+}
+
+}  // namespace
+
+Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      ChunkVersion shardVersionReceived,
+                                      bool forceRefreshFromThisThread) noexcept {
     try {
-        forceShardFilteringMetadataRefresh(opCtx, nss, forceRefreshFromThisThread);
+        onShardVersionMismatch(opCtx, nss, shardVersionReceived, forceRefreshFromThisThread);
         return Status::OK();
     } catch (const DBException& ex) {
         log() << "Failed to refresh metadata for collection" << nss << causedBy(redact(ex));

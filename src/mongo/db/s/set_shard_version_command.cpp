@@ -342,7 +342,7 @@ public:
 
         // Note: The forceRefresh flag controls whether we make sure to do our
         // own refresh or if we're okay with joining another thread
-        const auto status = onShardVersionMismatch(
+        const auto status = onShardVersionMismatchNoExcept(
             opCtx, nss, requestedVersion, forceRefresh /*forceRefreshFromThisThread*/);
 
         {
