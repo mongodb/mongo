@@ -59,6 +59,10 @@
     collections.sort(sortByName);
     var coll2uuid = collections[1].info.uuid;
 
+    // Await replication on the config server to guarantee the collections database has been
+    // propagated to all config secondaries.
+    st.configRS.awaitReplication();
+
     // Have the other shard clone the DB from the primary.
     assert.commandWorked(toShard.adminCommand(
         {_cloneCatalogData: 'test', from: fromShard.host, writeConcern: {w: "majority"}}));
@@ -138,6 +142,10 @@
     checkCount(fromShard, 'coll2', 3);
     checkCount(toShard, 'coll1', 3);
     checkCount(toShard, 'coll2', 0);
+
+    // Await replication on the config server to guarantee the collections database has been
+    // propagated to all config secondaries.
+    st.configRS.awaitReplication();
 
     // Check that the command fails without writeConcern majority.
     assert.commandFailedWithCode(
