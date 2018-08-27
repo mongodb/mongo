@@ -386,7 +386,11 @@ void stopFreeMonitoring() {
 }
 
 void notifyFreeMonitoringOnTransitionToPrimary() {
-    FreeMonController::get(getGlobalServiceContext())->notifyOnTransitionToPrimary();
+    auto controller = FreeMonController::get(getGlobalServiceContext());
+
+    if (controller != nullptr) {
+        controller->notifyOnTransitionToPrimary();
+    }
 }
 
 void setupFreeMonitoringOpObserver(OpObserverRegistry* registry) {
