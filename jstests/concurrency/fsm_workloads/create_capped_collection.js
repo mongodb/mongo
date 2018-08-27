@@ -56,9 +56,6 @@ var $config = (function() {
 
         // Define this function in data so that it can be used by workloads inheriting this one
         verifySizeTruncation: function verifySizeTruncation(db, myCollName, options) {
-            var ids = [];
-            var count;
-
             // Define a small document to be an eighth the size of the capped collection,
             // and a large document to be half the size of the capped collection.
             var smallDocSize = Math.floor(options.size / 8) - 1;
@@ -71,15 +68,17 @@ var $config = (function() {
 
             var threshold = 1000;
 
+            var insertedIds = [];
             for (var i = 0; i < threshold; ++i) {
-                ids.push(this.insert(db, myCollName, largeDocSize));
+                insertedIds.push(this.insert(db, myCollName, largeDocSize));
             }
 
-            count = db[myCollName].find().itcount();
+            var foundIds = this.getObjectIds(db, myCollName);
+            var count = foundIds.length;
 
             assertWhenOwnDB.lt(count, threshold, 'expected at least one truncation to occur');
-            assertWhenOwnDB.eq(ids.slice(ids.length - count),
-                               this.getObjectIds(db, myCollName),
+            assertWhenOwnDB.eq(insertedIds.slice(insertedIds.length - count),
+                               foundIds,
                                'expected truncation to remove the oldest documents');
         }
     };
