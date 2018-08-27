@@ -81,12 +81,12 @@
 
             // Confirm number of chunks for this stage.
             var numChunks = getNumberChunks(coll.getFullName());
-            assert.eq(numChunks,
-                      stage.expectedNumChunks,
-                      'in ' + coll.getFullName() + ' expected ' + stage.expectedNumChunks +
-                          ' chunks for stage ' + stageNum + ', but found ' + numChunks +
-                          '\nopts: ' + tojson(opts) + '\nchunks:\n' +
-                          s.getChunksString(coll.getFullName()));
+            assert.gte(numChunks,
+                       stage.expectedNumChunks,
+                       'in ' + coll.getFullName() + ' expected ' + stage.expectedNumChunks +
+                           ' chunks for stage ' + stageNum + ', but found ' + numChunks +
+                           '\nopts: ' + tojson(opts) + '\nchunks:\n' +
+                           s.getChunksString(coll.getFullName()));
         }
     };
 
@@ -166,7 +166,7 @@
         docSize: 514 * 1024,
         stages: [
             {numDocsToInsert: 10, expectedNumChunks: 10},
-            {numDocsToInsert: 10, expectedNumChunks: 20},
+            {numDocsToInsert: 10, expectedNumChunks: 18},
         ],
     });
 
