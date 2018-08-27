@@ -161,7 +161,7 @@ private:
     // The ExecContext is needed because if we're a tailable, awaitData cursor, we only want to
     // 'await data' if we 1) are in a getMore and 2) don't already have data to return. This context
     // allows us to determine which situation we're in.
-    RouterExecStage::ExecContext _execContext;
+    RouterExecStage::ExecContext _execContext = RouterExecStage::ExecContext::kInitialFind;
 };
 
 }  // namespace mongo
