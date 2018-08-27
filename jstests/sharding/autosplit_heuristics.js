@@ -42,8 +42,8 @@
 
         jsTest.log("Setup collection...");
         st.printShardingStatus(true);
-
-        var approxSize = Object.bsonsize({_id: 0.0});
+        var pad = (new Array(1024)).join(' ');
+        var approxSize = Object.bsonsize({_id: 0.0, pad: pad});
 
         jsTest.log("Starting inserts of approx size: " + approxSize + "...");
 
@@ -65,18 +65,17 @@
         });
 
         // Insert enough docs to trigger splits into all chunks
-        var bulk = coll.initializeUnorderedBulkOp();
         for (var i = 0; i < totalInserts; i++) {
-            bulk.insert({_id: i % numChunks + (i / totalInserts)});
+            assert.writeOK(coll.insert({_id: i % numChunks + (i / totalInserts), pad: pad}));
+            // Splitting is asynchronous so we should wait after each insert
+            // for autosplitting to happen
+            waitForOngoingChunkSplits(st);
         }
-        assert.writeOK(bulk.execute());
 
         jsTest.log("Inserts completed...");
 
         st.printShardingStatus(true);
         printjson(coll.stats());
-
-        waitForOngoingChunkSplits(st);
 
         // Check that all chunks (except the two extreme chunks)
         // have been split at least once + 1 extra chunk as reload buffer
