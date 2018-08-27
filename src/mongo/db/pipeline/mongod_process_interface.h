@@ -102,6 +102,10 @@ public:
                                                         const NamespaceString&,
                                                         const MatchExpression*) const final;
 
+    bool uniqueKeyIsSupportedByIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     const NamespaceString& nss,
+                                     const std::set<FieldPath>& uniqueKeyPaths) const final;
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

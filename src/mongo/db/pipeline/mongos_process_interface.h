@@ -163,6 +163,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool uniqueKeyIsSupportedByIndex(const boost::intrusive_ptr<ExpressionContext>&,
+                                     const NamespaceString&,
+                                     const std::set<FieldPath>& uniqueKeyPaths) const final {
+        // TODO SERVER-36047 we'll have to contact the primary shard for the database to ask for the
+        // index specs.
+        return true;
+    }
+
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,

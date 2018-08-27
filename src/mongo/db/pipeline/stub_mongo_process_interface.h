@@ -174,5 +174,11 @@ public:
                                                         const MatchExpression*) const override {
         MONGO_UNREACHABLE;
     }
+
+    bool uniqueKeyIsSupportedByIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     const NamespaceString& nss,
+                                     const std::set<FieldPath>& uniqueKeyPaths) const override {
+        return true;
+    }
 };
 }  // namespace mongo

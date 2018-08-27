@@ -245,6 +245,18 @@ public:
     virtual std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
                                                                 const NamespaceString&,
                                                                 const MatchExpression*) const = 0;
+
+    /**
+     * Returns true if there is an index on 'nss' with properties that will guarantee that a
+     * document with non-array values for each of 'uniqueKeyPaths' will have at most one matching
+     * document in 'nss'.
+     *
+     * Specifically, such an index must include all the fields, be unique, not be a partial index,
+     * and match the operation's collation as given by 'expCtx'.
+     */
+    virtual bool uniqueKeyIsSupportedByIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             const NamespaceString& nss,
+                                             const std::set<FieldPath>& uniqueKeyPaths) const = 0;
 };
 
 }  // namespace mongo

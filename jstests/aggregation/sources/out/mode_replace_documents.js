@@ -30,8 +30,8 @@
     // Test 'replaceDocuments' mode with a dotted path unique key.
     coll.drop();
     outColl.drop();
-    assert.commandWorked(coll.insert({_id: 0, a: {b: 1}}));
-    assert.commandWorked(coll.insert({_id: 1, a: {b: 1}, c: 1}));
+    assert.commandWorked(coll.insert([{_id: 0, a: {b: 1}}, {_id: 1, a: {b: 1}, c: 1}]));
+    assert.commandWorked(outColl.createIndex({"a.b": 1, _id: 1}, {unique: true}));
     coll.aggregate([
         {$addFields: {_id: 0}},
         {$out: {to: outColl.getName(), mode: "replaceDocuments", uniqueKey: {_id: 1, "a.b": 1}}}
@@ -52,10 +52,12 @@
                     50905);
 
     // Test that 'replaceDocuments' mode with a missing non-id unique key fails.
+    assert.commandWorked(outColl.createIndex({missing: 1}, {unique: true}));
     assertErrorCode(
         coll,
         [{$out: {to: outColl.getName(), mode: "replaceDocuments", uniqueKey: {missing: 1}}}],
-        50905);
+        50905  // This attempt should fail because there's no field 'missing' in the document.
+        );
 
     // Test that a replace fails to insert a document if it violates a unique index constraint. In
     // this example, $out will attempt to insert multiple documents with {a: 0} which is not allowed
@@ -73,6 +75,7 @@
     // Test that $out fails if the unique key contains an array.
     coll.drop();
     assert.commandWorked(coll.insert({_id: 0, a: [1, 2]}));
+    assert.commandWorked(outColl.createIndex({"a.b": 1, _id: 1}, {unique: true}));
     assertErrorCode(
         coll,
         [

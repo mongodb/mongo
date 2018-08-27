@@ -34,8 +34,10 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -115,6 +117,32 @@ Update buildUpdateOp(const NamespaceString& nss,
         return wcb;
     }());
     return updateOp;
+}
+
+// Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and each
+// of the elements of 'keyPattern' is numeric, i.e. not "text", "$**", or any other special type of
+// index.
+bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
+                               const std::set<FieldPath>& uniqueKeyPaths) {
+    size_t nFieldsMatched = 0;
+    for (auto&& elem : keyPattern) {
+        if (!elem.isNumber()) {
+            return false;
+        }
+        if (uniqueKeyPaths.find(elem.fieldNameStringData()) == uniqueKeyPaths.end()) {
+            return false;
+        }
+        ++nFieldsMatched;
+    }
+    return nFieldsMatched == uniqueKeyPaths.size();
+}
+
+bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       const IndexCatalogEntry* index,
+                       const std::set<FieldPath>& uniqueKeyPaths) {
+    return (index->descriptor()->unique() && !index->descriptor()->isPartial() &&
+            keyPatternNamesExactPaths(index->descriptor()->keyPattern(), uniqueKeyPaths) &&
+            CollatorInterface::collatorsMatch(index->getCollator(), expCtx->getCollator()));
 }
 
 }  // namespace
@@ -448,6 +476,34 @@ std::vector<BSONObj> MongoDInterface::getMatchingPlanCacheEntryStats(
     invariant(planCache);
 
     return planCache->getMatchingStats(serializer, predicate);
+}
+
+bool MongoDInterface::uniqueKeyIsSupportedByIndex(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    const std::set<FieldPath>& uniqueKeyPaths) const {
+    auto* opCtx = expCtx->opCtx;
+    // We purposefully avoid a helper like AutoGetCollection here because we don't want to check the
+    // db version or do anything else. We simply want to protect against concurrent modifications to
+    // the catalog.
+    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
+    Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
+    const auto* collection = [&]() -> Collection* {
+        auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db());
+        return db ? db->getCollection(opCtx, nss) : nullptr;
+    }();
+    if (!collection) {
+        return uniqueKeyPaths == std::set<FieldPath>{"_id"};
+    }
+
+    auto indexIterator = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
+    while (indexIterator.more()) {
+        IndexDescriptor* descriptor = indexIterator.next();
+        if (supportsUniqueKey(expCtx, indexIterator.catalogEntry(descriptor), uniqueKeyPaths)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 BSONObj MongoDInterface::_reportCurrentOpForClient(OperationContext* opCtx,

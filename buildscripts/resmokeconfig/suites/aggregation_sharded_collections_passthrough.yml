@@ -21,6 +21,8 @@ selector:
   - jstests/aggregation/use_query_project_and_sort.js
   - jstests/aggregation/use_query_projection.js
   - jstests/aggregation/use_query_sort.js
+  # TODO: Remove when SERVER-36047 is resolved.
+  - jstests/aggregation/sources/out/unique_key_requires_index.js
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
   exclude_with_any_tags:

@@ -242,6 +242,18 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
         // Convert unique key object to a vector of FieldPaths.
         if (auto uniqueKeyObj = spec.getUniqueKey()) {
             uniqueKey = uniqueKeyObj->getFieldNames<std::set<FieldPath>>();
+            // TODO SERVER-36047 Check if this is the document key and skip the check below.
+            const bool isDocumentKey = false;
+            // Make sure the uniqueKey has a supporting index. TODO SERVER-36047 Figure out where
+            // this assertion should take place in a sharded environment. For now we will skip the
+            // check on mongos and will not test this check against a sharded collection or another
+            // database - meaning the assertion should always happen on the primary shard where the
+            // collection must exist.
+            uassert(50938,
+                    "Cannot find index to verify that $out's unique key will be unique",
+                    expCtx->inMongos || isDocumentKey ||
+                        expCtx->mongoProcessInterface->uniqueKeyIsSupportedByIndex(
+                            expCtx, outputNs, uniqueKey));
         } else {
             std::vector<FieldPath> docKeyPaths = std::get<0>(
                 expCtx->mongoProcessInterface->collectDocumentKeyFields(expCtx->opCtx, outputNs));
