@@ -325,9 +325,11 @@ LockResult LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Da
 
         // If the ticket wait is interrupted, restore the state of the client.
         auto restoreStateOnErrorGuard = MakeGuard([&] { _clientState.store(kInactive); });
+
+        OperationContext* interruptible = _uninterruptibleLocksRequested ? nullptr : opCtx;
         if (deadline == Date_t::max()) {
-            holder->waitForTicket(opCtx);
-        } else if (!holder->waitForTicketUntil(opCtx, deadline)) {
+            holder->waitForTicket(interruptible);
+        } else if (!holder->waitForTicketUntil(interruptible, deadline)) {
             return LOCK_TIMEOUT;
         }
         restoreStateOnErrorGuard.Dismiss();
