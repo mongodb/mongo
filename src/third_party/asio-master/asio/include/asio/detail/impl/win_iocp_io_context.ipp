@@ -252,7 +252,7 @@ void win_iocp_io_context::post_deferred_completion(win_iocp_operation* op)
   op->ready_ = 1;
 
   // Enqueue the operation on the I/O completion port.
-  if (!::PostQueuedCompletionStatus(iocp_.handle, 0, 0, op))
+  if (!::PostQueuedCompletionStatus(iocp_.handle, 0, op->completionKey(), op))
   {
     // Out of resources. Put on completed queue instead.
     mutex::scoped_lock lock(dispatch_mutex_);
@@ -272,7 +272,7 @@ void win_iocp_io_context::post_deferred_completions(
     op->ready_ = 1;
 
     // Enqueue the operation on the I/O completion port.
-    if (!::PostQueuedCompletionStatus(iocp_.handle, 0, 0, op))
+    if (!::PostQueuedCompletionStatus(iocp_.handle, 0, op->completionKey(), op))
     {
       // Out of resources. Put on completed queue instead.
       mutex::scoped_lock lock(dispatch_mutex_);
@@ -298,9 +298,10 @@ void win_iocp_io_context::on_pending(win_iocp_operation* op)
 {
   if (::InterlockedCompareExchange(&op->ready_, 1, 0) == 1)
   {
+    op->completionKey() = overlapped_contains_result;
     // Enqueue the operation on the I/O completion port.
     if (!::PostQueuedCompletionStatus(iocp_.handle,
-          0, overlapped_contains_result, op))
+          0, op->completionKey(), op))
     {
       // Out of resources. Put on completed queue instead.
       mutex::scoped_lock lock(dispatch_mutex_);
@@ -322,9 +323,11 @@ void win_iocp_io_context::on_completion(win_iocp_operation* op,
   op->Offset = last_error;
   op->OffsetHigh = bytes_transferred;
 
+
   // Enqueue the operation on the I/O completion port.
+  op->completionKey() = overlapped_contains_result;
   if (!::PostQueuedCompletionStatus(iocp_.handle,
-        0, overlapped_contains_result, op))
+        0, op->completionKey(), op))
   {
     // Out of resources. Put on completed queue instead.
     mutex::scoped_lock lock(dispatch_mutex_);
@@ -344,9 +347,11 @@ void win_iocp_io_context::on_completion(win_iocp_operation* op,
   op->Offset = ec.value();
   op->OffsetHigh = bytes_transferred;
 
+
   // Enqueue the operation on the I/O completion port.
+  op->completionKey() = overlapped_contains_result;
   if (!::PostQueuedCompletionStatus(iocp_.handle,
-        0, overlapped_contains_result, op))
+        0, op->completionKey(), op))
   {
     // Out of resources. Put on completed queue instead.
     mutex::scoped_lock lock(dispatch_mutex_);
