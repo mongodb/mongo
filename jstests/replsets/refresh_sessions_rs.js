@@ -51,8 +51,9 @@
     res = db2.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
 
-    // Connect to the primary. The sessions collection here should not yet contain records.
-    assert.eq(db1.system.sessions.count(), 0, "flushed refresh to the primary prematurely");
+    // Connect to the primary. The sessions collection here should have one record for the session
+    // on the secondary.
+    assert.eq(db1.system.sessions.count(), 1, "failed to refresh on the secondary");
 
     // Trigger a refresh on the primary. The sessions collection should now contain two records.
     res = db1.runCommand(refresh);

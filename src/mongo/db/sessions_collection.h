@@ -105,9 +105,6 @@ protected:
     Status doRefresh(const NamespaceString& ns,
                      const LogicalSessionRecordSet& sessions,
                      SendBatchFn send);
-    Status doRefreshExternal(const NamespaceString& ns,
-                             const LogicalSessionRecordSet& sessions,
-                             SendBatchFn send);
 
     /**
      * Formats and sends batches of deletes for the given set of sessions.
@@ -115,9 +112,6 @@ protected:
     Status doRemove(const NamespaceString& ns,
                     const LogicalSessionIdSet& sessions,
                     SendBatchFn send);
-    Status doRemoveExternal(const NamespaceString& ns,
-                            const LogicalSessionIdSet& sessions,
-                            SendBatchFn send);
 
     /**
      * Formats and sends batches of fetches for the given set of sessions.
