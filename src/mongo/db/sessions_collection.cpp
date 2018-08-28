@@ -225,24 +225,6 @@ Status SessionsCollection::doRefresh(const NamespaceString& ns,
     return runBulkCmd("updates", init, add, send, sessions);
 }
 
-Status SessionsCollection::doRefreshExternal(const NamespaceString& ns,
-                                             const LogicalSessionRecordSet& sessions,
-                                             SendBatchFn send) {
-    auto makeT = [] { return std::vector<LogicalSessionRecord>{}; };
-
-    auto add = [](std::vector<LogicalSessionRecord>& batch, const LogicalSessionRecord& record) {
-        batch.push_back(record);
-    };
-
-    auto sendLocal = [&](std::vector<LogicalSessionRecord>& batch) {
-        RefreshSessionsCmdFromClusterMember idl;
-        idl.setRefreshSessionsInternal(batch);
-        return send(idl.toBSON());
-    };
-
-    return runBulkGeneric(makeT, add, sendLocal, sessions);
-}
-
 Status SessionsCollection::doRemove(const NamespaceString& ns,
                                     const LogicalSessionIdSet& sessions,
                                     SendBatchFn send) {
@@ -257,13 +239,6 @@ Status SessionsCollection::doRemove(const NamespaceString& ns,
     };
 
     return runBulkCmd("deletes", init, add, send, sessions);
-}
-
-Status SessionsCollection::doRemoveExternal(const NamespaceString& ns,
-                                            const LogicalSessionIdSet& sessions,
-                                            SendBatchFn send) {
-    // TODO SERVER-28335 Implement endSessions, with internal counterpart.
-    return Status::OK();
 }
 
 StatusWith<LogicalSessionIdSet> SessionsCollection::doFetch(const NamespaceString& ns,

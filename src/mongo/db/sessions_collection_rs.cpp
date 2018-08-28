@@ -159,52 +159,55 @@ Status SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
 
             return Status::OK();
         },
-        [&](DBClientBase*) {
-            // If we are not the primary, we aren't going to do writes anyway, so just return ok.
+        [&](DBClientBase* client) {
+            BSONObj info;
+            auto cmd = generateCreateIndexesCmd();
+            if (!client->runCommand(
+                    NamespaceString::kLogicalSessionsNamespace.db().toString(), cmd, info)) {
+                return getStatusFromCommandResult(info);
+            }
             return Status::OK();
         });
 }
 
 Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
                                              const LogicalSessionRecordSet& sessions) {
-    return dispatch(
-        NamespaceString::kLogicalSessionsNamespace,
-        MODE_IX,
-        opCtx,
-        [&] {
-            DBDirectClient client(opCtx);
-            return doRefresh(
-                NamespaceString::kLogicalSessionsNamespace,
-                sessions,
-                makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
-        },
-        [&](DBClientBase* client) {
-            return doRefreshExternal(
-                NamespaceString::kLogicalSessionsNamespace,
-                sessions,
-                makeSendFnForCommand(NamespaceString::kLogicalSessionsNamespace, client));
-        });
+    return dispatch(NamespaceString::kLogicalSessionsNamespace,
+                    MODE_IX,
+                    opCtx,
+                    [&] {
+                        DBDirectClient client(opCtx);
+                        return doRefresh(NamespaceString::kLogicalSessionsNamespace,
+                                         sessions,
+                                         makeSendFnForBatchWrite(
+                                             NamespaceString::kLogicalSessionsNamespace, &client));
+                    },
+                    [&](DBClientBase* client) {
+                        return doRefresh(NamespaceString::kLogicalSessionsNamespace,
+                                         sessions,
+                                         makeSendFnForBatchWrite(
+                                             NamespaceString::kLogicalSessionsNamespace, client));
+                    });
 }
 
 Status SessionsCollectionRS::removeRecords(OperationContext* opCtx,
                                            const LogicalSessionIdSet& sessions) {
-    return dispatch(
-        NamespaceString::kLogicalSessionsNamespace,
-        MODE_IX,
-        opCtx,
-        [&] {
-            DBDirectClient client(opCtx);
-            return doRemove(
-                NamespaceString::kLogicalSessionsNamespace,
-                sessions,
-                makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
-        },
-        [&](DBClientBase* client) {
-            return doRemoveExternal(
-                NamespaceString::kLogicalSessionsNamespace,
-                sessions,
-                makeSendFnForCommand(NamespaceString::kLogicalSessionsNamespace, client));
-        });
+    return dispatch(NamespaceString::kLogicalSessionsNamespace,
+                    MODE_IX,
+                    opCtx,
+                    [&] {
+                        DBDirectClient client(opCtx);
+                        return doRemove(NamespaceString::kLogicalSessionsNamespace,
+                                        sessions,
+                                        makeSendFnForBatchWrite(
+                                            NamespaceString::kLogicalSessionsNamespace, &client));
+                    },
+                    [&](DBClientBase* client) {
+                        return doRemove(NamespaceString::kLogicalSessionsNamespace,
+                                        sessions,
+                                        makeSendFnForBatchWrite(
+                                            NamespaceString::kLogicalSessionsNamespace, client));
+                    });
 }
 
 StatusWith<LogicalSessionIdSet> SessionsCollectionRS::findRemovedSessions(
