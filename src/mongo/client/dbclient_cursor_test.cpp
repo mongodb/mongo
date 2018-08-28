@@ -177,6 +177,7 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
 
     // Request more results. This call should trigger the first 'getMore' request with exhaust
     // flag set.
+    conn.clearLastSentMessage();
     ASSERT(cursor.more());
     m = conn.getLastSentMessage();
 
@@ -240,6 +241,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
 
     // Request more results. This call should trigger the first 'getMore' request with exhaust
     // flag set.
+    conn.clearLastSentMessage();
     ASSERT(cursor.more());
     m = conn.getLastSentMessage();
     ASSERT(!m.empty());
@@ -262,6 +264,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     // Request more results again. This call should trigger another 'getMore' request, since the
     // previous response had no 'moreToCome' flag set. This time the mock server will respond with
     // the 'moreToCome' flag set.
+    conn.clearLastSentMessage();
     ASSERT(cursor.more());
     m = conn.getLastSentMessage();
     ASSERT(!m.empty());
@@ -280,6 +283,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     conn.setRecvResponse(terminalGetMoreResponseMsg);
 
     // Get the last returned document.
+    conn.clearLastSentMessage();
     ASSERT(cursor.more());
     ASSERT_BSONOBJ_EQ(terminalDoc, cursor.next());
 
