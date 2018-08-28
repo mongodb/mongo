@@ -29,7 +29,7 @@
 
     // Expansion enabled, but not recursively.
     configExpandFailure({
-        __rest: web.getURL() + '/reflect/yaml?json=' + encodeURI(JSON.stringify(sicReflect)),
+        __rest: web.getURL() + '/reflect/yaml?yaml=' + encodeURI(jsToYaml(sicReflect)),
         type: 'yaml'
     },
                         /__rest support has not been enabled/);

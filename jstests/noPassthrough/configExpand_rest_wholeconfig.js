@@ -9,9 +9,9 @@
     const web = new ConfigExpandRestServer();
     web.start();
 
-    const jsonConfig = JSON.stringify({setParameter: {scramIterationCount: 12345}});
+    const yamlConfig = jsToYaml({setParameter: {scramIterationCount: 12345}});
     configExpandSuccess(
-        {__rest: web.getURL() + '/reflect/yaml?json=' + encodeURI(jsonConfig), type: 'yaml'},
+        {__rest: web.getURL() + '/reflect/yaml?yaml=' + encodeURI(yamlConfig), type: 'yaml'},
         function(admin) {
             const response =
                 assert.commandWorked(admin.runCommand({getParameter: 1, scramIterationCount: 1}));

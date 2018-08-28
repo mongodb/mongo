@@ -7,7 +7,6 @@ import json
 import logging
 import time
 import urllib.parse
-import yaml
 
 class ConfigExpandRestHandler(http.server.BaseHTTPRequestHandler):
     """
@@ -39,7 +38,7 @@ class ConfigExpandRestHandler(http.server.BaseHTTPRequestHandler):
                 self.send_response(code)
                 self.send_header('content-type', 'text/yaml')
                 self.end_headers()
-                self.wfile.write(yaml.dump(json.loads(query['json'][0]), default_flow_style=False).encode())
+                self.wfile.write(query['yaml'][0].encode())
                 return
 
             self.send_response(http.HTTPStatus.NOT_FOUND)

@@ -112,7 +112,7 @@ function jsToYaml(config, toplevel = true) {
             }
         }
     } else if (typeof config === 'string') {
-        return "'" + config.replace('\\', '\\\\').replace("'", "\\'") + "'";
+        return "'" + config.replace(/'/g, "''") + "'";
     } else {
         // Simple scalar JSON types are close enough to YAML types.
         return JSON.stringify(config);

@@ -241,8 +241,18 @@ private:
             "Failed sending HTTP request",
             WinHttpSendRequest(request, _headers.c_str(), -1L, data, data_len, data_len, 0));
 
-        uassertWithErrno("Failed receiving response from server",
-                         WinHttpReceiveResponse(request, nullptr));
+        if (!WinHttpReceiveResponse(request, nullptr)) {
+            // Carve out timeout which doesn't translate well.
+            const auto err = GetLastError();
+            if (err == ERROR_WINHTTP_TIMEOUT) {
+                uasserted(ErrorCodes::OperationFailed, "Timeout was reached");
+            }
+            const auto msg = errnoWithDescription(err);
+            uasserted(ErrorCodes::OperationFailed,
+                      str::stream() << "Failed receiving response from server"
+                                    << ": "
+                                    << msg);
+        }
 
         DWORD statusCode = 0;
         DWORD statusCodeLength = sizeof(statusCode);

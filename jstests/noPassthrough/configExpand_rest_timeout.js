@@ -22,7 +22,7 @@
             scramIterationCount: {__rest: web.getStringReflectionURL('12345', {sleep: 40})},
         }
     },
-                        /Timeout was reached/);  // Note: This error will be different on windows.
+                        /Timeout was reached/);
 
     // Sleep 10 seconds during request, with custom 5 second timeout.
     configExpandFailure({
