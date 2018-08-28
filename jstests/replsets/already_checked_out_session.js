@@ -16,9 +16,8 @@
     const primary = rst.getPrimary();
     const db = primary.getDB("test");
 
-    function doInsertWithSession(testData, host, lsid, txnNumber) {
+    function doInsertWithSession(host, lsid, txnNumber) {
         try {
-            TestData = testData;
             const conn = new Mongo(host);
             const db = conn.getDB("test");
             assert.commandWorked(db.runCommand({
@@ -44,7 +43,7 @@
         // instead pass a stringified form of the JavaScript object through the ScopedThread
         // constructor and use eval() to rehydrate it.
         const lsid = UUID();
-        thread1 = new ScopedThread(doInsertWithSession, TestData, primary.host, tojson(lsid), 1);
+        thread1 = new ScopedThread(doInsertWithSession, primary.host, tojson(lsid), 1);
         thread1.start();
 
         assert.soon(
@@ -60,7 +59,7 @@
                 return "insert operation with txnNumber 1 was not found: " + tojson(db.currentOp());
             });
 
-        thread2 = new ScopedThread(doInsertWithSession, TestData, primary.host, tojson(lsid), 2);
+        thread2 = new ScopedThread(doInsertWithSession, primary.host, tojson(lsid), 2);
         thread2.start();
 
         // Run currentOp() again to ensure that thread2 has started its insert command.

@@ -5,7 +5,7 @@ if (typeof _threadInject != "undefined") {
     // With --enableJavaScriptProtection functions are presented as Code objects.
     // This function evals all the Code objects then calls the provided start function.
     // arguments: [startFunction, startFunction args...]
-    function _threadStartWrapper() {
+    function _threadStartWrapper(testData) {
         // Recursively evals all the Code objects present in arguments
         // NOTE: This is a naive implementation that cannot handle cyclic objects.
         function evalCodeArgs(arg) {
@@ -24,7 +24,9 @@ if (typeof _threadInject != "undefined") {
         }
         var realStartFn;
         var newArgs = [];
-        for (var i = 0, l = arguments.length; i < l; i++) {
+        // We skip the first argument, which is always TestData.
+        TestData = evalCodeArgs(testData);
+        for (var i = 1, l = arguments.length; i < l; i++) {
             newArgs.push(evalCodeArgs(arguments[i]));
         }
         realStartFn = newArgs.shift();
@@ -33,6 +35,8 @@ if (typeof _threadInject != "undefined") {
 
     Thread = function() {
         var args = Array.prototype.slice.call(arguments);
+        // Always pass TestData as the first argument.
+        args.unshift(TestData);
         args.unshift(_threadStartWrapper);
         this.init.apply(this, args);
     };
@@ -40,6 +44,8 @@ if (typeof _threadInject != "undefined") {
 
     ScopedThread = function() {
         var args = Array.prototype.slice.call(arguments);
+        // Always pass TestData as the first argument.
+        args.unshift(TestData);
         args.unshift(_threadStartWrapper);
         this.init.apply(this, args);
     };

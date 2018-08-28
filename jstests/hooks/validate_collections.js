@@ -84,9 +84,7 @@ function CollectionValidator() {
     };
 
     // Run a separate thread to validate collections on each server in parallel.
-    const validateCollectionsThread = function(validatorFunc, host, testData) {
-        TestData = testData;  // Pass the TestData object from main thread.
-
+    const validateCollectionsThread = function(validatorFunc, host) {
         try {
             print('Running validate() on ' + host);
             const conn = new Mongo(host);
@@ -139,8 +137,8 @@ function CollectionValidator() {
 
         try {
             hostList.forEach(host => {
-                const thread = new ScopedThread(
-                    validateCollectionsThread, this.validateCollections, host, TestData);
+                const thread =
+                    new ScopedThread(validateCollectionsThread, this.validateCollections, host);
                 threads.push(thread);
                 thread.start();
             });

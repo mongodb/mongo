@@ -6,9 +6,8 @@
     load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
     load('jstests/libs/parallelTester.js');     // For ScopedThread.
 
-    function checkReplicatedDataHashesThread(hosts, testData) {
+    function checkReplicatedDataHashesThread(hosts) {
         try {
-            TestData = testData;
             const excludedDBs = jsTest.options().excludedDBsFromDBHash;
             const rst = new ReplSetTest(hosts[0]);
             rst.checkReplicatedDataHashes(undefined, excludedDBs);
@@ -56,8 +55,8 @@
         const threads = [];
         try {
             if (topology.configsvr.nodes.length > 1) {
-                const thread = new ScopedThread(
-                    checkReplicatedDataHashesThread, topology.configsvr.nodes, TestData);
+                const thread =
+                    new ScopedThread(checkReplicatedDataHashesThread, topology.configsvr.nodes);
                 threads.push(thread);
                 thread.start();
             } else {
@@ -79,8 +78,7 @@
                 }
 
                 if (shard.nodes.length > 1) {
-                    const thread =
-                        new ScopedThread(checkReplicatedDataHashesThread, shard.nodes, TestData);
+                    const thread = new ScopedThread(checkReplicatedDataHashesThread, shard.nodes);
                     threads.push(thread);
                     thread.start();
                 } else {

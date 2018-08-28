@@ -20,7 +20,6 @@ var workerThread = (function() {
     // args.globalAssertLevel = the global assertion level to use
     // args.errorLatch = CountDownLatch instance that threads count down when they error
     // args.sessionOptions = the options to start a session with
-    // args.testData = TestData object
     // run = callback that takes a map of workloads to their associated $config
     function main(workloads, args, run) {
         var myDB;
@@ -31,11 +30,6 @@ var workerThread = (function() {
         }
 
         globalAssertLevel = args.globalAssertLevel;
-
-        // The global 'TestData' object may still be undefined if the concurrency suite isn't being
-        // run by resmoke.py (e.g. if it is being run via a parallel shell in the backup/restore
-        // tests).
-        TestData = (args.testData !== undefined) ? args.testData : {};
 
         try {
             if (typeof db !== 'undefined') {
@@ -138,8 +132,8 @@ var workerThread = (function() {
                         logRetryAttempts: true,
                         overrideRetryAttempts: 3
                     };
-                    Object.assign(TestData, newOptions);
 
+                    TestData = Object.merge(TestData, newOptions);
                     load('jstests/libs/override_methods/auto_retry_on_network_error.js');
                 }
 
@@ -148,7 +142,7 @@ var workerThread = (function() {
                 // that database while we're waiting for a majority of nodes in the replica set to
                 // confirm it has been dropped. We load the
                 // implicitly_retry_on_database_drop_pending.js file to make it so that the clients
-                // started by the concurrency framework automatically retry their operation in the
+                // started by these concurrency framework automatically retry their operation in the
                 // face of this particular error response.
                 load('jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js');
             }

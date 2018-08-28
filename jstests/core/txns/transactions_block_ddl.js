@@ -41,10 +41,9 @@
 
         session.startTransaction();
         assert.commandWorked(sessionColl.insert({a: 5, b: 6}));
-        let thread = new ScopedThread(function(testData, cmdDBName, ddlCmd) {
-            TestData = testData;
+        let thread = new ScopedThread(function(cmdDBName, ddlCmd) {
             return db.getSiblingDB(cmdDBName).runCommand(ddlCmd);
-        }, TestData, cmdDBName, ddlCmd);
+        }, cmdDBName, ddlCmd);
         thread.start();
         // Wait for the DDL operation to have pending locks.
         assert.soon(

@@ -144,14 +144,11 @@
     // Start a transaction to hold the DBLock in IX mode so that drop will be blocked.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "lock-timeout-1"}));
-    function dropCmdFunc(testData, primaryHost, dbName, collName) {
-        // Pass the TestData into the new shell so that jsTest.authenticate() can use the correct
-        // credentials in auth test suites.
-        TestData = testData;
+    function dropCmdFunc(primaryHost, dbName, collName) {
         const primary = new Mongo(primaryHost);
         return primary.getDB(dbName).runCommand({drop: collName, writeConcern: {w: "majority"}});
     }
-    const thread = new ScopedThread(dropCmdFunc, TestData, primary.host, dbName, collName);
+    const thread = new ScopedThread(dropCmdFunc, primary.host, dbName, collName);
     thread.start();
     // Wait for the drop to have a pending MODE_X lock on the database.
     assert.soon(
