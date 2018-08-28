@@ -14,8 +14,7 @@ load('jstests/libs/sessions_collection.js');
     var secondary = replTest.liveNodes.slaves[0];
     var secondaryAdmin = secondary.getDB("admin");
 
-    // Test that we can use sessions on the primary
-    // before the sessions collection exists.
+    // Test that we can use sessions on the primary before the sessions collection exists.
     {
         validateSessionsCollection(primary, false, false);
 
@@ -24,8 +23,7 @@ load('jstests/libs/sessions_collection.js');
         validateSessionsCollection(primary, false, false);
     }
 
-    // Test that we can use sessions on secondaries
-    // before the sessions collection exists.
+    // Test that we can use sessions on secondaries before the sessions collection exists.
     {
         validateSessionsCollection(primary, false, false);
         validateSessionsCollection(secondary, false, false);
@@ -36,20 +34,20 @@ load('jstests/libs/sessions_collection.js');
         validateSessionsCollection(secondary, false, false);
     }
 
-    // Test that a refresh on a secondary does not create the sessions
-    // collection, on either the secondary or the primary.
+    // Test that a refresh on a secondary creates the sessions collection.
     {
         validateSessionsCollection(primary, false, false);
         validateSessionsCollection(secondary, false, false);
 
         assert.commandWorked(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
 
-        validateSessionsCollection(primary, false, false);
-        validateSessionsCollection(secondary, false, false);
+        validateSessionsCollection(primary, true, true);
+        validateSessionsCollection(secondary, true, true);
     }
-
     // Test that a refresh on the primary creates the sessions collection.
     {
+        assert.commandWorked(primary.getDB("config").runCommand(
+            {drop: "system.sessions", writeConcern: {w: "majority"}}));
         validateSessionsCollection(primary, false, false);
         validateSessionsCollection(secondary, false, false);
 
@@ -58,8 +56,7 @@ load('jstests/libs/sessions_collection.js');
         validateSessionsCollection(primary, true, true);
     }
 
-    // Test that a refresh on a secondary will not create the
-    // TTL index on the sessions collection.
+    // Test that a refresh on a secondary will create the TTL index on the sessions collection.
     {
         assert.commandWorked(primary.getDB("config").system.sessions.dropIndex({lastUse: 1}));
 
@@ -67,12 +64,13 @@ load('jstests/libs/sessions_collection.js');
 
         assert.commandWorked(secondaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
 
-        validateSessionsCollection(primary, true, false);
+        validateSessionsCollection(primary, true, true);
     }
 
-    // Test that a refresh on the primary will create the
-    // TTL index on the sessions collection.
+    // Test that a refresh on the primary will create the TTL index on the sessions collection.
     {
+        assert.commandWorked(primary.getDB("config").system.sessions.dropIndex({lastUse: 1}));
+
         validateSessionsCollection(primary, true, false);
 
         assert.commandWorked(primaryAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));

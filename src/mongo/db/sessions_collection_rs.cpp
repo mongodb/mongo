@@ -174,29 +174,33 @@ Status SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
 
             return Status::OK();
         },
-        [&](DBClientBase*) {
-            // If we are not the primary, we aren't going to do writes anyway, so just return ok.
+        [&](DBClientBase* client) {
+            BSONObj info;
+            auto cmd = generateCreateIndexesCmd();
+            if (!client->runCommand(kSessionsNamespaceString.db().toString(), cmd, info)) {
+                return getStatusFromCommandResult(info);
+            }
             return Status::OK();
         });
 }
 
 Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,
                                              const LogicalSessionRecordSet& sessions) {
-    return dispatch(
-        kSessionsNamespaceString,
-        MODE_IX,
-        opCtx,
-        [&] {
-            DBDirectClient client(opCtx);
-            return doRefresh(kSessionsNamespaceString,
-                             sessions,
-                             makeSendFnForBatchWrite(kSessionsNamespaceString, &client));
-        },
-        [&](DBClientBase* client) {
-            return doRefreshExternal(kSessionsNamespaceString,
-                                     sessions,
-                                     makeSendFnForCommand(kSessionsNamespaceString, client));
-        });
+    return dispatch(kSessionsNamespaceString,
+                    MODE_IX,
+                    opCtx,
+                    [&] {
+                        DBDirectClient client(opCtx);
+                        return doRefresh(
+                            kSessionsNamespaceString,
+                            sessions,
+                            makeSendFnForBatchWrite(kSessionsNamespaceString, &client));
+                    },
+                    [&](DBClientBase* client) {
+                        return doRefresh(kSessionsNamespaceString,
+                                         sessions,
+                                         makeSendFnForBatchWrite(kSessionsNamespaceString, client));
+                    });
 }
 
 Status SessionsCollectionRS::removeRecords(OperationContext* opCtx,
@@ -211,10 +215,9 @@ Status SessionsCollectionRS::removeRecords(OperationContext* opCtx,
                                         makeSendFnForBatchWrite(kSessionsNamespaceString, &client));
                     },
                     [&](DBClientBase* client) {
-                        return doRemoveExternal(
-                            kSessionsNamespaceString,
-                            sessions,
-                            makeSendFnForCommand(kSessionsNamespaceString, client));
+                        return doRemove(kSessionsNamespaceString,
+                                        sessions,
+                                        makeSendFnForBatchWrite(kSessionsNamespaceString, client));
                     });
 }
 
