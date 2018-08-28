@@ -479,10 +479,6 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
 
     updateStateInLock();
 
-    // Users are required to call indicateSuccess() or indicateFailure() before allowing
-    // a connection to be returned. Otherwise, we have entered an unknown state.
-    invariant(conn->getStatus() != kConnectionStateUnknown);
-
     if (conn->getGeneration() != _generation) {
         // If the connection is from an older generation, just return.
         return;
