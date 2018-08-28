@@ -1252,12 +1252,6 @@ var ReplSetTest = function(opts) {
                     "data": {"awaitLastStableRecoveryTimestamp": 1},
                     "writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}
                 }));
-
-                // TODO(SERVER-36758): Remove the second write. We should not need to prod the
-                // replica set to advance the commit point once all nodes are running a version with
-                // SERVER-33248. This can be removed once the last stable version includes the fix.
-                assert.commandWorked(db.adminCommand(
-                    {"appendOplogNote": 1, "data": {"awaitLastStableRecoveryTimestamp": 2}}));
             };
 
             // TODO(SERVER-14017): Remove this extra sub-shell in favor of a cleaner authentication
