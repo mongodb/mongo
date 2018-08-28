@@ -56,7 +56,7 @@ function testProperAuthorization(conn, t, testcase, privileges) {
     }
 
     firstDb.logout();
-    authCommandsLib.teardown(conn, t, runOnDb);
+    authCommandsLib.teardown(conn, t, runOnDb, res);
     return out;
 }
 

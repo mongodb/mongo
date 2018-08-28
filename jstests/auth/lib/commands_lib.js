@@ -34,20 +34,14 @@ be authorized.
 
 Additional options:
 
-1) onSuccess
-
-A test can provide an onSuccess callback, which is called when the command
-is authorized and succeeds. The callback is passed a single parameter, which
-is the document returned by the command.
-
-2) expectFail
+1) expectFail
 
 You can add "expectFail: true" to an individual element of the testcases
 array. This means that if the command is authorized, then you still expect
 it to fail with a non-auth related error. As always, for roles other than
 those in the "roles" array, an auth error is expected.
 
-3) expectAuthzFailure
+2) expectAuthzFailure
 
 Like "expectFailure", this option applies to an individual test case rather than
 than the full test object.  When this option is true, it means the test case is
@@ -55,30 +49,30 @@ than the full test object.  When this option is true, it means the test case is
 instead it makes it so it is testing that the given roles/privileges are *not* sufficient
 to be authorized to run the command.
 
-4) skipSharded
+3) skipSharded
 
 Add "skipSharded: true" if you want to run the test only ony in a non-sharded configuration.
 
-5) skipUnlessSharded
+4) skipUnlessSharded
 
 Add "skipUnlessSharded: true" if you want to run the test only in sharded
 configuration.
 
-6) skipUnlessReplicaSet
+5) skipUnlessReplicaSet
 Add "skipUnlessReplicaSet: true" if you want to run the test only when replica sets are in use.
 
-7) setup
+6) setup
 
 The setup function, if present, is called before testing whether a
 particular role authorizes a command for a particular database.
 
-8) teardown
+7) teardown
 
 The teardown function, if present, is called immediately after
-testint whether a particular role authorizes a command for a
+testing whether a particular role authorizes a command for a
 particular database.
 
-9) privileges
+8) privileges
 
 An array of privileges used when testing user-defined roles. The test case tests that a user with
 the specified privileges is authorized to run the command, and that having only a subset of the
@@ -5856,6 +5850,25 @@ var authCommandsLib = {
               },
           ]
         },
+        {
+          testname: "aggregate_$backupCursor",
+          command: {aggregate: 1, cursor: {}, pipeline: [{$backupCursor: {}}]},
+          skipSharded: true,
+          testcases: [{
+              runOnDb: adminDbName,
+              roles: roles_hostManager,
+              privileges: [
+                  {resource: {cluster: true}, actions: ["fsync"]},
+              ],
+              expectFail: TestData.storageEngine == "inMemory",
+          }],
+          teardown: (db, response) => {
+              if (response.ok) {
+                  assert.commandWorked(db.runCommand(
+                      {killCursors: "$cmd.aggregate", cursors: [response.cursor.id]}));
+              }
+          }
+        }
     ],
 
     /************* SHARED TEST LOGIC ****************/
@@ -5919,11 +5932,11 @@ var authCommandsLib = {
         }
     },
 
-    teardown: function(conn, t, runOnDb) {
+    teardown: function(conn, t, runOnDb, response) {
         var adminDb = conn.getDB(adminDbName);
         if (t.teardown) {
             adminDb.auth("admin", "password");
-            t.teardown(runOnDb);
+            t.teardown(runOnDb, response);
             runOnDb.getLastError();
             adminDb.logout();
         }

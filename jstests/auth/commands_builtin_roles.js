@@ -73,11 +73,6 @@ function testProperAuthorization(conn, t, testcase, r) {
             out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb +
                 " with role " + r.key;
         }
-        // test can provide a function that will run if
-        // the command completed successfully
-        else if (testcase.onSuccess) {
-            testcase.onSuccess(res);
-        }
     } else {
         if (res.ok == 1 || (res.ok == 0 && res.code != authErrCode)) {
             out = "expected authorization failure" + " but received result " + tojson(res) +
@@ -86,7 +81,7 @@ function testProperAuthorization(conn, t, testcase, r) {
     }
 
     r.db.logout();
-    authCommandsLib.teardown(conn, t, runOnDb);
+    authCommandsLib.teardown(conn, t, runOnDb, res);
     return out;
 }
 

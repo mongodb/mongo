@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_set.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/storage/backup_cursor_service.h"
@@ -59,8 +60,7 @@ public:
         }
 
         PrivilegeVector requiredPrivileges(bool isMongos) const final {
-            // SERVER-36266 will address requiring the appropriate privileges.
-            return PrivilegeVector();
+            return {Privilege(ResourcePattern::forClusterResource(), ActionSet{ActionType::fsync})};
         }
 
         bool isInitialSource() const final {
