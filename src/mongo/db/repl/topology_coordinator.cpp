@@ -1898,7 +1898,8 @@ bool TopologyCoordinator::prepareForUnconditionalStepDown() {
     return true;
 }
 
-Status TopologyCoordinator::prepareForStepDownAttempt() {
+StatusWith<TopologyCoordinator::StepDownAttemptAbortFn>
+TopologyCoordinator::prepareForStepDownAttempt() {
     if (_leaderMode == LeaderMode::kSteppingDown ||
         _leaderMode == LeaderMode::kAttemptingStepDown) {
         return Status{ErrorCodes::ConflictingOperationInProgress,
@@ -1909,14 +1910,15 @@ Status TopologyCoordinator::prepareForStepDownAttempt() {
         return Status{ErrorCodes::NotMaster, "This node is not a primary."};
     }
 
+    invariant(_leaderMode == LeaderMode::kMaster || _leaderMode == LeaderMode::kLeaderElect);
+    const auto previousLeaderMode = _leaderMode;
     _setLeaderMode(LeaderMode::kAttemptingStepDown);
-    return Status::OK();
-}
 
-void TopologyCoordinator::abortAttemptedStepDownIfNeeded() {
-    if (_leaderMode == TopologyCoordinator::LeaderMode::kAttemptingStepDown) {
-        _setLeaderMode(TopologyCoordinator::LeaderMode::kMaster);
-    }
+    return {[this, previousLeaderMode] {
+        if (_leaderMode == TopologyCoordinator::LeaderMode::kAttemptingStepDown) {
+            _setLeaderMode(previousLeaderMode);
+        }
+    }};
 }
 
 void TopologyCoordinator::changeMemberState_forTest(const MemberState& newMemberState,
@@ -2769,7 +2771,7 @@ void TopologyCoordinator::_setLeaderMode(TopologyCoordinator::LeaderMode newMode
             break;
         case LeaderMode::kAttemptingStepDown:
             invariant(newMode == LeaderMode::kNotLeader || newMode == LeaderMode::kMaster ||
-                      newMode == LeaderMode::kSteppingDown);
+                      newMode == LeaderMode::kSteppingDown || newMode == LeaderMode::kLeaderElect);
             break;
         case LeaderMode::kSteppingDown:
             invariant(newMode == LeaderMode::kNotLeader);
