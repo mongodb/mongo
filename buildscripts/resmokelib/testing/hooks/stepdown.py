@@ -357,8 +357,22 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             # If we failed to step up one of the secondaries, then we run the replSetStepUp to try
             # and elect the former primary again. This way we don't need to wait
             # self._stepdown_duration_secs seconds to restore write availability to the cluster.
-            client = primary.mongo_client()
-            client.admin.command("replSetStepUp")
+            # Since the former primary may have been killed, we need to wait until it has been
+            # restarted by retrying replSetStepUp.
+            retry_time_secs = rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
+            retry_start_time = time.time()
+            while True:
+                try:
+                    client = primary.mongo_client()
+                    client.admin.command("replSetStepUp")
+                    break
+                except pymongo.errors.OperationFailure:
+                    self._wait(0.2)
+                if time.time() - retry_start_time > retry_time_secs:
+                    raise errors.ServerFailure(
+                        "The old primary on port {} of replica set {} did not step up in"
+                        " {} seconds.".format(client.port, rs_fixture.replset_name,
+                                              retry_time_secs))
 
         # Bump the counter for the chosen secondary to indicate that the replSetStepUp command
         # executed successfully.
