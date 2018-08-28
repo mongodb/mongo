@@ -93,40 +93,6 @@ public:
 
     ~TopologyCoordinator();
 
-    /**
-     * Different modes a node can be in while still reporting itself as in state PRIMARY.
-     *
-     * Valid transitions:
-     *
-     *       kNotLeader <----------------------------------
-     *          |                                         |
-     *          |                                         |
-     *          |                                         |
-     *          v                                         |
-     *       kLeaderElect-----                            |
-     *          |            |                            |
-     *          |            |                            |
-     *          v            |                            |
-     *       kMaster -------------------------            |
-     *        |  ^           |                |           |
-     *        |  |     -------------------    |           |
-     *        |  |     |                 |    |           |
-     *        v  |     v                 v    v           |
-     *  kAttemptingStepDown----------->kSteppingDown      |
-     *        |                              |            |
-     *        |                              |            |
-     *        |                              |            |
-     *        ---------------------------------------------
-     *
-     */
-    enum class LeaderMode {
-        kNotLeader,           // This node is not currently a leader.
-        kLeaderElect,         // This node has been elected leader, but can't yet accept writes.
-        kMaster,              // This node reports ismaster:true and can accept writes.
-        kSteppingDown,        // This node is in the middle of a (hb) stepdown that must complete.
-        kAttemptingStepDown,  // This node is in the middle of a stepdown (cmd) that might fail.
-    };
-
     ////////////////////////////////////////////////////////////
     //
     // State inspection methods.
@@ -537,6 +503,8 @@ public:
      */
     void processLoseElection();
 
+
+    using StepDownAttemptAbortFn = stdx::function<void()>;
     /**
      * Readies the TopologyCoordinator for an attempt to stepdown that may fail.  This is used
      * when we receive a stepdown command (which can fail if not enough secondaries are caught up)
@@ -545,16 +513,10 @@ public:
      * - NotMaster if this node is not a leader.
      * - ConflictingOperationInProgess if this node is already processing a stepdown request of any
      * kind.
+     * On an OK return status also returns a function object that can be called to abort the
+     * pending stepdown attempt and return this node to normal primary/master state.
      */
-    Status prepareForStepDownAttempt();
-
-    /**
-     * If this node is still attempting to process a stepdown attempt, aborts the attempt and
-     * returns this node to normal primary/master state.  If this node has already completed
-     * stepping down or is now in the process of handling an unconditional stepdown, then this
-     * method does nothing.
-     */
-    void abortAttemptedStepDownIfNeeded();
+    StatusWith<StepDownAttemptAbortFn> prepareForStepDownAttempt();
 
     /**
      * Tries to transition the coordinator from the leader role to the follower role.
@@ -730,6 +692,40 @@ public:
 private:
     typedef int UnelectableReasonMask;
     class PingStats;
+
+    /**
+     * Different modes a node can be in while still reporting itself as in state PRIMARY.
+     *
+     * Valid transitions:
+     *
+     *       kNotLeader <----------------------------------
+     *          |                                         |
+     *          |                                         |
+     *          |                                         |
+     *          v                                         |
+     *       kLeaderElect-----------------                |
+     *          |    ^  |                |                |
+     *          |    |  |                |                |
+     *          v    |  |                |                |
+     *       kMaster --------------------------           |
+     *        |  ^   |  |                |    |           |
+     *        |  |   |  |                |    |           |
+     *        |  |   |  |                |    |           |
+     *        v  |   |  v                v    v           |
+     *  kAttemptingStepDown----------->kSteppingDown      |
+     *        |                              |            |
+     *        |                              |            |
+     *        |                              |            |
+     *        ---------------------------------------------
+     *
+     */
+    enum class LeaderMode {
+        kNotLeader,           // This node is not currently a leader.
+        kLeaderElect,         // This node has been elected leader, but can't yet accept writes.
+        kMaster,              // This node reports ismaster:true and can accept writes.
+        kSteppingDown,        // This node is in the middle of a (hb) stepdown that must complete.
+        kAttemptingStepDown,  // This node is in the middle of a stepdown (cmd) that might fail.
+    };
 
     enum UnelectableReason {
         None = 0,
