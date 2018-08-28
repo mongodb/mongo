@@ -1,5 +1,9 @@
 /**
- * Tests upgrading a cluster from last stable to current version.
+ * Tests that CRUD and aggregation commands through the mongos continue to work as expected on both
+ * sharded and unsharded collection at each step of cluster upgrade from last-stable to latest.
+ *
+ * TODO SERVER-36930 The tests about aggregation are specific to changes made in the 4.2 development
+ * cycle and can be deleted when we branch for 4.4.
  */
 
 load('./jstests/multiVersion/libs/multi_rs.js');
@@ -22,7 +26,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         jsTest.log("Starting" + (isRSCluster ? " (replica set)" : "") + " cluster" + "...");
 
-        var testCRUD = function(db) {
+        var testCRUDAndAgg = function(db) {
             assert.writeOK(db.foo.insert({x: 1}));
             assert.writeOK(db.foo.insert({x: -1}));
             assert.writeOK(db.foo.update({x: 1}, {$set: {y: 1}}));
@@ -31,6 +35,16 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             assert.eq(1, doc1.y);
             var doc2 = db.foo.findOne({x: -1});
             assert.eq(1, doc2.y);
+
+            // Make sure a user can always do an aggregation with an $out using the 4.0-style
+            // syntax.
+            // TODO SERVER-36930 This immediately invoked function can be removed when we are sure
+            // all nodes in the cluster understand both the new and the old $out syntax.
+            (function testAggOut() {
+                db.sanity_check.drop();
+                assert.eq(0, db.foo.aggregate([{$out: "sanity_check"}]).itcount());
+                assert.eq(2, db.sanity_check.find().itcount());
+            }());
 
             assert.writeOK(db.foo.remove({x: 1}, true));
             assert.writeOK(db.foo.remove({x: -1}, true));
@@ -69,32 +83,32 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         assert.commandWorked(
             st.s.adminCommand({moveChunk: 'sharded.foo', find: {x: 1}, to: st.shard1.shardName}));
 
-        testCRUD(st.s.getDB('unsharded'));
-        testCRUD(st.s.getDB('sharded'));
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
 
         // upgrade the config servers first
         jsTest.log('upgrading config servers');
         st.upgradeCluster("latest", {upgradeMongos: false, upgradeShards: false});
         st.restartMongoses();
 
-        testCRUD(st.s.getDB('unsharded'));
-        testCRUD(st.s.getDB('sharded'));
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
 
         // Then upgrade the shards.
         jsTest.log('upgrading shard servers');
         st.upgradeCluster("latest", {upgradeMongos: false, upgradeConfigs: false});
         st.restartMongoses();
 
-        testCRUD(st.s.getDB('unsharded'));
-        testCRUD(st.s.getDB('sharded'));
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
 
         // Finally, upgrade mongos
         jsTest.log('upgrading mongos servers');
         st.upgradeCluster("latest", {upgradeConfigs: false, upgradeShards: false});
         st.restartMongoses();
 
-        testCRUD(st.s.getDB('unsharded'));
-        testCRUD(st.s.getDB('sharded'));
+        testCRUDAndAgg(st.s.getDB('unsharded'));
+        testCRUDAndAgg(st.s.getDB('sharded'));
 
         // Check that version document is unmodified.
         version = st.s.getCollection('config.version').findOne();
