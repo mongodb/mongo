@@ -4,6 +4,7 @@
     "use strict";
 
     load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+    load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMongos.
 
     const coll = db.mode_insert_documents;
     coll.drop();
@@ -63,4 +64,41 @@
 
     assertErrorCode(coll, pipeline, ErrorCodes.DuplicateKey);
 
+    //
+    // Tests for $out to a database that differs from the aggregation database.
+    //
+    const foreignDb = db.getSiblingDB("mode_insert_documents_foreign");
+    const foreignTargetColl = foreignDb.mode_insert_documents_out;
+    const pipelineDifferentOutputDb = [{
+        $out: {
+            to: foreignTargetColl.getName(),
+            db: foreignDb.getName(),
+            mode: "insertDocuments",
+        }
+    }];
+
+    foreignDb.dropDatabase();
+
+    if (!FixtureHelpers.isMongos(db)) {
+        //
+        // Test that $out implicitly creates a new database when the output collection's database
+        // doesn't exist.
+        //
+        coll.aggregate(pipelineDifferentOutputDb);
+        assert.eq(foreignTargetColl.find().itcount(), 2);
+
+        //
+        // First, replace the contents of the collection with new documents that have different _id
+        // values. Then, re-run the same aggregation, which should merge the new documents into the
+        // existing output collection without overwriting the existing, non-conflicting documents.
+        //
+        coll.drop();
+        assert.commandWorked(coll.insert([{_id: 2, a: 2}, {_id: 3, a: 3}]));
+        coll.aggregate(pipelineDifferentOutputDb);
+        assert.eq(foreignTargetColl.find().itcount(), 4);
+    } else {
+        // Implicit database creation is prohibited in a cluster.
+        let error = assert.throws(() => coll.aggregate(pipelineDifferentOutputDb));
+        assert.commandFailedWithCode(error, ErrorCodes.NamespaceNotFound);
+    }
 }());

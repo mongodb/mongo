@@ -170,6 +170,12 @@ intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
     WriteModeEnum mode,
     std::set<FieldPath> uniqueKey) {
+    // TODO (SERVER-36832): Allow this combination.
+    uassert(
+        50939,
+        str::stream() << "$out with mode " << WriteMode_serializer(mode)
+                      << " is not supported when the output collection is in a different database",
+        !(mode == WriteModeEnum::kModeReplaceCollection && outputNs.db() != expCtx->ns.db()));
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "$out cannot be used in a transaction",

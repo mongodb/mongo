@@ -1,9 +1,15 @@
-// Tests the behavior of $out.
-// @tags: [assumes_unsharded_collection]
+/**
+ * Tests the behavior of $out with mode "replaceCollection".
+ *
+ * This test assumes that collections are not implicitly sharded, since mode "replaceCollection" is
+ * prohibited if the output collection is sharded.
+ * @tags: [assumes_unsharded_collection]
+ */
 (function() {
     "use strict";
 
     load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+    load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMongos.
 
     const coll = db.mode_replace_collection;
     coll.drop();
@@ -66,4 +72,20 @@
     assert.eq(1, targetColl.find().itcount());
     assert.eq(2, targetColl.getIndexes().length);
 
+    //
+    // Tests for $out to a database that differs from the aggregation database.
+    //
+    const foreignDb = db.getSiblingDB("mode_replace_collection_foreign");
+    const foreignTargetColl = foreignDb.mode_replace_collection_out;
+    const pipelineDifferentOutputDb = [{
+        $out: {
+            to: foreignTargetColl.getName(),
+            db: foreignDb.getName(),
+            mode: "replaceCollection",
+        }
+    }];
+
+    // TODO (SERVER-36832): Allow "replaceCollection" mode with a foreign output database.
+    assert.commandWorked(foreignTargetColl.insert({val: "forcing database creation"}));
+    assertErrorCode(coll, pipelineDifferentOutputDb, 50939);
 }());

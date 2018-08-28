@@ -229,9 +229,14 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             continue;
         }
 
-        if (!db || db->getCollection(opCtx, involvedNs)) {
-            // If the database exists and 'involvedNs' refers to a collection namespace, then we
-            // resolve it as an empty pipeline in order to read directly from the underlying
+        if (involvedNs.db() != request.getNamespaceString().db()) {
+            // If the involved namespace is not in the same database as the aggregation, it must be
+            // from a $out to a collection in a different database. Since we cannot write to views,
+            // simply assume that the namespace is a collection.
+            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+        } else if (!db || db->getCollection(opCtx, involvedNs)) {
+            // If the aggregation database exists and 'involvedNs' refers to a collection namespace,
+            // then we resolve it as an empty pipeline in order to read directly from the underlying
             // collection. If the database doesn't exist, then we still resolve it as an empty
             // pipeline because 'involvedNs' doesn't refer to a view namespace in our consistent
             // snapshot of the view catalog.

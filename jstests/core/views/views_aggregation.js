@@ -73,8 +73,32 @@
     assertAggResultEq("popSortedView", [], allDocuments.sort(byPopulation), doOrderedSort);
     assertAggResultEq("popSortedView", [{$limit: 1}, {$project: {_id: 1}}], [{_id: "Palo Alto"}]);
 
-    // Test that the $out stage errors when given a view namespace.
+    // Test that the $out stage errors when writing to a view namespace.
     assertErrorCode(coll, [{$out: "emptyPipelineView"}], ErrorCodes.CommandNotSupportedOnView);
+    assertErrorCode(coll,
+                    [{$out: {to: "emptyPipelineView", mode: "replaceCollection"}}],
+                    ErrorCodes.CommandNotSupportedOnView);
+    assertErrorCode(coll,
+                    [{$out: {to: "emptyPipelineView", mode: "insertDocuments"}}],
+                    ErrorCodes.CommandNotSupportedOnView);
+    assertErrorCode(coll,
+                    [{$out: {to: "emptyPipelineView", mode: "replaceDocuments"}}],
+                    ErrorCodes.CommandNotSupportedOnView);
+
+    // Test that the $out stage errors when writing to a view namespace in a foreign database.
+    let foreignDB = db.getSiblingDB("views_aggregation_foreign");
+    foreignDB.view.drop();
+    assert.commandWorked(foreignDB.createView("view", "coll", []));
+    assertErrorCode(coll,
+                    [{$out: {db: foreignDB.getName(), to: "view", mode: "insertDocuments"}}],
+                    ErrorCodes.CommandNotSupportedOnView);
+    assertErrorCode(coll,
+                    [{$out: {db: foreignDB.getName(), to: "view", mode: "replaceDocuments"}}],
+                    ErrorCodes.CommandNotSupportedOnView);
+    // TODO (SERVER-36832): When $out to foreign database is allowed with "replaceCollection", this
+    // should fail with ErrorCodes.CommandNotSupportedOnView.
+    assertErrorCode(
+        coll, [{$out: {db: foreignDB.getName(), to: "view", mode: "replaceCollection"}}], 50939);
 
     // Test that an aggregate on a view propagates the 'bypassDocumentValidation' option.
     const validatedCollName = "collectionWithValidator";

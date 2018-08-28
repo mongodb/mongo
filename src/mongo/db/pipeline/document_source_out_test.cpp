@@ -43,6 +43,7 @@ using boost::intrusive_ptr;
 StringData kModeFieldName = DocumentSourceOutSpec::kModeFieldName;
 StringData kUniqueKeyFieldName = DocumentSourceOutSpec::kUniqueKeyFieldName;
 StringData kDefaultMode = WriteMode_serializer(WriteModeEnum::kModeReplaceCollection);
+StringData kInsertDocumentsMode = WriteMode_serializer(WriteModeEnum::kModeInsertDocuments);
 
 /**
  * For the purpsoses of this test, assume every collection is unsharded. Stages may ask this during
@@ -274,7 +275,7 @@ TEST_F(DocumentSourceOutTest, FailsToParseIfDbIsNotAValidDatabaseName) {
     BSONObj spec = BSON("$out" << BSON("to"
                                        << "test"
                                        << "mode"
-                                       << kDefaultMode
+                                       << kInsertDocumentsMode
                                        << "db"
                                        << "$invalid"));
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 17385);
@@ -282,7 +283,7 @@ TEST_F(DocumentSourceOutTest, FailsToParseIfDbIsNotAValidDatabaseName) {
     spec = BSON("$out" << BSON("to"
                                << "test"
                                << "mode"
-                               << kDefaultMode
+                               << kInsertDocumentsMode
                                << "db"
                                << ".test"));
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, ErrorCodes::InvalidNamespace);
@@ -348,16 +349,25 @@ TEST_F(DocumentSourceOutTest, FailsToParseIfUniqueKeyIsNotAnObject) {
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, ErrorCodes::TypeMismatch);
 }
 
-TEST_F(DocumentSourceOutTest, CorrectlyUsesTargetDbIfSpecified) {
-    const auto targetDb = "someOtherDb"_sd;
+TEST_F(DocumentSourceOutTest, CorrectlyUsesTargetDbThatMatchesAggregationDb) {
+    const auto targetDbSameAsAggregationDb = getExpCtx()->ns.db();
     const auto targetColl = "test"_sd;
-    BSONObj spec =
-        BSON("$out" << BSON("to" << targetColl << "mode" << kDefaultMode << "db" << targetDb));
+    BSONObj spec = BSON("$out" << BSON("to" << targetColl << "mode" << kDefaultMode << "db"
+                                            << targetDbSameAsAggregationDb));
 
     auto outStage = createOutStage(spec);
-    ASSERT_EQ(outStage->getOutputNs().db(), targetDb);
+    ASSERT_EQ(outStage->getOutputNs().db(), targetDbSameAsAggregationDb);
     ASSERT_EQ(outStage->getOutputNs().coll(), targetColl);
 }
 
+// TODO (SERVER-50939): Allow "replaceCollection" to a foreign database.
+TEST_F(DocumentSourceOutTest, CorrectlyUsesForeignTargetDb) {
+    const auto foreignDb = "someOtherDb"_sd;
+    const auto targetColl = "test"_sd;
+    BSONObj spec =
+        BSON("$out" << BSON("to" << targetColl << "mode" << kDefaultMode << "db" << foreignDb));
+
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 50939);
+}
 }  // namespace
 }  // namespace mongo
