@@ -36,16 +36,10 @@
         // Insert one document and save its _id.
         assert.writeOK(coll.insert(docToInsert));
         var origFirstDocId = coll.findOne()["_id"];
-        var bulkBatchSize = 4;
 
-        // Insert documents in batches, since it's faster that way. Detect overflow by seeing if the
-        // original first doc of the collection is still present.
+        // Detect overflow by seeing if the original first doc of the collection is still present.
         while (coll.findOne({_id: origFirstDocId})) {
-            var bulk = coll.initializeUnorderedBulkOp();
-            for (var i = 0; i < bulkBatchSize; i++) {
-                bulk.insert(docToInsert);
-            }
-            assert.writeOK(bulk.execute());
+            assert.commandWorked(coll.insert(docToInsert));
         }
     }
 
@@ -61,27 +55,27 @@
     var cappedCollName = "capped_coll";
     var primaryCappedColl = primaryDB[cappedCollName];
 
-    // Create the capped collection. We make the capped collection large enough so that the initial
-    // sync collection cloner will need more than one cursor batch to fetch all documents.
-    // TODO: Once the collection cloner batch size is configurable, we can reduce collection &
-    // document size to make this test more lightweight.
-    var MB = 1024 * 1024;
-    var cappedCollSize = 48 * MB;
+    // Create a capped collection of the minimum allowed size.
+    var cappedCollSize = 4096;
 
-    jsTestLog("Creating capped collection of size " + (cappedCollSize / MB) + " MB.");
+    jsTestLog("Creating capped collection of size " + cappedCollSize + " bytes.");
     assert.commandWorked(
         primaryDB.createCollection(cappedCollName, {capped: true, size: cappedCollSize}));
 
     // Overflow the capped collection.
     jsTestLog("Overflowing the capped collection.");
 
-    var docSize = 4 * MB;
+    var docSize = cappedCollSize / 8;
     var largeDoc = {a: new Array(docSize).join("*")};
     overflowCappedColl(primaryCappedColl, largeDoc);
 
-    // Add a SECONDARY node.
+    // Check that there are more than two documents in the collection. This will ensure the
+    // secondary's collection cloner will send a getMore.
+    assert.gt(primaryCappedColl.find().itcount(), 2);
+
+    // Add a SECONDARY node. It should use batchSize=2 for its initial sync queries.
     jsTestLog("Adding secondary node.");
-    replTest.add();
+    replTest.add({setParameter: "collectionClonerBatchSize=2"});
 
     var secondary = replTest.getSecondary();
     var collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterHandlingBatchResponse";

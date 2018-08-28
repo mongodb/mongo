@@ -103,5 +103,7 @@ executor:
         # TODO SERVER-33063: Use numInitialSyncAttempts=1 once the idempotency issues in initial
         # sync have been addressed.
         numInitialSyncAttempts: 10
+        collectionClonerBatchSize: 10
+        initialSyncOplogFetcherBatchSize: 10
     num_nodes: 2
     start_initial_sync_node: True
