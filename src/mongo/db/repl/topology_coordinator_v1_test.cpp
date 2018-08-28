@@ -1789,7 +1789,7 @@ TEST_F(TopoCoordTest, PrepareStepDownAttemptFailsIfNotLeader) {
     getTopoCoord().changeMemberState_forTest(MemberState::RS_SECONDARY);
     Status expectedStatus(ErrorCodes::NotMaster, "This node is not a primary. ");
 
-    ASSERT_EQUALS(expectedStatus, getTopoCoord().prepareForStepDownAttempt());
+    ASSERT_EQUALS(expectedStatus, getTopoCoord().prepareForStepDownAttempt().getStatus());
 }
 
 class PrepareHeartbeatResponseV1Test : public TopoCoordTest {
@@ -4167,7 +4167,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsForDifferentTerm) {
     Date_t futureTime = curTime + Seconds(1);
 
     makeSelfPrimary();
-    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     ASSERT_THROWS_CODE(
         getTopoCoord().attemptStepDown(term - 1, curTime, futureTime, futureTime, false),
@@ -4197,7 +4197,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastStepDownUntil) {
     Date_t futureTime = curTime + Seconds(1);
 
     makeSelfPrimary();
-    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     ASSERT_THROWS_CODE_AND_WHAT(
         getTopoCoord().attemptStepDown(term, curTime, futureTime, curTime, false),
@@ -4229,7 +4229,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfPastWaitUntil) {
     Date_t futureTime = curTime + Seconds(1);
 
     makeSelfPrimary();
-    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     std::string expectedWhat = str::stream()
         << "No electable secondaries caught up as of " << dateToISOStringLocal(curTime)
@@ -4265,7 +4265,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUp) {
 
     makeSelfPrimary();
     setMyOpTime(OpTime(Timestamp(5, 0), term));
-    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     heartbeatFromMember(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
@@ -4298,7 +4298,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfNoSecondariesCaughtUpForceIsTrueButN
 
     makeSelfPrimary();
     setMyOpTime(OpTime(Timestamp(5, 0), term));
-    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     heartbeatFromMember(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
@@ -4331,7 +4331,7 @@ TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfNoSecondariesCaughtUpForceIsTrueA
 
     makeSelfPrimary();
     setMyOpTime(OpTime(Timestamp(5, 0), term));
-    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     heartbeatFromMember(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(4, 0), term));
@@ -4364,7 +4364,7 @@ TEST_F(TopoCoordTest, StepDownAttemptSucceedsIfSecondariesCaughtUp) {
 
     makeSelfPrimary();
     setMyOpTime(OpTime(Timestamp(5, 0), term));
-    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     heartbeatFromMember(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(5, 0), term));
@@ -4401,7 +4401,7 @@ TEST_F(TopoCoordTest, StepDownAttemptFailsIfSecondaryCaughtUpButNotElectable) {
 
     makeSelfPrimary();
     setMyOpTime(OpTime(Timestamp(5, 0), term));
-    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt());
+    ASSERT_OK(getTopoCoord().prepareForStepDownAttempt().getStatus());
 
     heartbeatFromMember(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(5, 0), term));
