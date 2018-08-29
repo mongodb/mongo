@@ -273,6 +273,42 @@ TEST_F(ClusterExchangeTest, RenamesAreEligibleForExchange) {
     future.timed_get(kFutureTimeout);
 }
 
+TEST_F(ClusterExchangeTest, MatchesAreEligibleForExchange) {
+    // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
+    setupNShards(2);
+    loadRoutingTableWithTwoChunksAndTwoShards(kTestOutNss);
+
+    auto mergePipe = unittest::assertGet(Pipeline::create(
+        {parse("{$group: {_id: '$x', $doingMerge: true}}"),
+         parse("{$match: {_id: {$gte: 0}}}"),
+         DocumentSourceOut::create(kTestOutNss, expCtx(), WriteModeEnum::kModeInsertDocuments)},
+        expCtx()));
+
+    auto future = launchAsync([&] {
+        auto exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
+            operationContext(), mergePipe.get());
+        ASSERT_TRUE(exchangeSpec);
+        ASSERT(exchangeSpec->policy == ExchangePolicyEnum::kRange);
+        ASSERT_TRUE(exchangeSpec->shardDistributionInfo);
+        const auto& partitions = exchangeSpec->shardDistributionInfo->partitions;
+        ASSERT_EQ(partitions.size(), 2UL);  // One for each shard.
+
+        auto shard0Ranges = partitions.find("0");
+        ASSERT(shard0Ranges != partitions.end());
+        ASSERT_EQ(shard0Ranges->second.size(), 1UL);
+        auto shard0Range = shard0Ranges->second[0];
+        ASSERT(shard0Range == ChunkRange(BSON("_id" << MINKEY), BSON("_id" << 0)));
+
+        auto shard1Ranges = partitions.find("1");
+        ASSERT(shard1Ranges != partitions.end());
+        ASSERT_EQ(shard1Ranges->second.size(), 1UL);
+        auto shard1Range = shard1Ranges->second[0];
+        ASSERT(shard1Range == ChunkRange(BSON("_id" << 0), BSON("_id" << MAXKEY)));
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
 TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
     setupNShards(2);
