@@ -21,6 +21,7 @@ selector:
   - jstests/core/txns/disallow_operations_on_prepared_transaction.js
   - jstests/core/txns/empty_prepare.js
   - jstests/core/txns/no_new_transactions_when_prepared_transaction_in_progress.js
+  - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
   - jstests/core/txns/prepare_committed_transaction.js
   - jstests/core/txns/prepare_conflict.js
   - jstests/core/txns/prepare_conflict_read_concern_behavior.js
