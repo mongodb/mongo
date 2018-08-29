@@ -63,7 +63,8 @@ DEFAULTS = {
     "no_journal": False,
     "num_clients_per_fixture": 1,
     "perf_report_file": None,
-    "repeat": 1,
+    "repeat_suites": 1,
+    "repeat_tests": 1,
     "report_failure_status": "fail",
     "report_file": None,
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
@@ -109,7 +110,8 @@ _SuiteOptions = collections.namedtuple("_SuiteOptions", [
     "fail_fast",
     "include_tags",
     "num_jobs",
-    "num_repeats",
+    "num_repeat_suites",
+    "num_repeat_tests",
     "report_failure_status",
 ])
 
@@ -171,7 +173,8 @@ class SuiteOptions(_SuiteOptions):
                 FAIL_FAST,
                 include_tags,
                 JOBS,
-                REPEAT,
+                REPEAT_SUITES,
+                REPEAT_TESTS,
                 REPORT_FAILURE_STATUS,
             ]))
 
@@ -299,7 +302,10 @@ PERF_REPORT_FILE = None
 RANDOM_SEED = None
 
 # If set, then each suite is repeated the specified number of times.
-REPEAT = None
+REPEAT_SUITES = None
+
+# If set, then each test is repeated the specified number of times inside the suites.
+REPEAT_TESTS = None
 
 # Controls if the test failure status should be reported as failed or be silently ignored.
 REPORT_FAILURE_STATUS = None

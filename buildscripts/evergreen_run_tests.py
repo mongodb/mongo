@@ -40,7 +40,8 @@ class Main(resmoke.Resmoke):
         tag_name="retry_on_failure",
         evergreen_aware=True,
         suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(  # type: ignore
-            fail_fast=False, num_repeats=2, report_failure_status="silentfail"))
+            fail_fast=False, num_repeat_suites=2, num_repeat_tests=1,
+            report_failure_status="silentfail"))
 
     @staticmethod
     def _make_evergreen_aware_tags(tag_name):

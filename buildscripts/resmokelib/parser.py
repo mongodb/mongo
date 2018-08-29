@@ -145,8 +145,13 @@ def _make_parser():  # pylint: disable=too-many-statements
                       " existing MongoDB cluster with the URL mongodb://localhost:[PORT]."
                       " This is useful for connecting to a server running in a debugger.")
 
-    parser.add_option("--repeat", type="int", dest="repeat", metavar="N",
+    parser.add_option("--repeat", "--repeatSuites", type="int", dest="repeat_suites", metavar="N",
                       help="Repeats the given suite(s) N times, or until one fails.")
+
+    parser.add_option("--repeatTests", type="int", dest="repeat_tests", metavar="N",
+                      help="Repeats the tests inside each suite N times. This applies to tests"
+                      " defined in the suite configuration as well as tests defined on the command"
+                      " line.")
 
     parser.add_option("--reportFailureStatus", type="choice", action="store",
                       dest="report_failure_status", choices=("fail",
@@ -340,10 +345,11 @@ def validate_benchmark_options():
     :return: None
     """
 
-    if _config.REPEAT > 1:
+    if _config.REPEAT_SUITES > 1 or _config.REPEAT_TESTS > 1:
         raise optparse.OptionValueError(
-            "--repeat cannot be used with benchmark tests. Please use --benchmarkMinTimeSecs to "
-            "increase the runtime of a single benchmark configuration.")
+            "--repeatSuites/--repeatTests cannot be used with benchmark tests. "
+            "Please use --benchmarkMinTimeSecs to increase the runtime of a single benchmark "
+            "configuration.")
 
     if _config.JOBS > 1:
         raise optparse.OptionValueError(
@@ -390,7 +396,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
     _config.PERF_REPORT_FILE = config.pop("perf_report_file")
     _config.RANDOM_SEED = config.pop("seed")
-    _config.REPEAT = config.pop("repeat")
+    _config.REPEAT_SUITES = config.pop("repeat_suites")
+    _config.REPEAT_TESTS = config.pop("repeat_tests")
     _config.REPORT_FAILURE_STATUS = config.pop("report_failure_status")
     _config.REPORT_FILE = config.pop("report_file")
     _config.SERVICE_EXECUTOR = config.pop("service_executor")

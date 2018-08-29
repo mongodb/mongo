@@ -271,7 +271,8 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         # cannot be said to have succeeded.
         num_failed = report.num_failed + report.num_interrupted
         num_run = report.num_succeeded + report.num_errored + num_failed
-        num_skipped = len(self.tests) + report.num_dynamic - num_run
+        num_tests = len(self.tests) * self.options.num_repeat_tests
+        num_skipped = num_tests + report.num_dynamic - num_run
 
         if report.num_succeeded == num_run and num_skipped == 0:
             sb.append("All %d test(s) passed in %0.2f seconds." % (num_run, time_taken))
@@ -286,12 +287,12 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         if num_failed > 0:
             sb.append("The following tests failed (with exit code):")
             for test_info in itertools.chain(report.get_failed(), report.get_interrupted()):
-                sb.append("    %s (%d)" % (test_info.test_id, test_info.return_code))
+                sb.append("    %s (%d)" % (test_info.test_file, test_info.return_code))
 
         if report.num_errored > 0:
             sb.append("The following tests had errors:")
             for test_info in report.get_errored():
-                sb.append("    %s" % (test_info.test_id))
+                sb.append("    %s" % (test_info.test_file))
 
         return summary
 

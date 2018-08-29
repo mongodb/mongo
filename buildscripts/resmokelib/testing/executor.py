@@ -53,7 +53,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         # Only start as many jobs as we need. Note this means that the number of jobs we run may
         # not actually be _config.JOBS or self._suite.options.num_jobs.
         jobs_to_start = self._suite.options.num_jobs
-        self.num_tests = len(suite.tests)
+        self.num_tests = len(suite.tests) * self._suite.options.num_repeat_tests
 
         if self.num_tests < jobs_to_start:
             self.logger.info(
@@ -80,8 +80,8 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 return_code = 2
                 return
 
-            num_repeats = self._suite.options.num_repeats
-            while num_repeats > 0:
+            num_repeat_suites = self._suite.options.num_repeat_suites
+            while num_repeat_suites > 0:
                 test_queue = self._make_test_queue()
 
                 partial_reports = [job.report for job in self._jobs]
@@ -91,7 +91,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 # finish running their last test. This avoids having a large number of processes
                 # still running if an Evergreen task were to time out from a hang/deadlock being
                 # triggered.
-                teardown_flag = threading.Event() if num_repeats == 1 else None
+                teardown_flag = threading.Event() if num_repeat_suites == 1 else None
                 (report, interrupted) = self._run_tests(test_queue, teardown_flag)
 
                 self._suite.record_test_end(report)
@@ -122,7 +122,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 # Clear the report so it can be reused for the next execution.
                 for job in self._jobs:
                     job.report.reset()
-                num_repeats -= 1
+                num_repeat_suites -= 1
         finally:
             if not teardown_flag:
                 if not self._teardown_fixtures():
@@ -269,10 +269,11 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         test_queue_logger = self.logger.new_testqueue_logger(self._suite.test_kind)
         # Put all the test cases in a queue.
         queue = _queue.Queue()
-        for test_name in self._suite.tests:
-            test_case = testcases.make_test_case(self._suite.test_kind, test_queue_logger,
-                                                 test_name, **self.test_config)
-            queue.put(test_case)
+        for _ in range(self._suite.options.num_repeat_tests):
+            for test_name in self._suite.tests:
+                test_case = testcases.make_test_case(self._suite.test_kind, test_queue_logger,
+                                                     test_name, **self.test_config)
+                queue.put(test_case)
 
         # Add sentinel value for each job to indicate when there are no more items to process.
         for _ in xrange(len(self._jobs)):

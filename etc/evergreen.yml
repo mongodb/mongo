@@ -4027,7 +4027,7 @@ tasks:
     vars:
       task_path_suffix: /data/multiversion:$HOME
       resmoke_wrapper: $python buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
-      resmoke_args: --repeat=2
+      resmoke_args: --repeatSuites=2
       run_multiple_jobs: true
 
 - <<: *benchmark_template
@@ -7756,7 +7756,7 @@ buildvariants:
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --enable-http-client=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --repeat=10 --shuffle
+    test_flags: --repeatSuites=10 --shuffle
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     test_flags: --excludeWithAnyTags=requires_http_client

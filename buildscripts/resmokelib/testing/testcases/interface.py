@@ -8,6 +8,7 @@ from __future__ import absolute_import
 import os
 import os.path
 import unittest
+import uuid
 
 from ... import logging
 from ...utils import registry
@@ -22,7 +23,7 @@ def make_test_case(test_kind, *args, **kwargs):
     return _TEST_CASES[test_kind](*args, **kwargs)
 
 
-class TestCase(unittest.TestCase):
+class TestCase(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
     """A test case to execute."""
 
     __metaclass__ = registry.make_registry_metaclass(_TEST_CASES)  # type: ignore
@@ -41,6 +42,8 @@ class TestCase(unittest.TestCase):
 
         if not isinstance(test_name, basestring):
             raise TypeError("test_name must be a string")
+
+        self._id = uuid.uuid4()
 
         # When the TestCase is created by the TestSuiteExecutor (through a call to make_test_case())
         # logger is an instance of TestQueueLogger. When the TestCase is created by a hook
@@ -71,7 +74,7 @@ class TestCase(unittest.TestCase):
 
     def id(self):
         """Return the id of the test."""
-        return self.test_name
+        return self._id
 
     def short_description(self):
         """Return the short_description of the test."""

@@ -337,7 +337,7 @@ def main():
 
     # If a resmoke.py command wasn't passed in, use a simple version.
     if not args:
-        args = ["python", "buildscripts/resmoke.py", "--repeat=2"]
+        args = ["python", "buildscripts/resmoke.py", "--repeatSuites=2"]
 
     # Load the dict of tests to run.
     if values.test_list_file:
