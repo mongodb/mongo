@@ -111,10 +111,15 @@ public:
             }
         }
 
-
         const NamespaceString nss(cmdObj.firstElement().String());
-
         const auto chunkRange = uassertStatusOK(ChunkRange::fromBSON(cmdObj));
+
+        const MigrationSessionId migrationSessionId(
+            uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
+
+        // Ensure this shard is not currently receiving or donating any chunks.
+        auto scopedRegisterReceiveChunk(
+            uassertStatusOK(shardingState->registerReceiveChunk(nss, chunkRange, fromShard)));
 
         // Refresh our collection manager from the config server, we need a collection manager to
         // start registering pending chunks. We force the remote refresh here to make the behavior
@@ -146,13 +151,6 @@ public:
             warning() << errmsg;
             return false;
         }
-
-        const MigrationSessionId migrationSessionId(
-            uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
-
-        // Ensure this shard is not currently receiving or donating any chunks.
-        auto scopedRegisterReceiveChunk(
-            uassertStatusOK(shardingState->registerReceiveChunk(nss, chunkRange, fromShard)));
 
         // Even if this shard is not currently donating any chunks, it may still have pending
         // deletes from a previous migration, particularly if there are still open cursors on the

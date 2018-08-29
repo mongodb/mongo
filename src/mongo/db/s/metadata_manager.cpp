@@ -192,8 +192,6 @@ void MetadataManager::beginReceive(const ChunkRange& range) {
         auto itRecv = _receivingChunks.find(overlapChunkMin.first);
         invariant(itRecv != _receivingChunks.end());
 
-        const ChunkRange receivingRange(itRecv->first, itRecv->second.getMaxKey());
-
         _receivingChunks.erase(itRecv);
     }
 

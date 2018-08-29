@@ -665,6 +665,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             wunit.commit();
         }
 
+        Status status = _notePending(txn, _nss, min, max, epoch);
+        if (!status.isOK()) {
+            setState(FAIL);
+            return;
+        }
+
         timing.done(1);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep1);
     }
@@ -680,17 +686,16 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
         // results
         deleterOptions.waitForOpenCursors = false;
         deleterOptions.fromMigrate = true;
-        deleterOptions.onlyRemoveOrphanedDocs = true;
+
+        // There is no need to perform checking for orphaned docs as part of the range deletion,
+        // because the call above (to _notePending) will ensure that the chunk which is coming in is
+        // not currently owned by this shard and the scopedRegisterReceiveChunk would prevent this
+        // chunk from getting received while range deletion is running.
+        deleterOptions.onlyRemoveOrphanedDocs = false;
         deleterOptions.removeSaverReason = "preCleanup";
 
         if (!getDeleter()->deleteNow(txn, deleterOptions, &errmsg)) {
             warning() << "Failed to queue delete for migrate abort: " << redact(errmsg);
-            setState(FAIL);
-            return;
-        }
-
-        Status status = _notePending(txn, _nss, min, max, epoch);
-        if (!status.isOK()) {
             setState(FAIL);
             return;
         }
