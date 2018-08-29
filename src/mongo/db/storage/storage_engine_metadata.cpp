@@ -50,7 +50,6 @@
 #include "mongo/base/data_type_validated.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
@@ -309,34 +308,6 @@ Status StorageEngineMetadata::write() const {
                                     << metadataPath.string()
                                     << ": "
                                     << ex.what());
-    }
-
-    return Status::OK();
-}
-
-Status StorageEngineMetadata::validateJournalPath(const StorageGlobalParams& params) const {
-    BSONElement journalPathMetadataElement = _storageEngineOptions.getField("journalPath");
-    if (journalPathMetadataElement.eoo())
-        return Status::OK();
-
-    if (journalPathMetadataElement.type() != mongo::String) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Expected string field journalPath but got "
-                                    << typeName(journalPathMetadataElement.type())
-                                    << " instead: "
-                                    << journalPathMetadataElement);
-    }
-
-    if (params.dur) {
-        if (journalPathMetadataElement.String() != params.journalPath) {
-            return Status(ErrorCodes::InvalidOptions,
-                          str::stream() << "Requested option conflicts with current storage engine "
-                                           "option for journalPath; you requested "
-                                        << params.journalPath
-                                        << " but the current server storage is already set to "
-                                        << journalPathMetadataElement.String()
-                                        << " and cannot be changed");
-        }
     }
 
     return Status::OK();

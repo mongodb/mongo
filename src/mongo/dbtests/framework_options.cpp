@@ -50,9 +50,8 @@ namespace mongo {
 
 namespace {
 
-// This specifies default dbpath and journalPath for our testing framework
+// This specifies default dbpath for our testing framework
 const std::string default_test_dbpath = "/tmp/unittest";
-const std::string default_test_journalpath_subdir = "journal";
 
 }  // namespace
 
@@ -74,12 +73,6 @@ Status addTestFrameworkOptions(moe::OptionSection* options) {
             "db data path for this test run. NOTE: the contents of this directory will "
             "be overwritten if it already exists")
         .setDefault(moe::Value(default_test_dbpath));
-
-    options->addOptionChaining("journalPath",
-                               "journalPath",
-                               moe::String,
-                               "db journal path for this test run. NOTE: the contents of this "
-                               "directory will be overwritten if it already exists");
 
     options->addOptionChaining("debug", "debug", moe::Switch, "run tests with verbose output");
 
@@ -144,13 +137,6 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
                                  const std::vector<std::string>& args) {
     if (params.count("dbpath")) {
         frameworkGlobalParams.dbpathSpec = params["dbpath"].as<string>();
-        auto path = boost::filesystem::path(frameworkGlobalParams.dbpathSpec);
-        path /= default_test_journalpath_subdir;
-        frameworkGlobalParams.journalPathSpec = path.string();
-    }
-
-    if (params.count("journalPath")) {
-        frameworkGlobalParams.journalPathSpec = params["journalPath"].as<string>();
     }
 
     if (params.count("seed")) {
@@ -171,30 +157,6 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     }
 
     boost::filesystem::path p(frameworkGlobalParams.dbpathSpec);
-    boost::filesystem::path journalPath(frameworkGlobalParams.journalPathSpec);
-
-    /* remove the contents of the journal directory if it exists. */
-    try {
-        if (boost::filesystem::exists(journalPath)) {
-            if (!boost::filesystem::is_directory(journalPath)) {
-                StringBuilder sb;
-                sb << "ERROR: path \"" << p.string() << "\" is not a directory";
-                sb << getTestFrameworkHelp(args[0], moe::startupOptions);
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            boost::filesystem::directory_iterator end_iter;
-            for (boost::filesystem::directory_iterator dir_iter(journalPath); dir_iter != end_iter;
-                 ++dir_iter) {
-                boost::filesystem::remove_all(*dir_iter);
-            }
-        } else {
-            boost::filesystem::create_directories(journalPath);
-        }
-    } catch (const boost::filesystem::filesystem_error& e) {
-        StringBuilder sb;
-        sb << "boost::filesystem threw exception: " << e.what();
-        return Status(ErrorCodes::BadValue, sb.str());
-    }
 
     /* remove the contents of the test directory if it exists. */
     try {
@@ -222,11 +184,7 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     DEV log() << "DEBUG build" << endl;
 
     string dbpathString = p.string();
-    // For both Windows and Mac, wiredtiger requires forward slashes in the journal path. Using
-    // 'generic_string' forces that conversion.
-    string journalPathString = journalPath.generic_string();
     storageGlobalParams.dbpath = dbpathString.c_str();
-    storageGlobalParams.journalPath = journalPathString.c_str();
 
     storageGlobalParams.engine = params["storage.engine"].as<string>();
 

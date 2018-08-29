@@ -69,7 +69,6 @@ public:
     static const int kDefaultJournalDelayMillis;
     WiredTigerKVEngine(const std::string& canonicalName,
                        const std::string& path,
-                       const std::string& rawJournalPath,
                        ClockSource* cs,
                        const std::string& extraOpenOptions,
                        size_t cacheSizeGB,
@@ -367,7 +366,6 @@ private:
 
     std::string _canonicalName;
     std::string _path;
-    std::string _journalPath;
     std::string _wtOpenConfig;
 
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;

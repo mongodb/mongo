@@ -47,7 +47,6 @@ struct FrameworkGlobalParams {
     unsigned long long seed;
     int runsPerTest;
     std::string dbpathSpec;
-    std::string journalPathSpec;
     std::vector<std::string> suites;
     std::string filter;
 };

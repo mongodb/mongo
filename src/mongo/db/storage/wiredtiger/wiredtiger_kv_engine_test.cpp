@@ -52,7 +52,7 @@ namespace {
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(bool forRepair = false)
-        : _dbpath("wt-kv-harness"), _journalPath("wt-kv-harness-journal"), _forRepair(forRepair) {
+        : _dbpath("wt-kv-harness"), _forRepair(forRepair) {
         if (!hasGlobalServiceContext())
             setGlobalServiceContext(ServiceContext::make());
         _engine.reset(makeEngine());
@@ -85,7 +85,6 @@ private:
     WiredTigerKVEngine* makeEngine() {
         return new WiredTigerKVEngine(kWiredTigerEngineName,
                                       _dbpath.path(),
-                                      _journalPath.path(),
                                       _cs.get(),
                                       "",
                                       1,
@@ -97,7 +96,6 @@ private:
 
     const std::unique_ptr<ClockSource> _cs = stdx::make_unique<ClockSourceMock>();
     unittest::TempDir _dbpath;
-    unittest::TempDir _journalPath;
     std::unique_ptr<WiredTigerKVEngine> _engine;
     bool _forRepair;
 };

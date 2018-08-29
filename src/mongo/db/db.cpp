@@ -305,8 +305,7 @@ ExitCode _initAndListen(int listenPort) {
         ProcessId pid = ProcessId::getCurrent();
         LogstreamBuilder l = log(LogComponent::kControl);
         l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
-          << " dbpath=" << storageGlobalParams.dbpath
-          << " journalPath=" << storageGlobalParams.journalPath;
+          << " dbpath=" << storageGlobalParams.dbpath;
 
         const bool is32bit = sizeof(int*) == 4;
         l << (is32bit ? " 32" : " 64") << "-bit host=" << getHostNameCached() << endl;

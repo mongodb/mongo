@@ -104,7 +104,6 @@ public:
         WiredTigerKVEngine* kv =
             new WiredTigerKVEngine(getCanonicalName().toString(),
                                    params.dbpath,
-                                   params.journalPath,
                                    getGlobalServiceContext()->getFastClockSource(),
                                    wiredTigerGlobalOptions.engineConfig,
                                    cacheMB,
@@ -145,11 +144,6 @@ public:
             return status;
         }
 
-        status = metadata.validateJournalPath(params);
-        if (!status.isOK()) {
-            return status;
-        }
-
         status = metadata.validateStorageEngineOption("directoryForIndexes",
                                                       wiredTigerGlobalOptions.directoryForIndexes);
         if (!status.isOK()) {
@@ -177,9 +171,6 @@ public:
         builder.appendBool("directoryPerDB", params.directoryperdb);
         builder.appendBool("directoryForIndexes", wiredTigerGlobalOptions.directoryForIndexes);
         builder.appendBool("groupCollections", params.groupCollections);
-        if (params.journalPathSetByUser)
-            builder.append("journalPath", params.journalPath);
-
         return builder.obj();
     }
 

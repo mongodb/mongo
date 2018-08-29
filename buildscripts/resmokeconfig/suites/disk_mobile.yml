@@ -5,7 +5,6 @@ selector:
   - jstests/disk/*.js
   exclude_files:
   - jstests/disk/directoryperdb.js
-  - jstests/disk/journalpath.js
   exclude_with_any_tags:
   - requires_wiredtiger
 
