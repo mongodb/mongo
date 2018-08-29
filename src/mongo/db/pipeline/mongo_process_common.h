@@ -43,6 +43,14 @@ class MongoProcessCommon : public MongoProcessInterface {
 public:
     virtual ~MongoProcessCommon() = default;
 
+    /**
+     * Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and
+     * each of the elements of 'keyPattern' is numeric, i.e. not "text", "$**", or any other special
+     * type of index.
+     */
+    static bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
+                                          const std::set<FieldPath>& uniqueKeyPaths);
+
     std::vector<BSONObj> getCurrentOps(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        CurrentOpConnectionsMode connMode,
                                        CurrentOpSessionsMode sessionMode,

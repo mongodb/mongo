@@ -93,4 +93,19 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
     return ops;
 }
 
+bool MongoProcessCommon::keyPatternNamesExactPaths(const BSONObj& keyPattern,
+                                                   const std::set<FieldPath>& uniqueKeyPaths) {
+    size_t nFieldsMatched = 0;
+    for (auto&& elem : keyPattern) {
+        if (!elem.isNumber()) {
+            return false;
+        }
+        if (uniqueKeyPaths.find(elem.fieldNameStringData()) == uniqueKeyPaths.end()) {
+            return false;
+        }
+        ++nFieldsMatched;
+    }
+    return nFieldsMatched == uniqueKeyPaths.size();
+}
+
 }  // namespace mongo

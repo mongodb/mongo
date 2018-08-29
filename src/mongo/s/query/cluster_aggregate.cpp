@@ -81,6 +81,7 @@ using SplitPipeline = cluster_aggregation_planner::SplitPipeline;
 MONGO_FAIL_POINT_DEFINE(clusterAggregateHangBeforeEstablishingShardCursors);
 
 namespace {
+
 // Given a document representing an aggregation command such as
 //
 //   {aggregate: "myCollection", pipeline: [], ...},
@@ -1220,25 +1221,28 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
 
     out->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(result));
 
-    auto status = getStatusFromCommandResult(out->asTempObj());
-    if (auto resolvedView = status.extraInfo<ResolvedView>()) {
-        auto resolvedAggRequest = resolvedView->asExpandedViewAggregation(aggRequest);
-        auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
-        out->resetToEmpty();
+    return getStatusFromCommandResult(out->asTempObj());
+}
 
-        // We pass both the underlying collection namespace and the view namespace here. The
-        // underlying collection namespace is used to execute the aggregation on mongoD. Any cursor
-        // returned will be registered under the view namespace so that subsequent getMore and
-        // killCursors calls against the view have access.
-        Namespaces nsStruct;
-        nsStruct.requestedNss = namespaces.requestedNss;
-        nsStruct.executionNss = resolvedView->getNamespace();
+Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
+                                          const AggregationRequest& request,
+                                          const ResolvedView& resolvedView,
+                                          const NamespaceString& requestedNss,
+                                          BSONObjBuilder* result) {
+    auto resolvedAggRequest = resolvedView.asExpandedViewAggregation(request);
+    auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
+    result->resetToEmpty();
 
-        return ClusterAggregate::runAggregate(
-            opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
-    }
+    // We pass both the underlying collection namespace and the view namespace here. The
+    // underlying collection namespace is used to execute the aggregation on mongoD. Any cursor
+    // returned will be registered under the view namespace so that subsequent getMore and
+    // killCursors calls against the view have access.
+    Namespaces nsStruct;
+    nsStruct.requestedNss = requestedNss;
+    nsStruct.executionNss = resolvedView.getNamespace();
 
-    return status;
+    return ClusterAggregate::runAggregate(
+        opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, result);
 }
 
 }  // namespace mongo

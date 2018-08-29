@@ -131,16 +131,12 @@ public:
                 return aggRequestOnView.getStatus();
             }
 
-            auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
-            auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
-
-            ClusterAggregate::Namespaces nsStruct;
-            nsStruct.requestedNss = nss;
-            nsStruct.executionNss = resolvedAggRequest.getNamespaceString();
-
             auto bodyBuilder = result->getBodyBuilder();
-            return ClusterAggregate::runAggregate(
-                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, &bodyBuilder);
+            return ClusterAggregate::retryOnViewError(opCtx,
+                                                      aggRequestOnView.getValue(),
+                                                      *ex.extraInfo<ResolvedView>(),
+                                                      nss,
+                                                      &bodyBuilder);
         }
 
         long long millisElapsed = timer.millis();

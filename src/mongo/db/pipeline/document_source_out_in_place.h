@@ -66,12 +66,18 @@ public:
         // or insert.
         constexpr auto upsert = true;
         constexpr auto multi = false;
-        pExpCtx->mongoProcessInterface->update(pExpCtx,
-                                               getWriteNs(),
-                                               std::move(batch.uniqueKeys),
-                                               std::move(batch.objects),
-                                               upsert,
-                                               multi);
+        try {
+            pExpCtx->mongoProcessInterface->update(pExpCtx,
+                                                   getWriteNs(),
+                                                   std::move(batch.uniqueKeys),
+                                                   std::move(batch.objects),
+                                                   upsert,
+                                                   multi);
+        } catch (const ExceptionFor<ErrorCodes::ImmutableField>& ex) {
+            uassertStatusOKWithContext(ex.toStatus(),
+                                       "$out failed to update the matching document, did you "
+                                       "attempt to modify the _id or the shard key?");
+        }
     }
 };
 

@@ -13,7 +13,7 @@
     const sourceCollection = mongosDB.source;
     assert.commandWorked(sourceCollection.insert([{a: 1, b: 1, c: 1, d: 1}, {a: 2, b: 2, c: 2}]));
 
-    // Test that the unique key will be defaulted to the unique key for a sharded collection.
+    // Test that the unique key will be defaulted to the document key for a sharded collection.
     st.shardColl(firstColl.getName(),
                  {a: 1, b: 1, c: 1},
                  {a: 1, b: 1, c: 1},

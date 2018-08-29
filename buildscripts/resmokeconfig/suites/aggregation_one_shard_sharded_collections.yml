@@ -10,8 +10,6 @@ selector:
   - jstests/aggregation/bugs/cursor_timeout.js
   - jstests/aggregation/bugs/lookup_unwind_getmore.js
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
-  # TODO: Remove when SERVER-36047 is resolved.
-  - jstests/aggregation/sources/out/unique_key_requires_index.js
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
   exclude_with_any_tags:

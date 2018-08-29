@@ -342,7 +342,7 @@ boost::optional<ShardedExchangePolicy> walkPipelineBackwardsTrackingShardKey(
                                                          : ExchangePolicyEnum::kRange);
     exchangeSpec.setKey(newShardKey.toBSON());
     exchangeSpec.setBoundaries(std::move(boundaries));
-    exchangeSpec.setConsumers(consumerIds.size());
+    exchangeSpec.setConsumers(shardToConsumer.size());
     exchangeSpec.setConsumerIds(std::move(consumerIds));
 
     return ShardedExchangePolicy{std::move(exchangeSpec), std::move(consumerShards)};

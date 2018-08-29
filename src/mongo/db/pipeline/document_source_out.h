@@ -55,6 +55,13 @@ public:
             return _allowShardedOutNss ? true : (_foreignNssSet.find(nss) == _foreignNssSet.end());
         }
 
+        bool allowedToPassthroughFromMongos() const final {
+            // Do not allow passthrough from mongos even if the source collection is unsharded. This
+            // ensures that the unique index verification happens once on mongos and can be bypassed
+            // on the shards.
+            return false;
+        }
+
     private:
         bool _allowShardedOutNss;
     };

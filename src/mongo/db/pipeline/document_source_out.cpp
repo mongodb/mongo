@@ -317,26 +317,26 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
         }
 
         // Convert unique key object to a vector of FieldPaths.
+        std::vector<FieldPath> docKeyPaths = std::get<0>(
+            expCtx->mongoProcessInterface->collectDocumentKeyFields(expCtx->opCtx, outputNs));
+        std::set<FieldPath> docKeyPathsSet =
+            std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
+                                std::make_move_iterator(docKeyPaths.end()));
         if (auto userSpecifiedUniqueKey = spec.getUniqueKey()) {
             uniqueKey = parseUniqueKeyFromSpec(userSpecifiedUniqueKey.get());
 
-            // TODO SERVER-36047 Check if this is the document key and skip the check below.
-            const bool isDocumentKey = false;
-            // Make sure the uniqueKey has a supporting index. TODO SERVER-36047 Figure out where
-            // this assertion should take place in a sharded environment. For now we will skip the
-            // check on mongos and will not test this check against a sharded collection or another
-            // database - meaning the assertion should always happen on the primary shard where the
-            // collection must exist.
+            // Skip the unique index check if the provided uniqueKey is the documentKey.
+            const bool isDocumentKey = (uniqueKey == docKeyPathsSet);
+
+            // Make sure the uniqueKey has a supporting index. Skip this check if the command is
+            // sent from mongos since the uniqueKey check would've happened already.
             uassert(50938,
-                    "Cannot find index to verify that $out's uniqueKey will be unique",
-                    expCtx->inMongos || isDocumentKey ||
+                    "Cannot find index to verify that $out's unique key will be unique",
+                    expCtx->fromMongos || isDocumentKey ||
                         expCtx->mongoProcessInterface->uniqueKeyIsSupportedByIndex(
                             expCtx, outputNs, uniqueKey));
         } else {
-            std::vector<FieldPath> docKeyPaths = std::get<0>(
-                expCtx->mongoProcessInterface->collectDocumentKeyFields(expCtx->opCtx, outputNs));
-            uniqueKey = std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
-                                            std::make_move_iterator(docKeyPaths.end()));
+            uniqueKey = std::move(docKeyPathsSet);
         }
     } else {
         uasserted(16990,

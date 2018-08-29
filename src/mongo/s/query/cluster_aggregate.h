@@ -80,6 +80,18 @@ public:
                                BSONObj cmdObj,
                                BSONObjBuilder* result);
 
+    /**
+     * Retries a command that was previously run on a view by resolving the view as an aggregation
+     * against the underlying collection.
+     *
+     * On success, populates 'result' with the command response.
+     */
+    static Status retryOnViewError(OperationContext* opCtx,
+                                   const AggregationRequest& request,
+                                   const ResolvedView& resolvedView,
+                                   const NamespaceString& requestedNss,
+                                   BSONObjBuilder* result);
+
 private:
     static void uassertAllShardsSupportExplain(
         const std::vector<AsyncRequestsSender::Response>& shardResults);

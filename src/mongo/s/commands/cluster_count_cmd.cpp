@@ -157,16 +157,12 @@ public:
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
 
-            auto countRequest = CountRequest::parseFromBSON(nss, cmdObj, false);
-            uassertStatusOK(countRequest.getStatus());
+            auto countRequest = uassertStatusOK(CountRequest::parseFromBSON(nss, cmdObj, false));
+            auto aggCmdOnView = uassertStatusOK(countRequest.asAggregationCommand());
+            auto aggRequestOnView =
+                uassertStatusOK(AggregationRequest::parseFromBSON(nss, aggCmdOnView));
 
-            auto aggCmdOnView = countRequest.getValue().asAggregationCommand();
-            uassertStatusOK(aggCmdOnView.getStatus());
-
-            auto aggRequestOnView = AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
-            uassertStatusOK(aggRequestOnView.getStatus());
-
-            auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
+            auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
@@ -275,16 +271,12 @@ public:
                 return aggRequestOnView.getStatus();
             }
 
-            auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
-            auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
-
-            ClusterAggregate::Namespaces nsStruct;
-            nsStruct.requestedNss = nss;
-            nsStruct.executionNss = resolvedAggRequest.getNamespaceString();
-
             auto bodyBuilder = result->getBodyBuilder();
-            return ClusterAggregate::runAggregate(
-                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, &bodyBuilder);
+            return ClusterAggregate::retryOnViewError(opCtx,
+                                                      aggRequestOnView.getValue(),
+                                                      *ex.extraInfo<ResolvedView>(),
+                                                      nss,
+                                                      &bodyBuilder);
         }
 
         long long millisElapsed = timer.millis();

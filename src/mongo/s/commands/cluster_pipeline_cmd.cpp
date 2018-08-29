@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/cluster_aggregate.h"
 
 namespace mongo {
@@ -74,8 +75,19 @@ public:
 
             const auto& nss = aggregationRequest.getNamespaceString();
 
-            uassertStatusOK(ClusterAggregate::runAggregate(
-                opCtx, ClusterAggregate::Namespaces{nss, nss}, aggregationRequest, cmdObj, result));
+            try {
+                uassertStatusOK(
+                    ClusterAggregate::runAggregate(opCtx,
+                                                   ClusterAggregate::Namespaces{nss, nss},
+                                                   aggregationRequest,
+                                                   cmdObj,
+                                                   result));
+            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+                // If the aggregation failed because the namespace is a view, re-run the command
+                // with the resolved view pipeline and namespace.
+                uassertStatusOK(ClusterAggregate::retryOnViewError(
+                    opCtx, aggregationRequest, *ex.extraInfo<ResolvedView>(), nss, result));
+            }
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
