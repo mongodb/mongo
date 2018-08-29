@@ -81,6 +81,7 @@ struct SSLParams {
     bool disableNonSSLConnectionLoggingSet = false;
     bool suppressNoTLSPeerCertificateWarning =
         false;  // --setParameter suppressNoTLSPeerCertificateWarning
+    bool tlsWithholdClientCertificate = false;  // --setParameter tlsWithholdClientCertificate
 
     SSLParams() {
         sslMode.store(SSLMode_disabled);

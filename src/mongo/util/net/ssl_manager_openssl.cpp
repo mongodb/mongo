@@ -746,13 +746,19 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
                                     << getSSLErrorMessage(ERR_get_error()));
     }
 
-    if (direction == ConnectionDirection::kOutgoing && !params.sslClusterFile.empty()) {
+    if (direction == ConnectionDirection::kOutgoing && params.tlsWithholdClientCertificate) {
+        // Do not send a client certificate if they have been suppressed.
+
+    } else if (direction == ConnectionDirection::kOutgoing && !params.sslClusterFile.empty()) {
+        // Use the configured clusterFile as our client certificate.
         ::EVP_set_pw_prompt("Enter cluster certificate passphrase");
         if (!_setupPEM(context, params.sslClusterFile, params.sslClusterPassword)) {
             return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up ssl clusterFile.");
         }
+
     } else if (!params.sslPEMKeyFile.empty()) {
-        // Use the pemfile for everything else
+        // Use the base pemKeyFile for any other outgoing connections,
+        // as well as all incoming connections.
         ::EVP_set_pw_prompt("Enter PEM passphrase");
         if (!_setupPEM(context, params.sslPEMKeyFile, params.sslPEMKeyPassword)) {
             return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up PEM key file.");

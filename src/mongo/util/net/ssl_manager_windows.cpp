@@ -1301,7 +1301,7 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     }
 
     if (direction == ConnectionDirection::kOutgoing) {
-        if (_clientCertificates[0]) {
+        if (_clientCertificates[0] && !params.tlsWithholdClientCertificate) {
             cred->cCreds = 1;
             cred->paCred = _clientCertificates.data();
         }
