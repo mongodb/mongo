@@ -679,6 +679,10 @@ void BatchWriteOp::abortBatch(const WriteErrorDetail& error) {
     dassert(isFinished());
 }
 
+void BatchWriteOp::forgetTargetedBatchesOnTransactionAbortingError() {
+    _targeted.clear();
+}
+
 bool BatchWriteOp::isFinished() {
     const size_t numWriteOps = _clientRequest.sizeWriteOps();
     const bool orderedOps = _clientRequest.getWriteCommandBase().getOrdered();

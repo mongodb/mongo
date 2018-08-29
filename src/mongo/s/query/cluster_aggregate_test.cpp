@@ -42,27 +42,11 @@ protected:
     const BSONObj kAggregateCmdTargeted{
         fromjson("{aggregate: 'coll', pipeline: [{$match: {_id: 0}}], explain: false, "
                  "allowDiskUse: false, fromMongos: true, "
-                 "cursor: {batchSize: 10}, maxTimeMS: 100, readConcern: {level: 'snapshot'}, "
-                 "autocommit: false, txnNumber: NumberLong(1), startTransaction: true}")};
+                 "cursor: {batchSize: 10}, maxTimeMS: 100}")};
 
     const BSONObj kAggregateCmdScatterGather{fromjson(
         "{aggregate: 'coll', pipeline: [], explain: false, allowDiskUse: false, fromMongos: true, "
-        "cursor: {batchSize: 10}, readConcern: {level: 'snapshot'}, autocommit: false, txnNumber: "
-        "NumberLong(1), startTransaction: true}")};
-
-    BSONObj appendLogicalSessionId(BSONObj cmdObj) {
-        BSONObjBuilder bob(cmdObj);
-        bob.append("lsid", makeLogicalSessionIdForTest().toBSON());
-        return bob.obj();
-    }
-
-    BSONObj aggregateCmdTargeted() {
-        return appendLogicalSessionId(kAggregateCmdTargeted);
-    }
-
-    BSONObj aggregateCmdScatterGather() {
-        return appendLogicalSessionId(kAggregateCmdScatterGather);
-    }
+        "cursor: {batchSize: 10}}")};
 
     // The index of the shard expected to receive the response is used to prevent different shards
     // from returning documents with the same shard key. This is expected to be 0 for queries
@@ -91,54 +75,24 @@ protected:
 };
 
 TEST_F(ClusterAggregateTest, NoErrors) {
-    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
-
-    // Target one shard.
-    runCommandSuccessful(aggregateCmdTargeted(), true);
-
-    // Target all shards.
-    runCommandSuccessful(aggregateCmdScatterGather(), false);
+    testNoErrors(kAggregateCmdTargeted, kAggregateCmdScatterGather);
 }
 
-// Verify aggregate through mongos will retry on a snapshot error.
 TEST_F(ClusterAggregateTest, RetryOnSnapshotError) {
-    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
+    testRetryOnSnapshotError(kAggregateCmdTargeted, kAggregateCmdScatterGather);
+}
 
-    // Target one shard.
-    runCommandOneError(aggregateCmdTargeted(), ErrorCodes::SnapshotUnavailable, true);
-    runCommandOneError(aggregateCmdTargeted(), ErrorCodes::SnapshotTooOld, true);
-
-    // Target all shards
-    runCommandOneError(aggregateCmdScatterGather(), ErrorCodes::SnapshotUnavailable, false);
-    runCommandOneError(aggregateCmdScatterGather(), ErrorCodes::SnapshotTooOld, false);
+TEST_F(ClusterAggregateTest, MaxRetriesSnapshotErrors) {
+    testMaxRetriesSnapshotErrors(kAggregateCmdTargeted, kAggregateCmdScatterGather);
 }
 
 TEST_F(ClusterAggregateTest, AttachesAtClusterTimeForSnapshotReadConcern) {
-    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
-
-    auto containsAtClusterTime = [](const executor::RemoteCommandRequest& request) {
-        ASSERT(!request.cmdObj["readConcern"]["atClusterTime"].eoo());
-    };
-
-    // Target one shard.
-    runCommandInspectRequests(aggregateCmdTargeted(), containsAtClusterTime, true);
-
-    // Target all shards.
-    runCommandInspectRequests(aggregateCmdScatterGather(), containsAtClusterTime, false);
+    testAttachesAtClusterTimeForSnapshotReadConcern(kAggregateCmdTargeted,
+                                                    kAggregateCmdScatterGather);
 }
 
-// Verify aggregate commands will retry up to its max retry attempts on snapshot errors
-// then return the final error it receives.
-TEST_F(ClusterAggregateTest, MaxRetriesSnapshotErrors) {
-    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
-
-    // Target one shard.
-    runCommandMaxErrors(aggregateCmdTargeted(), ErrorCodes::SnapshotUnavailable, true);
-    runCommandMaxErrors(aggregateCmdTargeted(), ErrorCodes::SnapshotTooOld, true);
-
-    // Target all shards
-    runCommandMaxErrors(aggregateCmdScatterGather(), ErrorCodes::SnapshotUnavailable, false);
-    runCommandMaxErrors(aggregateCmdScatterGather(), ErrorCodes::SnapshotTooOld, false);
+TEST_F(ClusterAggregateTest, SnapshotReadConcernWithAfterClusterTime) {
+    testSnapshotReadConcernWithAfterClusterTime(kAggregateCmdTargeted, kAggregateCmdScatterGather);
 }
 
 }  // namespace

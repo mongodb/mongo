@@ -45,6 +45,7 @@
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/transaction/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/chunk_manager_targeter.h"
@@ -244,6 +245,10 @@ private:
         auto db = batchedRequest.getNS().db();
         if (db != NamespaceString::kAdminDb && db != NamespaceString::kConfigDb) {
             batchedRequest.setAllowImplicitCreate(false);
+        }
+
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter->setAtClusterTimeToLatestTime(opCtx);
         }
 
         BatchWriteExecStats stats;

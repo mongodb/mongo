@@ -42,6 +42,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/transaction/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/log.h"
@@ -269,6 +270,18 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                     LOG(4) << "Write results received from " << shardHost.toString() << ": "
                            << redact(batchedCommandResponse.toString());
+
+                    // If we are in a transaction, we must fail the whole batch.
+                    if (TransactionRouter::get(opCtx)) {
+                        // Note: this returns a bad status if any part of the batch failed.
+                        auto batchStatus = batchedCommandResponse.toStatus();
+                        if (!batchStatus.isOK()) {
+                            batchOp.forgetTargetedBatchesOnTransactionAbortingError();
+                            uassertStatusOK(batchStatus.withContext(
+                                str::stream() << "Encountered error from " << shardHost.toString()
+                                              << " during a transaction"));
+                        }
+                    }
 
                     // Dispatch was ok, note response
                     batchOp.noteBatchResponse(*batch, batchedCommandResponse, &trackedErrors);

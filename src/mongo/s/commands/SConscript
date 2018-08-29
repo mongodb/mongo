@@ -146,13 +146,18 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="cluster_distinct_test",
+    target="cluster_commands_test",
     source=[
+        "cluster_delete_test.cpp",
         "cluster_distinct_test.cpp",
+        "cluster_find_and_modify_test.cpp",
+        "cluster_insert_test.cpp",
+        "cluster_update_test.cpp",
     ],
     LIBDEPS=[
         'cluster_commands',
         'cluster_command_test_fixture',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/saslauth',
     ],
 )

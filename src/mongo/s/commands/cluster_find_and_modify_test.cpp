@@ -36,48 +36,45 @@
 namespace mongo {
 namespace {
 
-class ClusterDistinctTest : public ClusterCommandTestFixture {
+class ClusterFindAndModifyTest : public ClusterCommandTestFixture {
 protected:
-    const BSONObj kDistinctCmdTargeted{
-        fromjson("{distinct: 'coll', key: 'x', query: {'_id': {$lt: -1}}}")};
-
-    const BSONObj kDistinctCmdScatterGather{fromjson("{distinct: 'coll', key: '_id'}")};
+    const BSONObj kFindAndModifyCmdTargeted{
+        fromjson("{findAndModify: 'coll', query: {'_id': -1}, update: {$set: {x: 1}}}")};
 
     void expectInspectRequest(int shardIndex, InspectionCallback cb) override {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
             cb(request);
-            return BSON("values" << BSON_ARRAY(shardIndex));
+            return BSON("_id" << -1);
         });
     }
 
     void expectReturnsSuccess(int shardIndex) override {
         onCommandForPoolExecutor([this, shardIndex](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
-            return BSON("values" << BSON_ARRAY(shardIndex));
+            return BSON("_id" << -1);
         });
     }
 };
 
-TEST_F(ClusterDistinctTest, NoErrors) {
-    testNoErrors(kDistinctCmdTargeted, kDistinctCmdScatterGather);
+TEST_F(ClusterFindAndModifyTest, NoErrors) {
+    testNoErrors(kFindAndModifyCmdTargeted);
 }
 
-TEST_F(ClusterDistinctTest, RetryOnSnapshotError) {
-    testRetryOnSnapshotError(kDistinctCmdTargeted, kDistinctCmdScatterGather);
+TEST_F(ClusterFindAndModifyTest, RetryOnSnapshotError) {
+    testRetryOnSnapshotError(kFindAndModifyCmdTargeted);
 }
 
-TEST_F(ClusterDistinctTest, MaxRetriesSnapshotErrors) {
-    testMaxRetriesSnapshotErrors(kDistinctCmdTargeted, kDistinctCmdScatterGather);
+TEST_F(ClusterFindAndModifyTest, MaxRetriesSnapshotErrors) {
+    testMaxRetriesSnapshotErrors(kFindAndModifyCmdTargeted);
 }
 
-TEST_F(ClusterDistinctTest, AttachesAtClusterTimeForSnapshotReadConcern) {
-    testAttachesAtClusterTimeForSnapshotReadConcern(kDistinctCmdTargeted,
-                                                    kDistinctCmdScatterGather);
+TEST_F(ClusterFindAndModifyTest, AttachesAtClusterTimeForSnapshotReadConcern) {
+    testAttachesAtClusterTimeForSnapshotReadConcern(kFindAndModifyCmdTargeted);
 }
 
-TEST_F(ClusterDistinctTest, SnapshotReadConcernWithAfterClusterTime) {
-    testSnapshotReadConcernWithAfterClusterTime(kDistinctCmdTargeted, kDistinctCmdScatterGather);
+TEST_F(ClusterFindAndModifyTest, SnapshotReadConcernWithAfterClusterTime) {
+    testSnapshotReadConcernWithAfterClusterTime(kFindAndModifyCmdTargeted);
 }
 
 }  // namespace

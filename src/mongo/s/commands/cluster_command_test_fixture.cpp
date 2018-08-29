@@ -39,6 +39,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -62,6 +63,26 @@ void ClusterCommandTestFixture::setUp() {
     LogicalTimeValidator::set(getServiceContext(), std::move(validator));
 
     LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
+
+    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
+}
+
+BSONObj ClusterCommandTestFixture::_makeCmd(BSONObj cmdObj, bool includeAfterClusterTime) {
+    BSONObjBuilder bob(cmdObj);
+    // Each command runs in a new session.
+    bob.append("lsid", makeLogicalSessionIdForTest().toBSON());
+    bob.append("txnNumber", TxnNumber(1));
+    bob.append("autocommit", false);
+    bob.append("startTransaction", true);
+
+    BSONObjBuilder readConcernBob = bob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
+    readConcernBob.append("level", "snapshot");
+    if (includeAfterClusterTime) {
+        readConcernBob.append("afterClusterTime", kAfterClusterTime);
+    }
+
+    readConcernBob.doneFast();
+    return bob.obj();
 }
 
 void ClusterCommandTestFixture::expectReturnsError(ErrorCodes::Error code) {
@@ -78,6 +99,15 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
     auto opCtx = client->makeOperationContext();
 
     const auto opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.db(), cmd);
+
+    // Ensure the clusterGLE on the Client has not yet been initialized.
+    ASSERT(!ClusterLastErrorInfo::get(client.get()));
+
+    // Initialize the cluster last error info for the client with a new request.
+    ClusterLastErrorInfo::get(client.get()) = std::make_shared<ClusterLastErrorInfo>();
+    ASSERT(ClusterLastErrorInfo::get(client.get()));
+    auto clusterGLE = ClusterLastErrorInfo::get(client.get());
+    clusterGLE->newRequest();
 
     return Strategy::clientCommand(opCtx.get(), opMsgRequest.serialize());
 }
@@ -140,6 +170,84 @@ void ClusterCommandTestFixture::runCommandMaxErrors(BSONObj cmd,
     }
 
     future.timed_get(kFutureTimeout);
+}
+
+void ClusterCommandTestFixture::testNoErrors(BSONObj targetedCmd, BSONObj scatterGatherCmd) {
+
+    // Target one shard.
+    runCommandSuccessful(_makeCmd(targetedCmd), true);
+
+    // Target all shards.
+    if (!scatterGatherCmd.isEmpty()) {
+        runCommandSuccessful(_makeCmd(scatterGatherCmd), false);
+    }
+}
+
+void ClusterCommandTestFixture::testRetryOnSnapshotError(BSONObj targetedCmd,
+                                                         BSONObj scatterGatherCmd) {
+    // Target one shard.
+    runCommandOneError(_makeCmd(targetedCmd), ErrorCodes::SnapshotUnavailable, true);
+    runCommandOneError(_makeCmd(targetedCmd), ErrorCodes::SnapshotTooOld, true);
+
+    // Target all shards
+    if (!scatterGatherCmd.isEmpty()) {
+        runCommandOneError(_makeCmd(scatterGatherCmd), ErrorCodes::SnapshotUnavailable, false);
+        runCommandOneError(_makeCmd(scatterGatherCmd), ErrorCodes::SnapshotTooOld, false);
+    }
+}
+
+void ClusterCommandTestFixture::testMaxRetriesSnapshotErrors(BSONObj targetedCmd,
+                                                             BSONObj scatterGatherCmd) {
+    // Target one shard.
+    runCommandMaxErrors(_makeCmd(targetedCmd), ErrorCodes::SnapshotUnavailable, true);
+    runCommandMaxErrors(_makeCmd(targetedCmd), ErrorCodes::SnapshotTooOld, true);
+
+    // Target all shards
+    if (!scatterGatherCmd.isEmpty()) {
+        runCommandMaxErrors(_makeCmd(scatterGatherCmd), ErrorCodes::SnapshotUnavailable, false);
+        runCommandMaxErrors(_makeCmd(scatterGatherCmd), ErrorCodes::SnapshotTooOld, false);
+    }
+}
+
+void ClusterCommandTestFixture::testAttachesAtClusterTimeForSnapshotReadConcern(
+    BSONObj targetedCmd, BSONObj scatterGatherCmd) {
+
+    auto containsAtClusterTime = [](const executor::RemoteCommandRequest& request) {
+        ASSERT(!request.cmdObj["readConcern"]["atClusterTime"].eoo());
+    };
+
+    // Target one shard.
+    runCommandInspectRequests(_makeCmd(targetedCmd), containsAtClusterTime, true);
+
+    // Target all shards.
+    if (!scatterGatherCmd.isEmpty()) {
+        runCommandInspectRequests(_makeCmd(scatterGatherCmd), containsAtClusterTime, false);
+    }
+}
+
+void ClusterCommandTestFixture::testSnapshotReadConcernWithAfterClusterTime(
+    BSONObj targetedCmd, BSONObj scatterGatherCmd) {
+
+    auto containsAtClusterTimeNoAfterClusterTime =
+        [&](const executor::RemoteCommandRequest& request) {
+            ASSERT(!request.cmdObj["readConcern"]["atClusterTime"].eoo());
+            ASSERT(request.cmdObj["readConcern"]["afterClusterTime"].eoo());
+
+            // The chosen atClusterTime should be greater than or equal to the request's
+            // afterClusterTime.
+            ASSERT_GTE(LogicalTime(request.cmdObj["readConcern"]["atClusterTime"].timestamp()),
+                       LogicalTime(kAfterClusterTime));
+        };
+
+    // Target one shard.
+    runCommandInspectRequests(
+        _makeCmd(targetedCmd, true), containsAtClusterTimeNoAfterClusterTime, true);
+
+    // Target all shards.
+    if (!scatterGatherCmd.isEmpty()) {
+        runCommandInspectRequests(
+            _makeCmd(scatterGatherCmd, true), containsAtClusterTimeNoAfterClusterTime, false);
+    }
 }
 
 }  // namespace mongo

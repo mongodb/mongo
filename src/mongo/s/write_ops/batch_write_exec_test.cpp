@@ -35,6 +35,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/transaction/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -567,6 +568,168 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
     });
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, nonRetryableErrResponse);
+
+    future.timed_get(kFutureTimeout);
+}
+
+
+class BatchWriteExecTransactionTest : public BatchWriteExecTest {
+public:
+    const TxnNumber kTxnNumber = 5;
+
+    void setUp() override {
+        BatchWriteExecTest::setUp();
+
+        operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+        operationContext()->setTxnNumber(kTxnNumber);
+        repl::ReadConcernArgs::get(operationContext()) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+        _scopedSession.emplace(operationContext());
+
+        auto txnRouter = TransactionRouter::get(operationContext());
+        txnRouter->checkOut();
+        txnRouter->beginOrContinueTxn(operationContext(), kTxnNumber, true);
+    }
+
+    void tearDown() override {
+        _scopedSession.reset();
+        repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+
+        BatchWriteExecTest::tearDown();
+    }
+
+private:
+    boost::optional<ScopedRouterSession> _scopedSession;
+};
+
+TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_CommandError) {
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        ASSERT_THROWS_CODE(BatchWriteExec::executeBatch(
+                               operationContext(), nsTargeter, request, &response, &stats),
+                           AssertionException,
+                           ErrorCodes::UnknownError);
+    });
+
+    BatchedCommandResponse failedResponse;
+    failedResponse.setStatus({ErrorCodes::UnknownError, "dummy error"});
+
+    expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, failedResponse);
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteError) {
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        ASSERT_THROWS_CODE(BatchWriteExec::executeBatch(
+                               operationContext(), nsTargeter, request, &response, &stats),
+                           AssertionException,
+                           ErrorCodes::StaleShardVersion);
+    });
+
+    // Any write error works, using SSV for convenience.
+    expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteErrorOrdered) {
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        ASSERT_THROWS_CODE(BatchWriteExec::executeBatch(
+                               operationContext(), nsTargeter, request, &response, &stats),
+                           AssertionException,
+                           ErrorCodes::StaleShardVersion);
+    });
+
+    // Any write error works, using SSV for convenience.
+    expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteConcernError) {
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        ASSERT_THROWS_CODE(BatchWriteExec::executeBatch(
+                               operationContext(), nsTargeter, request, &response, &stats),
+                           AssertionException,
+                           ErrorCodes::NetworkTimeout);
+    });
+
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto insertOp = InsertOp::parse(opMsgRequest);
+        ASSERT_EQUALS(nss, insertOp.getNamespace());
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setN(1);
+
+        auto wcError = stdx::make_unique<WriteConcernErrorDetail>();
+        WriteConcernResult wcRes;
+        wcRes.err = "timeout";
+        wcRes.wTimedOut = true;
+        wcError->setStatus({ErrorCodes::NetworkTimeout, "Failed to wait for write concern"});
+        wcError->setErrInfo(BSON("wtimeout" << true));
+        response.setWriteConcernError(wcError.release());
+
+        return response.toBSON();
+    });
 
     future.timed_get(kFutureTimeout);
 }

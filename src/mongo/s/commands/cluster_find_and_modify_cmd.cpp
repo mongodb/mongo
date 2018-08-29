@@ -45,6 +45,7 @@
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction/transaction_router.h"
 #include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/timer.h"
 
@@ -202,6 +203,10 @@ private:
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
                             BSONObjBuilder* result) {
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter->setAtClusterTimeToLatestTime(opCtx);
+        }
+
         const auto response = [&] {
             std::vector<AsyncRequestsSender::Request> requests;
             requests.emplace_back(
@@ -226,7 +231,8 @@ private:
         uassertStatusOK(response.status);
 
         const auto responseStatus = getStatusFromCommandResult(response.data);
-        if (ErrorCodes::isNeedRetargettingError(responseStatus.code())) {
+        if (ErrorCodes::isNeedRetargettingError(responseStatus.code()) ||
+            ErrorCodes::isSnapshotError(responseStatus.code())) {
             // Command code traps this exception and re-runs
             uassertStatusOK(responseStatus.withContext("findAndModify"));
         }

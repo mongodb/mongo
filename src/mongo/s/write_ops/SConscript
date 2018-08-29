@@ -34,6 +34,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
+        '$BUILD_DIR/mongo/s/transaction/router_session',
         'batch_write_types',
     ],
 )

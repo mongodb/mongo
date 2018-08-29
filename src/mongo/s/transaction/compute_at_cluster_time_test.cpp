@@ -268,6 +268,10 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {
     ASSERT(computedTime);
     ASSERT_GTE(*computedTime, afterClusterTime);
 
+    computedTime = at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), s0);
+    ASSERT(computedTime);
+    ASSERT_GTE(*computedTime, afterClusterTime);
+
     // Target all shards.
     computedTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
@@ -283,6 +287,10 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {
     // Target one shard.
     computedTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_GTE(*computedTime, afterClusterTime);
+
+    computedTime = at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), s0);
     ASSERT(computedTime);
     ASSERT_GTE(*computedTime, afterClusterTime);
 
@@ -329,6 +337,10 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTimeLowerBound) {
     ASSERT(computedTime);
     ASSERT_EQ(*computedTime, afterClusterTime);
 
+    computedTime = at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), s0);
+    ASSERT(computedTime);
+    ASSERT_EQ(*computedTime, afterClusterTime);
+
     // Target one shard with a last committed optime less than afterClusterTime. The computed value
     // should still equal afterClusterTime.
     LogicalTime time1(Timestamp(1, 1));
@@ -337,6 +349,10 @@ TEST_F(AtClusterTimeTargetingTest, AfterClusterTimeLowerBound) {
 
     computedTime = at_cluster_time_util::computeAtClusterTime(
         operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_EQ(*computedTime, afterClusterTime);
+
+    computedTime = at_cluster_time_util::computeAtClusterTimeForOneShard(operationContext(), s0);
     ASSERT(computedTime);
     ASSERT_EQ(*computedTime, afterClusterTime);
 }

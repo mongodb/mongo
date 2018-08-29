@@ -244,9 +244,9 @@ TransactionRouter::Participant& TransactionRouter::getOrCreateParticipant(const 
 
     auto participant =
         TransactionRouter::Participant(isFirstParticipant, _txnNumber, _readConcernArgs);
-    // TODO SERVER-36557: Every command that starts a cross-shard transaction should
-    // compute atClusterTime with snapshot read concern. Hence, we should be able to
-    // add an invariant here to ensure that atClusterTime is not none.
+    // TODO SERVER-36589: Once mongos aborts transactions by only sending abortTransaction to shards
+    // that have been successfully contacted we should be able to add an invariant here to ensure
+    // that an atClusterTime has been chosen if the read concern level is snapshot.
     if (_atClusterTime) {
         participant.setAtClusterTime(*_atClusterTime);
     }
@@ -297,6 +297,24 @@ void TransactionRouter::computeAtClusterTimeForOneShard(OperationContext* opCtx,
     if (atClusterTime) {
         _atClusterTime = *atClusterTime;
     }
+}
+
+void TransactionRouter::setAtClusterTimeToLatestTime(OperationContext* opCtx) {
+    if (_atClusterTime ||
+        _readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern) {
+        return;
+    }
+
+    auto atClusterTime = LogicalClock::get(opCtx)->getClusterTime();
+
+    // If the user passed afterClusterTime, atClusterTime for the transaction must be selected so it
+    // is at least equal to or greater than it.
+    auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
+    if (afterClusterTime && *afterClusterTime > atClusterTime) {
+        atClusterTime = *afterClusterTime;
+    }
+
+    _atClusterTime = atClusterTime;
 }
 
 void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,

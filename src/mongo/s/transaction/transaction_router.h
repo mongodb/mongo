@@ -126,6 +126,12 @@ public:
      */
     void computeAtClusterTimeForOneShard(OperationContext* opCtx, const ShardId& shardId);
 
+    /**
+     * Sets the atClusterTime for the current transaction to the latest time in the router's logical
+     * clock.
+     */
+    void setAtClusterTimeToLatestTime(OperationContext* opCtx);
+
     bool isCheckedOut();
 
     const LogicalSessionId& getSessionId() const;

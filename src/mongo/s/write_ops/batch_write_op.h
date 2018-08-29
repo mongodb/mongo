@@ -173,6 +173,13 @@ public:
     void abortBatch(const WriteErrorDetail& error);
 
     /**
+     * Disposes of all tracked targeted batches when an error is encountered during a transaction.
+     * This is safe because any partially written data on shards will be rolled back if mongos
+     * decides to abort.
+     */
+    void forgetTargetedBatchesOnTransactionAbortingError();
+
+    /**
      * Returns false if the batch write op needs more processing.
      */
     bool isFinished();

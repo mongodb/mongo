@@ -45,6 +45,8 @@ protected:
 
     const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(10, 1));
 
+    const Timestamp kAfterClusterTime = Timestamp(50, 2);
+
     void setUp() override;
 
     virtual void expectInspectRequest(int shardIndex, InspectionCallback cb) = 0;
@@ -62,6 +64,43 @@ protected:
     void runCommandInspectRequests(BSONObj cmd, InspectionCallback cb, bool isTargeted);
 
     void runCommandMaxErrors(BSONObj cmd, ErrorCodes::Error code, bool isTargeted);
+
+    /**
+     * Verifies that running the given commands through mongos will succeed.
+     */
+    void testNoErrors(BSONObj targetedCmd, BSONObj scatterGatherCmd = BSONObj());
+
+    /**
+     * Verifies that the given commands will retry on a snapshot error.
+     */
+    void testRetryOnSnapshotError(BSONObj targetedCmd, BSONObj scatterGatherCmd = BSONObj());
+
+    /**
+     * Verifies that the given commands will retry up to the max retry attempts on snapshot
+     * errors then return the final errors they receive.
+     */
+    void testMaxRetriesSnapshotErrors(BSONObj targetedCmd, BSONObj scatterGatherCmd = BSONObj());
+
+    /**
+     * Verifies that atClusterTime is attached to the given commands.
+     */
+    void testAttachesAtClusterTimeForSnapshotReadConcern(BSONObj targetedCmd,
+                                                         BSONObj scatterGatherCmd = BSONObj());
+
+    /**
+     * Verifies that the chosen atClusterTime is greater than or equal to each command's
+     * afterClusterTime.
+     */
+    void testSnapshotReadConcernWithAfterClusterTime(BSONObj targetedCmd,
+                                                     BSONObj scatterGatherCmd = BSONObj());
+
+private:
+    /**
+     * Makes a new command object from the one given by apppending read concern
+     * snapshot and the appropriate transaction options. If includeAfterClusterTime
+     * is true, also appends afterClusterTime to the read concern.
+     */
+    BSONObj _makeCmd(BSONObj cmdObj, bool includeAfterClusterTime = false);
 };
 
 }  // namespace mongo

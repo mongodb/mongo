@@ -57,9 +57,6 @@ selector:
   # TODO SERVER-33709: Support readConcern snapshot in cluster count command.
   - jstests/core/txns/commands_not_allowed_in_txn.js
 
-  # TODO SERVER-36580 Mongos should preserve error labels for write ops.
-  - jstests/core/txns/multi_statement_transaction_abort.js
-
   # TODO SERVER-35825: Mongos should only allow readConcern on writes that start transactions.
   - jstests/core/txns/no_read_concern_snapshot_outside_txn.js
 
@@ -67,6 +64,9 @@ selector:
   - jstests/core/txns/view_reads_in_transaction.js
   - jstests/core/txns/list_collections_not_blocked_by_txn.js
   - jstests/core/txns/statement_ids_accepted.js
+
+  # TODO SERVER-36591: Allow mongos to retry on snapshot errors when starting a transaction.
+  - jstests/core/txns/concurrent_drops_and_creates.js
 executor:
   archive:
     hooks:

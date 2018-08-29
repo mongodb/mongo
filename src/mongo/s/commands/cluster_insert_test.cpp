@@ -30,54 +30,46 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-class ClusterDistinctTest : public ClusterCommandTestFixture {
+class ClusterInsertTest : public ClusterCommandTestFixture {
 protected:
-    const BSONObj kDistinctCmdTargeted{
-        fromjson("{distinct: 'coll', key: 'x', query: {'_id': {$lt: -1}}}")};
+    const BSONObj kInsertCmdTargeted{fromjson("{insert: 'coll', documents: [{'_id': -1}]}")};
 
-    const BSONObj kDistinctCmdScatterGather{fromjson("{distinct: 'coll', key: '_id'}")};
+    const BSONObj kInsertCmdScatterGather{
+        fromjson("{insert: 'coll', documents: [{'_id': -1}, {'_id': 1}], ordered: false}")};
 
     void expectInspectRequest(int shardIndex, InspectionCallback cb) override {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
             cb(request);
-            return BSON("values" << BSON_ARRAY(shardIndex));
+            return BSON("nInserted" << 1);
         });
     }
 
     void expectReturnsSuccess(int shardIndex) override {
         onCommandForPoolExecutor([this, shardIndex](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
-            return BSON("values" << BSON_ARRAY(shardIndex));
+            return BSON("nInserted" << 1);
         });
     }
 };
 
-TEST_F(ClusterDistinctTest, NoErrors) {
-    testNoErrors(kDistinctCmdTargeted, kDistinctCmdScatterGather);
+TEST_F(ClusterInsertTest, NoErrors) {
+    testNoErrors(kInsertCmdTargeted, kInsertCmdScatterGather);
 }
 
-TEST_F(ClusterDistinctTest, RetryOnSnapshotError) {
-    testRetryOnSnapshotError(kDistinctCmdTargeted, kDistinctCmdScatterGather);
+TEST_F(ClusterInsertTest, AttachesAtClusterTimeForSnapshotReadConcern) {
+    testAttachesAtClusterTimeForSnapshotReadConcern(kInsertCmdTargeted, kInsertCmdScatterGather);
 }
 
-TEST_F(ClusterDistinctTest, MaxRetriesSnapshotErrors) {
-    testMaxRetriesSnapshotErrors(kDistinctCmdTargeted, kDistinctCmdScatterGather);
-}
-
-TEST_F(ClusterDistinctTest, AttachesAtClusterTimeForSnapshotReadConcern) {
-    testAttachesAtClusterTimeForSnapshotReadConcern(kDistinctCmdTargeted,
-                                                    kDistinctCmdScatterGather);
-}
-
-TEST_F(ClusterDistinctTest, SnapshotReadConcernWithAfterClusterTime) {
-    testSnapshotReadConcernWithAfterClusterTime(kDistinctCmdTargeted, kDistinctCmdScatterGather);
+TEST_F(ClusterInsertTest, SnapshotReadConcernWithAfterClusterTime) {
+    testSnapshotReadConcernWithAfterClusterTime(kInsertCmdTargeted, kInsertCmdScatterGather);
 }
 
 }  // namespace

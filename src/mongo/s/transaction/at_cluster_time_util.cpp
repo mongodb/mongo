@@ -118,11 +118,20 @@ boost::optional<LogicalTime> computeAtClusterTimeForOneShard(OperationContext* o
     uassert(ErrorCodes::ShardNotFound, str::stream() << "Could not find shard " << shardId, shard);
 
     // Return the cached last committed opTime for the shard if there is one, otherwise return the
-    // lastest cluster time from the logical clock.
+    // latest cluster time from the logical clock.
     auto lastCommittedOpTime = shard->getLastCommittedOpTime();
-    return lastCommittedOpTime != LogicalTime::kUninitialized
+
+    auto atClusterTime = lastCommittedOpTime != LogicalTime::kUninitialized
         ? lastCommittedOpTime
         : LogicalClock::get(opCtx)->getClusterTime();
+
+    // If the user passed afterClusterTime, atClusterTime must be greater than or equal to it.
+    const auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
+    if (afterClusterTime && *afterClusterTime > atClusterTime) {
+        return afterClusterTime;
+    }
+
+    return atClusterTime;
 }
 
 }  // namespace at_cluster_time_util
