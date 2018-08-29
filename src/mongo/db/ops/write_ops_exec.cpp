@@ -52,6 +52,7 @@
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -301,12 +302,13 @@ static WriteResult performCreateIndexes(OperationContext* txn, const InsertOp& w
 static void insertDocuments(OperationContext* txn,
                             Collection* collection,
                             std::vector<BSONObj>::const_iterator begin,
-                            std::vector<BSONObj>::const_iterator end) {
+                            std::vector<BSONObj>::const_iterator end,
+                            bool fromMigrate) {
     // Intentionally not using a WRITE_CONFLICT_RETRY_LOOP. That is handled by the caller so it can
     // react to oversized batches.
     WriteUnitOfWork wuow(txn);
     uassertStatusOK(collection->insertDocuments(
-        txn, begin, end, &CurOp::get(txn)->debug(), /*enforceQuota*/ true));
+        txn, begin, end, &CurOp::get(txn)->debug(), /*enforceQuota*/ true, fromMigrate));
     wuow.commit();
 }
 
@@ -317,7 +319,8 @@ static bool insertBatchAndHandleErrors(OperationContext* txn,
                                        const InsertOp& wholeOp,
                                        const std::vector<BSONObj>& batch,
                                        LastOpFixer* lastOpFixer,
-                                       WriteResult* out) {
+                                       WriteResult* out,
+                                       bool fromMigrate) {
     if (batch.empty())
         return true;
 
@@ -350,7 +353,8 @@ static bool insertBatchAndHandleErrors(OperationContext* txn,
             // First try doing it all together. If all goes well, this is all we need to do.
             // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
             lastOpFixer->startingOp();
-            insertDocuments(txn, collection->getCollection(), batch.begin(), batch.end());
+            insertDocuments(
+                txn, collection->getCollection(), batch.begin(), batch.end(), fromMigrate);
             lastOpFixer->finishedOpSuccessfully();
             globalOpCounters.gotInserts(batch.size());
             std::fill_n(
@@ -374,7 +378,7 @@ static bool insertBatchAndHandleErrors(OperationContext* txn,
                     if (!collection)
                         acquireCollection();
                     lastOpFixer->startingOp();
-                    insertDocuments(txn, collection->getCollection(), it, it + 1);
+                    insertDocuments(txn, collection->getCollection(), it, it + 1, fromMigrate);
                     lastOpFixer->finishedOpSuccessfully();
                     out->results.emplace_back(WriteResult::SingleResult{1});
                     curOp.debug().ninserted++;
@@ -396,7 +400,7 @@ static bool insertBatchAndHandleErrors(OperationContext* txn,
     return true;
 }
 
-WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
+WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp, bool fromMigrate) {
     invariant(!txn->lockState()->inAWriteUnitOfWork());  // Does own retries.
     auto& curOp = *CurOp::get(txn);
     ON_BLOCK_EXIT([&] {
@@ -453,7 +457,8 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
                 continue;  // Add more to batch before inserting.
         }
 
-        bool canContinue = insertBatchAndHandleErrors(txn, wholeOp, batch, &lastOpFixer, &out);
+        bool canContinue =
+            insertBatchAndHandleErrors(txn, wholeOp, batch, &lastOpFixer, &out, fromMigrate);
         batch.clear();  // We won't need the current batch any more.
         bytesInBatch = 0;
 
