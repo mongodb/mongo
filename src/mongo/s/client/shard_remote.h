@@ -33,6 +33,7 @@
 #include "mongo/s/client/shard.h"
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -80,7 +81,17 @@ public:
 
     LogicalTime getLastCommittedOpTime() const final;
 
+    void runFireAndForgetCommand(OperationContext* opCtx,
+                                 const ReadPreferenceSetting& readPref,
+                                 const std::string& dbName,
+                                 const BSONObj& cmdObj) final;
+
 private:
+    struct AsyncCmdHandle {
+        HostAndPort hostTargetted;
+        executor::TaskExecutor::CallbackHandle handle;
+    };
+
     /**
      * Returns the metadata that should be used when running commands against this shard with
      * the given read preference.
@@ -109,6 +120,14 @@ private:
         const BSONObj& query,
         const BSONObj& sort,
         boost::optional<long long> limit) final;
+
+    StatusWith<AsyncCmdHandle> _scheduleCommand(
+        OperationContext* opCtx,
+        const ReadPreferenceSetting& readPref,
+        const std::string& dbName,
+        Milliseconds maxTimeMSOverride,
+        const BSONObj& cmdObj,
+        const executor::TaskExecutor::RemoteCommandCallbackFn& cb);
 
     /**
      * Protects _lastCommittedOpTime.

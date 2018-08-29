@@ -149,4 +149,11 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
     return Status::OK();
 }
 
+void ShardLocal::runFireAndForgetCommand(OperationContext* opCtx,
+                                         const ReadPreferenceSetting& readPref,
+                                         const std::string& dbName,
+                                         const BSONObj& cmdObj) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

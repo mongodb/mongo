@@ -195,6 +195,15 @@ public:
         RetryPolicy retryPolicy);
 
     /**
+     * Schedules the command to be sent to the shard asynchronously. Does not provide any guarantee
+     * on whether the command is actually sent or even scheduled successfully.
+     */
+    virtual void runFireAndForgetCommand(OperationContext* opCtx,
+                                         const ReadPreferenceSetting& readPref,
+                                         const std::string& dbName,
+                                         const BSONObj& cmdObj) = 0;
+
+    /**
     * Runs a cursor command, exhausts the cursor, and pulls all data into memory. Performs retries
     * if the command fails in accordance with the kIdempotent RetryPolicy.
     */
@@ -229,6 +238,7 @@ public:
                                                      const BSONObj& query,
                                                      const BSONObj& sort,
                                                      const boost::optional<long long> limit);
+
     /**
      * Builds an index on a config server collection.
      * Creates the collection if it doesn't yet exist.  Does not error if the index already exists,

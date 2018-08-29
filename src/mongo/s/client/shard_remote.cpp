@@ -190,42 +190,29 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
                                                             const string& dbName,
                                                             Milliseconds maxTimeMSOverride,
                                                             const BSONObj& cmdObj) {
-
-    ReadPreferenceSetting readPrefWithMinOpTime(readPref);
-    if (isConfig()) {
-        readPrefWithMinOpTime.minOpTime = Grid::get(opCtx)->configOpTime();
-    }
-    const auto swHost = _targeter->findHost(opCtx, readPrefWithMinOpTime);
-    if (!swHost.isOK()) {
-        return swHost.getStatus();
-    }
-    const auto host = std::move(swHost.getValue());
-
-    const Milliseconds requestTimeout =
-        std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
-
-    const RemoteCommandRequest request(
-        host,
-        dbName,
-        appendMaxTimeToCmdObj(requestTimeout, cmdObj),
-        _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
-        opCtx,
-        requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
-
     RemoteCommandResponse response =
         Status(ErrorCodes::InternalError,
-               str::stream() << "Failed to run remote command request " << request.toString());
+               str::stream() << "Failed to run remote command request cmd: " << cmdObj);
 
-    TaskExecutor* executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    auto swCallbackHandle = executor->scheduleRemoteCommand(
-        request, [&response](const RemoteCommandCallbackArgs& args) { response = args.response; });
-    if (!swCallbackHandle.isOK()) {
-        return swCallbackHandle.getStatus();
+    auto asyncStatus = _scheduleCommand(
+        opCtx,
+        readPref,
+        dbName,
+        maxTimeMSOverride,
+        cmdObj,
+        [&response](const RemoteCommandCallbackArgs& args) { response = args.response; });
+
+    if (!asyncStatus.isOK()) {
+        return asyncStatus.getStatus();
     }
 
-    // Block until the command is carried out
-    executor->wait(swCallbackHandle.getValue());
+    auto asyncHandle = asyncStatus.getValue();
 
+    // Block until the command is carried out
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    executor->wait(asyncHandle.handle);
+
+    const auto& host = asyncHandle.hostTargetted;
     updateReplSetMonitor(host, response.status);
 
     if (!response.status.isOK()) {
@@ -388,6 +375,56 @@ Status ShardRemote::createIndexOnConfig(OperationContext* opCtx,
                                         const BSONObj& keys,
                                         bool unique) {
     MONGO_UNREACHABLE;
+}
+
+void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
+                                          const ReadPreferenceSetting& readPref,
+                                          const std::string& dbName,
+                                          const BSONObj& cmdObj) {
+    _scheduleCommand(opCtx, readPref, dbName, Milliseconds::max(), cmdObj, {}).getStatus().ignore();
+}
+
+StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const std::string& dbName,
+    Milliseconds maxTimeMSOverride,
+    const BSONObj& cmdObj,
+    const TaskExecutor::RemoteCommandCallbackFn& cb) {
+    ReadPreferenceSetting readPrefWithMinOpTime(readPref);
+
+    if (isConfig()) {
+        readPrefWithMinOpTime.minOpTime = Grid::get(opCtx)->configOpTime();
+    }
+
+    const auto swHost = _targeter->findHost(opCtx, readPrefWithMinOpTime);
+    if (!swHost.isOK()) {
+        return swHost.getStatus();
+    }
+
+    AsyncCmdHandle asyncHandle;
+    asyncHandle.hostTargetted = std::move(swHost.getValue());
+
+    const Milliseconds requestTimeout =
+        std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
+
+    const RemoteCommandRequest request(
+        asyncHandle.hostTargetted,
+        dbName,
+        appendMaxTimeToCmdObj(requestTimeout, cmdObj),
+        _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
+        opCtx,
+        requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
+
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto swHandle = executor->scheduleRemoteCommand(request, cb);
+
+    if (!swHandle.isOK()) {
+        return swHandle.getStatus();
+    }
+
+    asyncHandle.handle = std::move(swHandle.getValue());
+    return asyncHandle;
 }
 
 }  // namespace mongo

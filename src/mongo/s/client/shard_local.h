@@ -65,6 +65,11 @@ public:
 
     LogicalTime getLastCommittedOpTime() const final;
 
+    void runFireAndForgetCommand(OperationContext* opCtx,
+                                 const ReadPreferenceSetting& readPref,
+                                 const std::string& dbName,
+                                 const BSONObj& cmdObj) override;
+
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& unused,
