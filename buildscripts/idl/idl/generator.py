@@ -845,10 +845,21 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         else:
             self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
 
-    def gen_field_deserializer(self, field, bson_object, bson_element):
-        # type: (ast.Field, unicode, unicode) -> None
+    def _gen_usage_check(self, field, bson_element, field_usage_check):
+        # type: (ast.Field, unicode, _FieldUsageCheckerBase) -> None
+        """Generate the field usage check and insert the required field check."""
+        if field_usage_check:
+            field_usage_check.add(field, bson_element)
+
+            if _is_required_serializer_field(field):
+                self._writer.write_line('%s = true;' % (_get_has_field_member_name(field)))
+
+    def gen_field_deserializer(self, field, bson_object, bson_element, field_usage_check):
+        # type: (ast.Field, unicode, unicode, _FieldUsageCheckerBase) -> None
         """Generate the C++ deserializer piece for a field."""
         if field.array:
+            self._gen_usage_check(field, bson_element, field_usage_check)
+
             self._gen_array_deserializer(field, bson_element)
             return
 
@@ -864,13 +875,17 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 method_name = writer.get_method_name_from_qualified_method_name(field.deserializer)
                 expression = "%s(%s)" % (method_name, bson_object)
 
+            self._gen_usage_check(field, bson_element, field_usage_check)
+
             self._writer.write_line('%s = %s;' % (_get_field_member_name(field), expression))
         else:
-            # May be an empty block if the type is 'any'
             predicate = _get_bson_type_check(bson_element, 'ctxt', field)
             if predicate:
                 predicate = "MONGO_likely(%s)" % (predicate)
             with self._predicate(predicate):
+
+                self._gen_usage_check(field, bson_element, field_usage_check)
+
                 object_value = self._gen_field_deserializer_expression(bson_element, field)
                 if field.chained_struct_field:
                     self._writer.write_line('%s.%s(%s);' %
@@ -976,7 +991,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         if isinstance(struct, ast.Command) and struct.command_field:
             with self._block('{', '}'):
-                self.gen_field_deserializer(struct.command_field, bson_object, "commandElement")
+                self.gen_field_deserializer(struct.command_field, bson_object, "commandElement",
+                                            None)
         else:
             struct_type_info = struct_types.get_struct_info(struct)
 
@@ -1021,16 +1037,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 field_predicate = 'fieldName == %s' % (_get_field_constant_name(field))
 
                 with self._predicate(field_predicate, not first_field):
-                    field_usage_check.add(field, "element")
 
                     if field.ignore:
+                        field_usage_check.add(field, "element")
+
                         self._writer.write_line('// ignore field')
                     else:
-                        if _is_required_serializer_field(field):
-                            self._writer.write_line('%s = true;' %
-                                                    (_get_has_field_member_name(field)))
-
-                        self.gen_field_deserializer(field, bson_object, "element")
+                        self.gen_field_deserializer(field, bson_object, "element",
+                                                    field_usage_check)
 
                 if first_field:
                     first_field = False
@@ -1056,7 +1070,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 continue
 
             # Simply generate deserializers since these are all 'any' types
-            self.gen_field_deserializer(field, bson_object, "element")
+            self.gen_field_deserializer(field, bson_object, "element", None)
             self._writer.write_empty_line()
 
         self._writer.write_empty_line()

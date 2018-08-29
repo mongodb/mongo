@@ -274,6 +274,31 @@ TEST(IDLOneTypeTests, TestNegativeWrongTypes) {
     TestParsers<One_timestamp, bsonTimestamp>();
 }
 
+// Negative: document with wrong types for required field
+TEST(IDLOneTypeTests, TestNegativeRequiredNullTypes) {
+    TestParse<One_string, String, NullLabeler, jstNULL>(BSONNULL);
+    TestParse<One_int, NumberInt, NullLabeler, jstNULL>(BSONNULL);
+    TestParse<One_long, NumberLong, NullLabeler, jstNULL>(BSONNULL);
+    TestParse<One_double, NumberDouble, NullLabeler, jstNULL>(BSONNULL);
+    TestParse<One_bool, Bool, NullLabeler, jstNULL>(BSONNULL);
+    TestParse<One_objectid, jstOID, NullLabeler, jstNULL>(BSONNULL);
+    TestParse<One_date, Date, NullLabeler, jstNULL>(BSONNULL);
+    TestParse<One_timestamp, bsonTimestamp, NullLabeler, jstNULL>(BSONNULL);
+}
+
+// Negative: document with wrong types for required field
+TEST(IDLOneTypeTests, TestNegativeRequiredUndefinedTypes) {
+    TestParse<One_string, String, UndefinedLabeler, Undefined>(BSONUndefined);
+    TestParse<One_int, NumberInt, UndefinedLabeler, Undefined>(BSONUndefined);
+    TestParse<One_long, NumberLong, UndefinedLabeler, Undefined>(BSONUndefined);
+    TestParse<One_double, NumberDouble, UndefinedLabeler, Undefined>(BSONUndefined);
+    TestParse<One_bool, Bool, UndefinedLabeler, Undefined>(BSONUndefined);
+    TestParse<One_objectid, jstOID, UndefinedLabeler, Undefined>(BSONUndefined);
+    TestParse<One_date, Date, UndefinedLabeler, Undefined>(BSONUndefined);
+    TestParse<One_timestamp, bsonTimestamp, UndefinedLabeler, Undefined>(BSONUndefined);
+}
+
+
 // Mixed: test a type that accepts multiple bson types
 TEST(IDLOneTypeTests, TestSafeInt32) {
     TestParse<One_safeint32, NumberInt, StringData, String>("test_value");
@@ -600,6 +625,19 @@ TEST(IDLFieldTests, TestStrictStructIgnoredField) {
     }
 }
 
+// Negative: check duplicate ignored fields fail
+TEST(IDLFieldTests, TestStrictDuplicateIgnoredFields) {
+    IDLParserErrorContext ctxt("root");
+
+    // Negative: Test duplicate ignored fields fail
+    {
+        auto testDoc =
+            BSON("required_field" << 12 << "ignored_field" << 123 << "ignored_field" << 456);
+        ASSERT_THROWS(IgnoredField::parse(ctxt, testDoc), AssertionException);
+    }
+}
+
+
 // First test: test an empty document and the default value
 // Second test: test a non-empty document and that we do not get the default value
 #define TEST_DEFAULT_VALUES(field_name, default_value, new_value)   \
@@ -683,6 +721,31 @@ TEST(IDLFieldTests, TestOptionalFields) {
         auto testDoc = BSON("field2" << 123);
         ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
     }
+}
+
+template <typename TestT>
+void TestWeakType(TestT test_value) {
+    IDLParserErrorContext ctxt("root");
+    auto testDoc =
+        BSON("field1" << test_value << "field2" << test_value << "field3" << test_value << "field4"
+                      << test_value
+                      << "field5"
+                      << test_value);
+    auto testStruct = Optional_field::parse(ctxt, testDoc);
+
+    ASSERT_FALSE(testStruct.getField1().is_initialized());
+    ASSERT_FALSE(testStruct.getField2().is_initialized());
+    ASSERT_FALSE(testStruct.getField3().is_initialized());
+    ASSERT_FALSE(testStruct.getField4().is_initialized());
+    ASSERT_FALSE(testStruct.getField5().is_initialized());
+}
+
+// Positive: struct strict, and optional field works
+TEST(IDLFieldTests, TestOptionalFieldsWithNullAndUndefined) {
+
+    TestWeakType<NullLabeler>(BSONNULL);
+
+    TestWeakType<UndefinedLabeler>(BSONUndefined);
 }
 
 // Positive: Test a nested struct
