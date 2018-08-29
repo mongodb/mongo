@@ -1218,6 +1218,10 @@ Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
     };
 
     if (direction == ConnectionDirection::kOutgoing) {
+        if (params.tlsWithholdClientCertificate) {
+            return Status::OK();
+        }
+
         const auto status = selectCertificate(
             params.sslClusterCertificateSelector, params.sslClusterFile, params.sslClusterPassword);
         if (context->certs || !status.isOK()) {

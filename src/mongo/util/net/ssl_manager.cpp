@@ -72,6 +72,12 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly>
     suppressNoTLSPeerCertificateWarning(ServerParameterSet::getGlobal(),
                                         "suppressNoTLSPeerCertificateWarning",
                                         &sslGlobalParams.suppressNoTLSPeerCertificateWarning);
+
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly> sslWithholdClientCertificate(
+    ServerParameterSet::getGlobal(),
+    "sslWithholdClientCertificate",
+    &sslGlobalParams.tlsWithholdClientCertificate);
+
 }  // namespace
 
 class OpenSSLCipherConfigParameter
