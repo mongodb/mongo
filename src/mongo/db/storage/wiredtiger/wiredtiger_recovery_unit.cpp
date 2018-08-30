@@ -358,7 +358,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             // We reset _majorityCommittedSnapshot to the actual read timestamp used when the
             // transaction was started.
             _majorityCommittedSnapshot =
-                _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(session);
+                _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(
+                    session, _ignorePrepared);
             break;
         }
         case ReadSource::kLastApplied: {

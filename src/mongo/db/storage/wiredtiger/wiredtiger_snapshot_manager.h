@@ -62,7 +62,8 @@ public:
      *
      * Throws if there is currently no committed snapshot.
      */
-    Timestamp beginTransactionOnCommittedSnapshot(WT_SESSION* session) const;
+    Timestamp beginTransactionOnCommittedSnapshot(
+        WT_SESSION* session, WiredTigerBeginTxnBlock::IgnorePrepared ignorePrepared) const;
 
     /**
      * Starts a transaction on the last stable local timestamp, set by setLocalSnapshot.

@@ -334,7 +334,12 @@ Status waitForReadConcern(OperationContext* opCtx,
         LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(opCtx)->opDescription();
     }
 
-    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kAvailableReadConcern) {
+    // Only snapshot, linearizable and afterClusterTime reads should block on prepared transactions.
+    // We don't ignore prepare conflicts if we are in a direct client in case this overrides
+    // behavior set by a higher-level operation.
+    if (readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern &&
+        readConcernArgs.getLevel() != repl::ReadConcernLevel::kLinearizableReadConcern &&
+        !afterClusterTime && !atClusterTime && !opCtx->getClient()->isInDirectClient()) {
         opCtx->recoveryUnit()->setIgnorePrepared(true);
     }
 

@@ -5,6 +5,7 @@
  */
 (function() {
     "use strict";
+    load("jstests/core/txns/libs/prepare_helpers.js");
 
     const dbName = "test";
     const collName = "prepare_conflict";
@@ -14,9 +15,15 @@
     testColl.drop({writeConcern: {w: "majority"}});
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
-    function assertPrepareConflict(filter) {
+    function assertPrepareConflict(filter, clusterTime) {
         assert.commandFailedWithCode(
-            testDB.runCommand({find: collName, filter: filter, maxTimeMS: 1000}),
+            // Use afterClusterTime read to make sure that it will block on a prepare conflict.
+            testDB.runCommand({
+                find: collName,
+                filter: filter,
+                readConcern: {afterClusterTime: clusterTime},
+                maxTimeMS: 1000
+            }),
             ErrorCodes.MaxTimeMSExpired);
 
         let prepareConflicted = false;
@@ -55,13 +62,13 @@
         updates: [{q: txnDoc, u: {$inc: {x: 1}}}],
     }));
 
-    assert.commandWorked(sessionDB.adminCommand({prepareTransaction: 1}));
+    const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
     // Conflict on _id of prepared document.
-    assertPrepareConflict({_id: txnDoc._id});
+    assertPrepareConflict({_id: txnDoc._id}, prepareTimestamp);
 
     // Conflict on field that could be added to a prepared document.
-    assertPrepareConflict({randomField: "random"});
+    assertPrepareConflict({randomField: "random"}, prepareTimestamp);
 
     // No conflict on _id of a non-prepared document.
     assert.commandWorked(testDB.runCommand({find: collName, filter: {_id: otherDoc._id}}));

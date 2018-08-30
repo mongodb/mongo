@@ -207,13 +207,13 @@
 
         const prepareConflict = function() {
             jsTestLog("Ordinary reads should not block on prepared transactions.");
-            // TODO (SERVER-36382): Uncomment this block when local reads don't cause prepare
-            // conflicts.
-            // cursor = assert.commandWorked(_db.runCommand(
-            //    {find: _collName, filter: TestData.txnDocFilter, maxTimeMS:
-            //  TestData.successTimeout}));
-            // assert.docEq(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
             let cursor = assert.commandWorked(_db.runCommand({
+                find: _collName,
+                filter: TestData.txnDocFilter,
+                maxTimeMS: TestData.successTimeout
+            }));
+            assert.docEq(cursor.cursor.firstBatch, [TestData.txnDoc], tojson(cursor));
+            cursor = assert.commandWorked(_db.runCommand({
                 find: _collName,
                 filter: TestData.otherDocFilter,
                 maxTimeMS: TestData.successTimeout
