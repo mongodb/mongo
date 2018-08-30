@@ -129,11 +129,6 @@
                       .hint({$natural: 1})
                       .itcount());
     } finally {
-        // TODO SERVER-36444: We currently need to drop the collection with the $** index in order
-        // to allow validation to succeed. Once validation for $** indexes is implemented, this will
-        // no longer be needed.
-        assert(coll.drop());
-
         // Disable $** indexes once the tests have either completed or failed.
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false}));

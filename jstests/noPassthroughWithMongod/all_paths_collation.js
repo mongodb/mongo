@@ -124,9 +124,5 @@
     } finally {
         // Disable $** indexes once the tests have either completed or failed.
         db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false});
-
-        // Drop the collection's indexes so that the post-run validation does not fail on $**.
-        // TODO SERVER-36444: allow validation to proceed.
-        assert.commandWorked(coll.dropIndexes());
     }
 })();

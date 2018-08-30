@@ -133,31 +133,6 @@ public:
             uasserted(ErrorCodes::NamespaceNotFound, "ns not found");
         }
 
-        // Omit background validation logic until it is fully implemented and vetted.
-        const bool background = false;
-        /*
-        bool isInRecordIdOrder = collection->getRecordStore()->isInRecordIdOrder();
-        if (isInRecordIdOrder && !full) {
-            background = true;
-        }
-
-        if (cmdObj.hasElement("background")) {
-            background = cmdObj["background"].trueValue();
-        }
-
-        if (!isInRecordIdOrder && background) {
-            uasserted(ErrorCodes::CommandFailed,
-                      "This storage engine does not support the background option, use "
-                      "background:false");
-            return false;
-        }
-
-        if (full && background) {
-            uasserted(ErrorCodes::CommandFailed,
-                      "A full validate cannot run in the background, use full:false");
-        }
-        */
-
         result.append("ns", nss.ns());
 
         // Only one validation per collection can be in progress, the rest wait in order.
@@ -183,6 +158,9 @@ public:
             _validationsInProgress.erase(nss.ns());
             _validationNotifier.notify_all();
         });
+
+        // TODO SERVER-30357: Add support for background validation.
+        const bool background = false;
 
         ValidateResults results;
         Status status =

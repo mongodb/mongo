@@ -159,6 +159,15 @@ void RecordStoreValidateAdaptor::traverseIndex(const IndexAccessMethod* iam,
             results->valid = false;
         }
 
+
+        // TODO SERVER-36444: Add validation for $** multikey metadata index keys.
+        const RecordId kAllPathsMultikeyMetadataRecordId{
+            RecordId::ReservedId::kAllPathsMultikeyMetadataId};
+        if (descriptor->getIndexType() == IndexType::INDEX_ALLPATHS &&
+            indexEntry->loc == kAllPathsMultikeyMetadataRecordId) {
+            continue;
+        }
+
         _indexConsistency->addIndexKey(*indexKeyString, indexNumber);
 
         numKeys++;
@@ -200,8 +209,8 @@ void RecordStoreValidateAdaptor::traverseRecordStore(RecordStore* recordStore,
             invariant(prevRecordId < record->id);
         }
 
-        // While some storage engines, such as MMAPv1, may use padding, we still require
-        // that they return the unpadded record data.
+        // While some storage engines may use padding, we still require that they return the
+        // unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
             if (results->valid) {
                 // Only log once.
