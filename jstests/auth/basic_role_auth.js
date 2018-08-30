@@ -124,7 +124,7 @@ var testOps = function(db, allowedActions) {
         var res = db.runCommand({"listIndexes": "user"});
 
         if (res.code == errorCodeUnauthorized) {
-            throw Error("unauthorized listIndexes")
+            throw Error("unauthorized listIndexes");
         }
     });
 
