@@ -2730,6 +2730,10 @@ def doConfigure(myenv):
                     not AddToLINKFLAGSIfSupported(myenv, '-flto'):
                 myenv.ConfError("Link time optimization requested, "
                     "but selected compiler does not honor -flto" )
+
+            if myenv.TargetOSIs('darwin'):
+                AddToLINKFLAGSIfSupported(myenv, '-Wl,-object_path_lto,${TARGET}.lto')
+
         else:
             myenv.ConfError("Don't know how to enable --lto on current toolchain")
 
