@@ -127,6 +127,13 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         auto doc = nextInput.releaseDocument();
 
+        // Generate an _id if the uniqueKey includes _id but the document doesn't have one.
+        if (_uniqueKeyIncludesId && doc.getField("_id"_sd).missing()) {
+            MutableDocument mutableDoc(std::move(doc));
+            mutableDoc["_id"_sd] = Value(OID::gen());
+            doc = mutableDoc.freeze();
+        }
+
         // Extract the unique key before converting the document to BSON.
         auto uniqueKey = document_path_support::extractPathsFromDoc(doc, _uniqueKeyFields);
         auto insertObj = doc.toBson();
@@ -220,7 +227,8 @@ DocumentSourceOut::DocumentSourceOut(NamespaceString outputNs,
       _done(false),
       _outputNs(std::move(outputNs)),
       _mode(mode),
-      _uniqueKeyFields(std::move(uniqueKey)) {}
+      _uniqueKeyFields(std::move(uniqueKey)),
+      _uniqueKeyIncludesId(_uniqueKeyFields.count("_id") == 1) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {

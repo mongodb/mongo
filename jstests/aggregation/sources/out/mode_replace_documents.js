@@ -39,20 +39,60 @@
     ]);
     assert.eq([{_id: 0, a: {b: 1}, c: 1}], outColl.find().toArray());
 
-    // TODO SERVER-36100: 'replaceDocuments' mode should allow a missing "_id" unique key.
-    assertErrorCode(coll,
-                    [
-                      {$project: {_id: 0}},
-                      {
-                        $out: {
-                            to: outColl.getName(),
-                            mode: "replaceDocuments",
-                        }
-                      }
-                    ],
-                    50905);
+    // Test that 'replaceDocuments' mode will automatically generate a missing "_id" uniqueKey.
+    coll.drop();
+    outColl.drop();
+    assert.commandWorked(coll.insert({field: "will be removed"}));
+    assert.doesNotThrow(() => coll.aggregate([
+        {$replaceRoot: {newRoot: {}}},
+        {
+          $out: {
+              to: outColl.getName(),
+              mode: "replaceDocuments",
+          }
+        }
+    ]));
+    assert.eq(1, outColl.find({field: {$exists: false}}).itcount());
+
+    // Test that 'replaceDocuments' mode will automatically generate a missing "_id", and the
+    // aggregation succeeds with a multi-field uniqueKey.
+    outColl.drop();
+    assert.commandWorked(outColl.createIndex({name: -1, _id: 1}, {unique: true, sparse: true}));
+    assert.doesNotThrow(() => coll.aggregate([
+        {$replaceRoot: {newRoot: {name: "jungsoo"}}},
+        {
+          $out: {
+              to: outColl.getName(),
+              mode: "replaceDocuments",
+              uniqueKey: {_id: 1, name: 1},
+          }
+        }
+    ]));
+    assert.eq(1, outColl.find().itcount());
+
+    // Test that we will not attempt to modify the _id of an existing document if the _id is
+    // projected away but the uniqueKey does not involve _id.
+    coll.drop();
+    assert.commandWorked(coll.insert({name: "kyle"}));
+    assert.commandWorked(coll.insert({name: "nick"}));
+    outColl.drop();
+    assert.commandWorked(outColl.createIndex({name: 1}, {unique: true}));
+    assert.commandWorked(outColl.insert({_id: "must be unchanged", name: "kyle"}));
+    assert.doesNotThrow(() => coll.aggregate([
+        {$project: {_id: 0}},
+        {$addFields: {newField: 1}},
+        {$out: {to: outColl.getName(), mode: "replaceDocuments", uniqueKey: {name: 1}}}
+    ]));
+    const outResult = outColl.find().sort({name: 1}).toArray();
+    const errmsgFn = () => tojson(outResult);
+    assert.eq(2, outResult.length, errmsgFn);
+    assert.docEq({_id: "must be unchanged", name: "kyle", newField: 1}, outResult[0], errmsgFn);
+    assert.eq("nick", outResult[1].name, errmsgFn);
+    assert.eq(1, outResult[1].newField, errmsgFn);
+    assert.neq(null, outResult[1]._id, errmsgFn);
 
     // Test that 'replaceDocuments' mode with a missing non-id unique key fails.
+    outColl.drop();
     assert.commandWorked(outColl.createIndex({missing: 1}, {unique: true}));
     assertErrorCode(
         coll,
@@ -115,18 +155,21 @@
         // doesn't exist.
         coll.aggregate(pipelineDifferentOutputDb);
         assert.eq(foreignTargetColl.find().itcount(), 1);
-
-        // Insert a new document into the source collection, then test that running the same
-        // aggregation will replace existing documents in the foreign output collection when
-        // applicable.
-        coll.drop();
-        const newDocuments = [{_id: 0, newField: 1}, {_id: 1}];
-        assert.commandWorked(coll.insert(newDocuments));
-        coll.aggregate(pipelineDifferentOutputDb);
-        assert.eq(foreignTargetColl.find().sort({_id: 1}).toArray(), newDocuments);
     } else {
         // Implicit database creation is prohibited in a cluster.
         let error = assert.throws(() => coll.aggregate(pipelineDifferentOutputDb));
         assert.commandFailedWithCode(error, ErrorCodes.NamespaceNotFound);
+
+        // Force a creation of the database and collection, then fall through the test below.
+        assert.commandWorked(foreignTargetColl.insert({_id: 0}));
     }
+
+    // Insert a new document into the source collection, then test that running the same
+    // aggregation will replace existing documents in the foreign output collection when
+    // applicable.
+    coll.drop();
+    const newDocuments = [{_id: 0, newField: 1}, {_id: 1}];
+    assert.commandWorked(coll.insert(newDocuments));
+    coll.aggregate(pipelineDifferentOutputDb);
+    assert.eq(foreignTargetColl.find().sort({_id: 1}).toArray(), newDocuments);
 }());

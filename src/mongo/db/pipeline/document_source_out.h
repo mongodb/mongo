@@ -190,6 +190,10 @@ private:
     // with this key pattern (up to order). Default is "_id" for unsharded collections, and "_id"
     // plus the shard key for sharded collections.
     std::set<FieldPath> _uniqueKeyFields;
+
+    // True if '_uniqueKeyFields' contains the _id. We store this as a separate boolean to avoid
+    // repeated lookups into the set.
+    bool _uniqueKeyIncludesId;
 };
 
 }  // namespace mongo
