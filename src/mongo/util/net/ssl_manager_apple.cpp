@@ -1158,6 +1158,9 @@ StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(const SSL
 Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
                                        const SSLParams& params,
                                        ConnectionDirection direction) {
+    // Options.
+    context->allowInvalidHostnames = _allowInvalidHostnames;
+
     // Protocol Version.
     const auto swProto = parseProtocolRange(params);
     if (!swProto.isOK()) {
@@ -1324,9 +1327,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     auto result = ::kSecTrustResultInvalid;
     uassertOSStatusOK(::SecTrustEvaluate(cftrust.get(), &result), ErrorCodes::SSLHandshakeFailed);
     if ((result != ::kSecTrustResultProceed) && (result != ::kSecTrustResultUnspecified)) {
-        const bool proceed = _allowInvalidCertificates ||
-            (_allowInvalidHostnames && (result == ::kSecTrustResultRecoverableTrustFailure));
-        return badCert(explainTrustFailure(cftrust.get(), result), proceed);
+        return badCert(explainTrustFailure(cftrust.get(), result), _allowInvalidCertificates);
     }
 
     auto cert = ::SecTrustGetCertificateAtIndex(cftrust.get(), 0);
