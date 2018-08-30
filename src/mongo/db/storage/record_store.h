@@ -37,7 +37,6 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
-#include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
 
@@ -48,7 +47,6 @@ struct CompactStats;
 class MAdvise;
 class NamespaceDetails;
 class OperationContext;
-class RecordFetcher;
 
 class RecordStoreCompactAdaptor;
 class RecordStore;
@@ -183,27 +181,6 @@ public:
      * "saved" state, so callers must still call restoreState to use this object.
      */
     virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
-
-    //
-    // RecordFetchers
-    //
-    // Storage engines which do not support document-level locking hold locks at collection or
-    // database granularity. As an optimization, these locks can be yielded when a record needs
-    // to be fetched from secondary storage. If this method returns non-NULL, then it indicates
-    // that the query system layer should yield its locks, following the protocol defined by the
-    // RecordFetcher class, so that a potential page fault is triggered out of the lock.
-    //
-    // Storage engines which support document-level locking need not implement this.
-    //
-    // TODO see if these can be replaced by WriteConflictException.
-    //
-
-    /**
-     * Returns a RecordFetcher if needed for a call to next() or none if unneeded.
-     */
-    virtual std::unique_ptr<RecordFetcher> fetcherForNext() const {
-        return {};
-    }
 };
 
 /**
@@ -237,13 +214,6 @@ public:
      */
     virtual void saveUnpositioned() {
         save();
-    }
-
-    /**
-     * Returns a RecordFetcher if needed to fetch the provided Record or none if unneeded.
-     */
-    virtual std::unique_ptr<RecordFetcher> fetcherForId(const RecordId& id) const {
-        return {};
     }
 };
 

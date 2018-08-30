@@ -52,7 +52,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -471,7 +470,7 @@ PlanExecutor::ExecState PlanExecutor::waitForInserts(CappedInsertNotifierData* n
     ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
     auto opCtx = _opCtx;
     uint64_t currentNotifierVersion = notifierData->notifier->getVersion();
-    auto yieldResult = _yieldPolicy->yieldOrInterrupt(nullptr, [opCtx, notifierData] {
+    auto yieldResult = _yieldPolicy->yieldOrInterrupt([opCtx, notifierData] {
         const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
         notifierData->notifier->waitUntil(notifierData->lastEOFVersion, deadline);
     });
@@ -515,12 +514,6 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
         return PlanExecutor::ADVANCED;
     }
 
-    // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
-    // to use to pull the record into memory. We take ownership of the RecordFetcher here,
-    // deleting it after we've had a chance to do the fetch. For timing-based yields, we
-    // just pass a NULL fetcher.
-    unique_ptr<RecordFetcher> fetcher;
-
     // Incremented on every writeConflict, reset to 0 on any successful call to _root->work.
     size_t writeConflictsInARow = 0;
 
@@ -535,11 +528,11 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
     for (;;) {
         // These are the conditions which can cause us to yield:
         //   1) The yield policy's timer elapsed, or
-        //   2) some stage requested a yield due to a document fetch, or
+        //   2) some stage requested a yield, or
         //   3) we need to yield and retry due to a WriteConflictException.
         // In all cases, the actual yielding happens here.
         if (_yieldPolicy->shouldYieldOrInterrupt()) {
-            auto yieldStatus = _yieldPolicy->yieldOrInterrupt(fetcher.get());
+            auto yieldStatus = _yieldPolicy->yieldOrInterrupt();
             if (!yieldStatus.isOK()) {
                 if (objOut) {
                     *objOut = Snapshotted<BSONObj>(
@@ -548,10 +541,6 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
                 return PlanExecutor::DEAD;
             }
         }
-
-        // We're done using the fetcher, so it should be freed. We don't want to
-        // use the same RecordFetcher twice.
-        fetcher.reset();
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState code = _root->work(&id);
@@ -596,25 +585,20 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
             }
             // This result didn't have the data the caller wanted, try again.
         } else if (PlanStage::NEED_YIELD == code) {
-            if (id == WorkingSet::INVALID_ID) {
-                if (!_yieldPolicy->canAutoYield())
-                    throw WriteConflictException();
-                CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-                writeConflictsInARow++;
-                WriteConflictException::logAndBackoff(
-                    writeConflictsInARow, "plan execution", _nss.ns());
-
-            } else {
-                WorkingSetMember* member = _workingSet->get(id);
-                invariant(member->hasFetcher());
-                // Transfer ownership of the fetcher. Next time around the loop a yield will
-                // happen.
-                fetcher.reset(member->releaseFetcher());
+            invariant(id == WorkingSet::INVALID_ID);
+            if (!_yieldPolicy->canAutoYield()) {
+                throw WriteConflictException();
             }
 
+            CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            writeConflictsInARow++;
+            WriteConflictException::logAndBackoff(
+                writeConflictsInARow, "plan execution", _nss.ns());
+
             // If we're allowed to, we will yield next time through the loop.
-            if (_yieldPolicy->canAutoYield())
+            if (_yieldPolicy->canAutoYield()) {
                 _yieldPolicy->forceYield();
+            }
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
         } else if (PlanStage::IS_EOF == code) {

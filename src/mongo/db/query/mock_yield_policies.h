@@ -49,12 +49,7 @@ public:
         return true;
     }
 
-    Status yieldOrInterrupt(RecordFetcher* recordFetcher) override {
-        return {ErrorCodes::ExceededTimeLimit, "Using AlwaysTimeOutYieldPolicy"};
-    }
-
-    Status yieldOrInterrupt(stdx::function<void()> beforeYieldingFn,
-                            stdx::function<void()> whileYieldingFn) override {
+    Status yieldOrInterrupt(stdx::function<void()> whileYieldingFn) override {
         return {ErrorCodes::ExceededTimeLimit, "Using AlwaysTimeOutYieldPolicy"};
     }
 };
@@ -75,12 +70,7 @@ public:
         return true;
     }
 
-    Status yieldOrInterrupt(RecordFetcher* recordFetcher) override {
-        return {ErrorCodes::QueryPlanKilled, "Using AlwaysPlanKilledYieldPolicy"};
-    }
-
-    Status yieldOrInterrupt(stdx::function<void()> beforeYieldingFn,
-                            stdx::function<void()> whileYieldingFn) override {
+    Status yieldOrInterrupt(stdx::function<void()> whileYieldingFn) override {
         return {ErrorCodes::QueryPlanKilled, "Using AlwaysPlanKilledYieldPolicy"};
     }
 };

@@ -60,9 +60,6 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                              unowned_ptr<SeekableRecordCursor> cursor) {
     WorkingSetMember* member = workingSet->get(id);
 
-    // The RecordFetcher should already have been transferred out of the WSM and used.
-    invariant(!member->hasFetcher());
-
     // We should have a RecordId but need to retrieve the obj. Get the obj now and reset all WSM
     // state appropriately.
     invariant(member->hasRecordId());

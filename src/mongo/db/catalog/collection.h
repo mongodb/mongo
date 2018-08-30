@@ -68,7 +68,6 @@ class MultiIndexBlock;
 class OpDebug;
 class OperationContext;
 class RecordCursor;
-class RecordFetcher;
 class UpdateDriver;
 class UpdateRequest;
 

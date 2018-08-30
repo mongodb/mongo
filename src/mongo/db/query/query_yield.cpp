@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/time_support.h"
 

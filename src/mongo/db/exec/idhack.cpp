@@ -37,7 +37,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/btree_access_method.h"
-#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -58,8 +57,7 @@ IDHackStage::IDHackStage(OperationContext* opCtx,
       _collection(collection),
       _workingSet(ws),
       _key(query->getQueryObj()["_id"].wrap()),
-      _done(false),
-      _idBeingPagedIn(WorkingSet::INVALID_ID) {
+      _done(false) {
     const IndexCatalog* catalog = _collection->getIndexCatalog();
     _specificStats.indexName = descriptor->indexName();
     _accessMethod = catalog->getIndex(descriptor);
@@ -81,8 +79,7 @@ IDHackStage::IDHackStage(OperationContext* opCtx,
       _workingSet(ws),
       _key(key),
       _done(false),
-      _addKeyMetadata(false),
-      _idBeingPagedIn(WorkingSet::INVALID_ID) {
+      _addKeyMetadata(false) {
     const IndexCatalog* catalog = _collection->getIndexCatalog();
     _specificStats.indexName = descriptor->indexName();
     _accessMethod = catalog->getIndex(descriptor);
@@ -91,29 +88,12 @@ IDHackStage::IDHackStage(OperationContext* opCtx,
 IDHackStage::~IDHackStage() {}
 
 bool IDHackStage::isEOF() {
-    if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
-        // We asked the parent for a page-in, but still haven't had a chance to return the
-        // paged in document
-        return false;
-    }
-
     return _done;
 }
 
 PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
     if (_done) {
         return PlanStage::IS_EOF;
-    }
-
-    if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
-        invariant(_recordCursor);
-        WorkingSetID id = _idBeingPagedIn;
-        _idBeingPagedIn = WorkingSet::INVALID_ID;
-
-        invariant(WorkingSetCommon::fetchIfUnfetched(getOpCtx(), _workingSet, id, _recordCursor));
-
-        WorkingSetMember* member = _workingSet->get(id);
-        return advance(id, member, out);
     }
 
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -139,20 +119,9 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
         if (!_recordCursor)
             _recordCursor = _collection->getCursor(getOpCtx());
 
-        // We may need to request a yield while we fetch the document.
-        if (auto fetcher = _recordCursor->fetcherForId(recordId)) {
-            // There's something to fetch. Hand the fetcher off to the WSM, and pass up a
-            // fetch request.
-            _idBeingPagedIn = id;
-            member->setFetcher(fetcher.release());
-            *out = id;
-            return NEED_YIELD;
-        }
-
-        // The doc was already in memory, so we go ahead and return it.
+        // Find the document associated with 'id' in the collection's record store.
         if (!WorkingSetCommon::fetch(getOpCtx(), _workingSet, id, _recordCursor)) {
-            // _id is immutable so the index would return the only record that could
-            // possibly match the query.
+            // We didn't find a document with RecordId 'id'.
             _workingSet->free(id);
             _commonStats.isEOF = true;
             _done = true;

@@ -32,7 +32,6 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -46,10 +45,7 @@ const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 MultiIteratorStage::MultiIteratorStage(OperationContext* opCtx,
                                        WorkingSet* ws,
                                        Collection* collection)
-    : PlanStage(kStageType, opCtx),
-      _collection(collection),
-      _ws(ws),
-      _wsidForFetch(_ws->allocate()) {}
+    : PlanStage(kStageType, opCtx), _collection(collection), _ws(ws) {}
 
 void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {
     _iterators.push_back(std::move(it));
@@ -65,14 +61,6 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
     boost::optional<Record> record;
     try {
         while (!_iterators.empty()) {
-            if (auto fetcher = _iterators.back()->fetcherForNext()) {
-                // Pass the RecordFetcher off up.
-                WorkingSetMember* member = _ws->get(_wsidForFetch);
-                member->setFetcher(fetcher.release());
-                *out = _wsidForFetch;
-                return NEED_YIELD;
-            }
-
             record = _iterators.back()->next();
             if (record)
                 break;

@@ -66,16 +66,6 @@ public:
                       WorkingSetID id,
                       unowned_ptr<SeekableRecordCursor> cursor);
 
-    static bool fetchIfUnfetched(OperationContext* opCtx,
-                                 WorkingSet* workingSet,
-                                 WorkingSetID id,
-                                 unowned_ptr<SeekableRecordCursor> cursor) {
-        WorkingSetMember* member = workingSet->get(id);
-        if (member->hasObj())
-            return true;
-        return fetch(opCtx, workingSet, id, cursor);
-    }
-
     /**
      * Build a BSONObj which represents a Status to return in a WorkingSet.
      */

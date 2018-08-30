@@ -39,7 +39,6 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -63,8 +62,7 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
       _workingSet(workingSet),
       _filter(filter),
       _params(params),
-      _isDead(false),
-      _wsidForFetch(_workingSet->allocate()) {
+      _isDead(false) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
     _specificStats.maxTs = params.maxTs;
@@ -145,16 +143,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         if (_lastSeenId.isNull() && !_params.start.isNull()) {
             record = _cursor->seekExact(_params.start);
         } else {
-            // See if the record we're about to access is in memory. If not, pass a fetch
-            // request up.
-            if (auto fetcher = _cursor->fetcherForNext()) {
-                // Pass the RecordFetcher up.
-                WorkingSetMember* member = _workingSet->get(_wsidForFetch);
-                member->setFetcher(fetcher.release());
-                *out = _wsidForFetch;
-                return PlanStage::NEED_YIELD;
-            }
-
             record = _cursor->next();
         }
     } catch (const WriteConflictException&) {

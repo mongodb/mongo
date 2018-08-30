@@ -85,19 +85,9 @@ void PlanYieldPolicy::resetTimer() {
     _elapsedTracker.resetLastTime();
 }
 
-Status PlanYieldPolicy::yieldOrInterrupt(RecordFetcher* recordFetcher) {
+Status PlanYieldPolicy::yieldOrInterrupt(stdx::function<void()> whileYieldingFn) {
     invariant(_planYielding);
-    if (recordFetcher) {
-        OperationContext* opCtx = _planYielding->getOpCtx();
-        return yieldOrInterrupt([recordFetcher, opCtx] { recordFetcher->setup(opCtx); },
-                                [recordFetcher] { recordFetcher->fetch(); });
-    } else {
-        return yieldOrInterrupt(nullptr, nullptr);
-    }
-}
 
-Status PlanYieldPolicy::yieldOrInterrupt(stdx::function<void()> beforeYieldingFn,
-                                         stdx::function<void()> whileYieldingFn) {
     if (_policy == PlanExecutor::INTERRUPT_ONLY) {
         ON_BLOCK_EXIT([this]() { resetTimer(); });
         OperationContext* opCtx = _planYielding->getOpCtx();
@@ -114,11 +104,10 @@ Status PlanYieldPolicy::yieldOrInterrupt(stdx::function<void()> beforeYieldingFn
         return opCtx->checkForInterruptNoAssert();
     }
 
-    return yield(beforeYieldingFn, whileYieldingFn);
+    return yield(whileYieldingFn);
 }
 
-Status PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
-                              stdx::function<void()> whileYieldingFn) {
+Status PlanYieldPolicy::yield(stdx::function<void()> whileYieldingFn) {
     invariant(_planYielding);
     invariant(canAutoYield());
 
@@ -157,8 +146,6 @@ Status PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
                 opCtx->recoveryUnit()->abandonSnapshot();
             } else {
                 // Release and reacquire locks.
-                if (beforeYieldingFn)
-                    beforeYieldingFn();
                 QueryYield::yieldAllLocks(opCtx, whileYieldingFn, _planYielding->nss());
             }
 

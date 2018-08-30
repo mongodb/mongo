@@ -220,12 +220,6 @@ private:
     // returned by ::work()
     WorkingSetID _statusMemberId;
 
-    // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
-    // to use to pull the record into memory. We take ownership of the RecordFetcher here,
-    // deleting it after we've had a chance to do the fetch. For timing-based yields, we
-    // just pass a NULL fetcher.
-    std::unique_ptr<RecordFetcher> _fetcher;
-
     // Stats
     MultiPlanStats _specificStats;
 };

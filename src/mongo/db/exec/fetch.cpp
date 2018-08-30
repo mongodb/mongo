@@ -35,7 +35,6 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
@@ -66,8 +65,7 @@ FetchStage::~FetchStage() {}
 
 bool FetchStage::isEOF() {
     if (WorkingSet::INVALID_ID != _idRetrying) {
-        // We asked the parent for a page-in, but still haven't had a chance to return the
-        // paged in document
+        // We have a working set member that we need to retry.
         return false;
     }
 
@@ -105,17 +103,6 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
                 if (!_cursor)
                     _cursor = _collection->getCursor(getOpCtx());
 
-                if (auto fetcher = _cursor->fetcherForId(member->recordId)) {
-                    // There's something to fetch. Hand the fetcher off to the WSM, and pass up
-                    // a fetch request.
-                    _idRetrying = id;
-                    member->setFetcher(fetcher.release());
-                    *out = id;
-                    return NEED_YIELD;
-                }
-
-                // The doc is already in memory, so go ahead and grab it. Now we have a RecordId
-                // as well as an unowned object
                 if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, _cursor)) {
                     _ws->free(id);
                     return NEED_TIME;

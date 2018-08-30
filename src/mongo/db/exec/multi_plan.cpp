@@ -45,7 +45,6 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -148,11 +147,11 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
 Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     // These are the conditions which can cause us to yield:
     //   1) The yield policy's timer elapsed, or
-    //   2) some stage requested a yield due to a document fetch, or
+    //   2) some stage requested a yield, or
     //   3) we need to yield and retry due to a WriteConflictException.
     // In all cases, the actual yielding happens here.
     if (yieldPolicy->shouldYieldOrInterrupt()) {
-        auto yieldStatus = yieldPolicy->yieldOrInterrupt(_fetcher.get());
+        auto yieldStatus = yieldPolicy->yieldOrInterrupt();
 
         if (!yieldStatus.isOK()) {
             _failure = true;
@@ -161,10 +160,6 @@ Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
             return yieldStatus;
         }
     }
-
-    // We're done using the fetcher, so it should be freed. We don't want to
-    // use the same RecordFetcher twice.
-    _fetcher.reset();
 
     return Status::OK();
 }
@@ -371,14 +366,9 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // Assumes that the ranking will pick this plan.
             doneWorking = true;
         } else if (PlanStage::NEED_YIELD == state) {
-            if (id == WorkingSet::INVALID_ID) {
-                if (!yieldPolicy->canAutoYield())
-                    throw WriteConflictException();
-            } else {
-                WorkingSetMember* member = candidate.ws->get(id);
-                invariant(member->hasFetcher());
-                // Transfer ownership of the fetcher and yield.
-                _fetcher.reset(member->releaseFetcher());
+            invariant(id == WorkingSet::INVALID_ID);
+            if (!yieldPolicy->canAutoYield()) {
+                throw WriteConflictException();
             }
 
             if (yieldPolicy->canAutoYield()) {

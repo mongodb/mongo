@@ -34,7 +34,6 @@
 namespace mongo {
 
 class OperationContext;
-class RecordFetcher;
 
 /**
  * See the documentation for yieldAllLocks(...).

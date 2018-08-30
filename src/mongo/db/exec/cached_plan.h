@@ -38,7 +38,6 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
 
@@ -135,12 +134,6 @@ private:
 
     // Any results produced during trial period execution are kept here.
     std::queue<WorkingSetID> _results;
-
-    // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
-    // to use to pull the record into memory. We take ownership of the RecordFetcher here,
-    // deleting it after we've had a chance to do the fetch. For timing-based yields, we
-    // just pass a NULL fetcher.
-    std::unique_ptr<RecordFetcher> _fetcher;
 
     // Stats
     CachedPlanStats _specificStats;

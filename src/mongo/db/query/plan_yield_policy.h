@@ -36,7 +36,6 @@
 namespace mongo {
 
 class ClockSource;
-class RecordFetcher;
 
 class PlanYieldPolicy {
 public:
@@ -69,23 +68,14 @@ public:
      * plans). The PlanExecutor must *not* be in saved state. Handles calls to save/restore state
      * internally.
      *
-     * If 'fetcher' is non-NULL, then we are yielding because the storage engine told us
-     * that we will page fault on this record. We use 'fetcher' to retrieve the record
-     * after we give up our locks.
-     *
      * Returns Status::OK() if the executor was restored successfully and is still alive. Returns
      * ErrorCodes::QueryPlanKilled if the executor got killed during yield, and
      * ErrorCodes::ExceededTimeLimit if the operation has exceeded the time limit.
+     *
+     * Calls 'whileYieldingFn' after relinquishing locks and before reacquiring the locks that have
+     * been relinquished.
      */
-    virtual Status yieldOrInterrupt(RecordFetcher* fetcher = nullptr);
-
-    /**
-     * More generic version of yieldOrInterrupt() above.  This version calls 'beforeYieldingFn'
-     * immediately before locks are yielded (if they are), and 'whileYieldingFn' before locks are
-     * restored.
-     */
-    virtual Status yieldOrInterrupt(stdx::function<void()> beforeYieldingFn,
-                                    stdx::function<void()> whileYieldingFn);
+    virtual Status yieldOrInterrupt(stdx::function<void()> whileYieldingFn = nullptr);
 
     /**
      * All calls to shouldYieldOrInterrupt() will return true until the next call to
@@ -157,7 +147,7 @@ private:
     bool shouldYield();
 
     // Releases locks or storage engine state.
-    Status yield(stdx::function<void()> beforeYieldingFn, stdx::function<void()> whileYieldingFn);
+    Status yield(stdx::function<void()> whileYieldingFn);
 };
 
 }  // namespace mongo

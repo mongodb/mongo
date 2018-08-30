@@ -39,7 +39,6 @@
 namespace mongo {
 
 class IndexAccessMethod;
-class RecordFetcher;
 class WorkingSetMember;
 
 typedef size_t WorkingSetID;
@@ -279,15 +278,6 @@ public:
     const WorkingSetComputedData* getComputed(const WorkingSetComputedDataType type) const;
     void addComputed(WorkingSetComputedData* data);
 
-    //
-    // Fetching
-    //
-
-    void setFetcher(RecordFetcher* fetcher);
-    // Transfers ownership to the caller.
-    RecordFetcher* releaseFetcher();
-    bool hasFetcher() const;
-
     /**
      * getFieldDotted uses its state (obj or index data) to produce the field with the provided
      * name.
@@ -310,8 +300,6 @@ private:
     MemberState _state = WorkingSetMember::INVALID;
 
     std::unique_ptr<WorkingSetComputedData> _computed[WSM_COMPUTED_NUM_TYPES];
-
-    std::unique_ptr<RecordFetcher> _fetcher;
 };
 
 }  // namespace mongo

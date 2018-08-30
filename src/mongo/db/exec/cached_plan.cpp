@@ -114,15 +114,9 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             updatePlanCache();
             return Status::OK();
         } else if (PlanStage::NEED_YIELD == state) {
-            if (id == WorkingSet::INVALID_ID) {
-                if (!yieldPolicy->canAutoYield()) {
-                    throw WriteConflictException();
-                }
-            } else {
-                WorkingSetMember* member = _ws->get(id);
-                invariant(member->hasFetcher());
-                // Transfer ownership of the fetcher and yield.
-                _fetcher.reset(member->releaseFetcher());
+            invariant(id == WorkingSet::INVALID_ID);
+            if (!yieldPolicy->canAutoYield()) {
+                throw WriteConflictException();
             }
 
             if (yieldPolicy->canAutoYield()) {
@@ -177,17 +171,13 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     // These are the conditions which can cause us to yield:
     //   1) The yield policy's timer elapsed, or
-    //   2) some stage requested a yield due to a document fetch, or
+    //   2) some stage requested a yield, or
     //   3) we need to yield and retry due to a WriteConflictException.
     // In all cases, the actual yielding happens here.
     if (yieldPolicy->shouldYieldOrInterrupt()) {
         // Here's where we yield.
-        return yieldPolicy->yieldOrInterrupt(_fetcher.get());
+        return yieldPolicy->yieldOrInterrupt();
     }
-
-    // We're done using the fetcher, so it should be freed. We don't want to
-    // use the same RecordFetcher twice.
-    _fetcher.reset();
 
     return Status::OK();
 }

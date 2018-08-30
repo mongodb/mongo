@@ -31,7 +31,6 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
 
@@ -175,18 +174,6 @@ const WorkingSetComputedData* WorkingSetMember::getComputed(
 void WorkingSetMember::addComputed(WorkingSetComputedData* data) {
     verify(!hasComputed(data->type()));
     _computed[data->type()].reset(data);
-}
-
-void WorkingSetMember::setFetcher(RecordFetcher* fetcher) {
-    _fetcher.reset(fetcher);
-}
-
-RecordFetcher* WorkingSetMember::releaseFetcher() {
-    return _fetcher.release();
-}
-
-bool WorkingSetMember::hasFetcher() const {
-    return NULL != _fetcher.get();
 }
 
 bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) const {
