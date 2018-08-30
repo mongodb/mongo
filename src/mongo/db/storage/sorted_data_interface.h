@@ -52,21 +52,9 @@ struct ValidateResults;
 enum SpecialFormatInserted { NoSpecialFormatInserted = 0, LongTypeBitsInserted = 1 };
 
 /**
- * This interface is a work in progress.  Notes below:
- *
- * This interface began as the SortedDataInterface, a way to hide the fact that there were two
- * on-disk formats for the btree.  With the introduction of other storage engines, this
- * interface was generalized to provide access to sorted data.  Specifically:
- *
- * 1. Many other storage engines provide different Btree(-ish) implementations.  This interface
- * could allow those interfaces to avoid storing btree buckets in an already sorted structure.
- *
- * TODO: See if there is actually a performance gain.
- *
- * 2. The existing btree implementation is written to assume that if it modifies a record it is
- * modifying the underlying record.  This interface is an attempt to work around that.
- *
- * TODO: See if this actually works.
+ * This is the uniform interface for storing indexes and supporting point queries as well as range
+ * queries. The actual implementation is up to the storage engine. All the storage engines must
+ * support an index key size up to the maximum document size.
  */
 class SortedDataInterface {
 public:
