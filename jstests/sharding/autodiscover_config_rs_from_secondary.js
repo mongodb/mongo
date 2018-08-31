@@ -6,7 +6,8 @@ load('jstests/libs/feature_compatibility_version.js');
 (function() {
     'use strict';
 
-    var rst = new ReplSetTest({name: "configRS", nodes: 3, nodeOptions: {configsvr: ""}});
+    var rst = new ReplSetTest(
+        {name: "configRS", nodes: 3, nodeOptions: {configsvr: "", storageEngine: "wiredTiger"}});
     rst.startSet();
     var conf = rst.getReplSetConfig();
     conf.members[1].priority = 0;
