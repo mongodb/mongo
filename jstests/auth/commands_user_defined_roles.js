@@ -41,7 +41,7 @@ function testProperAuthorization(conn, t, testcase, privileges) {
 
     var command = t.command;
     if (typeof(command) === "function") {
-        command = t.command(state);
+        command = t.command(state, testcase.commandArgs);
     }
     var res = runOnDb.runCommand(command);
 
@@ -79,7 +79,7 @@ function testInsufficientPrivileges(conn, t, testcase, privileges) {
 
     var command = t.command;
     if (typeof(command) === "function") {
-        command = t.command(state);
+        command = t.command(state, testcase.commandArgs);
     }
     var res = runOnDb.runCommand(command);
 

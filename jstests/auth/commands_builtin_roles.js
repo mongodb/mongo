@@ -59,7 +59,7 @@ function testProperAuthorization(conn, t, testcase, r) {
     authCommandsLib.authenticatedSetup(t, runOnDb);
     var command = t.command;
     if (typeof(command) === "function") {
-        command = t.command(state);
+        command = t.command(state, testcase.commandArgs);
     }
     var res = runOnDb.runCommand(command);
 

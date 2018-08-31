@@ -55,7 +55,7 @@
     }());
 
     function assertDocValidationFailure(cmdOptions) {
-        targetColl.remove({});
+        assert.commandWorked(targetColl.remove({}));
         assertErrorCode(sourceColl,
                         [{$out: targetColl.getName()}],
                         ErrorCodes.DocumentValidationFailure,
@@ -119,7 +119,7 @@
 
     // Test that the bypassDocumentValidation is casted to true if the value is non-boolean.
     (function testNonBooleanBypassDocValidationFlag() {
-        targetColl.remove({});
+        assert.commandWorked(targetColl.remove({}));
         assert.commandWorked(testDB.runCommand({collMod: targetColl.getName(), validator: {a: 1}}));
         sourceColl.drop();
         assert.commandWorked(sourceColl.insert({_id: 0, a: 1}));
@@ -131,5 +131,65 @@
             [{$addFields: {a: 3}}, {$out: {to: targetColl.getName(), mode: "replaceDocuments"}}],
             {bypassDocumentValidation: "false"});
         assert.eq([{_id: 0, a: 3}], targetColl.find().toArray());
+    }());
+
+    // Test bypassDocumentValidation with $out to a collection in a foreign database.
+    (function testForeignDb() {
+        const foreignDB = db.getSiblingDB("foreign_db");
+        const foreignColl = foreignDB.foreign_coll;
+        foreignColl.drop();
+        assert.commandWorked(
+            foreignDB.createCollection(foreignColl.getName(), {validator: {a: 2}}));
+
+        sourceColl.aggregate(
+            [
+              {$addFields: {a: 3}},
+              {
+                $out: {
+                    db: foreignDB.getName(),
+                    to: foreignColl.getName(),
+                    mode: "replaceDocuments"
+                }
+              }
+            ],
+            {bypassDocumentValidation: true});
+        assert.eq([{_id: 0, a: 3}], foreignColl.find().toArray());
+
+        sourceColl.aggregate(
+            [
+              {$replaceRoot: {newRoot: {_id: 1, a: 4}}},
+              {
+                $out:
+                    {db: foreignDB.getName(), to: foreignColl.getName(), mode: "insertDocuments"}
+              }
+            ],
+            {bypassDocumentValidation: true});
+        assert.eq([{_id: 0, a: 3}, {_id: 1, a: 4}], foreignColl.find().sort({_id: 1}).toArray());
+
+        assert.commandWorked(foreignColl.remove({}));
+        assertErrorCode(sourceColl,
+                        [
+                          {$addFields: {a: 3}},
+                          {
+                            $out: {
+                                db: foreignDB.getName(),
+                                to: foreignColl.getName(),
+                                mode: "replaceDocuments"
+                            }
+                          }
+                        ],
+                        ErrorCodes.DocumentValidationFailure);
+
+        assertErrorCode(
+            sourceColl,
+            [
+              {$replaceRoot: {newRoot: {_id: 1, a: 4}}},
+              {
+                $out:
+                    {db: foreignDB.getName(), to: foreignColl.getName(), mode: "insertDocuments"}
+              }
+            ],
+            ErrorCodes.DocumentValidationFailure);
+        assert.eq(0, foreignColl.find().itcount());
     }());
 }());
