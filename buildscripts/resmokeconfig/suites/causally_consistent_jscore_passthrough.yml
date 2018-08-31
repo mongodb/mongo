@@ -145,15 +145,6 @@ selector:
   - jstests/core/drop3.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
-  ##
-  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
-  # override when it refuses to replace the readPreference of a particular command. Above each tag
-  # are the message(s) that cause the tag to be warranted.
-  ##
-  # "Cowardly refusing to override read preference of command: ..."
-  # "Cowardly refusing to run test with overridden read preference when it reads from a
-  #  non-replicated collection: ..."
-  - assumes_read_preference_unchanged
   - requires_collstats
 
 executor:
