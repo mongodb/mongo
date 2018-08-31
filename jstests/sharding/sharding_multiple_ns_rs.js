@@ -39,11 +39,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     s.rs0.awaitReplication();
     s.rs0.stopMaster(15);
 
-    // Wait for the primary to come back online...
-    var primary = s.rs0.getPrimary();
-
-    // Wait for the mongos to recognize the new primary...
-    awaitRSClientHosts(db.getMongo(), primary, {ismaster: true});
+    // Wait for mongos and the config server primary to recognize the new shard primary
+    awaitRSClientHosts(db.getMongo(), s.rs0.getPrimary(), {ismaster: true});
+    awaitRSClientHosts(db.getMongo(), s.configRS.getPrimary(), {ismaster: true});
 
     assert.eq(5, db.foo.findOne({_id: 5}).x);
     assert.eq(5, db.bar.findOne({_id: 5}).x);
