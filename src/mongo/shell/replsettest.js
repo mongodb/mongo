@@ -728,6 +728,29 @@ var ReplSetTest = function(opts) {
         return this.getSecondaries(timeout)[0];
     };
 
+    this.getArbiters = function() {
+        var arbiters = [];
+        for (var i = 0; i < this.nodes.length; i++) {
+            var node = this.nodes[i];
+
+            let isArbiter = false;
+
+            assert.retryNoExcept(() => {
+                isArbiter = node.getDB('admin').isMaster('admin').arbiterOnly;
+                return true;
+            }, `Could not call 'isMaster' on ${node}.`, 3, 1000);
+
+            if (isArbiter) {
+                arbiters.push(node);
+            }
+        }
+        return arbiters;
+    };
+
+    this.getArbiter = function() {
+        return this.getArbiters()[0];
+    };
+
     this.status = function(timeout) {
         var master = _callIsMaster();
         if (!master) {
@@ -1992,6 +2015,13 @@ var ReplSetTest = function(opts) {
         _forgetReplSet(this.name);
 
         print('ReplSetTest stopSet *** Shut down repl set - test worked ****');
+    };
+
+    /**
+     * Returns whether or not this ReplSetTest uses mongobridge.
+     */
+    this.usesBridge = function() {
+        return _useBridge;
     };
 
     /**

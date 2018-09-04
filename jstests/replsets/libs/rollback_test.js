@@ -1,6 +1,6 @@
 /**
  * Wrapper around ReplSetTest for testing rollback behavior. It allows the caller to easily
- * transition between stages of a rollback without having to configure the replset explicitly.
+ * transition between stages of a rollback without having to manually operate on the replset.
  *
  * This library exposes the following 5 sequential stages of rollback:
  * 1. RollbackTest starts in kSteadyStateOps: the replica set is in steady state replication.
@@ -14,9 +14,25 @@
  * Please refer to the various `transition*` functions for more information on the behavior
  * of each stage.
  */
+
+"use strict";
+
 load("jstests/replsets/rslib.js");
 
-function RollbackTest(name = "RollbackTest") {
+/**
+ * This fixture allows the user to optionally pass in a custom ReplSetTest
+ * to be used for the test. The underlying replica set must meet the following
+ * requirements:
+ *      1. It must have exactly three nodes: a primary, a secondary and an arbiter.
+ *      2. It must be running with mongobridge.
+ *
+ * If the caller does not provide their own replica set, a standard three-node
+ * replset will be initialized instead, with all nodes running the latest version.
+ *
+ * @param {string} [optional] name the name of the test being run
+ * @param {Object} [optional] replSet the ReplSetTest instance to adopt
+ */
+function RollbackTest(name = "RollbackTest", replSet) {
     const State = {
         kStopped: "kStopped",
         kRollbackOps: "kRollbackOps",
@@ -37,8 +53,7 @@ function RollbackTest(name = "RollbackTest") {
         [State.kSteadyStateOps]: [State.kStopped, State.kRollbackOps],
     };
 
-    const rst = new ReplSetTest({name, nodes: 3, useBridge: true});
-
+    let rst;
     let curPrimary;
     let curSecondary;
     let arbiter;
@@ -46,13 +61,48 @@ function RollbackTest(name = "RollbackTest") {
     let curState = State.kSteadyStateOps;
     let lastRBID;
 
-    // Do more complicated instantiation in this init() function. This reduces the amount of code
-    // run at the class level (i.e. outside of any functions) and improves readability.
-    (function init() {
-        rst.startSet();
+    // Make sure we have a replica set up and running.
+    replSet = (replSet === undefined) ? performStandardSetup() : replSet;
+    validateAndUseSetup(replSet);
 
-        const nodes = rst.nodeList();
-        rst.initiate({
+    /**
+     * Validate and use the provided replica set.
+     *
+     * @param {Object} replSet the ReplSetTest instance to adopt
+     */
+    function validateAndUseSetup(replSet) {
+        assert.eq(true,
+                  replSet instanceof ReplSetTest,
+                  `Must provide an instance of ReplSetTest. Have: ${tojson(replSet)}`);
+
+        assert.eq(true, replSet.usesBridge(), "Must set up ReplSetTest with mongobridge enabled.");
+        assert.eq(3, replSet.nodes.length, "Replica set must contain exactly three nodes.");
+
+        // Make sure we have a primary.
+        curPrimary = replSet.getPrimary();
+
+        // Extract the other two nodes and wait for them to be ready.
+        let secondaries = replSet.getSecondaries();
+        arbiter = replSet.getArbiter();
+        curSecondary = (secondaries[0] === arbiter) ? secondaries[1] : secondaries[0];
+
+        waitForState(curSecondary, ReplSetTest.State.SECONDARY);
+        waitForState(arbiter, ReplSetTest.State.ARBITER);
+
+        rst = replSet;
+        lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
+    }
+
+    /**
+     * Return an instance of ReplSetTest initialized with a standard
+     * three-node replica set running with the latest version.
+     */
+    function performStandardSetup() {
+        let replSet = new ReplSetTest({name, nodes: 3, useBridge: true});
+        replSet.startSet();
+
+        const nodes = replSet.nodeList();
+        replSet.initiate({
             _id: name,
             members: [
                 {_id: 0, host: nodes[0]},
@@ -60,19 +110,8 @@ function RollbackTest(name = "RollbackTest") {
                 {_id: 2, host: nodes[2], arbiterOnly: true}
             ]
         });
-
-        // The primary is always the first node after calling ReplSetTest.initiate();
-        curPrimary = rst.nodes[0];
-        curSecondary = rst.nodes[1];
-        arbiter = rst.nodes[2];
-
-        // Wait for the primary to be ready.
-        const actualPrimary = rst.getPrimary();
-
-        assert.eq(actualPrimary, curPrimary, "ReplSetTest.node[0] is not the primary");
-
-        lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
-    })();
+        return replSet;
+    }
 
     function checkDataConsistency() {
         assert.eq(curState,
