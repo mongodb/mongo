@@ -32,6 +32,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/transaction/transaction_router.h"
 
 namespace mongo {
 namespace {
@@ -69,14 +70,14 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto response = scatterGatherUnversionedTargetAllShards(
-            opCtx,
-            dbName,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-            {},
-            Shard::RetryPolicy::kNoRetry);
-        std::string errMsg;
-        return appendRawResponses(opCtx, &errMsg, &result, response);
+        auto txnRouter = TransactionRouter::get(opCtx);
+        uassert(ErrorCodes::InvalidOptions,
+                "commitTransaction can only be run within a context of a session",
+                txnRouter != nullptr);
+
+        auto cmdResponse = txnRouter->commitTransaction(opCtx);
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        return true;
     }
 } clusterCommitTransactionCmd;
 

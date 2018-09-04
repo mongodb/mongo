@@ -32,9 +32,13 @@
 
 #include "mongo/s/transaction/transaction_router.h"
 
+#include "mongo/client/read_preference.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/transaction/at_cluster_time_util.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -179,7 +183,7 @@ TransactionRouter::Participant::State TransactionRouter::Participant::getState()
     return _state;
 }
 
-bool TransactionRouter::Participant::isCoordinator() {
+bool TransactionRouter::Participant::isCoordinator() const {
     return _isCoordinator;
 }
 
@@ -348,6 +352,79 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     _participants.clear();
     _coordinatorId.reset();
     _atClusterTime.reset();
+}
+
+
+Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    auto citer = _participants.cbegin();
+    ShardId shardId(citer->first);
+    auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+
+    CommitTransaction commitCmd;
+    commitCmd.setDbName("admin");
+    return uassertStatusOK(
+        shard->runCommandWithFixedRetryAttempts(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                "admin",
+                                                commitCmd.toBSON(opCtx->getWriteConcern().toBSON()),
+                                                Shard::RetryPolicy::kIdempotent));
+}
+
+Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx) {
+    invariant(_coordinatorId);
+
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    PrepareTransaction prepareCmd;
+    prepareCmd.setDbName("admin");
+    prepareCmd.setCoordinatorId(*_coordinatorId);
+
+    auto prepareCmdObj = prepareCmd.toBSON(
+        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+
+    std::vector<CommitParticipant> participantList;
+    for (const auto& participantEntry : _participants) {
+        ShardId shardId(participantEntry.first);
+
+        CommitParticipant participant;
+        participant.setShardId(shardId);
+        participantList.push_back(std::move(participant));
+
+        if (participantEntry.second.isCoordinator()) {
+            // coordinateCommit is sent to participant that is also a coordinator.
+            invariant(shardId == *_coordinatorId);
+            continue;
+        }
+
+        auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+        shard->runFireAndForgetCommand(
+            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, "admin", prepareCmdObj);
+    }
+
+    auto coordinatorShard = uassertStatusOK(shardRegistry->getShard(opCtx, *_coordinatorId));
+
+    CoordinateCommitTransaction coordinateCommitCmd;
+    coordinateCommitCmd.setDbName("admin");
+    coordinateCommitCmd.setParticipants(participantList);
+
+    return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        coordinateCommitCmd.toBSON(opCtx->getWriteConcern().toBSON()),
+        Shard::RetryPolicy::kIdempotent));
+}
+
+Shard::CommandResponse TransactionRouter::commitTransaction(OperationContext* opCtx) {
+    uassert(50940, "cannot commit with no participants", !_participants.empty());
+
+    if (_participants.size() == 1) {
+        return _commitSingleShardTransaction(opCtx);
+    }
+
+    return _commitMultiShardTransaction(opCtx);
 }
 
 ScopedRouterSession::ScopedRouterSession(OperationContext* opCtx) : _opCtx(opCtx) {

@@ -381,7 +381,14 @@ void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
                                           const ReadPreferenceSetting& readPref,
                                           const std::string& dbName,
                                           const BSONObj& cmdObj) {
-    _scheduleCommand(opCtx, readPref, dbName, Milliseconds::max(), cmdObj, {}).getStatus().ignore();
+    _scheduleCommand(opCtx,
+                     readPref,
+                     dbName,
+                     Milliseconds::max(),
+                     cmdObj,
+                     [](const RemoteCommandCallbackArgs&) {})
+        .getStatus()
+        .ignore();
 }
 
 StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(

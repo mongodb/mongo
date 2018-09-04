@@ -31,9 +31,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/transaction_coordinator_commands_impl.h"
 #include "mongo/db/transaction_participant.h"
 

@@ -277,13 +277,10 @@
     // Runs against a sharded and unsharded collection.
     runScenario(shardingScenarios.singleShard, {useCausalConsistency: false});
 
-    runScenario(shardingScenarios.multiShardAllShardReads, {useCausalConsistency: false});
-
-    // Some-shard reads won't work until ClusterCommitTransaction sends commitTransaction only to
-    // shards in the participant list. Currently, ClusterCommitTransaction sends commitTransaction
-    // to all shards in a cluster, which will cause errors on non-participant shards.
+    // TODO: SERVER-36304
+    // Some-shard reads won't work until the end-to-end 2 phase commit works in mongos.
     //
-    // TODO: SERVER-36515 OR SERVER-36122
+    // runScenario(shardingScenarios.multiShardAllShardReads, {useCausalConsistency: false});
     //
     // runScenario(shardingScenarios.multiShardSomeShardReads, {useCausalConsistency: false,
     // collName: shardedCollName});

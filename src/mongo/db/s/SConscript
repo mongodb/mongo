@@ -270,7 +270,6 @@ env.Library(
         'split_vector_command.cpp',
         'unset_sharding_command.cpp',
         'wait_for_ongoing_chunk_splits_command.cpp',
-        env.Idlc("txn_two_phase_commit_cmds.idl")[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
@@ -278,6 +277,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',

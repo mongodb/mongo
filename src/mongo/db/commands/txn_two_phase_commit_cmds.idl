@@ -33,7 +33,7 @@ commands:
         strict: true
         namespace: ignored
         fields:
-            coordinator:
+            coordinatorId:
                 description: "The coordinator shard for this transaction."
                 type: shard_id
 
