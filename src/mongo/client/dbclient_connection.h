@@ -48,6 +48,7 @@
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
@@ -63,9 +64,13 @@ class DBClientCursor;
 class DBClientCursorBatchIterator;
 
 /**
-    A basic connection to the database.
-    This is the main entry point for talking to a simple Mongo setup
-*/
+ *  A basic connection to the database.
+ *  This is the main entry point for talking to a simple Mongo setup
+ *
+ *  In general, this type is only allowed to be used from one thread at a time. As a special
+ *  exception, it is legal to call shutdownAndDisallowReconnect() from any thread as a way to
+ *  interrupt the owning thread.
+ */
 class DBClientConnection : public DBClientBase {
 public:
     using DBClientBase::query;
@@ -177,14 +182,20 @@ public:
                a connection will transition back to an ok state after reconnecting.
      */
     bool isFailed() const override {
-        return _failed;
+        return _failed.load();
     }
 
     bool isStillConnected() override;
 
     void setTags(transport::Session::TagMask tag);
 
-    void shutdown();
+    /**
+     * Causes an error to be reported the next time the connection is used. Will interrupt
+     * operations if they are currently blocked waiting for the network.
+     *
+     * This is the only method that is allowed to be called from other threads.
+     */
+    void shutdownAndDisallowReconnect();
 
     void setWireVersions(int minWireVersion, int maxWireVersion) {
         _minWireVersion = minWireVersion;
@@ -204,7 +215,7 @@ public:
         ss << _serverAddress;
         if (!_resolvedAddress.empty())
             ss << " (" << _resolvedAddress << ")";
-        if (_failed)
+        if (_failed.load())
             ss << " failed";
         return ss.str();
     }
@@ -256,7 +267,7 @@ public:
 
     // throws a NetworkException if in failed state and not reconnecting or if waiting to reconnect
     void checkConnection() override {
-        if (_failed)
+        if (_failed.load())
             _checkConnection();
     }
 
@@ -276,13 +287,19 @@ protected:
 
     void _auth(const BSONObj& params) override;
 
+    // The session mutex must be held to shutdown the _session from a non-owning thread, or to
+    // rebind the handle from the owning thread. The thread that owns this DBClientConnection is
+    // allowed to use the _session without locking the mutex. This mutex also guards writes to
+    // _stayFailed, although reads are allowed outside the mutex.
+    stdx::mutex _sessionMutex;
     transport::SessionHandle _session;
     boost::optional<Milliseconds> _socketTimeout;
     transport::Session::TagMask _tagMask = transport::Session::kEmptyTagMask;
     uint64_t _sessionCreationMicros = INVALID_SOCK_CREATION_TIME;
     Date_t _lastConnectivityCheck;
 
-    bool _failed = false;
+    AtomicBool _stayFailed{false};
+    AtomicBool _failed{false};
     const bool autoReconnect;
     Backoff autoReconnectBackoff;
 

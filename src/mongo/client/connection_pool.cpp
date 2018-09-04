@@ -92,20 +92,20 @@ void ConnectionPool::_cleanUpOlderThan_inlock(Date_t now, ConnectionList* hostCo
     }
 }
 
-bool ConnectionPool::_shouldKeepConnection(Date_t now, const ConnectionInfo& connInfo) const {
+bool ConnectionPool::_shouldKeepConnection(Date_t now, const ConnectionInfo& connInfo) {
     const Date_t expirationDate = connInfo.creationDate + kMaxConnectionAge;
     if (expirationDate <= now) {
         return false;
     }
 
-    return true;
+    return !connInfo.conn->isFailed();
 }
 
 void ConnectionPool::closeAllInUseConnections() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     for (ConnectionList::iterator iter = _inUseConnections.begin(); iter != _inUseConnections.end();
          ++iter) {
-        iter->conn->shutdown();
+        iter->conn->shutdownAndDisallowReconnect();
     }
 }
 

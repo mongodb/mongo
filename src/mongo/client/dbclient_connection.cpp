@@ -273,6 +273,13 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     _serverAddress = serverAddress;
     _markFailed(kReleaseSession);
 
+
+    if (_stayFailed.load()) {
+        // This is just an optimization so we don't waste time connecting just to throw it away.
+        // The check below is the one that is important for correctness.
+        return makeSocketError(SocketErrorKind::FAILED_STATE, toString());
+    }
+
     if (serverAddress.host().empty()) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "couldn't connect to server " << _serverAddress.toString()
@@ -311,12 +318,20 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
                                     << sws.getStatus());
     }
 
-    _session = std::move(sws.getValue());
+    {
+        stdx::lock_guard<stdx::mutex> lk(_sessionMutex);
+        if (_stayFailed.load()) {
+            // This object is still in a failed state. The session we just created will be destroyed
+            // immediately since we aren't holding on to it.
+            return makeSocketError(SocketErrorKind::FAILED_STATE, toString());
+        }
+        _session = std::move(sws.getValue());
+        _failed.store(false);
+    }
     _sessionCreationMicros = curTimeMicros64();
     _lastConnectivityCheck = Date_t::now();
     _session->setTimeout(_socketTimeout);
     _session->setTags(_tagMask);
-    _failed = false;
     LOG(1) << "connected to server " << toString();
     return Status::OK();
 }
@@ -365,12 +380,15 @@ rpc::UniqueReply DBClientConnection::parseCommandReplyMessage(const std::string&
 }
 
 void DBClientConnection::_markFailed(FailAction action) {
-    _failed = true;
+    _failed.store(true);
     if (_session) {
         if (action == kEndSession) {
             _session->end();
         } else if (action == kReleaseSession) {
-            _session.reset();
+            transport::SessionHandle destroyedOutsideMutex;
+
+            stdx::lock_guard<stdx::mutex> lk(_sessionMutex);
+            _session.swap(destroyedOutsideMutex);
         }
     }
 }
@@ -379,13 +397,19 @@ bool DBClientConnection::isStillConnected() {
     // This method tries to figure out whether the connection is still open, but with several
     // caveats.
 
-    // If we don't have a _session then we may have hit an error, or we may just not have
-    // connected yet - the _failed flag should indicate which.
-    //
-    // Otherwise, return false if we know we've had an error (_failed is true)
-    if (!_session) {
-        return !_failed;
-    } else if (_failed) {
+    // If we don't have a _session then we are definitely not connected. If we've been marked failed
+    // then we are supposed to pretend that we aren't connected, even though we may be.
+    // HOWEVER, some unit tests have poorly designed mocks that never populate _session, even when
+    // the DBClientConnection should be considered healthy and connected.
+
+    if (_stayFailed.load()) {
+        // Ensures there is no chance that a perma-failed connection can go back into a pool.
+        return false;
+    } else if (!_session) {
+        // This should always return false in practice, but needs to do this to work around poorly
+        // designed mocks as described above.
+        return !_failed.load();
+    } else if (_failed.load()) {
         return false;
     }
 
@@ -400,7 +424,11 @@ bool DBClientConnection::isStillConnected() {
 
     // This will poll() the underlying socket and do a 1 byte recv to see if the connection
     // has been closed.
-    return _session->isConnected();
+    if (_session->isConnected())
+        return true;
+
+    _markFailed(kSetFlag);
+    return false;
 }
 
 void DBClientConnection::setTags(transport::Session::TagMask tags) {
@@ -410,13 +438,14 @@ void DBClientConnection::setTags(transport::Session::TagMask tags) {
     _session->setTags(tags);
 }
 
-void DBClientConnection::shutdown() {
+void DBClientConnection::shutdownAndDisallowReconnect() {
+    stdx::lock_guard<stdx::mutex> lk(_sessionMutex);
+    _stayFailed.store(true);
     _markFailed(kEndSession);
 }
 
 void DBClientConnection::_checkConnection() {
-    if (!_failed)
-        return;
+    dassert(_failed.load());  // only called when in failed state.
 
     if (!autoReconnect)
         throwSocketError(SocketErrorKind::FAILED_STATE, toString());
@@ -426,7 +455,6 @@ void DBClientConnection::_checkConnection() {
 
     LOG(_logLevel) << "trying reconnect to " << toString() << endl;
     string errmsg;
-    _failed = false;
     auto connectStatus = connect(_serverAddress, _applicationName);
     if (!connectStatus.isOK()) {
         _markFailed(kSetFlag);
@@ -520,8 +548,7 @@ DBClientConnection::DBClientConnection(bool _autoReconnect,
                                        double so_timeout,
                                        MongoURI uri,
                                        const HandshakeValidationHook& hook)
-    : _failed(false),
-      autoReconnect(_autoReconnect),
+    : autoReconnect(_autoReconnect),
       autoReconnectBackoff(1000, 2000),
       _hook(hook),
       _uri(std::move(uri)) {

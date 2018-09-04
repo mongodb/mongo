@@ -217,6 +217,18 @@ env.CppIntegrationTest(
     ],
 )
 
+env.CppIntegrationTest(
+    target='dbclient_connection_integration_test',
+    source=[
+        'dbclient_connection_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver_network',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/util/version_impl',
+    ],
+)
+
 env.Library(
     target='async_client',
     source=[

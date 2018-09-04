@@ -2,6 +2,8 @@ test_kind: cpp_integration_test
 
 selector:
   root: build/integration_tests.txt
+  exclude_files:
+  - build/integration_tests/dbclient_connection_integration_test* # Needs connection to single host.
 
 executor:
   archive:

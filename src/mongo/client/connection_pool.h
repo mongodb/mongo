@@ -169,7 +169,7 @@ private:
     /**
      * Returns true if the given connection is young enough to keep in the pool.
      */
-    bool _shouldKeepConnection(Date_t now, const ConnectionInfo& connInfo) const;
+    static bool _shouldKeepConnection(Date_t now, const ConnectionInfo& connInfo);
 
     /**
      * Apply cleanup policy to any host(s) not active in the last kCleanupInterval milliseconds.
