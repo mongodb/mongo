@@ -47,14 +47,22 @@ OperationContextSessionMongod::OperationContextSessionMongod(OperationContext* o
         session->refreshFromStorageIfNeeded(opCtx);
         session->beginOrContinueTxn(opCtx, clientTxnNumber);
 
-        if (coordinator && *coordinator) {
-            if (!TransactionCoordinator::get(opCtx)) {
-                uassert(ErrorCodes::InternalError,
-                        "'coordinator' flag was not sent on first statement",
-                        startTransaction && *startTransaction);
+        if (startTransaction && *startTransaction) {
+            // If this shard has been selected as the coordinator, set up the coordinator state to
+            // be ready to receive votes.
+            if (coordinator && *coordinator) {
+                // TODO: Once shards support multiple active coordinators per session, instead of
+                // resetting the previous TransactionCoordinator, simply create a new
+                // TransactionCoordinator and push it on the queue of active coordinators for this
+                // session.
+                // Note: Until the above TODO is done, starting a new transaction before receiving
+                // the decision for the previous transaction can corrupt the previous transaction.
+                auto& txnCoordinator = TransactionCoordinator::get(opCtx);
+                txnCoordinator.reset();
                 TransactionCoordinator::create(session);
             }
         }
+
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant->beginOrContinue(clientTxnNumber, autocommit, startTransaction);
     }
