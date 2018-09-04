@@ -1202,7 +1202,7 @@ DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const
 
     if (shouldLogOpDebug || (shouldSample && debug.executionTimeMicros > logThresholdMs * 1000LL)) {
         Locker::LockerInfo lockerInfo;
-        opCtx->lockState()->getLockerInfo(&lockerInfo);
+        opCtx->lockState()->getLockerInfo(&lockerInfo, currentOp.getLockStatsBase());
         log() << debug.report(&c, currentOp, lockerInfo.stats);
     }
 

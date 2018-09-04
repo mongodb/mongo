@@ -134,7 +134,8 @@ public:
 
     virtual ResourceId getWaitingResource() const;
 
-    virtual void getLockerInfo(LockerInfo* lockerInfo) const;
+    virtual void getLockerInfo(LockerInfo* lockerInfo,
+                               const boost::optional<SingleThreadedLockStats> lockStatsBase) const;
 
     virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut);
 

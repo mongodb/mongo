@@ -124,7 +124,8 @@ public:
         invariant(false);
     }
 
-    virtual void getLockerInfo(LockerInfo* lockerInfo) const {
+    virtual void getLockerInfo(LockerInfo* lockerInfo,
+                               boost::optional<SingleThreadedLockStats> lockStatsBase) const {
         invariant(false);
     }
 

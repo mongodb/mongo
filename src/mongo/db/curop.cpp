@@ -224,7 +224,15 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
     return _curopStack(opCtx).top();
 }
 
-CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {}
+CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {
+    // If this is a sub-operation, we store the snapshot of lock stats as the base lock stats of the
+    // current operation.
+    if (_parent != nullptr) {
+        Locker::LockerInfo info;
+        opCtx->lockState()->getLockerInfo(&info, boost::none);
+        _lockStatsBase = info.stats;
+    }
+}
 
 CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
     if (opCtx) {

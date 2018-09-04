@@ -122,7 +122,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
 
         if (logAll || (shouldSample && logSlow)) {
             Locker::LockerInfo lockerInfo;
-            opCtx->lockState()->getLockerInfo(&lockerInfo);
+            opCtx->lockState()->getLockerInfo(&lockerInfo, curOp->getLockStatsBase());
             log() << curOp->debug().report(opCtx->getClient(), *curOp, lockerInfo.stats);
         }
 

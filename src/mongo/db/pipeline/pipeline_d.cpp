@@ -334,7 +334,8 @@ public:
                                   (truncateMode == CurrentOpTruncateMode::kTruncateOps));
 
                 Locker::LockerInfo lockerInfo;
-                clientOpCtx->lockState()->getLockerInfo(&lockerInfo);
+                clientOpCtx->lockState()->getLockerInfo(
+                    &lockerInfo, CurOp::get(clientOpCtx)->getLockStatsBase());
                 fillLockerInfo(lockerInfo, infoBuilder);
             }
 
