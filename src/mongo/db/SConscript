@@ -643,6 +643,7 @@ env.Library(
         'catalog/database_holder',
         'catalog/uuid_catalog',
         'concurrency/lock_manager',
+        'curop_failpoint_helpers',
         'curop_metrics',
         'dbdirectclient',
         'index/index_access_method',
