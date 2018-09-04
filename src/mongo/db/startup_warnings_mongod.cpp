@@ -257,8 +257,12 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
     // Transparent Hugepages checks
     StatusWith<std::string> transparentHugePagesEnabledResult =
         StartupWarningsMongod::readTransparentHugePagesParameter("enabled");
+    bool shouldWarnAboutDefragAlways = false;
     if (transparentHugePagesEnabledResult.isOK()) {
         if (transparentHugePagesEnabledResult.getValue() == "always") {
+            // If we do not have hugepages enabled, we don't need to warn about its features
+            shouldWarnAboutDefragAlways = true;
+
             log() << startupWarningsLog;
             log() << "** WARNING: " << kTransparentHugePagesDirectory << "/enabled is 'always'."
                   << startupWarningsLog;
@@ -274,7 +278,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 
     StatusWith<std::string> transparentHugePagesDefragResult =
         StartupWarningsMongod::readTransparentHugePagesParameter("defrag");
-    if (transparentHugePagesDefragResult.isOK()) {
+    if (shouldWarnAboutDefragAlways && transparentHugePagesDefragResult.isOK()) {
         if (transparentHugePagesDefragResult.getValue() == "always") {
             log() << startupWarningsLog;
             log() << "** WARNING: " << kTransparentHugePagesDirectory << "/defrag is 'always'."
