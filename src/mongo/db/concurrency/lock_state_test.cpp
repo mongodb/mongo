@@ -225,7 +225,7 @@ TEST(LockerImpl, DefaultLocker) {
 
     // Make sure the flush lock IS NOT held
     Locker::LockerInfo info;
-    locker.getLockerInfo(&info);
+    locker.getLockerInfo(&info, boost::none);
     ASSERT(!info.waitingResource.isValid());
     ASSERT_EQUALS(2U, info.locks.size());
     ASSERT_EQUALS(RESOURCE_GLOBAL, info.locks[0].resourceId.getType());
@@ -479,7 +479,7 @@ TEST(LockerImpl, GetLockerInfoShouldReportHeldLocks) {
 
     // Assert it shows up in the output of getLockerInfo().
     Locker::LockerInfo lockerInfo;
-    locker.getLockerInfo(&lockerInfo);
+    locker.getLockerInfo(&lockerInfo, boost::none);
 
     ASSERT(lockerInfoContainsLock(lockerInfo, globalId, MODE_IX));
     ASSERT(lockerInfoContainsLock(lockerInfo, dbId, MODE_IX));
@@ -510,7 +510,7 @@ TEST(LockerImpl, GetLockerInfoShouldReportPendingLocks) {
 
     // Assert the held locks show up in the output of getLockerInfo().
     Locker::LockerInfo lockerInfo;
-    conflictingLocker.getLockerInfo(&lockerInfo);
+    conflictingLocker.getLockerInfo(&lockerInfo, boost::none);
     ASSERT(lockerInfoContainsLock(lockerInfo, globalId, MODE_IS));
     ASSERT(lockerInfoContainsLock(lockerInfo, dbId, MODE_IS));
     ASSERT(lockerInfoContainsLock(lockerInfo, collectionId, MODE_IS));
@@ -528,7 +528,7 @@ TEST(LockerImpl, GetLockerInfoShouldReportPendingLocks) {
     ASSERT_EQ(LOCK_OK,
               conflictingLocker.lockComplete(collectionId, MODE_IS, Date_t::now(), checkDeadlock));
 
-    conflictingLocker.getLockerInfo(&lockerInfo);
+    conflictingLocker.getLockerInfo(&lockerInfo, boost::none);
     ASSERT_FALSE(lockerInfo.waitingResource.isValid());
 
     ASSERT(conflictingLocker.unlock(collectionId));

@@ -2592,7 +2592,8 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
                                        const TxnNumber txnNum,
                                        const int metricValue) {
     // Calling transactionInfoForLog to get the actual transaction info string.
-    const auto lockerInfo = opCtx->lockState()->getLockerInfo();
+    const auto lockerInfo =
+        opCtx->lockState()->getLockerInfo(CurOp::get(*opCtx)->getLockStatsBase());
     // Building expected transaction info string.
     StringBuilder parametersInfo;
     buildParametersInfoString(
@@ -2658,7 +2659,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
     txnParticipant->commitUnpreparedTransaction(opCtx());
 
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
     std::string testTransactionInfo =
         txnParticipant->transactionInfoForLogForTest(&lockerInfo->stats, true, readConcernArgs);
@@ -2694,7 +2695,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
     txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
     txnParticipant->abortActiveTransaction(opCtx());
 
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
 
     std::string testTransactionInfo =
@@ -2724,7 +2725,7 @@ DEATH_TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogWithNoLockerInfoS
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
 
     txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
@@ -2759,7 +2760,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
     txnParticipant->commitUnpreparedTransaction(opCtx());
     stopCapturingLogMessages();
 
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
     std::string expectedTransactionInfo = "transaction " +
         txnParticipant->transactionInfoForLogForTest(&lockerInfo->stats, true, readConcernArgs);
@@ -2792,7 +2793,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
     txnParticipant->abortActiveTransaction(opCtx());
     stopCapturingLogMessages();
 
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
     std::string expectedTransactionInfo = "transaction " +
         txnParticipant->transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
@@ -2823,7 +2824,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     txnParticipant->stashTransactionResources(opCtx());
     const auto txnResourceStashLocker = txnParticipant->getTxnResourceStashLockerForTest();
     ASSERT(txnResourceStashLocker);
-    const auto lockerInfo = txnResourceStashLocker->getLockerInfo();
+    const auto lockerInfo = txnResourceStashLocker->getLockerInfo(boost::none);
 
     serverGlobalParams.slowMS = 10;
     sleepmillis(serverGlobalParams.slowMS + 1);

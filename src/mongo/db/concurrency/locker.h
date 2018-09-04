@@ -310,13 +310,21 @@ public:
         SingleThreadedLockStats stats;
     };
 
-    virtual void getLockerInfo(LockerInfo* lockerInfo) const = 0;
+    /**
+     * lockStatsBase is the snapshot of the lock stats taken at the point when the operation starts.
+     * The precise lock stats of a sub-operation would be the stats from the locker info minus the
+     * lockStatsBase.
+     */
+    virtual void getLockerInfo(
+        LockerInfo* lockerInfo,
+        const boost::optional<SingleThreadedLockStats> lockStatsBase) const = 0;
 
     /**
      * Returns boost::none if this is an instance of LockerNoop, or a populated LockerInfo
      * otherwise.
      */
-    virtual boost::optional<LockerInfo> getLockerInfo() const = 0;
+    virtual boost::optional<LockerInfo> getLockerInfo(
+        const boost::optional<SingleThreadedLockStats> lockStatsBase) const = 0;
 
     /**
      * LockSnapshot captures the state of all resources that are locked, what modes they're

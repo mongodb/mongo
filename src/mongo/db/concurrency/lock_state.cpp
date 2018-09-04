@@ -538,7 +538,8 @@ ResourceId LockerImpl::getWaitingResource() const {
     return ResourceId();
 }
 
-void LockerImpl::getLockerInfo(LockerInfo* lockerInfo) const {
+void LockerImpl::getLockerInfo(LockerInfo* lockerInfo,
+                               const boost::optional<SingleThreadedLockStats> lockStatsBase) const {
     invariant(lockerInfo);
 
     // Zero-out the contents
@@ -562,11 +563,19 @@ void LockerImpl::getLockerInfo(LockerInfo* lockerInfo) const {
 
     lockerInfo->waitingResource = getWaitingResource();
     lockerInfo->stats.append(_stats);
+
+    // lockStatsBase is a snapshot of lock stats taken when the sub-operation starts. Only
+    // sub-operations have lockStatsBase.
+    if (lockStatsBase)
+        // Adjust the lock stats by subtracting the lockStatsBase. No mutex is needed because
+        // lockStatsBase is immutable.
+        lockerInfo->stats.subtract(*lockStatsBase);
 }
 
-boost::optional<Locker::LockerInfo> LockerImpl::getLockerInfo() const {
+boost::optional<Locker::LockerInfo> LockerImpl::getLockerInfo(
+    const boost::optional<SingleThreadedLockStats> lockStatsBase) const {
     Locker::LockerInfo lockerInfo;
-    getLockerInfo(&lockerInfo);
+    getLockerInfo(&lockerInfo, lockStatsBase);
     return std::move(lockerInfo);
 }
 

@@ -522,7 +522,8 @@ BSONObj MongoDInterface::_reportCurrentOpForClient(OperationContext* opCtx,
         }
 
         // Append lock stats before returning.
-        if (auto lockerInfo = clientOpCtx->lockState()->getLockerInfo()) {
+        if (auto lockerInfo = clientOpCtx->lockState()->getLockerInfo(
+                CurOp::get(*clientOpCtx)->getLockStatsBase())) {
             fillLockerInfo(*lockerInfo, builder);
         }
     }

@@ -264,7 +264,12 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     }
 }
 
-CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {}
+CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {
+    // If this is a sub-operation, we store the snapshot of lock stats as the base lock stats of the
+    // current operation.
+    if (_parent != nullptr)
+        _lockStatsBase = opCtx->lockState()->getLockerInfo(boost::none)->stats;
+}
 
 CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
     if (opCtx) {
@@ -364,7 +369,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         client->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
 
     if (shouldLogOp || (shouldSample && _debug.executionTimeMicros > slowMs * 1000LL)) {
-        const auto lockerInfo = opCtx->lockState()->getLockerInfo();
+        auto lockerInfo = opCtx->lockState()->getLockerInfo(_lockStatsBase);
         log(component) << _debug.report(client, *this, (lockerInfo ? &lockerInfo->stats : nullptr));
     }
 

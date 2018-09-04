@@ -157,11 +157,13 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual void getLockerInfo(LockerInfo* lockerInfo) const {
+    virtual void getLockerInfo(LockerInfo* lockerInfo,
+                               boost::optional<SingleThreadedLockStats> lockStatsBase) const {
         MONGO_UNREACHABLE;
     }
 
-    virtual boost::optional<LockerInfo> getLockerInfo() const {
+    virtual boost::optional<LockerInfo> getLockerInfo(
+        boost::optional<SingleThreadedLockStats> lockStatsBase) const {
         return boost::none;
     }
 

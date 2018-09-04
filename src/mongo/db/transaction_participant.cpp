@@ -888,7 +888,7 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
                 &Top::get(getGlobalServiceContext()));
         }
         _logSlowTransaction(wl,
-                            &(_txnResourceStash->locker()->getLockerInfo())->stats,
+                            &(_txnResourceStash->locker()->getLockerInfo(boost::none))->stats,
                             TransactionState::kAborted,
                             _txnResourceStash->getReadConcernArgs());
         _txnResourceStash = boost::none;
@@ -912,10 +912,11 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
 void TransactionParticipant::_cleanUpTxnResourceOnOpCtx(
     WithLock wl, OperationContext* opCtx, TransactionState::StateFlag terminationCause) {
     // Log the transaction if its duration is longer than the slowMS command threshold.
-    _logSlowTransaction(wl,
-                        &(opCtx->lockState()->getLockerInfo())->stats,
-                        terminationCause,
-                        repl::ReadConcernArgs::get(opCtx));
+    _logSlowTransaction(
+        wl,
+        &(opCtx->lockState()->getLockerInfo(CurOp::get(*opCtx)->getLockStatsBase()))->stats,
+        terminationCause,
+        repl::ReadConcernArgs::get(opCtx));
 
     // Reset the WUOW. We should be able to abort empty transactions that don't have WUOW.
     if (opCtx->getWriteUnitOfWork()) {
@@ -1015,7 +1016,7 @@ void TransactionParticipant::reportStashedState(BSONObjBuilder* builder) const {
     stdx::lock_guard<stdx::mutex> lm(_mutex);
 
     if (_txnResourceStash && _txnResourceStash->locker()) {
-        if (auto lockerInfo = _txnResourceStash->locker()->getLockerInfo()) {
+        if (auto lockerInfo = _txnResourceStash->locker()->getLockerInfo(boost::none)) {
             invariant(_activeTxnNumber != kUninitializedTxnNumber);
             builder->append("host", getHostNameCachedAndPort());
             builder->append("desc", "inactive transaction");

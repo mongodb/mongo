@@ -558,6 +558,10 @@ public:
         _planSummary = std::move(summary);
     }
 
+    const boost::optional<SingleThreadedLockStats> getLockStatsBase() {
+        return _lockStatsBase;
+    }
+
 private:
     class CurOpStack;
 
@@ -600,6 +604,8 @@ private:
     int _numYields{0};
 
     std::string _planSummary;
+    boost::optional<SingleThreadedLockStats>
+        _lockStatsBase;  // This is the snapshot of lock stats taken when curOp is constructed.
 };
 
 /**
