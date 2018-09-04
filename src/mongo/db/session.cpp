@@ -38,6 +38,7 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_access_method.h"
@@ -848,7 +849,10 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
 
     // The Client lock must not be held when executing this failpoint as it will block currentOp
     // execution.
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterPreallocateSnapshot);
+    if (MONGO_FAIL_POINT(hangAfterPreallocateSnapshot)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangAfterPreallocateSnapshot, opCtx, "hangAfterPreallocateSnapshot");
+    }
 }
 
 void Session::abortArbitraryTransaction() {

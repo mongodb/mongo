@@ -15,10 +15,17 @@
     const adminDB = testDB.getSiblingDB("admin");
     const coll = testDB.getCollection(kCollName);
 
+    // Waits for the operation to reach the "hangAfterPreallocateSnapshot" failpoint.
     function waitForOp(curOpFilter) {
         assert.soon(
             function() {
-                const res = adminDB.aggregate([{$currentOp: {}}, {$match: curOpFilter}]).toArray();
+                const res =
+                    adminDB
+                        .aggregate([
+                            {$currentOp: {}},
+                            {$match: {$and: [curOpFilter, {msg: "hangAfterPreallocateSnapshot"}]}}
+                        ])
+                        .toArray();
                 if (res.length === 1) {
                     return true;
                 }
