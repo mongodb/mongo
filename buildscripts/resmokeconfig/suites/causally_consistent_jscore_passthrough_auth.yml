@@ -122,6 +122,7 @@ selector:
   - jstests/core/rename8.js
   - jstests/core/views/duplicate_ns.js
   - jstests/core/views/invalid_system_views.js
+  - jstests/core/views/view_with_invalid_dbname.js
   - jstests/core/views/views_creation.js
   - jstests/core/views/views_drop.js
   - jstests/core/views/views_rename.js
