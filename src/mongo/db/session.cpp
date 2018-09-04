@@ -919,10 +919,11 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
     }
 
     // Log the transaction if its duration is longer than the slowMS command threshold.
-    _logSlowTransaction(lock,
-                        &(opCtx->lockState()->getLockerInfo())->stats,
-                        MultiDocumentTransactionState::kAborted,
-                        repl::ReadConcernArgs::get(opCtx));
+    _logSlowTransaction(
+        lock,
+        &(opCtx->lockState()->getLockerInfo(CurOp::get(opCtx)->getLockStatsBase()))->stats,
+        MultiDocumentTransactionState::kAborted,
+        repl::ReadConcernArgs::get(opCtx));
 }
 
 void Session::_abortTransaction(WithLock wl) {
@@ -946,7 +947,7 @@ void Session::_abortTransaction(WithLock wl) {
     // If the transaction is stashed, then we have aborted an inactive transaction.
     if (_txnResourceStash) {
         _logSlowTransaction(wl,
-                            &(_txnResourceStash->locker()->getLockerInfo())->stats,
+                            &(_txnResourceStash->locker()->getLockerInfo(boost::none))->stats,
                             MultiDocumentTransactionState::kAborted,
                             _txnResourceStash->getReadConcernArgs());
         ServerTransactionsMetrics::get(getGlobalServiceContext())->decrementCurrentInactive();
@@ -1094,10 +1095,12 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
                 }
 
                 // Log the transaction if its duration is longer than the slowMS command threshold.
-                _logSlowTransaction(lk,
-                                    &(opCtx->lockState()->getLockerInfo())->stats,
-                                    MultiDocumentTransactionState::kAborted,
-                                    repl::ReadConcernArgs::get(opCtx));
+                _logSlowTransaction(
+                    lk,
+                    &(opCtx->lockState()->getLockerInfo(CurOp::get(opCtx)->getLockStatsBase()))
+                         ->stats,
+                    MultiDocumentTransactionState::kAborted,
+                    repl::ReadConcernArgs::get(opCtx));
             }
         }
         // We must clear the recovery unit and locker so any post-transaction writes can run without
@@ -1148,10 +1151,11 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     }
 
     // Log the transaction if its duration is longer than the slowMS command threshold.
-    _logSlowTransaction(lk,
-                        &(opCtx->lockState()->getLockerInfo())->stats,
-                        MultiDocumentTransactionState::kCommitted,
-                        repl::ReadConcernArgs::get(opCtx));
+    _logSlowTransaction(
+        lk,
+        &(opCtx->lockState()->getLockerInfo(CurOp::get(opCtx)->getLockStatsBase()))->stats,
+        MultiDocumentTransactionState::kCommitted,
+        repl::ReadConcernArgs::get(opCtx));
 }
 
 BSONObj Session::reportStashedState() const {
@@ -1164,7 +1168,7 @@ void Session::reportStashedState(BSONObjBuilder* builder) const {
     stdx::lock_guard<stdx::mutex> ls(_mutex);
 
     if (_txnResourceStash && _txnResourceStash->locker()) {
-        if (auto lockerInfo = _txnResourceStash->locker()->getLockerInfo()) {
+        if (auto lockerInfo = _txnResourceStash->locker()->getLockerInfo(boost::none)) {
             invariant(_activeTxnNumber != kUninitializedTxnNumber);
             builder->append("host", getHostNameCachedAndPort());
             builder->append("desc", "inactive transaction");

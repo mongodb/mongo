@@ -83,6 +83,14 @@ struct LockStatCounters {
         CounterOps::add(numDeadlocks, other.numDeadlocks);
     }
 
+    template <typename OtherType>
+    void subtract(const LockStatCounters<OtherType>& other) {
+        CounterOps::add(numAcquisitions, -other.numAcquisitions);
+        CounterOps::add(numWaits, -other.numWaits);
+        CounterOps::add(combinedWaitTimeMicros, -other.combinedWaitTimeMicros);
+        CounterOps::add(numDeadlocks, -other.numDeadlocks);
+    }
+
     void reset() {
         CounterOps::set(numAcquisitions, 0);
         CounterOps::set(numWaits, 0);
@@ -155,6 +163,25 @@ public:
             const OtherLockStatCountersType& otherStats = other._oplogStats.modeStats[mode];
             LockStatCountersType& thisStats = _oplogStats.modeStats[mode];
             thisStats.append(otherStats);
+        }
+    }
+
+    template <typename OtherType>
+    void subtract(const LockStats<OtherType>& other) {
+        typedef LockStatCounters<OtherType> OtherLockStatCountersType;
+
+        for (int i = 0; i < ResourceTypesCount; i++) {
+            for (int mode = 0; mode < LockModesCount; mode++) {
+                const OtherLockStatCountersType& otherStats = other._stats[i].modeStats[mode];
+                LockStatCountersType& thisStats = _stats[i].modeStats[mode];
+                thisStats.subtract(otherStats);
+            }
+        }
+
+        for (int mode = 0; mode < LockModesCount; mode++) {
+            const OtherLockStatCountersType& otherStats = other._oplogStats.modeStats[mode];
+            LockStatCountersType& thisStats = _oplogStats.modeStats[mode];
+            thisStats.subtract(otherStats);
         }
     }
 

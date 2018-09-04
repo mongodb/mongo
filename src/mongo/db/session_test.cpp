@@ -2342,7 +2342,7 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
                                        const TxnNumber txnNum,
                                        const int metricValue) {
     // Calling transactionInfoForLog to get the actual transaction info string.
-    const auto lockerInfo = opCtx->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx->lockState()->getLockerInfo(boost::none);
 
     // Building expected transaction info string.
     StringBuilder parametersInfo;
@@ -2416,7 +2416,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
     session.unstashTransactionResources(opCtx(), "commitTransaction");
     session.commitTransaction(opCtx());
 
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
     std::string testTransactionInfo =
         session.transactionInfoForLogForTest(&lockerInfo->stats, true, readConcernArgs);
@@ -2452,7 +2452,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
     session.unstashTransactionResources(opCtx(), "abortTransaction");
     session.abortActiveTransaction(opCtx());
 
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
     std::string testTransactionInfo =
         session.transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
@@ -2518,7 +2518,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
     session.commitTransaction(opCtx());
     stopCapturingLogMessages();
 
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
     std::string expectedTransactionInfo = "transaction " +
         session.transactionInfoForLogForTest(&lockerInfo->stats, true, readConcernArgs);
@@ -2556,7 +2556,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowAbort) {
     session.abortActiveTransaction(opCtx());
     stopCapturingLogMessages();
 
-    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
     std::string expectedTransactionInfo = "transaction " +
         session.transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
@@ -2590,7 +2590,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     session.stashTransactionResources(opCtx());
     const auto txnResourceStashLocker = session.getTxnResourceStashLockerForTest();
     ASSERT(txnResourceStashLocker);
-    const auto lockerInfo = txnResourceStashLocker->getLockerInfo();
+    const auto lockerInfo = txnResourceStashLocker->getLockerInfo(boost::none);
 
     serverGlobalParams.slowMS = 10;
     sleepmillis(serverGlobalParams.slowMS + 1);

@@ -101,4 +101,42 @@ TEST(LockStats, Reporting) {
     stats.report(&builder);
 }
 
+TEST(LockStats, Subtraction) {
+    const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Subtraction"));
+
+    resetGlobalLockStats();
+
+    LockerForTests locker(MODE_IX);
+    locker.lock(resId, MODE_X);
+
+    {
+        LockerForTests lockerConflict(MODE_IX);
+        ASSERT_EQUALS(LOCK_TIMEOUT,
+                      lockerConflict.lock(resId, MODE_S, Date_t::now() + Milliseconds(1)));
+    }
+
+    SingleThreadedLockStats stats;
+    reportGlobalLockingStats(&stats);
+    ASSERT_EQUALS(1, stats.get(resId, MODE_S).numAcquisitions);
+    ASSERT_EQUALS(1, stats.get(resId, MODE_S).numWaits);
+    ASSERT_GREATER_THAN(stats.get(resId, MODE_S).combinedWaitTimeMicros, 0);
+
+    {
+        LockerForTests lockerConflict(MODE_IX);
+        ASSERT_EQUALS(LOCK_TIMEOUT,
+                      lockerConflict.lock(resId, MODE_S, Date_t::now() + Milliseconds(1)));
+    }
+
+    SingleThreadedLockStats stats2;
+    reportGlobalLockingStats(&stats2);
+    ASSERT_EQUALS(2, stats2.get(resId, MODE_S).numAcquisitions);
+    ASSERT_EQUALS(2, stats2.get(resId, MODE_S).numWaits);
+    ASSERT_GREATER_THAN(stats2.get(resId, MODE_S).combinedWaitTimeMicros, 0);
+
+    stats2.subtract(stats);
+    ASSERT_EQUALS(1, stats2.get(resId, MODE_S).numAcquisitions);
+    ASSERT_EQUALS(1, stats2.get(resId, MODE_S).numWaits);
+    ASSERT_GREATER_THAN(stats2.get(resId, MODE_S).combinedWaitTimeMicros, 0);
+}
+
 }  // namespace mongo
