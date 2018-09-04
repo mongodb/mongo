@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/server_parameters.h"
@@ -515,7 +516,10 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
 
     // The Client lock must not be held when executing this failpoint as it will block currentOp
     // execution.
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterPreallocateSnapshot);
+    if (MONGO_FAIL_POINT(hangAfterPreallocateSnapshot)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangAfterPreallocateSnapshot, opCtx, "hangAfterPreallocateSnapshot");
+    }
 }
 
 Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx) {
