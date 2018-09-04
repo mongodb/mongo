@@ -393,9 +393,9 @@ std::pair<std::vector<FieldPath>, bool> MongoDInterface::collectDocumentKeyField
     return {result, true};
 }
 
-std::vector<GenericCursor> MongoDInterface::getCursors(
-    const intrusive_ptr<ExpressionContext>& expCtx) const {
-    return CursorManager::getAllCursors(expCtx->opCtx);
+std::vector<GenericCursor> MongoDInterface::getIdleCursors(
+    const intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
+    return CursorManager::getIdleCursors(expCtx->opCtx, userMode);
 }
 
 boost::optional<Document> MongoDInterface::lookupSingleDocument(

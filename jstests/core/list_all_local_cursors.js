@@ -8,11 +8,7 @@
 
     const admin = db.getSisterDB("admin");
     function listAllCursorsWithId(cursorId) {
-        return admin
-            .aggregate([
-                {"$listLocalCursors": {}},
-                {"$match": {"id": cursorId}},
-            ])
+        return admin.aggregate([{"$listLocalCursors": {}}, {"$match": {cursorId: cursorId}}])
             .toArray();
     }
 
@@ -31,13 +27,13 @@
     let foundCursors = listAllCursorsWithId(cursorIdWithoutSession);
     assert.eq(foundCursors.length, 1, tojson(foundCursors));
     assert.eq(foundCursors[0].ns, "listAllLocalCursors.data", tojson(foundCursors));
-    assert.eq(foundCursors[0].id, cursorIdWithoutSession, tojson(foundCursors));
+    assert.eq(foundCursors[0].cursorId, cursorIdWithoutSession, tojson(foundCursors));
 
     // Verify that we correctly list the cursor which is inside of a session.
     foundCursors = listAllCursorsWithId(cursorIdWithSession);
     assert.eq(foundCursors.length, 1, tojson(foundCursors));
     assert.eq(foundCursors[0].ns, "listAllLocalCursors.data", tojson(foundCursors));
-    assert.eq(foundCursors[0].id, cursorIdWithSession, tojson(foundCursors));
+    assert.eq(foundCursors[0].cursorId, cursorIdWithSession, tojson(foundCursors));
     assert(foundCursors[0].hasOwnProperty("lsid"), tojson(foundCursors));
     assert.eq(
         foundCursors[0].lsid.id, session._serverSession.handle.getId().id, tojson(foundCursors));

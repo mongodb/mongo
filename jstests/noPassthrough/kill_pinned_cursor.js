@@ -17,79 +17,30 @@
     // implicit session of the cursor establishing command.
     TestData.disableImplicitSessions = true;
 
-    load("jstests/libs/fixture_helpers.js");  // For "isMongos".
-
+    load("jstests/libs/fixture_helpers.js");     // For "isMongos".
+    load("jstests/libs/pin_getmore_cursor.js");  // For "withPinnedCursor".
     const st = new ShardingTest({shards: 2});
 
     // Enables the specified 'failPointName', executes 'runGetMoreFunc' function in a parallel
     // shell, waits for the the failpoint to be hit, then kills the cursor and confirms that the
     // kill was successful.
     function runPinnedCursorKillTest({conn, failPointName, runGetMoreFunc}) {
-        const db = conn.getDB("test");
-        jsTestLog("Running test with failPoint: " + failPointName);
-
-        const coll = db.jstest_kill_pinned_cursor;
-        coll.drop();
-
-        for (let i = 0; i < 10; i++) {
-            assert.writeOK(coll.insert({_id: i}));
-        }
-
-        let cleanup = null;
-        let cursorId;
-
-        try {
-            // Enable the specified failpoint.
-            assert.commandWorked(
-                db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
-
-            // Issue an initial find in order to create a cursor and obtain its ID.
-            let cmdRes = db.runCommand({find: coll.getName(), batchSize: 2});
-            assert.commandWorked(cmdRes);
-            cursorId = cmdRes.cursor.id;
-            assert.neq(cursorId, NumberLong(0));
-
-            // Serialize 'runGetMoreFunc' along with the cursor ID and collection name, then execute
-            // the function in a parallel shell.
-            let code = "let cursorId = " + cursorId.toString() + ";";
-            code += "let collName = '" + coll.getName() + "';";
-            code += "(" + runGetMoreFunc.toString() + ")();";
-            cleanup = startParallelShell(code, conn.port);
-
-            // Wait until we know the failpoint has been reached.
-            assert.soon(function() {
-                const arr =
-                    db.getSiblingDB("admin")
-                        .aggregate(
-                            [{$currentOp: {localOps: true}}, {$match: {"msg": failPointName}}])
-                        .toArray();
-                return arr.length > 0;
-            });
-
+        function assertFunction(cursorId, coll) {
+            const db = coll.getDB();
             // Kill the cursor associated with the command and assert that the kill succeeded.
-            cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [cursorId]});
+            let cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [cursorId]});
             assert.commandWorked(cmdRes);
             assert.eq(cmdRes.cursorsKilled, [cursorId]);
             assert.eq(cmdRes.cursorsAlive, []);
             assert.eq(cmdRes.cursorsNotFound, []);
             assert.eq(cmdRes.cursorsUnknown, []);
-        } finally {
-            assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
-            if (cleanup) {
-                cleanup();
-            }
         }
-
-        // Eventually the cursor should be cleaned up.
-        assert.soon(() => db.serverStatus().metrics.cursor.open.pinned == 0);
-
-        // Trying to kill the cursor again should result in the cursor not being found.
-        const cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [cursorId]});
-        assert.commandWorked(cmdRes);
-        assert.eq(cmdRes.cursorsKilled, []);
-        assert.eq(cmdRes.cursorsAlive, []);
-        assert.eq(cmdRes.cursorsNotFound, [cursorId]);
-        assert.eq(cmdRes.cursorsUnknown, []);
+        withPinnedCursor({
+            conn: conn,
+            assertFunction: assertFunction,
+            runGetMoreFunc: runGetMoreFunc,
+            failPointName: failPointName
+        });
     }
 
     // Test that killing the pinned cursor before it starts building the batch results in a

@@ -65,11 +65,12 @@ public:
 
     MockMongoInterface(bool hasShardName = true) : _hasShardName(hasShardName) {}
 
-    std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
+    std::vector<BSONObj> getCurrentOps(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        CurrentOpConnectionsMode connMode,
                                        CurrentOpSessionsMode sessionMode,
                                        CurrentOpUserMode userMode,
-                                       CurrentOpTruncateMode truncateMode) const {
+                                       CurrentOpTruncateMode truncateMode,
+                                       CurrentOpCursorMode cursorMode) const {
         return _ops;
     }
 

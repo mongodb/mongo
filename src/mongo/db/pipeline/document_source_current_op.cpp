@@ -40,6 +40,7 @@ const StringData kIdleConnectionsFieldName = "idleConnections"_sd;
 const StringData kIdleSessionsFieldName = "idleSessions"_sd;
 const StringData kLocalOpsFieldName = "localOps"_sd;
 const StringData kTruncateOpsFieldName = "truncateOps"_sd;
+const StringData kIdleCursorsFieldName = "idleCursors"_sd;
 
 const StringData kOpIdFieldName = "opid"_sd;
 const StringData kClientFieldName = "client"_sd;
@@ -109,11 +110,12 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (_ops.empty()) {
-        _ops = pExpCtx->mongoProcessInterface->getCurrentOps(pExpCtx->opCtx,
+        _ops = pExpCtx->mongoProcessInterface->getCurrentOps(pExpCtx,
                                                              _includeIdleConnections,
                                                              _includeIdleSessions,
                                                              _includeOpsFromAllUsers,
-                                                             _truncateOps);
+                                                             _truncateOps,
+                                                             _idleCursors);
 
         _opsIter = _ops.begin();
 
@@ -188,6 +190,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
     UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers;
     LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
     TruncationMode truncateOps = TruncationMode::kNoTruncation;
+    CursorMode idleCursors = CursorMode::kExcludeCursors;
 
     for (auto&& elem : spec.embeddedObject()) {
         const auto fieldName = elem.fieldNameStringData();
@@ -233,6 +236,14 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                     elem.type() == BSONType::Bool);
             truncateOps =
                 (elem.boolean() ? TruncationMode::kTruncateOps : TruncationMode::kNoTruncation);
+        } else if (fieldName == kIdleCursorsFieldName) {
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "The 'idleCursors' parameter of the $currentOp stage must be "
+                                     "a boolean value, but found: "
+                                  << typeName(elem.type()),
+                    elem.type() == BSONType::Bool);
+            idleCursors =
+                (elem.boolean() ? CursorMode::kIncludeCursors : CursorMode::kExcludeCursors);
         } else {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream() << "Unrecognized option '" << fieldName
@@ -245,7 +256,8 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                                        includeIdleSessions,
                                        includeOpsFromAllUsers,
                                        showLocalOpsOnMongoS,
-                                       truncateOps);
+                                       truncateOps,
+                                       idleCursors);
 }
 
 intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
@@ -254,13 +266,15 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
     SessionMode includeIdleSessions,
     UserMode includeOpsFromAllUsers,
     LocalOpsMode showLocalOpsOnMongoS,
-    TruncationMode truncateOps) {
+    TruncationMode truncateOps,
+    CursorMode idleCursors) {
     return new DocumentSourceCurrentOp(pExpCtx,
                                        includeIdleConnections,
                                        includeIdleSessions,
                                        includeOpsFromAllUsers,
                                        showLocalOpsOnMongoS,
-                                       truncateOps);
+                                       truncateOps,
+                                       idleCursors);
 }
 
 Value DocumentSourceCurrentOp::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
@@ -275,6 +289,8 @@ Value DocumentSourceCurrentOp::serialize(boost::optional<ExplainOptions::Verbosi
                   {kLocalOpsFieldName,
                    _showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps ? Value(true) : Value()},
                   {kTruncateOpsFieldName,
-                   _truncateOps == TruncationMode::kTruncateOps ? Value(true) : Value()}}}});
+                   _truncateOps == TruncationMode::kTruncateOps ? Value(true) : Value()},
+                  {kIdleCursorsFieldName,
+                   _idleCursors == CursorMode::kIncludeCursors ? Value(true) : Value()}}}});
 }
 }  // namespace mongo

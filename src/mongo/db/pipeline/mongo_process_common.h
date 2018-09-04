@@ -43,11 +43,12 @@ class MongoProcessCommon : public MongoProcessInterface {
 public:
     virtual ~MongoProcessCommon() = default;
 
-    std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
+    std::vector<BSONObj> getCurrentOps(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        CurrentOpConnectionsMode connMode,
                                        CurrentOpSessionsMode sessionMode,
                                        CurrentOpUserMode userMode,
-                                       CurrentOpTruncateMode) const final;
+                                       CurrentOpTruncateMode truncateMode,
+                                       CurrentOpCursorMode cursorMode) const final;
 
 protected:
     /**

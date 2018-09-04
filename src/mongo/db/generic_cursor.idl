@@ -28,8 +28,38 @@ structs:
   GenericCursor:
     description: "A struct representing a cursor in either mongod or mongos"
     fields:
-      id: long
-      ns: namespacestring
+      cursorId:
+        description: The cursor id of the cursor.
+        type: long
+        optional: true
+      ns:
+        description: The namespace of the cursor. 
+        type: namespacestring
+        optional: true
+      nDocsReturned:
+        description: The number of docs returned by the cursor.
+        type: long
+        optional: true
+      tailable: 
+        description: Whether the cursor is tailable and remains open after exhausting all documents in the find.
+        type: bool
+        optional: true
+      awaitData:
+        description: Whether this is a tailable and awaitData cursor that will block waiting for new data to be inserted into a capped collection. 
+        type: bool
+        optional: true
+      noCursorTimeout:
+        description: If true the cursor will not be timed out because of inactivity. 
+        type: bool
+        optional: true
+      originatingCommand:
+        description: The bson object containing the command that created the cursor.
+        type: object
+        optional: true
       lsid:
         type: LogicalSessionId
+        optional: true
+      operationUsingCursorId:
+        description: The op ID of the operation pinning the cursor. Will be empty for idle cursors.
+        type: long
         optional: true

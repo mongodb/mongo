@@ -30,19 +30,24 @@
 
 #include "mongo/db/pipeline/mongo_process_common.h"
 
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
 
-std::vector<BSONObj> MongoProcessCommon::getCurrentOps(OperationContext* opCtx,
-                                                       CurrentOpConnectionsMode connMode,
-                                                       CurrentOpSessionsMode sessionMode,
-                                                       CurrentOpUserMode userMode,
-                                                       CurrentOpTruncateMode truncateMode) const {
+std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    CurrentOpConnectionsMode connMode,
+    CurrentOpSessionsMode sessionMode,
+    CurrentOpUserMode userMode,
+    CurrentOpTruncateMode truncateMode,
+    CurrentOpCursorMode cursorMode) const {
+    OperationContext* opCtx = expCtx->opCtx;
     AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
 
     std::vector<BSONObj> ops;
@@ -67,6 +72,17 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(OperationContext* opCtx,
 
         // Delegate to the mongoD- or mongoS-specific implementation of _reportCurrentOpForClient.
         ops.emplace_back(_reportCurrentOpForClient(opCtx, client, truncateMode));
+    }
+
+    // If 'cursorMode' is set to include idle cursors, retrieve them and add them to ops.
+    if (cursorMode == CurrentOpCursorMode::kIncludeCursors) {
+
+        for (auto&& cursor : getIdleCursors(expCtx, userMode)) {
+            ops.push_back(BSON("type"
+                               << "idleCursor"
+                               << "cursor"
+                               << cursor.toBSON()));
+        }
     }
 
     // If we need to report on idle Sessions, defer to the mongoD or mongoS implementations.

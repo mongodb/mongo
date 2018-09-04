@@ -404,9 +404,9 @@ public:
     void appendActiveSessions(LogicalSessionIdSet* lsids) const;
 
     /**
-     * Returns a list of GenericCursors for all cursors in the cursor manager.
+     * Returns a list of GenericCursors for all idle (non-pinned) cursors in the cursor manager.
      */
-    std::vector<GenericCursor> getAllCursors() const;
+    std::vector<GenericCursor> getIdleCursors() const;
 
     std::pair<Status, int> killCursorsWithMatchingSessions(OperationContext* opCtx,
                                                            const SessionKiller::Matcher& matcher);

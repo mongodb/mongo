@@ -271,7 +271,7 @@ private:
     }
 
     // The ID of the ClientCursor. A value of 0 is used to mean that no cursor id has been assigned.
-    CursorId _cursorid = 0;
+    const CursorId _cursorid = 0;
 
     // Threads may read from this field even if they don't have the cursor pinned, as long as they
     // have the correct partition of the CursorManager locked (just like _authenticatedUsers).

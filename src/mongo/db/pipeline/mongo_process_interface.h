@@ -66,6 +66,7 @@ public:
     enum class CurrentOpTruncateMode { kNoTruncation, kTruncateOps };
     enum class CurrentOpLocalOpsMode { kLocalMongosOps, kRemoteShardOps };
     enum class CurrentOpSessionsMode { kIncludeIdle, kExcludeIdle };
+    enum class CurrentOpCursorMode { kIncludeCursors, kExcludeCursors };
 
     struct MakePipelineOptions {
         MakePipelineOptions(){};
@@ -186,11 +187,13 @@ public:
      * operation or, optionally, an idle connection. If userMode is kIncludeAllUsers, report
      * operations for all authenticated users; otherwise, report only the current user's operations.
      */
-    virtual std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
-                                               CurrentOpConnectionsMode connMode,
-                                               CurrentOpSessionsMode sessionMode,
-                                               CurrentOpUserMode userMode,
-                                               CurrentOpTruncateMode) const = 0;
+    virtual std::vector<BSONObj> getCurrentOps(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        CurrentOpConnectionsMode connMode,
+        CurrentOpSessionsMode sessionMode,
+        CurrentOpUserMode userMode,
+        CurrentOpTruncateMode,
+        CurrentOpCursorMode) const = 0;
 
     /**
      * Returns the name of the local shard if sharding is enabled, or an empty string.
@@ -221,10 +224,11 @@ public:
         boost::optional<BSONObj> readConcern) = 0;
 
     /**
-     * Returns a vector of all local cursors.
+     * Returns a vector of all idle (non-pinned) local cursors.
      */
-    virtual std::vector<GenericCursor> getCursors(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
+    virtual std::vector<GenericCursor> getIdleCursors(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        CurrentOpUserMode userMode) const = 0;
 
     /**
      * The following methods forward to the BackupCursorService decorating the ServiceContext.

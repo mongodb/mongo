@@ -91,8 +91,8 @@ public:
         UUID collectionUUID,
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) final;
-    std::vector<GenericCursor> getCursors(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+    std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              CurrentOpUserMode userMode) const final;
     void fsyncLock(OperationContext* opCtx) final;
     void fsyncUnlock(OperationContext* opCtx) final;
     BackupCursorState openBackupCursor(OperationContext* opCtx) final;

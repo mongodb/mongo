@@ -228,12 +228,12 @@ BSONObj MongoSInterface::_reportCurrentOpForClient(OperationContext* opCtx,
     return builder.obj();
 }
 
-std::vector<GenericCursor> MongoSInterface::getCursors(
-    const intrusive_ptr<ExpressionContext>& expCtx) const {
+std::vector<GenericCursor> MongoSInterface::getIdleCursors(
+    const intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
     invariant(hasGlobalServiceContext());
     auto cursorManager = Grid::get(expCtx->opCtx->getServiceContext())->getCursorManager();
     invariant(cursorManager);
-    return cursorManager->getAllCursors();
+    return cursorManager->getIdleCursors();
 }
 
 bool MongoSInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {

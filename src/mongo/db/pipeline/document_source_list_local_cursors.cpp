@@ -67,5 +67,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListLocalCursors::createFromB
 
 DocumentSourceListLocalCursors::DocumentSourceListLocalCursors(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _cursors(pExpCtx->mongoProcessInterface->getCursors(pExpCtx)) {}
+    : DocumentSource(pExpCtx),
+      _cursors(pExpCtx->mongoProcessInterface->getIdleCursors(
+          pExpCtx, MongoProcessInterface::CurrentOpUserMode::kIncludeAll)) {}
 }

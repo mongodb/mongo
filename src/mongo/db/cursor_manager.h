@@ -45,6 +45,7 @@
 
 namespace mongo {
 
+class AuthorizationSession;
 class OperationContext;
 class PseudoRandom;
 class PlanExecutor;
@@ -87,10 +88,13 @@ public:
     static void appendAllActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids);
 
     /**
-     * Returns a list of GenericCursors for all cursors on the global cursor manager and across all
-     * collection-level cursor maangers.
+     * Returns a list of GenericCursors for all idle cursors on the global cursor manager and across
+     * all collection-level cursor managers. Does not include currently pinned cursors.
+     * 'userMode': If auth is on, calling with userMode as kExcludeOthers will cause this function
+     * to only return cursors owned by the caller. If auth is off, this argument does not matter.
      */
-    static std::vector<GenericCursor> getAllCursors(OperationContext* opCtx);
+    static std::vector<GenericCursor> getIdleCursors(
+        OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode);
 
     /**
      * Kills cursors with matching logical sessions. Returns a pair with the overall
@@ -188,13 +192,17 @@ public:
 
     /**
      * Appends sessions that have open cursors in this cursor manager to the given set of lsids.
+     * 'userMode': If auth is on, calling with userMode as kExcludeOthers will cause this function
+     * to only return cursors owned by the caller. If auth is off, this argument does not matter.
      */
     void appendActiveSessions(LogicalSessionIdSet* lsids) const;
 
     /**
-     * Appends all active cursors in this cursor manager to the output vector.
+     * Appends all idle (non-pinned) cursors in this cursor manager to the output vector.
      */
-    void appendActiveCursors(std::vector<GenericCursor>* cursors) const;
+    void appendIdleCursors(AuthorizationSession* ctxAuth,
+                           MongoProcessInterface::CurrentOpUserMode userMode,
+                           std::vector<GenericCursor>* cursors) const;
 
     /*
      * Returns a list of all open cursors for the given session.
@@ -250,6 +258,13 @@ private:
     };
 
     CursorId allocateCursorId_inlock();
+
+    /**
+     * Creates a generic cursor from a ClientCursor. Can only be called while holding the
+     * CursorManager partition lock. This is neccessary to protect concurrent access to the data
+     * members of 'cursor', as it prevents other threads from pinning this cursor.
+     */
+    GenericCursor buildGenericCursor_inlock(const ClientCursor* cursor) const;
 
     ClientCursorPin _registerCursor(
         OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);

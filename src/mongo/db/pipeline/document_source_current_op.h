@@ -39,6 +39,7 @@ public:
     using LocalOpsMode = MongoProcessInterface::CurrentOpLocalOpsMode;
     using SessionMode = MongoProcessInterface::CurrentOpSessionsMode;
     using UserMode = MongoProcessInterface::CurrentOpUserMode;
+    using CursorMode = MongoProcessInterface::CurrentOpCursorMode;
 
     static constexpr StringData kStageName = "$currentOp"_sd;
 
@@ -100,7 +101,8 @@ public:
         SessionMode includeIdleSessions = SessionMode::kIncludeIdle,
         UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
         LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps,
-        TruncationMode truncateOps = TruncationMode::kNoTruncation);
+        TruncationMode truncateOps = TruncationMode::kNoTruncation,
+        CursorMode idleCursors = CursorMode::kExcludeCursors);
 
     GetNextResult getNext() final;
 
@@ -132,19 +134,22 @@ private:
                             SessionMode includeIdleSessions,
                             UserMode includeOpsFromAllUsers,
                             LocalOpsMode showLocalOpsOnMongoS,
-                            TruncationMode truncateOps)
+                            TruncationMode truncateOps,
+                            CursorMode idleCursors)
         : DocumentSource(pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),
           _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
-          _truncateOps(truncateOps) {}
+          _truncateOps(truncateOps),
+          _idleCursors(idleCursors) {}
 
     ConnMode _includeIdleConnections = ConnMode::kExcludeIdle;
     SessionMode _includeIdleSessions = SessionMode::kIncludeIdle;
     UserMode _includeOpsFromAllUsers = UserMode::kExcludeOthers;
     LocalOpsMode _showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
     TruncationMode _truncateOps = TruncationMode::kNoTruncation;
+    CursorMode _idleCursors = CursorMode::kExcludeCursors;
 
     std::string _shardName;
 
