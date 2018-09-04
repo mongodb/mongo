@@ -89,7 +89,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
 #endif
         sslGlobalParams.sslCAFile.empty()) {
         log() << "";
-        log() << "** WARNING: No SSL certificate validation can be performed since"
+        log() << "** WARNING: No client certificate validation can be performed since"
                  " no CA file has been provided";
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
         log() << "**          and no sslCertificateSelector has been specified.";
