@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/document_source_exchange_gen.h"
+#include "mongo/db/pipeline/exchange_spec_gen.h"
 #include "mongo/db/query/explain_options.h"
 
 namespace mongo {

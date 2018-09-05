@@ -45,4 +45,7 @@ extern AtomicBool internalQueryAlwaysMergeOnPrimaryShard;
 // of merging on mongoS will always do so.
 extern AtomicBool internalQueryProhibitMergingOnMongoS;
 
+// If set to true on mongos then the cluster query planner will not produce plans with the exchange.
+// False by default, so the queries run with exchanges.
+extern AtomicBool internalQueryDisableExchange;
 }  // namespace mongo

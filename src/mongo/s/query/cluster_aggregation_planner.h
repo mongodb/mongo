@@ -28,9 +28,8 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source_exchange_gen.h"
+#include "mongo/db/pipeline/exchange_spec_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
@@ -93,22 +92,13 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
                                             std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                             ClusterClientCursorParams&&);
 
-struct ShardDistributionInfo {
-    // If we want to send data to the shards which would own the data, 'logicalShardKeyAtSplitPoint'
-    // describes which of the fields to use to determine what the final shard key will be. For
-    // example, if the merging pipeline renames "x" to "out_shard_key" and then uses $out to output
-    // to a collection sharded by {out_shard_key: 1}, 'logicalShardKeyAtSplitPoint' will be {x: 1}.
-    ShardKeyPattern logicalShardKeyAtSplitPoint;
-
-    // This map describes which shard is going to receive which range. The keys are the shard ids.
-    StringMap<std::vector<ChunkRange>> partitions;
-};
-
 struct ShardedExchangePolicy {
-    ExchangePolicyEnum policy;
+    // The exchange specification that will be sent to shards as part of the aggregate command.
+    // It will be used by producers to determine how to distribute documents to consumers.
+    ExchangeSpec exchangeSpec;
 
-    // Only set if the policy is ranged.
-    boost::optional<ShardDistributionInfo> shardDistributionInfo;
+    // Shards that will run the consumer part of the exchange.
+    std::vector<ShardId> consumerShards;
 };
 
 /**

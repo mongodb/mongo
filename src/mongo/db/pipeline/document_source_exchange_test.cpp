@@ -304,7 +304,7 @@ TEST_F(DocumentSourceExchangeTest, RangeShardingExchangeNConsumer) {
     spec.setPolicy(ExchangePolicyEnum::kRange);
     spec.setKey(BSON("a" << 1));
     spec.setBoundaries(boundaries);
-    spec.setConsumerids(consumerIds);
+    spec.setConsumerIds(consumerIds);
     spec.setConsumers(nConsumers);
     spec.setBufferSize(1024);
 
@@ -534,7 +534,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundaries) {
                         << BSON("a" << 1)
                         << "boundaries"
                         << BSON_ARRAY(BSON("a" << MAXKEY) << BSON("a" << MINKEY))
-                        << "consumerids"
+                        << "consumerIds"
                         << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
@@ -551,7 +551,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesAndConsumerIds) {
                         << BSON("a" << 1)
                         << "boundaries"
                         << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
-                        << "consumerids"
+                        << "consumerIds"
                         << BSON_ARRAY(0 << 1));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
@@ -568,7 +568,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidPolicyBoundaries) {
                         << BSON("a" << 1)
                         << "boundaries"
                         << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
-                        << "consumerids"
+                        << "consumerIds"
                         << BSON_ARRAY(0));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
@@ -585,7 +585,7 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidConsumerIds) {
                         << BSON("a" << 1)
                         << "boundaries"
                         << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << MAXKEY))
-                        << "consumerids"
+                        << "consumerIds"
                         << BSON_ARRAY(1));
     ASSERT_THROWS_CODE(
         Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),

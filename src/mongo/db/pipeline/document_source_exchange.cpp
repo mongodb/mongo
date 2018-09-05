@@ -67,7 +67,7 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
       _keyPattern(_spec.getKey().getOwned()),
       _ordering(extractOrdering(_keyPattern)),
       _boundaries(extractBoundaries(_spec.getBoundaries())),
-      _consumerIds(extractConsumerIds(_spec.getConsumerids(), _spec.getConsumers())),
+      _consumerIds(extractConsumerIds(_spec.getConsumerIds(), _spec.getConsumers())),
       _policy(_spec.getPolicy()),
       _orderPreserving(_spec.getOrderPreserving()),
       _maxBufferSize(_spec.getBufferSize()),

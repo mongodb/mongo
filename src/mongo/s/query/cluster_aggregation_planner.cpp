@@ -43,6 +43,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_query_knobs.h"
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_pipeline.h"
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
@@ -301,23 +302,49 @@ boost::optional<ShardedExchangePolicy> walkPipelineBackwardsTrackingShardKey(
     auto renames = computeShardKeyRenameMap(mergePipeline, std::move(shardKeyPaths));
     ShardKeyPattern newShardKey(buildNewKeyPattern(shardKey, renames));
 
+    // Append the boundaries with the new names from the new shard key.
+    auto translateBoundary = [&renames](const BSONObj& oldBoundary) {
+        BSONObjBuilder bob;
+        for (auto&& elem : oldBoundary) {
+            bob.appendAs(elem, renames[elem.fieldNameStringData()]);
+        }
+        return bob.obj();
+    };
+
     // Given the new shard key fields, build the distribution map.
-    StringMap<std::vector<ChunkRange>> distribution;
+    ExchangeSpec exchangeSpec;
+    std::vector<BSONObj> boundaries;
+    std::vector<int> consumerIds;
+    std::map<ShardId, int> shardToConsumer;
+    std::vector<ShardId> consumerShards;
+    int numConsumers = 0;
+
+    // The chunk manager enumerates the chunks in the ascending order from MinKey to MaxKey. Every
+    // chunk has an associated range [from, to); i.e. inclusive lower bound and exclusive upper
+    // bound. The chunk ranges must cover all domain without any holes. For the exchange we coalesce
+    // ranges into a single vector of points. E.g. chunks [min,5], [5,10], [10,max] will produce
+    // [min,5,10,max] vector. Number of points in the vector is always one grater than number of
+    // chunks.
+    // We also compute consumer indices for every chunk. From the example above (3 chunks) we may
+    // get the vector [0,1,2]; i.e. the first chunk goes to the consumer 0 and so on. Note that
+    // the consumer id may be repeated if the consumer hosts more than 1 chunk.
+    boundaries.emplace_back(translateBoundary((*chunkManager.chunks().begin()).getMin()));
     for (auto&& chunk : chunkManager.chunks()) {
-        // Append the boundaries with the new names from the new shard key.
-        auto translateBoundary = [&renames](const BSONObj& oldBoundary) {
-            BSONObjBuilder bob;
-            for (auto&& elem : oldBoundary) {
-                bob.appendAs(elem, renames[elem.fieldNameStringData()]);
-            }
-            return bob.obj();
-        };
-        distribution[chunk.getShardId().toString()].emplace_back(translateBoundary(chunk.getMin()),
-                                                                 translateBoundary(chunk.getMax()));
+        boundaries.emplace_back(translateBoundary(chunk.getMax()));
+        if (shardToConsumer.find(chunk.getShardId()) == shardToConsumer.end()) {
+            shardToConsumer.emplace(chunk.getShardId(), numConsumers++);
+            consumerShards.emplace_back(chunk.getShardId());
+        }
+        consumerIds.emplace_back(shardToConsumer[chunk.getShardId()]);
     }
-    return ShardedExchangePolicy{
-        ExchangePolicyEnum::kRange,
-        ShardDistributionInfo{ShardKeyPattern{std::move(newShardKey)}, std::move(distribution)}};
+    exchangeSpec.setPolicy(newShardKey.isHashedPattern() ? ExchangePolicyEnum::kHash
+                                                         : ExchangePolicyEnum::kRange);
+    exchangeSpec.setKey(newShardKey.toBSON());
+    exchangeSpec.setBoundaries(std::move(boundaries));
+    exchangeSpec.setConsumers(consumerIds.size());
+    exchangeSpec.setConsumerIds(std::move(consumerIds));
+
+    return ShardedExchangePolicy{std::move(exchangeSpec), std::move(consumerShards)};
 }
 
 }  // namespace
@@ -390,8 +417,16 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
 
 boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationContext* opCtx,
                                                                   const Pipeline* mergePipeline) {
+    if (internalQueryDisableExchange.load()) {
+        return boost::none;
+    }
+
     const auto grid = Grid::get(opCtx);
     invariant(grid);
+
+    if (mergePipeline->getSources().empty()) {
+        return boost::none;
+    }
 
     const auto outStage =
         dynamic_cast<DocumentSourceOut*>(mergePipeline->getSources().back().get());

@@ -212,11 +212,13 @@ BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
     return genericTransformForShards(std::move(targetedCmd), opCtx, request, collationObj);
 }
 
-BSONObj createCommandForTargetedShards(OperationContext* opCtx,
-                                       const AggregationRequest& request,
-                                       const SplitPipeline& splitPipeline,
-                                       const BSONObj collationObj,
-                                       const boost::optional<ExchangeSpec> exchangeSpec) {
+BSONObj createCommandForTargetedShards(
+    OperationContext* opCtx,
+    const AggregationRequest& request,
+    const SplitPipeline& splitPipeline,
+    const BSONObj collationObj,
+    const boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec,
+    bool needsMerge) {
 
     // Create the command for the shards.
     MutableDocument targetedCmd(request.serializeToCommandObj());
@@ -226,12 +228,15 @@ BSONObj createCommandForTargetedShards(OperationContext* opCtx,
     // send to the shards.
     targetedCmd[AggregationRequest::kPipelineName] =
         Value(splitPipeline.shardsPipeline->serialize());
-    targetedCmd[AggregationRequest::kNeedsMergeName] = Value(true);
+    // When running on many shards with the exchange we may not need merging.
+    if (needsMerge) {
+        targetedCmd[AggregationRequest::kNeedsMergeName] = Value(true);
+    }
     targetedCmd[AggregationRequest::kCursorName] =
         Value(DOC(AggregationRequest::kBatchSizeName << 0));
 
     targetedCmd[AggregationRequest::kExchangeName] =
-        exchangeSpec ? Value(exchangeSpec->toBSON()) : Value();
+        exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
     return genericTransformForShards(std::move(targetedCmd), opCtx, request, collationObj);
 }
@@ -337,11 +342,11 @@ struct DispatchShardPipelineResults {
     // The command object to send to the targeted shards.
     BSONObj commandForTargetedShards;
 
-    // How many producers are running the shard part of splitPipeline.
+    // How many exchange producers are running the shard part of splitPipeline.
     size_t numProducers;
 
-    // How many consumers are running the merging.
-    size_t numConsumers;
+    // Placement of exchange consumers; if there is no exchange then the vector is empty.
+    std::vector<ShardId> consumerShards;
 };
 
 /**
@@ -407,14 +412,19 @@ DispatchShardPipelineResults dispatchShardPipeline(
                              (needsPrimaryShardMerge && executionNsRoutingInfo &&
                               *(shardIds.begin()) != executionNsRoutingInfo->db().primaryId()));
 
+    boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec;
+
     if (needsSplit) {
         splitPipeline = cluster_aggregation_planner::splitPipeline(std::move(pipeline));
+
+        exchangeSpec = cluster_aggregation_planner::checkIfEligibleForExchange(
+            opCtx, splitPipeline->mergePipeline.get());
     }
 
     // Generate the command object for the targeted shards.
     BSONObj targetedCommand = splitPipeline
         ? createCommandForTargetedShards(
-              opCtx, aggRequest, *splitPipeline, collationObj, aggRequest.getExchangeSpec())
+              opCtx, aggRequest, *splitPipeline, collationObj, exchangeSpec, true)
         : createPassthroughCommandForShard(
               opCtx, aggRequest, pipeline.get(), originalCmdObj, collationObj);
 
@@ -428,7 +438,6 @@ DispatchShardPipelineResults dispatchShardPipeline(
         }
     }
 
-    size_t consumers = 1;
     // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
     if (expCtx->explain) {
         if (mustRunOnAll) {
@@ -469,7 +478,6 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                 << ") is not a multiple of producers ("
                                 << shardIds.size()
                                 << ")");
-        consumers = cursors.size() / shardIds.size();
     }
 
     // Record the number of shards involved in the aggregation. If we are required to merge on
@@ -486,7 +494,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                         std::move(pipeline),
                                         targetedCommand,
                                         shardIds.size(),
-                                        consumers};
+                                        exchangeSpec ? exchangeSpec->consumerShards
+                                                     : std::vector<ShardId>()};
 }
 
 DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
@@ -500,20 +509,16 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     invariant(!liteParsedPipeline.hasChangeStream());
     auto opCtx = expCtx->opCtx;
 
-    // TODO SERVER-35905 - we will use ShardDistributionInfo to determine shards that will run the
-    // consumers. For now we simply distribute to all shards.
-    std::vector<ShardId> shardIds;
-    Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx, &shardIds);
-
     // For all consumers construct a request with appropriate cursor ids and send to shards.
     std::vector<std::pair<ShardId, BSONObj>> requests;
-    for (size_t idx = 0; idx < shardDispatchResults->numConsumers; ++idx) {
+    auto numConsumers = shardDispatchResults->consumerShards.size();
+    for (size_t idx = 0; idx < numConsumers; ++idx) {
 
         // Pick this consumer's cursors from producers.
         std::vector<RemoteCursor> producers;
         for (size_t p = 0; p < shardDispatchResults->numProducers; ++p) {
-            producers.emplace_back(std::move(
-                shardDispatchResults->remoteCursors[p * shardDispatchResults->numConsumers + idx]));
+            producers.emplace_back(
+                std::move(shardDispatchResults->remoteCursors[p * numConsumers + idx]));
         }
 
         // Create a pipeline for a consumer and add the merging stage.
@@ -531,10 +536,10 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
 
         SplitPipeline pipeline(std::move(consumerPipeline), nullptr, boost::none);
 
-        auto consumerCmdObj =
-            createCommandForTargetedShards(opCtx, aggRequest, pipeline, collationObj, boost::none);
+        auto consumerCmdObj = createCommandForTargetedShards(
+            opCtx, aggRequest, pipeline, collationObj, boost::none, false);
 
-        requests.emplace_back(shardIds[idx % shardIds.size()], consumerCmdObj);
+        requests.emplace_back(shardDispatchResults->consumerShards[idx], consumerCmdObj);
     }
     auto cursors = establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
@@ -555,8 +560,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
                                         std::move(splitPipeline),
                                         nullptr,
                                         BSONObj(),
-                                        shardDispatchResults->numConsumers,
-                                        1};
+                                        numConsumers};
 }
 
 Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
@@ -1085,9 +1089,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             remoteCursor.getShardId().toString(), reply, result);
     }
 
-    // If we have more than 1 consumer (i.e. the exchange operator is in use) then dispatch all
-    // consumers.
-    if (shardDispatchResults.numConsumers > 1) {
+    // If we have the exchange operator then dispatch all consumers.
+    if (!shardDispatchResults.consumerShards.empty()) {
         shardDispatchResults = dispatchExchangeConsumerPipeline(expCtx,
                                                                 namespaces.executionNss,
                                                                 cmdObj,
@@ -1096,6 +1099,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                                 collationObj,
                                                                 &shardDispatchResults);
     }
+
     // If we reach here, we have a merge pipeline to dispatch.
     return dispatchMergingPipeline(expCtx,
                                    namespaces,

@@ -44,7 +44,7 @@ enums:
 
 structs:
   ExchangeSpec:
-    description: "$exchange operator spec"
+    description: "exchange aggregation request specification"
     fields:
       policy:
         type: ExchangePolicy
@@ -63,12 +63,13 @@ structs:
       key:
         type: object
         default: "BSONObj()"
-        description: A key used for document distribution to consumers. The same description as sorting/sharding.
+        description: A key used for document distribution to consumers. The same description as
+                     sorting/sharding.
       boundaries:
         type: array<object>
         optional: true
         description: Range/hash split points.
-      consumerids:
+      consumerIds:
         type: array<int>
         optional: true
         description: Mapping from a range index to a consumer id.

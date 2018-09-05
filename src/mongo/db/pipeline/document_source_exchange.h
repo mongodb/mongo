@@ -33,7 +33,7 @@
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_exchange_gen.h"
+#include "mongo/db/pipeline/exchange_spec_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 

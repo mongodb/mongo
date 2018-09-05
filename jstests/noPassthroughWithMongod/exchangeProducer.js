@@ -132,7 +132,7 @@ TestData.disableImplicitSessions = true;
                 bufferSize: NumberInt(1024),
                 key: {a: 1},
                 boundaries: [{a: MinKey}, {a: 2500}, {a: 5000}, {a: 7500}, {a: MaxKey}],
-                consumerids: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
+                consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
             },
             cursor: {batchSize: 0}
         }));
@@ -161,7 +161,7 @@ TestData.disableImplicitSessions = true;
                 bufferSize: NumberInt(1024),
                 key: {a: 1},
                 boundaries: [{a: MinKey}, {a: 2500}, {a: 5000}, {a: 7500}, {a: MaxKey}],
-                consumerids: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
+                consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
             },
             cursor: {batchSize: 0}
         }));
