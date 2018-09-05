@@ -52,7 +52,7 @@
     jsTestLog('Oplog application on secondary ' + secondary.host + ' is limited to ' +
               batchOpsLimit + ' operations per batch.');
 
-    const numUpdates = 1000;
+    const numUpdates = 500;
     jsTestLog('Buffering ' + numUpdates + ' updates to ' + numDocs + ' documents on secondary.');
     checkLog.contains(secondary,
                       'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');

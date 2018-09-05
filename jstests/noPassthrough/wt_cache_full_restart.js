@@ -39,7 +39,7 @@
     }
     assert.eq(numDocs, coll.find().itcount());
 
-    const numUpdates = 1000;
+    const numUpdates = 500;
     let secondary = rst.getSecondary();
     const batchOpsLimit =
         assert.commandWorked(secondary.adminCommand({getParameter: 1, replBatchLimitOperations: 1}))

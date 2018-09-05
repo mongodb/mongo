@@ -58,7 +58,7 @@
     assert.commandWorked(
         secondary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
 
-    const numUpdates = 1000;
+    const numUpdates = 500;
     jsTestLog('Writing ' + numUpdates + ' updates to ' + numDocs +
               ' documents on secondary after disabling snapshots.');
     for (let i = 0; i < numDocs; ++i) {
