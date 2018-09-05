@@ -52,16 +52,6 @@
     }),
                                  ErrorCodes.PreparedTransactionInProgress);
 
-    jsTestLog("Test that you can't run coordinateCommitTransaction on a prepared transaction.");
-    assert.commandFailedWithCode(sessionDB.adminCommand({
-        coordinateCommitTransaction: 1,
-        participants: [],
-        txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-        stmtId: NumberInt(1),
-        autocommit: false
-    }),
-                                 ErrorCodes.PreparedTransactionInProgress);
-
     jsTestLog("Test that you can't run delete on a prepared transaction.");
     assert.commandFailedWithCode(sessionColl.remove({_id: 4}),
                                  ErrorCodes.PreparedTransactionInProgress);

@@ -187,28 +187,7 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {
-            auto txnParticipant = TransactionParticipant::get(opCtx);
-            uassert(ErrorCodes::CommandFailed,
-                    "commitTransaction must be run within a transaction",
-                    txnParticipant);
-
-            // commitTransaction is retryable.
-            if (txnParticipant->transactionIsCommitted()) {
-                // We set the client last op to the last optime observed by the system to ensure
-                // that we wait for the specified write concern on an optime greater than or equal
-                // to the commit oplog entry.
-                auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-                replClient.setLastOpToSystemLastOpTime(opCtx);
-                return;
-            }
-
-            uassert(ErrorCodes::NoSuchTransaction,
-                    "Transaction isn't in progress",
-                    txnParticipant->inMultiDocumentTransaction());
-
-            txnParticipant->commitUnpreparedTransaction(opCtx);
-        }
+        void typedRun(OperationContext* opCtx) {}
 
     private:
         bool supportsWriteConcern() const override {
