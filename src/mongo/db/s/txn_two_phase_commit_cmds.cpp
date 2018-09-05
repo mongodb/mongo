@@ -32,7 +32,9 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/transaction_coordinator_commands_impl.h"
 #include "mongo/db/transaction_participant.h"
 
 namespace mongo {
@@ -117,7 +119,23 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {}
+        void typedRun(OperationContext* opCtx) {
+            // Only config servers or initialized shard servers can act as transaction coordinators.
+            if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+                uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            }
+
+            uassert(
+                ErrorCodes::CommandNotSupported,
+                "'voteCommitTransaction' is only supported in feature compatibility version 4.2",
+                (serverGlobalParams.featureCompatibility.getVersion() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
+
+            const auto& cmd = request();
+
+            txn::recvVoteCommit(
+                opCtx, cmd.getShardId(), 0 /* TODO (SERVER-36584) pass real prepareTimestamp */);
+        }
 
     private:
         bool supportsWriteConcern() const override {
@@ -152,7 +170,21 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {}
+        void typedRun(OperationContext* opCtx) {
+            // Only config servers or initialized shard servers can act as transaction coordinators.
+            if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+                uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            }
+
+            uassert(ErrorCodes::CommandNotSupported,
+                    "'voteAbortTransaction' is only supported in feature compatibility version 4.2",
+                    (serverGlobalParams.featureCompatibility.getVersion() ==
+                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
+
+            const auto& cmd = request();
+
+            txn::recvVoteAbort(opCtx, cmd.getShardId());
+        }
 
     private:
         bool supportsWriteConcern() const override {
@@ -187,7 +219,35 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {}
+        void typedRun(OperationContext* opCtx) {
+            // Only config servers or initialized shard servers can act as transaction coordinators.
+            if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+                uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            }
+
+            uassert(ErrorCodes::CommandNotSupported,
+                    "'coordinateCommitTransaction' is only supported in feature compatibility "
+                    "version 4.2",
+                    (serverGlobalParams.featureCompatibility.getVersion() ==
+                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
+
+            const auto& cmd = request();
+
+            // Convert the participant list array into a set, and assert that all participants in
+            // the list are unique.
+            // TODO (PM-564): Propagate the 'readOnly' flag down into the TransactionCoordinator.
+            std::set<ShardId> participantList;
+            for (const auto& participant : cmd.getParticipants()) {
+                const auto shardId = participant.getShardId();
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "participant list contained duplicate shardId " << shardId,
+                        std::find(participantList.begin(), participantList.end(), shardId) ==
+                            participantList.end());
+                participantList.insert(shardId);
+            }
+
+            txn::recvCoordinateCommit(opCtx, participantList);
+        }
 
     private:
         bool supportsWriteConcern() const override {

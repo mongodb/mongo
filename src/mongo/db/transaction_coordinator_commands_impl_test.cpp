@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/transaction_coordinator_commands_impl.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/shard_server_test_fixture.h"
@@ -69,7 +70,19 @@ protected:
         SessionCatalog::get(getServiceContext())->onStepUp(operationContext());
         auto scopedSession =
             SessionCatalog::get(operationContext())->getOrCreateSession(operationContext(), _lsid);
-        TransactionCoordinator::create(scopedSession.get());
+
+        // Simulate that a regular transaction statement containing 'coordinator: true' was already
+        // sent to this shard.
+        operationContext()->setLogicalSessionId(_lsid);
+        operationContext()->setTxnNumber(_txnNumber);
+        {
+            OperationContextSessionMongod checkOutSession(
+                operationContext(), true, false, true, true);
+
+            auto txnParticipant = TransactionParticipant::get(operationContext());
+            txnParticipant->unstashTransactionResources(operationContext(), "dummy");
+            txnParticipant->stashTransactionResources(operationContext());
+        }
 
         for_each(shardIds.begin(), shardIds.end(), [this](const ShardId& shardId) {
             auto shardTargeter = RemoteCommandTargeterMock::get(
@@ -99,13 +112,9 @@ protected:
                 auto opCtxPtr = cc().makeOperationContext();
                 auto opCtx = opCtxPtr.get();
 
-                // Required in order for OperationContextSession to check out the session.
-                opCtx->setLogicalSessionId(this->_lsid);
-
-                // Check out the session.
-                OperationContextSession ocs(opCtx, true);
-                auto session = OperationContextSession::get(opCtx);
-                invariant(session);
+                // Required to be able to check out the session later.
+                opCtx->setLogicalSessionId(_lsid);
+                opCtx->setTxnNumber(_txnNumber);
 
                 // Call the command's "run".
                 commandBody(opCtx);
@@ -197,6 +206,7 @@ private:
     }
 
     const LogicalSessionId _lsid{makeLogicalSessionIdForTest()};
+    const TxnNumber _txnNumber{0};
 };
 
 //

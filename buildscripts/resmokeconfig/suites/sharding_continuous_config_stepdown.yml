@@ -96,6 +96,7 @@ selector:
   - jstests/sharding/move_chunk_insert_with_write_retryability.js
   - jstests/sharding/move_chunk_remove_with_write_retryability.js
   - jstests/sharding/move_chunk_update_with_write_retryability.js
+  - jstests/sharding/txn_coordinator_commands_basic_requirements.js
   # Runs setShardVersion/getShardVersion against the config server and we don't support retries
   # for this command
   - jstests/sharding/major_version_check.js
