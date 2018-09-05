@@ -19,11 +19,12 @@ var $config = (function() {
     }
 
     function autoRetryTxn(data, func) {
-        // conflictingOp is true when startTransaction fails with ConflictingOperationInProgress.
-        // This occurs when we attempt to start a transaction with a txnNumber that is already
-        // active on this session. In this case, we will re-run the command with this txnNumber
-        // without calling startTransaction, and essentially join the already running transaction.
-        let conflictingOp = false;
+        // joinAndRetry is true either if there is a TransientTransactionError or if
+        // startTransaction fails with ConflictingOperationInProgress. The latter occurs when we
+        // attempt to start a transaction with a txnNumber that is already active on this session.
+        // In both cases, we will re-run the command with this txnNumber without calling
+        // startTransaction, and essentially join the already running transaction.
+        let joinAndRetry = false;
 
         // startNewTxn is true if the transaction fails with TransactionTooOld or NoSuchTransaction.
         // TransactionTooOld occurs when a transaction on this session with a higher txnNumber has
@@ -46,7 +47,7 @@ var $config = (function() {
                     data.txnNumber++;
                 }
                 startNewTxn = false;
-                conflictingOp = false;
+                joinAndRetry = false;
 
                 func();
 
@@ -57,11 +58,6 @@ var $config = (function() {
                     continue;
                 }
 
-                if (e.code === ErrorCodes.ConflictingOperationInProgress) {
-                    conflictingOp = true;
-                    continue;
-                }
-
                 if (e.code === ErrorCodes.TransactionCommitted) {
                     // If running in the same_session workload, it is possible another worker thread
                     // has already committed this transaction, but a new one has not yet been
@@ -69,9 +65,16 @@ var $config = (function() {
                     break;
                 }
 
+                if ((e.hasOwnProperty('errorLabels') &&
+                     e.errorLabels.includes('TransientTransactionError')) ||
+                    e.code === ErrorCodes.ConflictingOperationInProgress) {
+                    joinAndRetry = true;
+                    continue;
+                }
+
                 throw e;
             }
-        } while (startNewTxn || conflictingOp);
+        } while (startNewTxn || joinAndRetry);
     }
 
     const states = {
@@ -136,7 +139,9 @@ var $config = (function() {
                         break;
                     }
 
-                    if (e.code === ErrorCodes.ConflictingOperationInProgress) {
+                    if ((e.hasOwnProperty('errorLabels') &&
+                         e.errorLabels.includes('TransientTransactionError')) ||
+                        e.code === ErrorCodes.ConflictingOperationInProgress) {
                         shouldJoin = true;
                         continue;
                     }

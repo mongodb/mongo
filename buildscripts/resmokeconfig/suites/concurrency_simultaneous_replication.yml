@@ -26,10 +26,6 @@ selector:
   # TODO SERVER-36848: This workload leads to a task timeout because the txnNumber being incremented
   # in a getMore command prevents the idle transaction from ever being aborted.
   - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
-
-  # TODO SERVER-36928: These workloads leads to failures because TransientTransactionErrors are not
-  # handled properly.
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands*.js
   exclude_with_any_tags:
   - requires_sharding
 
