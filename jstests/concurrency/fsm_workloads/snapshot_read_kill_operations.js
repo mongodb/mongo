@@ -48,8 +48,16 @@ var $config = (function() {
 
         killSessions: function killSessions(db, collName) {
             // Kill a random active session.
-            const idToKill = "sessionDoc" + Math.floor(Math.random() * this.threadCount);
-            const sessionDocToKill = db[collName].find({"_id": idToKill});
+            let idToKill = "sessionDoc" + Math.floor(Math.random() * this.threadCount);
+            let sessionDocToKill = db[collName].findOne({"_id": idToKill});
+
+            // Retry the find on idToKill in case the ID corresponds to a thread that has not
+            // inserted its sessionDoc yet, and make sure we don't kill our own thread.
+            while (!sessionDocToKill || idToKill == "sessionDoc" + this.tid) {
+                idToKill = "sessionDoc" + Math.floor(Math.random() * this.threadCount);
+                sessionDocToKill = db[collName].findOne({"_id": idToKill});
+            }
+
             assert.commandWorked(
                 this.sessionDb.runCommand({killSessions: [{id: sessionDocToKill.id}]}));
         },

@@ -27,6 +27,8 @@ selector:
   # would instead execute each state function as its own transaction.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands.js
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+  - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
+
   exclude_with_any_tags:
   - requires_sharding
 
