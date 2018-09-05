@@ -40,6 +40,20 @@ namespace mongo {
 
 namespace at_cluster_time_util {
 
+namespace {
+const char kReadConcernLevelSnapshotName[] = "snapshot";
+
+LogicalTime _computeAtClusterTime(OperationContext* opCtx,
+                                  bool mustRunOnAll,
+                                  const std::set<ShardId>& shardIds,
+                                  const NamespaceString& nss,
+                                  const BSONObj query,
+                                  const BSONObj collation) {
+    // TODO: SERVER-31767
+    return LogicalClock::get(opCtx)->getClusterTime();
+}
+}  // namespace
+
 BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
     BSONObjBuilder cmdAtClusterTimeBob;
     for (auto el : cmdObj) {
@@ -54,6 +68,13 @@ BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
                 }
             }
 
+            // Transactions will upconvert a read concern with afterClusterTime but no level to have
+            // level snapshot, so a command may have a read concern field with no level.
+            if (!readConcernBob.hasField(repl::ReadConcernArgs::kLevelFieldName)) {
+                readConcernBob.append(repl::ReadConcernArgs::kLevelFieldName,
+                                      kReadConcernLevelSnapshotName);
+            }
+
             readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
                                   atClusterTime.asTimestamp());
         } else {
@@ -62,19 +83,6 @@ BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
     }
 
     return cmdAtClusterTimeBob.obj();
-}
-
-namespace {
-
-LogicalTime _computeAtClusterTime(OperationContext* opCtx,
-                                  bool mustRunOnAll,
-                                  const std::set<ShardId>& shardIds,
-                                  const NamespaceString& nss,
-                                  const BSONObj query,
-                                  const BSONObj collation) {
-    // TODO: SERVER-31767
-    return LogicalClock::get(opCtx)->getClusterTime();
-}
 }
 
 boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,

@@ -40,9 +40,7 @@ BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& se
 
     bool isRetryable = ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code);
     bool isTransientTransactionError = code == ErrorCodes::WriteConflict  //
-        || code == ErrorCodes::SnapshotTooOld                             //
         || code == ErrorCodes::SnapshotUnavailable                        //
-        || code == ErrorCodes::StaleChunkHistory                          //
         || code == ErrorCodes::NoSuchTransaction                          //
         || code == ErrorCodes::LockTimeout                                //
         || code == ErrorCodes::PreparedTransactionInProgress              //

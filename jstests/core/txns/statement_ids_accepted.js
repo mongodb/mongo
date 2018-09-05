@@ -162,38 +162,6 @@
         autocommit: false
     }));
 
-    jsTestLog("Check that geoSearch accepts a statement ID");
-    assert.writeOK(testColl.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}),
-                   {writeConcern: {w: "majority"}});
-    assert.writeOK(testColl.insert({geoh: {lat: 0, long: 0}, b: 0}),
-                   {writeConcern: {w: "majority"}});
-    assert.commandWorked(sessionDb.runCommand({
-        createIndexes: collName,
-        indexes: [
-            {name: "geo", key: {geo: "2dsphere"}},
-            {name: "geoh", key: {geoh: "geoHaystack", b: 1}, bucketSize: 1}
-        ],
-        writeConcern: {w: "majority"}
-    }));
-    // Ensure the snapshot is available following the index creation.
-    assert.soonNoExcept(function() {
-        testColl.find({}, {readConcern: {level: "snapshot"}});
-        return true;
-    });
-
-    jsTestLog("Check that geoSearch accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        geoSearch: collName,
-        search: {b: 0},
-        near: [0, 0],
-        maxDistance: 1,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
-    }));
-
     jsTestLog("Check that insert accepts a statement ID");
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,
@@ -219,36 +187,73 @@
         stmtId: NumberInt(0)
     }));
 
-    jsTestLog("Check that prepareTransaction accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        insert: collName,
-        documents: [{_id: "doc2"}],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
-    }));
-    // prepareTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
-        prepareTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(1),
-        autocommit: false
-    }));
-    assert.commandWorked(sessionDb.adminCommand({
-        abortTransaction: 1,
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(2),
-        autocommit: false
-    }));
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        prepareTransaction: 1,
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-        autocommit: false
-    }),
-                                 ErrorCodes.Unauthorized);
+    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+    if (!isMongos) {
+        // Skip commands that do not exist on mongos.
+
+        jsTestLog("Check that geoSearch accepts a statement ID");
+        assert.writeOK(testColl.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}),
+                       {writeConcern: {w: "majority"}});
+        assert.writeOK(testColl.insert({geoh: {lat: 0, long: 0}, b: 0}),
+                       {writeConcern: {w: "majority"}});
+        assert.commandWorked(sessionDb.runCommand({
+            createIndexes: collName,
+            indexes: [
+                {name: "geo", key: {geo: "2dsphere"}},
+                {name: "geoh", key: {geoh: "geoHaystack", b: 1}, bucketSize: 1}
+            ],
+            writeConcern: {w: "majority"}
+        }));
+        // Ensure the snapshot is available following the index creation.
+        assert.soonNoExcept(function() {
+            testColl.find({}, {readConcern: {level: "snapshot"}});
+            return true;
+        });
+
+        jsTestLog("Check that geoSearch accepts a statement ID");
+        assert.commandWorked(sessionDb.runCommand({
+            geoSearch: collName,
+            search: {b: 0},
+            near: [0, 0],
+            maxDistance: 1,
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(txnNumber++),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false
+        }));
+
+        jsTestLog("Check that prepareTransaction accepts a statement ID");
+        assert.commandWorked(sessionDb.runCommand({
+            insert: collName,
+            documents: [{_id: "doc2"}],
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false
+        }));
+        // prepareTransaction can only be run on the admin database.
+        assert.commandWorked(sessionDb.adminCommand({
+            prepareTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(1),
+            autocommit: false
+        }));
+        assert.commandWorked(sessionDb.adminCommand({
+            abortTransaction: 1,
+            txnNumber: NumberLong(txnNumber++),
+            stmtId: NumberInt(2),
+            autocommit: false
+        }));
+        assert.commandFailedWithCode(sessionDb.runCommand({
+            prepareTransaction: 1,
+            txnNumber: NumberLong(txnNumber++),
+            stmtId: NumberInt(0),
+            autocommit: false
+        }),
+                                     ErrorCodes.Unauthorized);
+    }
 
     // refreshLogicalSessionCacheNow is intentionally omitted.
 

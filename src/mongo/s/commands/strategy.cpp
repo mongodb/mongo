@@ -404,6 +404,19 @@ void runCommand(OperationContext* opCtx,
 
                 Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNs);
 
+                // Update transaction tracking state for a possible retry. Throws if the transaction
+                // cannot continue.
+                if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                    txnRouter->onStaleShardOrDbError(commandName);
+                    // TODO SERVER-37210: Implicitly abort the transaction if this uassert throws.
+                    uassert(ErrorCodes::NoSuchTransaction,
+                            str::stream() << "Transaction " << opCtx->getTxnNumber()
+                                          << " was aborted after "
+                                          << kMaxNumStaleVersionRetries
+                                          << " failed retries",
+                            canRetry);
+                }
+
                 if (canRetry) {
                     continue;
                 }
@@ -412,25 +425,41 @@ void runCommand(OperationContext* opCtx,
                 // Mark database entry in cache as stale.
                 Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
                                                                          ex->getVersionReceived());
+
+                // Update transaction tracking state for a possible retry. Throws if the transaction
+                // cannot continue.
+                if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                    txnRouter->onStaleShardOrDbError(commandName);
+                    // TODO SERVER-37210: Implicitly abort the transaction if this uassert throws.
+                    uassert(ErrorCodes::NoSuchTransaction,
+                            str::stream() << "Transaction " << opCtx->getTxnNumber()
+                                          << " was aborted after "
+                                          << kMaxNumStaleVersionRetries
+                                          << " failed retries",
+                            canRetry);
+                }
+
                 if (canRetry) {
                     continue;
                 }
                 throw;
-            } catch (ExceptionForCat<ErrorCategory::SnapshotError>& ex) {
+            } catch (const ExceptionForCat<ErrorCategory::SnapshotError>&) {
                 // Simple retry on any type of snapshot error.
+
+                // Update transaction tracking state for a possible retry. Throws if the transaction
+                // cannot continue.
+                if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                    txnRouter->onSnapshotError();
+                    // TODO SERVER-37210: Implicitly abort the transaction if this uassert throws.
+                    uassert(ErrorCodes::NoSuchTransaction,
+                            str::stream() << "Transaction " << opCtx->getTxnNumber()
+                                          << " was aborted after "
+                                          << kMaxNumStaleVersionRetries
+                                          << " failed retries",
+                            canRetry);
+                }
+
                 if (canRetry) {
-                    auto txnRouter = TransactionRouter::get(opCtx);
-                    invariant(txnRouter);
-
-                    if (txnRouter->canContinueOnSnapshotError()) {
-                        txnRouter->onSnapshotError();
-                    } else {
-                        // TODO SERVER-36589: Abort the entire transaction.
-                        ex.addContext(
-                            "Encountered snapshot error on subsequent transaction statement");
-                        throw;
-                    }
-
                     continue;
                 }
                 throw;

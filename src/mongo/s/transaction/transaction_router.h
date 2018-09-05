@@ -71,7 +71,9 @@ public:
      */
     class Participant {
     public:
-        explicit Participant(bool isCoordinator, SharedTransactionOptions sharedOptions);
+        explicit Participant(bool isCoordinator,
+                             StmtId stmtIdCreatedAt,
+                             SharedTransactionOptions sharedOptions);
 
         enum class State {
             // Next transaction should include startTransaction.
@@ -101,9 +103,19 @@ public:
          */
         void markAsCommandSent();
 
+        /**
+         * Returns the highest statement id of the command during which this participant was
+         * created.
+         */
+        StmtId getStmtIdCreatedAt() const;
+
     private:
         State _state{State::kMustStart};
         const bool _isCoordinator{false};
+
+        // The highest statement id of the request during which this participant was created.
+        const StmtId _stmtIdCreatedAt{kUninitializedStmtId};
+
         const SharedTransactionOptions _sharedOptions;
     };
 
@@ -124,15 +136,15 @@ public:
     void checkOut();
 
     /**
-     * Returns true if the current transaction can retry on a snapshot error. This is only true on
-     * the first command recevied for a transaction.
+     * Updates the transaction state to allow for a retry of the current command on a stale version
+     * error. Will throw if the transaction cannot be continued.
      */
-    bool canContinueOnSnapshotError() const;
+    void onStaleShardOrDbError(StringData cmdName);
 
     /**
      * Resets the transaction state to allow for a retry attempt. This includes clearing all
      * participants and adding them to the orphaned list, clearing the coordinator, and resetting
-     * the global read timestamp.
+     * the global read timestamp. Will throw if the transaction cannot be continued.
      */
     void onSnapshotError();
 
@@ -193,6 +205,28 @@ private:
      * Run two phase commit for transactions that touched multiple shards.
      */
     Shard::CommandResponse _commitMultiShardTransaction(OperationContext* opCtx);
+
+    /**
+     * Returns true if the current transaction can retry on a stale version error from a contacted
+     * shard. This is always true except for an error received by a write that is not the first
+     * overall statement in the sharded transaction. This is because the entire command will be
+     * retried, and shards that were not stale and are targeted again may incorrectly execute the
+     * command a second time.
+     *
+     * Note: Even if this method returns true, the retry attempt may still fail, e.g. if one of the
+     * shards that returned a stale version error was involved in a previously completed a statement
+     * for this transaction.
+     *
+     * TODO SERVER-37207: Change batch writes to retry only the failed writes in a batch, to allow
+     * retrying writes beyond the first overall statement.
+     */
+    bool _canContinueOnStaleShardOrDbError(StringData cmdName) const;
+
+    /**
+     * Returns true if the current transaction can retry on a snapshot error. This is only true on
+     * the first command recevied for a transaction.
+     */
+    bool _canContinueOnSnapshotError() const;
 
     const LogicalSessionId _sessionId;
     TxnNumber _txnNumber{kUninitializedTxnNumber};

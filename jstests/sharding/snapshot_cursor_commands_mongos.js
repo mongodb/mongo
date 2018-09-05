@@ -100,15 +100,6 @@
                 assert.eq(
                     1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
 
-                // Routing table cache updates are necessary until mongos retargeting is fixed.
-                // TODO: SERVER-35707
-                assert.commandWorked(
-                    st.shard0.getDB('admin').runCommand({_flushRoutingTableCacheUpdates: ns}));
-                assert.commandWorked(
-                    st.shard1.getDB('admin').runCommand({_flushRoutingTableCacheUpdates: ns}));
-                assert.commandWorked(
-                    st.shard2.getDB('admin').runCommand({_flushRoutingTableCacheUpdates: ns}));
-
                 return st;
             }
         },
@@ -143,13 +134,6 @@
                     1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
                 assert.eq(
                     1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
-
-                // Routing table cache updates are necessary until mongos retargeting is fixed.
-                // TODO: SERVER-35707
-                assert.commandWorked(
-                    st.shard1.getDB('admin').runCommand({_flushRoutingTableCacheUpdates: ns}));
-                assert.commandWorked(
-                    st.shard2.getDB('admin').runCommand({_flushRoutingTableCacheUpdates: ns}));
 
                 return st;
             }

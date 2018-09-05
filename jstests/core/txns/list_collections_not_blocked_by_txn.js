@@ -12,6 +12,14 @@
 
     assert.commandWorked(mydb.createCollection("foo", {writeConcern: {w: "majority"}}));
     session.startTransaction({readConcern: {level: "snapshot"}});
+
+    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+    if (isMongos) {
+        // Force the shard to refresh its database version, because this requires a database
+        // exclusive lock, which will block behind the transaction.
+        sessionDb.foo.distinct("x");
+    }
+
     assert.commandWorked(sessionDb.foo.insert({x: 1}));
 
     for (let nameOnly of[false, true]) {

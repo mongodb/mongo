@@ -85,5 +85,28 @@ TEST(ClusterCommands, AddingAtClusterTimeOverwritesExistingAfterClusterTime) {
     ASSERT_BSONOBJ_EQ(expectedCommand, newCommand);
 }
 
+// Adding atClusterTime overwrites an existing afterClusterTime and will add level "snapshot" if it
+// is not there.
+TEST(ClusterCommands, AddingAtClusterTimeAddsLevelSnapshotIfNotThere) {
+    const auto existingAfterClusterTime = Timestamp(1, 1);
+    BSONObj command = BSON("aggregate"
+                           << "testColl"
+                           << "readConcern"
+                           << BSON("afterClusterTime" << existingAfterClusterTime));
+
+    const auto computedAtClusterTime = Timestamp(2, 1);
+    BSONObj expectedCommand = BSON("aggregate"
+                                   << "testColl"
+                                   << "readConcern"
+                                   << BSON("level"
+                                           << "snapshot"
+                                           << "atClusterTime"
+                                           << computedAtClusterTime));
+
+    BSONObj newCommand =
+        at_cluster_time_util::appendAtClusterTime(command, LogicalTime(computedAtClusterTime));
+    ASSERT_BSONOBJ_EQ(expectedCommand, newCommand);
+}
+
 }  // namespace
 }  // namespace mongo

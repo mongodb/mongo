@@ -55,7 +55,8 @@
 
             // Verify the command must fail on a snapshot error from a subsequent statement.
             setFailCommandOnShards(st, {times: 1}, [commandName], errorCode, 1);
-            const res = assert.commandFailedWithCode(sessionDB.runCommand(commandBody), errorCode);
+            const res = assert.commandFailedWithCode(sessionDB.runCommand(commandBody),
+                                                     ErrorCodes.NoSuchTransaction);
             assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
             session.abortTransaction();
@@ -68,7 +69,6 @@
 
     assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
-    flushShardRoutingTableUpdates(st, dbName, ns, 2);
 
     // Single shard case simulates the storage engine discarding an in-use snapshot.
     for (let errorCode of kSnapshotErrors) {
@@ -88,7 +88,6 @@
 
     assert.eq(2, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
     assert.eq(0, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
-    flushShardRoutingTableUpdates(st, dbName, ns, 2);
 
     for (let errorCode of kSnapshotErrors) {
         runTest(st, collName, errorCode);
@@ -100,7 +99,6 @@
         st.s.adminCommand({moveChunk: ns, find: {_id: 15}, to: st.shard1.shardName}));
     assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
     assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
-    flushShardRoutingTableUpdates(st, dbName, ns, 2);
 
     // Multi shard case simulates adding a new participant that can no longer support the already
     // chosen read timestamp.

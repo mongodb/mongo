@@ -62,10 +62,8 @@ selector:
   # TODO SERVER-35825: Mongos should only allow readConcern on writes that start transactions.
   - jstests/core/txns/no_read_concern_snapshot_outside_txn.js
 
-  # TODO SERVER-35707: Figure out transaction abort state on re-targeting exceptions.
+  # TODO SERVER-37209: Allow mongos to retry on view errors.
   - jstests/core/txns/view_reads_in_transaction.js
-  - jstests/core/txns/list_collections_not_blocked_by_txn.js
-  - jstests/core/txns/statement_ids_accepted.js
 
   # Uses hangAfterCollectionInserts failpoint not available on mongos.
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js

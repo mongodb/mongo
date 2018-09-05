@@ -29,10 +29,6 @@
     // Insert data to create the collection.
     assert.writeOK(testDB[collName].insert({x: 1}));
 
-    // TODO SERVER-35707: Re-targeting errors abort transactions. Run distinct on the unsharded
-    // collection to force the shard and mongos to refresh their DB versions.
-    assert.commandWorked(testDB.runCommand({distinct: collName, key: "x"}));
-
     // noPassthrough tests
 
     // readConcern 'snapshot' is not allowed outside session context.

@@ -44,6 +44,8 @@ selector:
   - jstests/sharding/snapshot_cursor_commands_mongos.js
   - jstests/sharding/transactions_snapshot_errors_first_statement.js
   - jstests/sharding/transactions_snapshot_errors_subsequent_statements.js
+  - jstests/sharding/transactions_stale_database_version_errors.js
+  - jstests/sharding/transactions_stale_shard_version_errors.js
   - jstests/sharding/txn_basic_two_phase_commit.js
   - jstests/sharding/txn_coordinator_commands_basic_requirements.js
   - jstests/sharding/update_sharded.js

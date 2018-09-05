@@ -64,7 +64,9 @@
     // since the transaction's read timestamp. Since our implementation of the in-memory collection
     // catalog always has the most recent collection metadata, we do not allow you to read from a
     // collection at a time prior to its most recent catalog changes.
-    assert.commandFailedWithCode(sessionCollB.insert({}), ErrorCodes.SnapshotUnavailable);
+    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+    const expectedCode = isMongos ? ErrorCodes.NoSuchTransaction : ErrorCodes.SnapshotUnavailable;
+    assert.commandFailedWithCode(sessionCollB.insert({}), expectedCode);
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 

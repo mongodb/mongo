@@ -52,6 +52,8 @@ protected:
     const ShardId shard2 = ShardId("shard2");
     const HostAndPort hostAndPort2 = HostAndPort("shard2:1234");
 
+    const ShardId shard3 = ShardId("shard3");
+
     void setUp() {
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
@@ -833,7 +835,6 @@ TEST_F(TransactionRouterTest, SnapshotErrorsResetAtClusterTime) {
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
 
     // Simulate a snapshot error.
-    ASSERT(txnRouter.canContinueOnSnapshotError());
     txnRouter.onSnapshotError();
 
     txnRouter.setAtClusterTimeToLatestTime(operationContext());
@@ -915,7 +916,6 @@ TEST_F(TransactionRouterTest, SnapshotErrorsAddAllParticipantsToOrphanedList) {
     // Simulate a snapshot error and an internal retry that only re-targets one of the original two
     // shards.
 
-    ASSERT(txnRouter.canContinueOnSnapshotError());
     txnRouter.onSnapshotError();
 
     ASSERT_FALSE(txnRouter.getCoordinatorId());
@@ -941,35 +941,220 @@ TEST_F(TransactionRouterTest, SnapshotErrorsAddAllParticipantsToOrphanedList) {
     }
 }
 
-TEST_F(TransactionRouterTest, CanOnlyContinueOnSnapshotErrorOnFirstCommand) {
+TEST_F(TransactionRouterTest, OnSnapshotErrorThrowsAfterFirstCommand) {
     TxnNumber txnNum{3};
 
     TransactionRouter txnRouter({});
     txnRouter.checkOut();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
 
-    ASSERT(txnRouter.canContinueOnSnapshotError());
+    // Should not throw.
+    txnRouter.onSnapshotError();
 
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
-    ASSERT_FALSE(txnRouter.canContinueOnSnapshotError());
+    ASSERT_THROWS_CODE(
+        txnRouter.onSnapshotError(), AssertionException, ErrorCodes::NoSuchTransaction);
 
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
-    ASSERT_FALSE(txnRouter.canContinueOnSnapshotError());
+    ASSERT_THROWS_CODE(
+        txnRouter.onSnapshotError(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
-DEATH_TEST_F(TransactionRouterTest, CannotCallOnSnapshotErrorAfterFirstCommand, "invariant") {
+TEST_F(TransactionRouterTest, ParticipantsRememberStmtIdCreatedAt) {
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+
+    TxnNumber txnNum{3};
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    // Transaction 1 contacts shard1 and shard2 during the first command, then shard3 in the second
+    // command.
+
+    int initialStmtId = 0;
+    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard1).getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard2).getStmtIdCreatedAt(), initialStmtId);
+
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
+
+    ShardId shard3("shard3");
+    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard3).getStmtIdCreatedAt(), initialStmtId + 1);
+
+    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard1).getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard2).getStmtIdCreatedAt(), initialStmtId);
+
+    // Transaction 2 contacts shard3 and shard2 during the first command, then shard1 in the second
+    // command.
+
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+    TxnNumber txnNum2{5};
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum2, true);
+
+    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard3).getStmtIdCreatedAt(), initialStmtId);
+    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard2).getStmtIdCreatedAt(), initialStmtId);
+
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum2, false);
+
+    ASSERT_EQ(txnRouter.getOrCreateParticipant(shard1).getStmtIdCreatedAt(), initialStmtId + 1);
+}
+
+TEST_F(TransactionRouterTest, AllParticipantsAndCoordinatorClearedOnStaleErrorOnFirstCommand) {
     TxnNumber txnNum{3};
 
     TransactionRouter txnRouter({});
     txnRouter.checkOut();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
 
+    // Start a transaction on two shards, selecting one as the coordinator, but simulate a
+    // re-targeting error from at least one of them.
+
+    txnRouter.getOrCreateParticipant(shard1).markAsCommandSent();
+    txnRouter.getOrCreateParticipant(shard2).markAsCommandSent();
+
+    ASSERT(txnRouter.getCoordinatorId());
+    ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
+
+    ASSERT(txnRouter.getOrphanedParticipants().empty());
+
+    // Simulate stale error and internal retry that only re-targets one of the original shards.
+
+    txnRouter.onStaleShardOrDbError("find");
+
+    ASSERT_FALSE(txnRouter.getCoordinatorId());
+    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 2U);
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard2);
+        ASSERT(participant.mustStartTransaction());
+        participant.markAsCommandSent();
+        ASSERT_FALSE(participant.mustStartTransaction());
+    }
+
+    // There is a new coordinator and shard1 is still in the orphaned list.
+    ASSERT(txnRouter.getCoordinatorId());
+    ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
+    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 1U);
+    ASSERT_EQ(txnRouter.getOrphanedParticipants().count(shard1), 1U);
+
+    // Shard1 has not started a transaction.
+    ASSERT(txnRouter.getOrCreateParticipant(shard1).mustStartTransaction());
+}
+
+TEST_F(TransactionRouterTest, OnlyNewlyCreatedParticipantsAddedToOrphanedListOnStaleError) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    // First statement successfully targets one shard, selecing it as the coordinator.
+
+    txnRouter.getOrCreateParticipant(shard1).markAsCommandSent();
+
+    ASSERT(txnRouter.getCoordinatorId());
+    ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
+
+    ASSERT(txnRouter.getOrphanedParticipants().empty());
+
+    // Start a subsequent statement that targets two new shards and encounters a stale error from at
+    // least one of them.
+
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
 
-    txnRouter.onSnapshotError();
+    txnRouter.getOrCreateParticipant(shard2).markAsCommandSent();
+    txnRouter.getOrCreateParticipant(shard3).markAsCommandSent();
+
+    txnRouter.onStaleShardOrDbError("find");
+
+    // Only the two new shards are in the orphaned list.
+    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 2U);
+    ASSERT_EQ(txnRouter.getOrphanedParticipants().count(shard1), 0U);
+
+    // Shards 2 and 3 must start a transaction, but shard 1 must not.
+    ASSERT_FALSE(txnRouter.getOrCreateParticipant(shard1).mustStartTransaction());
+    ASSERT(txnRouter.getOrCreateParticipant(shard2).mustStartTransaction());
+    ASSERT(txnRouter.getOrCreateParticipant(shard3).mustStartTransaction());
+}
+
+TEST_F(TransactionRouterTest, RetryOnStaleErrorCannotPickNewAtClusterTime) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    txnRouter.setAtClusterTimeToLatestTime(operationContext());
+
+    BSONObj expectedReadConcern = BSON("level"
+                                       << "snapshot"
+                                       << "atClusterTime"
+                                       << kInMemoryLogicalTime.asTimestamp());
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("find"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
+        participant.markAsCommandSent();
+    }
+
+    // Advance the latest time in the logical clock, simulate a stale config/db error, and verify
+    // the retry attempt cannot pick a new atClusterTime.
+    LogicalTime laterTime(Timestamp(1000, 1));
+    ASSERT_GT(laterTime, kInMemoryLogicalTime);
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
+
+    txnRouter.onStaleShardOrDbError("find");
+
+    txnRouter.setAtClusterTimeToLatestTime(operationContext());
+
+    {
+        auto& participant = txnRouter.getOrCreateParticipant(shard1);
+        auto newCmd = participant.attachTxnFieldsIfNeeded(BSON("find"
+                                                               << "test"));
+        ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
+    }
+}
+
+TEST_F(TransactionRouterTest, WritesCanOnlyBeRetriedIfFirstOverallCommand) {
+    auto writeCmds = {"insert", "update", "delete", "findAndModify", "findandmodify"};
+    auto otherCmds = {"find", "distinct", "aggregate", "killCursors", "getMore"};
+
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    txnRouter.getOrCreateParticipant(shard1).markAsCommandSent();
+
+    for (auto writeCmd : writeCmds) {
+        txnRouter.onStaleShardOrDbError(writeCmd);  // Should not throw.
+    }
+
+    for (auto cmd : otherCmds) {
+        txnRouter.onStaleShardOrDbError(cmd);  // Should not throw.
+    }
+
+    // Advance to the next command.
+
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
+
+    for (auto writeCmd : writeCmds) {
+        ASSERT_THROWS_CODE(txnRouter.onStaleShardOrDbError(writeCmd),
+                           AssertionException,
+                           ErrorCodes::NoSuchTransaction);
+    }
+
+    for (auto cmd : otherCmds) {
+        txnRouter.onStaleShardOrDbError(cmd);  // Should not throw.
+    }
 }
 
 }  // unnamed namespace

@@ -43,9 +43,13 @@
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
+MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
 
 namespace {
 
@@ -84,6 +88,10 @@ void onShardVersionMismatch(OperationContext* opCtx,
         // smaller than the one we know about. This means that the remote side is behind.
     }
 
+    if (MONGO_FAIL_POINT(skipShardFilteringMetadataRefresh)) {
+        return;
+    }
+
     forceShardFilteringMetadataRefresh(opCtx, nss, forceRefreshFromThisThread);
 }
 
@@ -106,6 +114,10 @@ void onDbVersionMismatch(OperationContext* opCtx,
     // just an optimization so that mongos does not exhaust its maximum number of
     // StaleDatabaseVersion retry attempts while the movePrimary is being committed.
     OperationShardingState::get(opCtx).waitForMovePrimaryCriticalSectionSignal(opCtx);
+
+    if (MONGO_FAIL_POINT(skipDatabaseVersionMetadataRefresh)) {
+        return;
+    }
 
     forceDatabaseRefresh(opCtx, dbName);
 }
