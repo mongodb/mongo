@@ -34,7 +34,7 @@
 
     var config = replTest.getReplSetConfig();
     config.version = replTest.getReplSetConfigFromNode().version + 1;
-    config.members.push({_id: 2, host: hostname + ":" + s.port, priority: 0});
+    config.members.push({_id: 2, host: hostname + ":" + s.port, priority: 0, votes: 0});
     try {
         m.getDB("admin").runCommand({replSetReconfig: config});
     } catch (e) {

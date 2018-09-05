@@ -30,7 +30,12 @@
     const secondary = rst.add({setParameter: {allowUnsafeRenamesDuringInitialSync: true}});
     assert.commandWorked(secondary.adminCommand(
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
-    rst.reInitiate();
+
+    jsTestLog('Begin initial sync on secondary');
+    let conf = rst.getPrimary().getDB('admin').runCommand({replSetGetConfig: 1}).config;
+    conf.members.push({_id: 1, host: secondary.host, priority: 0, votes: 0});
+    conf.version++;
+    assert.commandWorked(rst.getPrimary().getDB('admin').runCommand({replSetReconfig: conf}));
     assert.eq(primary, rst.getPrimary(), 'Primary changed after reconfig');
 
     // Wait for fail point message to be logged.
