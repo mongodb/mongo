@@ -66,7 +66,7 @@
     const minValidDocBeforeUpdate = minValidColl.findOne();
     jsTestLog('Minvalid document before updates: ' + tojson(minValidDocBeforeUpdate));
 
-    const numUpdates = 1000;
+    const numUpdates = 500;
     jsTestLog('Writing ' + numUpdates + ' updates to ' + numDocs +
               ' documents on secondary after disabling snapshots.');
     for (let i = 0; i < numDocs; ++i) {
