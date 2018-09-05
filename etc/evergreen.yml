@@ -9943,6 +9943,8 @@ buildvariants:
   - name: benchmarks_sharding
   - name: buildscripts_test
   - name: dbtest_TG
+    distros:
+    - windows-64-vs2015-large
   - name: ese
   - name: external_auth
     distros:
