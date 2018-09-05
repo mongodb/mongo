@@ -500,7 +500,35 @@ TEST(PlanCacheIndexabilityTest, AllPathsWithCollationDiscriminator) {
         parseMatchExpression(fromjson("{a: \"hello world\"}"), &collator).get()));
 }
 
-// TODO SERVER-35336: Update this test to use a partial $** index, and be sure indexability
-// discriminators also work for partial indices.
+TEST(PlanCacheIndexabilityTest, AllPathsPartialIndexDiscriminator) {
+    PlanCacheIndexabilityState state;
+
+    // Need to keep the filter BSON object around for the duration of the test since the match
+    // expression will store (unowned) pointers into it.
+    BSONObj filterObj = fromjson("{a: {$gt: 5}}");
+    auto filterExpr = parseMatchExpression(filterObj);
+    IndexEntry entry(BSON("$**" << 1),
+                     false,  // multikey
+                     false,  // sparse
+                     false,  // unique
+                     IndexEntry::Identifier{"indexName"},
+                     filterExpr.get(),
+                     BSONObj());
+    state.updateDiscriminators({entry});
+
+    auto discriminatorsA = state.buildAllPathsDiscriminators("a");
+    ASSERT_EQ(1U, discriminatorsA.size());
+    ASSERT(discriminatorsA.find("indexName") != discriminatorsA.end());
+
+    const auto disc = discriminatorsA["indexName"];
+
+    // Match expression which queries for a value not included by the filter expression cannot use
+    // the index.
+    ASSERT_FALSE(disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 0}")).get()));
+
+    // Match expression which queries for a value included by the filter expression does not get
+    // discriminated out.
+    ASSERT_TRUE(disc.isMatchCompatibleWithIndex(parseMatchExpression(fromjson("{a: 6}")).get()));
+}
 }  // namespace
 }  // namespace mongo

@@ -110,6 +110,27 @@
                    queryWithStringExplain.queryPlanner.queryHash);
     })();
 
-    // TODO SERVER-35336: Update this test to use a partial $** index, and be sure indexability
-    // discriminators also work for partial indices.
+    // Check that indexability discriminators work with partial allPaths indexes.
+    (function() {
+        assert.eq(coll.drop(), true);
+        assert.commandWorked(db.createCollection(coll.getName()));
+        assert.commandWorked(
+            coll.createIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 5}}}));
+
+        // Run a query for a value included by the partial filter expression.
+        const queryIndexedExplain = coll.find({a: 4}).explain();
+        let ixScans = getPlanStages(queryIndexedExplain.queryPlanner.winningPlan, "IXSCAN");
+        assert.eq(ixScans.length, 1);
+        assert.eq(ixScans[0].keyPattern, {$_path: 1, a: 1});
+
+        // Run a query which tries to get a value not included by the partial filter expression.
+        const queryUnindexedExplain = coll.find({a: 100}).explain();
+        ixScans = getPlanStages(queryUnindexedExplain.queryPlanner.winningPlan, "IXSCAN");
+        assert.eq(ixScans.length, 0);
+
+        // Check that the shapes are different since the query which searches for a value not
+        // included by the partial filter expression won't be eligible to use the $** index.
+        assert.neq(queryIndexedExplain.queryPlanner.queryHash,
+                   queryUnindexedExplain.queryPlanner.queryHash);
+    })();
 })();
