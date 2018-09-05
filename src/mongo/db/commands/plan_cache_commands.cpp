@@ -308,18 +308,14 @@ Status PlanCacheClear::clear(OperationContext* opCtx,
 
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        if (planCache->get(*cq).state == PlanCache::CacheEntryState::kNotPresent) {
-            // Log if asked to clear non-existent query shape.
+        Status result = planCache->remove(*cq);
+        if (!result.isOK()) {
+            invariant(result.code() == ErrorCodes::NoSuchKey);
             LOG(1) << ns << ": query shape doesn't exist in PlanCache - "
                    << redact(cq->getQueryObj()) << "(sort: " << cq->getQueryRequest().getSort()
                    << "; projection: " << cq->getQueryRequest().getProj()
                    << "; collation: " << cq->getQueryRequest().getCollation() << ")";
             return Status::OK();
-        }
-
-        Status result = planCache->remove(*cq);
-        if (!result.isOK()) {
-            return result;
         }
 
         LOG(1) << ns << ": removed plan cache entry - " << redact(cq->getQueryObj())

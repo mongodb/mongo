@@ -38,7 +38,7 @@
     assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
 
     // Invalid key should be a no-op.
-    t.runCommand('planCacheClear', {query: {unknownfield: 1}});
+    assert.commandWorked(t.runCommand('planCacheClear', {query: {unknownfield: 1}}));
     assert.eq(
         1, getShapes().length, 'removing unknown query should not affecting exisiting entries');
 
