@@ -417,7 +417,7 @@ void ReplicationCoordinatorEmbedded::dropAllSnapshots() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::stepUpIfEligible() {
+Status ReplicationCoordinatorEmbedded::stepUpIfEligible(bool skipDryRun) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

@@ -714,6 +714,7 @@ public:
         kElectionTimeout,
         kPriorityTakeover,
         kStepUpRequest,
+        kStepUpRequestSkipDryRun,
         kCatchupTakeover,
         kSingleNodePromptElection
     };
