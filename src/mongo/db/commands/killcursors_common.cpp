@@ -65,10 +65,10 @@ Status KillCursorsCmdBase::checkAuthForCommand(Client* client,
     return Status::OK();
 }
 
-bool KillCursorsCmdBase::run(OperationContext* opCtx,
-                             const std::string& dbname,
-                             const BSONObj& cmdObj,
-                             BSONObjBuilder& result) {
+bool KillCursorsCmdBase::runImpl(OperationContext* opCtx,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj,
+                                 BSONObjBuilder& result) {
     auto statusWithRequest = KillCursorsRequest::parseFromBSON(dbname, cmdObj);
     uassertStatusOK(statusWithRequest.getStatus());
     auto killCursorsRequest = std::move(statusWithRequest.getValue());

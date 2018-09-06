@@ -69,10 +69,10 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) const final;
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) final;
+    bool runImpl(OperationContext* opCtx,
+                 const std::string& dbname,
+                 const BSONObj& cmdObj,
+                 BSONObjBuilder& result);
 
 private:
     /**

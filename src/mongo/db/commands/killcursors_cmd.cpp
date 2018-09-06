@@ -55,6 +55,13 @@ public:
             level == repl::ReadConcernLevel::kSnapshotReadConcern;
     }
 
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) final {
+        return runImpl(opCtx, dbname, cmdObj, result);
+    }
+
 private:
     Status _checkAuth(Client* client, const NamespaceString& nss, CursorId id) const final {
         auto opCtx = client->getOperationContext();

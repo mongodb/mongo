@@ -32,6 +32,7 @@
 #include "mongo/db/commands/killcursors_common.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/transaction/transaction_router.h"
 
 namespace mongo {
 namespace {
@@ -45,6 +46,23 @@ public:
                              repl::ReadConcernLevel level) const final {
         // killCursors must support read concerns in order to be run in transactions.
         return true;
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) final {
+        // killCursors must choose a global read timestamp if it is the first command in a
+        // transaction with snapshot level read concern because any shards it may contact will not
+        // be able to change the snapshot of the local transactions they begin.
+        //
+        // TODO SERVER-37045: This can be removed once killCursors is not allowed to start a
+        // cross-shard transaction.
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter->setAtClusterTimeToLatestTime(opCtx);
+        }
+
+        return runImpl(opCtx, dbname, cmdObj, result);
     }
 
 private:
