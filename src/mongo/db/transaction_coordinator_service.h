@@ -39,8 +39,8 @@ namespace mongo {
 
 class ShardId;
 class OperationContext;
+class ServiceContext;
 
-// TODO (SERVER-37026): Add TransactionCoordinatorService to the Grid.
 // TODO (SERVER-37017): Update comments to reflect asynchronicity of relevant methods.
 class TransactionCoordinatorService final {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorService);
@@ -53,6 +53,12 @@ public:
 
     TransactionCoordinatorService();
     ~TransactionCoordinatorService();
+
+    /**
+     * Retrieves the TransactionCoordinatorService associated with the service or operation context.
+     */
+    static TransactionCoordinatorService* get(OperationContext* opCtx);
+    static TransactionCoordinatorService* get(ServiceContext* serviceContext);
 
     /**
      * Creates a new TransactionCoordinator for the given session id and transaction number, with a

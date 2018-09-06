@@ -33,6 +33,7 @@
 #include "mongo/db/transaction_coordinator_service.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/transaction_coordinator.h"
 #include "mongo/db/transaction_coordinator_commands_impl.h"
 #include "mongo/executor/task_executor.h"
@@ -41,9 +42,22 @@
 
 namespace mongo {
 
+namespace {
+const auto transactionCoordinatorServiceDecoration =
+    ServiceContext::declareDecoration<TransactionCoordinatorService>();
+}
+
 TransactionCoordinatorService::TransactionCoordinatorService() = default;
 
 TransactionCoordinatorService::~TransactionCoordinatorService() = default;
+
+TransactionCoordinatorService* TransactionCoordinatorService::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
+TransactionCoordinatorService* TransactionCoordinatorService::get(ServiceContext* serviceContext) {
+    return &transactionCoordinatorServiceDecoration(serviceContext);
+}
 
 void TransactionCoordinatorService::createCoordinator(LogicalSessionId lsid,
                                                       TxnNumber txnNumber,
