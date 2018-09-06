@@ -559,4 +559,31 @@ TEST_F(QueryPlannerTest, NoSortStageWhenMinMaxIndexCollationDoesNotMatchButBound
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1, c: 1}}}}}");
 }
 
+TEST_F(QueryPlannerTest, StringComparisonWithUnequalCollatorsAndAllPathsIndexResultsInCollscan) {
+    CollatorInterfaceMock alwaysEqualCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    addIndex(fromjson("{'$**': 1}"), &alwaysEqualCollator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: {$lt: 'foo'}}, collation: {locale: 'reverse'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, StringComparisonWithEqualCollatorsAndAllPathsIndexUsesIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+
+    CollatorInterfaceMock reverseStringCollator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{'$**': 1}"), &reverseStringCollator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: {$lt: 'foo'}}, collation: {locale: 'reverse'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, collation: {locale: 'reverse'}, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], 'a': [['','oof',true,false]]}}}}}");
+}
+
 }  // namespace

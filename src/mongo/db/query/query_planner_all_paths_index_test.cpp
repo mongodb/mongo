@@ -271,4 +271,324 @@ TEST_F(QueryPlannerAllPathsTest, AllPredsEligibleForIndexUseGenerateCandidatePla
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[0,Infinity,false,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerAllPathsTest, RangeIndexScan) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$gt: 0, $lt: 9}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[0,9,false,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, RangeIndexScanEmptyRange) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$gt: 9, $lt: 0}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], 'a': []}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, RangeIndexScanMinKeyMaxKey) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$gt: {$minKey: 1}, $lt: {$maxKey: 1}}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true], ['a.', 'a/', true, false]], 'a': [['MinKey', "
+        "'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, RangeIndexScanNestedField) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{'a.b': {$gt: 0, $lt: 9}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.b': 1},"
+        "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[0,9,false,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, EqualityIndexScan) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$eq: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, EqualityIndexScanOverNestedField) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{'a.b': {$eq: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.b': 1},"
+        "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[5,5,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ExprEqCanUseIndex) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ExprEqCanUseSparseIndexForEqualityToNull) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$_internalExprEq: null}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$_internalExprEq: null}}, node: {ixscan: {pattern: {'$_path': 1, a: "
+        "1}, bounds: {'$_path': [['a','a',true,true]], a: [[undefined,undefined,true,true], "
+        "[null,null,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, PrefixRegex) {
+    addIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: /^foo/}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]],"
+        "a: [['foo','fop',true,false], [/^foo/,/^foo/,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, NonPrefixRegex) {
+    addIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: /foo/}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: {a: /foo/}, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]],"
+        "a: [['',{},true,false], [/foo/,/foo/,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, GreaterThan) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$gt: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[5,Infinity,false,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, GreaterThanEqualTo) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$gte: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[5,Infinity,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, LessThan) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$lt: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[-Infinity,5,true,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, LessThanEqualTo) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$lte: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[-Infinity,5,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, Mod) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$mod: [2, 0]}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: {a: {$mod: [2, 0]}}, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[NaN,Infinity, true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ExistsTrue) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{x: {$exists: true}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, x: 1},"
+        "bounds: {'$_path': [['x','x',true,true],['x.','x/',true,false]], x: "
+        "[['MinKey','MaxKey',true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ExistsFalseDoesNotUseIndex) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{x: {$exists: false}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AndEqualityWithTwoPredicatesIndexesOnePath) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: 5, b: 10}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {filter: {b: {$eq: 10}}, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, OrEqualityWithTwoPredicatesUsesTwoPaths) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{$or: [{a: 5}, {b: 10}]}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {or: {nodes: ["
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}, "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, b: 1},"
+        "bounds: {'$_path': [['b','b',true,true]], b: [[10,10,true,true]]}}}]}}}}");
+    ;
+}
+
+TEST_F(QueryPlannerAllPathsTest, OrWithOneRegularAndOneAllPathsIndexPathUsesTwoIndexes) {
+    addAllPathsIndex(BSON("a.$**" << 1));
+    addIndex(BSON("b" << 1));
+    runQuery(fromjson("{$or: [{a: 5}, {b: 10}]}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {or: {nodes: ["
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}, "
+        "{ixscan: {filter: null, pattern: {b: 1},"
+        "bounds: {b: [[10,10,true,true]]}}}]}}}}");
+    ;
+}
+
+TEST_F(QueryPlannerAllPathsTest, BasicSkip) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuerySkipNToReturn(BSON("a" << 5), 8, 0);
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {skip: {n: 8, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, CoveredSkip) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuerySortProjSkipNToReturn(fromjson("{a: 5}"), BSONObj(), fromjson("{_id: 0, a: 1}"), 8, 0);
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {skip: {n: 8, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, BasicLimit) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuerySkipNToReturn(BSON("a" << 5), 0, -5);
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{limit: {n: 5, node: {fetch: {filter: null, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[5,5,true,true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, BasicCovering) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuerySortProj(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{_id: 0, x: 1}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, x: 1}, node: {ixscan: {filter: null, pattern: {'$_path': 1, x: 1},"
+        "bounds: {'$_path': [['x','x',true,true]], x: [[1,Infinity,false,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, DottedFieldCovering) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuerySortProj(fromjson("{'a.b': 5}"), BSONObj(), fromjson("{_id: 0, 'a.b': 1}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, 'a.b': 1}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
+        "'a.b': 1},"
+        "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[5,5,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, CoveredIxscanForCountOnIndexedPath) {
+    params.options = QueryPlannerParams::IS_COUNT;
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: 5}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{ixscan: {filter: null, pattern: {'$_path': 1, 'a': 1},"
+        "bounds: {'$_path': [['a','a',true,true]], 'a': [[5,5,true,true]]}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, InBasic) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$in: [1, 2]}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, "
+        "node: {ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true],[2,2,true,true]]}}}}}");
+}
+
+// Logically equivalent to the preceding $in query.
+// Indexed solution should be the same.
+TEST_F(QueryPlannerAllPathsTest, InBasicOrEquivalent) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{$or: [{a: 1}, {a: 2}]}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, "
+        "node: {ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true],[2,2,true,true]]}}}}}");
+}
+
+// TODO SERVER-35335: Add testing for Min/Max.
+// TODO SERVER-36517: Add testing for DISTINCT_SCAN.
+// TODO SERVER-35336: Add testing for partialFilterExpression.
+// TODO SERVER-35331: Add testing for hints.
+// TODO SERVER-36145: Add testing for non-blocking sort.
+
 }  // namespace mongo
