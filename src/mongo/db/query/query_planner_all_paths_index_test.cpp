@@ -895,6 +895,97 @@ TEST_F(QueryPlannerTest, MultipleAllPathsIndexesHintWithPartialFilter) {
     assertNumSolutions(0U);
 }
 
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportObjectEquality) {
+    addIndex(BSON("$**" << 1));
+
+    runQuery(fromjson("{x: {abc: 1}}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{$or: [{z: {abc: 1}}]}"));
+    assertHasOnlyCollscan();
+
+    // We can only use the index for the predicate on 'x'.
+    runQuery(fromjson("{x: 5, y: {abc: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportObjectInequality) {
+    addIndex(BSON("$**" << 1));
+
+    runQuery(fromjson("{x: {$lt: {abc: 1}}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$lte: {abc: 1}}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$gte: {abc: 1}}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$gt: {abc: 1}}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {ne: {abc: 1}}}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{x: {$lt: [1, 2, 'a string']}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$lte: [1, 2, 'a string']}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$gte: [1, 2, 'a string']}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$gt: [1, 2, 'a string']}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {ne: [1, 2, 'a string']}}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{$or: [{z: {$ne: {abc: 1}}}]}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{$and: [{x: 5}, {$or: [{x: 1}, {y: {abc: 1}}]}]}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportInWithUnsupportedValues) {
+    addIndex(BSON("$**" << 1));
+
+    runQuery(fromjson("{x: {$in: [1, 2, 3, {abc: 1}]}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$in: [1, 2, 3, ['a', 'b', 'c']]}}"));
+    assertHasOnlyCollscan();
+    runQuery(fromjson("{x: {$in: [1, 2, 3, null]}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesSupportElemMatchWithNull) {
+    addIndex(BSON("$**" << 1));
+
+    // Simple case.
+    runQuery(fromjson("{x: {$elemMatch: {$lt: 5, $gt: 0}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
+
+    // null inside an $in inside an $elemMatch is supported by the allPaths index, since it means
+    // we're searching for an explicit null value.
+    runQuery(fromjson("{x: {$elemMatch: {$in: [1, 2, 3, null]}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportElemMatchWithUnsupportedValues) {
+    runQuery(fromjson("{x: {$elemMatch: {$eq: ['a', 'b', 'c']}}}"));
+    assertHasOnlyCollscan();
+
+    // An object or array inside an $in inside a $elemMatch is not supported by the index.
+    runQuery(fromjson("{x: {$elemMatch: {$in: [1, 2, 3, {a: 1}]}}}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{x: {$elemMatch: {$in: [1, 2, 3, ['a', 'b', 'c']]}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportElemMatchObject) {
+    runQuery(fromjson("{x: {$elemMatch: {a: 1}}}"));
+    assertHasOnlyCollscan();
+}
+
 // TODO SERVER-35335: Add testing for Min/Max.
 // TODO SERVER-36517: Add testing for DISTINCT_SCAN.
 // TODO SERVER-35331: Add testing for hints.

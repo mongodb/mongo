@@ -151,6 +151,17 @@ public:
     static std::vector<IndexEntry> expandIndexes(const stdx::unordered_set<std::string>& fields,
                                                  const std::vector<IndexEntry>& relevantIndices);
 
+    /**
+     * Check if this match expression is a leaf and is supported by an allPaths index.
+     */
+    static bool nodeIsSupportedByAllPathsIndex(const MatchExpression* queryExpr);
+
+    /*
+     * Return true if the given match expression can use a sparse index, false otherwise. This will
+     * not traverse the children of the given match expression.
+     */
+    static bool nodeIsSupportedBySparseIndex(const MatchExpression* queryExpr, bool isInElemMatch);
+
 private:
     /**
      * Used to keep track of if any $elemMatch predicates were encountered when walking a

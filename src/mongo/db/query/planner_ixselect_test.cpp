@@ -1510,4 +1510,47 @@ TEST(QueryPlannerIXSelectTest, AllPathsIndicesIncludeMatchingInternalNodes) {
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));
 }
 
+TEST(QueryPlannerIXSelectTest, AllPathsIndexSupported) {
+    ASSERT_FALSE(QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex(
+        parseMatchExpression(fromjson("{x: {abc: 1}}")).get()));
+    ASSERT_FALSE(QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex(
+        parseMatchExpression(fromjson("{x: {$lt: {abc: 1}}}")).get()));
+    ASSERT_FALSE(QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex(
+        parseMatchExpression(fromjson("{x: {$in: [1, 2, 3, {abc: 1}]}}")).get()));
+}
+
+TEST(QueryPlannerIXSelectTest, AllPathsIndexSupportedDoesNotTraverse) {
+    // The function will not traverse a node's children.
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex(
+        parseMatchExpression(fromjson("{$or: [{z: {abc: 1}}]}")).get()));
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex(
+        parseMatchExpression(fromjson("{x: 5, y: {abc: 1}}")).get()));
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex(
+        parseMatchExpression(fromjson("{x: {$ne: {abc: 1}}}")).get()));
+}
+
+TEST(QueryPlannerIXSelectTest, SparseIndexSupported) {
+    auto filterAObj = fromjson("{x: null}");
+    const auto queryA = parseMatchExpression(filterAObj);
+    ASSERT_FALSE(QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(queryA.get(), false));
+    // When in an elemMatch, a comparison to null implies literal null, so it is always supported.
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(queryA.get(), true));
+
+    auto filterBObj = fromjson("{x: {$in: [1, 2, 3, null]}}");
+    const auto queryB = parseMatchExpression(filterBObj);
+    ASSERT_FALSE(QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(queryB.get(), false));
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(queryB.get(), true));
+}
+
+TEST(QueryPlannerIXSelectTest, SparseIndexSupportedDoesNotTraverse) {
+    // The function will not traverse a node's children.
+    const bool inElemMatch = false;
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(
+        parseMatchExpression(fromjson("{$or: [{z: null}]}")).get(), inElemMatch));
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(
+        parseMatchExpression(fromjson("{x: 5, y: null}")).get(), inElemMatch));
+    ASSERT_TRUE(QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(
+        parseMatchExpression(fromjson("{x: {$ne: null}}")).get(), inElemMatch));
+}
+
 }  // namespace

@@ -64,6 +64,12 @@
         {expression: {$exists: false}, bounds: null},
         {expression: {$eq: null}, bounds: null},
         {expression: {$ne: null}, bounds: null},
+        {expression: {$eq: {abc: 1}}, bounds: null},
+        {expression: {$lt: {abc: 1}}, bounds: null},
+        {expression: {$ne: {abc: 1}}, bounds: null},
+        {expression: {$lt: {abc: 1}, $gt: {abc: 1}}, bounds: null},
+        {expression: {$in: [{abc: 1}, 1, 2, 3]}, bounds: null},
+        {expression: {$in: [null, 1, 2, 3]}, bounds: null},
         {expression: {$ne: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
         // In principle we could have tighter bounds for this. See SERVER-36765.
         {expression: {$eq: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
@@ -110,7 +116,11 @@
                 // and projection, or if the current operation is not supported by $** indexes,
                 // confirm that no indexed solution was found.
                 if (!expectedPaths.includes(path) || op.bounds === null) {
-                    assert.eq(ixScans.length, 0);
+                    assert.eq(ixScans.length,
+                              0,
+                              () => "Bounds check for operation: " + tojson(op) +
+                                  " failed. Expected no IXSCAN plans to be generated, but got " +
+                                  tojson(ixScans));
                     continue;
                 }
 

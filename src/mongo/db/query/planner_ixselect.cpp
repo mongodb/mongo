@@ -131,6 +131,20 @@ void expandIndex(const IndexEntry& allPathsIndex,
         out->push_back(std::move(entry));
     }
 }
+
+bool canUseAllPathsIndex(BSONElement elt, MatchExpression::MatchType matchType) {
+    if (elt.type() == BSONType::Object) {
+        return false;
+    }
+
+    if (elt.type() == BSONType::Array) {
+        // We only support equality to empty array.
+        return elt.embeddedObject().isEmpty() && matchType == MatchExpression::EQ;
+    }
+
+    return true;
+}
+
 }  // namespace
 
 bool QueryPlannerIXSelect::notEqualsNullCanUseIndex(const IndexEntry& index,
@@ -432,26 +446,9 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
     }
 
     if (indexedFieldType.empty()) {
-        // Can't use a sparse index for $eq with a null element, unless the equality is within a
-        // $elemMatch expression since the latter implies a match on the literal element 'null'.
-        //
-        // We can use a sparse index for $_internalExprEq with a null element. Expression language
-        // equality-to-null semantics are that only literal nulls match. Sparse indexes contain
-        // index keys for literal nulls, but not for missing elements.
-        if (exprtype == MatchExpression::EQ && index.sparse && !isChildOfElemMatchValue) {
-            const EqualityMatchExpression* expr = static_cast<const EqualityMatchExpression*>(node);
-            if (expr->getData().isNull()) {
-                return false;
-            }
-        }
-
-        // Can't use a sparse index for $in with a null element, unless the $eq is within a
-        // $elemMatch expression since the latter implies a match on the literal element 'null'.
-        if (exprtype == MatchExpression::MATCH_IN && index.sparse && !isChildOfElemMatchValue) {
-            const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
-            if (expr->hasNull()) {
-                return false;
-            }
+        // We can't use a sparse index for certain match expressions.
+        if (index.sparse && !nodeIsSupportedBySparseIndex(node, isChildOfElemMatchValue)) {
+            return false;
         }
 
         // We can't use a btree-indexed field for geo expressions.
@@ -518,6 +515,10 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                 })) {
                 return false;
             }
+        }
+
+        if (index.type == IndexType::INDEX_ALLPATHS && !nodeIsSupportedByAllPathsIndex(node)) {
+            return false;
         }
 
         // We can only index EQ using text indices.  This is an artificial limitation imposed by
@@ -623,6 +624,58 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                   << keyPatternElt.toString();
         verify(0);
     }
+}
+
+bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* queryExpr,
+                                                        bool isInElemMatch) {
+    // The only types of queries which may not be supported by a sparse index are ones which have
+    // an equality to null (or an {$exists: false}), because of the language's "null or missing"
+    // semantics. {$exists: false} gets translated into a negation query (which a sparse index
+    // cannot answer), so this function only needs to check if the query performs an equality to
+    // null.
+
+    // Equality to null inside an $elemMatch implies a match on literal 'null'.
+    if (isInElemMatch) {
+        return true;
+    }
+
+    // Otherwise, we can't use a sparse index for $eq (or $lte, or $gte) with a null element.
+    //
+    // We can use a sparse index for $_internalExprEq with a null element. Expression language
+    // equality-to-null semantics are that only literal nulls match. Sparse indexes contain
+    // index keys for literal nulls, but not for missing elements.
+    const auto typ = queryExpr->matchType();
+    if (typ == MatchExpression::EQ) {
+        const auto* queryExprEquality = static_cast<const EqualityMatchExpression*>(queryExpr);
+        return !queryExprEquality->getData().isNull();
+    } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
+        const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
+        return !queryExprIn->hasNull();
+    }
+
+    return true;
+}
+
+bool QueryPlannerIXSelect::nodeIsSupportedByAllPathsIndex(const MatchExpression* queryExpr) {
+    // AllPaths indexes only store index keys for "leaf" nodes in an object. That is, they do not
+    // store keys for nested objects, meaning that any kind of comparison to an object or array
+    // cannot be answered by the index (including with a $in).
+
+    if (ComparisonMatchExpression::isComparisonMatchExpression(queryExpr)) {
+        const ComparisonMatchExpression* cmpExpr =
+            static_cast<const ComparisonMatchExpression*>(queryExpr);
+
+        return canUseAllPathsIndex(cmpExpr->getData(), cmpExpr->matchType());
+    } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
+        const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
+
+        return std::all_of(
+            queryExprIn->getEqualities().begin(),
+            queryExprIn->getEqualities().end(),
+            [](const BSONElement& elt) { return canUseAllPathsIndex(elt, MatchExpression::EQ); });
+    }
+
+    return true;
 }
 
 // static
