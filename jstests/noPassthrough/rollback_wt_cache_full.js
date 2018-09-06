@@ -15,7 +15,10 @@
         slowms: 30000,
         // Constrain the storage engine cache size to make it easier to fill it up with unflushed
         // modifications.
-        wiredTigerCacheSizeGB: 1,
+        // This test uses a smaller cache size than the other wt_cache_full.js tests because it
+        // has to work with the hard-coded 300 MB refetch limit in the pre-4.0 rollback
+        // implementation.
+        wiredTigerCacheSizeGB: 0.5,
     };
     const rst = new ReplSetTest({
         nodes: [nodeOptions, nodeOptions, {arbiter: true}],
