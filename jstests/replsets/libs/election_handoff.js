@@ -42,6 +42,13 @@ var ElectionHandoffTest = (function() {
 
         jsTestLog("Stepping down primary...");
 
+        // Make sure all secondaries are ready before stepping down. We must additionally
+        // make sure that the primary is aware that the secondaries are ready and caught up
+        // to the primary's lastApplied, so we issue a dummy write and wait on its optime.
+        assert.writeOK(primary.getDB("test").secondariesMustBeCaughtUpToHere.insert(
+            {"a": 1}, {w: rst.nodes.length}));
+        rst.awaitNodesAgreeOnAppliedOpTime();
+
         // Step down the current primary.
         assert.adminCommandWorkedAllowingNetworkError(primary, {
             replSetStepDown: kStepDownPeriodSecs,
