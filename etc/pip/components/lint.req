@@ -1,0 +1,6 @@
+# Linters
+pylint
+yapf
+# typing in Python 2 for mypy
+typing; python_version < "3"
+pydocstyle

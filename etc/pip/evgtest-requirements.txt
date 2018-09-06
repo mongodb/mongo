@@ -1,0 +1,5 @@
+-r components/platform.req
+-r components/core.req
+
+-r components/resmoke.req
+-r components/aws.req

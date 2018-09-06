@@ -1,0 +1,1 @@
+mypy == 0.620; python_version > "3.4"

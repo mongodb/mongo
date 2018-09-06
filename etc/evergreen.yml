@@ -455,6 +455,7 @@ variables:
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
+    python3: '/cygdrive/c/python/python36/python.exe'
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
@@ -1295,22 +1296,38 @@ functions:
     command: shell.exec
     type: test
     params:
+        shell: bash
         script: |
           # exit immediately if virtualenv is not found
           set -o errexit
           set -o verbose
 
-          python_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})
-          python3_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python3})
           virtualenv_loc=$(which ${virtualenv|virtualenv})
-          if [ "Windows_NT" = "$OS" ]; then
-            python_loc=$(cygpath -w $python_loc)
-            python3_loc=$(cygpath -w c:/python/Python36/python.exe)
+
+          python2_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})
+          python3_loc=$(which ${python3|/opt/mongodbtoolchain/v2/bin/python3})
+          venv2_dir="${workdir}/venv"
+          venv3_dir="${workdir}/venv_3"
+          if command -V cygpath; then
+            # Sad note: We have to use the Windows path instead of the posix path here.
+            # Otherwise, virtualenv may mistakenly resolve paths relative to c:\cygdrive.
+            python2_loc=$(cygpath -w $python2_loc)
+            python3_loc=$(cygpath -w $python3_loc)
+            venv2_dir="$(cygpath -w "$venv2_dir")"
+            venv3_dir="$(cygpath -w "$venv3_dir")"
           fi
-          # Set up virtualenv in ${workdir}
-          "$virtualenv_loc" --python "$python_loc" --system-site-packages "${workdir}/venv"
-          # Add virtualenv for python3 in ${workdir}
-          "$virtualenv_loc" --python "$python3_loc" --system-site-packages "${workdir}/venv_3"
+
+          # Set up virtualenvs in ${workdir}
+          "$virtualenv_loc" --python "$python2_loc" --system-site-packages "$venv2_dir"
+          "$virtualenv_loc" --python "$python3_loc" --system-site-packages "$venv3_dir"
+
+          # Link python2/python3 in the primary virtualenv bin dir
+          export VIRTUAL_ENV_DISABLE_PROMPT=yes
+          venv2_bin="$(dirname "$(cd "$venv2_dir"; . ./*/activate; which python)")"
+          py2_exe="$(cd "$venv2_dir"; . ./*/activate; which python)"
+          py3_exe="$(cd "$venv3_dir"; . ./*/activate; which python)"
+          if [[ ! -f $venv2_bin/python2 ]]; then ln -sfv "$py2_exe" "$venv2_bin/python2"; fi
+          if [[ ! -f $venv2_bin/python3 ]]; then ln -sfv "$py3_exe" "$venv2_bin/python3"; fi
 
   "run tests" :
     - *determine_task_timeout
@@ -1339,8 +1356,7 @@ functions:
 
           # activate the virtualenv if it has been set up
           ${activate_virtualenv}
-          pip install boto3==1.5.27
-          pip install mock==2.0.0
+          python2 -m pip install -r etc/pip/evgtest-requirements.txt
 
           # Set the TMPDIR environment variable to be a directory in the task's working
           # directory so that temporary files created by processes spawned by resmoke.py get
@@ -1504,6 +1520,7 @@ functions:
     type: test
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -1520,12 +1537,15 @@ functions:
         fi
 
         ${activate_virtualenv}
-        set +o errexit
-        ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} ${task_compile_flags|} ${task_compile_flags_extra|} ${scons_cache_args|} $extra_args ${targets} ${additional_targets|} MONGO_VERSION=${version}
-        exit_status=$?
+
+        python2 -m pip install -r ./etc/pip/compile-requirements.txt
+        ${compile_env|} $python ./buildscripts/scons.py                                     \
+            ${compile_flags|} ${task_compile_flags|} ${task_compile_flags_extra|}           \
+            ${scons_cache_args|} $extra_args                                                \
+            ${targets} ${additional_targets|} MONGO_VERSION=${version} || exit_status=$?
         # If compile fails we do not run any tests
-        if [ $exit_status -ne 0 ]; then
-          if [ ${dump_scons_config_on_failure} = 'true' ]; then
+        if [[ $exit_status -ne 0 ]]; then
+          if [[ "${dump_scons_config_on_failure}" == true ]]; then
             echo "Dumping build/scons/config.log"
             cat build/scons/config.log
           fi
@@ -1929,7 +1949,7 @@ functions:
 
         ${activate_virtualenv}
         # The Windows build variants are running python 2.7.3 and require TLS 1.2 from pyOpenSSL
-        pip install 'pyOpenSSL ; sys_platform == "win32" or sys_platform == "cygwin"'
+        python2 -m pip install 'pyOpenSSL ; sys_platform == "win32" or sys_platform == "cygwin"'
 
         rm -rf /data/install /data/multiversion
         $python buildscripts/setup_multiversion_mongodb.py   \
@@ -2132,8 +2152,7 @@ functions:
 
           set -o errexit
           ${activate_virtualenv}
-          pip install -r buildscripts/requirements.txt
-          pip install -r pytests/requirements.txt
+          python2 -m pip install -r etc/pip/powercycle-requirements.txt
 
           if [ ! -z "${subnet_id}" ]; then
             subnet_id="-n ${subnet_id}"
@@ -2261,7 +2280,7 @@ functions:
         script: |
           set -o errexit
           # Copy buildscripts, pytests and mongoDB executables to the remote host.
-          file_param="--file buildscripts --file pytests"
+          file_param="--file etc --file buildscripts --file pytests"
           mongo_executables="mongo mongod mongos"
           for executable in $mongo_executables
           do
@@ -2291,7 +2310,7 @@ functions:
           cmds="$cmds; virtualenv --python \$python_loc --system-site-packages ${virtualenv_dir|venv}"
           cmds="$cmds; activate=\$(find ${virtualenv_dir|venv} -name 'activate')"
           cmds="$cmds; . \$activate"
-          cmds="$cmds; pip install -r \$remote_dir/pytests/requirements.txt"
+          cmds="$cmds; pip2 install -r \$remote_dir/etc/pip/powercycle-requirements.txt"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${activate_virtualenv}
           $python buildscripts/remote_operations.py          \
@@ -2767,7 +2786,7 @@ functions:
             python=python
           else
             if [ "Windows_NT" = "$OS" ]; then
-              python=/cygdrive/c/python/Python36/python
+              python=/cygdrive/c/python/python36/python
             else
               python=${python3|/opt/mongodbtoolchain/v2/bin/python3}
             fi
@@ -3466,6 +3485,8 @@ tasks:
           - "*Test"
           - "./**.pdb"
           - "./**.msi"
+          - "./etc/pip/**"
+          - "./etc/scons/**"
           - "./etc/*san.suppressions"
           - "./etc/repo_config.yaml"
           - "./etc/test_lifecycle.yml"
@@ -4182,19 +4203,58 @@ tasks:
           set -o errexit
           set -o verbose
 
-          ### TODO: Remove python3 when mypy 0.580 is installed in the toolchain.
-          # Since mypy requires python3, we need to activate the venv_3
-          ${activate_virtualenv_3}
-          pip install -r buildscripts/requirements.txt
-          updated_mypy=$(PATH=$PATH:/opt/mongodbtoolchain/v2/bin which mypy)
-          deactivate
-          ###
           ${activate_virtualenv}
-          # TODO: Remove once the linters have been updated on the variants.
-          pip install -r buildscripts/requirements.txt
-          # The linters require the modules be installed.
-          pip install -r pytests/requirements.txt
-          MYPY=$updated_mypy ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
+          python3 -m pip install -r etc/pip/lint-requirements.txt
+          python2 -m pip install -r etc/pip/lint-requirements.txt
+          export MYPY="$(
+            PATH+=':/opt/mongodbtoolchain/v2/bin'
+            if command -V cygpath 2>/dev/null; then
+                PATH+=":$(cypath "${workdir}")/venv_3/Scripts"
+            else
+                PATH+=":${workdir}/venv_3/bin"
+            fi
+            which mypy
+          )"
+          ${compile_env|} python2 ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
+
+- name: verify_pip
+  depends_on: []
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        # Note: One pleasant side effect of this task is that it should pre warm pip's cache.
+        # For every pypa project that is part of our current toolchain, this will do nothing.
+        # For every pypa project that we are missing, the .whl file will be added to the pip cache.
+        # (See https://pip.pypa.io/en/latest/reference/pip_install/#caching)
+
+        ${activate_virtualenv}
+        # This installs the explicit project versions which would be installed in the toolchain
+        # from this patch
+        python2 -m pip install -r etc/pip/constraints.txt
+        python3 -m pip install -r etc/pip/constraints.txt
+
+        python2 -m pip freeze >requirements.txt.python2.old
+        python3 -m pip freeze >requirements.txt.python3.old
+
+        # This installs any requirements which are unsatisfied by the constraints.txt above
+        python2 -m pip install -r etc/pip/toolchain-requirements.txt
+        python3 -m pip install -r etc/pip/toolchain-requirements.txt
+
+        python2 -m pip freeze >requirements.txt.python2.new
+        python3 -m pip freeze >requirements.txt.python3.new
+
+        # Compare the old freezes to the new freezes.
+        # They should be the same if our constraints satisfy our toolchain requirements
+        diff -w requirements.txt.python2.old requirements.txt.python2.new
+        diff -w requirements.txt.python3.old requirements.txt.python3.new
 
 - <<: *task_template
   name: burn_in_tests
@@ -5061,16 +5121,6 @@ tasks:
   name: ese
   commands:
   - func: "do setup"
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        ${activate_virtualenv}
-        python -m pip install -r src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt
   - func: "run tests"
     vars:
       resmoke_args: --suites=ese --storageEngine=wiredTiger
@@ -7135,8 +7185,13 @@ tasks:
         set -o verbose
 
         ${activate_virtualenv}
-        if [ "Windows_NT" = "$OS" ]; then
-          /cygdrive/c/python/python36/python.exe -m pip install -r buildscripts/requirements.txt
+        # Since the free monitoring tests use python 3 via C exec,
+        # they deliberately hit python3.6 on Windows and toolchain python otherwise.
+        # We happen to pre-seed the core requirements in the toolchain,
+        # but we have no way of doing so to Windows python3.6 installed via Chocolatey.
+        if command -V cygpath; then
+            echo "Installing core requirements into Python at '${python3}'"
+            "$(cygpath "${python3}")" -mpip install -r etc/pip/core-requirements.txt
         fi
   - func: "run tests"
     vars:
@@ -7853,8 +7908,7 @@ tasks:
         set -o verbose
 
         ${activate_virtualenv}
-        # Install Python modules to support OAuth with pip until it is available in the toolchain.
-        pip install cryptography==1.7.2 pyjwt==1.5.3
+        python2 -m pip install -r etc/pip/jira-requirements.txt
 
         # We use a small batch size to avoid hitting the load balancer timeout if the Evergreen
         # API query is not fast enough.
@@ -9492,6 +9546,7 @@ buildvariants:
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
+    python3: '/cygdrive/c/python/python36/python.exe'
     ext: zip
     use_scons_cache: true
     multiversion_platform: windows
@@ -9655,6 +9710,7 @@ buildvariants:
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
+    python3: '/cygdrive/c/python/python36/python.exe'
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
@@ -9675,12 +9731,14 @@ buildvariants:
   - name: compile_TG
     requires:
     - name: burn_in_tests
+    - name: verify_pip
     distros:
     - windows-64-vs2015-large
   - name: compile_benchmarks
     distros:
     - windows-64-vs2015-large
   - name: burn_in_tests
+  - name: verify_pip
   - name: audit
   - name: auth_audit
   - name: benchmarks_orphaned
@@ -9976,6 +10034,7 @@ buildvariants:
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
+    python3: '/cygdrive/c/python/python36/python.exe'
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
@@ -10008,6 +10067,7 @@ buildvariants:
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
+    python3: '/cygdrive/c/python/python36/python.exe'
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     ext: zip
@@ -10083,6 +10143,7 @@ buildvariants:
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
+    python3: '/cygdrive/c/python/python36/python.exe'
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
@@ -10200,6 +10261,7 @@ buildvariants:
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
+    python3: '/cygdrive/c/python/python36/python.exe'
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
@@ -10891,6 +10953,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     requires:
     - name: burn_in_tests
+    - name: verify_pip
     - name: lint
     distros:
     - rhel62-large
@@ -10901,6 +10964,7 @@ buildvariants:
   - name: burn_in_tests
     distros:
     - rhel62-large
+  - name: verify_pip
   - name: rollback_fuzzer
   - name: rollback_fuzzer_clean_shutdowns
   - name: rollback_fuzzer_unclean_shutdowns

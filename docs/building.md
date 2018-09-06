@@ -33,7 +33,7 @@ Python Prerequisites
 In order to build MongoDB, Python 2.7.x is required, and several Python modules. To install
 the required Python modules, run:
 
-    $ pip2 install -r buildscripts/requirements.txt
+    $ pip2 install -r etc/pip/compile-requirements.txt
 
 Note: If the `pip2` command is not available, `pip` without a suffix may be the pip command
 associated with Python 2.7.x.
