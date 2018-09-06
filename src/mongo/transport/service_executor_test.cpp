@@ -57,7 +57,7 @@ struct TestOptions : public ServiceExecutorAdaptive::Options {
         return 1;
     }
 
-    constexpr Milliseconds workerThreadRunTime() const final {
+    Milliseconds workerThreadRunTime() const final {
         return kWorkerThreadRunTime;
     }
 
