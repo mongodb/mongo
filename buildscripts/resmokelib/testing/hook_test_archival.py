@@ -111,3 +111,5 @@ class HookTestArchival(object):
                                                                     s3_bucket, s3_path)
         if status:
             logger.warning("Archive failed for %s: %s", test_name, message)
+        else:
+            logger.info("Archive succeeded for %s: %s", test_name, message)
