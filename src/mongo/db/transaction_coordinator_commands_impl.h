@@ -39,9 +39,16 @@ namespace mongo {
  */
 namespace txn {
 
-void recvCoordinateCommit(OperationContext* opCtx, const std::set<ShardId>& participantList);
-void recvVoteCommit(OperationContext* opCtx, const ShardId& shardId, int prepareTimestamp);
-void recvVoteAbort(OperationContext* opCtx, const ShardId& shardId);
+void recvCoordinateCommit(OperationContext* opCtx,
+                          std::shared_ptr<TransactionCoordinator> coordinator,
+                          const std::set<ShardId>& participantList);
+void recvVoteCommit(OperationContext* opCtx,
+                    std::shared_ptr<TransactionCoordinator> coordinator,
+                    const ShardId& shardId,
+                    int prepareTimestamp);
+void recvVoteAbort(OperationContext* opCtx,
+                   std::shared_ptr<TransactionCoordinator> coordinator,
+                   const ShardId& shardId);
 
 }  // namespace txn
 }  // namespace mongo

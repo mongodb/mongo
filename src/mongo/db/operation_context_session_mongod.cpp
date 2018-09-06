@@ -29,6 +29,7 @@
 #include "mongo/db/operation_context_session_mongod.h"
 
 #include "mongo/db/transaction_coordinator.h"
+#include "mongo/db/transaction_coordinator_service.h"
 #include "mongo/db/transaction_participant.h"
 
 namespace mongo {
@@ -48,18 +49,16 @@ OperationContextSessionMongod::OperationContextSessionMongod(OperationContext* o
         session->beginOrContinueTxn(opCtx, clientTxnNumber);
 
         if (startTransaction && *startTransaction) {
-            // If this shard has been selected as the coordinator, set up the coordinator state to
-            // be ready to receive votes.
+            auto clientLsid = opCtx->getLogicalSessionId().get();
+            auto clockSource = opCtx->getServiceContext()->getFastClockSource();
+
+            // If this shard has been selected as the coordinator, set up the coordinator state
+            // to be ready to receive votes.
             if (coordinator && *coordinator) {
-                // TODO: Once shards support multiple active coordinators per session, instead of
-                // resetting the previous TransactionCoordinator, simply create a new
-                // TransactionCoordinator and push it on the queue of active coordinators for this
-                // session.
-                // Note: Until the above TODO is done, starting a new transaction before receiving
-                // the decision for the previous transaction can corrupt the previous transaction.
-                auto& txnCoordinator = TransactionCoordinator::get(opCtx);
-                txnCoordinator.reset();
-                TransactionCoordinator::create(session);
+                TransactionCoordinatorService::get(opCtx)->createCoordinator(
+                    clientLsid,
+                    clientTxnNumber,
+                    clockSource->now() + Seconds(transactionLifetimeLimitSeconds.load()));
             }
         }
 

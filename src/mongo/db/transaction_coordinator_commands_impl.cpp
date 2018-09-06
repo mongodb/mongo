@@ -160,54 +160,36 @@ std::vector<ShardId> sendAbort(OperationContext* opCtx, std::set<ShardId>& nonAc
     return ackedParticipants;
 }
 
-void doAction(OperationContext* opCtx, TransactionCoordinator::StateMachine::Action action) {
+void doAction(OperationContext* opCtx,
+              std::shared_ptr<TransactionCoordinator> coordinator,
+              TransactionCoordinator::StateMachine::Action action) {
     switch (action) {
         case TransactionCoordinator::StateMachine::Action::kSendCommit: {
             std::set<ShardId> nonAckedParticipants;
-            {
-                OperationContextSessionMongod checkOutSession(
-                    opCtx, true, false, boost::none, true);
-                nonAckedParticipants =
-                    TransactionCoordinator::get(opCtx)->getNonAckedCommitParticipants();
-            }
+            nonAckedParticipants = coordinator->getNonAckedCommitParticipants();
 
             // TODO (SERVER-36638): Spawn a separate thread to do this so that the client's thread
             // does not block.
 
             auto ackedParticipants = sendCommit(opCtx, nonAckedParticipants);
 
-            {
-                OperationContextSessionMongod checkOutSession(
-                    opCtx, true, false, boost::none, true);
-                auto& coordinator = TransactionCoordinator::get(opCtx);
-                for (auto& participant : ackedParticipants) {
-                    coordinator->recvCommitAck(participant);
-                }
+            for (auto& participant : ackedParticipants) {
+                coordinator->recvCommitAck(participant);
             }
 
             return;
         }
         case TransactionCoordinator::StateMachine::Action::kSendAbort: {
             std::set<ShardId> nonAckedParticipants;
-            {
-                OperationContextSessionMongod checkOutSession(
-                    opCtx, true, false, boost::none, true);
-                nonAckedParticipants =
-                    TransactionCoordinator::get(opCtx)->getNonAckedAbortParticipants();
-            }
+            nonAckedParticipants = coordinator->getNonAckedAbortParticipants();
 
             // TODO (SERVER-36638): Spawn a separate thread to do this so that the client's thread
             // does not block.
 
             auto ackedParticipants = sendAbort(opCtx, nonAckedParticipants);
 
-            {
-                OperationContextSessionMongod checkOutSession(
-                    opCtx, true, false, boost::none, true);
-                auto& coordinator = TransactionCoordinator::get(opCtx);
-                for (auto& participant : ackedParticipants) {
-                    coordinator->recvAbortAck(participant);
-                }
+            for (auto& participant : ackedParticipants) {
+                coordinator->recvAbortAck(participant);
             }
 
             return;
@@ -222,7 +204,9 @@ void doAction(OperationContext* opCtx, TransactionCoordinator::StateMachine::Act
 
 namespace txn {
 
-void recvCoordinateCommit(OperationContext* opCtx, const std::set<ShardId>& participantList) {
+void recvCoordinateCommit(OperationContext* opCtx,
+                          std::shared_ptr<TransactionCoordinator> coordinator,
+                          const std::set<ShardId>& participantList) {
     // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
     // transactions are stable.
     StringBuilder ss;
@@ -234,42 +218,39 @@ void recvCoordinateCommit(OperationContext* opCtx, const std::set<ShardId>& part
     LOG(0) << "Coordinator shard received participant list with shards " << ss.str();
 
     TransactionCoordinator::StateMachine::Action action;
-    {
-        OperationContextSessionMongod checkOutSession(opCtx, true, false, boost::none, true);
-        action = TransactionCoordinator::get(opCtx)->recvCoordinateCommit(participantList);
-    }
 
-    doAction(opCtx, action);
+    action = coordinator->recvCoordinateCommit(participantList);
+
+    doAction(opCtx, coordinator, action);
 
     // TODO (SERVER-36640): Wait for decision to be made.
 }
 
-void recvVoteCommit(OperationContext* opCtx, const ShardId& shardId, int prepareTimestamp) {
+void recvVoteCommit(OperationContext* opCtx,
+                    std::shared_ptr<TransactionCoordinator> coordinator,
+                    const ShardId& shardId,
+                    int prepareTimestamp) {
     // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
     // transactions are stable.
     LOG(0) << "Coordinator shard received voteCommit from " << shardId;
 
     TransactionCoordinator::StateMachine::Action action;
-    {
-        OperationContextSessionMongod checkOutSession(opCtx, true, false, boost::none, true);
-        action = TransactionCoordinator::get(opCtx)->recvVoteCommit(shardId, prepareTimestamp);
-    }
+    action = coordinator->recvVoteCommit(shardId, prepareTimestamp);
 
-    doAction(opCtx, action);
+    doAction(opCtx, coordinator, action);
 }
 
-void recvVoteAbort(OperationContext* opCtx, const ShardId& shardId) {
+void recvVoteAbort(OperationContext* opCtx,
+                   std::shared_ptr<TransactionCoordinator> coordinator,
+                   const ShardId& shardId) {
     // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
     // transactions are stable.
     LOG(0) << "Coordinator shard received voteAbort from " << shardId;
 
     TransactionCoordinator::StateMachine::Action action;
-    {
-        OperationContextSessionMongod checkOutSession(opCtx, true, false, boost::none, true);
-        action = TransactionCoordinator::get(opCtx)->recvVoteAbort(shardId);
-    }
+    action = coordinator->recvVoteAbort(shardId);
 
-    doAction(opCtx, action);
+    doAction(opCtx, coordinator, action);
 }
 
 }  // namespace txn

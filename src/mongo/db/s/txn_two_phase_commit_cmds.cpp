@@ -34,7 +34,7 @@
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/transaction_coordinator_commands_impl.h"
+#include "mongo/db/transaction_coordinator_service.h"
 #include "mongo/db/transaction_participant.h"
 
 namespace mongo {
@@ -133,8 +133,12 @@ public:
 
             const auto& cmd = request();
 
-            txn::recvVoteCommit(
-                opCtx, cmd.getShardId(), 0 /* TODO (SERVER-36584) pass real prepareTimestamp */);
+            TransactionCoordinatorService::get(opCtx)->voteCommit(
+                opCtx,
+                opCtx->getLogicalSessionId().get(),
+                opCtx->getTxnNumber().get(),
+                cmd.getShardId(),
+                0 /* TODO (SERVER-36584) pass real prepareTimestamp */);
         }
 
     private:
@@ -183,7 +187,10 @@ public:
 
             const auto& cmd = request();
 
-            txn::recvVoteAbort(opCtx, cmd.getShardId());
+            TransactionCoordinatorService::get(opCtx)->voteAbort(opCtx,
+                                                                 opCtx->getLogicalSessionId().get(),
+                                                                 opCtx->getTxnNumber().get(),
+                                                                 cmd.getShardId());
         }
 
     private:
@@ -246,7 +253,11 @@ public:
                 participantList.insert(shardId);
             }
 
-            txn::recvCoordinateCommit(opCtx, participantList);
+            TransactionCoordinatorService::get(opCtx)->coordinateCommit(
+                opCtx,
+                opCtx->getLogicalSessionId().get(),
+                opCtx->getTxnNumber().get(),
+                participantList);
         }
 
     private:

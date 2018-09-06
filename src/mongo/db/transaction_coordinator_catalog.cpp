@@ -45,7 +45,7 @@ TransactionCoordinatorCatalog::~TransactionCoordinatorCatalog() = default;
 std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::create(LogicalSessionId lsid,
                                                                               TxnNumber txnNumber) {
 
-    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     // Create a new map for the session if it does not exist
     if (_coordinatorsBySession.find(lsid) == _coordinatorsBySession.end()) {
@@ -68,7 +68,7 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::create(Lo
 boost::optional<std::shared_ptr<TransactionCoordinator>> TransactionCoordinatorCatalog::get(
     LogicalSessionId lsid, TxnNumber txnNumber) {
 
-    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
@@ -89,7 +89,7 @@ boost::optional<std::shared_ptr<TransactionCoordinator>> TransactionCoordinatorC
 boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
 TransactionCoordinatorCatalog::getLatestOnSession(LogicalSessionId lsid) {
 
-    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
@@ -110,7 +110,7 @@ TransactionCoordinatorCatalog::getLatestOnSession(LogicalSessionId lsid) {
 void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnNumber) {
     using CoordinatorState = TransactionCoordinator::StateMachine::State;
 
-    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
@@ -120,8 +120,15 @@ void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnN
 
         if (coordinatorForTxnIter != coordinatorsForSession.end()) {
             auto coordinator = coordinatorForTxnIter->second;
-            invariant(coordinator->state() == CoordinatorState::kCommitted ||
-                      coordinator->state() == CoordinatorState::kAborted);
+            // TODO (SERVER-36304/37021): Reenable the below invariant once transaction participants
+            // are able to send votes and once we validate the state of the coordinator when a new
+            // transaction comes in for an existing session. For now, we're not validating the state
+            // of the coordinator which means it is possible that starting a new transaction before
+            // waiting for the previous one's coordinator to reach state committed or aborted will
+            // corrupt the previous transaction.
+
+            // invariant(coordinator->state() == CoordinatorState::kCommitted ||
+            //           coordinator->state() == CoordinatorState::kAborted);
             coordinatorsForSession.erase(coordinatorForTxnIter);
             if (coordinatorsForSession.size() == 0) {
                 _coordinatorsBySession.erase(coordinatorsForSessionIter);

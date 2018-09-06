@@ -185,14 +185,19 @@ TEST_F(TransactionCoordinatorCatalogTest, RemovingAnAbortedCoordinatorSucceeds) 
     ASSERT_EQ(coordinatorInCatalog, boost::none);
 }
 
-DEATH_TEST_F(TransactionCoordinatorCatalogTest,
-             RemovingACoordinatorNotInCommittedOrAbortedStateFails,
-             "Invariant failure") {
-    LogicalSessionId lsid = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber = 1;
-    coordinatorCatalog().create(lsid, txnNumber);
-    coordinatorCatalog().remove(lsid, txnNumber);
-}
+// TODO (SERVER-36304/37021): Reenable once transaction participants are able to send
+// votes and once we validate the state of the coordinator when a new transaction comes
+// in for an existing session. For now, we're not validating the state of the
+// coordinator which means it is possible that if we hit invalid behavior in testing
+// that this will result in hidden incorrect behavior.
+// DEATH_TEST_F(TransactionCoordinatorCatalogTest,
+//              RemovingACoordinatorNotInCommittedOrAbortedStateFails,
+//              "Invariant failure") {
+//     LogicalSessionId lsid = makeLogicalSessionIdForTest();
+//     TxnNumber txnNumber = 1;
+//     coordinatorCatalog().create(lsid, txnNumber);
+//     coordinatorCatalog().remove(lsid, txnNumber);
+// }
 
 }  // namespace
 }  // namespace mongo

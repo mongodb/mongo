@@ -41,27 +41,14 @@ using Action = TransactionCoordinator::StateMachine::Action;
 using Event = TransactionCoordinator::StateMachine::Event;
 using State = TransactionCoordinator::StateMachine::State;
 
-namespace {
-const Session::Decoration<boost::optional<TransactionCoordinator>> getTransactionCoordinator =
-    Session::declareDecoration<boost::optional<TransactionCoordinator>>();
-}  // namespace
-
-boost::optional<TransactionCoordinator>& TransactionCoordinator::get(OperationContext* opCtx) {
-    auto session = OperationContextSession::get(opCtx);
-    return getTransactionCoordinator(session);
-}
-
-void TransactionCoordinator::create(Session* session) {
-    invariant(!getTransactionCoordinator(session));
-    getTransactionCoordinator(session).emplace();
-}
-
 Action TransactionCoordinator::recvCoordinateCommit(const std::set<ShardId>& participants) {
+    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
     _participantList.recordFullList(participants);
     return _stateMachine.onEvent(Event::kRecvParticipantList);
 }
 
 Action TransactionCoordinator::recvVoteCommit(const ShardId& shardId, int prepareTimestamp) {
+    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
     _participantList.recordVoteCommit(shardId, prepareTimestamp);
 
     auto event = (_participantList.allParticipantsVotedCommit()) ? Event::kRecvFinalVoteCommit
@@ -70,11 +57,13 @@ Action TransactionCoordinator::recvVoteCommit(const ShardId& shardId, int prepar
 }
 
 Action TransactionCoordinator::recvVoteAbort(const ShardId& shardId) {
+    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
     _participantList.recordVoteAbort(shardId);
     return _stateMachine.onEvent(Event::kRecvVoteAbort);
 }
 
 void TransactionCoordinator::recvCommitAck(const ShardId& shardId) {
+    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
     _participantList.recordCommitAck(shardId);
     if (_participantList.allParticipantsAckedCommit()) {
         _stateMachine.onEvent(Event::kRecvFinalCommitAck);
@@ -82,6 +71,7 @@ void TransactionCoordinator::recvCommitAck(const ShardId& shardId) {
 }
 
 void TransactionCoordinator::recvAbortAck(const ShardId& shardId) {
+    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
     _participantList.recordAbortAck(shardId);
     if (_participantList.allParticipantsAckedAbort()) {
         _stateMachine.onEvent(Event::kRecvFinalAbortAck);

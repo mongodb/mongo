@@ -67,22 +67,7 @@ protected:
     void setUp() final {
         ShardServerTestFixture::setUp();
 
-        SessionCatalog::get(getServiceContext())->onStepUp(operationContext());
-        auto scopedSession =
-            SessionCatalog::get(operationContext())->getOrCreateSession(operationContext(), _lsid);
-
-        // Simulate that a regular transaction statement containing 'coordinator: true' was already
-        // sent to this shard.
-        operationContext()->setLogicalSessionId(_lsid);
-        operationContext()->setTxnNumber(_txnNumber);
-        {
-            OperationContextSessionMongod checkOutSession(
-                operationContext(), true, false, true, true);
-
-            auto txnParticipant = TransactionParticipant::get(operationContext());
-            txnParticipant->unstashTransactionResources(operationContext(), "dummy");
-            txnParticipant->stashTransactionResources(operationContext());
-        }
+        _coordinator = std::make_shared<TransactionCoordinator>();
 
         for_each(shardIds.begin(), shardIds.end(), [this](const ShardId& shardId) {
             auto shardTargeter = RemoteCommandTargeterMock::get(
@@ -94,6 +79,7 @@ protected:
 
     void tearDown() final {
         SessionCatalog::get(getServiceContext())->reset_forTest();
+        _coordinator.reset();
         ShardServerTestFixture::tearDown();
     }
 
@@ -112,7 +98,7 @@ protected:
                 auto opCtxPtr = cc().makeOperationContext();
                 auto opCtx = opCtxPtr.get();
 
-                // Required to be able to check out the session later.
+                // Required to be able to send abort and commit commands
                 opCtx->setLogicalSessionId(_lsid);
                 opCtx->setTxnNumber(_txnNumber);
 
@@ -127,19 +113,20 @@ protected:
     }
 
     auto receiveCoordinateCommit(std::set<ShardId> participantList) {
-        auto commandFn =
-            std::bind(txn::recvCoordinateCommit, std::placeholders::_1, participantList);
+        auto commandFn = std::bind(
+            txn::recvCoordinateCommit, std::placeholders::_1, _coordinator, participantList);
         return simulateHandleRequest(commandFn);
     }
 
     auto receiveVoteCommit(ShardId shardId, int prepareTimestamp) {
-        auto commandFn =
-            std::bind(txn::recvVoteCommit, std::placeholders::_1, shardId, prepareTimestamp);
+        auto commandFn = std::bind(
+            txn::recvVoteCommit, std::placeholders::_1, _coordinator, shardId, prepareTimestamp);
         return simulateHandleRequest(commandFn);
     }
 
     auto receiveVoteAbort(ShardId shardId) {
-        auto commandFn = std::bind(txn::recvVoteAbort, std::placeholders::_1, shardId);
+        auto commandFn =
+            std::bind(txn::recvVoteAbort, std::placeholders::_1, _coordinator, shardId);
         return simulateHandleRequest(commandFn);
     }
 
@@ -205,6 +192,7 @@ private:
         return stdx::make_unique<StaticCatalogClient>();
     }
 
+    std::shared_ptr<TransactionCoordinator> _coordinator;
     const LogicalSessionId _lsid{makeLogicalSessionIdForTest()};
     const TxnNumber _txnNumber{0};
 };

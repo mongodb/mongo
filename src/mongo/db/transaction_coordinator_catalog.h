@@ -85,7 +85,7 @@ private:
     /**
      * Protects the _coordinatorsBySession map.
      */
-    stdx::mutex _mtx;
+    stdx::mutex _mutex;
 
     /**
      * Contains TransactionCoordinator objects by session id and transaction number. May contain

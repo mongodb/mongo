@@ -62,10 +62,15 @@ TransactionCoordinatorService* TransactionCoordinatorService::get(ServiceContext
 void TransactionCoordinatorService::createCoordinator(LogicalSessionId lsid,
                                                       TxnNumber txnNumber,
                                                       Date_t commitDeadline) {
-
     // TODO (SERVER-37021): Validate lsid and txnNumber against latest txnNumber on session in the
     // catalog.
 
+    auto latestTxnNumAndCoordinator = _coordinatorCatalog.getLatestOnSession(lsid);
+    // TODO (SERVER-37039): The below removal logic for a coordinator will change/be removed once we
+    // allow multiple coordinators for a session.
+    if (latestTxnNumAndCoordinator) {
+        _coordinatorCatalog.remove(lsid, latestTxnNumAndCoordinator->first);
+    }
     _coordinatorCatalog.create(lsid, txnNumber);
 
     // TODO (SERVER-37024): Schedule abort task on executor to execute at commitDeadline.
@@ -84,11 +89,7 @@ TransactionCoordinatorService::CommitDecision TransactionCoordinatorService::coo
     }
 
     // TODO (SERVER-37017): Execute this asynchronously.
-    txn::recvCoordinateCommit(opCtx, participantList);
-    // TODO (SERVER-37017): Once coordinate commit is asynchronous and/or returns after deciding to
-    // commit instead of after finishing commit, removal of the coordinator from the catalog will
-    // need to be done somewhere else.
-    _coordinatorCatalog.remove(lsid, txnNumber);
+    txn::recvCoordinateCommit(opCtx, coordinator.get(), participantList);
 
     // TODO (SERVER-36640): Return a notification wrapping the decision that the caller can wait on.
     return TransactionCoordinatorService::CommitDecision::kAbort;
@@ -102,10 +103,11 @@ void TransactionCoordinatorService::voteCommit(OperationContext* opCtx,
     auto coordinator = _coordinatorCatalog.get(lsid, txnNumber);
     if (!coordinator) {
         // TODO (SERVER-37018): Send abort to the participant who sent this vote (shardId)
+        return;
     }
 
     // TODO (SERVER-37017): Execute this asynchronously
-    txn::recvVoteCommit(opCtx, shardId, prepareTimestamp);
+    txn::recvVoteCommit(opCtx, coordinator.get(), shardId, prepareTimestamp);
 }
 
 void TransactionCoordinatorService::voteAbort(OperationContext* opCtx,
@@ -116,7 +118,7 @@ void TransactionCoordinatorService::voteAbort(OperationContext* opCtx,
 
     if (coordinator) {
         // TODO (SERVER-37017): Execute this asynchronously.
-        txn::recvVoteAbort(opCtx, shardId);
+        txn::recvVoteAbort(opCtx, coordinator.get(), shardId);
     }
 }
 

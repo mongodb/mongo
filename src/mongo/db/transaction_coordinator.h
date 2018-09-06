@@ -34,6 +34,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/mongoutils/str.h"
@@ -53,9 +54,6 @@ class TransactionCoordinator {
 public:
     TransactionCoordinator() = default;
     ~TransactionCoordinator() = default;
-
-    static boost::optional<TransactionCoordinator>& get(OperationContext* opCtx);
-    static void create(Session* session);
 
     /**
      * The internal state machine, or "brain", used by the TransactionCoordinator to determine what
@@ -202,6 +200,7 @@ public:
     };
 
 private:
+    stdx::mutex _mtx;
     ParticipantList _participantList;
     StateMachine _stateMachine;
 };
