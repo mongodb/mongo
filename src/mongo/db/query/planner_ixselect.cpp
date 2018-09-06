@@ -313,22 +313,53 @@ void QueryPlannerIXSelect::getFields(const MatchExpression* node,
 }
 
 // static
-void QueryPlannerIXSelect::findRelevantIndices(const stdx::unordered_set<std::string>& fields,
-                                               const std::vector<IndexEntry>& allIndices,
-                                               std::vector<IndexEntry>* out) {
+std::vector<IndexEntry> QueryPlannerIXSelect::findIndexesByHint(
+    const BSONObj& hintedIndex, const std::vector<IndexEntry>& allIndices) {
+    std::vector<IndexEntry> out;
+    BSONElement firstHintElt = hintedIndex.firstElement();
+    if (firstHintElt.fieldNameStringData() == "$hint"_sd &&
+        firstHintElt.type() == BSONType::String) {
+        auto hintName = firstHintElt.valueStringData();
+        for (auto&& entry : allIndices) {
+            if (entry.identifier.catalogName == hintName) {
+                LOG(5) << "Hint by name specified, restricting indices to "
+                       << entry.keyPattern.toString();
+                out.push_back(entry);
+            }
+        }
+    } else {
+        for (auto&& entry : allIndices) {
+            if (SimpleBSONObjComparator::kInstance.evaluate(entry.keyPattern == hintedIndex)) {
+                LOG(5) << "Hint specified, restricting indices to " << hintedIndex.toString();
+                out.push_back(entry);
+            }
+        }
+    }
+
+    return out;
+}
+
+// static
+std::vector<IndexEntry> QueryPlannerIXSelect::findRelevantIndices(
+    const stdx::unordered_set<std::string>& fields, const std::vector<IndexEntry>& allIndices) {
+
+    std::vector<IndexEntry> out;
     for (auto&& entry : allIndices) {
         BSONObjIterator it(entry.keyPattern);
         BSONElement elt = it.next();
         if (fields.end() != fields.find(elt.fieldName())) {
-            out->push_back(entry);
+            out.push_back(entry);
         }
     }
+
+    return out;
 }
 
 std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(
-    const stdx::unordered_set<std::string>& fields, const std::vector<IndexEntry>& allIndexes) {
+    const stdx::unordered_set<std::string>& fields,
+    const std::vector<IndexEntry>& relevantIndices) {
     std::vector<IndexEntry> out;
-    for (auto&& entry : allIndexes) {
+    for (auto&& entry : relevantIndices) {
         if (entry.type == IndexType::INDEX_ALLPATHS) {
             expandIndex(entry, fields, &out);
         } else {

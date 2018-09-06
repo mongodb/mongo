@@ -802,6 +802,97 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsDoesNotSupportNegationPredicateInsideEl
     assertHasOnlyCollscan();
 }
 
+//
+// Hinting with all paths index tests.
+//
+
+TEST_F(QueryPlannerTest, ChooseAllPathsIndexHint) {
+    addIndex(BSON("$**" << 1));
+    addIndex(BSON("x" << 1));
+
+    runQueryHint(fromjson("{x: {$eq: 1}}"), BSON("$**" << 1));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintByName) {
+    addIndex(BSON("$**" << 1), nullptr, "allPaths");
+    addIndex(BSON("x" << 1));
+
+    runQueryHint(fromjson("{x: {$eq: 1}}"),
+                 BSON("$hint"
+                      << "allPaths"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintWithPath) {
+    addIndex(BSON("x.$**" << 1));
+    addIndex(BSON("x" << 1));
+
+    runQueryHint(fromjson("{x: {$eq: 1}}"), BSON("x.$**" << 1));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintWithOr) {
+    addIndex(BSON("$**" << 1));
+    addIndex(BSON("x" << 1 << "y" << 1));
+
+    runQueryHint(fromjson("{$or: [{x: 1}, {y: 1}]}"), BSON("$**" << 1));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {or: {nodes: [{ixscan: {pattern: {$_path: 1, x: 1}}},"
+        " {ixscan: {pattern: {$_path: 1, y: 1}}}]}}}}");
+}
+
+TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintWithCompoundIndex) {
+    addIndex(BSON("$**" << 1));
+    addIndex(BSON("x" << 1 << "y" << 1));
+
+    runQueryHint(fromjson("{x: 1, y: 1}"), BSON("$**" << 1));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, y: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, QueryNotInAllPathsIndexHint) {
+    addIndex(BSON("a.$**" << 1));
+    addIndex(BSON("x" << 1));
+
+    runQueryHint(fromjson("{x: {$eq: 1}}"), BSON("a.$**" << 1));
+    assertNumSolutions(0U);
+}
+
+TEST_F(QueryPlannerTest, AllPathsIndexDoesNotExist) {
+    addIndex(BSON("x" << 1));
+
+    runInvalidQueryHint(fromjson("{x: {$eq: 1}}"), BSON("$**" << 1));
+}
+
+TEST_F(QueryPlannerTest, AllPathsIndexHintWithPartialFilter) {
+    auto filterObj = fromjson("{a: {$gt: 100}}");
+    auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
+    addIndex(BSON("$**" << 1), filterExpr.get());
+
+    runQueryHint(fromjson("{a: {$eq: 1}}"), BSON("$**" << 1));
+    assertNumSolutions(0U);
+}
+
+TEST_F(QueryPlannerTest, MultipleAllPathsIndexesHintWithPartialFilter) {
+    auto filterObj = fromjson("{a: {$gt: 100}, b: {$gt: 100}}");
+    auto filterExpr = QueryPlannerTest::parseMatchExpression(filterObj);
+    addIndex(BSON("$**" << 1), filterExpr.get());
+
+    runQueryHint(fromjson("{a: {$eq: 1}, b: {$eq: 1}}"), BSON("$**" << 1));
+    assertNumSolutions(0U);
+}
+
 // TODO SERVER-35335: Add testing for Min/Max.
 // TODO SERVER-36517: Add testing for DISTINCT_SCAN.
 // TODO SERVER-35331: Add testing for hints.

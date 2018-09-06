@@ -60,12 +60,18 @@ public:
                           stdx::unordered_set<std::string>* out);
 
     /**
-     * Find all indices prefixed by fields we have predicates over.  Only these indices are
+     * Finds all indices that correspond to the hinted index. Matches the index both by name and by
+     * key pattern.
+     */
+    static std::vector<IndexEntry> findIndexesByHint(const BSONObj& hintedIndex,
+                                                     const std::vector<IndexEntry>& allIndices);
+
+    /**
+     * Finds all indices prefixed by fields we have predicates over.  Only these indices are
      * useful in answering the query.
      */
-    static void findRelevantIndices(const stdx::unordered_set<std::string>& fields,
-                                    const std::vector<IndexEntry>& indices,
-                                    std::vector<IndexEntry>* out);
+    static std::vector<IndexEntry> findRelevantIndices(
+        const stdx::unordered_set<std::string>& fields, const std::vector<IndexEntry>& allIndices);
 
     /**
      * Return true if the index key pattern field 'keyPatternElt' (which belongs to 'index' and is
@@ -143,7 +149,7 @@ public:
      * "expanded" indexes (where the $** indexes in the given list have been expanded).
      */
     static std::vector<IndexEntry> expandIndexes(const stdx::unordered_set<std::string>& fields,
-                                                 const std::vector<IndexEntry>& allIndexes);
+                                                 const std::vector<IndexEntry>& relevantIndices);
 
 private:
     /**
