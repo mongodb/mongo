@@ -367,6 +367,11 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
             newCmdBob.append(OperationSessionInfo::kTxnNumberFieldName, *_params.getTxnNumber());
         }
 
+        if (_params.getAutocommit()) {
+            newCmdBob.append(OperationSessionInfoFromClient::kAutocommitFieldName,
+                             *_params.getAutocommit());
+        }
+
         cmdObj = newCmdBob.obj();
     }
 

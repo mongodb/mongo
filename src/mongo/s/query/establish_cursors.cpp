@@ -39,8 +39,8 @@
 #include "mongo/db/query/killcursors_request.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -60,12 +60,12 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
     }
 
     // Send the requests
-    AsyncRequestsSender ars(opCtx,
-                            executor,
-                            nss.db().toString(),
-                            std::move(requests),
-                            readPref,
-                            Shard::RetryPolicy::kIdempotent);
+    MultiStatementTransactionRequestsSender ars(opCtx,
+                                                executor,
+                                                nss.db().toString(),
+                                                std::move(requests),
+                                                readPref,
+                                                Shard::RetryPolicy::kIdempotent);
 
     std::vector<RemoteCursor> remoteCursors;
     try {

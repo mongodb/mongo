@@ -40,11 +40,11 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/transaction/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -182,12 +182,13 @@ private:
         // Send the requests.
 
         const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-        AsyncRequestsSender ars(opCtx,
-                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                dbName,
-                                requests,
-                                readPref,
-                                Shard::RetryPolicy::kNoRetry);
+        MultiStatementTransactionRequestsSender ars(
+            opCtx,
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+            dbName,
+            requests,
+            readPref,
+            Shard::RetryPolicy::kNoRetry);
 
         // Receive the responses.
 

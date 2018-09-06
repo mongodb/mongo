@@ -12,7 +12,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/s/async_requests_sender',
+        '$BUILD_DIR/mongo/s/multi_statement_transaction_requests_sender',
         '$BUILD_DIR/mongo/s/transaction/router_session',
     ],
 )

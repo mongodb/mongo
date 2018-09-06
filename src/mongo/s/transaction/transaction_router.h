@@ -85,7 +85,7 @@ public:
         /**
          * Attaches necessary fields if this is participating in a multi statement transaction.
          */
-        BSONObj attachTxnFieldsIfNeeded(BSONObj cmd);
+        BSONObj attachTxnFieldsIfNeeded(BSONObj cmd) const;
 
         /**
          * True if the participant has been chosen as the coordinator for its transaction.

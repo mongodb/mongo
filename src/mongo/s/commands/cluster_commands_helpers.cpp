@@ -47,6 +47,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/create_database_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/stale_exception.h"
@@ -181,12 +182,13 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     const std::vector<AsyncRequestsSender::Request>& requests) {
 
     // Send the requests.
-    AsyncRequestsSender ars(opCtx,
-                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                            dbName,
-                            requests,
-                            readPref,
-                            retryPolicy);
+    MultiStatementTransactionRequestsSender ars(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+        dbName,
+        requests,
+        readPref,
+        retryPolicy);
 
     // Get the responses.
 

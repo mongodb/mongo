@@ -86,8 +86,15 @@ protected:
             params.setAllowPartialResults(qr->isAllowPartialResults());
         }
 
-        OperationSessionInfo sessionInfo;
-        sessionInfo.setSessionId(operationContext()->getLogicalSessionId());
+        OperationSessionInfoFromClient sessionInfo;
+        boost::optional<LogicalSessionFromClient> lsidFromClient;
+
+        if (auto lsid = operationContext()->getLogicalSessionId()) {
+            lsidFromClient.emplace(lsid->getId());
+            lsidFromClient->setUid(lsid->getUid());
+        }
+
+        sessionInfo.setSessionId(lsidFromClient);
         sessionInfo.setTxnNumber(operationContext()->getTxnNumber());
         params.setOperationSessionInfo(sessionInfo);
         return params;

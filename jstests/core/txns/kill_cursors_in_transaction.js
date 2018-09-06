@@ -34,7 +34,13 @@
     assert(res.cursor.hasOwnProperty("id"), tojson(res));
     session.startTransaction();
     assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
-    session.commitTransaction();
+
+    try {
+        session.commitTransaction();
+    } catch (ex) {
+        assert.eq(50940, ex.code);
+        print('Error (expected) returned while performing commit: ' + tojson(ex));
+    }
 
     jsTest.log("killCursors must not block on locks held by the transaction in which it is run.");
 

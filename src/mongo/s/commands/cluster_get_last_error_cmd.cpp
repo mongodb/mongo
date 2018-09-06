@@ -37,10 +37,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/write_ops/batch_downconvert.h"
 #include "mongo/util/log.h"
 
@@ -114,12 +114,13 @@ Status enforceLegacyWriteConcern(OperationContext* opCtx,
     // Send the requests.
 
     const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-    AsyncRequestsSender ars(opCtx,
-                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                            dbName.toString(),
-                            requests,
-                            readPref,
-                            Shard::RetryPolicy::kIdempotent);
+    MultiStatementTransactionRequestsSender ars(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+        dbName.toString(),
+        requests,
+        readPref,
+        Shard::RetryPolicy::kIdempotent);
 
     // Receive the responses.
 

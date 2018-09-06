@@ -169,6 +169,7 @@ std::set<ShardId> getTargetedShards(OperationContext* opCtx,
  */
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   OperationContext* opCtx,
+                                  const boost::optional<ShardId>& shardId,
                                   const AggregationRequest& request,
                                   BSONObj collationObj) {
     cmdForShards[AggregationRequest::kFromMongosName] = Value(true);
@@ -192,12 +193,22 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
             Value(static_cast<long long>(*opCtx->getTxnNumber()));
     }
 
+    auto aggCmd = cmdForShards.freeze().toBson();
+
+    if (shardId) {
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            auto& participant = txnRouter->getOrCreateParticipant(*shardId);
+            aggCmd = participant.attachTxnFieldsIfNeeded(aggCmd);
+        }
+    }
+
     // agg creates temp collection and should handle implicit create separately.
-    return appendAllowImplicitCreate(cmdForShards.freeze().toBson(), true);
+    return appendAllowImplicitCreate(aggCmd, true);
 }
 
 BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
                                          const AggregationRequest& request,
+                                         const boost::optional<ShardId>& shardId,
                                          Pipeline* pipeline,
                                          const BSONObj& originalCmdObj,
                                          BSONObj collationObj) {
@@ -209,7 +220,7 @@ BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
     // This pipeline is not split, ensure that the write concern is propagated if present.
     targetedCmd["writeConcern"] = Value(originalCmdObj["writeConcern"]);
 
-    return genericTransformForShards(std::move(targetedCmd), opCtx, request, collationObj);
+    return genericTransformForShards(std::move(targetedCmd), opCtx, shardId, request, collationObj);
 }
 
 BSONObj createCommandForTargetedShards(
@@ -238,12 +249,14 @@ BSONObj createCommandForTargetedShards(
     targetedCmd[AggregationRequest::kExchangeName] =
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
-    return genericTransformForShards(std::move(targetedCmd), opCtx, request, collationObj);
+    return genericTransformForShards(
+        std::move(targetedCmd), opCtx, boost::none, request, collationObj);
 }
 
 BSONObj createCommandForMergingShard(const AggregationRequest& request,
                                      const boost::intrusive_ptr<ExpressionContext>& mergeCtx,
                                      const BSONObj originalCmdObj,
+                                     const ShardId& shardId,
                                      const Pipeline* pipelineForMerging) {
     MutableDocument mergeCmd(request.serializeToCommandObj());
 
@@ -259,8 +272,15 @@ BSONObj createCommandForMergingShard(const AggregationRequest& request,
             : Value(Document{CollationSpec::kSimpleSpec});
     }
 
+    auto aggCmd = mergeCmd.freeze().toBson();
+
+    if (auto txnRouter = TransactionRouter::get(mergeCtx->opCtx)) {
+        auto& participant = txnRouter->getOrCreateParticipant(shardId);
+        aggCmd = participant.attachTxnFieldsIfNeeded(aggCmd);
+    }
+
     // agg creates temp collection and should handle implicit create separately.
-    return appendAllowImplicitCreate(mergeCmd.freeze().toBson(), true);
+    return appendAllowImplicitCreate(aggCmd, true);
 }
 
 std::vector<RemoteCursor> establishShardCursors(
@@ -426,7 +446,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
         ? createCommandForTargetedShards(
               opCtx, aggRequest, *splitPipeline, collationObj, exchangeSpec, true)
         : createPassthroughCommandForShard(
-              opCtx, aggRequest, pipeline.get(), originalCmdObj, collationObj);
+              opCtx, aggRequest, boost::none, pipeline.get(), originalCmdObj, collationObj);
 
     // Refresh the shard registry if we're targeting all shards.  We need the shard registry
     // to be at least as current as the logical time used when creating the command for
@@ -627,6 +647,10 @@ BSONObj establishMergingMongosCursor(
         : boost::optional<long long>(request.getBatchSize());
     params.lsid = opCtx->getLogicalSessionId();
     params.txnNumber = opCtx->getTxnNumber();
+
+    if (TransactionRouter::get(opCtx)) {
+        params.isAutoCommit = false;
+    }
 
     auto ccc = cluster_aggregation_planner::buildClusterCursor(
         opCtx, std::move(pipelineForMerging), std::move(params));
@@ -966,7 +990,8 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                                               targetedShards,
                                               routingInfo->db().primaryId());
 
-    auto mergeCmdObj = createCommandForMergingShard(request, expCtx, cmdObj, mergePipeline);
+    auto mergeCmdObj =
+        createCommandForMergingShard(request, expCtx, cmdObj, mergingShardId, mergePipeline);
 
     // Dispatch $mergeCursors to the chosen shard, store the resulting cursor, and return.
     auto mergeResponse =
@@ -1144,16 +1169,15 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     }
     auto shard = std::move(swShard.getValue());
 
-    // aggPassthrough is for unsharded collections since changing primary shardId will cause SSV
-    // error and hence shardId history does not need to be verified.
-    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    if (txnRouter) {
         txnRouter->computeAtClusterTimeForOneShard(opCtx, shardId);
     }
 
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     cmdObj = CommandHelpers::filterCommandRequestForPassthrough(
-        createPassthroughCommandForShard(opCtx, aggRequest, nullptr, cmdObj, BSONObj()));
+        createPassthroughCommandForShard(opCtx, aggRequest, shardId, nullptr, cmdObj, BSONObj()));
 
     auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
         opCtx,
@@ -1162,6 +1186,11 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         !shard->isConfig() ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
                            : std::move(cmdObj),
         Shard::RetryPolicy::kIdempotent));
+
+    if (txnRouter) {
+        auto& participant = txnRouter->getOrCreateParticipant(shardId);
+        participant.markAsCommandSent();
+    }
 
     if (ErrorCodes::isStaleShardVersionError(cmdResponse.commandStatus.code())) {
         uassertStatusOK(

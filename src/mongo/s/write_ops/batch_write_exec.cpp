@@ -39,9 +39,9 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/transaction/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
@@ -207,13 +207,14 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 pendingBatches.emplace(targetShardId, nextBatch);
             }
 
-            AsyncRequestsSender ars(opCtx,
-                                    Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                    clientRequest.getNS().db().toString(),
-                                    requests,
-                                    kPrimaryOnlyReadPreference,
-                                    opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent
-                                                          : Shard::RetryPolicy::kNoRetry);
+            MultiStatementTransactionRequestsSender ars(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                clientRequest.getNS().db().toString(),
+                requests,
+                kPrimaryOnlyReadPreference,
+                opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent
+                                      : Shard::RetryPolicy::kNoRetry);
             numSent += pendingBatches.size();
 
             //

@@ -241,6 +241,10 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     params.lsid = opCtx->getLogicalSessionId();
     params.txnNumber = opCtx->getTxnNumber();
 
+    if (TransactionRouter::get(opCtx)) {
+        params.isAutoCommit = false;
+    }
+
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
     // usually use the batchSize associated with the initial find, but as it is illegal to send a
     // getMore with a batchSize of 0, we set it to use the default batchSize logic.

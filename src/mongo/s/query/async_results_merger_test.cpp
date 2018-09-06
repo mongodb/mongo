@@ -1786,7 +1786,7 @@ DEATH_TEST_F(AsyncResultsMergerTest,
              "Invariant failure params.getSessionId()") {
     AsyncResultsMergerParams params;
 
-    OperationSessionInfo sessionInfo;
+    OperationSessionInfoFromClient sessionInfo;
     sessionInfo.setTxnNumber(5);
     params.setOperationSessionInfo(sessionInfo);
 

@@ -277,6 +277,9 @@ private:
         // The exact host in the shard on which the cursor resides.
         HostAndPort shardHostAndPort;
 
+        // The identity of the shard which the cursor belongs to.
+        ShardId shardId;
+
         // The buffer of results that have been retrieved but not yet returned to the caller.
         std::queue<ClusterQueryResult> docBuffer;
 

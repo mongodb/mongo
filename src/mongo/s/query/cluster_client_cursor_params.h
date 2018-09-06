@@ -86,9 +86,17 @@ struct ClusterClientCursorParams {
         armParams.setNss(nsString);
         armParams.setAllowPartialResults(isAllowPartialResults);
 
-        OperationSessionInfo sessionInfo;
-        sessionInfo.setSessionId(lsid);
+        OperationSessionInfoFromClient sessionInfo;
+        boost::optional<LogicalSessionFromClient> lsidFromClient;
+
+        if (lsid) {
+            lsidFromClient.emplace(lsid->getId());
+            lsidFromClient->setUid(lsid->getUid());
+        }
+
+        sessionInfo.setSessionId(lsidFromClient);
         sessionInfo.setTxnNumber(txnNumber);
+        sessionInfo.setAutocommit(isAutoCommit);
         armParams.setOperationSessionInfo(sessionInfo);
 
         return armParams;
@@ -139,6 +147,9 @@ struct ClusterClientCursorParams {
 
     // The transaction number of the command that created the cursor.
     boost::optional<TxnNumber> txnNumber;
+
+    // Set to false for multi statement transactions.
+    boost::optional<bool> isAutoCommit;
 };
 
 }  // mongo

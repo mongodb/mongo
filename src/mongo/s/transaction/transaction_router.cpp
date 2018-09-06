@@ -48,9 +48,7 @@ namespace mongo {
 
 namespace {
 
-const char kAutoCommitField[] = "autocommit";
 const char kCoordinatorField[] = "coordinator";
-const char kStartTransactionField[] = "startTransaction";
 
 class RouterSessionCatalog {
 public:
@@ -146,11 +144,15 @@ BSONObj appendReadConcernForTxn(BSONObj cmd,
 
 BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
                                                repl::ReadConcernArgs readConcernArgs,
-                                               boost::optional<LogicalTime> atClusterTime) {
+                                               boost::optional<LogicalTime> atClusterTime,
+                                               bool doAppendStartTransaction) {
     auto cmdWithReadConcern =
         appendReadConcernForTxn(std::move(cmd), readConcernArgs, atClusterTime);
     BSONObjBuilder bob(std::move(cmdWithReadConcern));
-    bob.append(kStartTransactionField, true);
+
+    if (doAppendStartTransaction) {
+        bob.append(OperationSessionInfoFromClient::kStartTransactionFieldName, true);
+    }
 
     return bob;
 }
@@ -171,8 +173,30 @@ TransactionRouter::Participant::Participant(bool isCoordinator,
       _stmtIdCreatedAt(stmtIdCreatedAt),
       _sharedOptions(sharedOptions) {}
 
-BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(BSONObj cmd) {
-    auto isTxnCmd = isTransactionCommand(cmd);  // check first before moving cmd.
+BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(BSONObj cmd) const {
+    // Perform checks first before calling std::move on cmd.
+    auto isTxnCmd = isTransactionCommand(cmd);
+
+    bool hasStartTxn = false;
+    bool hasAutoCommit = false;
+    bool hasTxnNum = false;
+
+    BSONObjIterator iter(cmd);
+    while (iter.more()) {
+        auto elem = iter.next();
+
+        if (OperationSessionInfoFromClient::kStartTransactionFieldName ==
+            elem.fieldNameStringData()) {
+            hasStartTxn = true;
+        } else if (OperationSessionInfoFromClient::kAutocommitFieldName ==
+                   elem.fieldNameStringData()) {
+            hasAutoCommit = true;
+        } else if (OperationSessionInfo::kTxnNumberFieldName == elem.fieldNameStringData()) {
+            hasTxnNum = true;
+        }
+    }
+
+    // TODO: SERVER-37045 assert when attaching startTransaction to killCursors command.
 
     // The first command sent to a participant must start a transaction, unless it is a transaction
     // command, which don't support the options that start transactions, i.e. starTransaction and
@@ -184,17 +208,21 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(BSONObj cmd) {
     }
 
     BSONObjBuilder newCmd = mustStartTransaction
-        ? appendFieldsForStartTransaction(
-              std::move(cmd), _sharedOptions.readConcernArgs, _sharedOptions.atClusterTime)
+        ? appendFieldsForStartTransaction(std::move(cmd),
+                                          _sharedOptions.readConcernArgs,
+                                          _sharedOptions.atClusterTime,
+                                          !hasStartTxn)
         : BSONObjBuilder(std::move(cmd));
 
     if (_isCoordinator) {
         newCmd.append(kCoordinatorField, true);
     }
 
-    newCmd.append(kAutoCommitField, false);
+    if (!hasAutoCommit) {
+        newCmd.append(OperationSessionInfoFromClient::kAutocommitFieldName, false);
+    }
 
-    if (!newCmd.hasField(OperationSessionInfo::kTxnNumberFieldName)) {
+    if (!hasTxnNum) {
         newCmd.append(OperationSessionInfo::kTxnNumberFieldName, _sharedOptions.txnNumber);
     } else {
         auto osi =
@@ -481,12 +509,14 @@ Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(Operatio
 
     CommitTransaction commitCmd;
     commitCmd.setDbName("admin");
-    return uassertStatusOK(
-        shard->runCommandWithFixedRetryAttempts(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                "admin",
-                                                commitCmd.toBSON(opCtx->getWriteConcern().toBSON()),
-                                                Shard::RetryPolicy::kIdempotent));
+
+    const auto& participant = citer->second;
+    return uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        participant.attachTxnFieldsIfNeeded(commitCmd.toBSON(opCtx->getWriteConcern().toBSON())),
+        Shard::RetryPolicy::kIdempotent));
 }
 
 Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx) {
@@ -505,9 +535,9 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
     for (const auto& participantEntry : _participants) {
         ShardId shardId(participantEntry.first);
 
-        CommitParticipant participant;
-        participant.setShardId(shardId);
-        participantList.push_back(std::move(participant));
+        CommitParticipant commitParticipant;
+        commitParticipant.setShardId(shardId);
+        participantList.push_back(std::move(commitParticipant));
 
         if (participantEntry.second.isCoordinator()) {
             // coordinateCommit is sent to participant that is also a coordinator.
@@ -515,9 +545,12 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
             continue;
         }
 
+        const auto& participant = participantEntry.second;
         auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-        shard->runFireAndForgetCommand(
-            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, "admin", prepareCmdObj);
+        shard->runFireAndForgetCommand(opCtx,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       "admin",
+                                       participant.attachTxnFieldsIfNeeded(prepareCmdObj));
     }
 
     auto coordinatorShard = uassertStatusOK(shardRegistry->getShard(opCtx, *_coordinatorId));
@@ -526,11 +559,15 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
     coordinateCommitCmd.setDbName("admin");
     coordinateCommitCmd.setParticipants(participantList);
 
+    auto coordinatorIter = _participants.find(*_coordinatorId);
+    invariant(coordinatorIter != _participants.end());
+
     return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
-        coordinateCommitCmd.toBSON(opCtx->getWriteConcern().toBSON()),
+        coordinatorIter->second.attachTxnFieldsIfNeeded(
+            coordinateCommitCmd.toBSON(opCtx->getWriteConcern().toBSON())),
         Shard::RetryPolicy::kIdempotent));
 }
 

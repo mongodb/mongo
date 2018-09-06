@@ -36,7 +36,6 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
@@ -44,6 +43,7 @@
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction/transaction_router.h"
 #include "mongo/s/write_ops/cluster_write.h"
@@ -214,13 +214,14 @@ private:
                 appendShardVersion(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
                                    shardVersion));
 
-            AsyncRequestsSender ars(opCtx,
-                                    Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                    nss.db().toString(),
-                                    requests,
-                                    kPrimaryOnlyReadPreference,
-                                    opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent
-                                                          : Shard::RetryPolicy::kNoRetry);
+            MultiStatementTransactionRequestsSender ars(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                nss.db().toString(),
+                requests,
+                kPrimaryOnlyReadPreference,
+                opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent
+                                      : Shard::RetryPolicy::kNoRetry);
 
             auto response = ars.next();
             invariant(ars.done());

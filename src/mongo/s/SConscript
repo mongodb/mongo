@@ -109,6 +109,17 @@ env.Library(
 )
 
 env.Library(
+    target="multi_statement_transaction_requests_sender",
+    source=[
+        "multi_statement_transaction_requests_sender.cpp",
+    ],
+    LIBDEPS=[
+        "async_requests_sender",
+        "$BUILD_DIR/mongo/s/transaction/router_session",
+    ],
+)
+
+env.Library(
     target='common_s',
     source=[
         'catalog/mongo_version_range.cpp',
@@ -299,7 +310,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         'cluster_last_error_info',
-        'transaction/router_session',
     ],
 )
 

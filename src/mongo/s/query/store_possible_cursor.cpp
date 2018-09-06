@@ -41,6 +41,7 @@
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/transaction/transaction_router.h"
 
 namespace mongo {
 
@@ -118,6 +119,10 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     params.tailableMode = tailableMode;
     params.lsid = opCtx->getLogicalSessionId();
     params.txnNumber = opCtx->getTxnNumber();
+
+    if (TransactionRouter::get(opCtx)) {
+        params.isAutoCommit = false;
+    }
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, executor, std::move(params));
 
