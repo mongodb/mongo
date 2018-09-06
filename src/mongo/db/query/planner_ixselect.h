@@ -228,6 +228,17 @@ private:
                                                          const std::vector<IndexEntry>& indices);
 
     /**
+     * This function strips RelevantTag assignments to expanded 'allPaths' indexes, in cases where
+     * the assignment is incompatible with the query.
+     *
+     * Specifically, if the query has a TEXT node with both 'text' and 'allPaths' indexes present,
+     * then the 'allPaths' index will mark itself as relevant to the '_fts' path reported by the
+     * TEXT node. We therefore remove any such misassigned 'allPaths' tags here.
+     */
+    static void stripInvalidAssignmentsToAllPathsIndexes(MatchExpression* root,
+                                                         const std::vector<IndexEntry>& indices);
+
+    /**
      * This function strips RelevantTag assignments to partial indices, where the assignment is
      * incompatible with the index's filter expression.
      *

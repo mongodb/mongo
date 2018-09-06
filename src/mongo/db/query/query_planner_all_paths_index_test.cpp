@@ -585,12 +585,6 @@ TEST_F(QueryPlannerAllPathsTest, InBasicOrEquivalent) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true],[2,2,true,true]]}}}}}");
 }
 
-// TODO SERVER-35335: Add testing for Min/Max.
-// TODO SERVER-36517: Add testing for DISTINCT_SCAN.
-// TODO SERVER-35336: Add testing for partialFilterExpression.
-// TODO SERVER-35331: Add testing for hints.
-// TODO SERVER-36145: Add testing for non-blocking sort.
-
 //
 // Index intersection tests.
 //
@@ -667,5 +661,39 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotParticipateInIndexIntersect
     assertSolutionExists(
         "{fetch: {filter:{b:{$gt:10}}, node: {ixscan: {filter: null, pattern: {$_path:1, a:1}}}}}");
 }
+
+//
+// AllPaths and $text index tests.
+//
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotSupplyCandidatePlanForTextSearch) {
+    addAllPathsIndex(BSON("$**" << 1));
+    addIndex(BSON("a" << 1 << "_fts"
+                      << "text"
+                      << "_ftsx"
+                      << 1));
+
+    // Confirm that the allPaths index generates candidate plans for queries which do not include a
+    // $text predicate.
+    runQuery(fromjson("{a: 10, b: 10}"));
+    ASSERT_EQUALS(getNumSolutions(), 2U);
+    assertSolutionExists(
+        "{fetch: {filter: {b: 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, a: 1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, b: 1}}}}}");
+
+    // Confirm that the allPaths index does not produce any candidate plans when a query includes a
+    // $text predicate, even for non-$text predicates which may be present in the query.
+    runQuery(fromjson("{a: 10, b: 10, $text: {$search: 'banana'}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: {b: 10}, node: {text: {prefix: {a: 10}, search: 'banana'}}}}");
+}
+
+// TODO SERVER-35335: Add testing for Min/Max.
+// TODO SERVER-36517: Add testing for DISTINCT_SCAN.
+// TODO SERVER-35336: Add testing for partialFilterExpression.
+// TODO SERVER-35331: Add testing for hints.
+// TODO SERVER-36145: Add testing for non-blocking sort.
 
 }  // namespace mongo

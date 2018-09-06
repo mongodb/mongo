@@ -686,6 +686,7 @@ void QueryPlannerIXSelect::_rateIndices(MatchExpression* node,
 // static
 void QueryPlannerIXSelect::stripInvalidAssignments(MatchExpression* node,
                                                    const vector<IndexEntry>& indices) {
+    stripInvalidAssignmentsToAllPathsIndexes(node, indices);
     stripInvalidAssignmentsToTextIndexes(node, indices);
 
     if (MatchExpression::GEO != node->matchType() &&
@@ -869,6 +870,34 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsToPartialIndices(
     for (size_t i = 0; i < indices.size(); ++i) {
         if (indices[i].filterExpr) {
             stripInvalidAssignmentsToPartialIndexRoot(node, i, indices[i]);
+        }
+    }
+}
+
+//
+// AllPaths index invalid assignments.
+//
+void QueryPlannerIXSelect::stripInvalidAssignmentsToAllPathsIndexes(
+    MatchExpression* root, const vector<IndexEntry>& indices) {
+    for (size_t idx = 0; idx < indices.size(); ++idx) {
+        // Skip over all indexes except $**.
+        if (indices[idx].type != IndexType::INDEX_ALLPATHS) {
+            continue;
+        }
+        // If we have a $** index, check whether we have a TEXT node in the MatchExpression tree.
+        const std::function<MatchExpression*(MatchExpression*)> findTextNode = [&](auto* node) {
+            if (node->matchType() == MatchExpression::TEXT) {
+                return node;
+            }
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                if (auto* foundNode = findTextNode(node->getChild(i)))
+                    return foundNode;
+            }
+            return static_cast<MatchExpression*>(nullptr);
+        };
+        // If so, remove the $** index from the node's relevant tags.
+        if (auto* textNode = findTextNode(root)) {
+            removeIndexRelevantTag(textNode, idx);
         }
     }
 }
