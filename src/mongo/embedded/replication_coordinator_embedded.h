@@ -219,7 +219,7 @@ public:
     repl::ReplSettings::IndexPrefetchConfig getIndexPrefetchConfig() const override;
     void setIndexPrefetchConfig(const repl::ReplSettings::IndexPrefetchConfig) override;
 
-    Status stepUpIfEligible() override;
+    Status stepUpIfEligible(bool skipDryRun) override;
 
     Status abortCatchupIfNeeded() override;
 

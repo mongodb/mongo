@@ -692,7 +692,8 @@ public:
 
         log() << "Received replSetStepUp request";
 
-        status = ReplicationCoordinator::get(opCtx)->stepUpIfEligible();
+        const bool skipDryRun = cmdObj["skipDryRun"].trueValue();
+        status = ReplicationCoordinator::get(opCtx)->stepUpIfEligible(skipDryRun);
 
         if (!status.isOK()) {
             log() << "replSetStepUp request failed" << causedBy(status);

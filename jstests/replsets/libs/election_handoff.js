@@ -57,9 +57,8 @@ var ElectionHandoffTest = (function() {
 
         // If there are only two nodes in the set, verify that the old primary voted "yes".
         if (numNodes === 2) {
-            checkLog.contains(
-                expectedCandidate,
-                `VoteRequester(term ${term} dry run) received a yes vote from ${primary.host}`);
+            checkLog.contains(expectedCandidate,
+                              `skipping dry run and running for election in term ${term+1}`);
             checkLog.contains(
                 expectedCandidate,
                 `VoteRequester(term ${term+1}) received a yes vote from ${primary.host}`);

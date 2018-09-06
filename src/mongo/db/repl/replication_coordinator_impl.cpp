@@ -1827,7 +1827,8 @@ void ReplicationCoordinatorImpl::_performElectionHandoff() {
     }
 
     auto target = _rsConfig.getMemberAt(candidateIndex).getHostAndPort();
-    executor::RemoteCommandRequest request(target, "admin", BSON("replSetStepUp" << 1), nullptr);
+    executor::RemoteCommandRequest request(
+        target, "admin", BSON("replSetStepUp" << 1 << "skipDryRun" << true), nullptr);
     log() << "Handing off election to " << target;
 
     auto callbackHandleSW = _replExecutor->scheduleRemoteCommand(
@@ -3496,8 +3497,12 @@ CallbackFn ReplicationCoordinatorImpl::_wrapAsCallbackFn(const stdx::function<vo
     };
 }
 
-Status ReplicationCoordinatorImpl::stepUpIfEligible() {
-    _startElectSelfIfEligibleV1(TopologyCoordinator::StartElectionReason::kStepUpRequest);
+Status ReplicationCoordinatorImpl::stepUpIfEligible(bool skipDryRun) {
+
+    auto reason = skipDryRun ? TopologyCoordinator::StartElectionReason::kStepUpRequestSkipDryRun
+                             : TopologyCoordinator::StartElectionReason::kStepUpRequest;
+    _startElectSelfIfEligibleV1(reason);
+
     EventHandle finishEvent;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
