@@ -869,6 +869,7 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
                       << "since we are not electable due to: " << status.reason();
                 break;
             case TopologyCoordinator::StartElectionReason::kStepUpRequest:
+            case TopologyCoordinator::StartElectionReason::kStepUpRequestSkipDryRun:
                 log() << "Not starting an election for a replSetStepUp request, "
                       << "since we are not electable due to: " << status.reason();
                 break;
@@ -893,6 +894,7 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
             log() << "Starting an election for a priority takeover";
             break;
         case TopologyCoordinator::StartElectionReason::kStepUpRequest:
+        case TopologyCoordinator::StartElectionReason::kStepUpRequestSkipDryRun:
             log() << "Starting an election due to step up request";
             break;
         case TopologyCoordinator::StartElectionReason::kCatchupTakeover:

@@ -492,7 +492,7 @@ ReplSettings::IndexPrefetchConfig ReplicationCoordinatorMock::getIndexPrefetchCo
 void ReplicationCoordinatorMock::setIndexPrefetchConfig(
     const ReplSettings::IndexPrefetchConfig cfg) {}
 
-Status ReplicationCoordinatorMock::stepUpIfEligible() {
+Status ReplicationCoordinatorMock::stepUpIfEligible(bool skipDryRun) {
     return Status::OK();
 }
 
