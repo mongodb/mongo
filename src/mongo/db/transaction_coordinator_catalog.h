@@ -65,6 +65,14 @@ public:
     boost::optional<std::shared_ptr<TransactionCoordinator>> get(LogicalSessionId lsid,
                                                                  TxnNumber txnNumber);
 
+    /**
+     * Removes the coordinator with the given session id and transaction number from the catalog, if
+     * one exists.
+     *
+     * Note: The coordinator must be in a state suitable for removal (i.e. committed or aborted).
+     */
+    void remove(LogicalSessionId lsid, TxnNumber txnNumber);
+
 private:
     /**
      * Protects the _coordinatorsBySession map.

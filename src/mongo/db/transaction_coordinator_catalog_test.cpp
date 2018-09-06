@@ -101,5 +101,48 @@ DEATH_TEST_F(TransactionCoordinatorCatalogTest,
     coordinatorCatalog().create(lsid, txnNumber);
 }
 
+TEST_F(TransactionCoordinatorCatalogTest, RemovingACommittedCoordinatorSucceeds) {
+    using CoordinatorState = TransactionCoordinator::StateMachine::State;
+
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber = 1;
+    auto coordinator = coordinatorCatalog().create(lsid, txnNumber);
+
+    coordinator->recvCoordinateCommit({ShardId("shard0000")});
+    coordinator->recvVoteCommit(ShardId("shard0000"), 0);
+    coordinator->recvCommitAck(ShardId("shard0000"));
+    ASSERT_EQ(coordinator->state(), CoordinatorState::kCommitted);
+
+    coordinatorCatalog().remove(lsid, txnNumber);
+    auto coordinatorInCatalog = coordinatorCatalog().get(lsid, txnNumber);
+    ASSERT_EQ(coordinatorInCatalog, boost::none);
+}
+
+TEST_F(TransactionCoordinatorCatalogTest, RemovingAnAbortedCoordinatorSucceeds) {
+    using CoordinatorState = TransactionCoordinator::StateMachine::State;
+
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber = 1;
+    auto coordinator = coordinatorCatalog().create(lsid, txnNumber);
+
+    coordinator->recvCoordinateCommit({ShardId("shard0000")});
+    coordinator->recvVoteAbort(ShardId("shard0000"));
+    coordinator->recvAbortAck(ShardId("shard0000"));
+    ASSERT_EQ(coordinator->state(), CoordinatorState::kAborted);
+
+    coordinatorCatalog().remove(lsid, txnNumber);
+    auto coordinatorInCatalog = coordinatorCatalog().get(lsid, txnNumber);
+    ASSERT_EQ(coordinatorInCatalog, boost::none);
+}
+
+DEATH_TEST_F(TransactionCoordinatorCatalogTest,
+             RemovingACoordinatorNotInCommittedOrAbortedStateFails,
+             "Invariant failure") {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber = 1;
+    coordinatorCatalog().create(lsid, txnNumber);
+    coordinatorCatalog().remove(lsid, txnNumber);
+}
+
 }  // namespace
 }  // namespace mongo

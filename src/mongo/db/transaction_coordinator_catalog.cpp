@@ -33,6 +33,7 @@
 #include "mongo/db/transaction_coordinator.h"
 #include "mongo/db/transaction_coordinator_catalog.h"
 
+#include "mongo/db/transaction_coordinator.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -83,6 +84,24 @@ boost::optional<std::shared_ptr<TransactionCoordinator>> TransactionCoordinatorC
     }
 
     return coordinatorForTxnIter->second;
+}
+
+void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnNumber) {
+    using CoordinatorState = TransactionCoordinator::StateMachine::State;
+
+    const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
+
+    if (coordinatorsForSessionIter != _coordinatorsBySession.end()) {
+        auto& coordinatorsForSession = coordinatorsForSessionIter->second;
+        const auto& coordinatorForTxnIter = coordinatorsForSession.find(txnNumber);
+
+        if (coordinatorForTxnIter != coordinatorsForSession.end()) {
+            auto coordinator = coordinatorForTxnIter->second;
+            invariant(coordinator->state() == CoordinatorState::kCommitted ||
+                      coordinator->state() == CoordinatorState::kAborted);
+            coordinatorsForSession.erase(coordinatorForTxnIter);
+        }
+    }
 }
 
 }  // namespace mongo
