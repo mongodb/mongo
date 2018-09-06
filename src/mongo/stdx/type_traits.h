@@ -54,29 +54,89 @@ using enable_if_t = typename std::enable_if<B, T>::type;
 }  // namespace mongo
 #endif
 
-#if __cplusplus >= 201703
-
+// TODO: Deal with importing this from C++20, when the time comes.
 namespace mongo {
 namespace stdx {
 
-using std::void_t;
+template <typename T>
+struct type_identity {
+    using type = T;
+};
+
+template <typename T>
+using type_identity_t = stdx::type_identity<T>;
 
 }  // namespace stdx
 }  // namespace mongo
 
-#else
+
+// TODO: Re-evaluate which of these we need when making the cutover to C++17.
 
 namespace mongo {
 namespace stdx {
 
+namespace detail {
 template <typename...>
 struct make_void {
     using type = void;
 };
+}  // namespace detail
 
 template <typename... Args>
-using void_t = typename make_void<Args...>::type;
+using void_t = typename detail::make_void<Args...>::type;
+
+template <bool b>
+using bool_constant = std::integral_constant<bool, b>;
+
+template <typename T>
+struct negation : stdx::bool_constant<!bool(T::value)> {};
+
+template <typename... B>
+struct disjunction : std::false_type {};
+template <typename B>
+struct disjunction<B> : B {};
+template <typename B1, typename... B>
+struct disjunction<B1, B...> : std::conditional_t<bool(B1::value), B1, stdx::disjunction<B...>> {};
+
+template <typename...>
+struct conjunction : std::true_type {};
+template <typename B>
+struct conjunction<B> : B {};
+template <typename B1, typename... B>
+struct conjunction<B1, B...> : std::conditional_t<bool(B1::value), stdx::conjunction<B...>, B1> {};
+
+namespace detail {
+template <typename Func,
+          typename... Args,
+          typename = typename std::result_of<Func && (Args && ...)>::type>
+auto is_invocable_impl(Func&& func, Args&&... args) -> std::true_type;
+auto is_invocable_impl(...) -> std::false_type;
+}  // namespace detail
+
+template <typename Func, typename... Args>
+struct is_invocable
+    : decltype(detail::is_invocable_impl(std::declval<Func>(), std::declval<Args>()...)) {};
+
+namespace detail {
+
+// This helps solve the lack of regular void problem, when passing a 'conversion target' as a
+// parameter.
+
+template <typename R,
+          typename Func,
+          typename... Args,
+          typename ComputedResult = typename std::result_of<Func && (Args && ...)>::type>
+auto is_invocable_r_impl(stdx::type_identity<R>, Func&& func, Args&&... args) ->
+    typename stdx::disjunction<std::is_void<R>,
+                               std::is_same<ComputedResult, R>,
+                               std::is_convertible<ComputedResult, R>>::type;
+auto is_invocable_r_impl(...) -> std::false_type;
+}  // namespace detail
+
+template <typename R, typename Func, typename... Args>
+struct is_invocable_r
+    : decltype(detail::is_invocable_r_impl(
+          stdx::type_identity<R>(), std::declval<Func>(), std::declval<Args>()...)) {};
 
 }  // namespace stdx
 }  // namespace mongo
-#endif

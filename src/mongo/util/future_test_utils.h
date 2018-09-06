@@ -70,7 +70,7 @@ Future<Result> async(Func&& func) {
     return std::move(pf.future);
 }
 
-inline const auto failStatus() {
+inline Status failStatus() {
     return Status(ErrorCodes::Error(50728), "expected failure");
 }
 

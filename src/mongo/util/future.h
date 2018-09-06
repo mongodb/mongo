@@ -39,9 +39,11 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 
@@ -74,21 +76,6 @@ struct FakeVoid {};
 template <typename T>
 using VoidToFakeVoid = std::conditional_t<std::is_void<T>::value, FakeVoid, T>;
 
-/**
- * This is a poor-man's implementation of c++17 std::is_invocable. We should replace it with the
- * stdlib one once we can make call() use std::invoke.
- */
-template <typename Func,
-          typename... Args,
-          typename = typename std::result_of<Func && (Args && ...)>::type>
-auto is_invocable_impl(Func&& func, Args&&... args) -> std::true_type;
-auto is_invocable_impl(...) -> std::false_type;
-
-template <typename Func, typename... Args>
-struct is_invocable
-    : public decltype(is_invocable_impl(std::declval<Func>(), std::declval<Args>()...)) {};
-
-
 // call(func, FakeVoid) -> func(Status::OK())
 // This simulates the implicit Status/T overloading you get by taking a StatusWith<T> that doesn't
 // work for Status/void and Status.
@@ -119,8 +106,9 @@ inline auto call(Func&& func) {
 
 template <typename Func>
 inline auto call(Func&& func, FakeVoid) {
-    auto useStatus =
-        std::integral_constant<bool, (!is_invocable<Func>() && is_invocable<Func, Status>())>();
+    auto useStatus = std::integral_constant<bool,
+                                            (!stdx::is_invocable<Func>() &&
+                                             stdx::is_invocable<Func, Status>())>();
     return callVoidOrStatus(func, useStatus);
 }
 
@@ -422,7 +410,7 @@ public:
     boost::intrusive_ptr<SharedStateBase> continuation;  // F
 
     // Takes this as argument and usually writes to continuation.
-    std::function<void(SharedStateBase* input)> callback;  // F
+    unique_function<void(SharedStateBase* input)> callback;  // F
 
 
     // These are only used to signal completion to blocking waiters. Benchmarks showed that it was
@@ -522,7 +510,7 @@ public:
 
 
     /**
-     * Breaks this `Promise`, if not fulfilled and not in a moved-from state.
+     * Breaks this `Promise`, if not fulfilled and not in a null state.
      */
     Promise& operator=(Promise&& p) noexcept {
         breakPromiseIfNeeded();

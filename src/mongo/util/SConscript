@@ -69,6 +69,17 @@ env.CppUnitTest(
     )
 
 env.CppUnitTest(
+    target='unique_function_test',
+    source=[
+        'unique_function_test.cpp'
+    ],
+    LIBDEPS=[
+    ],
+    LIBDEPS_PRIVATE=[
+    ],
+)
+
+env.CppUnitTest(
     target='represent_as_test',
     source=[
         'represent_as_test.cpp',

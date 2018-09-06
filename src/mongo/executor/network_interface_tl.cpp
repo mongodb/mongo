@@ -235,17 +235,11 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
             });
     });
 
-    auto remainingWork = [
-        this,
-        state,
-        // TODO: once SERVER-35685 is done, stop using a `std::shared_ptr<Future>` here.
-        future = std::make_shared<decltype(pf.future)>(std::move(pf.future)),
-        baton,
-        onFinish
-    ](StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
+    auto remainingWork = [ this, state, future = std::move(pf.future), baton, onFinish ](
+        StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
         makeReadyFutureWith([&] {
             return _onAcquireConn(
-                state, std::move(*future), std::move(*uassertStatusOK(swConn)), baton);
+                state, std::move(future), std::move(*uassertStatusOK(swConn)), baton);
         })
             .onError([](Status error) -> StatusWith<RemoteCommandResponse> {
                 // The TransportLayer has, for historical reasons returned SocketException for

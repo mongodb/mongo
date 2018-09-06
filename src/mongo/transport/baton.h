@@ -30,8 +30,8 @@
 
 #include <memory>
 
-#include "mongo/stdx/functional.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
 
@@ -82,7 +82,7 @@ public:
     /**
      * Executes a callback on the baton.
      */
-    virtual void schedule(stdx::function<void()> func) = 0;
+    virtual void schedule(unique_function<void()> func) = 0;
 
     /**
      * Adds a session, returning a future which activates on read/write-ability of the session.

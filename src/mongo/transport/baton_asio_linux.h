@@ -71,6 +71,9 @@ class TransportLayerASIO::BatonASIO : public Baton {
             ::close(fd);
         }
 
+        EventFDHolder(const EventFDHolder&) = delete;
+        EventFDHolder& operator=(const EventFDHolder&) = delete;
+
         // Writes to the underlying eventfd
         void notify() {
             while (true) {
@@ -189,7 +192,7 @@ public:
         return true;
     }
 
-    void schedule(stdx::function<void()> func) override {
+    void schedule(unique_function<void()> func) override {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         _scheduled.push_back(std::move(func));
@@ -407,7 +410,7 @@ private:
     stdx::unordered_map<const ReactorTimer*, decltype(_timers)::const_iterator> _timersById;
 
     // For tasks that come in via schedule.  Or that were deferred because we were in poll
-    std::vector<std::function<void()>> _scheduled;
+    std::vector<unique_function<void()>> _scheduled;
 };
 
 }  // namespace transport
