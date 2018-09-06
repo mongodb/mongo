@@ -86,8 +86,31 @@ boost::optional<std::shared_ptr<TransactionCoordinator>> TransactionCoordinatorC
     return coordinatorForTxnIter->second;
 }
 
+boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
+TransactionCoordinatorCatalog::getLatestOnSession(LogicalSessionId lsid) {
+
+    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+
+    const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
+
+    if (coordinatorsForSessionIter == _coordinatorsBySession.end()) {
+        return boost::none;
+    }
+
+    const auto& coordinatorsForSession = coordinatorsForSessionIter->second;
+    const auto& lastCoordinatorOnSession = coordinatorsForSession.rbegin();
+
+    // Should never have empty map for a session. Entries for sessions with no transactions should
+    // be removed.
+    invariant(lastCoordinatorOnSession != coordinatorsForSession.rend());
+
+    return std::make_pair(lastCoordinatorOnSession->first, lastCoordinatorOnSession->second);
+}
+
 void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnNumber) {
     using CoordinatorState = TransactionCoordinator::StateMachine::State;
+
+    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
@@ -100,6 +123,9 @@ void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnN
             invariant(coordinator->state() == CoordinatorState::kCommitted ||
                       coordinator->state() == CoordinatorState::kAborted);
             coordinatorsForSession.erase(coordinatorForTxnIter);
+            if (coordinatorsForSession.size() == 0) {
+                _coordinatorsBySession.erase(coordinatorsForSessionIter);
+            }
         }
     }
 }

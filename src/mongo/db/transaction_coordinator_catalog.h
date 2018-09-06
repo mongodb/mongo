@@ -66,6 +66,14 @@ public:
                                                                  TxnNumber txnNumber);
 
     /**
+     * Returns the coordinator with the highest transaction number with the given session id, if it
+     * exists. If it does not exist, return boost::none.
+     */
+    boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
+    getLatestOnSession(LogicalSessionId lsid);
+
+
+    /**
      * Removes the coordinator with the given session id and transaction number from the catalog, if
      * one exists.
      *

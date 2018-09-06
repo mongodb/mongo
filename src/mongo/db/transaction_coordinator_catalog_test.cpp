@@ -101,6 +101,56 @@ DEATH_TEST_F(TransactionCoordinatorCatalogTest,
     coordinatorCatalog().create(lsid, txnNumber);
 }
 
+TEST_F(TransactionCoordinatorCatalogTest, GetLatestOnSessionWithNoCoordinatorsReturnsNone) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    auto latestTxnNumAndCoordinator = coordinatorCatalog().getLatestOnSession(lsid);
+    ASSERT_FALSE(latestTxnNumAndCoordinator);
+}
+
+TEST_F(TransactionCoordinatorCatalogTest,
+       CreateFollowedByGetLatestOnSessionReturnsOnlyCoordinator) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber = 1;
+    coordinatorCatalog().create(lsid, txnNumber);
+    auto latestTxnNumAndCoordinator = coordinatorCatalog().getLatestOnSession(lsid);
+
+    ASSERT_TRUE(latestTxnNumAndCoordinator);
+    ASSERT_EQ(latestTxnNumAndCoordinator->first, txnNumber);
+}
+
+TEST_F(TransactionCoordinatorCatalogTest,
+       TwoCreatesFollowedByGetLatestOnSessionReturnsCoordinatorWithHighestTxnNumber) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber1 = 1;
+    TxnNumber txnNumber2 = 2;
+    coordinatorCatalog().create(lsid, txnNumber1);
+    coordinatorCatalog().create(lsid, txnNumber2);
+    auto latestTxnNumAndCoordinator = coordinatorCatalog().getLatestOnSession(lsid);
+
+    ASSERT_EQ(latestTxnNumAndCoordinator->first, txnNumber2);
+}
+
+// Basically checks to make sure we clear out entries in the catalog for
+// sessions with no remaining coordinators.
+TEST_F(TransactionCoordinatorCatalogTest,
+       CreatingAndThenRemovingACoordinatorFollowedByGetLatestOnSessionReturnsNone) {
+    using CoordinatorState = TransactionCoordinator::StateMachine::State;
+
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber = 1;
+    auto coordinator = coordinatorCatalog().create(lsid, txnNumber);
+
+    coordinator->recvCoordinateCommit({ShardId("shard0000")});
+    coordinator->recvVoteCommit(ShardId("shard0000"), 0);
+    coordinator->recvCommitAck(ShardId("shard0000"));
+    ASSERT_EQ(coordinator->state(), CoordinatorState::kCommitted);
+
+    coordinatorCatalog().remove(lsid, txnNumber);
+
+    auto latestTxnNumAndCoordinator = coordinatorCatalog().getLatestOnSession(lsid);
+    ASSERT_FALSE(latestTxnNumAndCoordinator);
+}
+
 TEST_F(TransactionCoordinatorCatalogTest, RemovingACommittedCoordinatorSucceeds) {
     using CoordinatorState = TransactionCoordinator::StateMachine::State;
 
