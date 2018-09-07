@@ -278,7 +278,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
         incrementOpsAppliedStats();
     }
     getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-        opCtx, indexNss, indexCollection->uuid(), indexSpec, false);
+        opCtx, indexNss, *(indexCollection->uuid()), indexSpec, false);
 }
 
 namespace {

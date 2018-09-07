@@ -415,7 +415,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
             indexer.commit([opCtx, &tmpName, tmpColl](const BSONObj& spec) {
                 opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, tmpName, tmpColl->uuid(), spec, false);
+                    opCtx, tmpName, *(tmpColl->uuid()), spec, false);
             });
             wunit.commit();
         });

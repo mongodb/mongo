@@ -58,7 +58,7 @@ public:
 
     void onCreateIndex(OperationContext* const opCtx,
                        const NamespaceString& nss,
-                       OptionalCollectionUUID uuid,
+                       CollectionUUID uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) override {
         ReservedTimes times{opCtx};

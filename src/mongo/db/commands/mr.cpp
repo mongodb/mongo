@@ -590,7 +590,7 @@ void State::prepTempCollection() {
 
             // Log the createIndex operation.
             _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                _opCtx, _config.tempNamespace, tempColl->uuid(), indexToInsert, false);
+                _opCtx, _config.tempNamespace, *(tempColl->uuid()), indexToInsert, false);
         }
         wuow.commit();
     });

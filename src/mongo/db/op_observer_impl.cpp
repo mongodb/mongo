@@ -323,11 +323,9 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
 
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   OptionalCollectionUUID uuid,
+                                   CollectionUUID uuid,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
-    // TODO: uuid should no longer be optional (SERVER-36472).
-    invariant(uuid);
 
     BSONObjBuilder builder;
     builder.append("createIndexes", nss.coll());

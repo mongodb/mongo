@@ -658,8 +658,11 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(OperationCont
 
             for (auto&& infoObj : indexInfoObjs.getValue()) {
                 // make sure to create index on secondaries as well
-                serviceContext->getOpObserver()->onCreateIndex(
-                    opCtx, collection->ns(), collection->uuid(), infoObj, true /* fromMigrate */);
+                serviceContext->getOpObserver()->onCreateIndex(opCtx,
+                                                               collection->ns(),
+                                                               *(collection->uuid()),
+                                                               infoObj,
+                                                               true /* fromMigrate */);
             }
 
             wunit.commit();

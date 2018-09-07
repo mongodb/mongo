@@ -81,7 +81,7 @@ public:
     virtual ~OpObserver() = default;
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               OptionalCollectionUUID uuid,
+                               CollectionUUID uuid,
                                BSONObj indexDoc,
                                bool fromMigrate) = 0;
     virtual void onInserts(OperationContext* opCtx,

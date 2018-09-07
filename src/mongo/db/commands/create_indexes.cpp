@@ -395,7 +395,7 @@ public:
 
             indexer.commit([opCtx, &ns, collection](const BSONObj& spec) {
                 opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, ns, collection->uuid(), spec, false);
+                    opCtx, ns, *(collection->uuid()), spec, false);
             });
 
             wunit.commit();

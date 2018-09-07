@@ -73,7 +73,7 @@ class OpObserverMock : public OpObserverNoop {
 public:
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       OptionalCollectionUUID uuid,
+                       CollectionUUID uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) override;
 
@@ -136,7 +136,7 @@ private:
 
 void OpObserverMock::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   OptionalCollectionUUID uuid,
+                                   CollectionUUID uuid,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
     _logOp(opCtx, nss, "index");

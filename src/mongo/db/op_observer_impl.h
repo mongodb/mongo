@@ -41,7 +41,7 @@ public:
 
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       OptionalCollectionUUID uuid,
+                       CollectionUUID uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) override;
     void onInserts(OperationContext* opCtx,
