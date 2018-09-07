@@ -241,8 +241,13 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
         do {
             // The server has always generated positive values for CursorId (which is a signed
             // type), so we use std::abs() here on the prefix for consistency with this historical
-            // behavior.
-            containerPrefix = static_cast<uint32_t>(std::abs(_pseudoRandom.nextInt32()));
+            // behavior. If the random number generated is INT_MIN, calling std::abs on it is
+            // undefined behavior on 2's complement systems so we need to generate a new number.
+            int32_t randomNumber = 0;
+            do {
+                randomNumber = _pseudoRandom.nextInt32();
+            } while (randomNumber == std::numeric_limits<int32_t>::min());
+            containerPrefix = static_cast<uint32_t>(std::abs(randomNumber));
         } while (_cursorIdPrefixToNamespaceMap.count(containerPrefix) > 0);
         _cursorIdPrefixToNamespaceMap[containerPrefix] = nss;
 
