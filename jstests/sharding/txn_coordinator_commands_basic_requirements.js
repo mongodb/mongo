@@ -1,6 +1,7 @@
 /**
  * The equivalent of jstests/core/txns/statement_ids_accepted.js, but for transactions commands that
  * are only legal in sharded clusters (e.g., the two phase commit commands).
+ * @tags: [uses_transactions]
  */
 (function() {
     "use strict";

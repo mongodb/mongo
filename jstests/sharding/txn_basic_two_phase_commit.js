@@ -1,6 +1,8 @@
 /**
  * Exercises the coordinator commands logic by simulating a basic two phase commit and basic two
  * phase abort.
+ *
+ * @tags: [uses_transactions]
  */
 (function() {
     const dbName = "test";
