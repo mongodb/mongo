@@ -21,6 +21,9 @@
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
+    testDB.runCommand({drop: collName2, writeConcern: {w: "majority"}});
+    assert.commandWorked(testDB.runCommand({create: collName2, writeConcern: {w: "majority"}}));
+
     const session = db.getMongo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
@@ -34,21 +37,20 @@
         });
 
         if (num_expected) {
+            assert(res.cursor, tojson(res));
             assert.eq(res.cursor.firstBatch.length, num_expected, tojson(res));
         }
         return res;
     };
 
-    const clusterTimeBeforePrepare =
-        assert
-            .commandWorked(testColl.runCommand(
-                "insert",
-                {documents: [{_id: 1, in_prepared_txn: 3}], writeConcern: {w: "majority"}}))
-            .operationTime;
-    testColl2.runCommand("insert", {documents: [{_id: 1, in_prepared_txn: 3}]});
+    assert.commandWorked(
+        testColl.insert({_id: 1, in_prepared_txn: 3}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(testColl2.insert({_id: 1, in_prepared_txn: 3}));
 
     session.startTransaction();
-    assert.commandWorked(sessionColl.insert({_id: 2}));
+    const clusterTimeBeforePrepare =
+        assert.commandWorked(sessionColl.runCommand("insert", {documents: [{_id: 2}]}))
+            .operationTime;
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
     const clusterTimeAfterPrepare =
@@ -57,6 +59,9 @@
                 "insert",
                 {documents: [{_id: 3, in_prepared_txn: 3}], writeConcern: {w: "majority"}}))
             .operationTime;
+
+    jsTestLog("prepareTimestamp: " + prepareTimestamp + " clusterTimeBeforePrepare: " +
+              clusterTimeBeforePrepare + " clusterTimeAfterPrepare: " + clusterTimeAfterPrepare);
 
     assert.gt(prepareTimestamp, clusterTimeBeforePrepare);
     assert.gt(clusterTimeAfterPrepare, prepareTimestamp);
