@@ -167,8 +167,6 @@ if (typeof _threadInject != "undefined") {
             "mr_drop.js",
             "mr3.js",
             "indexh.js",
-            "evald.js",
-            "evalf.js",
             "run_program1.js",
             "notablescan.js",
             "dropdb_race.js",
@@ -193,7 +191,6 @@ if (typeof _threadInject != "undefined") {
             "kill_cursors.js",
 
             // Use eval command and potentially cause deadlock.
-            "apitest_db.js",
             "constructors.js",
             "error2.js",
             "eval0.js",
@@ -209,16 +206,17 @@ if (typeof _threadInject != "undefined") {
             "evald.js",
             "evale.js",
             "evalg.js",
+            "evalh.js",
+            "evalj.js",
             "eval_mr.js",
             "eval_nolock.js",
             "fsync.js",
-            "recursion.js",
             "js3.js",
             "js7.js",
             "js9.js",
+            "recursion.js",
             "remove8.js",
             "rename4.js",
-            "shellkillop.js",
             "storefunc.js",
         ]);
 
