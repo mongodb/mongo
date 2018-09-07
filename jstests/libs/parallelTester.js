@@ -201,8 +201,9 @@ if (typeof _threadInject != "undefined") {
             "kill_cursors.js",
 
             // Views tests
-            "views/invalid_system_views.js",  // Creates invalid view definitions in system.views.
-            "views/views_all_commands.js",    // Drops test DB.
+            "views/invalid_system_views.js",      // Puts invalid view definitions in system.views.
+            "views/views_all_commands.js",        // Drops test DB.
+            "views/view_with_invalid_dbname.js",  // Puts invalid view definitions in system.views.
 
             // Destroys and recreates the catalog, which will interfere with other tests.
             "restart_catalog.js",
