@@ -259,7 +259,7 @@ void ProgramOutputMultiplexer::clear() {
     _buffer.str("");
 }
 
-ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
+ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMongo) {
     uassert(ErrorCodes::FailedToParse,
             "cannot pass an empty argument to ProgramRunner",
             !args.isEmpty());
@@ -271,14 +271,17 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
     boost::filesystem::path programPath = findProgram(program);
     boost::filesystem::path programName = programPath.stem();
 
-    string prefix("mongod-");
-    bool isMongodProgram = string("mongod") == programName ||
-        programName.string().compare(0, prefix.size(), prefix) == 0;
-    prefix = "mongos-";
-    bool isMongosProgram = string("mongos") == programName ||
-        programName.string().compare(0, prefix.size(), prefix) == 0;
 
-    if (isMongodProgram) {
+    string prefix("mongod-");
+    bool isMongodProgram = isMongo && (string("mongod") == programName ||
+                                       programName.string().compare(0, prefix.size(), prefix) == 0);
+    prefix = "mongos-";
+    bool isMongosProgram = isMongo && (string("mongos") == programName ||
+                                       programName.string().compare(0, prefix.size(), prefix) == 0);
+
+    if (!isMongo) {
+        _name = "sh";
+    } else if (isMongodProgram) {
         _name = "d";
     } else if (isMongosProgram) {
         _name = "s";
@@ -295,6 +298,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
     // Parse individual arguments into _argv
     BSONObjIterator j(args);
     j.next();  // skip program name (handled above)
+
     while (j.more()) {
         BSONElement e = j.next();
         string str;
@@ -306,12 +310,14 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
             verify(e.type() == mongo::String);
             str = e.valuestr();
         }
-        if (str == "--port") {
-            _port = -2;
-        } else if (_port == -2) {
-            _port = strtol(str.c_str(), 0, 10);
-        } else if (isMongodProgram && str == "--configsvr") {
-            _name = "c";
+        if (isMongo) {
+            if (str == "--port") {
+                _port = -2;
+            } else if (_port == -2) {
+                _port = strtol(str.c_str(), 0, 10);
+            } else if (isMongodProgram && str == "--configsvr") {
+                _name = "c";
+            }
         }
         _argv.push_back(str);
     }
@@ -361,10 +367,12 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
         ++environEntry;
     }
 #endif
-    bool needsPort = isMongodProgram || isMongosProgram || (programName == "mongobridge");
+    bool needsPort =
+        isMongo && (isMongodProgram || isMongosProgram || (programName == "mongobridge"));
     if (!needsPort) {
         _port = -1;
     }
+
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "a port number is expected when running " << program
                           << " from the shell",
@@ -786,7 +794,7 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
         }
     }
 
-    ProgramRunner r(args, env);
+    ProgramRunner r(args, env, true);
     r.start();
     invariant(registry.isPidRegistered(r.pid()));
     stdx::thread t(r);
@@ -794,9 +802,9 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
     return BSON(string("") << r.pid().asLongLong());
 }
 
-BSONObj RunMongoProgram(const BSONObj& a, void* data) {
+BSONObj RunProgram(const BSONObj& a, void* data, bool isMongo) {
     BSONObj env{};
-    ProgramRunner r(a, env);
+    ProgramRunner r(a, env, isMongo);
     r.start();
     invariant(registry.isPidRegistered(r.pid()));
     stdx::thread t(r);
@@ -804,6 +812,14 @@ BSONObj RunMongoProgram(const BSONObj& a, void* data) {
     int exit_code = -123456;  // sentinel value
     wait_for_pid(r.pid(), true, &exit_code);
     return BSON(string("") << exit_code);
+}
+
+BSONObj RunMongoProgram(const BSONObj& a, void* data) {
+    return RunProgram(a, data, true);
+}
+
+BSONObj RunNonMongoProgram(const BSONObj& a, void* data) {
+    return RunProgram(a, data, false);
 }
 
 BSONObj ResetDbpath(const BSONObj& a, void* data) {
@@ -1074,6 +1090,7 @@ void installShellUtilsLauncher(Scope& scope) {
     scope.injectNative("runProgram", RunMongoProgram);
     scope.injectNative("run", RunMongoProgram);
     scope.injectNative("_runMongoProgram", RunMongoProgram);
+    scope.injectNative("runNonMongoProgram", RunNonMongoProgram);
     scope.injectNative("_stopMongoProgram", StopMongoProgram);
     scope.injectNative("stopMongoProgramByPid", StopMongoProgramByPid);
     scope.injectNative("rawMongoProgramOutput", RawMongoProgramOutput);
