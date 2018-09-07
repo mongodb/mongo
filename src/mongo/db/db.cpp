@@ -322,7 +322,7 @@ ExitCode _initAndListen(int listenPort) {
     serviceContext->setServiceEntryPoint(
         stdx::make_unique<ServiceEntryPointMongod>(serviceContext));
 
-    {
+    if (!storageGlobalParams.repair) {
         auto tl =
             transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);
         auto res = tl->setup();
@@ -332,7 +332,6 @@ ExitCode _initAndListen(int listenPort) {
         }
         serviceContext->setTransportLayer(std::move(tl));
     }
-
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
@@ -651,10 +650,12 @@ ExitCode _initAndListen(int listenPort) {
         return EXIT_NET_ERROR;
     }
 
-    start = serviceContext->getTransportLayer()->start();
-    if (!start.isOK()) {
-        error() << "Failed to start the listener: " << start.toString();
-        return EXIT_NET_ERROR;
+    if (!storageGlobalParams.repair) {
+        start = serviceContext->getTransportLayer()->start();
+        if (!start.isOK()) {
+            error() << "Failed to start the listener: " << start.toString();
+            return EXIT_NET_ERROR;
+        }
     }
 
     serviceContext->notifyStartupComplete();
