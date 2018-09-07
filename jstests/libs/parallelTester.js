@@ -161,7 +161,6 @@ if (typeof _threadInject != "undefined") {
             "index_bigkeys_validation.js",
 
             "mr3.js",
-            "evald.js",
             "run_program1.js",
             "notablescan.js",
             "bench_test1.js",
@@ -202,7 +201,6 @@ if (typeof _threadInject != "undefined") {
             "restart_catalog.js",
 
             // Use eval command and potentially cause deadlock.
-            "apitest_db.js",
             "constructors.js",
             "error2.js",
             "eval0.js",
@@ -213,21 +211,23 @@ if (typeof _threadInject != "undefined") {
             "eval6.js",
             "eval7.js",
             "eval9.js",
+            "eval_mr.js",
+            "eval_nolock.js",
             "evala.js",
             "evalb.js",
             "evald.js",
             "evale.js",
             "evalg.js",
-            "eval_mr.js",
-            "eval_nolock.js",
+            "evalh.js",
+            "evalj.js",
             "fsync.js",
-            "recursion.js",
             "js3.js",
             "js7.js",
             "js9.js",
+            "json_schema/misc_validation.js",
+            "recursion.js",
             "remove8.js",
             "rename4.js",
-            "shellkillop.js",
             "storefunc.js",
         ]);
 
