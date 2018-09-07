@@ -1015,6 +1015,16 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
     if (ixscanNodes.size() == 1) {
         andResult = std::move(ixscanNodes[0]);
     } else {
+        // $** indexes are prohibited from participating in either AND_SORTED or AND_HASH.
+        const bool allPathsIndexInvolvedInIntersection =
+            std::any_of(ixscanNodes.begin(), ixscanNodes.end(), [](const auto& ixScan) {
+                return ixScan->getType() == StageType::STAGE_IXSCAN &&
+                    static_cast<IndexScanNode*>(ixScan.get())->index.type == INDEX_ALLPATHS;
+            });
+        if (allPathsIndexInvolvedInIntersection) {
+            return nullptr;
+        }
+
         // Figure out if we want AndHashNode or AndSortedNode.
         bool allSortedByDiskLoc = true;
         for (size_t i = 0; i < ixscanNodes.size(); ++i) {

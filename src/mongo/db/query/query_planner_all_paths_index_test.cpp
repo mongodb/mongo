@@ -591,4 +591,81 @@ TEST_F(QueryPlannerAllPathsTest, InBasicOrEquivalent) {
 // TODO SERVER-35331: Add testing for hints.
 // TODO SERVER-36145: Add testing for non-blocking sort.
 
+//
+// Index intersection tests.
+//
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotParticipateInIndexIntersection) {
+    // Enable both AND_SORTED and AND_HASH index intersection for this test.
+    params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+    internalQueryPlannerEnableHashIntersection.store(true);
+
+    // Add two standard single-field indexes.
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+
+    // Run a point query on both fields and confirm that an AND_SORTED plan is generated.
+    runQuery(fromjson("{a:10, b:10}"));
+    // Three plans are generated: one IXSCAN for each index, and an AND_SORTED on both.
+    ASSERT_EQUALS(getNumSolutions(), 3U);
+    assertSolutionExists(
+        "{fetch: {filter: {a:10}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {b:10}, node: {ixscan: {filter: null, pattern: {a:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:10, b:10}, node: {andSorted: {nodes: [{ixscan: {filter: null, "
+        "pattern: {a:1}}},{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+
+    // Run a range query on both fields and confirm that an AND_HASH plan is generated.
+    runQuery(fromjson("{a:{$gt: 10}, b:{$gt: 10}}"));
+    // Three plans are generated: one IXSCAN for each index, and an AND_HASH on both.
+    ASSERT_EQUALS(getNumSolutions(), 3U);
+    assertSolutionExists(
+        "{fetch: {filter: {a:{$gt: 10}}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {b:{$gt: 10}}, node: {ixscan: {filter: null, pattern: {a:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:{$gt: 10}, b:{$gt: 10}}, node: {andHash: {nodes: [{ixscan: "
+        "{filter: null, pattern: {a:1}}},{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+
+    // Now add a $** index and re-run the tests.
+    addAllPathsIndex(BSON("$**" << 1));
+
+    // First re-run the AND_SORTED test.
+    runQuery(fromjson("{a:10, b:10}"));
+    // Solution count has increased from 3 to 5, as $** 'duplicates' the {a:1} and {b:1} IXSCANS.
+    ASSERT_EQUALS(getNumSolutions(), 5U);
+    assertSolutionExists(
+        "{fetch: {filter: {a:10}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {b:10}, node: {ixscan: {filter: null, pattern: {a:1}}}}}");
+    // The previous AND_SORTED solution is still present...
+    assertSolutionExists(
+        "{fetch: {filter: {a:10, b:10}, node: {andSorted: {nodes: [{ixscan: {filter: null, "
+        "pattern: {a:1}}},{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+    // ... but there are no additional AND_SORTED solutions contributed by the $** index.
+    assertSolutionExists(
+        "{fetch: {filter: {a:10}, node: {ixscan: {filter: null, pattern: {$_path:1, b:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {b:10}, node: {ixscan: {filter: null, pattern: {$_path:1, a:1}}}}}");
+
+    // Now re-run the AND_HASH test.
+    runQuery(fromjson("{a:{$gt: 10}, b:{$gt: 10}}"));
+    // Solution count has increased from 3 to 5, as $** 'duplicates' the {a:1} and {b:1} IXSCANS.
+    ASSERT_EQUALS(getNumSolutions(), 5U);
+    assertSolutionExists(
+        "{fetch: {filter: {a:{$gt:10}}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {b:{$gt:10}}, node: {ixscan: {filter: null, pattern: {a:1}}}}}");
+    // The previous AND_HASH solution is still present...
+    assertSolutionExists(
+        "{fetch: {filter: {a:{$gt:10}, b:{$gt:10}}, node: {andHash: {nodes: [{ixscan: "
+        "{filter: null, pattern: {a:1}}},{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+    // ... but there are no additional AND_HASH solutions contributed by the $** index.
+    assertSolutionExists(
+        "{fetch: {filter:{a:{$gt:10}}, node: {ixscan: {filter: null, pattern: {$_path:1, b:1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter:{b:{$gt:10}}, node: {ixscan: {filter: null, pattern: {$_path:1, a:1}}}}}");
+}
+
 }  // namespace mongo
