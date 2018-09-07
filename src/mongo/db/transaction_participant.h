@@ -398,6 +398,11 @@ public:
         _txnState.transitionTo(lk, TransactionState::kPrepared);
     }
 
+    void transitionToAbortedforTest() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _txnState.transitionTo(lk, TransactionState::kAborted);
+    }
+
     /**
      * Checks to see if the txnNumber changed in the parent session and perform the necessary
      * cleanup.
@@ -539,7 +544,7 @@ private:
 
     // Abort the transaction if it's in one of the expected states and clean up the transaction
     // states associated with the opCtx.
-    void _abortActiveTransaction(WithLock,
+    void _abortActiveTransaction(stdx::unique_lock<stdx::mutex> lock,
                                  OperationContext* opCtx,
                                  TransactionState::StateSet expectedStates);
 
@@ -547,7 +552,9 @@ private:
     void _abortTransactionOnSession(WithLock);
 
     // Clean up the transaction resources unstashed on operation context.
-    void _cleanUpTxnResourceOnOpCtx(WithLock wl, OperationContext* opCtx);
+    void _cleanUpTxnResourceOnOpCtx(WithLock wl,
+                                    OperationContext* opCtx,
+                                    TransactionState::StateFlag terminationCause);
 
     // Checks if the current transaction number of this transaction still matches with the
     // parent session as well as the transaction number of the current operation context.

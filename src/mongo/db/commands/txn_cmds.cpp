@@ -148,7 +148,21 @@ public:
                 "Transaction isn't in progress",
                 txnParticipant->inMultiDocumentTransaction());
 
-        txnParticipant->abortActiveTransaction(opCtx);
+        auto wasPrepared = txnParticipant->transactionIsPrepared();
+        try {
+            txnParticipant->abortActiveTransaction(opCtx);
+        } catch (...) {
+            // Make sure that abort succeeds if we are prepared. We check if we're prepared before
+            // aborting because the state may have changed while attempting to abort.
+            invariant(!wasPrepared,
+                      str::stream() << "Caught exception during transaction "
+                                    << opCtx->getTxnNumber()
+                                    << " abort on "
+                                    << opCtx->getLogicalSessionId()
+                                    << ": "
+                                    << exceptionToStatus());
+            throw;
+        }
         return true;
     }
 

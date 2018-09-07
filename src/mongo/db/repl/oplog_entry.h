@@ -57,6 +57,7 @@ public:
         kCreateIndexes,
         kDropIndexes,
         kCommitTransaction,
+        kAbortTransaction,
     };
 
     // Current oplog version, should be the value of the v field in all oplog entries.

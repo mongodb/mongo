@@ -213,6 +213,11 @@ public:
     void unlockTxnNumber();
 
     /**
+     * Returns if the given TxnNumber is locked.
+     */
+    bool isLockedTxnNumber(const TxnNumber expectedLockedNumber) const;
+
+    /**
      * Sets the current operation running on this Session.
      */
     void setCurrentOperation(OperationContext* currentOperation);

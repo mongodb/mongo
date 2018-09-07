@@ -258,7 +258,8 @@ public:
 
     /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the
-     * RecoveryUnit onRollback() is called.  It must not be called when no transaction is active.
+     * RecoveryUnit onRollback() is called.  It must be called when the transaction to abort is
+     * active.
      */
     virtual void onTransactionAbort(OperationContext* opCtx) = 0;
 

@@ -682,6 +682,15 @@ void Session::unlockTxnNumber() {
     _txnNumberLockConflictStatus = boost::none;
 }
 
+bool Session::isLockedTxnNumber(const TxnNumber expectedLockedNumber) const {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    invariant(_activeTxnNumber == expectedLockedNumber,
+              str::stream() << "Expected TxnNumber: " << expectedLockedNumber
+                            << ", Active TxnNumber: "
+                            << _activeTxnNumber);
+    return _isTxnNumberLocked;
+}
+
 void Session::setCurrentOperation(OperationContext* currentOperation) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_currentOperation);

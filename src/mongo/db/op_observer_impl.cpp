@@ -40,6 +40,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
@@ -1037,6 +1038,65 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx, const OplogSl
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
     invariant(opCtx->getTxnNumber());
+    Session* const session = OperationContextSession::get(opCtx);
+    invariant(session);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    invariant(txnParticipant);
+
+    if (!txnParticipant->transactionIsPrepared()) {
+        invariant(!txnParticipant->transactionIsCommitted());
+        return;
+    }
+
+    invariant(session->isLockedTxnNumber(*opCtx->getTxnNumber()));
+    const auto cmdObj = BSON("abortTransaction" << 1);
+    const NamespaceString cmdNss{"admin", "$cmd"};
+
+    OperationSessionInfo sessionInfo;
+    repl::OplogLink oplogLink;
+    sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+    sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+    // Note: This could be null if the 'prepareTransaction' call failed and led to the abort after
+    // the TransactionParticipant had already transitioned to 'kPrepared' but before the 'prepare'
+    // oplog entry was written.
+    oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
+
+    const StmtId stmtId(1);
+    const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
+
+    // We write the oplog entry in a side transaction so that we do not commit the prepared
+    // transaction, since we must write the oplog entry before aborting the prepared transaction.
+    TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+
+    // There should not be a parent WUOW outside of this one. This guarantees the safety of the
+    // write conflict retry loop.
+    invariant(!opCtx->getWriteUnitOfWork());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    writeConflictRetry(opCtx, "onTransactionAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
+
+        // Writes to the oplog only require a Global intent lock.
+        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
+        WriteUnitOfWork wuow(opCtx);
+        auto writeOpTime = logOperation(opCtx,
+                                        "c",
+                                        cmdNss,
+                                        {} /* uuid */,
+                                        cmdObj,
+                                        nullptr /* o2 */,
+                                        false /* fromMigrate */,
+                                        wallClockTime,
+                                        sessionInfo,
+                                        stmtId,
+                                        oplogLink,
+                                        false /* prepare */,
+                                        OplogSlot());
+
+        onWriteOpCompleted(
+            opCtx, cmdNss, session, {stmtId}, writeOpTime, wallClockTime, boost::none);
+        wuow.commit();
+    });
 }
 
 void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
@@ -1050,8 +1110,8 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
         AuthorizationManager::get(opCtx->getServiceContext())->invalidateUserCache();
     }
 
-    // If there were ops rolled back that were part of operations on a session, then invalidate the
-    // session cache.
+    // If there were ops rolled back that were part of operations on a session, then invalidate
+    // the session cache.
     if (rbInfo.rollbackSessionIds.size() > 0) {
         SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
     }

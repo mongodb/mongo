@@ -68,6 +68,8 @@ OplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return OplogEntry::CommandType::kDropIndexes;
     } else if (commandString == "commitTransaction") {
         return OplogEntry::CommandType::kCommitTransaction;
+    } else if (commandString == "abortTransaction") {
+        return OplogEntry::CommandType::kAbortTransaction;
     } else {
         severe() << "Unknown oplog entry command type: " << commandString
                  << " Object field: " << redact(objectField);

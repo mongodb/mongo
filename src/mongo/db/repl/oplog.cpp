@@ -985,6 +985,14 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           return emptyCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd));
       },
       {ErrorCodes::NamespaceNotFound}}},
+    {"abortTransaction",
+     {[](OperationContext* opCtx,
+         const char* ns,
+         const BSONElement& ui,
+         BSONObj& cmd,
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status { return Status::OK(); },
+      {}}},
 };
 
 }  // namespace

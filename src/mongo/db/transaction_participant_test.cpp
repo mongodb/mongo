@@ -99,6 +99,11 @@ public:
     stdx::function<void(bool)> onTransactionCommitFn = [this](bool wasPrepared) {
         transactionCommitted = true;
     };
+
+    void onTransactionAbort(OperationContext* opCtx) override;
+    bool onTransactionAbortThrowsException = false;
+    bool transactionAborted = false;
+    stdx::function<void()> onTransactionAbortFn = [this]() { transactionAborted = true; };
 };
 
 void OpObserverMock::onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) {
@@ -120,6 +125,15 @@ void OpObserverMock::onTransactionCommit(OperationContext* opCtx, bool wasPrepar
             !onTransactionCommitThrowsException);
     transactionCommitted = true;
     onTransactionCommitFn(wasPrepared);
+}
+
+void OpObserverMock::onTransactionAbort(OperationContext* opCtx) {
+    OpObserverNoop::onTransactionAbort(opCtx);
+    uassert(ErrorCodes::OperationFailed,
+            "onTransactionAbort() failed",
+            !onTransactionAbortThrowsException);
+    transactionAborted = true;
+    onTransactionAbortFn();
 }
 
 // When this class is in scope, makes the system behave as if we're in a DBDirectClient
@@ -873,7 +887,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfCommitTransactionAndAbort) {
                        ErrorCodes::NoSuchTransaction);
 }
 
-TEST_F(TxnParticipantTest, ConcurrencyOfActiveAbortAndArbitraryAbort) {
+TEST_F(TxnParticipantTest, ConcurrencyOfActiveUnpreparedAbortAndArbitraryAbort) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
@@ -890,7 +904,7 @@ TEST_F(TxnParticipantTest, ConcurrencyOfActiveAbortAndArbitraryAbort) {
     ASSERT(opCtx()->getWriteUnitOfWork() == nullptr);
 }
 
-TEST_F(TxnParticipantTest, ConcurrencyOfActiveAbortAndMigration) {
+TEST_F(TxnParticipantTest, ConcurrencyOfActiveUnpreparedAbortAndMigration) {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
@@ -903,12 +917,31 @@ TEST_F(TxnParticipantTest, ConcurrencyOfActiveAbortAndMigration) {
     const auto higherTxnNum = *opCtx()->getTxnNumber() + 1;
     bumpTxnNumberFromDifferentOpCtx(*opCtx()->getLogicalSessionId(), higherTxnNum);
 
-    // The operation throws for some reason and aborts implicitly.
-    // Abort active transaction after it's been aborted by migration is a no-op.
-    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT_THROWS_CODE(txnParticipant->abortActiveTransaction(opCtx()),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
 
-    // The session's state is None after migration, but we should have cleared
-    // the states of opCtx.
+    // The abort fails so the OperationContext state is not cleaned up until the operation is
+    // complete. The session has already moved on to a new transaction so the transaction will not
+    // remain active beyond this operation.
+    ASSERT_FALSE(opCtx()->getWriteUnitOfWork() == nullptr);
+}
+
+TEST_F(TxnParticipantTest, ConcurrencyOfActivePreparedAbortAndArbitraryAbort) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+    ASSERT(txnParticipant->inMultiDocumentTransaction());
+    txnParticipant->prepareTransaction(opCtx());
+
+    // The transaction may be aborted without checking out the txnParticipant.
+    txnParticipant->abortArbitraryTransaction();
+
+    // The operation throws for some reason and aborts implicitly.
+    // Abort active transaction after it's been aborted by KillSession is a no-op.
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(txnParticipant->transactionIsAborted());
     ASSERT(opCtx()->getWriteUnitOfWork() == nullptr);
 }
 
@@ -956,7 +989,7 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
     ASSERT_FALSE(txnParticipant->transactionIsAborted());
 }
 
-DEATH_TEST_F(TxnParticipantTest, AbortDuringPrepareIsFatal, "Fatal assertion 50906") {
+DEATH_TEST_F(TxnParticipantTest, AbortDuringPrepareIsFatal, "Invariant") {
     OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
@@ -1557,6 +1590,130 @@ TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnPreparedTxn) {
 
 TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnStartedRetryableWrite) {
     cannotSpecifyStartTransactionOnStartedRetryableWrite();
+}
+
+TEST_F(TxnParticipantTest, KillSessionsDuringUnpreparedAbortSucceeds) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+
+    auto originalFn = _opObserver->onTransactionAbortFn;
+    _opObserver->onTransactionAbortFn = [&] {
+        originalFn();
+
+        // The transaction may be aborted without checking out the txnParticipant.
+        txnParticipant->abortArbitraryTransaction();
+        ASSERT(txnParticipant->transactionIsAborted());
+    };
+
+    txnParticipant->abortActiveTransaction(opCtx());
+
+    ASSERT(_opObserver->transactionAborted);
+    ASSERT(txnParticipant->transactionIsAborted());
+}
+
+TEST_F(TxnParticipantTest, ActiveAbortIsLegalDuringUnpreparedAbort) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+
+    auto sessionId = *opCtx()->getLogicalSessionId();
+    auto txnNumber = *opCtx()->getTxnNumber();
+    auto originalFn = _opObserver->onTransactionAbortFn;
+    _opObserver->onTransactionAbortFn = [&] {
+        originalFn();
+
+        auto func = [&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(sessionId);
+            opCtx->setTxnNumber(txnNumber);
+
+            // Prevent recursion.
+            _opObserver->onTransactionAbortFn = originalFn;
+            txnParticipant->abortActiveTransaction(opCtx);
+            ASSERT(txnParticipant->transactionIsAborted());
+        };
+        runFunctionFromDifferentOpCtx(func);
+    };
+
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(_opObserver->transactionAborted);
+    ASSERT(txnParticipant->transactionIsAborted());
+}
+
+TEST_F(TxnParticipantTest, ThrowDuringUnpreparedOnTransactionAbort) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+
+    _opObserver->onTransactionAbortThrowsException = true;
+
+    ASSERT_THROWS_CODE(txnParticipant->abortActiveTransaction(opCtx()),
+                       AssertionException,
+                       ErrorCodes::OperationFailed);
+}
+
+TEST_F(TxnParticipantTest, KillSessionsDuringPreparedAbortFails) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+    txnParticipant->prepareTransaction(opCtx());
+
+    auto originalFn = _opObserver->onTransactionAbortFn;
+    _opObserver->onTransactionAbortFn = [&] {
+        originalFn();
+
+        // KillSessions may attempt to abort without checking out the txnParticipant.
+        txnParticipant->abortArbitraryTransaction();
+        ASSERT_FALSE(txnParticipant->transactionIsAborted());
+        ASSERT(txnParticipant->transactionIsPrepared());
+    };
+
+    txnParticipant->abortActiveTransaction(opCtx());
+
+    ASSERT(_opObserver->transactionAborted);
+    ASSERT(txnParticipant->transactionIsAborted());
+}
+
+TEST_F(TxnParticipantTest, ActiveAbortSucceedsDuringPreparedAbort) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+    txnParticipant->prepareTransaction(opCtx());
+
+    auto sessionId = *opCtx()->getLogicalSessionId();
+    auto txnNumber = *opCtx()->getTxnNumber();
+    auto originalFn = _opObserver->onTransactionAbortFn;
+    _opObserver->onTransactionAbortFn = [&] {
+        originalFn();
+
+        auto func = [&](OperationContext* opCtx) {
+            opCtx->setLogicalSessionId(sessionId);
+            opCtx->setTxnNumber(txnNumber);
+
+            // Prevent recursion.
+            _opObserver->onTransactionAbortFn = originalFn;
+            txnParticipant->abortActiveTransaction(opCtx);
+            ASSERT(txnParticipant->transactionIsAborted());
+        };
+        runFunctionFromDifferentOpCtx(func);
+    };
+
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(_opObserver->transactionAborted);
+    ASSERT(txnParticipant->transactionIsAborted());
+}
+
+TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionAbortIsFatal) {
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+    txnParticipant->prepareTransaction(opCtx());
+
+    _opObserver->onTransactionAbortThrowsException = true;
+
+    ASSERT_THROWS_CODE(txnParticipant->abortActiveTransaction(opCtx()),
+                       AssertionException,
+                       ErrorCodes::OperationFailed);
 }
 
 /**

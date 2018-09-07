@@ -523,10 +523,6 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
 }
 
 Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx) {
-    // This ScopeGuard is created outside of the lock so that the lock is always released before
-    // this is called.
-    ScopeGuard abortGuard = MakeGuard([&] { abortActiveTransaction(opCtx); });
-
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     // Always check session's txnNumber and '_txnState', since they can be modified by
     // session kill and migration, which do not check out the session.
@@ -536,6 +532,14 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx) {
         _activeTxnNumber,
         {ErrorCodes::PreparedTransactionInProgress,
          "cannot change transaction number while the session has a prepared transaction"});
+
+    ScopeGuard abortGuard = MakeGuard([&] {
+        if (lk.owns_lock()) {
+            lk.unlock();
+        }
+        abortActiveTransaction(opCtx);
+    });
+
     _txnState.transitionTo(lk, TransactionState::kPrepared);
 
     // Reserve an optime for the 'prepareTimestamp'. This will create a hole in the oplog and cause
@@ -697,8 +701,18 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
 void TransactionParticipant::_commitTransaction(stdx::unique_lock<stdx::mutex> lk,
                                                 OperationContext* opCtx) {
     auto abortGuard = MakeGuard([this, opCtx]() {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _abortActiveTransaction(lock, opCtx, TransactionState::kCommittingWithoutPrepare);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        // It is illegal for this check to fail. We ignore the transaction being aborted since we're
+        // actively aborting the transaction and the transaction could be aborted without checking
+        // out the session.
+        //
+        // TODO (SERVER-36540): Lock the TxnNumber before unlocking the mutex in the caller. The
+        // TxnNumber can change without checking out the session on a migration. For a transaction
+        // that fails to commit without 'prepare', the TxnNumber will not be locked and could
+        // change. That will lead to this assert failing and the server terminating.
+        _checkIsActiveTransaction(lock, *opCtx->getTxnNumber(), true);
+        _abortActiveTransaction(
+            std::move(lock), opCtx, TransactionState::kCommittingWithoutPrepare);
     });
     lk.unlock();
 
@@ -730,15 +744,9 @@ void TransactionParticipant::_commitTransaction(stdx::unique_lock<stdx::mutex> l
             opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
     }
 
-    // Log the transaction if its duration is longer than the slowMS command threshold.
-    _logSlowTransaction(lk,
-                        &(opCtx->lockState()->getLockerInfo())->stats,
-                        TransactionState::kCommitted,
-                        repl::ReadConcernArgs::get(opCtx));
-
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
-    _cleanUpTxnResourceOnOpCtx(lk, opCtx);
+    _cleanUpTxnResourceOnOpCtx(lk, opCtx, TransactionState::kCommitted);
 }
 
 void TransactionParticipant::abortArbitraryTransaction() {
@@ -779,32 +787,63 @@ void TransactionParticipant::abortArbitraryTransactionIfExpired() {
 }
 
 void TransactionParticipant::abortActiveTransaction(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    // This function shouldn't throw if the transaction is already aborted.
+    _checkIsActiveTransaction(lock, *opCtx->getTxnNumber(), false);
     _abortActiveTransaction(
-        lock, opCtx, TransactionState::kInProgress | TransactionState::kPrepared);
+        std::move(lock), opCtx, TransactionState::kInProgress | TransactionState::kPrepared);
 }
 
 void TransactionParticipant::abortActiveUnpreparedOrStashPreparedTransaction(
-    OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    OperationContext* opCtx) try {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    if (_txnState.isInSet(lock, TransactionState::kNone)) {
+        // If there is no active transaction, do nothing.
+        return;
+    }
+
+    // We do this check to follow convention and maintain safety. If this were to throw we should
+    // have returned in the check above. As a result, throwing here is fatal.
+    _checkIsActiveTransaction(lock, *opCtx->getTxnNumber(), false);
+
     // Stash the transaction if it's in prepared state.
     if (_txnState.isInSet(lock, TransactionState::kPrepared)) {
         _stashActiveTransaction(lock, opCtx);
         return;
     }
-    _abortActiveTransaction(lock, opCtx, TransactionState::kInProgress);
+    _abortActiveTransaction(std::move(lock), opCtx, TransactionState::kInProgress);
+} catch (...) {
+    // It is illegal for this to throw so we catch and log this here for diagnosability.
+    severe() << "Caught exception during transaction " << opCtx->getTxnNumber()
+             << " abort or stash on " << _getSession()->getSessionId().toBSON() << " in state "
+             << _txnState << ": " << exceptionToStatus();
+    std::terminate();
 }
 
-void TransactionParticipant::_abortActiveTransaction(WithLock lock,
+void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mutex> lock,
                                                      OperationContext* opCtx,
                                                      TransactionState::StateSet expectedStates) {
     invariant(!_txnResourceStash);
+    invariant(!_txnState.isCommittingWithPrepare(lock));
 
     if (!_txnState.isNone(lock)) {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onTransactionOperation(
             opCtx->getClient(), CurOp::get(opCtx)->debug().additiveMetrics);
     }
+
+    // We write the abort oplog entry before aborting the transaction so that no writes that are
+    // causally related to the transaction aborting enter the oplog with a timestamp earlier
+    // than the abort oplog entry's timestamp. This is required so that secondaries apply subsequent
+    // operations on a document with a prepared update after the prepared update is aborted.
+    // We need to unlock the mutex to run the opObserver onTransactionAbort, which calls back
+    // into the TransactionParticipant.
+    lock.unlock();
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    invariant(opObserver);
+    opObserver->onTransactionAbort(opCtx);
+    lock.lock();
+    // We do not check if the active transaction number is correct here because we handle it below.
 
     // Only abort the transaction in session if it's in expected states.
     // When the state of active transaction on session is not expected, it means another
@@ -831,15 +870,9 @@ void TransactionParticipant::_abortActiveTransaction(WithLock lock,
         invariant(_txnState.isInSet(lock, TransactionState::kNone | TransactionState::kAborted));
     }
 
-    // Log the transaction if its duration is longer than the slowMS command threshold.
-    _logSlowTransaction(lock,
-                        &(opCtx->lockState()->getLockerInfo())->stats,
-                        TransactionState::kAborted,
-                        repl::ReadConcernArgs::get(opCtx));
-
-    // Clean up the transaction resources on opCtx even if the transaction on session has been
-    // aborted.
-    _cleanUpTxnResourceOnOpCtx(lock, opCtx);
+    // Clean up the transaction resources on the opCtx even if the transaction resources on the
+    // session were not aborted. This actually aborts the storage-transaction.
+    _cleanUpTxnResourceOnOpCtx(lock, opCtx, TransactionState::kAborted);
 }
 
 void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
@@ -876,7 +909,14 @@ void TransactionParticipant::_abortTransactionOnSession(WithLock wl) {
     _getSession()->unlockTxnNumber();
 }
 
-void TransactionParticipant::_cleanUpTxnResourceOnOpCtx(WithLock wl, OperationContext* opCtx) {
+void TransactionParticipant::_cleanUpTxnResourceOnOpCtx(
+    WithLock wl, OperationContext* opCtx, TransactionState::StateFlag terminationCause) {
+    // Log the transaction if its duration is longer than the slowMS command threshold.
+    _logSlowTransaction(wl,
+                        &(opCtx->lockState()->getLockerInfo())->stats,
+                        terminationCause,
+                        repl::ReadConcernArgs::get(opCtx));
+
     // Reset the WUOW. We should be able to abort empty transactions that don't have WUOW.
     if (opCtx->getWriteUnitOfWork()) {
         opCtx->setWriteUnitOfWork(nullptr);
@@ -896,7 +936,7 @@ void TransactionParticipant::_checkIsActiveTransaction(WithLock wl,
                                                        bool checkAbort) const {
     const auto txnNumber = _getSession()->getActiveTxnNumber();
     uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Cannot perform operations on transaction " << _activeTxnNumber
+            str::stream() << "Cannot perform operations on active transaction " << _activeTxnNumber
                           << " on session "
                           << _getSession()->getSessionId()
                           << " because a different transaction "
@@ -905,7 +945,8 @@ void TransactionParticipant::_checkIsActiveTransaction(WithLock wl,
             txnNumber == _activeTxnNumber);
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Cannot perform operations on transaction " << requestTxnNumber
+            str::stream() << "Cannot perform operations on requested transaction "
+                          << requestTxnNumber
                           << " on session "
                           << _getSession()->getSessionId()
                           << " because a different transaction "
