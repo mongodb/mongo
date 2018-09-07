@@ -430,7 +430,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                // retries and they will succeed.  Unfortunately, initial sync will
                                // fail if it finds its sync source has an empty oplog.  Thus, we
                                // need to wait here until the seed document is visible in our oplog.
-                               waitForAllEarlierOplogWritesToBeVisible(opCtx);
+                               _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
                            });
 
         // Update unique index format version for all non-replicated collections. It is possible
@@ -461,22 +461,6 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         return ex.toStatus();
     }
     return Status::OK();
-}
-
-void ReplicationCoordinatorExternalStateImpl::waitForAllEarlierOplogWritesToBeVisible(
-    OperationContext* opCtx) {
-    Collection* oplog;
-    {
-        // We don't want to be holding the collection lock while blocking, to avoid deadlocks.
-        // It is safe to store and access the oplog's Collection object after dropping the lock
-        // because the oplog is special and cannot be deleted on a running process.
-        // TODO(spencer): It should be possible to get the pointer to the oplog Collection object
-        // without ever having to take the collection lock.
-        AutoGetCollection oplogLock(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
-        oplog = oplogLock.getCollection();
-    }
-    uassert(ErrorCodes::NotYetInitialized, "The oplog does not exist", oplog);
-    oplog->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 }
 
 void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* opCtx) {

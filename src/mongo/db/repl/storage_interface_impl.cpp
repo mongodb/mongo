@@ -1132,16 +1132,18 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
 }
 
 void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) {
+    Lock::GlobalLock lk(opCtx, MODE_IS);
     Collection* oplog;
     {
         // We don't want to be holding the collection lock while blocking, to avoid deadlocks.
-        // It is safe to store and access the oplog's Collection object after dropping the lock
-        // because the oplog is special and cannot be deleted on a running process.
+        // It is safe to store and access the oplog's Collection object with just the global IS
+        // lock because of the special concurrency rules for the oplog.
         // TODO(spencer): It should be possible to get the pointer to the oplog Collection object
         // without ever having to take the collection lock.
         AutoGetCollection oplogLock(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
         oplog = oplogLock.getCollection();
     }
+    uassert(ErrorCodes::NotYetInitialized, "The oplog does not exist", oplog);
     oplog->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 }
 
