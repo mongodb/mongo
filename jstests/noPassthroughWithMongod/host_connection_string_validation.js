@@ -28,7 +28,7 @@
         MongoRunner.stopMongod(mongod);
         // Pass the inner test's exit code back as the outer test's exit code
         if (exitCode != 0) {
-            doassert("inner test failed with exit code " + exitcode);
+            doassert("inner test failed with exit code " + exitCode);
         }
         return;
     }
