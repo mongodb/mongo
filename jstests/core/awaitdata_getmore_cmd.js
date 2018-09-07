@@ -156,7 +156,6 @@
 
     // Test that a getMore command on a tailable, awaitData cursor does not return a new batch to
     // the user if a document was inserted, but it did not match the filter.
-    const getMoreMaxTimeMS = 60000;
     let insertshell = startParallelShell(() => {
         // Signal to the original shell that the parallel shell has successfully started.
         assert.writeOK(db.await_data.insert({_id: "signal parent shell"}));
@@ -189,7 +188,7 @@
     // document and that we subsequently time out.
     now = new Date();
     cmdRes = db.runCommand(
-        {getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: getMoreMaxTimeMS});
+        {getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: kReplDefaultTimeoutMS});
     assert.commandWorked(cmdRes);
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
