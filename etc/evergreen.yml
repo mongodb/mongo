@@ -12826,7 +12826,6 @@ buildvariants:
   - name: benchrun_embedded_update
     distros:
     - centos6-perf
-  - name: dbtest
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth
