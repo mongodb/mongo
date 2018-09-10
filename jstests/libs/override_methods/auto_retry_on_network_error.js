@@ -147,6 +147,11 @@
             msg.indexOf("InterruptedDueToStepDown") >= 0;
     }
 
+    function isTransientTransactionError(res) {
+        return res.hasOwnProperty('errorLabels') &&
+            res.errorLabels.includes('TransientTransactionError');
+    }
+
     function runWithRetriesOnNetworkErrors(mongo, cmdObj, clientFunction, clientFunctionArguments) {
         let cmdName = Object.keys(cmdObj)[0];
 
@@ -220,8 +225,11 @@
                 " std::terminate() if interrupted by a stepdown.");
         }
 
+        let retry = false;
         do {
             try {
+                TestData.retryingOnNetworkError = retry;
+                retry = true;
                 let res = clientFunction.apply(mongo, clientFunctionArguments);
 
                 if (isRetryableWriteCmd) {
@@ -229,7 +237,17 @@
                     if ((cmdName === "findandmodify" || cmdName === "findAndModify") &&
                         isRetryableExecutorCodeAndMessage(res.code, res.errmsg)) {
                         print("=-=-=-= Retrying because of executor interruption: " + cmdName +
-                              ", retries remaining: " + numRetries);
+                              ", retries remaining: " + numRetries + " error: " +
+                              tojsononeline(res));
+                        continue;
+                    }
+
+                    // A write in a transaction can fail with a TransientTransactionError and the
+                    // transaction should be retried and not treated as a retryable write.
+                    if (cmdObj.hasOwnProperty("autocommit") && isTransientTransactionError(res)) {
+                        print("=-=-=-= Retrying because of a TransientTransactionError: " +
+                              cmdName + ", retries remaining: " + numRetries + " error: " +
+                              tojsononeline(res));
                         continue;
                     }
 
@@ -312,6 +330,13 @@
                               ", code: " + res.code + ", retries remaining: " + numRetries);
                         res.ok = 1;
                     }
+
+                    if (isTransientTransactionError(res)) {
+                        print("=-=-=-= Retrying on TransientTransactionError for command: " +
+                              cmdName + ", retries remaining: " + numRetries + " error: " +
+                              tojson(res));
+                        continue;
+                    }
                 }
 
                 if (res.writeConcernError && numRetries > 0) {
@@ -326,12 +351,15 @@
                     }
                 }
 
+                TestData.retryingOnNetworkError = false;
                 return res;
             } catch (e) {
                 const kReplicaSetMonitorError =
                     /^Could not find host matching read preference.*mode: "primary"/;
 
                 if (numRetries === 0) {
+                    TestData.retryingOnNetworkError = false;
+                    jsTestLog("=-=-=-= No retries, throwing");
                     throw e;
                 } else if (e.message.match(kReplicaSetMonitorError) &&
                            Date.now() - startTime < 5 * 60 * 1000) {
@@ -342,10 +370,18 @@
                     print("=-=-=-= Failed to find primary when attempting to run " + cmdName +
                           " command, will retry for another 15 seconds");
                     continue;
+                } else if ((e.message.indexOf("writeConcernError") >= 0) && isRetryableError(e)) {
+                    print("=-=-=-= Retrying write concern error with retryable code for command: " +
+                          cmdName + ", retries remaining: " + numRetries + " error: " + tojson(e));
+                    continue;
+                } else if (isTransientTransactionError(e)) {
+                    print("=-=-=-= Retrying on TransientTransactionError for command: " + cmdName +
+                          ", retries remaining: " + numRetries + " error: " + tojson(res));
+                    continue;
                 } else if (!isNetworkError(e)) {
                     throw e;
                 } else if (isRetryableWriteCmd) {
-                    if (canRetryWrites) {
+                    if (_serverSession.canRetryWrites(cmdObj)) {
                         // If the command is retryable, assume the command has already gone through
                         // or will go through the retry logic in SessionAwareClient, so propagate
                         // the error.

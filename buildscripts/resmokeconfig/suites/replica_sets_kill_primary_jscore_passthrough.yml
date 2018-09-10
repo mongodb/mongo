@@ -40,7 +40,7 @@ selector:
   - jstests/core/fsync.js
   - jstests/core/killop_drop_collection.js
 
-  # Expect drops/creates to fail or have certain a response:
+  # Expect drops/creates to fail or have a certain response:
   - jstests/core/drop.js
   - jstests/core/dropdb.js
   - jstests/core/explain_upsert.js
@@ -121,9 +121,10 @@ selector:
   # "Cowardly refusing to override write concern of command: ..."
   - assumes_write_concern_unchanged
   ##
-  # The next three tags corresponds to the special errors thrown by the error_on_fast_count.js
-  # override when it refuses to run commands that are innacurate after an unclean shutdown. Above
-  # each tag is the message that causes the tag to be warranted.
+  # The next three tags corresponds to the special errors thrown by the
+  # fail_unclean_shutdown_incompatible_commands.js override when it refuses to run commands that are
+  # inaccurate after an unclean shutdown. Above each tag is the message that causes the tag to be
+  # warranted.
   ##
   # "Cowardly fail if fastcount is run with a mongod that had an unclean shutdown: ..."
   - requires_fastcount

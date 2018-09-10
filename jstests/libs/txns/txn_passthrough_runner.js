@@ -1,9 +1,6 @@
 (function() {
     'use strict';
 
-    load('jstests/libs/override_methods/enable_sessions.js');
-    load('jstests/libs/txns/txn_override.js');
-
     const testFile = TestData.multiStmtTxnTestFile;
 
     try {

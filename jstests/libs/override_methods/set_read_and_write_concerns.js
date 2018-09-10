@@ -18,6 +18,7 @@
     "use strict";
 
     load("jstests/libs/override_methods/override_helpers.js");
+    load("jstests/libs/override_methods/read_and_write_concern_helpers.js");
 
     if (typeof TestData === "undefined" || !TestData.hasOwnProperty("defaultReadConcernLevel")) {
         throw new Error(
@@ -35,89 +36,6 @@
             // This way the wtimeout set by this override is distinguishable in the server logs.
             wtimeout: 5 * 60 * 1000 + 321,  // 300321ms
         };
-
-    const kCommandsSupportingReadConcern = new Set([
-        "aggregate",
-        "count",
-        "distinct",
-        "find",
-        "geoSearch",
-    ]);
-
-    const kCommandsOnlySupportingReadConcernSnapshot = new Set([
-        "delete",
-        "findAndModify",
-        "findandmodify",
-        "insert",
-        "update",
-    ]);
-
-    const kCommandsSupportingWriteConcern = new Set([
-        "_configsvrAddShard",
-        "_configsvrAddShardToZone",
-        "_configsvrCommitChunkMerge",
-        "_configsvrCommitChunkMigration",
-        "_configsvrCommitChunkSplit",
-        "_configsvrCreateDatabase",
-        "_configsvrEnableSharding",
-        "_configsvrMoveChunk",
-        "_configsvrMovePrimary",
-        "_configsvrRemoveShard",
-        "_configsvrRemoveShardFromZone",
-        "_configsvrShardCollection",
-        "_configsvrUpdateZoneKeyRange",
-        "_mergeAuthzCollections",
-        "_recvChunkStart",
-        "abortTransaction",
-        "appendOplogNote",
-        "applyOps",
-        "aggregate",
-        "captrunc",
-        "cleanupOrphaned",
-        "clone",
-        "cloneCollection",
-        "cloneCollectionAsCapped",
-        "collMod",
-        "commitTransaction",
-        "convertToCapped",
-        "create",
-        "createIndexes",
-        "createRole",
-        "createUser",
-        "delete",
-        "deleteIndexes",
-        "doTxn",
-        "drop",
-        "dropAllRolesFromDatabase",
-        "dropAllUsersFromDatabase",
-        "dropDatabase",
-        "dropIndexes",
-        "dropRole",
-        "dropUser",
-        "emptycapped",
-        "findAndModify",
-        "findandmodify",
-        "godinsert",
-        "grantPrivilegesToRole",
-        "grantRolesToRole",
-        "grantRolesToUser",
-        "insert",
-        "mapReduce",
-        "mapreduce",
-        "mapreduce.shardedfinish",
-        "moveChunk",
-        "renameCollection",
-        "revokePrivilegesFromRole",
-        "revokeRolesFromRole",
-        "revokeRolesFromUser",
-        "setFeatureCompatibilityVersion",
-        "update",
-        "updateRole",
-        "updateUser",
-    ]);
-
-    const kCommandsSupportingWriteConcernInTransaction =
-        new Set(["doTxn", "abortTransaction", "commitTransaction"]);
 
     function runCommandWithReadAndWriteConcerns(
         conn, dbName, commandName, commandObj, func, makeFuncArgs) {

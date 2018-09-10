@@ -82,6 +82,35 @@ function isNetworkError(error) {
     return networkErrs.some(err => error.message.includes(err));
 }
 
+function isRetryableError(error) {
+    const retryableErrors = [
+        "Interrupted",
+        "InterruptedAtShutdown",
+        "InterruptedDueToStepDown",
+        "ExceededTimeLimit",
+        "MaxTimeMSExpired",
+        "CursorKilled",
+        "LockTimeout",
+        "ShutdownInProgress",
+        "HostUnreachable",
+        "HostNotFound",
+        "NetworkTimeout",
+        "SocketException",
+        "NotMaster",
+        "NotMasterNoSlaveOk",
+        "NotMasterOrSecondary",
+        "InterruptedDueToStepDown",
+        "PrimarySteppedDown",
+        "WriteConcernFailed",
+        "WriteConcernLegacyOK",
+        "UnknownReplWriteConcern",
+        "UnsatisfiableWriteConcern"
+    ];
+
+    // See if any of the known network error strings appear in the given message.
+    return retryableErrors.some(err => error.message.includes(err));
+}
+
 // Please consider using bsonWoCompare instead of this as much as possible.
 friendlyEqual = function(a, b) {
     if (a == b)
@@ -318,6 +347,9 @@ jsTestOptions = function() {
             mqlTestFile: TestData.mqlTestFile,
             mqlRootPath: TestData.mqlRootPath,
             disableImplicitSessions: TestData.disableImplicitSessions || false,
+            setSkipShardingPartsOfPrepareTransactionFailpoint:
+                TestData.setSkipShardingPartsOfPrepareTransactionFailpoint || false,
+            retryingOnNetworkError: TestData.retryingOnNetworkError,
         });
     }
     return _jsTestOptions;

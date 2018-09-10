@@ -3,7 +3,6 @@ test_kind: multi_stmt_txn_passthrough
 selector:
   roots:
   - jstests/core/**/*.js
-  - jstests/libs/txns/txn_passthrough_runner_selftest.js
   exclude_files:
   # These tests already run with transactions.
   - jstests/core/txns/*.js
@@ -17,7 +16,7 @@ selector:
   ##
   ## Limitations with the way the runner file injects transactions.
   ##
-  
+
   # These tests expects some statements to error, which will cause txns to abort entirely.
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
@@ -53,7 +52,7 @@ selector:
   - jstests/core/ref4.js
   - jstests/core/regex_limit.js
   - jstests/core/remove_undefined.js
-  - jstests/core/set7.js 
+  - jstests/core/set7.js
   - jstests/core/sortb.js
   - jstests/core/sortf.js
   - jstests/core/sortg.js
@@ -91,7 +90,6 @@ selector:
   - jstests/core/optimized_match_explain.js
   - jstests/core/sort_array.js
   - jstests/core/views/views_collation.js
-  - jstests/core/wildcard_index_count.js
 
   # $out
   - jstests/core/bypass_doc_validation.js
@@ -269,27 +267,110 @@ selector:
   # E.g. Suppose the following sequence of events: op1, join() op2 in parallel shell, op3.
   # op3 will still be using the snapshot from op1, and not see op2 at all.
   - jstests/core/cursora.js
-  - jstests/core/bench_test1.js
 
+  # Expect drops/creates to fail or have a certain response:
+  - jstests/core/drop.js
+  - jstests/core/explain_upsert.js
+
+  # Expect certain responses, but retries of successfully completed commands may return
+  # different values:
+  - jstests/core/create_indexes.js
+  - jstests/core/objid5.js
+
+  # Expect results to return in a certain order, secondaries may apply ops out of order.
+  - jstests/core/coveredIndex1.js
+  - jstests/core/sortc.js
+
+  # Assert on the ismaster field of an isMaster response. If a primary steps down after accepting
+  # an isMaster command and returns before its connection is closed, the response can contain
+  # ismaster: false.
+  - jstests/core/ismaster.js
+
+  - jstests/core/bench_test*.js # benchRun() used for writes
+  - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
+  - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
+  - jstests/core/insert2.js # Creates new mongo connection.
+  - jstests/core/list_collections_filter.js # Temporary collections are dropped on failover.
+  - jstests/core/startup_log.js # Checks pid, which is different on each server.
+
+  # Creates new mongo connection but won't retry connecting.
+  - jstests/core/shell_connection_strings.js
+
+  # Explain command runs for 6 seconds in this test, whereas we kill the primary every 15 seconds.
+  # If it takes longer than 9 seconds for the new primary to step up, there isn't enough time for
+  # the explain command to run.
+  - jstests/core/explain2.js
+
+  # Starts a parallel shell but won't restart it after shutdown.
+  # TODO SERVER-33229: Remove these exclusions
+  - jstests/core/compact_keeps_indexes.js
+  - jstests/core/find_and_modify_concurrent_update.js
+  - jstests/core/shellstartparallel.js
   exclude_with_any_tags:
+  ##
+  # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js
+  # override when it refuses to run a certain command. Above each tag are the message(s) that cause
+  # the tag to be warranted.
+  ##
+  # "Refusing to run a test that issues a getMore command since if a network error occurs during
+  #   it then we won't know whether the cursor was advanced or not"
+  - requires_getmore
+  # "Refusing to run a test that issues non-retryable write operations since the test likely makes
+  #   assertions on the write results and can lead to spurious failures if a network error occurs"
+  - requires_non_retryable_writes
+  # "Refusing to run a test that issues commands that are not blindly retryable"
+  # "Refusing to run a test that issues an aggregation command with $out because it is not
+  #   retryable"
+  - requires_non_retryable_commands
+  # "Refusing to run a test that issues commands that may return different values after a failover"
+  # "Refusing to run a test that issues an aggregation command with explain because it may return
+  #   incomplete results"
+  # "Refusing to run a test that issues an aggregation command with $listLocalCursors or
+  #   $listLocalSessions because they rely on in-memory state that may not survive failovers"
+  # "Refusing to run a test that issues a mapReduce command, because it calls std::terminate() if
+  #   interrupted by a stepdown"
+  - does_not_support_stepdowns
+  ##
+  # The next three tags correspond to the special errors thrown by the
+  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+  # warranted.
+  ##
   # "Cowardly refusing to override read concern of command: ..."
   - assumes_read_concern_unchanged
   # "writeConcern is not allowed within a multi-statement transaction"
   - assumes_write_concern_unchanged
+  ##
+  # The next tag corresponds to long running-operations, as they may exhaust their number
+  # of retries and result in a network error being thrown.
+  - operations_longer_than_stepdown_interval
 
 executor:
   config:
     shell_options:
       eval: >-
         var testingReplication = true;
-        load('jstests/libs/override_methods/enable_sessions.js');
-        load('jstests/libs/txns/txn_override.js');
+        load("jstests/libs/txns/txn_override.js");
+        load("jstests/libs/override_methods/auto_retry_on_network_error.js");
+        db = connect(TestData.connectionString);
+        load("jstests/libs/override_methods/enable_sessions.js");
       global_vars:
         TestData:
+          logRetryAttempts: true
+          overrideRetryAttempts: 3
           sessionOptions:
             causalConsistency: false
+            retryWrites: true
+      # We specify nodb so the shell used by each test will attempt to connect after loading the
+      # retry logic in auto_retry_on_network_error.js.
+      nodb: ""
       readMode: commands
   hooks:
+  # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
+  # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
+  # too many network errors occur when re-running a transaction we will run out of retries.
+  - class: ContinuousStepdown
+    stepdown_interval_ms: 15000
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
@@ -302,6 +383,22 @@ executor:
     class: ReplicaSetFixture
     mongod_options:
       set_parameters:
+        logComponentVerbosity:
+          verbosity: 0
+          command: 2
+          replication:
+            election: 4
+            heartbeats: 2
+            initialSync: 2
+            rollback: 2
+          storage:
+            recovery: 2
+          transaction: 4
         enableTestCommands: 1
         numInitialSyncAttempts: 1
-    num_nodes: 2
+        enableElectionHandoff: 0
+    all_nodes_electable: true
+    num_nodes: 3
+    replset_config_options:
+      settings:
+        catchUpTimeoutMillis: 0

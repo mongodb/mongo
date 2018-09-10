@@ -328,7 +328,8 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
             return status;
         }
 
-        LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(opCtx)->opDescription();
+        LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(opCtx)->opDescription()
+                        << " with readTs: " << opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
     }
 
     // Only snapshot, linearizable and afterClusterTime reads should block on prepared transactions.
