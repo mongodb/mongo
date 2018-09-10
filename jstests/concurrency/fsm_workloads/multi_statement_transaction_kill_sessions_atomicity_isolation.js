@@ -31,9 +31,11 @@ var $config = extendWorkload($config, ($config, $super) => {
                     {$sample: {size: 1}},
                 ]);
 
-                assertAlways.eq(sessionToKill.toArray().length, 1);
-                const sessionUUID = sessionToKill.toArray()[0]._id.id;
+                if (sessionToKill.toArray().length === 0) {
+                    break;
+                }
 
+                const sessionUUID = sessionToKill.toArray()[0]._id.id;
                 res = db.runCommand({killSessions: [{id: sessionUUID}]});
                 assertAlways.commandWorked(res);
             } catch (e) {
