@@ -589,7 +589,9 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         return;
     }
     Collection* coll = db->getCollection(opCtx, nss.ns());
-    invariant(coll->uuid() == uuid);
+    invariant(coll->uuid() == uuid,
+              str::stream() << (uuid ? uuid->toString() : "<no uuid>") << ","
+                            << (coll->uuid() ? coll->uuid()->toString() : "<no uuid>"));
     CollectionCatalogEntry* entry = coll->getCatalogEntry();
     invariant(entry->isEqualToMetadataUUID(opCtx, uuid));
 
