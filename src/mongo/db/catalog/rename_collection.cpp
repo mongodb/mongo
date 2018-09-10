@@ -275,6 +275,51 @@ Status renameCollectionCommon(OperationContext* opCtx,
             invariant(options.dropTarget);
             auto dropTargetUUID = targetColl->uuid();
             invariant(dropTargetUUID);
+
+            // If this rename collection is replicated, check for long index names in the target
+            // collection that may exceed the MMAPv1 namespace limit when the target collection
+            // is renamed with a drop-pending namespace.
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, target);
+            if (!isOplogDisabledForNamespace) {
+                invariant(opCtx->writesAreReplicated());
+                invariant(renameOpTimeFromApplyOps.isNull());
+
+                // Compile a list of any indexes that would become too long following the
+                // drop-pending rename. In the case that this collection drop gets rolled back, this
+                // will incur a performance hit, since those indexes will have to be rebuilt from
+                // scratch, but data integrity is maintained.
+                std::vector<IndexDescriptor*> indexesToDrop;
+                auto indexIter = targetColl->getIndexCatalog()->getIndexIterator(opCtx, true);
+
+                // Determine which index names are too long. Since we don't have the collection
+                // rename optime at this time, use the maximum optime to check the index names.
+                auto longDpns = target.makeDropPendingNamespace(repl::OpTime::max());
+                while (indexIter.more()) {
+                    auto index = indexIter.next();
+                    auto status = longDpns.checkLengthForRename(index->indexName().size());
+                    if (!status.isOK()) {
+                        indexesToDrop.push_back(index);
+                    }
+                }
+
+                // Drop the offending indexes.
+                auto sourceUuidString = sourceUUID ? sourceUUID.get().toString() : "no UUID";
+                auto dropTargetUuidString =
+                    dropTargetUUID ? dropTargetUUID.get().toString() : "no UUID";
+                for (auto&& index : indexesToDrop) {
+                    log() << "renameCollection: renaming collection " << sourceUuidString
+                          << " from " << source << " to " << target << " (" << dropTargetUuidString
+                          << ") - target collection contains an index namespace '"
+                          << index->indexNamespace()
+                          << "' that would be too long after drop-pending rename. Dropping index "
+                             "immediately.";
+                    fassert(50941, targetColl->getIndexCatalog()->dropIndex(opCtx, index));
+                    opObserver->onDropIndex(
+                        opCtx, target, targetColl->uuid(), index->indexName(), index->infoObj());
+                }
+            }
+
             auto renameOpTime = opObserver->preRenameCollection(
                 opCtx, source, target, sourceUUID, dropTargetUUID, options.stayTemp);
 
