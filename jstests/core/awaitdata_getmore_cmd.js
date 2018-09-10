@@ -189,8 +189,11 @@
     // write a non-matching document into the collection. Confirm that we do not receive this
     // document and that we subsequently time out.
     now = new Date();
-    cmdRes = db.runCommand(
-        {getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: kReplDefaultTimeoutMS});
+    cmdRes = db.runCommand({
+        getMore: cmdRes.cursor.id,
+        collection: collName,
+        maxTimeMS: ReplSetTest.kDefaultTimeoutMS
+    });
     assert.commandWorked(cmdRes);
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
