@@ -28,12 +28,15 @@
 
 #include "mongo/platform/basic.h"
 
+#include <limits>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
+
 
 TEST(Parsing, EpochIsOptional) {
     const OID oid = OID::gen();
@@ -44,16 +47,16 @@ TEST(Parsing, EpochIsOptional) {
     ASSERT(canParse);
     ASSERT(chunkVersionComplete.epoch().isSet());
     ASSERT(chunkVersionComplete.epoch() == oid);
-    ASSERT_EQ(2, chunkVersionComplete.majorVersion());
-    ASSERT_EQ(3, chunkVersionComplete.minorVersion());
+    ASSERT_EQ(2u, chunkVersionComplete.majorVersion());
+    ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
 
     canParse = false;
     ChunkVersion chunkVersionNoEpoch =
         ChunkVersion::fromBSON(BSON("lastmod" << Timestamp(Seconds(3), 4)), "lastmod", &canParse);
     ASSERT(canParse);
     ASSERT(!chunkVersionNoEpoch.epoch().isSet());
-    ASSERT_EQ(3, chunkVersionNoEpoch.majorVersion());
-    ASSERT_EQ(4, chunkVersionNoEpoch.minorVersion());
+    ASSERT_EQ(3u, chunkVersionNoEpoch.majorVersion());
+    ASSERT_EQ(4u, chunkVersionNoEpoch.minorVersion());
 }
 
 TEST(Comparison, StrictEqual) {
@@ -83,5 +86,17 @@ TEST(Comparison, OlderThan) {
     ASSERT(!ChunkVersion(3, 1, epoch).isOlderThan(ChunkVersion(3, 1, epoch)));
 }
 
+TEST(ChunkVersionConstruction, CreateWithLargeValues) {
+    const auto minorVersion = std::numeric_limits<uint32_t>::max();
+    const uint32_t majorVersion = 1 << 24;
+    const auto epoch = OID::gen();
+
+    ChunkVersion version(majorVersion, minorVersion, epoch);
+    ASSERT_EQ(majorVersion, version.majorVersion());
+    ASSERT_EQ(minorVersion, version.minorVersion());
+    ASSERT_EQ(epoch, version.epoch());
+}
+
 }  // unnamed namespace
+
 }  // namespace mongo
