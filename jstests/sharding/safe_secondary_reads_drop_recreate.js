@@ -569,6 +569,11 @@
             // Do any test-specific setup.
             test.setUp(staleMongos);
 
+            // Wait for replication as a safety net, in case the individual setup function for a
+            // test case did not specify writeConcern itself
+            st.rs0.awaitReplication();
+            st.rs1.awaitReplication();
+
             // Do dummy read from the stale mongos so it loads the routing table into memory once.
             // Additionally, do a secondary read to ensure that the secondary has loaded the initial
             // routing table -- the first read to the primary will refresh the mongos' shardVersion,

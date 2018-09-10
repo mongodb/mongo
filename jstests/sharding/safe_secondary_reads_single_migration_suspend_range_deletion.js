@@ -392,6 +392,11 @@
         // Do any test-specific setup.
         test.setUp(staleMongos);
 
+        // Wait for replication as a safety net, in case the individual setup function for a test
+        // case did not specify writeConcern itself
+        st.rs0.awaitReplication();
+        st.rs1.awaitReplication();
+
         assert.commandWorked(recipientShardPrimary.getDB(db).setProfilingLevel(2));
         assert.commandWorked(donorShardSecondary.getDB(db).setProfilingLevel(2));
         assert.commandWorked(recipientShardSecondary.getDB(db).setProfilingLevel(2));
