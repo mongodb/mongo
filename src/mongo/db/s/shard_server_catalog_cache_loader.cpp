@@ -679,7 +679,21 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 
                 swCollectionAndChangedChunks =
                     _getLoaderMetadata(opCtx, nss, catalogCacheSinceVersion, termScheduled);
-                if (swCollectionAndChangedChunks.isOK()) {
+
+                const auto termAfterRefresh = [&] {
+                    stdx::lock_guard<stdx::mutex> lock(_mutex);
+                    return _term;
+                }();
+
+                if (termAfterRefresh != termScheduled) {
+                    // Raising a ConflictingOperationInProgress error here will cause the
+                    // CatalogCache to attempt the refresh as secondary instead of failing the
+                    // operation
+                    swCollectionAndChangedChunks = Status(
+                        ErrorCodes::ConflictingOperationInProgress,
+                        str::stream() << "Replication stepdown occurred during refresh for  '"
+                                      << nss.toString());
+                } else if (swCollectionAndChangedChunks.isOK()) {
                     // After finding metadata remotely, we must have found metadata locally.
                     invariant(!collAndChunks.changedChunks.empty());
                 }
@@ -749,12 +763,12 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
-    const long long term) {
+    long long expectedTerm) {
 
     // Get the enqueued metadata first. Otherwise we could miss data between reading persisted and
     // enqueued, if an enqueued task finished after the persisted read but before the enqueued read.
 
-    auto enqueuedRes = _getEnqueuedMetadata(nss, catalogCacheSinceVersion, term);
+    auto enqueuedRes = _getEnqueuedMetadata(nss, catalogCacheSinceVersion, expectedTerm);
     bool tasksAreEnqueued = std::move(enqueuedRes.first);
     CollectionAndChangedChunks enqueued = std::move(enqueuedRes.second);
 

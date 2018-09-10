@@ -400,7 +400,7 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
-        const long long term);
+        long long expectedTerm);
 
     /**
      * Loads chunk metadata from all in-memory tasks enqueued to update the shard persisted metadata
