@@ -475,10 +475,6 @@ public:
         return MutableValue(storage().getField(key));
     }
 
-    bool hasField(StringData key) {
-        return storage().findField(key).found();
-    }
-
     /// Update field by Position. Must already be a valid Position.
     MutableValue operator[](Position pos) {
         return getField(pos);

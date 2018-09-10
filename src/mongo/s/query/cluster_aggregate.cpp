@@ -183,7 +183,11 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     }
 
     if (opCtx->getTxnNumber()) {
-        invariant(!cmdForShards.hasField(OperationSessionInfo::kTxnNumberFieldName));
+        invariant(cmdForShards.peek()[OperationSessionInfo::kTxnNumberFieldName].missing(),
+                  str::stream() << "Command for shards unexpectedly had the "
+                                << OperationSessionInfo::kTxnNumberFieldName
+                                << " field set: "
+                                << cmdForShards.peek().toString());
         cmdForShards[OperationSessionInfo::kTxnNumberFieldName] =
             Value(static_cast<long long>(*opCtx->getTxnNumber()));
     }
