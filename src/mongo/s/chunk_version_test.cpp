@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <limits>
+
 #include "mongo/s/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 
@@ -70,8 +72,8 @@ TEST(ChunkVersionParsing, FromBSON) {
 
     ASSERT(chunkVersionComplete.epoch().isSet());
     ASSERT_EQ(oid, chunkVersionComplete.epoch());
-    ASSERT_EQ(2, chunkVersionComplete.majorVersion());
-    ASSERT_EQ(3, chunkVersionComplete.minorVersion());
+    ASSERT_EQ(2u, chunkVersionComplete.majorVersion());
+    ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
 }
 
 TEST(ChunkVersionParsing, FromBSONMissingEpoch) {
@@ -97,8 +99,8 @@ TEST(ChunkVersionParsing, FromBSONLegacy) {
 
     ASSERT(chunkVersionComplete.epoch().isSet());
     ASSERT_EQ(oid, chunkVersionComplete.epoch());
-    ASSERT_EQ(2, chunkVersionComplete.majorVersion());
-    ASSERT_EQ(3, chunkVersionComplete.minorVersion());
+    ASSERT_EQ(2u, chunkVersionComplete.majorVersion());
+    ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
 }
 
 TEST(ChunkVersionParsing, FromBSONLegacyEpochIsOptional) {
@@ -106,8 +108,8 @@ TEST(ChunkVersionParsing, FromBSONLegacyEpochIsOptional) {
         ChunkVersion::parseLegacyWithField(BSON("lastmod" << Timestamp(Seconds(3), 4)), "lastmod"));
 
     ASSERT(!chunkVersionNoEpoch.epoch().isSet());
-    ASSERT_EQ(3, chunkVersionNoEpoch.majorVersion());
-    ASSERT_EQ(4, chunkVersionNoEpoch.minorVersion());
+    ASSERT_EQ(3u, chunkVersionNoEpoch.majorVersion());
+    ASSERT_EQ(4u, chunkVersionNoEpoch.minorVersion());
 }
 
 TEST(ChunkVersionComparison, EqualityOperators) {
@@ -136,6 +138,17 @@ TEST(ChunkVersionComparison, OlderThan) {
     ASSERT(ChunkVersion(3, 2, epoch).isOlderThan(ChunkVersion(4, 1, epoch)));
 
     ASSERT(!ChunkVersion(3, 1, epoch).isOlderThan(ChunkVersion(3, 1, epoch)));
+}
+
+TEST(ChunkVersionConstruction, CreateWithLargeValues) {
+    const auto minorVersion = std::numeric_limits<uint32_t>::max();
+    const uint32_t majorVersion = 1 << 24;
+    const auto epoch = OID::gen();
+
+    ChunkVersion version(majorVersion, minorVersion, epoch);
+    ASSERT_EQ(majorVersion, version.majorVersion());
+    ASSERT_EQ(minorVersion, version.minorVersion());
+    ASSERT_EQ(epoch, version.epoch());
 }
 
 }  // namespace
