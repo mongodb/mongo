@@ -64,6 +64,15 @@ void uassertStatusOKWithWarning(const Status& status) {
     }
 }
 
+const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
+                                                // Note: Even though we're setting UNSET here,
+                                                // kMajority implies JOURNAL if journaling is
+                                                // supported by mongod and
+                                                // writeConcernMajorityJournalDefault is set to true
+                                                // in the ReplSetConfig.
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                -1);
+
 // Tests can pause and resume moveChunk's progress at each step by enabling/disabling each failpoint
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep1);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep2);
@@ -154,7 +163,19 @@ public:
             // OperationContext.
             // TODO (SERVER-30183): If this moveChunk joined an active moveChunk that did not have
             // waitForDelete=true, the captured opTime may not reflect all the deletes.
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+            replClient.setLastOpToSystemLastOpTime(opCtx);
+
+            WriteConcernResult writeConcernResult;
+            writeConcernResult.wTimedOut = false;
+            Status majorityStatus = waitForWriteConcern(
+                opCtx, replClient.getLastOp(), kMajorityWriteConcern, &writeConcernResult);
+            if (!majorityStatus.isOK()) {
+                if (!writeConcernResult.wTimedOut) {
+                    uassertStatusOK(majorityStatus);
+                }
+                return false;
+            }
         }
 
         return true;
