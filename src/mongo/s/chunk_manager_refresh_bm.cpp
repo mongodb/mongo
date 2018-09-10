@@ -55,14 +55,14 @@ ChunkRange getRangeForChunk(int i, int nChunks) {
 }
 
 template <typename ShardSelectorFn>
-auto makeChunkManagerWithShardSelector(int nShards, int nChunks, ShardSelectorFn selectShard) {
+auto makeChunkManagerWithShardSelector(int nShards, uint32_t nChunks, ShardSelectorFn selectShard) {
     const auto collEpoch = OID::gen();
     const auto collName = NamespaceString("test.foo");
     const auto shardKeyPattern = KeyPattern(BSON("_id" << 1));
 
     std::vector<ChunkType> chunks;
     chunks.reserve(nChunks);
-    for (int i = 0; i < nChunks; ++i) {
+    for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collName,
                             getRangeForChunk(i, nChunks),
                             ChunkVersion{i + 1, 0, collEpoch},
@@ -85,11 +85,11 @@ ShardId optimalShardSelector(int i, int nShards, int nChunks) {
     return ShardId(str::stream() << "shard" << shardNum);
 }
 
-NOINLINE_DECL auto makeChunkManagerWithPessimalBalancedDistribution(int nShards, int nChunks) {
+NOINLINE_DECL auto makeChunkManagerWithPessimalBalancedDistribution(int nShards, uint32_t nChunks) {
     return makeChunkManagerWithShardSelector(nShards, nChunks, pessimalShardSelector);
 }
 
-NOINLINE_DECL auto makeChunkManagerWithOptimalBalancedDistribution(int nShards, int nChunks) {
+NOINLINE_DECL auto makeChunkManagerWithOptimalBalancedDistribution(int nShards, uint32_t nChunks) {
     return makeChunkManagerWithShardSelector(nShards, nChunks, optimalShardSelector);
 }
 
@@ -125,7 +125,7 @@ BENCHMARK(BM_IncrementalRefreshOfPessimalBalancedDistribution)->Args({2, 50000})
 template <typename ShardSelectorFn>
 auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectShard) {
     const int nShards = state.range(0);
-    const int nChunks = state.range(1);
+    const uint32_t nChunks = state.range(1);
 
     const auto collEpoch = OID::gen();
     const auto collName = NamespaceString("test.foo");
@@ -133,7 +133,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
 
     std::vector<ChunkType> chunks;
     chunks.reserve(nChunks);
-    for (int i = 0; i < nChunks; ++i) {
+    for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collName,
                             getRangeForChunk(i, nChunks),
                             ChunkVersion{i + 1, 0, collEpoch},

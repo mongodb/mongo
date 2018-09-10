@@ -56,7 +56,7 @@ public:
 
     ChunkVersion() : _combined(0), _epoch(OID()) {}
 
-    ChunkVersion(int major, int minor, const OID& epoch)
+    ChunkVersion(uint32_t major, uint32_t minor, const OID& epoch)
         : _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)),
           _epoch(epoch) {}
 
@@ -127,12 +127,12 @@ public:
         return _combined > 0;
     }
 
-    int majorVersion() const {
+    uint32_t majorVersion() const {
         return _combined >> 32;
     }
 
-    int minorVersion() const {
-        return _combined & 0xFFFF;
+    uint32_t minorVersion() const {
+        return _combined & 0xFFFFFFFF;
     }
 
     const OID& epoch() const {
