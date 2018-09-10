@@ -14,6 +14,7 @@
     const st = new ShardingTest(
         {shards: {rs0: {nodes: [{rsConfig: {votes: 1}}, {rsConfig: {priority: 0, votes: 0}}]}}});
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    st.rs0.awaitReplication();  // Ensure secondary reaches the new FCV.
 
     const db1Name = "db1";
     const db2Name = "db2";
@@ -59,6 +60,7 @@
     //
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    st.rs0.awaitReplication();  // Ensure secondary reaches the new FCV.
 
     // Database versions should have been generated for the authoritative database entries.
     const db1EntryFCV40 = st.s.getDB("config").getCollection("databases").findOne({_id: db1Name});
@@ -97,6 +99,7 @@
     //
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    st.rs0.awaitReplication();  // Ensure secondary reaches the new FCV.
 
     // Database versions should have been removed from the authoritative database entries.
     const db1EntryFCV36 = st.s.getDB("config").getCollection("databases").findOne({_id: db1Name});
