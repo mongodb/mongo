@@ -1822,8 +1822,8 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing, this, stdx::placeholders::_1));
 
     // If election handoff is enabled, schedule a step-up immediately instead of waiting for the
-    // election timeout to expire.
-    if (!force && enableElectionHandoff.load()) {
+    // election timeout to expire. ReplSetStepUp is only supported in PV1.
+    if (isV1ElectionProtocol() && !force && enableElectionHandoff.load()) {
         _performElectionHandoff();
     }
     return Status::OK();
