@@ -71,6 +71,18 @@ variables:
       run_multiple_jobs: false
   - func: "send benchmark results"
 
+- &benchrun_embedded_template
+  name: benchrun_embedded_template
+  depends_on:
+  - generate_benchrun_embedded_files
+  commands:
+  - func: "do benchmark embedded setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --help
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
 - &jepsen_config_vars
   jepsen_key_time_limit: --key-time-limit 15
   jepsen_protocol_version: --protocol-version 1
@@ -186,6 +198,7 @@ variables:
   - benchrun_embedded_queries
   - benchrun_embedded_remove
   - benchrun_embedded_update
+  - generate_benchrun_embedded_files
 
 - &replica_sets_auth
   name: replica_sets_auth
@@ -791,7 +804,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/benchrun_embedded/benchrun_json_files.tgz
+      remote_file: ${project}/${build_variant}/${revision}/benchrun_json_files.tgz
       bucket: mciuploads
       extract_to: src/benchrun_embedded/testcases
 
@@ -4049,6 +4062,63 @@ tasks:
   - func: "send benchmark results"
 
 - <<: *task_template
+  name: generate_benchrun_embedded_files
+  commands:
+  - func: "git get project"
+  - func: "fetch binaries"
+  - func: "extract binaries"
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${activate_virtualenv}
+
+        mkdir -p /data/db
+        rm -rf /data/db/*
+
+        ./mongod --fork --logpath=/data/db/mongod.log
+        PATH="$(pwd):$PATH" ./src/third_party/scripts/mongo-perf_get_sources.sh
+        ./mongo --eval 'db.getSiblingDB("admin").shutdownServer()'
+  - command: archive.targz_pack
+    params:
+      target: "src/benchrun_json_files.tgz"
+      source_dir: "${workdir}/src/benchrun_embedded/testcases"
+      include:
+      - "**.json"
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/benchrun_json_files.tgz
+      remote_file: ${project}/${build_variant}/${revision}/benchrun_json_files.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/gzip}
+      display_name: benchrun embedded JSON config files
+
+- <<: *task_template
+  name: upload_benchrun_embedded_files
+  depends_on:
+  - generate_benchrun_embedded_files
+  patchable: false
+  commands:
+  - command: s3Copy.copy
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      s3_copy_files:
+      - source:
+          path: ${project}/${build_variant}/${revision}/benchrun_json_files.tgz
+          bucket: mciuploads
+        destination:
+          path: ${project}/benchrun_embedded/benchrun_json_files.tgz
+          bucket: mciuploads
+        build_variants: [rhel-62-64-bit-mobile]
+
+- <<: *benchrun_embedded_template
   name: benchrun_embedded_aggregation
   commands:
   - func: "do benchmark embedded setup"
@@ -4058,7 +4128,7 @@ tasks:
       run_multiple_jobs: false
   - func: "send benchmark results"
 
-- <<: *task_template
+- <<: *benchrun_embedded_template
   name: benchrun_embedded_commands
   commands:
   - func: "do benchmark embedded setup"
@@ -4068,7 +4138,7 @@ tasks:
       run_multiple_jobs: false
   - func: "send benchmark results"
 
-- <<: *task_template
+- <<: *benchrun_embedded_template
   name: benchrun_embedded_insert
   commands:
   - func: "do benchmark embedded setup"
@@ -4078,7 +4148,7 @@ tasks:
       run_multiple_jobs: false
   - func: "send benchmark results"
 
-- <<: *task_template
+- <<: *benchrun_embedded_template
   name: benchrun_embedded_misc
   commands:
   - func: "do benchmark embedded setup"
@@ -4088,7 +4158,7 @@ tasks:
       run_multiple_jobs: false
   - func: "send benchmark results"
 
-- <<: *task_template
+- <<: *benchrun_embedded_template
   name: benchrun_embedded_mixed_and_multi
   commands:
   - func: "do benchmark embedded setup"
@@ -4098,7 +4168,7 @@ tasks:
       run_multiple_jobs: false
   - func: "send benchmark results"
 
-- <<: *task_template
+- <<: *benchrun_embedded_template
   name: benchrun_embedded_queries
   commands:
   - func: "do benchmark embedded setup"
@@ -4108,7 +4178,7 @@ tasks:
       run_multiple_jobs: false
   - func: "send benchmark results"
 
-- <<: *task_template
+- <<: *benchrun_embedded_template
   name: benchrun_embedded_remove
   commands:
   - func: "do benchmark embedded setup"
@@ -4118,7 +4188,7 @@ tasks:
       run_multiple_jobs: false
   - func: "send benchmark results"
 
-- <<: *task_template
+- <<: *benchrun_embedded_template
   name: benchrun_embedded_update
   commands:
   - func: "do benchmark embedded setup"
@@ -12875,6 +12945,7 @@ buildvariants:
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth
+  - name: generate_benchrun_embedded_files
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_auth
@@ -12891,6 +12962,7 @@ buildvariants:
   - name: powercycle_mobile
   - name: serial_run
   - name: session_jscore_passthrough
+  - name: upload_benchrun_embedded_files
 
 - name: ubuntu1604-arm64-mobile
   display_name: "Ubuntu 16.04 arm64 (mobile)"
