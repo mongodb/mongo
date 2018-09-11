@@ -438,32 +438,14 @@ void shardCollection(OperationContext* opCtx,
                                               ->makeFromBSON(defaultCollation));
     }
 
-    const auto initialChunks =
-        InitialSplitPolicy::writeFirstChunksToConfig(opCtx,
-                                                     nss,
-                                                     fieldsAndOrder,
-                                                     dbPrimaryShardId,
-                                                     splitPoints,
-                                                     tags,
-                                                     distributeChunks,
-                                                     numContiguousChunksPerShard);
-
-    {
-        CollectionType coll;
-        coll.setNs(nss);
-        if (uuid)
-            coll.setUUID(*uuid);
-        coll.setEpoch(initialChunks.collVersion().epoch());
-        coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(initialChunks.collVersion().toLong()));
-        coll.setKeyPattern(fieldsAndOrder.toBSON());
-        coll.setDefaultCollation(defaultCollator ? defaultCollator->getSpec().toBSON() : BSONObj());
-        coll.setUnique(unique);
-
-        uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
-            opCtx, nss, coll, true /*upsert*/));
-    }
-
-    forceShardFilteringMetadataRefresh(opCtx, nss);
+    const auto initialChunks = InitialSplitPolicy::createFirstChunks(opCtx,
+                                                                     nss,
+                                                                     fieldsAndOrder,
+                                                                     dbPrimaryShardId,
+                                                                     splitPoints,
+                                                                     tags,
+                                                                     distributeChunks,
+                                                                     numContiguousChunksPerShard);
 
     // Create collections on all shards that will receive chunks. We need to do this after we mark
     // the collection as sharded so that the shards will update their metadata correctly. We do not
@@ -508,6 +490,47 @@ void shardCollection(OperationContext* opCtx,
                     str::stream() << "Unable to create collection on " << response.shardId));
             }
         }
+    }
+
+    // Insert chunk documents to config.chunks on the config server.
+    InitialSplitPolicy::writeFirstChunksToConfig(opCtx, initialChunks);
+
+    {
+        CollectionType coll;
+        coll.setNs(nss);
+        if (uuid)
+            coll.setUUID(*uuid);
+        coll.setEpoch(initialChunks.collVersion().epoch());
+        coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(initialChunks.collVersion().toLong()));
+        coll.setKeyPattern(fieldsAndOrder.toBSON());
+        coll.setDefaultCollation(defaultCollator ? defaultCollator->getSpec().toBSON() : BSONObj());
+        coll.setUnique(unique);
+
+        uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
+            opCtx, nss, coll, true /*upsert*/));
+    }
+
+    forceShardFilteringMetadataRefresh(opCtx, nss);
+
+    std::vector<ShardId> shardsRefreshed;
+    for (const auto& chunk : initialChunks.chunks) {
+        if ((chunk.getShard() == dbPrimaryShardId) ||
+            std::find(shardsRefreshed.begin(), shardsRefreshed.end(), chunk.getShard()) !=
+                shardsRefreshed.end()) {
+            continue;
+        }
+
+        auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, chunk.getShard()));
+        auto refreshCmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
+            Seconds{30},
+            Shard::RetryPolicy::kIdempotent));
+
+        uassertStatusOK(refreshCmdResponse.commandStatus);
+        shardsRefreshed.emplace_back(chunk.getShard());
     }
 
     catalogClient

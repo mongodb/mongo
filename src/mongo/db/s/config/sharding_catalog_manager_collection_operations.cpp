@@ -401,8 +401,10 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     }
 
     std::vector<TagsType> tags;
-    const auto initialChunks = InitialSplitPolicy::writeFirstChunksToConfig(
+    const auto initialChunks = InitialSplitPolicy::createFirstChunks(
         opCtx, nss, fieldsAndOrder, dbPrimaryShardId, splitPoints, tags, distributeInitialChunks);
+
+    InitialSplitPolicy::writeFirstChunksToConfig(opCtx, initialChunks);
 
     {
         CollectionType coll;

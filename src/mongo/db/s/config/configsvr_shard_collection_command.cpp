@@ -753,33 +753,29 @@ public:
         bool isEmpty = (conn->count(nss.ns()) == 0);
         boost::optional<UUID> uuid;
 
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42) {
+        // The primary shard will read the config.tags collection so we need to lock the zone
+        // mutex.
+        Lock::ExclusiveLock lk = catalogManager->lockZoneMutex(opCtx);
 
-            // The primary shard will read the config.tags collection so we need to lock the zone
-            // mutex.
-            Lock::ExclusiveLock lk = catalogManager->lockZoneMutex(opCtx);
+        ShardsvrShardCollection shardsvrShardCollectionRequest;
+        shardsvrShardCollectionRequest.set_shardsvrShardCollection(nss);
+        shardsvrShardCollectionRequest.setKey(request.getKey());
+        shardsvrShardCollectionRequest.setUnique(request.getUnique());
+        shardsvrShardCollectionRequest.setNumInitialChunks(request.getNumInitialChunks());
+        shardsvrShardCollectionRequest.setInitialSplitPoints(request.getInitialSplitPoints());
+        shardsvrShardCollectionRequest.setCollation(request.getCollation());
+        shardsvrShardCollectionRequest.setGetUUIDfromPrimaryShard(
+            request.getGetUUIDfromPrimaryShard());
 
-            ShardsvrShardCollection shardsvrShardCollectionRequest;
-            shardsvrShardCollectionRequest.set_shardsvrShardCollection(nss);
-            shardsvrShardCollectionRequest.setKey(request.getKey());
-            shardsvrShardCollectionRequest.setUnique(request.getUnique());
-            shardsvrShardCollectionRequest.setNumInitialChunks(request.getNumInitialChunks());
-            shardsvrShardCollectionRequest.setInitialSplitPoints(request.getInitialSplitPoints());
-            shardsvrShardCollectionRequest.setCollation(request.getCollation());
-            shardsvrShardCollectionRequest.setGetUUIDfromPrimaryShard(
-                request.getGetUUIDfromPrimaryShard());
+        auto cmdResponse = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            "admin",
+            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
+                cmdObj, shardsvrShardCollectionRequest.toBSON())),
+            Shard::RetryPolicy::kIdempotent));
 
-            auto cmdResponse = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                "admin",
-                CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
-                    cmdObj, shardsvrShardCollectionRequest.toBSON())),
-                Shard::RetryPolicy::kIdempotent));
-
-            // SERVER-14394 Remove status check below and replace with
-            // filterCommandReplyForPassthrough
+        if (cmdResponse.commandStatus != ErrorCodes::CommandNotFound) {
             uassertStatusOK(cmdResponse.commandStatus);
 
             auto shardCollResponse = ShardsvrShardCollectionResponse::parse(
@@ -799,71 +795,75 @@ public:
                     routingInfo.cm());
 
             return true;
-        }
-
-        // Step 3.
-        validateShardKeyAgainstExistingIndexes(
-            opCtx, nss, proposedKey, shardKeyPattern, primaryShard, conn, request);
-
-        // Step 4.
-        if (request.getGetUUIDfromPrimaryShard()) {
-            uuid = getUUIDFromPrimaryShard(nss, conn);
         } else {
-            uuid = UUID::gen();
+
+            // Step 3.
+            validateShardKeyAgainstExistingIndexes(
+                opCtx, nss, proposedKey, shardKeyPattern, primaryShard, conn, request);
+
+            // Step 4.
+            if (request.getGetUUIDfromPrimaryShard()) {
+                uuid = getUUIDFromPrimaryShard(nss, conn);
+            } else {
+                uuid = UUID::gen();
+            }
+
+            // Step 5.
+            std::vector<BSONObj> initialSplitPoints;  // there will be at most numShards-1 of these
+            std::vector<BSONObj> finalSplitPoints;    // all of the desired split points
+            if (request.getInitialSplitPoints()) {
+                initialSplitPoints = std::move(*request.getInitialSplitPoints());
+            } else {
+                InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
+                    shardKeyPattern,
+                    isEmpty,
+                    numShards,
+                    request.getNumInitialChunks(),
+                    &initialSplitPoints,
+                    &finalSplitPoints);
+            }
+
+            LOG(0) << "CMD: shardcollection: " << cmdObj;
+
+            audit::logShardCollection(
+                Client::getCurrent(), nss.ns(), proposedKey, request.getUnique());
+
+            // The initial chunks are distributed evenly across shards only if the initial split
+            // points
+            // were specified in the request, i.e., by mapReduce. Otherwise, all the initial chunks
+            // are
+            // placed on the primary shard, and may be distributed across shards through migrations
+            // (below) if using a hashed shard key.
+            const bool distributeInitialChunks = bool(request.getInitialSplitPoints());
+
+            // Step 6. Actually shard the collection.
+            catalogManager->shardCollection(opCtx,
+                                            nss,
+                                            uuid,
+                                            shardKeyPattern,
+                                            *request.getCollation(),
+                                            request.getUnique(),
+                                            initialSplitPoints,
+                                            distributeInitialChunks,
+                                            primaryShardId);
+            result << "collectionsharded" << nss.ns();
+            if (uuid) {
+                result << "collectionUUID" << *uuid;
+            }
+
+            // Make sure the cached metadata for the collection knows that we are now sharded
+            catalogCache->invalidateShardedCollection(nss);
+
+            // Free the distlocks to allow the splits and migrations below to proceed.
+            collDistLock.reset();
+            dbDistLock.reset();
+
+            // Step 7. Migrate initial chunks to distribute them across shards.
+            migrateAndFurtherSplitInitialChunks(
+                opCtx, nss, numShards, shardIds, isEmpty, shardKeyPattern, finalSplitPoints);
+
+            return true;
         }
-
-        // Step 5.
-        std::vector<BSONObj> initialSplitPoints;  // there will be at most numShards-1 of these
-        std::vector<BSONObj> finalSplitPoints;    // all of the desired split points
-        if (request.getInitialSplitPoints()) {
-            initialSplitPoints = std::move(*request.getInitialSplitPoints());
-        } else {
-            InitialSplitPolicy::calculateHashedSplitPointsForEmptyCollection(
-                shardKeyPattern,
-                isEmpty,
-                numShards,
-                request.getNumInitialChunks(),
-                &initialSplitPoints,
-                &finalSplitPoints);
-        }
-
-        LOG(0) << "CMD: shardcollection: " << cmdObj;
-
-        audit::logShardCollection(Client::getCurrent(), nss.ns(), proposedKey, request.getUnique());
-
-        // The initial chunks are distributed evenly across shards only if the initial split points
-        // were specified in the request, i.e., by mapReduce. Otherwise, all the initial chunks are
-        // placed on the primary shard, and may be distributed across shards through migrations
-        // (below) if using a hashed shard key.
-        const bool distributeInitialChunks = bool(request.getInitialSplitPoints());
-
-        // Step 6. Actually shard the collection.
-        catalogManager->shardCollection(opCtx,
-                                        nss,
-                                        uuid,
-                                        shardKeyPattern,
-                                        *request.getCollation(),
-                                        request.getUnique(),
-                                        initialSplitPoints,
-                                        distributeInitialChunks,
-                                        primaryShardId);
-        result << "collectionsharded" << nss.ns();
-        if (uuid) {
-            result << "collectionUUID" << *uuid;
-        }
-
-        // Make sure the cached metadata for the collection knows that we are now sharded
-        catalogCache->invalidateShardedCollection(nss);
-
-        // Free the distlocks to allow the splits and migrations below to proceed.
-        collDistLock.reset();
-        dbDistLock.reset();
-
-        // Step 7. Migrate initial chunks to distribute them across shards.
-        migrateAndFurtherSplitInitialChunks(
-            opCtx, nss, numShards, shardIds, isEmpty, shardKeyPattern, finalSplitPoints);
-
-        return true;
     }
 
 } configsvrShardCollectionCmd;

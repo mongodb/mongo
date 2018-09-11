@@ -106,17 +106,22 @@ public:
         const std::vector<ShardId>& allShardIds);
 
     /**
-     * Creates and writes to the config server the first chunks for a newly sharded collection.
+     * Creates the first chunks for a newly sharded collection.
      * Returns the created chunks.
      */
-    static ShardCollectionConfig writeFirstChunksToConfig(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ShardKeyPattern& shardKeyPattern,
-        const ShardId& primaryShardId,
-        const std::vector<BSONObj>& splitPoints,
-        const std::vector<TagsType>& tags,
-        const bool distributeInitialChunks,
-        const int numContiguousChunksPerShard = 1);
+    static ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const ShardKeyPattern& shardKeyPattern,
+                                                   const ShardId& primaryShardId,
+                                                   const std::vector<BSONObj>& splitPoints,
+                                                   const std::vector<TagsType>& tags,
+                                                   const bool distributeInitialChunks,
+                                                   const int numContiguousChunksPerShard = 1);
+
+    /**
+     * Writes to the config server the first chunks for a newly sharded collection.
+     */
+    static void writeFirstChunksToConfig(
+        OperationContext* opCtx, const InitialSplitPolicy::ShardCollectionConfig& initialChunks);
 };
 }  // namespace mongo
