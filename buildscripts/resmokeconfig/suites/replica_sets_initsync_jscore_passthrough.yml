@@ -78,6 +78,7 @@ selector:
   # entries.
   - jstests/core/txns/commit_prepared_transaction.js
   - jstests/core/txns/disallow_operations_on_prepared_transaction.js
+  - jstests/core/txns/ensure_active_txn_for_prepare_transaction.js
   - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
   - jstests/core/txns/prepare_requires_fcv42.js
 
