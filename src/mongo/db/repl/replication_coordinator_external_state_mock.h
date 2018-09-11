@@ -67,7 +67,6 @@ public:
     virtual ThreadPool* getDbWorkThreadPool() const override;
     virtual Status runRepairOnLocalDB(OperationContext* opCtx) override;
     virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
-    virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx);
     void onDrainComplete(OperationContext* opCtx) override;
     OpTime onTransitionToPrimary(OperationContext* opCtx, bool isV1ElectionProtocol) override;
     virtual void forwardSlaveProgress();
