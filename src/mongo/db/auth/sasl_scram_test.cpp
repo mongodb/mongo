@@ -499,7 +499,8 @@ TEST_F(SCRAMFixture, testIncorrectUser) {
     ASSERT_OK(saslClientSession->initialize());
 
     ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 1),
-                               Status(ErrorCodes::UserNotFound, "Could not find user sajack@test")),
+                               Status(ErrorCodes::UserNotFound,
+                                      "Could not find user \"sajack\" for db \"test\"")),
               runSteps());
 }
 

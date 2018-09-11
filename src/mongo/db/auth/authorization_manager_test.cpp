@@ -252,9 +252,12 @@ private:
                                      << userName.getDB()),
                                 userDoc);
         if (status == ErrorCodes::NoMatchingDocument) {
-            status = Status(ErrorCodes::UserNotFound,
-                            mongoutils::str::stream() << "Could not find user "
-                                                      << userName.getFullName());
+            status =
+                Status(ErrorCodes::UserNotFound,
+                       mongoutils::str::stream() << "Could not find user \"" << userName.getUser()
+                                                 << "\" for db \""
+                                                 << userName.getDB()
+                                                 << "\"");
         }
         return status;
     }
