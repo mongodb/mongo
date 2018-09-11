@@ -47,7 +47,7 @@ Action TransactionCoordinator::recvCoordinateCommit(const std::set<ShardId>& par
     return _stateMachine.onEvent(Event::kRecvParticipantList);
 }
 
-Action TransactionCoordinator::recvVoteCommit(const ShardId& shardId, int prepareTimestamp) {
+Action TransactionCoordinator::recvVoteCommit(const ShardId& shardId, Timestamp prepareTimestamp) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _participantList.recordVoteCommit(shardId, prepareTimestamp);
 
@@ -167,7 +167,7 @@ void TransactionCoordinator::ParticipantList::recordFullList(
 }
 
 void TransactionCoordinator::ParticipantList::recordVoteCommit(const ShardId& shardId,
-                                                               int prepareTimestamp) {
+                                                               Timestamp prepareTimestamp) {
     if (!_fullListReceived) {
         _recordParticipant(shardId);
     }
@@ -194,11 +194,11 @@ void TransactionCoordinator::ParticipantList::recordVoteCommit(const ShardId& sh
     } else {
         uassert(ErrorCodes::InternalError,
                 str::stream() << "Transaction commit coordinator received prepareTimestamp "
-                              << prepareTimestamp
+                              << prepareTimestamp.toStringPretty()
                               << " from participant "
                               << shardId.toString()
                               << " that previously reported prepareTimestamp "
-                              << participant.prepareTimestamp,
+                              << participant.prepareTimestamp->toStringPretty(),
                 *participant.prepareTimestamp == prepareTimestamp);
     }
 }
@@ -273,6 +273,18 @@ bool TransactionCoordinator::ParticipantList::allParticipantsAckedCommit() const
         _participants.begin(), _participants.end(), [](const std::pair<ShardId, Participant>& i) {
             return i.second.ack == Participant::Ack::kCommit;
         });
+}
+
+Timestamp TransactionCoordinator::ParticipantList::getHighestPrepareTimestamp() const {
+    invariant(_fullListReceived);
+    Timestamp highestPrepareTimestamp = Timestamp::min();
+    for (const auto& participant : _participants) {
+        invariant(participant.second.prepareTimestamp);
+        if (*participant.second.prepareTimestamp > highestPrepareTimestamp) {
+            highestPrepareTimestamp = *participant.second.prepareTimestamp;
+        }
+    }
+    return highestPrepareTimestamp;
 }
 
 std::set<ShardId> TransactionCoordinator::ParticipantList::getNonAckedCommitParticipants() const {

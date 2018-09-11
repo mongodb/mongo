@@ -45,7 +45,7 @@ void recvCoordinateCommit(OperationContext* opCtx,
 void recvVoteCommit(OperationContext* opCtx,
                     std::shared_ptr<TransactionCoordinator> coordinator,
                     const ShardId& shardId,
-                    int prepareTimestamp);
+                    Timestamp prepareTimestamp);
 void recvVoteAbort(OperationContext* opCtx,
                    std::shared_ptr<TransactionCoordinator> coordinator,
                    const ShardId& shardId);

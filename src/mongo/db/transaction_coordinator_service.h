@@ -84,7 +84,7 @@ public:
                     LogicalSessionId lsid,
                     TxnNumber txnNumber,
                     const ShardId& shardId,
-                    int prepareTimestamp);
+                    Timestamp prepareTimestamp);
 
     /**
      * Delivers voteAbort on the TransactionCoordinator.

@@ -99,7 +99,7 @@ void TransactionCoordinatorService::voteCommit(OperationContext* opCtx,
                                                LogicalSessionId lsid,
                                                TxnNumber txnNumber,
                                                const ShardId& shardId,
-                                               int prepareTimestamp) {
+                                               Timestamp prepareTimestamp) {
     auto coordinator = _coordinatorCatalog.get(lsid, txnNumber);
     if (!coordinator) {
         // TODO (SERVER-37018): Send abort to the participant who sent this vote (shardId)

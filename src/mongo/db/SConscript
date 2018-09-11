@@ -644,6 +644,7 @@ env.Library(
         'catalog/database',
         'catalog/database_holder',
         'catalog/uuid_catalog',
+        'commands/txn_cmd_request',
         'concurrency/lock_manager',
         'curop_failpoint_helpers',
         'curop_metrics',

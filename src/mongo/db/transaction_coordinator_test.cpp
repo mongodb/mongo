@@ -35,11 +35,13 @@ namespace mongo {
 
 using State = TransactionCoordinator::StateMachine::State;
 
+const Timestamp dummyTimestamp;
+
 TEST(Coordinator, SomeParticipantVotesAbortLeadsToAbort) {
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
     coordinator.recvVoteAbort(ShardId("shard0000"));
-    coordinator.recvVoteCommit(ShardId("shard0001"), 1);
+    coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
     coordinator.recvAbortAck(ShardId("shard0000"));
     coordinator.recvAbortAck(ShardId("shard0001"));
     ASSERT_EQ(State::kAborted, coordinator.state());
@@ -49,7 +51,7 @@ TEST(Coordinator, SomeParticipantsVoteAbortBeforeCoordinatorReceivesParticipantL
     TransactionCoordinator coordinator;
     coordinator.recvVoteAbort(ShardId("shard0000"));
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteCommit(ShardId("shard0001"), 1);
+    coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
     coordinator.recvAbortAck(ShardId("shard0000"));
     coordinator.recvAbortAck(ShardId("shard0001"));
     ASSERT_EQ(State::kAborted, coordinator.state());
@@ -58,8 +60,8 @@ TEST(Coordinator, SomeParticipantsVoteAbortBeforeCoordinatorReceivesParticipantL
 TEST(Coordinator, AllParticipantsVoteCommitLeadsToCommit) {
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteCommit(ShardId("shard0000"), 0);
-    coordinator.recvVoteCommit(ShardId("shard0001"), 1);
+    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
+    coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
     coordinator.recvCommitAck(ShardId("shard0000"));
     coordinator.recvCommitAck(ShardId("shard0001"));
     ASSERT_EQ(State::kCommitted, coordinator.state());
@@ -69,9 +71,9 @@ TEST(
     Coordinator,
     AllParticipantsVoteCommitSomeParticipantsVoteBeforeCoordinatorReceivesParticipantListLeadsToCommit) {
     TransactionCoordinator coordinator;
-    coordinator.recvVoteCommit(ShardId("shard0000"), 0);
+    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteCommit(ShardId("shard0001"), 1);
+    coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
     coordinator.recvCommitAck(ShardId("shard0000"));
     coordinator.recvCommitAck(ShardId("shard0001"));
     ASSERT_EQ(State::kCommitted, coordinator.state());
@@ -80,7 +82,7 @@ TEST(
 TEST(Coordinator, NotHearingSomeParticipantsVoteOtherParticipantsVotedCommitLeadsToStillWaiting) {
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteCommit(ShardId("shard0000"), 0);
+    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
     ASSERT_EQ(State::kWaitingForVotes, coordinator.state());
 }
 
@@ -102,8 +104,8 @@ TEST(Coordinator, NotHearingSomeParticipantsAbortAckLeadsToStillWaiting) {
 TEST(Coordinator, NotHearingSomeParticipantsCommitAckLeadsToStillWaiting) {
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteCommit(ShardId("shard0000"), 0);
-    coordinator.recvVoteCommit(ShardId("shard0001"), 1);
+    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
+    coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
     coordinator.recvCommitAck(ShardId("shard0000"));
     ASSERT_EQ(State::kWaitingForCommitAcks, coordinator.state());
 }

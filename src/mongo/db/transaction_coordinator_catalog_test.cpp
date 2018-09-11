@@ -39,6 +39,8 @@
 namespace mongo {
 namespace {
 
+const Timestamp dummyTimestamp;
+
 class TransactionCoordinatorCatalogTest : public unittest::Test {
 public:
     void setUp() override {
@@ -141,7 +143,7 @@ TEST_F(TransactionCoordinatorCatalogTest,
     auto coordinator = coordinatorCatalog().create(lsid, txnNumber);
 
     coordinator->recvCoordinateCommit({ShardId("shard0000")});
-    coordinator->recvVoteCommit(ShardId("shard0000"), 0);
+    coordinator->recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
     coordinator->recvCommitAck(ShardId("shard0000"));
     ASSERT_EQ(coordinator->state(), CoordinatorState::kCommitted);
 
@@ -159,7 +161,7 @@ TEST_F(TransactionCoordinatorCatalogTest, RemovingACommittedCoordinatorSucceeds)
     auto coordinator = coordinatorCatalog().create(lsid, txnNumber);
 
     coordinator->recvCoordinateCommit({ShardId("shard0000")});
-    coordinator->recvVoteCommit(ShardId("shard0000"), 0);
+    coordinator->recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
     coordinator->recvCommitAck(ShardId("shard0000"));
     ASSERT_EQ(coordinator->state(), CoordinatorState::kCommitted);
 

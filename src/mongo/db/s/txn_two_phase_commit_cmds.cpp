@@ -138,7 +138,7 @@ public:
                 opCtx->getLogicalSessionId().get(),
                 opCtx->getTxnNumber().get(),
                 cmd.getShardId(),
-                0 /* TODO (SERVER-36584) pass real prepareTimestamp */);
+                cmd.getPrepareTimestamp());
         }
 
     private:

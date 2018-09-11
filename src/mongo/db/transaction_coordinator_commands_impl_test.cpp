@@ -48,6 +48,7 @@ namespace {
 
 const std::vector<ShardId> shardIds{{"s1"}, {"s2"}, {"s3"}};
 const int kMaxNumFailedHostRetryAttempts = 3;
+const Timestamp dummyTimestamp;
 
 HostAndPort makeHostAndPort(const ShardId& shardId) {
     return HostAndPort(str::stream() << shardId << ":123");
@@ -118,7 +119,7 @@ protected:
         return simulateHandleRequest(commandFn);
     }
 
-    auto receiveVoteCommit(ShardId shardId, int prepareTimestamp) {
+    auto receiveVoteCommit(ShardId shardId, Timestamp prepareTimestamp) {
         auto commandFn = std::bind(
             txn::recvVoteCommit, std::placeholders::_1, _coordinator, shardId, prepareTimestamp);
         return simulateHandleRequest(commandFn);
@@ -203,15 +204,15 @@ private:
 
 TEST_F(TransactionCoordinatorTestFixture,
        VoteCommitDoesNotSendCommitIfParticipantListNotYetReceived) {
-    auto future = receiveVoteCommit(shardIds[0], 0);
+    auto future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 }
 
 TEST_F(TransactionCoordinatorTestFixture,
        ResentVoteCommitDoesNotSendCommitIfParticipantListNotYetReceived) {
-    auto future = receiveVoteCommit(shardIds[0], 0);
+    auto future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
-    future = receiveVoteCommit(shardIds[0], 0);
+    future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 }
 
@@ -220,7 +221,7 @@ TEST_F(TransactionCoordinatorTestFixture,
     auto future = receiveCoordinateCommit({shardIds[0], shardIds[1]});
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[0], 0);
+    future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 }
 
@@ -229,10 +230,10 @@ TEST_F(TransactionCoordinatorTestFixture,
     auto future = receiveCoordinateCommit({shardIds[0], shardIds[1]});
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[0], 0);
+    future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[0], 0);
+    future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 }
 
@@ -240,10 +241,10 @@ TEST_F(TransactionCoordinatorTestFixture, FinalVoteCommitSendsCommit) {
     auto future = receiveCoordinateCommit({shardIds[0], shardIds[1]});
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[0], 0);
+    future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[1], 0);
+    future = receiveVoteCommit(shardIds[1], dummyTimestamp);
     expectSendCommitAndReturnSuccess();
     expectSendCommitAndReturnSuccess();
     future.timed_get(kFutureTimeout);
@@ -254,15 +255,15 @@ TEST_F(TransactionCoordinatorTestFixture,
     auto future = receiveCoordinateCommit({shardIds[0], shardIds[1]});
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[0], 0);
+    future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[1], 0);
+    future = receiveVoteCommit(shardIds[1], dummyTimestamp);
     expectSendCommitAndReturnSuccess();
     expectSendCommitAndReturnRetryableError();
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[1], 0);
+    future = receiveVoteCommit(shardIds[1], dummyTimestamp);
     expectSendCommitAndReturnSuccess();
     future.timed_get(kFutureTimeout);
 }
@@ -272,15 +273,15 @@ TEST_F(TransactionCoordinatorTestFixture,
     auto future = receiveCoordinateCommit({shardIds[0], shardIds[1]});
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[0], 0);
+    future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[1], 0);
+    future = receiveVoteCommit(shardIds[1], dummyTimestamp);
     expectSendCommitAndReturnSuccess();
     expectSendCommitAndReturnSuccess();
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[1], 0);
+    future = receiveVoteCommit(shardIds[1], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 }
 
@@ -329,7 +330,7 @@ TEST_F(TransactionCoordinatorTestFixture,
 }
 
 TEST_F(TransactionCoordinatorTestFixture, VoteAbortSendsAbortIfSomeParticipantsHaveVotedCommit) {
-    auto future = receiveVoteCommit(shardIds[0], 0);
+    auto future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
     future = receiveVoteAbort(shardIds[1]);
@@ -339,7 +340,7 @@ TEST_F(TransactionCoordinatorTestFixture, VoteAbortSendsAbortIfSomeParticipantsH
 
 TEST_F(TransactionCoordinatorTestFixture,
        VoteAbortDoesNotSendAbortIfAlreadySentAbortToAllParticipantsWhoHaveVotedSoFar) {
-    auto future = receiveVoteCommit(shardIds[0], 0);
+    auto future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
     future = receiveVoteAbort(shardIds[1]);
@@ -352,7 +353,7 @@ TEST_F(TransactionCoordinatorTestFixture,
 
 TEST_F(TransactionCoordinatorTestFixture,
        ResentVoteAbortDoesNotSendAbortIfAlreadySentAbortToAllParticipantsWhoHaveVotedSoFar) {
-    auto future = receiveVoteCommit(shardIds[0], 0);
+    auto future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
     future = receiveVoteAbort(shardIds[1]);
@@ -365,14 +366,14 @@ TEST_F(TransactionCoordinatorTestFixture,
 
 TEST_F(TransactionCoordinatorTestFixture,
        ResentVoteAbortDoesNotSendAbortEvenIfMoreParticipantsHaveVotedCommit) {
-    auto future = receiveVoteCommit(shardIds[0], 0);
+    auto future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
     future = receiveVoteAbort(shardIds[1]);
     expectSendAbortAndReturnSuccess();
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[2], 0);
+    future = receiveVoteCommit(shardIds[2], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
     future = receiveVoteAbort(shardIds[1]);
@@ -384,7 +385,7 @@ TEST_F(TransactionCoordinatorTestFixture,
     auto future = receiveCoordinateCommit({shardIds[0], shardIds[1], shardIds[2]});
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[0], 0);
+    future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
     future = receiveVoteAbort(shardIds[1]);
@@ -413,7 +414,7 @@ TEST_F(TransactionCoordinatorTestFixture,
 
 TEST_F(TransactionCoordinatorTestFixture,
        CoordinateCommitDoesNotSendCommitIfSomeParticipantsNotYetVoted) {
-    auto future = receiveVoteCommit(shardIds[1], 0);
+    auto future = receiveVoteCommit(shardIds[1], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
     future = receiveCoordinateCommit({shardIds[0], shardIds[1]});
@@ -422,7 +423,7 @@ TEST_F(TransactionCoordinatorTestFixture,
 
 TEST_F(TransactionCoordinatorTestFixture,
        ResentCoordinateCommitDoesNotSendCommitIfSomeParticipantsNotYetVoted) {
-    auto future = receiveVoteCommit(shardIds[1], 0);
+    auto future = receiveVoteCommit(shardIds[1], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
     future = receiveCoordinateCommit({shardIds[0], shardIds[1]});
@@ -455,13 +456,13 @@ TEST_F(TransactionCoordinatorTestFixture,
 
 TEST_F(TransactionCoordinatorTestFixture,
        ResentCoordinateCommitDoesNotSendCommitEvenIfAllParticipantsAlreadyVotedCommit) {
-    auto future = receiveVoteCommit(shardIds[0], 0);
+    auto future = receiveVoteCommit(shardIds[0], dummyTimestamp);
     future.timed_get(kFutureTimeout);
 
     future = receiveCoordinateCommit({shardIds[0], shardIds[1]});
     future.timed_get(kFutureTimeout);
 
-    future = receiveVoteCommit(shardIds[1], 0);
+    future = receiveVoteCommit(shardIds[1], dummyTimestamp);
     expectSendCommitAndReturnSuccess();
     expectSendCommitAndReturnSuccess();
     future.timed_get(kFutureTimeout);

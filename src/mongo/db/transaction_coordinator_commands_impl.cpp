@@ -32,6 +32,7 @@
 
 #include "mongo/db/transaction_coordinator_commands_impl.h"
 
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -43,27 +44,30 @@ namespace mongo {
 
 namespace {
 
-std::vector<ShardId> sendCommit(OperationContext* opCtx, std::set<ShardId>& nonAckedParticipants) {
+std::vector<ShardId> sendCommit(OperationContext* opCtx,
+                                const std::set<ShardId>& nonAckedParticipants,
+                                Timestamp commitTimestamp) {
     StringBuilder ss;
     ss << "[";
 
+    CommitTransaction commitTransaction;
+    commitTransaction.setCommitTimestamp(commitTimestamp);
+    commitTransaction.setDbName("admin");
+    BSONObj commitObj = commitTransaction.toBSON(BSON(
+        "lsid" << opCtx->getLogicalSessionId()->toBSON() << "txnNumber" << *opCtx->getTxnNumber()
+               << "autocommit"
+               << false));
+
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& shardId : nonAckedParticipants) {
-        // TODO (SERVER-36584): Use the commitTransaction IDL to create the command BSON.
-        requests.emplace_back(shardId,
-                              BSON("commitTransaction" << 1 << "lsid"
-                                                       << opCtx->getLogicalSessionId()->toBSON()
-                                                       << "txnNumber"
-                                                       << *opCtx->getTxnNumber()
-                                                       << "autocommit"
-                                                       << false));
+        requests.emplace_back(shardId, commitObj);
         ss << shardId << " ";
     }
 
     // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
     // transactions are stable.
     ss << "]";
-    LOG(0) << "Coordinator shard sending commitTransaction to " << ss.str();
+    LOG(0) << "Coordinator shard sending " << commitObj << " to " << ss.str();
 
     // TODO (SERVER-36638): Change to arbitrary task executor? Unit test only supports fixed
     // executor.
@@ -100,27 +104,28 @@ std::vector<ShardId> sendCommit(OperationContext* opCtx, std::set<ShardId>& nonA
     return ackedParticipants;
 }
 
-std::vector<ShardId> sendAbort(OperationContext* opCtx, std::set<ShardId>& nonAckedParticipants) {
+std::vector<ShardId> sendAbort(OperationContext* opCtx,
+                               const std::set<ShardId>& nonAckedParticipants) {
     StringBuilder ss;
     ss << "[";
+
+    BSONObj abortObj = BSON(
+        "abortTransaction" << 1 << "lsid" << opCtx->getLogicalSessionId()->toBSON() << "txnNumber"
+                           << *opCtx->getTxnNumber()
+                           << "autocommit"
+                           << false);
 
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& shardId : nonAckedParticipants) {
         // TODO (SERVER-36584) Use IDL to create command BSON.
-        requests.emplace_back(shardId,
-                              BSON("abortTransaction" << 1 << "lsid"
-                                                      << opCtx->getLogicalSessionId()->toBSON()
-                                                      << "txnNumber"
-                                                      << *opCtx->getTxnNumber()
-                                                      << "autocommit"
-                                                      << false));
+        requests.emplace_back(shardId, abortObj);
         ss << shardId << " ";
     }
 
     // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
     // transactions are stable.
     ss << "]";
-    LOG(0) << "Coordinator shard sending abortTransaction to " << ss.str();
+    LOG(0) << "Coordinator shard sending " << abortObj << " to " << ss.str();
 
     // TODO (SERVER-36638): Change to arbitrary task executor? Unit test only supports fixed
     // executor.
@@ -165,14 +170,12 @@ void doAction(OperationContext* opCtx,
               TransactionCoordinator::StateMachine::Action action) {
     switch (action) {
         case TransactionCoordinator::StateMachine::Action::kSendCommit: {
-            std::set<ShardId> nonAckedParticipants;
-            nonAckedParticipants = coordinator->getNonAckedCommitParticipants();
+            const auto nonAckedParticipants = coordinator->getNonAckedCommitParticipants();
+            const auto commitTimestamp = coordinator->getCommitTimestamp();
 
             // TODO (SERVER-36638): Spawn a separate thread to do this so that the client's thread
             // does not block.
-
-            auto ackedParticipants = sendCommit(opCtx, nonAckedParticipants);
-
+            auto ackedParticipants = sendCommit(opCtx, nonAckedParticipants, commitTimestamp);
             for (auto& participant : ackedParticipants) {
                 coordinator->recvCommitAck(participant);
             }
@@ -185,9 +188,7 @@ void doAction(OperationContext* opCtx,
 
             // TODO (SERVER-36638): Spawn a separate thread to do this so that the client's thread
             // does not block.
-
             auto ackedParticipants = sendAbort(opCtx, nonAckedParticipants);
-
             for (auto& participant : ackedParticipants) {
                 coordinator->recvAbortAck(participant);
             }
@@ -218,9 +219,7 @@ void recvCoordinateCommit(OperationContext* opCtx,
     LOG(0) << "Coordinator shard received participant list with shards " << ss.str();
 
     TransactionCoordinator::StateMachine::Action action;
-
     action = coordinator->recvCoordinateCommit(participantList);
-
     doAction(opCtx, coordinator, action);
 
     // TODO (SERVER-36640): Wait for decision to be made.
@@ -229,14 +228,14 @@ void recvCoordinateCommit(OperationContext* opCtx,
 void recvVoteCommit(OperationContext* opCtx,
                     std::shared_ptr<TransactionCoordinator> coordinator,
                     const ShardId& shardId,
-                    int prepareTimestamp) {
+                    Timestamp prepareTimestamp) {
     // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
     // transactions are stable.
-    LOG(0) << "Coordinator shard received voteCommit from " << shardId;
+    LOG(0) << "Coordinator shard received voteCommit from " << shardId << " with prepare timestamp "
+           << prepareTimestamp;
 
     TransactionCoordinator::StateMachine::Action action;
     action = coordinator->recvVoteCommit(shardId, prepareTimestamp);
-
     doAction(opCtx, coordinator, action);
 }
 
@@ -249,7 +248,6 @@ void recvVoteAbort(OperationContext* opCtx,
 
     TransactionCoordinator::StateMachine::Action action;
     action = coordinator->recvVoteAbort(shardId);
-
     doAction(opCtx, coordinator, action);
 }
 

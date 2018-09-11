@@ -37,6 +37,8 @@ namespace mongo {
 
 using ParticipantList = TransactionCoordinator::ParticipantList;
 
+const Timestamp dummyTimestamp;
+
 TEST(ParticipantList, ReceiveSameParticipantListMultipleTimesSucceeds) {
     ParticipantList participantList;
     participantList.recordFullList({ShardId("shard0000"), ShardId("shard0001")});
@@ -80,7 +82,7 @@ TEST(ParticipantList, ReceiveVoteAbortFromParticipantNotInListThrows) {
 TEST(ParticipantList, ReceiveVoteCommitFromParticipantNotInListThrows) {
     ParticipantList participantList;
     participantList.recordFullList({ShardId("shard0000")});
-    ASSERT_THROWS_CODE(participantList.recordVoteCommit(ShardId("shard0001"), 0),
+    ASSERT_THROWS_CODE(participantList.recordVoteCommit(ShardId("shard0001"), dummyTimestamp),
                        AssertionException,
                        ErrorCodes::InternalError);
 }
@@ -95,7 +97,7 @@ TEST(ParticipantList, ReceiveParticipantListMissingParticipantThatAlreadyVotedAb
 
 TEST(ParticipantList, ReceiveParticipantListMissingParticipantThatAlreadyVotedCommitThrows) {
     ParticipantList participantList;
-    participantList.recordVoteCommit(ShardId("shard0000"), 0);
+    participantList.recordVoteCommit(ShardId("shard0000"), dummyTimestamp);
     ASSERT_THROWS_CODE(participantList.recordFullList({ShardId("shard0001")}),
                        AssertionException,
                        ErrorCodes::InternalError);
@@ -109,21 +111,21 @@ TEST(ParticipantList, ParticipantResendsVoteAbortSucceeds) {
 
 TEST(ParticipantList, ParticipantResendsVoteCommitSucceeds) {
     ParticipantList participantList;
-    participantList.recordVoteCommit(ShardId("shard0000"), 0);
-    participantList.recordVoteCommit(ShardId("shard0000"), 0);
+    participantList.recordVoteCommit(ShardId("shard0000"), dummyTimestamp);
+    participantList.recordVoteCommit(ShardId("shard0000"), dummyTimestamp);
 }
 
 TEST(ParticipantList, ParticipantChangesVoteFromAbortToCommitThrows) {
     ParticipantList participantList;
     participantList.recordVoteAbort(ShardId("shard0000"));
-    ASSERT_THROWS_CODE(participantList.recordVoteCommit(ShardId("shard0000"), 0),
+    ASSERT_THROWS_CODE(participantList.recordVoteCommit(ShardId("shard0000"), dummyTimestamp),
                        AssertionException,
                        ErrorCodes::InternalError);
 }
 
 TEST(ParticipantList, ParticipantChangesVoteFromCommitToAbortThrows) {
     ParticipantList participantList;
-    participantList.recordVoteCommit(ShardId("shard0000"), 0);
+    participantList.recordVoteCommit(ShardId("shard0000"), dummyTimestamp);
     ASSERT_THROWS_CODE(participantList.recordVoteAbort(ShardId("shard0000")),
                        AssertionException,
                        ErrorCodes::InternalError);
@@ -131,8 +133,8 @@ TEST(ParticipantList, ParticipantChangesVoteFromCommitToAbortThrows) {
 
 TEST(ParticipantList, ParticipantChangesPrepareTimestampThrows) {
     ParticipantList participantList;
-    participantList.recordVoteCommit(ShardId("shard0000"), 0);
-    ASSERT_THROWS_CODE(participantList.recordVoteCommit(ShardId("shard0000"), 1),
+    participantList.recordVoteCommit(ShardId("shard0000"), Timestamp::min());
+    ASSERT_THROWS_CODE(participantList.recordVoteCommit(ShardId("shard0000"), Timestamp::max()),
                        AssertionException,
                        ErrorCodes::InternalError);
 }
