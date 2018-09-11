@@ -258,7 +258,7 @@ InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
     return {std::move(chunks)};
 }
 
-InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::writeFirstChunksToConfig(
+InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
@@ -347,6 +347,12 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::writeFirstChunksTo
                                                                    numContiguousChunksPerShard)
         : InitialSplitPolicy::generateShardCollectionInitialZonedChunks(
               nss, shardKeyPattern, validAfter, tags, tagToShards, shardIds);
+
+    return initialChunks;
+}
+
+void InitialSplitPolicy::writeFirstChunksToConfig(
+    OperationContext* opCtx, const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
     for (const auto& chunk : initialChunks.chunks) {
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,
@@ -354,8 +360,6 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::writeFirstChunksTo
             chunk.toConfigBSON(),
             ShardingCatalogClient::kMajorityWriteConcern));
     }
-
-    return initialChunks;
 }
 
 }  // namespace mongo
