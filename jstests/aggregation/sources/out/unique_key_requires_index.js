@@ -77,7 +77,6 @@
         assertUniqueKeyIsInvalid({uniqueKey: {a: 1, b: 1}, targetColl: target.getName()});
         assertUniqueKeyIsInvalid({uniqueKey: {b: 1}, targetColl: target.getName()});
         assertUniqueKeyIsInvalid({uniqueKey: {a: 1}, targetColl: target.getName()});
-        assertUniqueKeyIsInvalid({uniqueKey: {}, targetColl: target.getName()});
 
         assert.commandWorked(target.dropIndex({a: 1, _id: 1}));
         assert.commandWorked(target.createIndex({a: 1}, {unique: true}));

@@ -183,36 +183,6 @@ TEST_F(DocumentSourceOutTest, SerializeDottedPathUniqueKeySharedPrefix) {
                        (Document{{"_id", 1}, {"a.b", 1}, {"a.c", 1}}));
 }
 
-TEST_F(DocumentSourceOutTest, SerializeDuplicateUniqueKey) {
-    BSONObj spec = BSON("$out" << BSON("to"
-                                       << "target"
-                                       << "mode"
-                                       << kDefaultMode
-                                       << "uniqueKey"
-                                       << BSON("_id" << 1 << "dupKey" << 1 << "dupKey" << 1)));
-    auto outStage = createOutStage(spec);
-    auto serialized = outStage->serialize().getDocument();
-    ASSERT_EQ(serialized["$out"][kModeFieldName].getStringData(), kDefaultMode);
-    ASSERT_DOCUMENT_EQ(serialized["$out"][kUniqueKeyFieldName].getDocument(),
-                       (Document{{"_id", 1}, {"dupKey", 1}}));
-}
-
-// TODO SERVER-36367: Nested objects should not be allowed in the uniqueKey spec.
-TEST_F(DocumentSourceOutTest, SerializeNestedObjectInUniqueKey) {
-    BSONObj spec = BSON("$out" << BSON("to"
-                                       << "target"
-                                       << "mode"
-                                       << kDefaultMode
-                                       << "uniqueKey"
-                                       << BSON("_id" << 1 << "shardKey"
-                                                     << BSON("subShardKey" << 1))));
-    auto outStage = createOutStage(spec);
-    auto serialized = outStage->serialize().getDocument();
-    ASSERT_EQ(serialized["$out"][kModeFieldName].getStringData(), kDefaultMode);
-    ASSERT_DOCUMENT_EQ(serialized["$out"][kUniqueKeyFieldName].getDocument(),
-                       (Document{{"_id", 1}, {"shardKey", 1}}));
-}
-
 TEST_F(DocumentSourceOutTest, FailsToParseIfToIsNotString) {
     BSONObj spec = BSON("$out" << BSONObj());
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 40414);
@@ -347,6 +317,24 @@ TEST_F(DocumentSourceOutTest, FailsToParseIfUniqueKeyIsNotAnObject) {
                                << "uniqueKey"
                                << "_id"));
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, ErrorCodes::TypeMismatch);
+}
+
+TEST_F(DocumentSourceOutTest, FailsToParseIfUniqueKeyHasDuplicateFields) {
+    BSONObj spec = BSON("$out" << BSON("to"
+                                       << "test"
+                                       << "mode"
+                                       << kDefaultMode
+                                       << "uniqueKey"
+                                       << BSON("_id" << 1 << "_id" << 1)));
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, ErrorCodes::BadValue);
+
+    spec = BSON("$out" << BSON("to"
+                               << "test"
+                               << "mode"
+                               << kDefaultMode
+                               << "uniqueKey"
+                               << BSON("x" << 1 << "y" << 1 << "x" << 1)));
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, ErrorCodes::BadValue);
 }
 
 TEST_F(DocumentSourceOutTest, CorrectlyUsesTargetDbThatMatchesAggregationDb) {

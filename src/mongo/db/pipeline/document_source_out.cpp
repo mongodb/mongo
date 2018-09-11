@@ -29,7 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_out_gen.h"
 #include "mongo/db/pipeline/document_source_out_in_place.h"
@@ -108,6 +107,68 @@ const char* DocumentSourceOut::getSourceName() const {
     return "$out";
 }
 
+namespace {
+/**
+ * Parses the fields of the 'uniqueKey' from the user-specified 'obj' from the $out spec, returning
+ * a set of field paths. Throws if 'obj' is invalid.
+ */
+std::set<FieldPath> parseUniqueKeyFromSpec(const BSONObj& obj) {
+    std::set<FieldPath> uniqueKey;
+    for (const auto& elem : obj) {
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "All fields of $out uniqueKey must be the number 1, but '"
+                              << elem.fieldNameStringData()
+                              << "' is of type "
+                              << elem.type(),
+                elem.isNumber());
+
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "All fields of $out uniqueKey must be the number 1, but '"
+                              << elem.fieldNameStringData()
+                              << "' has the invalid value "
+                              << elem.numberDouble(),
+                elem.numberDouble() == 1.0);
+
+        const auto res = uniqueKey.insert(FieldPath(elem.fieldNameStringData()));
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Found a duplicate field '" << elem.fieldNameStringData()
+                              << "' in $out uniqueKey",
+                res.second);
+    }
+
+    uassert(ErrorCodes::InvalidOptions,
+            "If explicitly specifying $out uniqueKey, must include at least one field",
+            uniqueKey.size() > 0);
+    return uniqueKey;
+}
+
+/**
+ * Extracts the fields of 'uniqueKey' from 'doc' and returns the key as a BSONObj. Throws if any
+ * field of the 'uniqueKey' extracted from 'doc' is nullish or an array.
+ */
+BSONObj extractUniqueKeyFromDoc(const Document& doc, const std::set<FieldPath>& uniqueKey) {
+    MutableDocument result;
+    for (const auto& field : uniqueKey) {
+        auto value = doc.getNestedField(field);
+        uassert(50943,
+                str::stream() << "$out write error: uniqueKey field '" << field.fullPath()
+                              << "' is an array in the document '"
+                              << doc.toString()
+                              << "'",
+                !value.isArray());
+        uassert(
+            50905,
+            str::stream() << "$out write error: uniqueKey field '" << field.fullPath()
+                          << "' cannot be missing, null, undefined or an array. Full document: '"
+                          << doc.toString()
+                          << "'",
+            !value.nullish());
+        result.addField(field.fullPath(), std::move(value));
+    }
+    return result.freeze().toBson();
+}
+}  // namespace
+
 DocumentSource::GetNextResult DocumentSourceOut::getNext() {
     pExpCtx->checkForInterrupt();
 
@@ -135,11 +196,8 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
         }
 
         // Extract the unique key before converting the document to BSON.
-        auto uniqueKey = document_path_support::extractPathsFromDoc(doc, _uniqueKeyFields);
+        auto uniqueKey = extractUniqueKeyFromDoc(doc, _uniqueKeyFields);
         auto insertObj = doc.toBson();
-        uassert(50905,
-                str::stream() << "Failed to extract unique key from input document: " << insertObj,
-                uniqueKey.size() == _uniqueKeyFields.size());
 
         bufferedBytes += insertObj.objsize();
         if (!batch.empty() &&
@@ -148,7 +206,7 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
             batch.clear();
             bufferedBytes = insertObj.objsize();
         }
-        batch.emplace(std::move(insertObj), uniqueKey.toBson());
+        batch.emplace(std::move(insertObj), std::move(uniqueKey));
     }
     if (!batch.empty())
         spill(batch);
@@ -254,8 +312,9 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
         }
 
         // Convert unique key object to a vector of FieldPaths.
-        if (auto uniqueKeyObj = spec.getUniqueKey()) {
-            uniqueKey = uniqueKeyObj->getFieldNames<std::set<FieldPath>>();
+        if (auto userSpecifiedUniqueKey = spec.getUniqueKey()) {
+            uniqueKey = parseUniqueKeyFromSpec(userSpecifiedUniqueKey.get());
+
             // TODO SERVER-36047 Check if this is the document key and skip the check below.
             const bool isDocumentKey = false;
             // Make sure the uniqueKey has a supporting index. TODO SERVER-36047 Figure out where
@@ -264,7 +323,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
             // database - meaning the assertion should always happen on the primary shard where the
             // collection must exist.
             uassert(50938,
-                    "Cannot find index to verify that $out's unique key will be unique",
+                    "Cannot find index to verify that $out's uniqueKey will be unique",
                     expCtx->inMongos || isDocumentKey ||
                         expCtx->mongoProcessInterface->uniqueKeyIsSupportedByIndex(
                             expCtx, outputNs, uniqueKey));
