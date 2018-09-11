@@ -2,7 +2,8 @@
  * Test that a node that is shutdown without running replication recovery does not downgrade to
  * 3.6 compatible data files, even when FCV is 3.6.
  *
- * @tags: [requires_wiredtiger, requires_persistence, requires_replication]
+ * @tags: [requires_wiredtiger, requires_persistence, requires_replication,
+ * requires_majority_read_concern]
  */
 
 // Steps:

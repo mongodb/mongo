@@ -1,5 +1,6 @@
 // Tests that change stream returns the stream of results continuously and in the right order when
 // it's migrating a chunk to a new shard.
+// @tags: [uses_change_streams]
 (function() {
     'use strict';
 

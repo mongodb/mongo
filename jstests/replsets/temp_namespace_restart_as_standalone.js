@@ -2,7 +2,7 @@
  * Tests that temporary collections are not dropped when a member of a replica set is started up as
  * a stand-alone mongod, i.e. without the --replSet parameter.
  *
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, requires_majority_read_concern]
  */
 (function() {
     var rst = new ReplSetTest({nodes: 2});

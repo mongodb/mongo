@@ -1,6 +1,7 @@
 // Tests that a $changeStream pipeline is split rather than forwarded even in the case where the
 // cluster only has a single shard, and that it can therefore successfully look up a document in a
 // sharded collection.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

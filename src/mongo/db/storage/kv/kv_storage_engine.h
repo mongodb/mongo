@@ -136,6 +136,8 @@ public:
 
     bool supportsReadConcernSnapshot() const final;
 
+    bool supportsReadConcernMajority() const final;
+
     virtual void replicationBatchIsComplete() const override;
 
     SnapshotManager* getSnapshotManager() const final;

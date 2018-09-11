@@ -128,7 +128,8 @@ public:
     repl::ReplicationConsistencyMarkers* _consistencyMarkers;
 
     StorageTimestampTest() {
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -176,7 +177,8 @@ public:
     }
 
     ~StorageTimestampTest() {
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -588,7 +590,8 @@ class SecondaryInsertTimes : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -650,7 +653,8 @@ class SecondaryArrayInsertTimes : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -731,7 +735,8 @@ class SecondaryDeleteTimes : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -792,7 +797,8 @@ class SecondaryUpdateTimes : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -869,7 +875,8 @@ class SecondaryInsertToUpsert : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -936,7 +943,8 @@ class SecondaryAtomicApplyOps : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1001,7 +1009,8 @@ class SecondaryAtomicApplyOpsWCEToNonAtomic : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1058,7 +1067,8 @@ class SecondaryCreateCollection : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1097,7 +1107,8 @@ class SecondaryCreateTwoCollections : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1159,7 +1170,8 @@ class SecondaryCreateCollectionBetweenInserts : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1255,7 +1267,8 @@ class PrimaryCreateCollectionInApplyOps : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1303,7 +1316,8 @@ class SecondarySetIndexMultikeyOnInsert : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1388,7 +1402,8 @@ class InitialSyncSetIndexMultikeyOnInsert : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1497,7 +1512,8 @@ class PrimarySetIndexMultikeyOnInsert : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1531,7 +1547,8 @@ class PrimarySetIndexMultikeyOnInsertUnreplicated : public StorageTimestampTest 
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1565,7 +1582,8 @@ class InitializeMinValid : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1593,7 +1611,8 @@ class SetMinValidInitialSyncFlag : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1636,7 +1655,8 @@ class SetMinValidToAtLeast : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1690,7 +1710,8 @@ class SetMinValidAppliedThrough : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1739,7 +1760,8 @@ class KVDropDatabase : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1849,7 +1871,8 @@ class TimestampIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -1971,7 +1994,8 @@ class TimestampMultiIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -2057,7 +2081,8 @@ class TimestampMultiIndexBuildsDuringRename : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
         auto kvStorageEngine =
@@ -2171,7 +2196,8 @@ class TimestampIndexDrops : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
         auto kvStorageEngine =
@@ -2252,7 +2278,8 @@ class SecondaryReadsDuringBatchApplicationAreAllowed : public StorageTimestampTe
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
         ASSERT(_opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot());
@@ -2360,7 +2387,8 @@ class TimestampIndexBuilderOnPrimary : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -2465,7 +2493,8 @@ class ViewCreationSeparateTransaction : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 
@@ -2526,7 +2555,8 @@ class CreateCollectionWithSystemIndex : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+        if (!(mongo::storageGlobalParams.engine == "wiredTiger" &&
+              mongo::serverGlobalParams.enableMajorityReadConcern)) {
             return;
         }
 

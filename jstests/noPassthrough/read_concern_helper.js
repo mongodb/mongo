@@ -1,4 +1,5 @@
 // This tests readConcern handling for the find/findOne shell helpers.
+// @tags: [requires_majority_read_concern]
 (function() {
     "use strict";
     var testServer = MongoRunner.runMongod();

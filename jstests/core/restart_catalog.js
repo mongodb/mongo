@@ -2,7 +2,7 @@
  * Forces the server to restart the catalog and rebuild its in-memory catalog data structures, then
  * asserts that the server works normally.
  * @tags: [
- *  assumes_read_concern_unchanged,
+ *  assumes_read_concern_unchanged, requires_majority_read_concern,
  *
  *  # restartCatalog command is not available on embedded
  *  incompatible_with_embedded

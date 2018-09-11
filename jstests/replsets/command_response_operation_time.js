@@ -2,6 +2,7 @@
  * Tests that reads and writes in a replica set return the correct operationTime for their
  * read/write concern level. Majority reads and writes return the last committed optime's timestamp
  * and local reads and writes return the last applied optime's timestamp.
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
     "use strict";

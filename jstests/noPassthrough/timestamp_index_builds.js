@@ -15,7 +15,7 @@
  * timestamping, merely that the catalog state is not corrupted due to the existence of background
  * index builds.
  *
- * @tags: [requires_replication, requires_persistence]
+ * @tags: [requires_replication, requires_persistence, requires_majority_read_concern]
  */
 (function() {
     "use strict";

@@ -52,7 +52,8 @@ MONGO_FAIL_POINT_DEFINE(WTPausePrimaryOplogDurabilityLoop);
 
 void WiredTigerOplogManager::start(OperationContext* opCtx,
                                    const std::string& uri,
-                                   WiredTigerRecordStore* oplogRecordStore) {
+                                   WiredTigerRecordStore* oplogRecordStore,
+                                   bool updateOldestTimestamp) {
     invariant(!_isRunning);
     // Prime the oplog read timestamp.
     std::unique_ptr<SeekableRecordCursor> reverseOplogCursor =
@@ -80,7 +81,8 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
     _oplogJournalThread = stdx::thread(&WiredTigerOplogManager::_oplogJournalThreadLoop,
                                        this,
                                        WiredTigerRecoveryUnit::get(opCtx)->getSessionCache(),
-                                       oplogRecordStore);
+                                       oplogRecordStore,
+                                       updateOldestTimestamp);
 
     _isRunning = true;
     _shuttingDown = false;
@@ -161,8 +163,9 @@ void WiredTigerOplogManager::triggerJournalFlush() {
     }
 }
 
-void WiredTigerOplogManager::_oplogJournalThreadLoop(
-    WiredTigerSessionCache* sessionCache, WiredTigerRecordStore* oplogRecordStore) noexcept {
+void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
+                                                     WiredTigerRecordStore* oplogRecordStore,
+                                                     const bool updateOldestTimestamp) noexcept {
     Client::initThread("WTOplogJournalThread");
 
     // This thread updates the oplog read timestamp, the timestamp used to read from the oplog with
@@ -238,6 +241,11 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(
             _setOplogReadTimestamp(lk, newTimestamp);
         }
         lk.unlock();
+
+        if (updateOldestTimestamp) {
+            const bool force = false;
+            sessionCache->getKVEngine()->setOldestTimestamp(Timestamp(newTimestamp), force);
+        }
 
         // Wake up any await_data cursors and tell them more data might be visible now.
         oplogRecordStore->notifyCappedWaitersIfNeeded();

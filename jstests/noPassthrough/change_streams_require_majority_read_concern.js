@@ -1,4 +1,5 @@
 // Tests that the $changeStream requires read concern majority.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

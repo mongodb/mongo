@@ -3,7 +3,7 @@
  * the same document can run back to back without waiting for the first transaction to
  * commit to a majority.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, requires_majority_read_concern]
  */
 (function() {
     "use strict";

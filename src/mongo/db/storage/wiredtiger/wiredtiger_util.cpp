@@ -38,6 +38,7 @@
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -523,6 +524,10 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
 bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
     if (!replEnabled) {
         // All tables on standalones are logged.
+        return true;
+    }
+
+    if (!serverGlobalParams.enableMajorityReadConcern) {
         return true;
     }
 

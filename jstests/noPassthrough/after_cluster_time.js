@@ -1,5 +1,5 @@
 // This test verifies readConcern:afterClusterTime behavior on a standalone mongod.
-// @tags: [requires_replication]
+// @tags: [requires_replication, requires_majority_read_concern]
 (function() {
     "use strict";
     var standalone =

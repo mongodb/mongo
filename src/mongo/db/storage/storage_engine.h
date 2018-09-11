@@ -326,6 +326,10 @@ public:
         return false;
     }
 
+    virtual bool supportsReadConcernMajority() const {
+        return false;
+    }
+
     /**
      * Recovers the storage engine state to the last stable timestamp. "Stable" in this case
      * refers to a timestamp that is guaranteed to never be rolled back. The stable timestamp

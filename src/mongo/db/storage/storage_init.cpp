@@ -56,7 +56,7 @@ public:
                                     const BSONElement& configElement) const {
         auto engine = opCtx->getClient()->getServiceContext()->getStorageEngine();
         return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
-                           << bool(engine->getSnapshotManager())
+                           << engine->supportsReadConcernMajority()
                            << "supportsSnapshotReadConcern"
                            << engine->supportsReadConcernSnapshot()
                            << "readOnly"

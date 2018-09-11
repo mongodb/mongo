@@ -1,5 +1,6 @@
 // Test that change streams involving 4.0 features are not allowed to be opened when the FCV is
 // older than 4.0.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

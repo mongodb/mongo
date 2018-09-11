@@ -49,8 +49,7 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
     const BSONObj& requestBody,
     bool requiresAuth,
     bool isReplSetMemberOrMongos,
-    bool supportsDocLocking,
-    bool supportsRecoverToStableTimestamp) {
+    bool supportsDocLocking) {
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
     if (opCtx->getClient()->isInDirectClient()) {
@@ -127,16 +126,12 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
                 !osi.getAutocommit().value());
 
         // We allow transactions to run on in-memory storage engines for testing purposes.
-        bool allowInMemoryTransactions = false;
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         if (storageEngine) {
-            allowInMemoryTransactions =
-                storageEngine->isEphemeral() && enableInMemoryTransactions.load();
+            uassert(ErrorCodes::IllegalOperation,
+                    "Multi-document transactions are not allowed on ephemeral storage engines",
+                    !storageEngine->isEphemeral() || enableInMemoryTransactions.load());
         }
-        uassert(ErrorCodes::IllegalOperation,
-                "Multi-document transactions are only allowed on storage engines that support "
-                "recover to stable timestamp.",
-                supportsRecoverToStableTimestamp || allowInMemoryTransactions);
     } else {
         uassert(ErrorCodes::InvalidOptions,
                 "'startTransaction' field requires 'autocommit' field to also be specified",

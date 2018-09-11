@@ -1,5 +1,6 @@
 // This tests resuming a change stream on a sharded collection where not all shards have a chunk in
 // the collection.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

@@ -630,7 +630,8 @@ void KVStorageEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
 }
 
 void KVStorageEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
-    _engine->setOldestTimestamp(oldestTimestamp);
+    const bool force = true;
+    _engine->setOldestTimestamp(oldestTimestamp, force);
 }
 
 bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
@@ -673,6 +674,10 @@ boost::optional<Timestamp> KVStorageEngine::getLastStableCheckpointTimestamp() c
 
 bool KVStorageEngine::supportsReadConcernSnapshot() const {
     return _engine->supportsReadConcernSnapshot();
+}
+
+bool KVStorageEngine::supportsReadConcernMajority() const {
+    return _engine->supportsReadConcernMajority();
 }
 
 void KVStorageEngine::replicationBatchIsComplete() const {

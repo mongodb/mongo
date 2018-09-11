@@ -2,7 +2,7 @@
 // to be majority committed. If 'atClusterTime' is older than the oldest available snapshot, the
 // error code SnapshotTooOld is returned.
 //
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, requires_majority_read_concern]
 (function() {
     "use strict";
 

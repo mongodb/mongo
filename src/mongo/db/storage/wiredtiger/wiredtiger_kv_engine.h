@@ -188,10 +188,11 @@ public:
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
     /**
-     * This method will force the oldest timestamp to the input value. Callers must be serialized
-     * along with `setStableTimestamp`
+     * This method will set the oldest timestamp and commit timestamp to the input value. Callers
+     * must be serialized along with `setStableTimestamp`. If force=false, this function does not
+     * set the commit timestamp and may choose to lag the oldest timestamp.
      */
-    void setOldestTimestamp(Timestamp oldestTimestamp);
+    void setOldestTimestamp(Timestamp oldestTimestamp, bool force) override;
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
@@ -209,6 +210,8 @@ public:
     virtual Timestamp getAllCommittedTimestamp() const override;
 
     bool supportsReadConcernSnapshot() const final;
+
+    bool supportsReadConcernMajority() const final;
 
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
@@ -312,8 +315,6 @@ private:
 
     std::string _uri(StringData ident) const;
 
-    void _setOldestTimestamp(Timestamp oldestTimestamp, bool force = false);
-
     WT_CONNECTION* _conn;
     WiredTigerFileVersion _fileVersion;
     WiredTigerEventHandler _eventHandler;
@@ -337,6 +338,14 @@ private:
     bool _ephemeral;
     const bool _inRepairMode;
     bool _readOnly;
+
+    // If _keepDataHistory is true, then the storage engine keeps all history after the stable
+    // timestamp, and WiredTigerKVEngine is responsible for advancing the oldest timestamp. If
+    // _keepDataHistory is false (i.e. majority reads are disabled), then we only keep history after
+    // the "no holes point", and WiredTigerOplogManager is responsible for advancing the oldest
+    // timestamp.
+    const bool _keepDataHistory = true;
+
     std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;  // Depends on _sizeStorer
     std::unique_ptr<WiredTigerCheckpointThread> _checkpointThread;
 

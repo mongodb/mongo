@@ -1,5 +1,6 @@
 // Tests that a mongos on version 3.6 will be able to successfully operate a change stream within a
 // session against shards that are binary version 4.0 but feature compatibility version 3.6.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

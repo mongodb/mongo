@@ -5,6 +5,7 @@
 // could occur, followed by write 'B' to shard 1, and then the change stream could be established on
 // shard 1, then some third write 'C' could occur.  This test ensures that in that case, both 'A'
 // and 'B' will be seen in the changestream before 'C'.
+// @tags: [uses_change_streams]
 (function() {
     "use strict";
 

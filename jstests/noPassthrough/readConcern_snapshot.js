@@ -24,14 +24,14 @@
         assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
                                      ErrorCodes.IllegalOperation);
         assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+                                     [ErrorCodes.NoSuchTransaction, ErrorCodes.IllegalOperation]);
 
         // Transactions without readConcern snapshot fail.
         session.startTransaction();
         assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
                                      ErrorCodes.IllegalOperation);
         assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+                                     [ErrorCodes.NoSuchTransaction, ErrorCodes.IllegalOperation]);
 
         rst.stopSet();
         return;

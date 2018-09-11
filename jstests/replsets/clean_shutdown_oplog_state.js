@@ -3,7 +3,7 @@
 // present without this test failing. In particular if the rst.stop(1) doesn't execute mid-batch,
 // it isn't fully exercising the code. However, if the test fails there is definitely a bug.
 //
-// @tags: [requires_persistence]
+// @tags: [requires_persistence, requires_majority_read_concern]
 (function() {
     "use strict";
 

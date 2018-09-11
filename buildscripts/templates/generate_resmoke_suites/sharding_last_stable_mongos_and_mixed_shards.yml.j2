@@ -84,6 +84,7 @@ selector:
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/change_streams_whole_db.js
+  - jstests/sharding/clone_catalog_data.js
   - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js
   - jstests/sharding/resume_change_stream.js
   - jstests/sharding/transactions_prohibited_in_sharded_cluster.js
@@ -103,6 +104,13 @@ selector:
   - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
   - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
   - jstests/sharding/resume_change_stream_from_stale_mongos.js
+  # TODO SERVER-37186: These tests insert data before calling ensurePrimaryShard(), so they can hit
+  # the issue where we cannot move primary from 4.0 to 3.6 if the collections have data. Enable
+  # these tests when SERVER-37186 is fixed.
+  - jstests/sharding/explain_find_and_modify_sharded.js
+  - jstests/sharding/find_getmore_cmd.js
+  - jstests/sharding/move_chunk_open_cursors.js
+  - jstests/sharding/validate_collection.js
 {% if excluded_tests is defined %}
 {% for test in excluded_tests %}
   - {{ test }}

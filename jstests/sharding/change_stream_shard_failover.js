@@ -1,6 +1,7 @@
 /**
  * Test resuming a change stream on a node other than the one it was started on. Accomplishes this
  * by triggering a stepdown.
+ * @tags: [uses_change_streams]
  */
 
 // Checking UUID consistency uses cached connections, which are not valid across restarts or

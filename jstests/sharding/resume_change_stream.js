@@ -1,6 +1,6 @@
 // Tests resuming change streams on sharded collections.
 // We need to use a readConcern in this test, which requires read commands.
-// @tags: [requires_find_command]
+// @tags: [requires_find_command, uses_change_streams]
 (function() {
     "use strict";
 

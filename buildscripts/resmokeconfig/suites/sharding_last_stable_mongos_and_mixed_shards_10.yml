@@ -15,8 +15,6 @@ selector:
   - jstests/sharding/auth_add_shard.js
   - jstests/sharding/min_optime_recovery_on_failed_move_chunk_commit.js
   - jstests/sharding/not_allowed_on_sharded_collection_cmd.js
-  - jstests/sharding/find_getmore_cmd.js
-  - jstests/sharding/explain_find_and_modify_sharded.js
   - jstests/sharding/large_skip_one_shard.js
   - jstests/sharding/empty_doc_results.js
   - jstests/sharding/findandmodify1.js
@@ -30,7 +28,6 @@ selector:
   - jstests/sharding/localhostAuthBypass.js
   - jstests/sharding/create_idx_empty_primary.js
   - jstests/sharding/move_primary_fcv_40.js
-  - jstests/sharding/clone_catalog_data.js
   - jstests/sharding/coll_epoch_test0.js
   - jstests/sharding/shard7.js
   - jstests/sharding/initial_split_validate_shard_collections.js
