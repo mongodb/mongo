@@ -27,14 +27,15 @@
  */
 
 ext.jnaVersion = '4.5.2'
-ext.libraryName = 'mongodb-embedded-capi'
-ext.pomName = 'MongoDB Embedded Driver C API'
-ext.pomDescription = 'The MongoDB Embedded Driver Native'
+ext.libraryName = 'embedded-capi'
+ext.licenseShort = 'AGPL-3.0'
+ext.pomName = 'MongoDB Embedded for Java'
+ext.pomDescription = 'The MongoDB Embedded SDK for Java'
 ext.pomUrl = 'http://www.mongodb.org'
-ext.pomLicenseName = 'The Apache License, Version 2.0'
-ext.pomLicenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-ext.pomScmConnection = 'scm:https://github.com/mongodb/mongo.git'
-ext.pomScmDevConnection = 'scm:git@github.com:mongodb/mongo.git'
+ext.pomLicenseName = 'GNU Affero General Public License version 3'
+ext.pomLicenseUrl = 'http://www.gnu.org/licenses/agpl-3.0.html'
+ext.pomScmConnection = 'https://github.com/mongodb/mongo.git'
+ext.pomScmDevConnection = 'git@github.com:mongodb/mongo.git'
 ext.pomScmUrl = 'https://github.com/mongodb/mongo'
 
 buildscript {
@@ -47,6 +48,7 @@ buildscript {
         classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:1.12.+'
         classpath 'com.android.tools.build:gradle:3.1.2'
         classpath 'digital.wup:android-maven-publish:3.6.2'
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.+'
     }
 }
 
@@ -70,7 +72,7 @@ def getGitVersion() {
 }
 
 allprojects {
-    group = 'com.mongodb'
+    group = 'org.mongodb'
     version = getGitVersion()
 
     repositories {

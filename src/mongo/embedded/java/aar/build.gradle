@@ -29,6 +29,7 @@
 apply plugin: 'com.android.library'
 apply plugin: 'digital.wup.android-maven-publish'
 apply plugin: 'optional-base'
+apply plugin: 'com.jfrog.bintray'
 
 android {
     compileSdkVersion 28
@@ -82,20 +83,38 @@ publishing {
                     }
                 }
                 scm {
-                    connection = pomScmConnection
-                    developerConnection = pomScmDevConnection
+                    connection = "scm:" + pomScmConnection
+                    developerConnection = "scm:" + pomScmDevConnection
                     url = pomScmUrl
                 }
             }
         }
     }
+}
 
-    repositories {
-        maven {
-            name = 'local'
-            url = "$buildDir/repo"
+bintray {
+    dryRun = true
+    //publish = false
+
+    user = System.getenv('BINTRAY_USER')
+    key = System.getenv('BINTRAY_KEY')
+
+    publications = ['mavenAar']
+
+    pkg {
+        repo = 'MongoDB'
+        name = "$group:$libraryName-android"
+        userOrg = 'mongodb'
+        licenses = [licenseShort]
+        vcsUrl = pomScmConnection
+        githubRepo = 'mongodb/mongo'
+        githubReleaseNotesFile = 'README'
+        websiteUrl = pomUrl
+        publicDownloadNumbers = true
+
+        version {
+            name = getGitVersion()
         }
     }
 }
-
 
