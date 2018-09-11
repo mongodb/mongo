@@ -206,6 +206,32 @@ StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
     return indexSpecsWithDefaults;
 }
 
+/**
+ * Returns a vector of index specs with the filled in collection default options and removes any
+ * indexes that already exist on the collection. If the returned vector is empty after returning, no
+ * new indexes need to be built. Throws on error.
+ */
+std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* opCtx,
+                                                             const Collection* collection,
+                                                             std::vector<BSONObj> validatedSpecs) {
+    auto swDefaults =
+        resolveCollectionDefaultProperties(opCtx, collection, std::move(validatedSpecs));
+    uassertStatusOK(swDefaults.getStatus());
+
+    auto specs = std::move(swDefaults.getValue());
+    for (size_t i = 0; i < specs.size(); i++) {
+        Status status =
+            collection->getIndexCatalog()->prepareSpecForCreate(opCtx, specs.at(i)).getStatus();
+        if (status.code() == ErrorCodes::IndexAlreadyExists) {
+            specs.erase(specs.begin() + i);
+            i--;
+            continue;
+        }
+        uassertStatusOK(status);
+    }
+    return specs;
+}
+
 }  // namespace
 
 /**
@@ -254,13 +280,39 @@ public:
         uassertStatusOK(specsWithStatus.getStatus());
         auto specs = std::move(specsWithStatus.getValue());
 
-        // now we know we have to create index(es)
-        // Do not use AutoGetOrCreateDb because we may relock the DbLock in mode IX.
-        Lock::DBLock dbLock(opCtx, ns.db(), MODE_X);
+        // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
+        Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
             uasserted(ErrorCodes::NotMaster,
                       str::stream() << "Not primary while creating indexes in " << ns.ns());
         }
+
+        const auto indexesAlreadyExist = [&result](int numIndexes) {
+            result.append("numIndexesBefore", numIndexes);
+            result.append("numIndexesAfter", numIndexes);
+            result.append("note", "all indexes already exist");
+            return true;
+        };
+
+        // Before potentially taking an exclusive database lock, check if all indexes already exist
+        // while holding an intent lock. Only continue if new indexes need to be built and the
+        // database should be re-locked in exclusive mode.
+        {
+            AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+            if (auto collection = autoColl.getCollection()) {
+                auto specsCopy = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, specs);
+                if (specsCopy.size() == 0) {
+                    return indexesAlreadyExist(
+                        collection->getIndexCatalog()->numIndexesTotal(opCtx));
+                }
+            }
+        }
+
+        // Relocking temporarily releases the Database lock while holding a Global IX lock. This
+        // prevents the replication state from changing, but requires abandoning the current
+        // snapshot in case indexes change during the period of time where no database lock is held.
+        opCtx->recoveryUnit()->abandonSnapshot();
+        dbLock.relockWithMode(MODE_X);
 
         // Allow the strong lock acquisition above to be interrupted, but from this point forward do
         // not allow locks or re-locks to be interrupted.
@@ -298,26 +350,20 @@ public:
         const boost::optional<int> dbProfilingLevel = boost::none;
         statsTracker.emplace(opCtx, ns, Top::LockType::WriteLocked, dbProfilingLevel);
 
-        auto indexSpecsWithDefaults =
-            resolveCollectionDefaultProperties(opCtx, collection, std::move(specs));
-        uassertStatusOK(indexSpecsWithDefaults.getStatus());
-        specs = std::move(indexSpecsWithDefaults.getValue());
-
-        const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(opCtx);
-        result.append("numIndexesBefore", numIndexesBefore);
 
         MultiIndexBlock indexer(opCtx, collection);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
 
         const size_t origSpecsSize = specs.size();
-        indexer.removeExistingIndexes(&specs);
+        specs = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, std::move(specs));
 
+        const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(opCtx);
         if (specs.size() == 0) {
-            result.append("numIndexesAfter", numIndexesBefore);
-            result.append("note", "all indexes already exist");
-            return true;
+            return indexesAlreadyExist(numIndexesBefore);
         }
+
+        result.append("numIndexesBefore", numIndexesBefore);
 
         if (specs.size() != origSpecsSize) {
             result.append("note", "index already exists");
@@ -341,11 +387,6 @@ public:
         if (indexer.getBuildInBackground()) {
             opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_IX);
-            if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
-                uasserted(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while creating background indexes in "
-                                        << ns.ns());
-            }
         }
 
         try {
@@ -364,12 +405,6 @@ public:
                 } catch (...) {
                     std::terminate();
                 }
-                uassert(ErrorCodes::NotMaster,
-                        str::stream() << "Not primary while creating background indexes in "
-                                      << ns.ns()
-                                      << ": cleaning up index build failure due to "
-                                      << e.toString(),
-                        repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns));
             }
             throw;
         }
@@ -377,9 +412,6 @@ public:
         if (indexer.getBuildInBackground()) {
             opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_X);
-            uassert(ErrorCodes::NotMaster,
-                    str::stream() << "Not primary while completing index build in " << dbname,
-                    repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns));
 
             Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, ns.db());
             if (db) {

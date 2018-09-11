@@ -309,7 +309,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
         log() << "Index build interrupted due to 'crashAfterStartingIndexBuild' failpoint. Exiting "
                  "after waiting for changes to become durable.";
         Locker::LockSnapshot lockInfo;
-        _opCtx->lockState()->saveLockStateAndUnlock(&lockInfo);
+        invariant(_opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
         if (_opCtx->recoveryUnit()->waitUntilDurable()) {
             quickExit(EXIT_TEST);
         }
@@ -440,7 +440,7 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection() {
     if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
         // Unlock before hanging so replication recognizes we've completed.
         Locker::LockSnapshot lockInfo;
-        _opCtx->lockState()->saveLockStateAndUnlock(&lockInfo);
+        invariant(_opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
         while (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
             log() << "Hanging index build with no locks due to "
                      "'hangAfterStartingIndexBuildUnlocked' failpoint";
