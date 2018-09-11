@@ -81,6 +81,9 @@ Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(Operati
     return storeLocalConfigDocument(opCtx, config);
 }
 
+void ReplicationCoordinatorExternalStateMock::waitForAllEarlierOplogWritesToBeVisible(
+    OperationContext* opCtx) {}
+
 void ReplicationCoordinatorExternalStateMock::shutdown(OperationContext*) {}
 
 executor::TaskExecutor* ReplicationCoordinatorExternalStateMock::getTaskExecutor() const {
