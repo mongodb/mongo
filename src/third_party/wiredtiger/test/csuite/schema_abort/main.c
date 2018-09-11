@@ -56,6 +56,8 @@ static char home[1024];			/* Program working dir */
  */
 #define	INVALID_KEY	UINT64_MAX
 #define	MAX_CKPT_INVL	2	/* Maximum interval between checkpoints */
+/* Set large, some slow I/O systems take tens of seconds to fsync. */
+#define	MAX_STARTUP	30	/* Seconds to start up and set stable */
 #define	MAX_TH		12
 #define	MAX_TIME	40
 #define	MAX_VAL		1024
@@ -76,7 +78,11 @@ static const char * const ckpt_file = "checkpoint_done";
 static bool compat, inmem, stable_set, use_ts, use_txn;
 static volatile uint64_t global_ts = 1;
 static volatile uint64_t uid = 1;
-static volatile uint64_t th_ts[MAX_TH];
+typedef struct {
+	uint64_t ts;
+	const char *op;
+} THREAD_TS;
+static volatile THREAD_TS th_ts[MAX_TH];
 
 #define	ENV_CONFIG_COMPAT	",compatibility=(release=\"2.9\")"
 #define	ENV_CONFIG_DEF						\
@@ -98,7 +104,19 @@ typedef struct {
 	WT_CONNECTION *conn;
 	uint64_t start;
 	uint32_t info;
+	const char *op;
 } THREAD_DATA;
+
+#define	NOOP		"noop"
+#define	BULK		"bulk"
+#define	BULK_UNQ	"bulk_unique"
+#define	CREATE		"create"
+#define	CREATE_UNQ	"create_unique"
+#define	CURSOR		"cursor"
+#define	DROP		"drop"
+#define	REBALANCE	"rebalance"
+#define	UPGRADE		"upgrade"
+#define	VERIFY		"verify"
 
 static void sig_handler(int)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -155,8 +173,8 @@ dump_ts(uint64_t nth)
 	uint64_t i;
 
 	for (i = 0; i < nth; ++i)
-		fprintf(stderr, "THREAD %" PRIu64 ": ts: %" PRIu64 "\n",
-		    i, th_ts[i]);
+		fprintf(stderr, "THREAD %" PRIu64 ": ts: %" PRIu64
+		    " op %s\n", i, th_ts[i].ts, th_ts[i].op);
 }
 
 /*
@@ -477,7 +495,7 @@ thread_ts_run(void *arg)
 			 * any thread still with a zero timestamp we go to
 			 * sleep.
 			 */
-			this_ts = th_ts[i];
+			this_ts = th_ts[i].ts;
 			if (this_ts == 0)
 				goto ts_wait;
 			else if (this_ts < oldest_ts)
@@ -557,10 +575,11 @@ thread_ckpt_run(void *arg)
 					printf("CKPT: !stable_set time %"
 					    PRIu64 "\n",
 					    WT_TIMEDIFF_SEC(now, start));
-				if (WT_TIMEDIFF_SEC(now, start) > 10) {
+				if (WT_TIMEDIFF_SEC(now, start) >
+				    MAX_STARTUP) {
 					fprintf(stderr,
-					    "After 10 seconds stable still "
-					    "not set. Aborting.\n");
+					    "After %d seconds stable still not "
+					    "set. Aborting.\n", MAX_STARTUP);
 					/*
 					 * For the checkpoint thread the info
 					 * contains the number of threads.
@@ -676,6 +695,7 @@ thread_run(void *arg)
 		 * Allow some threads to skip schema operations so that they
 		 * are generating sufficient dirty data.
 		 */
+		WT_PUBLISH(th_ts[td->info].op, NOOP);
 		if (td->info != 0 && td->info != 1)
 			/*
 			 * Do a schema operation about 50% of the time by having
@@ -683,30 +703,39 @@ thread_run(void *arg)
 			 */
 			switch (__wt_random(&rnd) % 20) {
 			case 0:
+				WT_PUBLISH(th_ts[td->info].op, BULK);
 				test_bulk(td);
 				break;
 			case 1:
+				WT_PUBLISH(th_ts[td->info].op, BULK_UNQ);
 				test_bulk_unique(td, __wt_random(&rnd) & 1);
 				break;
 			case 2:
+				WT_PUBLISH(th_ts[td->info].op, CREATE);
 				test_create(td);
 				break;
 			case 3:
+				WT_PUBLISH(th_ts[td->info].op, CREATE_UNQ);
 				test_create_unique(td, __wt_random(&rnd) & 1);
 				break;
 			case 4:
+				WT_PUBLISH(th_ts[td->info].op, CURSOR);
 				test_cursor(td);
 				break;
 			case 5:
+				WT_PUBLISH(th_ts[td->info].op, DROP);
 				test_drop(td, __wt_random(&rnd) & 1);
 				break;
 			case 6:
+				WT_PUBLISH(th_ts[td->info].op, REBALANCE);
 				test_rebalance(td);
 				break;
 			case 7:
+				WT_PUBLISH(th_ts[td->info].op, UPGRADE);
 				test_upgrade(td);
 				break;
 			case 8:
+				WT_PUBLISH(th_ts[td->info].op, VERIFY);
 				test_verify(td);
 				break;
 			}
@@ -772,7 +801,7 @@ thread_run(void *arg)
 			 * if we were to race with the timestamp thread, it
 			 * might see our thread update before the commit.
 			 */
-			WT_PUBLISH(th_ts[td->info], stable_ts);
+			WT_PUBLISH(th_ts[td->info].ts, stable_ts);
 		} else {
 			testutil_check(
 			    session->commit_transaction(session, NULL));

@@ -29,15 +29,17 @@
 import Queue
 import threading, time, wiredtiger, wttest
 from wtthread import backup_thread, checkpoint_thread, op_thread
-from wtscenario import make_scenarios
 
 # test_backup02.py
 #   Run background checkpoints and backups repeatedly while doing inserts
 #   in another thread
 class test_backup02(wttest.WiredTigerTestCase):
-    scenarios = make_scenarios([
-        ('table', dict(uri='table:test',fmt='L',dsize=100,nops=200,nthreads=1,time=30)),
-    ])
+    uri = 'table:test_backup02'
+    fmt = 'L'
+    dsize = 100
+    nops = 200
+    nthreads = 1
+    time = 60 if wttest.islongtest() else 10
 
     def test_backup02(self):
         done = threading.Event()

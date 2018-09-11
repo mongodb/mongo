@@ -17,11 +17,12 @@ static int __evict_review(WT_SESSION_IMPL *, WT_REF *, bool, bool *);
  *	Release exclusive access to a page.
  */
 static inline void
-__evict_exclusive_clear(WT_SESSION_IMPL *session, WT_REF *ref)
+__evict_exclusive_clear(
+    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t previous_state)
 {
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED && ref->page != NULL);
 
-	ref->state = WT_REF_MEM;
+	ref->state = previous_state;
 }
 
 /*
@@ -56,21 +57,27 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint64_t time_start, time_stop;
+	uint32_t previous_state;
 	bool locked, too_big;
 
 	btree = S2BT(session);
+	locked = false;
 	page = ref->page;
 	time_start = __wt_clock(session);
 
 	/*
-	 * Take some care with order of operations: if we release the hazard
-	 * reference without first locking the page, it could be evicted in
-	 * between.
+	 * This function always releases the hazard pointer - ensure that's
+	 * done regardless of whether we can get exclusive access.  Take some
+	 * care with order of operations: if we release the hazard pointer
+	 * without first locking the page, it could be evicted in between.
 	 */
-	locked = __wt_atomic_casv32(&ref->state, WT_REF_MEM, WT_REF_LOCKED);
+	previous_state = ref->state;
+	if ((previous_state == WT_REF_MEM || previous_state == WT_REF_LIMBO) &&
+	    __wt_atomic_casv32(&ref->state, previous_state, WT_REF_LOCKED))
+		locked = true;
 	if ((ret = __wt_hazard_clear(session, ref)) != 0 || !locked) {
 		if (locked)
-			ref->state = WT_REF_MEM;
+			ref->state = previous_state;
 		return (ret == 0 ? EBUSY : ret);
 	}
 
@@ -82,7 +89,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Track how long the call to evict took. If eviction is successful then
 	 * we have one of two pairs of stats to increment.
 	 */
-	ret = __wt_evict(session, ref, false);
+	ret = __wt_evict(session, ref, false, previous_state);
 	time_stop = __wt_clock(session);
 	if (ret == 0) {
 		if (too_big) {
@@ -116,7 +123,8 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Evict a page.
  */
 int
-__wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
+__wt_evict(WT_SESSION_IMPL *session,
+    WT_REF *ref, bool closing, uint32_t previous_state)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -223,7 +231,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 
 	if (0) {
 err:		if (!closing)
-			__evict_exclusive_clear(session, ref);
+			__evict_exclusive_clear(
+			    session, ref, previous_state);
 
 		WT_STAT_CONN_INCR(session, cache_eviction_fail);
 		WT_STAT_DATA_INCR(session, cache_eviction_fail);
@@ -517,7 +526,7 @@ __evict_review(
 	conn = S2C(session);
 	page = ref->page;
 	flags = WT_REC_EVICT;
-	if (!WT_SESSION_IS_CHECKPOINT(session))
+	if (!WT_SESSION_BTREE_SYNC(session))
 		LF_SET(WT_REC_VISIBLE_ALL);
 
 	/*
@@ -574,15 +583,9 @@ __evict_review(
 		 * exclusive access. If an in-memory split completes, the page
 		 * stays in memory and the tree is left in the desired state:
 		 * avoid the usual cleanup.
-		 *
-		 * Note that checkpoints may not split pages in-memory, it can
-		 * lead to corruption when the parent internal page is updated.
 		 */
-		if (*inmem_splitp) {
-			 if (WT_SESSION_IS_CHECKPOINT(session))
-				return (__wt_set_return(session, EBUSY));
+		if (*inmem_splitp)
 			return (__wt_split_insert(session, ref));
-		}
 	}
 
 	/* If the page is clean, we're done and we can evict. */
@@ -637,7 +640,7 @@ __evict_review(
 		if (F_ISSET(conn, WT_CONN_IN_MEMORY))
 			LF_SET(WT_REC_IN_MEMORY |
 			    WT_REC_SCRUB | WT_REC_UPDATE_RESTORE);
-		else if (WT_SESSION_IS_CHECKPOINT(session))
+		else if (WT_SESSION_BTREE_SYNC(session))
 			LF_SET(WT_REC_LOOKASIDE);
 		else if (!WT_IS_METADATA(session->dhandle)) {
 			LF_SET(WT_REC_UPDATE_RESTORE);
@@ -665,7 +668,7 @@ __evict_review(
 	 * to evict.  Give up evicting in that case: checkpoint will include
 	 * the reconciled page when it visits the parent.
 	 */
-	if (WT_SESSION_IS_CHECKPOINT(session) && !__wt_page_is_modified(page) &&
+	if (WT_SESSION_BTREE_SYNC(session) && !__wt_page_is_modified(page) &&
 	    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
 	    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp)))
 		return (__wt_set_return(session, EBUSY));
@@ -693,7 +696,7 @@ __evict_review(
 	 * very unlikely.  However, since checkpoint is partway through
 	 * reconciling the parent page, a split can corrupt the checkpoint.
 	 */
-	if (WT_SESSION_IS_CHECKPOINT(session) &&
+	if (WT_SESSION_BTREE_SYNC(session) &&
 	    page->modify->rec_result == WT_PM_REC_MULTIBLOCK)
 		return (__wt_set_return(session, EBUSY));
 

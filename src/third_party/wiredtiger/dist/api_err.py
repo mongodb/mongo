@@ -64,6 +64,11 @@ errors = [
         an already updated record which is in prepared state. An updated
         record will be in prepared state, when the transaction that performed
         the update is in prepared state.'''),
+    Error('WT_TRY_SALVAGE', -31809,
+        'database corruption detected', '''
+        This error is generated when corruption is detected in an on-disk file.
+        The application may choose to salvage the file or retry wiredtiger_open
+        with the 'salvage=true' configuration setting.'''),
 ]
 
 # Update the #defines in the wiredtiger.in file.

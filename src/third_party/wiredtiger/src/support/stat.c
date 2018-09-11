@@ -70,11 +70,11 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache: modified pages evicted",
 	"cache: overflow pages read into cache",
 	"cache: page split during eviction deepened the tree",
-	"cache: page written requiring lookaside records",
+	"cache: page written requiring cache overflow records",
 	"cache: pages read into cache",
 	"cache: pages read into cache after truncate",
 	"cache: pages read into cache after truncate in prepare state",
-	"cache: pages read into cache requiring lookaside entries",
+	"cache: pages read into cache requiring cache overflow entries",
 	"cache: pages requested from the cache",
 	"cache: pages seen by eviction walk",
 	"cache: pages written from cache",
@@ -783,11 +783,15 @@ static const char * const __stats_connection_desc[] = {
 	"cache: application threads page write from cache to disk count",
 	"cache: application threads page write from cache to disk time (usecs)",
 	"cache: bytes belonging to page images in the cache",
-	"cache: bytes belonging to the lookaside table in the cache",
+	"cache: bytes belonging to the cache overflow table in the cache",
 	"cache: bytes currently in the cache",
 	"cache: bytes not belonging to page images in the cache",
 	"cache: bytes read into cache",
 	"cache: bytes written from cache",
+	"cache: cache overflow score",
+	"cache: cache overflow table entries",
+	"cache: cache overflow table insert calls",
+	"cache: cache overflow table remove calls",
 	"cache: checkpoint blocked page eviction",
 	"cache: eviction calls to get a page",
 	"cache: eviction calls to get a page found queue empty",
@@ -832,10 +836,6 @@ static const char * const __stats_connection_desc[] = {
 	"cache: internal pages evicted",
 	"cache: internal pages split during eviction",
 	"cache: leaf pages split during eviction",
-	"cache: lookaside score",
-	"cache: lookaside table entries",
-	"cache: lookaside table insert calls",
-	"cache: lookaside table remove calls",
 	"cache: maximum bytes configured",
 	"cache: maximum page size at eviction",
 	"cache: modified pages evicted",
@@ -843,7 +843,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: operations timed out waiting for space in cache",
 	"cache: overflow pages read into cache",
 	"cache: page split during eviction deepened the tree",
-	"cache: page written requiring lookaside records",
+	"cache: page written requiring cache overflow records",
 	"cache: pages currently held in the cache",
 	"cache: pages evicted because they exceeded the in-memory maximum count",
 	"cache: pages evicted because they exceeded the in-memory maximum time (usecs)",
@@ -856,11 +856,11 @@ static const char * const __stats_connection_desc[] = {
 	"cache: pages read into cache",
 	"cache: pages read into cache after truncate",
 	"cache: pages read into cache after truncate in prepare state",
-	"cache: pages read into cache requiring lookaside entries",
-	"cache: pages read into cache requiring lookaside for checkpoint",
-	"cache: pages read into cache skipping older lookaside entries",
-	"cache: pages read into cache with skipped lookaside entries needed later",
-	"cache: pages read into cache with skipped lookaside entries needed later by checkpoint",
+	"cache: pages read into cache requiring cache overflow entries",
+	"cache: pages read into cache requiring cache overflow for checkpoint",
+	"cache: pages read into cache skipping older cache overflow entries",
+	"cache: pages read into cache with skipped cache overflow entries needed later",
+	"cache: pages read into cache with skipped cache overflow entries needed later by checkpoint",
 	"cache: pages requested from the cache",
 	"cache: pages seen by eviction walk",
 	"cache: pages selected for eviction unable to be evicted",
@@ -1075,7 +1075,7 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: read timestamp queue length",
 	"transaction: rollback to stable calls",
 	"transaction: rollback to stable updates aborted",
-	"transaction: rollback to stable updates removed from lookaside",
+	"transaction: rollback to stable updates removed from cache overflow",
 	"transaction: set timestamp calls",
 	"transaction: set timestamp commit calls",
 	"transaction: set timestamp commit updates",
@@ -1190,6 +1190,10 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing cache_bytes_other */
 	stats->cache_bytes_read = 0;
 	stats->cache_bytes_write = 0;
+		/* not clearing cache_lookaside_score */
+		/* not clearing cache_lookaside_entries */
+	stats->cache_lookaside_insert = 0;
+	stats->cache_lookaside_remove = 0;
 	stats->cache_eviction_checkpoint = 0;
 	stats->cache_eviction_get_ref = 0;
 	stats->cache_eviction_get_ref_empty = 0;
@@ -1234,10 +1238,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_internal = 0;
 	stats->cache_eviction_split_internal = 0;
 	stats->cache_eviction_split_leaf = 0;
-		/* not clearing cache_lookaside_score */
-		/* not clearing cache_lookaside_entries */
-	stats->cache_lookaside_insert = 0;
-	stats->cache_lookaside_remove = 0;
 		/* not clearing cache_bytes_max */
 		/* not clearing cache_eviction_maximum_page_size */
 	stats->cache_eviction_dirty = 0;
@@ -1575,6 +1575,14 @@ __wt_stat_connection_aggregate(
 	to->cache_bytes_other += WT_STAT_READ(from, cache_bytes_other);
 	to->cache_bytes_read += WT_STAT_READ(from, cache_bytes_read);
 	to->cache_bytes_write += WT_STAT_READ(from, cache_bytes_write);
+	to->cache_lookaside_score +=
+	    WT_STAT_READ(from, cache_lookaside_score);
+	to->cache_lookaside_entries +=
+	    WT_STAT_READ(from, cache_lookaside_entries);
+	to->cache_lookaside_insert +=
+	    WT_STAT_READ(from, cache_lookaside_insert);
+	to->cache_lookaside_remove +=
+	    WT_STAT_READ(from, cache_lookaside_remove);
 	to->cache_eviction_checkpoint +=
 	    WT_STAT_READ(from, cache_eviction_checkpoint);
 	to->cache_eviction_get_ref +=
@@ -1658,14 +1666,6 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_split_internal);
 	to->cache_eviction_split_leaf +=
 	    WT_STAT_READ(from, cache_eviction_split_leaf);
-	to->cache_lookaside_score +=
-	    WT_STAT_READ(from, cache_lookaside_score);
-	to->cache_lookaside_entries +=
-	    WT_STAT_READ(from, cache_lookaside_entries);
-	to->cache_lookaside_insert +=
-	    WT_STAT_READ(from, cache_lookaside_insert);
-	to->cache_lookaside_remove +=
-	    WT_STAT_READ(from, cache_lookaside_remove);
 	to->cache_bytes_max += WT_STAT_READ(from, cache_bytes_max);
 	to->cache_eviction_maximum_page_size +=
 	    WT_STAT_READ(from, cache_eviction_maximum_page_size);

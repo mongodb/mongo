@@ -693,6 +693,10 @@ __curfile_create(WT_SESSION_IMPL *session,
 		cacheable = false;
 	}
 
+	WT_ERR(__wt_config_gets_def(session, cfg, "read_once", 0, &cval));
+	if (cval.val != 0)
+		F_SET(cbt, WT_CBT_READ_ONCE);
+
 	/* Underlying btree initialization. */
 	__wt_btcur_open(cbt);
 

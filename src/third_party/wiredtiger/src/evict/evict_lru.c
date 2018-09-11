@@ -1442,7 +1442,7 @@ retry:	while (slot < max_entries) {
 		 * Skip files that are checkpointing if we are only looking for
 		 * dirty pages.
 		 */
-		if (btree->checkpointing != WT_CKPT_OFF &&
+		if (WT_BTREE_SYNCING(btree) &&
 		    !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
 			continue;
 
@@ -1693,7 +1693,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session,
 	WT_PAGE *last_parent, *page;
 	WT_REF *ref;
 	uint64_t min_pages, pages_seen, pages_queued, refs_walked;
-	uint32_t remaining_slots, target_pages, walk_flags;
+	uint32_t read_flags, remaining_slots, target_pages, walk_flags;
 	int restarts;
 	bool give_up, modified, urgent_queued;
 
@@ -1789,10 +1789,13 @@ __evict_walk_tree(WT_SESSION_IMPL *session,
 		FLD_SET(walk_flags, WT_READ_PREV);
 		/* FALLTHROUGH */
 	case WT_EVICT_WALK_RAND_NEXT:
+		read_flags = WT_READ_CACHE | WT_READ_NO_EVICT |
+			WT_READ_NO_GEN | WT_READ_NO_WAIT |
+			WT_READ_NOTFOUND_OK | WT_READ_RESTART_OK;
 		if (btree->evict_ref == NULL) {
 			/* Ensure internal pages indexes remain valid */
 			WT_WITH_PAGE_INDEX(session, ret = __wt_random_descent(
-			    session, &btree->evict_ref, true));
+			    session, &btree->evict_ref, read_flags));
 			WT_RET_NOTFOUND_OK(ret);
 		}
 		break;
@@ -1907,7 +1910,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session,
 			continue;
 
 		/* Don't queue dirty pages in trees during checkpoints. */
-		if (modified && btree->checkpointing != WT_CKPT_OFF)
+		if (modified && WT_BTREE_SYNCING(btree))
 			continue;
 
 		/*
@@ -2084,8 +2087,8 @@ fast:		/* If the page can't be evicted, give up. */
  *	Get a page for eviction.
  */
 static int
-__evict_get_ref(
-    WT_SESSION_IMPL *session, bool is_server, WT_BTREE **btreep, WT_REF **refp)
+__evict_get_ref(WT_SESSION_IMPL *session,
+    bool is_server, WT_BTREE **btreep, WT_REF **refp, uint32_t *previous_statep)
 {
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *evict;
@@ -2094,6 +2097,11 @@ __evict_get_ref(
 	bool is_app, server_only, urgent_ok;
 
 	*btreep = NULL;
+	/*
+	 * It is polite to initialize output variables, but it isn't safe for
+	 * callers to use the previous state if we don't return a locked ref.
+	 */
+	*previous_statep = WT_REF_MEM;
 	*refp = NULL;
 
 	cache = S2C(session)->cache;
@@ -2231,6 +2239,7 @@ __evict_get_ref(
 
 		*btreep = evict->btree;
 		*refp = evict->ref;
+		*previous_statep = previous_state;
 
 		/*
 		 * Remove the entry so we never try to reconcile the same page
@@ -2265,11 +2274,13 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 	WT_REF *ref;
 	WT_TRACK_OP_DECL;
 	uint64_t time_start, time_stop;
+	uint32_t previous_state;
 	bool app_timer;
 
 	WT_TRACK_OP_INIT(session);
 
-	WT_RET_TRACK(__evict_get_ref(session, is_server, &btree, &ref));
+	WT_RET_TRACK(__evict_get_ref(
+	    session, is_server, &btree, &ref, &previous_state));
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
 	app_timer = false;
@@ -2308,7 +2319,8 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 	 */
 	__wt_cache_read_gen_bump(session, ref->page);
 
-	WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, false));
+	WT_WITH_BTREE(session, btree,
+	     ret = __wt_evict(session, ref, false, previous_state));
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 

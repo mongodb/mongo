@@ -172,18 +172,36 @@ typedef enum __wt_txn_isolation {
  *	records during commit or undo the operations during rollback.
  */
 struct __wt_txn_op {
-	uint32_t fileid;
+	WT_BTREE *btree;
 	enum {
-		WT_TXN_OP_NONE,
-		WT_TXN_OP_BASIC,
-		WT_TXN_OP_INMEM,
+		WT_TXN_OP_NONE=0,
+		WT_TXN_OP_BASIC_COL,
+		WT_TXN_OP_BASIC_ROW,
+		WT_TXN_OP_INMEM_COL,
+		WT_TXN_OP_INMEM_ROW,
 		WT_TXN_OP_REF_DELETE,
 		WT_TXN_OP_TRUNCATE_COL,
 		WT_TXN_OP_TRUNCATE_ROW
 	} type;
 	union {
-		/* WT_TXN_OP_BASIC, WT_TXN_OP_INMEM */
-		WT_UPDATE *upd;
+		/* WT_TXN_OP_BASIC_ROW, WT_TXN_OP_INMEM_ROW */
+		struct {
+			WT_UPDATE *upd;
+			WT_ITEM key;
+		} op_row;
+
+		/* WT_TXN_OP_BASIC_COL, WT_TXN_OP_INMEM_COL */
+		struct {
+			WT_UPDATE *upd;
+			uint64_t recno;
+		} op_col;
+/*
+ * upd is pointing to same memory in both op_row and op_col, so for simplicity
+ * just chose op_row upd
+ */
+#undef op_upd
+#define	op_upd	op_row.upd
+
 		/* WT_TXN_OP_REF_DELETE */
 		WT_REF *ref;
 		/* WT_TXN_OP_TRUNCATE_COL */

@@ -308,13 +308,6 @@ __logmgr_config(
 		    session, cfg, "log.recover", 0, &cval));
 		if (WT_STRING_MATCH("error", cval.str, cval.len))
 			FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR);
-		else if (WT_STRING_MATCH("salvage", cval.str, cval.len)) {
-			if (F_ISSET(conn, WT_CONN_READONLY))
-				WT_RET_MSG(session, EINVAL,
-				    "Readonly configuration incompatible with "
-				    "log=(recover=salvage)");
-			FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_SALVAGE);
-		}
 	}
 
 	WT_RET(__wt_config_gets(session, cfg, "log.zero_fill", &cval));

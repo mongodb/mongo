@@ -37,7 +37,6 @@ static char home[1024];			/* Program working dir */
  * These two names for the URI and file system must be maintained in tandem.
  */
 static const char * const uri = "table:main";
-static const char * const fs_main = "main.wt";
 static bool compat;
 static bool inmem;
 
@@ -311,6 +310,11 @@ main(int argc, char *argv[])
 		    compat ? "true" : "false", inmem ? "true" : "false");
 		printf("Parent: Create %" PRIu32
 		    " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
+		printf("CONFIG: %s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n",
+		    progname,
+		    compat ? " -C" : "",
+		    inmem ? " -m" : "",
+		    working_dir, nth, timeout);
 		/*
 		 * Fork a child to insert as many items.  We will then randomly
 		 * kill the child, run recovery and make sure all items we wrote
@@ -331,13 +335,22 @@ main(int argc, char *argv[])
 		/*
 		 * Sleep for the configured amount of time before killing
 		 * the child.  Start the timeout from the time we notice that
-		 * the table has been created.  That allows the test to run
-		 * correctly on really slow machines.
+		 * the child workers have created their record files. That
+		 * allows the test to run correctly on really slow machines.
 		 */
-		testutil_check(__wt_snprintf(
-		    buf, sizeof(buf), "%s/%s", home, fs_main));
-		while (stat(buf, &sb) != 0)
-			sleep(1);
+		i = 0;
+		while (i < nth) {
+			/*
+			 * Wait for each record file to exist.
+			 */
+			testutil_check(__wt_snprintf(
+			    fname, sizeof(fname), RECORDS_FILE, i));
+			testutil_check(__wt_snprintf(
+			    buf, sizeof(buf),"%s/%s", home, fname));
+			while (stat(buf, &sb) != 0)
+				sleep(1);
+			++i;
+		}
 		sleep(timeout);
 		sa.sa_handler = SIG_DFL;
 		testutil_checksys(sigaction(SIGCHLD, &sa, NULL));

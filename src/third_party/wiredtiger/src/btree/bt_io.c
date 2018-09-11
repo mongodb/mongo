@@ -151,6 +151,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	if (0) {
 corrupt:	if (ret == 0)
 			ret = WT_ERROR;
+		F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
 		if (!F_ISSET(btree, WT_BTREE_VERIFY) &&
 		    !F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)) {
 			WT_TRET(bm->corrupt(bm, session, addr, addr_size));

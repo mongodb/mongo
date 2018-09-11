@@ -446,18 +446,18 @@ __wt_log_written_reset(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_log_get_all_files --
- *	Retrieve the list of log files, either all of them or only the active
- *	ones (those that are not candidates for archiving).  The caller is
- *	responsible for freeing the directory list returned.
+ * __wt_log_get_backup_files --
+ *	Retrieve the list of log files for taking a backup, either all of them
+ *	or only the active ones (those that are not candidates for archiving).
+ *	The caller is responsible for freeing the directory list returned.
  */
 int
-__wt_log_get_all_files(WT_SESSION_IMPL *session,
+__wt_log_get_backup_files(WT_SESSION_IMPL *session,
     char ***filesp, u_int *countp, uint32_t *maxid, bool active_only)
 {
 	WT_DECL_RET;
 	WT_LOG *log;
-	uint32_t id, max;
+	uint32_t id, max, max_file, min_file;
 	u_int count, i;
 	char **files;
 
@@ -469,16 +469,36 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	log = S2C(session)->log;
 
 	/*
-	 * These may be files needed by backup.  Force the current slot
-	 * to get written to the file.
+	 * Capture the next file utilized for writing to the log, before forcing
+	 * a new log file. This represents the latest journal file that needs to
+	 * be copied. Note the checkpoint selected for backup may be writing to
+	 * an even later log file. In that case, copying the journal files is
+	 * correct, but wasteful.
 	 */
+	max_file = log->alloc_lsn.l.file;
+
+	/*
+	 * Capture the journal file the current checkpoint started in. The
+	 * current checkpoint or a later one may be selected for backing up,
+	 * requiring log files as early as this file. Together with max_file,
+	 * this defines the range of journal files to include.
+	 */
+	min_file = log->ckpt_lsn.l.file;
+
+	/*
+	 * Force the current slot to get written to the file. Also switch to
+	 * using a new log file. That log file will be removed from the list of
+	 * files returned. New writes will not be included in the backup.
+	 */
+	if (active_only)
+		F_SET(log, WT_LOG_FORCE_NEWFILE);
 	WT_RET(__wt_log_force_write(session, 1, NULL));
 	WT_RET(__log_get_files(session, WT_LOG_FILENAME, &files, &count));
 
-	/* Filter out any files that are below the checkpoint LSN. */
 	for (max = 0, i = 0; i < count; ) {
 		WT_ERR(__wt_log_extract_lognum(session, files[i], &id));
-		if (active_only && id < log->ckpt_lsn.l.file) {
+		if (active_only &&
+		    (id < min_file || id > max_file)) {
 			/*
 			 * Any files not being returned are individually freed
 			 * and the array adjusted.
@@ -672,7 +692,7 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 	 */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ZERO_FILL))
 		return (__log_zero(session, fh,
-		    WT_LOG_END_HEADER, conn->log_file_max));
+		    log->first_record, conn->log_file_max));
 
 	/* If configured to not extend the file, we're done. */
 	if (conn->log_extend_len == 0)
@@ -948,7 +968,7 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp,
 	need_salvage = false;
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	salvage_mode = (need_salvagep != NULL &&
-	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_SALVAGE));
+	    F_ISSET(conn, WT_CONN_SALVAGE));
 
 	if (log == NULL)
 		allocsize = WT_LOG_ALIGN;
@@ -2155,6 +2175,7 @@ __log_salvage_message(WT_SESSION_IMPL *session, const char *log_name,
 	WT_RET(__wt_msg(session,
 	    "log file %s corrupted%s at position %" PRIuMAX
 	    ", truncated", log_name, extra_msg, (uintmax_t)offset));
+	F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
 	return (WT_ERROR);
 }
 
@@ -2407,8 +2428,7 @@ advance:
 		 * read fails, we know this is an situation we can salvage.
 		 */
 		WT_ASSERT(session, buf->memsize >= allocsize);
-		need_salvage = FLD_ISSET(conn->log_flags,
-		    WT_CONN_LOG_RECOVER_SALVAGE);
+		need_salvage = F_ISSET(conn, WT_CONN_SALVAGE);
 		WT_ERR(__wt_read(session,
 		    log_fh, rd_lsn.l.offset, (size_t)allocsize, buf->mem));
 		need_salvage = false;

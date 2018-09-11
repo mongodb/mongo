@@ -24,6 +24,7 @@
 
 #define	WT_METADATA_URI		"metadata:"		/* Metadata alias */
 #define	WT_METAFILE		"WiredTiger.wt"		/* Metadata table */
+#define	WT_METAFILE_SLVG	"WiredTiger.wt.orig"	/* Metadata copy */
 #define	WT_METAFILE_URI		"file:WiredTiger.wt"	/* Metadata table URI */
 
 #define	WT_LAS_URI		"file:WiredTigerLAS.wt"	/* Lookaside table URI*/

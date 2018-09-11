@@ -115,6 +115,10 @@ test_wt4117_checksum_SOURCES = wt4117_checksum/main.c
 noinst_PROGRAMS += test_wt4117_checksum
 all_TESTS += test_wt4117_checksum
 
+test_wt4156_metadata_salvage_SOURCES = wt4156_metadata_salvage/main.c
+noinst_PROGRAMS += test_wt4156_metadata_salvage
+all_TESTS += test_wt4156_metadata_salvage
+
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)
 LOG_COMPILER = $(TEST_WRAPPER)

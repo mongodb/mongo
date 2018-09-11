@@ -2361,7 +2361,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
-	bool config_base_set;
+	bool config_base_set, try_salvage;
 	const char *enc_cfg[] = { NULL, NULL }, *merge_cfg;
 	char version[64];
 
@@ -2374,6 +2374,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn = NULL;
 	session = NULL;
 	merge_cfg = NULL;
+	try_salvage = false;
 
 	WT_RET(__wt_library_init());
 
@@ -2585,10 +2586,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "session_scratch_max", &cval));
 	conn->session_scratch_max = (size_t)cval.val;
 
-	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
-	if (cval.val)
-		F_SET(conn, WT_CONN_CKPT_SYNC);
-
+	/*
+	 * If buffer alignment is not configured, use zero unless direct I/O is
+	 * also configured, in which case use the build-time default. The code
+	 * to parse write through is also here because it is nearly identical
+	 * to direct I/O.
+	 */
 	WT_ERR(__wt_config_gets(session, cfg, "direct_io", &cval));
 	for (ft = file_types; ft->name != NULL; ft++) {
 		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
@@ -2609,10 +2612,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 			WT_ERR_NOTFOUND_OK(ret);
 	}
 
-	/*
-	 * If buffer alignment is not configured, use zero unless direct I/O is
-	 * also configured, in which case use the build-time default.
-	 */
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)
 		conn->buffer_alignment =
@@ -2624,6 +2623,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR_MSG(session, EINVAL,
 		    "buffer_alignment requires posix_memalign");
 #endif
+
+	WT_ERR(__wt_config_gets(session, cfg, "cache_cursors", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_CACHE_CURSORS);
+
+	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_CKPT_SYNC);
 
 	WT_ERR(__wt_config_gets(session, cfg, "file_extend", &cval));
 	/*
@@ -2664,9 +2671,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val != 0;
 
-	WT_ERR(__wt_config_gets(session, cfg, "cache_cursors", &cval));
-	if (cval.val)
-		F_SET(conn, WT_CONN_CACHE_CURSORS);
+	WT_ERR(__wt_config_gets(session, cfg, "salvage", &cval));
+	if (cval.val) {
+		if (F_ISSET(conn, WT_CONN_READONLY))
+			WT_ERR_MSG(session, EINVAL,
+			    "Readonly configuration incompatible with "
+			    "salvage.");
+		F_SET(conn, WT_CONN_SALVAGE);
+	}
 
 	WT_ERR(__wt_conn_statistics_config(session, cfg));
 	WT_ERR(__wt_lsm_manager_config(session, cfg));
@@ -2734,6 +2746,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 	WT_ERR(__wt_turtle_init(session));
 
+	/*
+	 * If the user wants to salvage, do so before opening the
+	 * metadata cursor. We do this after the call to wt_turtle_init
+	 * because that moves metadata files around from backups and
+	 * would overwrite any salvage we did if done before that call.
+	 */
+	if (F_ISSET(conn, WT_CONN_SALVAGE))
+		WT_ERR(__wt_metadata_salvage(session));
+
 	WT_ERR(__wt_metadata_cursor(session, NULL));
 
 	/* Start the worker threads and run recovery. */
@@ -2765,7 +2786,24 @@ err:	/* Discard the scratch buffers. */
 		 */
 		if (ret == WT_RUN_RECOVERY)
 			F_SET(conn, WT_CONN_PANIC);
+		/*
+		 * If we detected a data corruption issue, we really want to
+		 * indicate the corruption instead of whatever error was set.
+		 * We cannot use standard return macros because we don't want
+		 * to generalize this. Record it here while we have the
+		 * connection and set it after we destroy the connection.
+		 */
+		if (F_ISSET(conn, WT_CONN_DATA_CORRUPTION) &&
+		    (ret == WT_PANIC || ret == WT_ERROR))
+			try_salvage = true;
 		WT_TRET(__wt_connection_close(conn));
+		/*
+		 * Depending on the error, shutting down the connection may
+		 * again return WT_PANIC. So if we detected the corruption
+		 * above, set it here after closing.
+		 */
+		if (try_salvage)
+			ret = WT_TRY_SALVAGE;
 	}
 
 	return (ret);

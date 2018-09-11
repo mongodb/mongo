@@ -607,6 +607,7 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_DECL_TIMESTAMP(prev_timestamp)
 	WT_ITEM las_timestamp, las_value;
 	WT_SAVE_UPD *list;
 	WT_SESSION_IMPL *session;
@@ -625,6 +626,8 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 	insert_cnt = 0;
 	btree_id = btree->id;
 	local_txn = false;
+
+	__wt_timestamp_set_zero(&prev_timestamp);
 
 	las_pageid = __wt_atomic_add64(&conn->cache->las_pageid, 1);
 
@@ -996,14 +999,14 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	uint32_t las_id, session_flags;
 	uint8_t prepare_state, upd_type;
 	int notused;
-	bool local_txn, locked;
+	bool local_txn, locked, removing_key_block;
 
 	cache = S2C(session)->cache;
 	cursor = NULL;
 	sweep_key = &cache->las_sweep_key;
 	remove_cnt = 0;
 	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
-	local_txn = locked = false;
+	local_txn = locked = removing_key_block = false;
 
 	WT_RET(__wt_scr_alloc(session, 0, &saved_key));
 	saved_pageid = 0;
@@ -1060,21 +1063,17 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		WT_ERR(cursor->get_key(cursor,
 		    &las_pageid, &las_id, &las_counter, &las_key));
 
-		/*
-		 * If we have switched to a different page, clear the saved key.
-		 * Otherwise, sweep could incorrectly remove records after
-		 * seeing a birthmark for a key in one block if the same key is
-		 * at the beginning of the next block.  See WT-3982 for details.
-		 */
-		if (las_pageid != saved_pageid) {
-			saved_key->size = 0;
-			saved_pageid = las_pageid;
-		}
+		__wt_verbose(session,
+		    WT_VERB_LOOKASIDE_ACTIVITY,
+		    "Sweep reviewing lookaside entry with lookaside "
+		    "page ID %" PRIu64 " btree ID %" PRIu32
+		    " saved key size: %" WT_SIZET_FMT,
+		    las_pageid, las_id, saved_key->size);
 
 		/*
-		 * Stop if the cache is stuck: we are ignoring the cache size
-		 * while scanning the lookaside table, so we're making things
-		 * worse.
+		 * Signal to stop if the cache is stuck: we are ignoring the
+		 * cache size while scanning the lookaside table, so we're
+		 * making things worse.
 		 */
 		if (__wt_cache_stuck(session))
 			cnt = 0;
@@ -1085,9 +1084,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * and there is a reader waiting and we're on a key boundary.
 		 */
 		++visit_cnt;
-		if ((cnt == 0 ||
-		    (visit_cnt > WT_LAS_SWEEP_ENTRIES && cache->las_reader)) &&
-		    saved_key->size == 0)
+		if (!removing_key_block && (cnt == 0 ||
+		    (visit_cnt > WT_LAS_SWEEP_ENTRIES && cache->las_reader)))
 			break;
 		if (cnt > 0)
 			--cnt;
@@ -1107,12 +1105,17 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			WT_ERR(cursor->remove(cursor));
 			++remove_cnt;
 			saved_key->size = 0;
+			/*
+			 * Allow sweep to break while removing entries from a
+			 * dead file.
+			 */
+			removing_key_block = false;
 			continue;
 		}
 
 		/*
-		 * Remove entries from the lookaside that have aged out and are
-		 * now no longer needed.
+		 * Remove all entries for a key once they have aged out and are
+		 * no longer needed.
 		 */
 		WT_ERR(cursor->get_value(cursor, &las_txnid,
 		    &las_timestamp, &prepare_state, &upd_type, &las_value));
@@ -1125,44 +1128,51 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 #endif
 
 		/*
-		 * If this entry isn't globally visible or if it is a part of a
-		 * prepared transaction, then we cannot remove it. Otherwise,
-		 * perform additional checks to see whether it has aged out of a
-		 * live file.
+		 * Check to see if the page or key has changed this iteration,
+		 * and if they have, setup context for safely removing obsolete
+		 * updates.
+		 *
+		 * It's important to check for page boundaries explicitly
+		 * because it is possible for the same key to be at the start
+		 * of the next block. See WT-3982 for details.
 		 */
-		if (!__wt_txn_visible_all(session, las_txnid, val_ts) ||
-		    prepare_state == WT_PREPARE_INPROGRESS) {
-			saved_key->size = 0;
-			continue;
-		}
-
-		/*
-		 * Save our key for comparing with older entries if we
-		 * don't have one or it is different.
-		 */
-		if (saved_key->size != las_key.size ||
+		if (las_pageid != saved_pageid ||
+		    saved_key->size != las_key.size ||
 		    memcmp(saved_key->data, las_key.data, las_key.size) != 0) {
-			/* If we have processed enough entries, give up. */
+			/* If we've examined enough entries, give up. */
 			if (cnt == 0)
 				break;
 
-			/* We can only start removing from a full value. */
-			if (upd_type == WT_UPDATE_MODIFY) {
-				saved_key->size = 0;
-				continue;
-			}
-
-			WT_ERR(__wt_buf_set(session, saved_key,
-			    las_key.data, las_key.size));
+			saved_pageid = las_pageid;
+			WT_ERR(__wt_buf_set(
+			    session, saved_key, las_key.data, las_key.size));
 
 			/*
-			 * If the first stable record contains data, we have to
-			 * keep it.
+			 * There are several conditions that need to be met
+			 * before we choose to remove a key block:
+			 *  * The entries were written with skew newest.
+			 *    Indicated by the first entry being a birthmark.
+			 *  * The first entry is globally visible.
+			 *  * The entry wasn't from a prepared transaction.
 			 */
-			if (upd_type != WT_UPDATE_BIRTHMARK)
-				continue;
+			if (upd_type == WT_UPDATE_BIRTHMARK &&
+			    __wt_txn_visible_all(session, las_txnid, val_ts) &&
+			    prepare_state != WT_PREPARE_INPROGRESS)
+				removing_key_block = true;
+			else
+				removing_key_block = false;
 		}
 
+		if (!removing_key_block)
+			continue;
+
+		__wt_verbose(session,
+		    WT_VERB_LOOKASIDE_ACTIVITY,
+		    "Sweep removing lookaside entry with "
+		    "page ID: %" PRIu64 " btree ID: %" PRIu32
+		    " saved key size: %" WT_SIZET_FMT ", record type: %" PRIu8
+		    " transaction ID: %" PRIu64,
+		    las_pageid, las_id, saved_key->size, upd_type, las_txnid);
 		WT_ERR(cursor->remove(cursor));
 		++remove_cnt;
 	}

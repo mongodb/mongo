@@ -228,10 +228,11 @@ struct __wt_cursor_btree {
 #define	WT_CBT_ITERATE_NEXT	0x004u	/* Next iteration configuration */
 #define	WT_CBT_ITERATE_PREV	0x008u	/* Prev iteration configuration */
 #define	WT_CBT_NO_TXN   	0x010u	/* Non-txn cursor (e.g. a checkpoint) */
-#define	WT_CBT_RETRY_NEXT	0x020u	/* Next, resulted in prepare conflict */
-#define	WT_CBT_RETRY_PREV	0x040u	/* Prev, resulted in prepare conflict */
-#define	WT_CBT_SEARCH_SMALLEST	0x080u	/* Row-store: small-key insert list */
-#define	WT_CBT_VAR_ONPAGE_MATCH	0x100u	/* Var-store: on-page recno match */
+#define	WT_CBT_READ_ONCE	0x020u	/* Page in with WT_READ_WONT_NEED */
+#define	WT_CBT_RETRY_NEXT	0x040u	/* Next, resulted in prepare conflict */
+#define	WT_CBT_RETRY_PREV	0x080u	/* Prev, resulted in prepare conflict */
+#define	WT_CBT_SEARCH_SMALLEST	0x100u	/* Row-store: small-key insert list */
+#define	WT_CBT_VAR_ONPAGE_MATCH	0x200u	/* Var-store: on-page recno match */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 #define	WT_CBT_POSITION_MASK		/* Flags associated with position */ \

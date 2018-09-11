@@ -186,19 +186,8 @@ __split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 
 	cell = WT_PAGE_REF_OFFSET(page, cell_offset);
 	__wt_cell_unpack(cell, &kpack);
-	if (kpack.ovfl && kpack.raw != WT_CELL_KEY_OVFL_RM) {
-		/*
-		 * Eviction cannot free overflow items once a checkpoint is
-		 * running in a tree: that can corrupt the checkpoint's block
-		 * management.  Assert that checkpoints aren't running to make
-		 * sure we're catching all paths and to avoid regressions.
-		 */
-		WT_ASSERT(session,
-		    S2BT(session)->checkpointing != WT_CKPT_RUNNING ||
-		    WT_SESSION_IS_CHECKPOINT(session));
-
+	if (kpack.ovfl && kpack.raw != WT_CELL_KEY_OVFL_RM)
 		WT_RET(__wt_ovfl_discard(session, cell));
-	}
 
 	return (0);
 }

@@ -439,11 +439,15 @@ __posix_file_read(WT_FILE_HANDLE *file_handle,
 	/* Break reads larger than 1GB into 1GB chunks. */
 	for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
 		chunk = WT_MIN(len, WT_GIGABYTE);
-		if ((nr = pread(pfh->fd, addr, chunk, offset)) <= 0)
-			WT_RET_MSG(session, nr == 0 ? WT_ERROR : __wt_errno(),
+		if ((nr = pread(pfh->fd, addr, chunk, offset)) <= 0) {
+			if (nr == 0)
+				F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+			WT_RET_MSG(session,
+			    nr == 0 ? WT_ERROR : __wt_errno(),
 			    "%s: handle-read: pread: failed to read %"
 			    WT_SIZET_FMT " bytes at offset %" PRIuMAX,
 			    file_handle->name, chunk, (uintmax_t)offset);
+		}
 	}
 	return (0);
 }

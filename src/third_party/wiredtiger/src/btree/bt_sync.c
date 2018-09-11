@@ -240,9 +240,13 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 * Set the checkpointing flag to block such actions and wait for
 		 * any problematic eviction or page splits to complete.
 		 */
-		btree->checkpointing = WT_CKPT_PREPARE;
+		WT_ASSERT(session, btree->syncing == WT_BTREE_SYNC_OFF &&
+		    btree->sync_session == NULL);
+
+		btree->sync_session = session;
+		btree->syncing = WT_BTREE_SYNC_WAIT;
 		(void)__wt_gen_next_drain(session, WT_GEN_EVICT);
-		btree->checkpointing = WT_CKPT_RUNNING;
+		btree->syncing = WT_BTREE_SYNC_RUNNING;
 
 		/* Write all dirty in-cache pages. */
 		LF_SET(WT_READ_NO_EVICT);
@@ -383,7 +387,8 @@ err:	/* On error, clear any left-over tree walk. */
 		__wt_txn_release_snapshot(session);
 
 	/* Clear the checkpoint flag. */
-	btree->checkpointing = WT_CKPT_OFF;
+	btree->syncing = WT_BTREE_SYNC_OFF;
+	btree->sync_session = NULL;
 
 	__wt_spin_unlock(session, &btree->flush_lock);
 

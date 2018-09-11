@@ -290,7 +290,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         #self.show_logs(newdir, 'before corruption')
         self.corrupt_log(newdir)
         #self.show_logs(newdir, 'after corruption')
-        salvage_config = self.base_config + ',log=(recover=salvage)'
+        salvage_config = self.base_config + ',salvage=true'
         errfile = 'list.err'
         outfile = 'list.out'
         expect_fail = self.expect_recovery_failure()

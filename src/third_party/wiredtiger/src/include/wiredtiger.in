@@ -1094,6 +1094,9 @@ struct __wt_session {
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u". See @ref cursor_raw for details., a
 	 * boolean flag; default \c false.}
+	 * @config{read_once, results that are brought into cache from disk by
+	 * this cursor will be given less priority in the cache., a boolean
+	 * flag; default \c false.}
 	 * @config{readonly, only query operations are supported by this cursor.
 	 * An error is returned if a modification is attempted using the cursor.
 	 * The default is false for all cursor types except for log and metadata
@@ -2484,14 +2487,15 @@ struct __wt_connection {
 	 * @config{get, specify which timestamp to query: \c all_committed
 	 * returns the largest timestamp such that all timestamps up to that
 	 * value have committed\, \c oldest returns the most recent \c
-	 * oldest_timestamp set with WT_CONNECTION::set_timestamp\, \c pinned
-	 * returns the minimum of the \c oldest_timestamp and the read
-	 * timestamps of all active readers\, and \c stable returns the most
-	 * recent \c stable_timestamp set with WT_CONNECTION::set_timestamp.
-	 * See @ref transaction_timestamps., a string\, chosen from the
-	 * following options: \c "all_committed"\, \c "last_checkpoint"\, \c
-	 * "oldest"\, \c "pinned"\, \c "recovery"\, \c "stable"; default \c
-	 * all_committed.}
+	 * oldest_timestamp set with WT_CONNECTION::set_timestamp\, \c
+	 * oldest_reader returns the minimum of the read timestamps of all
+	 * active readers \c pinned returns the minimum of the\c
+	 * oldest_timestamp and the read timestamps of all active readers\, and
+	 * \c stable returns the most recent \c stable_timestamp set with
+	 * WT_CONNECTION::set_timestamp.  See @ref transaction_timestamps., a
+	 * string\, chosen from the following options: \c "all_committed"\, \c
+	 * "last_checkpoint"\, \c "oldest"\, \c "oldest_reader"\, \c "pinned"\,
+	 * \c "recovery"\, \c "stable"; default \c all_committed.}
 	 * @configend
 	 * @errors
 	 * If there is no matching timestamp (e.g., if this method is called
@@ -2944,10 +2948,9 @@ struct __wt_connection {
  * flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery
  * or error if recovery needs to run after an unclean shutdown., a string\,
- * chosen from the following options: \c "error"\, \c "on"\, \c "salvage";
- * default \c on.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write
- * zeroes into log files., a boolean flag; default \c false.}
+ * chosen from the following options: \c "error"\, \c "on"; default \c on.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into log
+ * files., a boolean flag; default \c false.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
  * management.  The LSM manager is started automatically the first time an LSM
@@ -2979,6 +2982,12 @@ struct __wt_connection {
  * @config{readonly, open connection in read-only mode.  The database must
  * exist.  All methods that may modify a database are disabled.  See @ref
  * readonly for more information., a boolean flag; default \c false.}
+ * @config{salvage, open connection and salvage any WiredTiger-owned database
+ * and log files that it detects as corrupted.  This API should only be used
+ * after getting an error return of WT_TRY_SALVAGE. Salvage rebuilds files in
+ * place\, overwriting existing files.  We recommend making a backup copy of all
+ * files with the WiredTiger prefix prior to passing this flag., a boolean flag;
+ * default \c false.}
  * @config{session_max, maximum expected number of sessions (including server
  * threads)., an integer greater than or equal to 1; default \c 100.}
  * @config{shared_cache = (, shared cache configuration options.  A database
@@ -3704,6 +3713,13 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
  * state.
  */
 #define	WT_PREPARE_CONFLICT	(-31808)
+/*!
+ * Database corruption detected.
+ * This error is generated when corruption is detected in an on-disk file. The
+ * application may choose to salvage the file or retry wiredtiger_open with the
+ * 'salvage=true' configuration setting.
+ */
+#define	WT_TRY_SALVAGE	(-31809)
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.
@@ -5038,7 +5054,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_WRITE_APP_TIME		1034
 /*! cache: bytes belonging to page images in the cache */
 #define	WT_STAT_CONN_CACHE_BYTES_IMAGE			1035
-/*! cache: bytes belonging to the lookaside table in the cache */
+/*! cache: bytes belonging to the cache overflow table in the cache */
 #define	WT_STAT_CONN_CACHE_BYTES_LOOKASIDE		1036
 /*! cache: bytes currently in the cache */
 #define	WT_STAT_CONN_CACHE_BYTES_INUSE			1037
@@ -5048,117 +5064,117 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_BYTES_READ			1039
 /*! cache: bytes written from cache */
 #define	WT_STAT_CONN_CACHE_BYTES_WRITE			1040
+/*! cache: cache overflow score */
+#define	WT_STAT_CONN_CACHE_LOOKASIDE_SCORE		1041
+/*! cache: cache overflow table entries */
+#define	WT_STAT_CONN_CACHE_LOOKASIDE_ENTRIES		1042
+/*! cache: cache overflow table insert calls */
+#define	WT_STAT_CONN_CACHE_LOOKASIDE_INSERT		1043
+/*! cache: cache overflow table remove calls */
+#define	WT_STAT_CONN_CACHE_LOOKASIDE_REMOVE		1044
 /*! cache: checkpoint blocked page eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_CHECKPOINT		1041
+#define	WT_STAT_CONN_CACHE_EVICTION_CHECKPOINT		1045
 /*! cache: eviction calls to get a page */
-#define	WT_STAT_CONN_CACHE_EVICTION_GET_REF		1042
+#define	WT_STAT_CONN_CACHE_EVICTION_GET_REF		1046
 /*! cache: eviction calls to get a page found queue empty */
-#define	WT_STAT_CONN_CACHE_EVICTION_GET_REF_EMPTY	1043
+#define	WT_STAT_CONN_CACHE_EVICTION_GET_REF_EMPTY	1047
 /*! cache: eviction calls to get a page found queue empty after locking */
-#define	WT_STAT_CONN_CACHE_EVICTION_GET_REF_EMPTY2	1044
+#define	WT_STAT_CONN_CACHE_EVICTION_GET_REF_EMPTY2	1048
 /*! cache: eviction currently operating in aggressive mode */
-#define	WT_STAT_CONN_CACHE_EVICTION_AGGRESSIVE_SET	1045
+#define	WT_STAT_CONN_CACHE_EVICTION_AGGRESSIVE_SET	1049
 /*! cache: eviction empty score */
-#define	WT_STAT_CONN_CACHE_EVICTION_EMPTY_SCORE		1046
+#define	WT_STAT_CONN_CACHE_EVICTION_EMPTY_SCORE		1050
 /*! cache: eviction passes of a file */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALK_PASSES		1047
+#define	WT_STAT_CONN_CACHE_EVICTION_WALK_PASSES		1051
 /*! cache: eviction server candidate queue empty when topping up */
-#define	WT_STAT_CONN_CACHE_EVICTION_QUEUE_EMPTY		1048
+#define	WT_STAT_CONN_CACHE_EVICTION_QUEUE_EMPTY		1052
 /*! cache: eviction server candidate queue not empty when topping up */
-#define	WT_STAT_CONN_CACHE_EVICTION_QUEUE_NOT_EMPTY	1049
+#define	WT_STAT_CONN_CACHE_EVICTION_QUEUE_NOT_EMPTY	1053
 /*! cache: eviction server evicting pages */
-#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_EVICTING	1050
+#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_EVICTING	1054
 /*!
  * cache: eviction server slept, because we did not make progress with
  * eviction
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_SLEPT	1051
+#define	WT_STAT_CONN_CACHE_EVICTION_SERVER_SLEPT	1055
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		1052
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		1056
 /*! cache: eviction state */
-#define	WT_STAT_CONN_CACHE_EVICTION_STATE		1053
+#define	WT_STAT_CONN_CACHE_EVICTION_STATE		1057
 /*! cache: eviction walk target pages histogram - 0-9 */
-#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_LT10	1054
+#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_LT10	1058
 /*! cache: eviction walk target pages histogram - 10-31 */
-#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_LT32	1055
+#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_LT32	1059
 /*! cache: eviction walk target pages histogram - 128 and higher */
-#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_GE128	1056
+#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_GE128	1060
 /*! cache: eviction walk target pages histogram - 32-63 */
-#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_LT64	1057
+#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_LT64	1061
 /*! cache: eviction walk target pages histogram - 64-128 */
-#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_LT128	1058
+#define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_LT128	1062
 /*! cache: eviction walks abandoned */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_ABANDONED	1059
+#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_ABANDONED	1063
 /*! cache: eviction walks gave up because they restarted their walk twice */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_STOPPED	1060
+#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_STOPPED	1064
 /*!
  * cache: eviction walks gave up because they saw too many pages and
  * found no candidates
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_GAVE_UP_NO_TARGETS	1061
+#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_GAVE_UP_NO_TARGETS	1065
 /*!
  * cache: eviction walks gave up because they saw too many pages and
  * found too few candidates
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_GAVE_UP_RATIO	1062
+#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_GAVE_UP_RATIO	1066
 /*! cache: eviction walks reached end of tree */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_ENDED		1063
+#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_ENDED		1067
 /*! cache: eviction walks started from root of tree */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALK_FROM_ROOT	1064
+#define	WT_STAT_CONN_CACHE_EVICTION_WALK_FROM_ROOT	1068
 /*! cache: eviction walks started from saved location in tree */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALK_SAVED_POS	1065
+#define	WT_STAT_CONN_CACHE_EVICTION_WALK_SAVED_POS	1069
 /*! cache: eviction worker thread active */
-#define	WT_STAT_CONN_CACHE_EVICTION_ACTIVE_WORKERS	1066
+#define	WT_STAT_CONN_CACHE_EVICTION_ACTIVE_WORKERS	1070
 /*! cache: eviction worker thread created */
-#define	WT_STAT_CONN_CACHE_EVICTION_WORKER_CREATED	1067
+#define	WT_STAT_CONN_CACHE_EVICTION_WORKER_CREATED	1071
 /*! cache: eviction worker thread evicting pages */
-#define	WT_STAT_CONN_CACHE_EVICTION_WORKER_EVICTING	1068
+#define	WT_STAT_CONN_CACHE_EVICTION_WORKER_EVICTING	1072
 /*! cache: eviction worker thread removed */
-#define	WT_STAT_CONN_CACHE_EVICTION_WORKER_REMOVED	1069
+#define	WT_STAT_CONN_CACHE_EVICTION_WORKER_REMOVED	1073
 /*! cache: eviction worker thread stable number */
-#define	WT_STAT_CONN_CACHE_EVICTION_STABLE_STATE_WORKERS	1070
+#define	WT_STAT_CONN_CACHE_EVICTION_STABLE_STATE_WORKERS	1074
 /*!
  * cache: failed eviction of pages that exceeded the in-memory maximum
  * count
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_FORCE_FAIL		1071
+#define	WT_STAT_CONN_CACHE_EVICTION_FORCE_FAIL		1075
 /*!
  * cache: failed eviction of pages that exceeded the in-memory maximum
  * time (usecs)
  */
-#define	WT_STAT_CONN_CACHE_EVICTION_FORCE_FAIL_TIME	1072
+#define	WT_STAT_CONN_CACHE_EVICTION_FORCE_FAIL_TIME	1076
 /*! cache: files with active eviction walks */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_ACTIVE	1073
+#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_ACTIVE	1077
 /*! cache: files with new eviction walks started */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_STARTED	1074
+#define	WT_STAT_CONN_CACHE_EVICTION_WALKS_STARTED	1078
 /*! cache: force re-tuning of eviction workers once in a while */
-#define	WT_STAT_CONN_CACHE_EVICTION_FORCE_RETUNE	1075
+#define	WT_STAT_CONN_CACHE_EVICTION_FORCE_RETUNE	1079
 /*! cache: hazard pointer blocked page eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		1076
+#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		1080
 /*! cache: hazard pointer check calls */
-#define	WT_STAT_CONN_CACHE_HAZARD_CHECKS		1077
+#define	WT_STAT_CONN_CACHE_HAZARD_CHECKS		1081
 /*! cache: hazard pointer check entries walked */
-#define	WT_STAT_CONN_CACHE_HAZARD_WALKS			1078
+#define	WT_STAT_CONN_CACHE_HAZARD_WALKS			1082
 /*! cache: hazard pointer maximum array length */
-#define	WT_STAT_CONN_CACHE_HAZARD_MAX			1079
+#define	WT_STAT_CONN_CACHE_HAZARD_MAX			1083
 /*! cache: in-memory page passed criteria to be split */
-#define	WT_STAT_CONN_CACHE_INMEM_SPLITTABLE		1080
+#define	WT_STAT_CONN_CACHE_INMEM_SPLITTABLE		1084
 /*! cache: in-memory page splits */
-#define	WT_STAT_CONN_CACHE_INMEM_SPLIT			1081
+#define	WT_STAT_CONN_CACHE_INMEM_SPLIT			1085
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		1082
+#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		1086
 /*! cache: internal pages split during eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_SPLIT_INTERNAL	1083
+#define	WT_STAT_CONN_CACHE_EVICTION_SPLIT_INTERNAL	1087
 /*! cache: leaf pages split during eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_SPLIT_LEAF		1084
-/*! cache: lookaside score */
-#define	WT_STAT_CONN_CACHE_LOOKASIDE_SCORE		1085
-/*! cache: lookaside table entries */
-#define	WT_STAT_CONN_CACHE_LOOKASIDE_ENTRIES		1086
-/*! cache: lookaside table insert calls */
-#define	WT_STAT_CONN_CACHE_LOOKASIDE_INSERT		1087
-/*! cache: lookaside table remove calls */
-#define	WT_STAT_CONN_CACHE_LOOKASIDE_REMOVE		1088
+#define	WT_STAT_CONN_CACHE_EVICTION_SPLIT_LEAF		1088
 /*! cache: maximum bytes configured */
 #define	WT_STAT_CONN_CACHE_BYTES_MAX			1089
 /*! cache: maximum page size at eviction */
@@ -5173,7 +5189,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_READ_OVERFLOW		1094
 /*! cache: page split during eviction deepened the tree */
 #define	WT_STAT_CONN_CACHE_EVICTION_DEEPEN		1095
-/*! cache: page written requiring lookaside records */
+/*! cache: page written requiring cache overflow records */
 #define	WT_STAT_CONN_CACHE_WRITE_LOOKASIDE		1096
 /*! cache: pages currently held in the cache */
 #define	WT_STAT_CONN_CACHE_PAGES_INUSE			1097
@@ -5205,20 +5221,20 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_READ_DELETED			1107
 /*! cache: pages read into cache after truncate in prepare state */
 #define	WT_STAT_CONN_CACHE_READ_DELETED_PREPARED	1108
-/*! cache: pages read into cache requiring lookaside entries */
+/*! cache: pages read into cache requiring cache overflow entries */
 #define	WT_STAT_CONN_CACHE_READ_LOOKASIDE		1109
-/*! cache: pages read into cache requiring lookaside for checkpoint */
+/*! cache: pages read into cache requiring cache overflow for checkpoint */
 #define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_CHECKPOINT	1110
-/*! cache: pages read into cache skipping older lookaside entries */
+/*! cache: pages read into cache skipping older cache overflow entries */
 #define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_SKIPPED	1111
 /*!
- * cache: pages read into cache with skipped lookaside entries needed
- * later
+ * cache: pages read into cache with skipped cache overflow entries
+ * needed later
  */
 #define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_DELAY		1112
 /*!
- * cache: pages read into cache with skipped lookaside entries needed
- * later by checkpoint
+ * cache: pages read into cache with skipped cache overflow entries
+ * needed later by checkpoint
  */
 #define	WT_STAT_CONN_CACHE_READ_LOOKASIDE_DELAY_CHECKPOINT	1113
 /*! cache: pages requested from the cache */
@@ -5670,7 +5686,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE		1326
 /*! transaction: rollback to stable updates aborted */
 #define	WT_STAT_CONN_TXN_ROLLBACK_UPD_ABORTED		1327
-/*! transaction: rollback to stable updates removed from lookaside */
+/*! transaction: rollback to stable updates removed from cache overflow */
 #define	WT_STAT_CONN_TXN_ROLLBACK_LAS_REMOVED		1328
 /*! transaction: set timestamp calls */
 #define	WT_STAT_CONN_TXN_SET_TS				1329
@@ -5926,7 +5942,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		2065
 /*! cache: page split during eviction deepened the tree */
 #define	WT_STAT_DSRC_CACHE_EVICTION_DEEPEN		2066
-/*! cache: page written requiring lookaside records */
+/*! cache: page written requiring cache overflow records */
 #define	WT_STAT_DSRC_CACHE_WRITE_LOOKASIDE		2067
 /*! cache: pages read into cache */
 #define	WT_STAT_DSRC_CACHE_READ				2068
@@ -5934,7 +5950,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_READ_DELETED			2069
 /*! cache: pages read into cache after truncate in prepare state */
 #define	WT_STAT_DSRC_CACHE_READ_DELETED_PREPARED	2070
-/*! cache: pages read into cache requiring lookaside entries */
+/*! cache: pages read into cache requiring cache overflow entries */
 #define	WT_STAT_DSRC_CACHE_READ_LOOKASIDE		2071
 /*! cache: pages requested from the cache */
 #define	WT_STAT_DSRC_CACHE_PAGES_REQUESTED		2072

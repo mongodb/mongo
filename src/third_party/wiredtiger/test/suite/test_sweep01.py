@@ -43,7 +43,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     numfiles = 30
     numkv = 1000
     conn_config = 'file_manager=(close_handle_minimum=0,' + \
-                  'close_idle_time=6,close_scan_interval=2),' + \
+                  'close_idle_time=3,close_scan_interval=1),' + \
                   'statistics=(fast),operation_tracking=(enabled=false),'
 
     types = [
@@ -111,8 +111,8 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.checkpoint()
             k = k+1
             c[k] = 1
-            sleep += 2
-            time.sleep(2)
+            sleep += 0.5
+            time.sleep(0.5)
             # Give slow machines time to process files.
             stat_cursor = self.session.open_cursor('statistics:', None, None)
             this_nfile = stat_cursor[stat.conn.file_open][2]

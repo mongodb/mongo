@@ -381,3 +381,10 @@ union __wt_rand_state {
 		    session, buf, (buf)->size + __len + 1));		\
 	}								\
 } while (0)
+
+/*
+ * HAVE_LONG_RUNNING_PREPARE
+ * 	To enable functionality of evicting prepared transactions using
+ * cache overflow mechanism.
+ */
+#undef	HAVE_LONG_RUNNING_PREPARE

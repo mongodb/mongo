@@ -718,7 +718,7 @@ wiredtiger_open_log_configuration = [
         Config('recover', 'on', r'''
             run recovery or error if recovery needs to run after an
             unclean shutdown''',
-            choices=['error', 'on', 'salvage'])
+            choices=['error', 'on'])
     ]),
 ]
 
@@ -885,6 +885,14 @@ wiredtiger_open_common =\
         open connection in read-only mode.  The database must exist.  All
         methods that may modify a database are disabled.  See @ref readonly
         for more information''',
+        type='boolean'),
+    Config('salvage', 'false', r'''
+        open connection and salvage any WiredTiger-owned database and log
+        files that it detects as corrupted. This API should only be used
+        after getting an error return of WT_TRY_SALVAGE.
+        Salvage rebuilds files in place, overwriting existing files.
+        We recommend making a backup copy of all files with the
+        WiredTiger prefix prior to passing this flag.''',
         type='boolean'),
     Config('session_max', '100', r'''
         maximum expected number of sessions (including server
@@ -1132,6 +1140,10 @@ methods = {
     Config('raw', 'false', r'''
         ignore the encodings for the key and value, manage data as if
         the formats were \c "u".  See @ref cursor_raw for details''',
+        type='boolean'),
+    Config('read_once', 'false', r'''
+        results that are brought into cache from disk by this cursor will be
+        given less priority in the cache.''',
         type='boolean'),
     Config('readonly', 'false', r'''
         only query operations are supported by this cursor. An error is
@@ -1441,12 +1453,14 @@ methods = {
         specify which timestamp to query: \c all_committed returns the largest
         timestamp such that all timestamps up to that value have committed,
         \c oldest returns the most recent \c oldest_timestamp set with
-        WT_CONNECTION::set_timestamp, \c pinned returns the minimum of the
-        \c oldest_timestamp and the read timestamps of all active readers, and
-        \c stable returns the most recent \c stable_timestamp set with
-        WT_CONNECTION::set_timestamp.  See @ref transaction_timestamps''',
+        WT_CONNECTION::set_timestamp, \c oldest_reader returns the
+        minimum of the read timestamps of all active readers \c pinned returns
+        the minimum of the\c oldest_timestamp and the read timestamps of all
+        active readers, and \c stable returns the most recent
+        \c stable_timestamp set with WT_CONNECTION::set_timestamp. See
+        @ref transaction_timestamps''',
         choices=['all_committed','last_checkpoint',
-            'oldest','pinned','recovery','stable']),
+            'oldest','oldest_reader','pinned','recovery','stable']),
 ]),
 
 'WT_CONNECTION.set_timestamp' : Method([

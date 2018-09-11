@@ -40,33 +40,66 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
     def conn_config(self):
         return 'cache_size=50MB'
 
-    def prepare_updates(self, session, uri, value, ds, nrows):
-        # Update a large number of records with prepare transactions using
-        # multiple sessions. we'll hang if lookaside table isn't doing its
-        # thing.
+    def prepare_updates(self, uri, ds, nrows, nsessions, nkeys):
+        # Update a large number of records in their individual transactions.
+        # This will force eviction and start lookaside eviction of committed
+        # updates.
         #
-        # If we do all updates in a single session, then hang will be due to
-        # uncommitted updates, instead of prepared updates.
+        # Follow this by updating a number of records in prepared transactions
+        # under multiple sessions. We'll hang if lookaside table isn't doing its
+        # thing. If we do all updates in a single session, then hang will be due
+        # to uncommitted updates, instead of prepared updates.
         #
-        # If we increase nsessions below, then hang will occur.
-        nsessions = 1
+        # Do another set of updates in that many transactions. This forces the
+        # pages that have been evicted to lookaside to be re-read and brought in
+        # memory. Hence testing if we can read prepared updates from lookaside.
+
+        # Start with setting a stable timestamp to pin history in cache
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
+
+        # Commit some updates to get eviction and lookaside fired up
+        bigvalue1 = "bbbbb" * 100
+        cursor = self.session.open_cursor(uri)
+        for i in range(1, nsessions * nkeys):
+            self.session.begin_transaction()
+            cursor.set_key(ds.key(nrows + i))
+            cursor.set_value(bigvalue1)
+            self.assertEquals(cursor.update(), 0)
+            self.session.commit_transaction('commit_timestamp=' + timestamp_str(i))
+
+        # Have prepared updates in multiple sessions. This should ensure writing
+        # prepared updates to the lookaside
         sessions = [0] * nsessions
         cursors = [0] * nsessions
+        bigvalue2 = "ccccc" * 100
         for j in range (0, nsessions):
             sessions[j] = self.conn.open_session()
             sessions[j].begin_transaction("isolation=snapshot")
             cursors[j] = sessions[j].open_cursor(uri)
             # Each session will update many consecutive keys.
-            nkeys = 4000
             start = (j * nkeys)
             end = start + nkeys
             for i in range(start, end):
                 cursors[j].set_key(ds.key(nrows + i))
-                cursors[j].set_value(value)
+                cursors[j].set_value(bigvalue2)
                 self.assertEquals(cursors[j].update(), 0)
             sessions[j].prepare_transaction('prepare_timestamp=' + timestamp_str(2))
 
-        # Close all cursors and sessions.
+        # Commit more regular updates. To do this, the pages that were just
+        # evicted need to be read back. This ensures reading prepared updates
+        # from the lookaside
+        bigvalue3 = "ddddd" * 100
+        cursor = self.session.open_cursor(uri)
+        for i in range(1, nsessions * nkeys):
+            self.session.begin_transaction()
+            cursor.set_key(ds.key(nrows + i))
+            cursor.set_value(bigvalue3)
+            self.assertEquals(cursor.update(), 0)
+            self.session.commit_transaction('commit_timestamp=' + timestamp_str(i + 3))
+        cursor.close()
+
+        # Close all cursors and sessions, this will cause prepared updates to be
+        # rollback-ed
         for j in range (1, nsessions):
             cursors[j].close()
             sessions[j].close()
@@ -91,10 +124,14 @@ class test_prepare_lookaside01(wttest.WiredTigerTestCase):
         cursor.close()
         self.session.checkpoint()
 
-        # Check to see lookaside working with prepare transactions.
-        bigvalue1 = "bbbbb" * 100
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
-        self.prepare_updates(self.session, uri, bigvalue1, ds, nrows)
+        # Check if lookaside is working properly with prepare transactions.
+        # We put prepared updates in multiple sessions so that we do not hang
+        # because of cache being full with uncommitted updates.
+        # TODO: Increase the nsessions below to start testing lookaside eviction
+        # of prepared updates.
+        nsessions = 1
+        nkeys = 4000
+        self.prepare_updates(uri, ds, nrows, nsessions, nkeys)
 
 if __name__ == '__main__':
     wttest.run()

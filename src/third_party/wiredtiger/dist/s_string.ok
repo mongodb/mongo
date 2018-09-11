@@ -445,6 +445,7 @@ Zlib's
 Zstandard
 Zstd
 Zstd's
+aaa
 abcdef
 abcdefghijklmnopqrstuvwxyz
 addl
@@ -480,6 +481,7 @@ backoff
 bal
 basecfg
 basho
+bbb
 bcr
 bdb
 beginthreadex
@@ -527,6 +529,7 @@ calloc
 cas
 catfmt
 cb
+ccc
 ccr
 cd
 centric
@@ -624,6 +627,7 @@ datastore
 dbc
 dbs
 dcalloc
+ddd
 decile
 deciles
 decl
@@ -679,6 +683,7 @@ dsync
 dumpcmp
 dumpfile
 dup
+eee
 eg
 egrep
 emp
@@ -720,6 +725,7 @@ fdatasync
 fdopen
 fextend
 ffc
+fff
 fflush
 ffs
 fgetc
@@ -748,9 +754,11 @@ fopen
 formatmessage
 fp
 fprintf
+fread
 free'd
 fs
 fscanf
+fseek
 fstat
 fstream
 fsync
@@ -760,6 +768,7 @@ ftruncate
 func
 funcid
 fvisibility
+fwrite
 gcc
 gdb
 ge
@@ -774,6 +783,7 @@ getraw
 gettime
 gettimeofday
 getv
+ggg
 github
 gitignore
 gobare
@@ -787,6 +797,7 @@ handlep
 hashval
 havesize
 hdr
+hhh
 highjack
 hilq
 hotbackup
@@ -861,6 +872,7 @@ iszero
 iter
 iteratively
 iters
+jjj
 jnr
 jrx
 json
@@ -1364,3 +1376,4 @@ zstd
 zstd's
 zu
 zyxwvutsrqponmlkjihgfedcba
+zzz
