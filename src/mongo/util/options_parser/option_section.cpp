@@ -380,6 +380,9 @@ Status OptionSection::getBoostOptions(po::options_description* boostOptions,
                                         includeDefaults ? oditerator->_default : Value(),
                                         oditerator->_implicit,
                                         !(sources & SourceCommandLine));
+                    if (!retDep.isOK()) {
+                        return retDep;
+                    }
                     boostOptions->add_options()(depreatedSingleName.c_str(),
                                                 boostTypeDep.release(),
                                                 oditerator->_description.c_str());

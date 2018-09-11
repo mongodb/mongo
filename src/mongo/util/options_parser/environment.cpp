@@ -211,6 +211,9 @@ bool Environment::count(const Key& key) const {
 Value Environment::operator[](const Key& key) const {
     Value value;
     Status ret = get(key, &value);
+    if (!ret.isOK()) {
+        return Value();
+    }
     return value;
 }
 
