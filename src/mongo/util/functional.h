@@ -48,15 +48,16 @@ class unique_function;
 template <typename RetType, typename... Args>
 class unique_function<RetType(Args...)> {
 private:
-    // `nilbase` is used as a base for the `nil` type, to prevent it from being an aggregate.
-    struct nilbase {
+    // `TagTypeBase` is used as a base for the `TagType` type, to prevent it from being an
+    // aggregate.
+    struct TagTypeBase {
     protected:
-        nilbase() = default;
+        TagTypeBase() = default;
     };
-    // `nil` is used as a placeholder type in parameter lists for `enable_if` clauses.  They have to
-    // be real parameters, not template parameters, due to MSVC limitations.
-    class nil : nilbase {
-        nil() = default;
+    // `TagType` is used as a placeholder type in parameter lists for `enable_if` clauses.  They
+    // have to be real parameters, not template parameters, due to MSVC limitations.
+    class TagType : TagTypeBase {
+        TagType() = default;
         friend unique_function;
     };
 
@@ -93,9 +94,10 @@ public:
         // requirements are met.  They must be concrete parameters not template parameters to work
         // around bugs in some compilers that we presently use.  We may be able to revisit this
         // design after toolchain upgrades for C++17.
-        std::enable_if_t<stdx::is_invocable_r<RetType, Functor, Args...>::value, nil> = makeNil(),
-        std::enable_if_t<std::is_move_constructible<Functor>::value, nil> = makeNil(),
-        std::enable_if_t<!std::is_same<Functor, unique_function>::value, nil> = makeNil())
+        std::enable_if_t<stdx::is_invocable_r<RetType, Functor, Args...>::value, TagType> =
+            makeTag(),
+        std::enable_if_t<std::is_move_constructible<Functor>::value, TagType> = makeTag(),
+        std::enable_if_t<!std::is_same<Functor, unique_function>::value, TagType> = makeTag())
         : impl(makeImpl(std::forward<Functor>(functor))) {}
 
     unique_function(std::nullptr_t) noexcept {}
@@ -122,9 +124,9 @@ public:
     operator std::function<Signature>() const = delete;
 
 private:
-    // The `nil` type cannot be constructed as a default function-parameter in Clang.  So we use a
-    // static member function that initializes that default parameter.
-    static nil makeNil() {
+    // The `TagType` type cannot be constructed as a default function-parameter in Clang.  So we use
+    // a static member function that initializes that default parameter.
+    static TagType makeTag() {
         return {};
     }
 
