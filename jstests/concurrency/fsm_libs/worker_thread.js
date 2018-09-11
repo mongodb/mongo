@@ -31,6 +31,11 @@ var workerThread = (function() {
 
         globalAssertLevel = args.globalAssertLevel;
 
+        // The global 'TestData' object may still be undefined if the concurrency suite isn't being
+        // run by resmoke.py (e.g. if it is being run via a parallel shell in the backup/restore
+        // tests).
+        TestData = (TestData !== undefined) ? TestData : {};
+
         try {
             if (typeof db !== 'undefined') {
                 // The implicit database connection created within the thread's scope
@@ -132,8 +137,8 @@ var workerThread = (function() {
                         logRetryAttempts: true,
                         overrideRetryAttempts: 3
                     };
+                    Object.assign(TestData, newOptions);
 
-                    TestData = Object.merge(TestData, newOptions);
                     load('jstests/libs/override_methods/auto_retry_on_network_error.js');
                 }
 
@@ -142,7 +147,7 @@ var workerThread = (function() {
                 // that database while we're waiting for a majority of nodes in the replica set to
                 // confirm it has been dropped. We load the
                 // implicitly_retry_on_database_drop_pending.js file to make it so that the clients
-                // started by these concurrency framework automatically retry their operation in the
+                // started by the concurrency framework automatically retry their operation in the
                 // face of this particular error response.
                 load('jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js');
             }
