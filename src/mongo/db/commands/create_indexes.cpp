@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -204,6 +205,32 @@ StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
     return indexSpecsWithDefaults;
 }
 
+/**
+ * Returns a vector of index specs with the filled in collection default options and removes any
+ * indexes that already exist on the collection. If the returned vector is empty after returning, no
+ * new indexes need to be built. Throws on error.
+ */
+std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* opCtx,
+                                                             const Collection* collection,
+                                                             std::vector<BSONObj> validatedSpecs) {
+    auto swDefaults =
+        resolveCollectionDefaultProperties(opCtx, collection, std::move(validatedSpecs));
+    uassertStatusOK(swDefaults.getStatus());
+
+    auto specs = std::move(swDefaults.getValue());
+    for (size_t i = 0; i < specs.size(); i++) {
+        Status status =
+            collection->getIndexCatalog()->prepareSpecForCreate(opCtx, specs.at(i)).getStatus();
+        if (status.code() == ErrorCodes::IndexAlreadyExists) {
+            specs.erase(specs.begin() + i);
+            i--;
+            continue;
+        }
+        uassertStatusOK(status);
+    }
+    return specs;
+}
+
 }  // namespace
 
 /**
@@ -255,15 +282,41 @@ public:
         }
         auto specs = std::move(specsWithStatus.getValue());
 
-        // now we know we have to create index(es)
-        // Note: createIndexes command does not currently respect shard versioning.
-        Lock::DBLock dbLock(opCtx, ns.db(), MODE_X);
+        // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
+        Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
         if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::NotMaster,
                        str::stream() << "Not primary while creating indexes in " << ns.ns()));
         }
+
+        const auto indexesAlreadyExist = [&result](int numIndexes) {
+            result.append("numIndexesBefore", numIndexes);
+            result.append("numIndexesAfter", numIndexes);
+            result.append("note", "all indexes already exist");
+            return true;
+        };
+
+        // Before potentially taking an exclusive database lock, check if all indexes already exist
+        // while holding an intent lock. Only continue if new indexes need to be built and the
+        // database should be re-locked in exclusive mode.
+        {
+            AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+            if (auto collection = autoColl.getCollection()) {
+                auto specsCopy = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, specs);
+                if (specsCopy.size() == 0) {
+                    return indexesAlreadyExist(
+                        collection->getIndexCatalog()->numIndexesTotal(opCtx));
+                }
+            }
+        }
+
+        // Relocking temporarily releases the Database lock while holding a Global IX lock. This
+        // prevents the replication state from changing, but requires abandoning the current
+        // snapshot in case indexes change during the period of time where no database lock is held.
+        opCtx->recoveryUnit()->abandonSnapshot();
+        dbLock.relockWithMode(MODE_X);
 
         Database* db = dbHolder().get(opCtx, ns.db());
         if (!db) {
@@ -288,28 +341,19 @@ public:
             result.appendBool("createdCollectionAutomatically", true);
         }
 
-        auto indexSpecsWithDefaults =
-            resolveCollectionDefaultProperties(opCtx, collection, std::move(specs));
-        if (!indexSpecsWithDefaults.isOK()) {
-            return appendCommandStatus(result, indexSpecsWithDefaults.getStatus());
-        }
-        specs = std::move(indexSpecsWithDefaults.getValue());
-
-        const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(opCtx);
-        result.append("numIndexesBefore", numIndexesBefore);
-
         MultiIndexBlock indexer(opCtx, collection);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
 
         const size_t origSpecsSize = specs.size();
-        indexer.removeExistingIndexes(&specs);
+        specs = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, std::move(specs));
 
+        const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(opCtx);
         if (specs.size() == 0) {
-            result.append("numIndexesAfter", numIndexesBefore);
-            result.append("note", "all indexes already exist");
-            return true;
+            return indexesAlreadyExist(numIndexesBefore);
         }
+
+        result.append("numIndexesBefore", numIndexesBefore);
 
         if (specs.size() != origSpecsSize) {
             result.append("note", "index already exists");
@@ -336,13 +380,6 @@ public:
         if (indexer.getBuildInBackground()) {
             opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_IX);
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
-                return appendCommandStatus(
-                    result,
-                    Status(ErrorCodes::NotMaster,
-                           str::stream() << "Not primary while creating background indexes in "
-                                         << ns.ns()));
-            }
         }
 
         try {
@@ -358,16 +395,6 @@ public:
                     // that day, to avoid data corruption due to lack of index cleanup.
                     opCtx->recoveryUnit()->abandonSnapshot();
                     dbLock.relockWithMode(MODE_X);
-                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
-                        return appendCommandStatus(
-                            result,
-                            Status(ErrorCodes::NotMaster,
-                                   str::stream()
-                                       << "Not primary while creating background indexes in "
-                                       << ns.ns()
-                                       << ": cleaning up index build failure due to "
-                                       << e.toString()));
-                    }
                 } catch (...) {
                     std::terminate();
                 }
@@ -378,9 +405,6 @@ public:
         if (indexer.getBuildInBackground()) {
             opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_X);
-            uassert(ErrorCodes::NotMaster,
-                    str::stream() << "Not primary while completing index build in " << dbname,
-                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns));
 
             Database* db = dbHolder().get(opCtx, ns.db());
             uassert(28551, "database dropped during index build", db);
