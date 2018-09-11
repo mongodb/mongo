@@ -45,12 +45,30 @@ NUM_CPUS=$(python -c 'import multiprocessing; print(multiprocessing.cpu_count())
 #
 # We don't generate JSON config files for tests that are tagged with "capped" or "where" because
 # they aren't supported by embedded.
-find testcases -type f -print0 | xargs -0 -I% -n1 -P$NUM_CPUS  \
-    python2 benchrun.py --testfiles %                          \
-                        --threads 1                            \
-                        --excludeFilter capped                 \
-                        --excludeFilter where                  \
-                        --generateMongoeBenchConfigFiles mongoebench/
+#
+# We generate JSON config files for tests that are tagged with "aggregation_identityview" or
+# "query_identityview" while using --readCmd=true because the find command is necessary to read from
+# a view. We use --readCmd=false for all other tests to match what etc/perf.yml does.
+find testcases -type f -print0 | xargs -0 -I% -n1 -P$NUM_CPUS          \
+    python2 benchrun.py --testfiles %                                  \
+                        --threads 1                                    \
+                        --excludeFilter capped                         \
+                        --excludeFilter where                          \
+                        --generateMongoeBenchConfigFiles mongoebench/  \
+                        --readCmd false                                \
+                        --writeCmd true                                \
+                        --excludeFilter aggregation_identityview       \
+                        --excludeFilter query_identityview
+
+find testcases -type f -print0 | xargs -0 -I% -n1 -P$NUM_CPUS          \
+    python2 benchrun.py --testfiles %                                  \
+                        --threads 1                                    \
+                        --excludeFilter capped                         \
+                        --excludeFilter where                          \
+                        --generateMongoeBenchConfigFiles mongoebench/  \
+                        --readCmd true                                 \
+                        --writeCmd true                                \
+                        --includeFilter aggregation_identityview query_identityview
 
 popd
 
