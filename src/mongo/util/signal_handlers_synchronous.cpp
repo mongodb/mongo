@@ -262,7 +262,10 @@ void myPureCallHandler() {
 
 #else
 
-void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void*) {
+void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void* ucontext_erased) {
+    // For convenient debugger access.
+    MONGO_COMPILER_VARIABLE_UNUSED auto ucontext = static_cast<const ucontext_t*>(ucontext_erased);
+
     MallocFreeOStreamGuard lk{};
 
     const char* action = (signalNum == SIGSEGV || signalNum == SIGBUS) ? "access" : "operation";
