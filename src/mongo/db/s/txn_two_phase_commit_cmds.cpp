@@ -32,6 +32,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/transaction_coordinator_service.h"
@@ -258,6 +259,25 @@ public:
                 opCtx->getLogicalSessionId().get(),
                 opCtx->getTxnNumber().get(),
                 participantList);
+
+            // Execute the 'prepare' logic on the local participant (the router does not send a
+            // separate 'prepare' message to the coordinator shard.
+            {
+                OperationContextSessionMongod checkOutSession(
+                    opCtx, true, false, boost::none, false);
+
+                auto txnParticipant = TransactionParticipant::get(opCtx);
+
+                txnParticipant->unstashTransactionResources(opCtx, "prepareTransaction");
+                ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
+                    txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
+                });
+
+                txnParticipant->prepareTransaction(opCtx);
+
+                txnParticipant->stashTransactionResources(opCtx);
+                guard.Dismiss();
+            }
         }
 
     private:

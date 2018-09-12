@@ -149,20 +149,7 @@
                                              }))
                                              .prepareTimestamp;
 
-    // Simulate that the coordinator executes the 'prepare' logic on its local participant (remove
-    // this under SERVER-36677).
-    const coordinatorPrepareTimestamp = assert
-                                            .commandWorked(coordinator.adminCommand({
-                                                prepareTransaction: 1,
-                                                coordinatorId: coordinator.shardName,
-                                                lsid: lsid,
-                                                txnNumber: NumberLong(txnNumber),
-                                                stmtId: NumberInt(0),
-                                                autocommit: false
-                                            }))
-                                            .prepareTimestamp;
-
-    // Simulate that all participants vote to commit.
+    // Simulate that all participants vote to commit (remove this under SERVER-36304).
     assert.commandWorked(coordinator.adminCommand({
         voteCommitTransaction: 1,
         shardId: participant1.shardName,
