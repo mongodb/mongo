@@ -15,8 +15,8 @@ const PrepareHelpers = (function() {
     function prepareTransaction(session) {
         assert(session);
 
-        const res = assert.commandWorked(
-            session.getDatabase('admin').adminCommand({prepareTransaction: 1}));
+        const res = assert.commandWorked(session.getDatabase('admin').adminCommand(
+            {prepareTransaction: 1, coordinatorId: "dummy"}));
         assert(res.prepareTimestamp,
                "prepareTransaction did not return a 'prepareTimestamp': " + tojson(res));
         const prepareTimestamp = res.prepareTimestamp;

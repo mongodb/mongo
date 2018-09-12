@@ -41,75 +41,89 @@
 namespace mongo {
 namespace {
 
-class CmdPrepareTxn : public BasicCommand {
+class PrepareTransactionCmd : public TypedCommand<PrepareTransactionCmd> {
 public:
-    CmdPrepareTxn() : BasicCommand("prepareTransaction") {}
+    class PrepareTimestamp {
+    public:
+        PrepareTimestamp(Timestamp timestamp) : _timestamp(std::move(timestamp)) {}
+        void serialize(BSONObjBuilder* bob) const {
+            bob->append("prepareTimestamp", _timestamp);
+        }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
-    }
+    private:
+        Timestamp _timestamp;
+    };
+
+    using Request = PrepareTransaction;
+    using Response = PrepareTimestamp;
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        Response typedRun(OperationContext* opCtx) {
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            uassert(ErrorCodes::CommandFailed,
+                    "prepareTransaction must be run within a transaction",
+                    txnParticipant);
+
+            uassert(ErrorCodes::CommandNotSupported,
+                    "'prepareTransaction' is only supported in feature compatibility version 4.2",
+                    (serverGlobalParams.featureCompatibility.getVersion() ==
+                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
+
+            uassert(ErrorCodes::NoSuchTransaction,
+                    "Transaction isn't in progress",
+                    txnParticipant->inMultiDocumentTransaction());
+
+            if (txnParticipant->transactionIsPrepared()) {
+                auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+                auto prepareOpTime = txnParticipant->getPrepareOpTime();
+                // Set the client optime to be prepareOpTime if it's not already later than
+                // prepareOpTime. his ensures that we wait for writeConcern and that prepareOpTime
+                // will be committed.
+                if (prepareOpTime > replClient.getLastOp()) {
+                    replClient.setLastOp(prepareOpTime);
+                }
+
+                invariant(opCtx->recoveryUnit()->getPrepareTimestamp() ==
+                              prepareOpTime.getTimestamp(),
+                          str::stream() << "recovery unit prepareTimestamp: "
+                                        << opCtx->recoveryUnit()->getPrepareTimestamp().toString()
+                                        << " participant prepareOpTime: "
+                                        << prepareOpTime.toString());
+
+                return PrepareTimestamp(prepareOpTime.getTimestamp());
+            }
+
+            // TODO (SERVER-36839): Pass coordinatorId into prepareTransaction() so that the
+            // coordinatorId can be included in the write to config.transactions.
+            return PrepareTimestamp(txnParticipant->prepareTransaction(opCtx, {}));
+        }
+
+    private:
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName(), "");
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {}
+    };
 
     virtual bool adminOnly() const {
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
     std::string help() const override {
-        return "Prepares a transaction. This is only expected to be called by mongos.";
+        return "Prepares a transaction on this shard; sent by a router or re-sent by the "
+               "transaction commit coordinator for a cross-shard transaction";
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        uassert(ErrorCodes::CommandFailed,
-                "prepareTransaction must be run within a transaction",
-                txnParticipant);
-
-        uassert(ErrorCodes::CommandNotSupported,
-                "'prepareTransaction' is only supported in feature compatibility version 4.2",
-                (serverGlobalParams.featureCompatibility.getVersion() ==
-                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42));
-
-        uassert(ErrorCodes::NoSuchTransaction,
-                "Transaction isn't in progress",
-                txnParticipant->inMultiDocumentTransaction());
-
-        if (txnParticipant->transactionIsPrepared()) {
-            auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-            auto prepareOpTime = txnParticipant->getPrepareOpTime();
-            // Set the client optime to be prepareOpTime if it's not already later than
-            // prepareOpTime.
-            // This ensures that we wait for writeConcern and that prepareOpTime will be committed.
-            if (prepareOpTime > replClient.getLastOp()) {
-                replClient.setLastOp(prepareOpTime);
-            }
-
-            invariant(opCtx->recoveryUnit()->getPrepareTimestamp() == prepareOpTime.getTimestamp(),
-                      str::stream() << "recovery unit prepareTimestamp: "
-                                    << opCtx->recoveryUnit()->getPrepareTimestamp().toString()
-                                    << " participant prepareOpTime: "
-                                    << prepareOpTime.toString());
-
-            result.append("prepareTimestamp", prepareOpTime.getTimestamp());
-            return true;
-        }
-
-        // Add prepareTimestamp to the command response.
-        auto timestamp = txnParticipant->prepareTransaction(opCtx, {});
-        result.append("prepareTimestamp", timestamp);
-
-        return true;
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
     }
 } prepareTransactionCmd;
 
@@ -262,25 +276,28 @@ public:
 
             // Execute the 'prepare' logic on the local participant (the router does not send a
             // separate 'prepare' message to the coordinator shard.
-            {
-                OperationContextSessionMongod checkOutSession(
-                    opCtx, true, false, boost::none, false);
-
-                auto txnParticipant = TransactionParticipant::get(opCtx);
-
-                txnParticipant->unstashTransactionResources(opCtx, "prepareTransaction");
-                ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
-                    txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
-                });
-
-                txnParticipant->prepareTransaction(opCtx, {});
-
-                txnParticipant->stashTransactionResources(opCtx);
-                guard.Dismiss();
-            }
+            _callPrepareOnLocalParticipant(opCtx);
         }
 
     private:
+        Timestamp _callPrepareOnLocalParticipant(OperationContext* opCtx) {
+            OperationContextSessionMongod checkOutSession(opCtx, true, false, boost::none, false);
+
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+
+            txnParticipant->unstashTransactionResources(opCtx, "prepareTransaction");
+            ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
+                txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
+            });
+
+            auto localParticipantPrepareTimestamp = txnParticipant->prepareTransaction(opCtx, {});
+
+            txnParticipant->stashTransactionResources(opCtx);
+            guard.Dismiss();
+
+            return localParticipantPrepareTimestamp;
+        }
+
         bool supportsWriteConcern() const override {
             return true;
         }

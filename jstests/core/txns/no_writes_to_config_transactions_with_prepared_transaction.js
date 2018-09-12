@@ -45,8 +45,9 @@
     }));
     assert.commandWorked(sessionDB.adminCommand({
         prepareTransaction: 1,
+        coordinatorId: "dummy",
         txnNumber: NumberLong(0),
-        stmtid: NumberInt(1),
+        stmtId: NumberInt(1),
         autocommit: false
     }));
 

@@ -236,6 +236,7 @@
         // prepareTransaction can only be run on the admin database.
         assert.commandWorked(sessionDb.adminCommand({
             prepareTransaction: 1,
+            coordinatorId: "dummy",
             txnNumber: NumberLong(txnNumber),
             stmtId: NumberInt(1),
             autocommit: false
@@ -248,6 +249,7 @@
         }));
         assert.commandFailedWithCode(sessionDb.runCommand({
             prepareTransaction: 1,
+            coordinatorId: "dummy",
             txnNumber: NumberLong(txnNumber++),
             stmtId: NumberInt(0),
             autocommit: false

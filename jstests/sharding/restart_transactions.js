@@ -108,8 +108,12 @@
             autocommit: false,
             startTransaction: true
         }));
-        assert.commandWorked(directDB.adminCommand(
-            {prepareTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
+        assert.commandWorked(directDB.adminCommand({
+            prepareTransaction: 1,
+            coordinatorId: "dummy",
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false
+        }));
 
         assert.commandFailedWithCode(directDB.runCommand({
             find: collName,
