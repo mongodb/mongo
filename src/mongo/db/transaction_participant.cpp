@@ -50,9 +50,6 @@
 
 namespace mongo {
 
-using Action = TransactionParticipant::StateMachine::Action;
-using Event = TransactionParticipant::StateMachine::Event;
-using State = TransactionParticipant::StateMachine::State;
 // Server parameter that dictates the max number of milliseconds that any transaction lock request
 // will wait for lock acquisition. If an operation provides a greater timeout in a lock request,
 // maxTransactionLockRequestTimeoutMillis will override it. If this is set to a negative value, it
@@ -1181,72 +1178,6 @@ void TransactionParticipant::_updateState(WithLock wl, const Session::RefreshSta
     }
 
     _lastStateRefreshCount = newState.refreshCount;
-}
-
-//
-// StateMachine
-//
-
-/**
- * This table shows the events that are legal to occur (given an asynchronous network) while in each
- * state.
- *
- * For each legal event, it shows the associated action (if any) the participant should take, and
- * the next state the participant should transition to.
- *
- * Empty ("{}") transitions mean "legal event, but no action to take and no new state to transition
- * to.
- * Missing transitions are illegal.
- */
-const std::map<State, std::map<Event, TransactionParticipant::StateMachine::Transition>>
-    TransactionParticipant::StateMachine::transitionTable = {
-        // clang-format off
-        {State::kUnprepared, {
-            {Event::kRecvPrepare,           {Action::kPrepare, State::kWaitingForDecision}},
-            {Event::kRecvCommit,            {Action::kCommit, State::kCommitted}},
-            {Event::kRecvAbort,             {Action::kAbort, State::kAborted}},
-        }},
-        {State::kAborted, {
-            {Event::kRecvAbort,             {}},
-        }},
-        {State::kCommitted, {
-            {Event::kRecvCommit,            {}},
-        }},
-        {State::kWaitingForDecision, {
-            {Event::kRecvPrepare,           {}},
-            {Event::kVoteCommitRejected,    {Action::kAbort, State::kAbortedAfterPrepare}},
-            {Event::kRecvCommit,            {Action::kCommit, State::kCommittedAfterPrepare}},
-            {Event::kRecvAbort,             {Action::kAbort, State::kAbortedAfterPrepare}},
-        }},
-        {State::kAbortedAfterPrepare, {
-            {Event::kRecvPrepare,           {}},
-            {Event::kVoteCommitRejected,    {}},
-            {Event::kRecvAbort,             {}},
-        }},
-        {State::kCommittedAfterPrepare, {
-            {Event::kRecvPrepare,           {}},
-            {Event::kRecvCommit,            {}},
-        }},
-        {State::kBroken, {}},
-        // clang-format on
-};
-
-Action TransactionParticipant::StateMachine::onEvent(Event event) {
-    const auto legalTransitions = transitionTable.find(_state)->second;
-    if (!legalTransitions.count(event)) {
-        _state = State::kBroken;
-        uasserted(ErrorCodes::InternalError,
-                  str::stream() << "Transaction participant received illegal event '" << event
-                                << "' while in state '"
-                                << _state
-                                << "'");
-    }
-
-    const auto transition = legalTransitions.find(event)->second;
-    if (transition.nextState) {
-        _state = *transition.nextState;
-    }
-    return transition.action;
 }
 
 std::string TransactionParticipant::_transactionInfoForLog(

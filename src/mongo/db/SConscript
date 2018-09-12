@@ -672,7 +672,6 @@ env.CppUnitTest(
         'transaction_coordinator_participant_list_test.cpp',
         'transaction_coordinator_state_machine_test.cpp',
         'transaction_coordinator_test.cpp',
-        'transaction_participant_state_machine_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
