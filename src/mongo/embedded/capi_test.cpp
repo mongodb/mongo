@@ -101,7 +101,7 @@ protected:
         }
 
         mongo_embedded_v1_init_params params;
-        params.log_flags = 0;
+        params.log_flags = MONGO_EMBEDDED_V1_LOG_STDOUT;
         params.log_callback = nullptr;
         params.log_user_data = nullptr;
 
