@@ -178,6 +178,16 @@ TEST_F(MetadataManagerTest, MetadataAfterClearIsUnknown) {
     ASSERT_EQ(0UL, _manager->numberOfRangesToCleanStillInUse());
 }
 
+TEST_F(MetadataManagerTest, GetActiveMetadataForUnshardedCollection) {
+    _manager->setFilteringMetadata(CollectionMetadata());
+
+    ASSERT(_manager->getActiveMetadata(_manager, boost::none));
+    ASSERT(!(*_manager->getActiveMetadata(_manager, boost::none))->isSharded());
+
+    ASSERT(_manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10))));
+    ASSERT(!(*_manager->getActiveMetadata(_manager, LogicalTime(Timestamp(10))))->isSharded());
+}
+
 TEST_F(MetadataManagerTest, CleanUpForMigrateIn) {
     _manager->setFilteringMetadata(makeEmptyMetadata());
 

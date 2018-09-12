@@ -239,13 +239,17 @@ boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
         return boost::none;
     }
 
-    auto metadataTracker = _metadata.back();
-    if (!atClusterTime) {
-        return ScopedCollectionMetadata(
-            std::make_shared<RangePreserver>(lg, std::move(self), std::move(metadataTracker)));
+    auto activeMetadataTracker = _metadata.back();
+    const auto& activeMetadata = activeMetadataTracker->metadata;
+
+    // We don't keep routing history for unsharded collections, so if the collection is unsharded
+    // just return the active metadata
+    if (!atClusterTime || !activeMetadata.isSharded()) {
+        return ScopedCollectionMetadata(std::make_shared<RangePreserver>(
+            lg, std::move(self), std::move(activeMetadataTracker)));
     }
 
-    auto chunkManager = metadataTracker->metadata.getChunkManager();
+    auto chunkManager = activeMetadata.getChunkManager();
     auto chunkManagerAtClusterTime = std::make_shared<ChunkManager>(
         chunkManager->getRoutingHistory(), atClusterTime->asTimestamp());
 
@@ -262,7 +266,7 @@ boost::optional<ScopedCollectionMetadata> MetadataManager::getActiveMetadata(
     };
 
     return ScopedCollectionMetadata(std::make_shared<MetadataAtTimestamp>(
-        CollectionMetadata(chunkManagerAtClusterTime, metadataTracker->metadata.shardId())));
+        CollectionMetadata(chunkManagerAtClusterTime, activeMetadata.shardId())));
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {
