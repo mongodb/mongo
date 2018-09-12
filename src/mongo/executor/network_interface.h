@@ -160,6 +160,9 @@ public:
                          },
                          baton);
 
+        if (!status.isOK()) {
+            return status;
+        }
         return std::move(pf.future);
     }
 
