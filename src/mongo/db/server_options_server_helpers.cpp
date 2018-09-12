@@ -116,17 +116,22 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
         .setSources(moe::SourceCommandLine)
         .hidden();
 
-    options
-        ->addOptionChaining(
-            "net.bindIp",
-            "bind_ip",
-            moe::String,
-            "comma separated list of ip addresses to listen on - localhost by default")
-        .incompatibleWith("bind_ip_all");
+    options->addOptionChaining(
+        "net.bindIp",
+        "bind_ip",
+        moe::String,
+        "comma separated list of ip addresses to listen on - localhost by default");
 
     options
         ->addOptionChaining("net.bindIpAll", "bind_ip_all", moe::Switch, "bind to all ip addresses")
-        .incompatibleWith("bind_ip");
+        .canonicalize([](moe::Environment* env) {
+            bool all = (*env)["net.bindIpAll"].as<bool>();
+            auto status = env->remove("net.bindIpAll");
+            if (!status.isOK()) {
+                return status;
+            }
+            return all ? env->set("net.bindIp", moe::Value("*")) : Status::OK();
+        });
 
     options->addOptionChaining(
         "net.ipv6", "ipv6", moe::Switch, "enable IPv6 support (disabled by default)");
@@ -641,18 +646,19 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.objcheck = params["net.wireObjectCheck"].as<bool>();
     }
 
-    if (params.count("net.bindIpAll") && params["net.bindIpAll"].as<bool>()) {
-        // Bind to all IP addresses
-        serverGlobalParams.bind_ips.emplace_back("0.0.0.0");
-        if (params.count("net.ipv6") && params["net.ipv6"].as<bool>()) {
-            serverGlobalParams.bind_ips.emplace_back("::");
-        }
-    } else if (params.count("net.bindIp")) {
+    if (params.count("net.bindIp")) {
         std::string bind_ip = params["net.bindIp"].as<std::string>();
-        boost::split(serverGlobalParams.bind_ips,
-                     bind_ip,
-                     [](char c) { return c == ','; },
-                     boost::token_compress_on);
+        if (bind_ip == "*") {
+            serverGlobalParams.bind_ips.emplace_back("0.0.0.0");
+            if (params.count("net.ipv6") && params["net.ipv6"].as<bool>()) {
+                serverGlobalParams.bind_ips.emplace_back("::");
+            }
+        } else {
+            boost::split(serverGlobalParams.bind_ips,
+                         bind_ip,
+                         [](char c) { return c == ','; },
+                         boost::token_compress_on);
+        }
     }
 
     for (auto& ip : serverGlobalParams.bind_ips) {
