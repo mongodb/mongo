@@ -27,7 +27,8 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-
+#define LOG_FOR_TRANSACTION(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kTransaction)
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/session.h"
@@ -435,6 +436,9 @@ void Session::_beginOrContinueTxn(WithLock wl, TxnNumber txnNumber) {
 
     invariant(txnNumber > _activeTxnNumber);
     _setActiveTxn(wl, txnNumber);
+
+    LOG_FOR_TRANSACTION(4) << "New transaction started with txnNumber: " << txnNumber
+                           << " on session with lsid " << getSessionId().getId();
 }
 
 void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {

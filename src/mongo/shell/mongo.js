@@ -441,7 +441,15 @@ Mongo.prototype.startSession = function startSession(options = {}) {
     if (!options.hasOwnProperty("retryWrites") && this.hasOwnProperty("_retryWrites")) {
         options.retryWrites = this._retryWrites;
     }
-    return new DriverSession(this, options);
+    const newDriverSession = new DriverSession(this, options);
+
+    // Only log this message if we are running a test
+    if (typeof TestData === "object" && TestData.testName) {
+        jsTest.log("New session started with sessionID: " +
+                   tojson(newDriverSession.getSessionId()));
+    }
+
+    return newDriverSession;
 };
 
 Mongo.prototype._getDefaultSession = function getDefaultSession() {
