@@ -200,7 +200,7 @@ public:
     };
 
 private:
-    stdx::mutex _mtx;
+    stdx::mutex _mutex;
     ParticipantList _participantList;
     StateMachine _stateMachine;
 };

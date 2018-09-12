@@ -42,13 +42,13 @@ using Event = TransactionCoordinator::StateMachine::Event;
 using State = TransactionCoordinator::StateMachine::State;
 
 Action TransactionCoordinator::recvCoordinateCommit(const std::set<ShardId>& participants) {
-    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _participantList.recordFullList(participants);
     return _stateMachine.onEvent(Event::kRecvParticipantList);
 }
 
 Action TransactionCoordinator::recvVoteCommit(const ShardId& shardId, int prepareTimestamp) {
-    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _participantList.recordVoteCommit(shardId, prepareTimestamp);
 
     auto event = (_participantList.allParticipantsVotedCommit()) ? Event::kRecvFinalVoteCommit
@@ -57,13 +57,13 @@ Action TransactionCoordinator::recvVoteCommit(const ShardId& shardId, int prepar
 }
 
 Action TransactionCoordinator::recvVoteAbort(const ShardId& shardId) {
-    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _participantList.recordVoteAbort(shardId);
     return _stateMachine.onEvent(Event::kRecvVoteAbort);
 }
 
 void TransactionCoordinator::recvCommitAck(const ShardId& shardId) {
-    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _participantList.recordCommitAck(shardId);
     if (_participantList.allParticipantsAckedCommit()) {
         _stateMachine.onEvent(Event::kRecvFinalCommitAck);
@@ -71,7 +71,7 @@ void TransactionCoordinator::recvCommitAck(const ShardId& shardId) {
 }
 
 void TransactionCoordinator::recvAbortAck(const ShardId& shardId) {
-    stdx::lock_guard<decltype(_mtx)> lk(_mtx);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _participantList.recordAbortAck(shardId);
     if (_participantList.allParticipantsAckedAbort()) {
         _stateMachine.onEvent(Event::kRecvFinalAbortAck);
