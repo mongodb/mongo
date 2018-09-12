@@ -50,6 +50,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/http_client.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
 #include "mongo/util/winutil.h"
 

@@ -35,10 +35,7 @@
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -81,21 +78,9 @@ public:
     virtual DataBuilder post(StringData url, ConstDataRange data) const = 0;
 
     /**
-     * Futurized helper for HttpClient::post().
-     */
-    Future<DataBuilder> postAsync(executor::ThreadPoolTaskExecutor* executor,
-                                  StringData url,
-                                  std::shared_ptr<std::vector<std::uint8_t>> data) const;
-
-    /**
      * Perform a GET request from the specified URL.
      */
     virtual DataBuilder get(StringData url) const = 0;
-
-    /**
-     * Futurized helpr for HttpClient::get().
-     */
-    Future<DataBuilder> getAsync(executor::ThreadPoolTaskExecutor* executor, StringData url) const;
 
     /**
      * Factory method provided by client implementation.

@@ -59,6 +59,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -124,28 +125,25 @@ public:
         auto data = std::make_shared<std::vector<std::uint8_t>>(
             reqObj.objdata(), reqObj.objdata() + reqObj.objsize());
 
-        return _client
-            ->postAsync(
-                _executor.get(), exportedExportedFreeMonEndpointURL.getLocked() + "/register", data)
-            .then([](DataBuilder&& blob) {
+        return post("/register", data).then([](DataBuilder&& blob) {
 
-                if (!blob.size()) {
-                    uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
-                }
+            if (!blob.size()) {
+                uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
+            }
 
-                auto blobSize = blob.size();
-                auto blobData = blob.release();
-                ConstDataRange cdr(blobData.get(), blobSize);
-                auto swDoc = cdr.read<Validated<BSONObj>>();
-                uassertStatusOK(swDoc.getStatus());
+            auto blobSize = blob.size();
+            auto blobData = blob.release();
+            ConstDataRange cdr(blobData.get(), blobSize);
+            auto swDoc = cdr.read<Validated<BSONObj>>();
+            uassertStatusOK(swDoc.getStatus());
 
-                BSONObj respObj(swDoc.getValue());
+            BSONObj respObj(swDoc.getValue());
 
-                auto resp =
-                    FreeMonRegistrationResponse::parse(IDLParserErrorContext("response"), respObj);
+            auto resp =
+                FreeMonRegistrationResponse::parse(IDLParserErrorContext("response"), respObj);
 
-                return resp;
-            });
+            return resp;
+        });
     }
 
     Future<FreeMonMetricsResponse> sendMetricsAsync(const FreeMonMetricsRequest& req) override {
@@ -153,29 +151,50 @@ public:
         auto data = std::make_shared<std::vector<std::uint8_t>>(
             reqObj.objdata(), reqObj.objdata() + reqObj.objsize());
 
-        return _client
-            ->postAsync(
-                _executor.get(), exportedExportedFreeMonEndpointURL.getLocked() + "/metrics", data)
-            .then([](DataBuilder&& blob) {
+        return post("/metrics", data).then([](DataBuilder&& blob) {
 
-                if (!blob.size()) {
-                    uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
-                }
+            if (!blob.size()) {
+                uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
+            }
 
-                auto blobSize = blob.size();
-                auto blobData = blob.release();
-                ConstDataRange cdr(blobData.get(), blobSize);
+            auto blobSize = blob.size();
+            auto blobData = blob.release();
+            ConstDataRange cdr(blobData.get(), blobSize);
 
-                auto swDoc = cdr.read<Validated<BSONObj>>();
-                uassertStatusOK(swDoc.getStatus());
+            auto swDoc = cdr.read<Validated<BSONObj>>();
+            uassertStatusOK(swDoc.getStatus());
 
-                BSONObj respObj(swDoc.getValue());
+            BSONObj respObj(swDoc.getValue());
 
-                auto resp =
-                    FreeMonMetricsResponse::parse(IDLParserErrorContext("response"), respObj);
+            auto resp = FreeMonMetricsResponse::parse(IDLParserErrorContext("response"), respObj);
 
-                return resp;
-            });
+            return resp;
+        });
+    }
+
+private:
+    Future<DataBuilder> post(StringData path,
+                             std::shared_ptr<std::vector<std::uint8_t>> data) const {
+        auto pf = makePromiseFuture<DataBuilder>();
+        std::string url(exportedExportedFreeMonEndpointURL.getLocked() + path.toString());
+
+        auto status = _executor->scheduleWork([
+            shared_promise = pf.promise.share(),
+            url = std::move(url),
+            data = std::move(data),
+            this
+        ](const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
+            ConstDataRange cdr(reinterpret_cast<char*>(data->data()), data->size());
+            try {
+                auto result = this->_client->post(url, cdr);
+                shared_promise.emplaceValue(std::move(result));
+            } catch (...) {
+                shared_promise.setError(exceptionToStatus());
+            }
+        });
+
+        uassertStatusOK(status);
+        return std::move(pf.future);
     }
 
 private:

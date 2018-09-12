@@ -44,6 +44,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
