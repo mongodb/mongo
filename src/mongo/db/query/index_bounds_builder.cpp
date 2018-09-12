@@ -57,7 +57,7 @@ namespace mongo {
 
 namespace {
 
-namespace app = ::mongo::wildcard_planning;
+namespace wcp = ::mongo::wildcard_planning;
 
 // Helper for checking that an OIL "appears" to be ascending given one interval.
 void assertOILIsAscendingLocally(const vector<Interval>& intervals, size_t idx) {
@@ -345,7 +345,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
     // adjusted regardless of the predicate. Having filled out the initial bounds, we apply any
     // necessary changes to the tightness here.
     if (index.type == IndexType::INDEX_WILDCARD) {
-        *tightnessOut = app::translateWildcardIndexBoundsAndTightness(index, *tightnessOut, oilOut);
+        *tightnessOut = wcp::translateWildcardIndexBoundsAndTightness(index, *tightnessOut, oilOut);
     }
 }
 

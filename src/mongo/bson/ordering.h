@@ -45,6 +45,8 @@ class Ordering {
     Ordering(unsigned b) : bits(b) {}
 
 public:
+    static constexpr size_t kMaxCompoundIndexKeys = size_t{32};
+
     Ordering(const Ordering& r) : bits(r.bits) {}
     void operator=(const Ordering& r) {
         bits = r.bits;
@@ -78,7 +80,7 @@ public:
             BSONElement e = k.next();
             if (e.eoo())
                 break;
-            uassert(13103, "too many compound keys", n <= 31);
+            uassert(13103, "too many compound keys", n < kMaxCompoundIndexKeys);
             if (e.number() < 0)
                 b |= (1 << n);
             n++;

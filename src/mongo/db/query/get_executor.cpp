@@ -66,6 +66,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -117,6 +118,7 @@ void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
 }
 
 namespace {
+namespace wcp = ::mongo::wildcard_planning;
 // The body is below in the "count hack" section but getExecutor calls it.
 bool turnIxscanIntoCount(QuerySolution* soln);
 }  // namespace
@@ -1335,6 +1337,22 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
         indexScanNode = static_cast<IndexScanNode*>(fetchNode->children[0]);
     }
 
+    if (indexScanNode->index.type == IndexType::INDEX_WILDCARD) {
+        // If the query is on a field other than the distinct key, we may have generated a $** plan
+        // which does not actually contain the distinct key field.
+        if (field != std::next(indexScanNode->index.keyPattern.begin())->fieldName()) {
+            return false;
+        }
+        // If the query includes object bounds, we cannot turn this IXSCAN into a DISTINCT_SCAN.
+        // Wildcard indexes contain multiple keys per object, one for each subpath in ascending
+        // (Path, Value, RecordId) order. If the distinct fields in two successive documents are
+        // objects with the same leaf path values but in different field order, e.g. {a: 1, b: 2}
+        // and {b: 2, a: 1}, we would therefore only return the first document and skip the other.
+        if (wcp::isWildcardObjectSubpathScan(indexScanNode)) {
+            return false;
+        }
+    }
+
     // An additional filter must be applied to the data in the key, so we can't just skip
     // all the keys with a given value; we must examine every one to find the one that (may)
     // pass the filter.
@@ -1440,16 +1458,24 @@ namespace {
 QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                                                    Collection* collection,
                                                    size_t plannerOptions,
-                                                   const std::string& distinctKey) {
+                                                   const ParsedDistinct& parsedDistinct) {
     QueryPlannerParams plannerParams;
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN | plannerOptions;
 
     IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
+    auto query = parsedDistinct.getQuery()->getQueryRequest().getFilter();
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
         IndexCatalogEntry* ice = ii.catalogEntry(desc);
-        if (desc->keyPattern().hasField(distinctKey)) {
+        if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
             plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
+        } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
+            // Check whether the $** projection captures the field over which we are distinct-ing.
+            const auto proj = WildcardKeyGenerator::createProjectionExec(desc->keyPattern(),
+                                                                         desc->pathProjection());
+            if (proj->applyProjectionToOneField(parsedDistinct.getKey())) {
+                plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
+            }
         }
     }
 
@@ -1485,9 +1511,8 @@ Status getExecutorForSimpleDistinct(OperationContext* opCtx,
     invariant(queryOrExecutor->cq);
     invariant(!queryOrExecutor->executor);
 
-    // If there's no query, we can just distinct-scan one of the indices.
-    // Not every index in plannerParams.indices may be suitable. Refer to
-    // getDistinctNodeIndex().
+    // If there's no query, we can just distinct-scan one of the indices. Not every index in
+    // plannerParams.indices may be suitable. Refer to getDistinctNodeIndex().
     size_t distinctNodeIndex = 0;
     if (!parsedDistinct->getQuery()->getQueryRequest().getFilter().isEmpty() ||
         !parsedDistinct->getQuery()->getQueryRequest().getSort().isEmpty() ||
@@ -1632,8 +1657,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     // We go through normal planning (with limited parameters) to see if we can produce
     // a soln with the above properties.
 
-    auto plannerParams = fillOutPlannerParamsForDistinct(
-        opCtx, collection, plannerOptions, parsedDistinct->getKey());
+    auto plannerParams =
+        fillOutPlannerParamsForDistinct(opCtx, collection, plannerOptions, *parsedDistinct);
 
     const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
 
@@ -1657,8 +1682,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     auto qr = stdx::make_unique<QueryRequest>(parsedDistinct->getQuery()->getQueryRequest());
 
     // Applying a projection allows the planner to try to give us covered plans that we can turn
-    // into the projection hack.  getDistinctProjection deals with .find() projection semantics
-    // (ie _id:1 being implied by default).
+    // into the projection hack. The getDistinctProjection() function deals with .find() projection
+    // semantics (ie _id:1 being implied by default).
     if (qr->getProj().isEmpty()) {
         BSONObj projection = getDistinctProjection(parsedDistinct->getKey());
         qr->setProj(projection);

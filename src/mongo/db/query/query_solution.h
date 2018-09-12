@@ -884,11 +884,13 @@ struct DistinctNode : public QuerySolutionNode {
     BSONObjSet sorts;
 
     IndexEntry index;
-    int direction;
     IndexBounds bounds;
+
     const CollatorInterface* queryCollator;
+
     // We are distinct-ing over the 'fieldNo'-th field of 'index.keyPattern'.
-    int fieldNo;
+    int fieldNo{0};
+    int direction{1};
 };
 
 /**

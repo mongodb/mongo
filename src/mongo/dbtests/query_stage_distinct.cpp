@@ -130,9 +130,8 @@ public:
         coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, BSON("a" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
-        DistinctParams params;
-        params.descriptor = indexes[0];
-        params.direction = 1;
+        DistinctParams params{&_opCtx, *indexes[0]};
+        params.scanDirection = 1;
         // Distinct-ing over the 0-th field of the keypattern.
         params.fieldNo = 0;
         // We'll look at all values in the bounds.
@@ -142,7 +141,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(&_opCtx, params, &ws);
+        DistinctScan distinct(&_opCtx, std::move(params), &ws);
 
         WorkingSetID wsid;
         // Get our first result.
@@ -197,12 +196,11 @@ public:
         coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, BSON("a" << 1), false, &indexes);
         verify(indexes.size() == 1);
 
-        DistinctParams params;
-        params.descriptor = indexes[0];
-        ASSERT_TRUE(params.descriptor->isMultikey(&_opCtx));
+        DistinctParams params{&_opCtx, *indexes[0]};
+        ASSERT_TRUE(params.isMultiKey);
 
-        verify(params.descriptor);
-        params.direction = 1;
+        verify(params.accessMethod);
+        params.scanDirection = 1;
         // Distinct-ing over the 0-th field of the keypattern.
         params.fieldNo = 0;
         // We'll look at all values in the bounds.
@@ -212,7 +210,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(&_opCtx, params, &ws);
+        DistinctScan distinct(&_opCtx, std::move(params), &ws);
 
         // We should see each number in the range [1, 6] exactly once.
         std::set<int> seen;
@@ -266,11 +264,9 @@ public:
             &_opCtx, BSON("a" << 1 << "b" << 1), false, &indices);
         ASSERT_EQ(1U, indices.size());
 
-        DistinctParams params;
-        params.descriptor = indices[0];
-        ASSERT_TRUE(params.descriptor);
+        DistinctParams params{&_opCtx, *indices[0]};
 
-        params.direction = 1;
+        params.scanDirection = 1;
         params.fieldNo = 1;
         params.bounds.isSimpleRange = false;
 
@@ -283,7 +279,7 @@ public:
         params.bounds.fields.push_back(bOil);
 
         WorkingSet ws;
-        DistinctScan distinct(&_opCtx, params, &ws);
+        DistinctScan distinct(&_opCtx, std::move(params), &ws);
 
         WorkingSetID wsid;
         PlanStage::StageState state;

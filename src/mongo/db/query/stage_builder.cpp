@@ -311,15 +311,22 @@ PlanStage* buildStages(OperationContext* opCtx,
                 return nullptr;
             }
 
-            DistinctParams params;
-
-            params.descriptor = collection->getIndexCatalog()->findIndexByName(
+            auto descriptor = collection->getIndexCatalog()->findIndexByName(
                 opCtx, dn->index.identifier.catalogName);
-            invariant(params.descriptor);
-            params.direction = dn->direction;
+            invariant(descriptor);
+
+            // We use the node's internal name, keyPattern and multikey details here. For $**
+            // indexes, these may differ from the information recorded in the index's descriptor.
+            DistinctParams params{*descriptor,
+                                  dn->index.identifier.catalogName,
+                                  dn->index.keyPattern,
+                                  dn->index.multikeyPaths,
+                                  dn->index.multikey};
+
+            params.scanDirection = dn->direction;
             params.bounds = dn->bounds;
             params.fieldNo = dn->fieldNo;
-            return new DistinctScan(opCtx, params, ws);
+            return new DistinctScan(opCtx, std::move(params), ws);
         }
         case STAGE_COUNT_SCAN: {
             const CountScanNode* csn = static_cast<const CountScanNode*>(root);

@@ -28,9 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/unittest/death_test.h"
 
 namespace mongo {
+
+namespace wcp = ::mongo::wildcard_planning;
 
 const std::string kIndexName = "indexName";
 
@@ -75,6 +79,24 @@ protected:
                                             nullptr});  // collator
     }
 };
+
+//
+// General planning tests.
+//
+
+DEATH_TEST_F(QueryPlannerWildcardTest, CannotExpandPreExpandedWildcardIndexEntry, "Invariant") {
+    addIndex(BSON("$**" << 1));
+    ASSERT_EQ(params.indices.size(), 2U);
+
+    // Expand the $** index and add the expanded entry to the list of available indices.
+    std::vector<IndexEntry> expandedIndex;
+    wcp::expandWildcardIndexEntry(params.indices.back(), {"a"}, &expandedIndex);
+    ASSERT_EQ(expandedIndex.size(), 1U);
+    params.indices.push_back(expandedIndex.front());
+
+    // Now run a query. This will invariant when the planner expands the expanded index.
+    runQuery(fromjson("{a: 1}"));
+}
 
 //
 // Null comparison and existence tests.
@@ -619,6 +641,10 @@ TEST_F(QueryPlannerWildcardTest, InBasic) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true],[2,2,true,true]]}}}}}");
 }
 
+//
+// Array tests.
+//
+
 TEST_F(QueryPlannerWildcardTest, EqualsEmptyArray) {
     addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: []}"));
@@ -650,6 +676,10 @@ TEST_F(QueryPlannerWildcardTest, EqualsArrayWithValue) {
 
     assertHasOnlyCollscan();
 }
+
+//
+// $in tests.
+//
 
 TEST_F(QueryPlannerWildcardTest, InEmptyArray) {
     addWildcardIndex(BSON("$**" << 1));
@@ -695,6 +725,10 @@ TEST_F(QueryPlannerWildcardTest, InBasicOrEquivalent) {
         "node: {ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
         "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true],[2,2,true,true]]}}}}}");
 }
+
+//
+// Partial index tests.
+//
 
 TEST_F(QueryPlannerWildcardTest, PartialIndexCanAnswerPredicateOnFilteredField) {
     auto filterObj = fromjson("{a: {$gt: 0}}");
@@ -877,6 +911,10 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexDoesNotSupplyCandidatePlanForTextS
         "{fetch: {filter: {b: 10}, node: {text: {prefix: {a: 10}, search: 'banana'}}}}");
 }
 
+//
+// Negation tests.
+//
+
 TEST_F(QueryPlannerWildcardTest, WildcardDoesNotSupportNegationPredicate) {
     // Wildcard indexes can't support negation queries because they are sparse, and {a: {$ne: 5}}
     // will match documents which don't have an "a" field.
@@ -1005,6 +1043,10 @@ TEST_F(QueryPlannerTest, MultipleWildcardIndexesHintWithPartialFilter) {
     assertNumSolutions(0U);
 }
 
+//
+// Object comparison tests.
+//
+
 TEST_F(QueryPlannerWildcardTest, WildcardIndexesDoNotSupportObjectEquality) {
     addIndex(BSON("$**" << 1));
 
@@ -1053,6 +1095,10 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexesDoNotSupportObjectInequality) {
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1}}}}}");
 }
 
+//
+// Unsupported values tests.
+//
+
 TEST_F(QueryPlannerWildcardTest, WildcardIndexesDoNotSupportInWithUnsupportedValues) {
     addIndex(BSON("$**" << 1));
 
@@ -1095,6 +1141,10 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexesDoNotSupportElemMatchObject) {
     runQuery(fromjson("{x: {$elemMatch: {a: 1}}}"));
     assertHasOnlyCollscan();
 }
+
+//
+// Sorting tests.
+//
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexCanProvideNonBlockingSort) {
     addWildcardIndex(BSON("$**" << 1));
@@ -1766,7 +1816,5 @@ TEST_F(QueryPlannerWildcardTest, ContainedOrPushdownWorksWithWildcardIndex) {
         "{ixscan: {filter: null, pattern: {$_path: 1, a: 1}, bounds:"
         "{$_path: [['a','a',true,true]], a:[[1,1,true,true]]}}}}}");
 }
-
-// TODO SERVER-36517: Add testing for DISTINCT_SCAN.
 
 }  // namespace mongo

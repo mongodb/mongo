@@ -38,11 +38,14 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_planner_common.h"
 
 namespace mongo {
 
 namespace {
+
+namespace wcp = ::mongo::wildcard_planning;
 
 // Create an ordred interval list which represents the bounds for all BSON elements of type String,
 // Object, or Array.
@@ -536,6 +539,12 @@ void IndexScanNode::appendToString(mongoutils::str::stream* ss, int indent) cons
 }
 
 bool IndexScanNode::hasField(const string& field) const {
+    // A $** index whose bounds overlap the object type bracket cannot provide covering, since the
+    // index only contains the leaf nodes along each of the object's subpaths.
+    if (index.type == IndexType::INDEX_WILDCARD && wcp::isWildcardObjectSubpathScan(this)) {
+        return false;
+    }
+
     // The index is multikey but does not have any path-level multikeyness information. Such indexes
     // can never provide covering.
     if (index.multikey && index.multikeyPaths.empty()) {

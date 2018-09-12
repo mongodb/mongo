@@ -52,80 +52,10 @@ namespace mongo {
 
 namespace {
 
-namespace app = ::mongo::wildcard_planning;
+namespace wcp = ::mongo::wildcard_planning;
 
 std::size_t numPathComponents(StringData path) {
     return FieldRef{path}.numParts();
-}
-
-/**
- * Given a single wildcard index, and a set of fields which are being queried, create 'mock'
- * IndexEntry for each of the appropriate fields.
- */
-void expandIndex(const IndexEntry& wildcardIndex,
-                 const stdx::unordered_set<std::string>& fields,
-                 vector<IndexEntry>* out) {
-    invariant(out);
-    invariant(wildcardIndex.type == INDEX_WILDCARD);
-    // Should only have one field of the form {"path.$**" : 1}.
-    invariant(wildcardIndex.keyPattern.nFields() == 1);
-
-    // $** indexes do not keep the multikey metadata inside the index catalog entry, as the amount
-    // of metadata is not bounded. We do not expect IndexEntry objects for $** indexes to have a
-    // fixed-size vector of multikey metadata until after they are expanded.
-    invariant(wildcardIndex.multikeyPaths.empty());
-
-    const auto projExec = WildcardKeyGenerator::createProjectionExec(
-        wildcardIndex.keyPattern, wildcardIndex.infoObj.getObjectField("wildcardProjection"));
-
-    const auto projectedFields = projExec->applyProjectionToFields(fields);
-
-    const auto& includedPaths = projExec->getExhaustivePaths();
-
-    out->reserve(out->size() + projectedFields.size());
-    for (auto&& fieldName : projectedFields) {
-        // Convert string 'fieldName' into a FieldRef, to better facilitate the subsequent checks.
-        const auto queryPath = FieldRef{fieldName};
-        // $** indices hold multikey metadata directly in the index keys, rather than in the index
-        // catalog. In turn, the index key data is used to produce a set of multikey paths
-        // in-memory. Here we convert this set of all multikey paths into a MultikeyPaths vector
-        // which will indicate to the downstream planning code which components of 'fieldName' are
-        // multikey.
-        auto multikeyPaths = app::buildMultiKeyPathsForExpandedWildcardIndexEntry(
-            queryPath, wildcardIndex.multikeyPathSet);
-
-        // Check whether a query on the current fieldpath is answerable by the $** index, given any
-        // numerical path components that may be present in the path string.
-        if (!app::validateNumericPathComponents(multikeyPaths, includedPaths, queryPath)) {
-            continue;
-        }
-
-        // The expanded IndexEntry is only considered multikey if the particular path represented by
-        // this IndexEntry has a multikey path component. For instance, suppose we have index {$**:
-        // 1} with "a" as the only multikey path. If we have a query on paths "a.b" and "c.d", then
-        // we will generate two expanded index entries: one for "a.b" and "c.d". The "a.b" entry
-        // will be marked as multikey because "a" is multikey, whereas the "c.d" entry will not be
-        // marked as multikey.
-        invariant(multikeyPaths.size() == 1u);
-        const bool isMultikey = !multikeyPaths[0].empty();
-
-        IndexEntry entry(BSON(fieldName << wildcardIndex.keyPattern.firstElement()),
-                         IndexType::INDEX_WILDCARD,
-                         isMultikey,
-                         std::move(multikeyPaths),
-                         // Expanded index entries always use the fixed-size multikey paths
-                         // representation, so we purposefully discard 'multikeyPathSet'.
-                         {},
-                         true,   // sparse
-                         false,  // unique
-                         {wildcardIndex.identifier.catalogName, fieldName},
-                         wildcardIndex.filterExpr,
-                         wildcardIndex.infoObj,
-                         wildcardIndex.collator);
-
-        invariant("$_path"_sd != fieldName);
-        out->push_back(std::move(entry));
-    }
 }
 
 bool canUseWildcardIndex(BSONElement elt, MatchExpression::MatchType matchType) {
@@ -378,7 +308,7 @@ std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(
     std::vector<IndexEntry> out;
     for (auto&& entry : relevantIndices) {
         if (entry.type == IndexType::INDEX_WILDCARD) {
-            expandIndex(entry, fields, &out);
+            wcp::expandWildcardIndexEntry(entry, fields, &out);
         } else {
             out.push_back(entry);
         }

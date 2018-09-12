@@ -46,28 +46,22 @@ using stdx::make_unique;
 // static
 const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
-DistinctScan::DistinctScan(OperationContext* opCtx,
-                           const DistinctParams& params,
-                           WorkingSet* workingSet)
+DistinctScan::DistinctScan(OperationContext* opCtx, DistinctParams params, WorkingSet* workingSet)
     : PlanStage(kStageType, opCtx),
+      _params(std::move(params)),
       _workingSet(workingSet),
-      _descriptor(params.descriptor),
-      _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
-      _params(params),
-      _checker(&_params.bounds, _descriptor->keyPattern(), _params.direction) {
-    _specificStats.keyPattern = _params.descriptor->keyPattern();
-    if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
-        invariant(collationElement.isABSONObj());
-        _specificStats.collation = collationElement.Obj().getOwned();
-    }
-    _specificStats.indexName = _params.descriptor->indexName();
-    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
-    _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());
-    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(getOpCtx());
-    _specificStats.isUnique = _params.descriptor->unique();
-    _specificStats.isSparse = _params.descriptor->isSparse();
-    _specificStats.isPartial = _params.descriptor->isPartial();
-    _specificStats.direction = _params.direction;
+      _iam(_params.accessMethod),
+      _checker(&_params.bounds, _params.keyPattern, _params.scanDirection) {
+    _specificStats.keyPattern = _params.keyPattern;
+    _specificStats.indexName = _params.name;
+    _specificStats.indexVersion = static_cast<int>(_params.version);
+    _specificStats.isMultiKey = _params.isMultiKey;
+    _specificStats.multiKeyPaths = _params.multikeyPaths;
+    _specificStats.isUnique = _params.isUnique;
+    _specificStats.isSparse = _params.isSparse;
+    _specificStats.isPartial = _params.isPartial;
+    _specificStats.direction = _params.scanDirection;
+    _specificStats.collation = _params.collation.getOwned();
 
     // Set up our initial seek. If there is no valid data, just mark as EOF.
     _commonStats.isEOF = !_checker.getStartSeekPoint(&_seekPoint);
@@ -80,7 +74,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     boost::optional<IndexKeyEntry> kv;
     try {
         if (!_cursor)
-            _cursor = _iam->newCursor(getOpCtx(), _params.direction == 1);
+            _cursor = _iam->newCursor(getOpCtx(), _params.scanDirection == 1);
         kv = _cursor->seek(_seekPoint);
     } catch (const WriteConflictException&) {
         *out = WorkingSet::INVALID_ID;
@@ -119,7 +113,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->recordId = kv->loc;
-            member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), kv->key, _iam));
+            member->keyData.push_back(IndexKeyDatum(_params.keyPattern, kv->key, _iam));
             _workingSet->transitionToRecordIdAndIdx(id);
 
             *out = id;

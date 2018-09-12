@@ -42,16 +42,51 @@ class IndexAccessMethod;
 class IndexDescriptor;
 class WorkingSet;
 
-// TODO SERVER-36517: keyPattern, indexName and multikeyPaths info should be provided explicitly
-// here and adopted by DistinctScan, rather than being resolved via the IndexDescriptor.
 struct DistinctParams {
-    DistinctParams() : descriptor(NULL), direction(1), fieldNo(0) {}
+    DistinctParams(const IndexDescriptor& descriptor,
+                   std::string indexName,
+                   BSONObj keyPattern,
+                   MultikeyPaths multikeyPaths,
+                   bool multikey)
+        : accessMethod(descriptor.getIndexCatalog()->getIndex(&descriptor)),
+          name(std::move(indexName)),
+          keyPattern(std::move(keyPattern)),
+          multikeyPaths(std::move(multikeyPaths)),
+          isMultiKey(multikey),
+          isSparse(descriptor.isSparse()),
+          isUnique(descriptor.unique()),
+          isPartial(descriptor.isPartial()),
+          version(descriptor.version()),
+          collation(descriptor.infoObj()
+                        .getObjectField(IndexDescriptor::kCollationFieldName)
+                        .getOwned()) {
+        invariant(accessMethod);
+    }
 
-    // What index are we traversing?
-    const IndexDescriptor* descriptor;
+    DistinctParams(OperationContext* opCtx, const IndexDescriptor& descriptor)
+        : DistinctParams(descriptor,
+                         descriptor.indexName(),
+                         descriptor.keyPattern(),
+                         descriptor.getMultikeyPaths(opCtx),
+                         descriptor.isMultikey(opCtx)) {}
 
-    // And in what direction?
-    int direction;
+    const IndexAccessMethod* accessMethod;
+    std::string name;
+
+    BSONObj keyPattern;
+
+    MultikeyPaths multikeyPaths;
+    bool isMultiKey;
+
+    bool isSparse;
+    bool isUnique;
+    bool isPartial;
+
+    IndexDescriptor::IndexVersion version;
+
+    BSONObj collation;
+
+    int scanDirection{1};
 
     // What are the bounds?
     IndexBounds bounds;
@@ -61,7 +96,7 @@ struct DistinctParams {
     // If we have an index {a:1, b:1} we could use it to distinct over either 'a' or 'b'.
     // If we distinct over 'a' the position is 0.
     // If we distinct over 'b' the position is 1.
-    int fieldNo;
+    int fieldNo{0};
 };
 
 /**
@@ -75,7 +110,7 @@ struct DistinctParams {
  */
 class DistinctScan final : public PlanStage {
 public:
-    DistinctScan(OperationContext* opCtx, const DistinctParams& params, WorkingSet* workingSet);
+    DistinctScan(OperationContext* opCtx, DistinctParams params, WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
@@ -95,17 +130,16 @@ public:
     static const char* kStageType;
 
 private:
+    // The parameters used to configure this DistinctScan stage.
+    DistinctParams _params;
+
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;
 
-    // Index access.
-    const IndexDescriptor* _descriptor;  // owned by Collection -> IndexCatalog
-    const IndexAccessMethod* _iam;       // owned by Collection -> IndexCatalog
+    const IndexAccessMethod* _iam;
 
     // The cursor we use to navigate the tree.
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
-
-    DistinctParams _params;
 
     // _checker gives us our start key and ensures we stay in bounds.
     IndexBoundsChecker _checker;
