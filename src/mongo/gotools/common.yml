@@ -11,39 +11,35 @@ mongo_tools_variables:
 
 ## List of tests to run on each buildvariant
   mongo_tools_task_lists:
-    mac_1012_task_list: &macos_1012_tasks
+    mac_task_list: &macos_tasks
       - name: db
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy30
-#      No SSL on 2.6 for osx
-#      - name: legacy26
       - name: qa-tests-3.2
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
-      - name: qa-tests-unstable
       - name: qa-dump-restore-gzip
       - name: qa-dump-restore-gzip-3.2
       - name: qa-dump-restore-archiving
       - name: qa-dump-restore-archiving-3.2
       - name: unit
-# disabled until BUILD-2273 is done
-#      - name: replay-dist
-#      - name: replay-sanity_check
-#      - name: replay-go_test
-#      - name: replay-auth_test
-#      - name: replay-sharded_test
-#      - name: replay-repl_test
-#      - name: replay-replay_test
-    macos_1012_ssl_task_list: &macos_1012_ssl_tasks
+      - name: replay-dist
+      - name: replay-sanity_check
+      - name: replay-go_test
+      - name: replay-auth_test
+      - name: replay-sharded_test
+      - name: replay-repl_test
+      # Disabled due to TOOLS-2107
+      # - name: replay-replay_test
+    macos_ssl_task_list: &macos_ssl_tasks
       - name: dist
       - name: qa-tests-4.0
-      - name: qa-tests-unstable
       - name: native-cert-ssl
       - name: unit
-    ubuntu1404_x86_64_task_list: &ubuntu1404_x86_64_tasks
+      - name: replay-dist
+    rhel_x86_64_task_list: &rhel_x86_64_tasks
       - name: db
       - name: dist
       - name: integration
@@ -55,7 +51,6 @@ mongo_tools_variables:
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
-      - name: qa-tests-unstable
       - name: qa-dump-restore-gzip
       - name: qa-dump-restore-gzip-3.2
       - name: qa-dump-restore-archiving
@@ -68,25 +63,23 @@ mongo_tools_variables:
       - name: replay-auth_test
       - name: replay-sharded_test
       - name: replay-repl_test
-      - name: replay-replay_test
-    ubuntu1404_x86_64_ssl_task_list: &ubuntu1404_x86_64_ssl_tasks
+      # Disabled due to TOOLS-2116
+      # - name: replay-replay_test
+    rhel_x86_64_ssl_task_list: &rhel_x86_64_ssl_tasks
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy30
       - name: qa-tests-4.0
-      - name: qa-tests-unstable
       - name: native-cert-ssl
-    ubuntu1404_x86_64_enterprise_task_list: &ubuntu1404_x86_64_enterprise_tasks
+      - name: replay-dist
+    rhel_x86_64_enterprise_task_list: &rhel_x86_64_enterprise_tasks
       - name: db
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: kerberos
-      - name: legacy30
-      - name: legacy26
+      # Disabled due to TOOLS-2119
+      # - name: kerberos
       - name: qa-tests-4.0
-      - name: qa-tests-unstable
       - name: native-cert-ssl
       - name: replay-dist
       - name: replay-sanity_check
@@ -94,14 +87,61 @@ mongo_tools_variables:
       - name: replay-auth_test
       - name: replay-sharded_test
       - name: replay-repl_test
-      - name: replay-replay_test
-    ubuntu1404_x86_64_race_task_list: &ubuntu1404_x86_64_race_tasks
+      # Disabled due to TOOLS-2116
+      # - name: replay-replay_test
+    ubuntu_x86_64_task_list: &ubuntu_x86_64_tasks
       - name: db
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy30
-      - name: legacy26
+      - name: lint-go
+      - name: lint-js
+      - name: qa-tests-3.2
+      - name: qa-tests-3.4
+      - name: qa-tests-3.6
+      - name: qa-tests-4.0
+      - name: qa-dump-restore-gzip
+      - name: qa-dump-restore-gzip-3.2
+      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-archiving-3.2
+      - name: unit
+      - name: vet
+      - name: replay-dist
+      - name: replay-sanity_check
+      - name: replay-go_test
+      - name: replay-auth_test
+      - name: replay-sharded_test
+      - name: replay-repl_test
+      # Disabled due to TOOLS-2108
+      # - name: replay-replay_test
+    ubuntu_x86_64_ssl_task_list: &ubuntu_x86_64_ssl_tasks
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: qa-tests-4.0
+      - name: native-cert-ssl
+      - name: replay-dist
+    ubuntu_x86_64_enterprise_task_list: &ubuntu_x86_64_enterprise_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: kerberos
+      - name: qa-tests-4.0
+      - name: native-cert-ssl
+      - name: replay-dist
+      - name: replay-sanity_check
+      - name: replay-go_test
+      - name: replay-auth_test
+      - name: replay-sharded_test
+      - name: replay-repl_test
+      # Disabled due to TOOLS-2108
+      # - name: replay-replay_test
+    ubuntu_x86_64_race_task_list: &ubuntu_x86_64_race_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
       - name: qa-tests-4.0
       - name: unit
       - name: replay-dist
@@ -110,13 +150,13 @@ mongo_tools_variables:
       - name: replay-auth_test
       - name: replay-sharded_test
       - name: replay-repl_test
-      - name: replay-replay_test
+      # Disabled due to TOOLS-2108
+      # - name: replay-replay_test
     windows_64_task_list: &windows_64_tasks
       - name: db
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy30
         distros:
         - windows-64-vs2013-test
       - name: qa-tests-3.2
@@ -143,15 +183,12 @@ mongo_tools_variables:
       - name: qa-dump-restore-gzip-3.2
         distros:
         - windows-64-vs2013-test
-      - name: qa-tests-unstable
       - name: unit
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy30
       - name: qa-tests-4.0
-      - name: qa-tests-unstable
       - name: native-cert-ssl
       - name: unit
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
@@ -160,7 +197,6 @@ mongo_tools_variables:
       - name: integration
       - name: integration-auth
       - name: kerberos
-      - name: legacy30
         distros:
         - windows-64-vs2013-test
       - name: qa-tests-3.2
@@ -173,9 +209,6 @@ mongo_tools_variables:
         distros:
         - windows-64-vs2013-test
       - name: qa-tests-4.0
-        distros:
-        - windows-64-vs2013-test
-      - name: qa-tests-unstable
         distros:
         - windows-64-vs2013-test
       - name: unit
@@ -191,37 +224,36 @@ mongo_tools_variables:
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
-      - name: qa-tests-unstable
       - name: native-cert-ssl
-# disabled until BUILD-2273 is done
-#      - name: replay-dist
-#      - name: replay-sanity_check
-#      - name: replay-go_test
-#      - name: replay-auth_test
-#      - name: replay-sharded_test
-#      - name: replay-repl_test
-#      - name: replay-replay_test
+      - name: replay-dist
+      - name: replay-sanity_check
+      - name: replay-go_test
+      - name: replay-auth_test
+      - name: replay-sharded_test
+      - name: replay-repl_test
+      # Disabled due to TOOLS-2108
+      # - name: replay-replay_test
     rhel67_s390x_enterprise_task_list: &rhel67_s390x_enterprise_tasks
       - name: db
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: kerberos
+      # Disabled due to TOOLS-2119
+      # - name: kerberos
       - name: qa-dump-restore-archiving
       - name: qa-dump-restore-gzip
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
-      - name: qa-tests-unstable
       - name: native-cert-ssl
-# disabled until BUILD-2273 is done
-#      - name: replay-dist
-#      - name: replay-sanity_check
-#      - name: replay-go_test
-#      - name: replay-auth_test
-#      - name: replay-sharded_test
-#      - name: replay-repl_test
-#      - name: replay-replay_test
+      - name: replay-dist
+      - name: replay-sanity_check
+      - name: replay-go_test
+      - name: replay-auth_test
+      - name: replay-sharded_test
+      - name: replay-repl_test
+      # Disabled due to TOOLS-2108
+      # - name: replay-replay_test
     ubuntu1604_arm64_ssl_task_list: &ubuntu1604_arm64_ssl_tasks
       - name: db
       - name: dist
@@ -232,8 +264,8 @@ mongo_tools_variables:
       - name: qa-tests-3.4
       - name: qa-tests-3.6
       - name: qa-tests-4.0
-      - name: qa-tests-unstable
       - name: native-cert-ssl
+      - name: replay-dist
 
 
 ## Common mongodb arguments
@@ -270,7 +302,7 @@ functions:
         chmod +x bin/*
         mv bin/* ${test_path}/
         cd ${test_path}
-        python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file ../../report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} ${smoke_args} tool
+        python buildscripts/smoke.py ${smoke_use_ssl} --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file ../../report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} ${smoke_args} tool
 
   "run qa-tests":
     command: shell.exec
@@ -284,14 +316,9 @@ functions:
         chmod +x bin/*
         mv bin/* test/qa-tests/
         cd test/qa-tests
-        rm -rf /data/mci/install /data/mci/multiversion
-        mkdir -p /data/mci/install /data/mci/multiversion
-        if [ "${multiversion_override}" != "skip" ]; then
-          python buildscripts/setup_multiversion_mongodb.py /data/mci/install /data/mci/multiversion ${arch} ${multiversion_override|2.6} --latest ${smoke_use_ssl} --os="${mongo_os}"
-        fi
         chmod 400 jstests/libs/key*
 
-        PATH=$PATH:/data/mci/multiversion python buildscripts/resmoke.py --suite=${resmoke_suite} --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
+        python buildscripts/resmoke.py --suite=${resmoke_suite} --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
 
   "build tool":
     command: shell.exec
@@ -400,13 +427,14 @@ functions:
     params:
       working_dir: src
       script: |
+        # export sensitive info before `set -x`
+        export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
         set -x
         set -v
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
         . ./set_gopath.sh
-        export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
         export basedir=$PWD
         cd ${package}
         ${gorootvars} go test ${coverage_args} ${args} -tags "${build_tags}" -test.v > unit.suite
@@ -422,13 +450,21 @@ functions:
       # Set up Kerberos stuff: run kinit if necessary, and add KDC to registry
       # on Windows (see https://wiki.mongodb.com/display/DH/Testing+Kerberos)
       script: |
+        set -e
+        # export sensitive info before `set -x`
+        if [ '${run_kinit}' = 'true' ]; then
+            # BUILD-3830
+            mkdir -p "$(pwd)/.evergreen"
+            touch "$(pwd)/.evergreen/krb5.conf.empty"
+            export KRB5_CONFIG="$(pwd)/.evergreen/krb5.conf.empty"
+
+            echo "Writing keytab"
+            echo ${kerberos_keytab} | base64 -d > "$(pwd)/.evergreen/drivers.keytab"
+            echo "Running kinit"
+            kinit -k -t "$(pwd)/.evergreen/drivers.keytab" -p drivers@LDAPTEST.10GEN.CC;
+        fi;
         set -x
         set -v
-        set -e
-        if [ '${run_kinit}' = 'true' ]
-        then
-          echo "${kerberos_password}" | kinit -p drivers@LDAPTEST.10GEN.CC;
-        fi;
         if [ "Windows_NT" = "$OS" ]; then
           cmd /c "REG ADD HKLM\SYSTEM\ControlSet001\Control\Lsa\Kerberos\Domains\LDAPTEST.10GEN.CC /v KdcNames /d ldaptest.10gen.cc /t REG_MULTI_SZ /f"
         fi;
@@ -497,12 +533,13 @@ functions:
     params:
       working_dir: src
       script: |
-        set -x
-        set -v
+        # export sensitive info before `set -x`
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
             export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
         fi;
+        set -x
+        set -v
         . ./set_gopath.sh
 
         if [ "${create_mongod_users_command}" != "" ]; then
@@ -818,8 +855,6 @@ post:
         set -x
           set -v
         rm -rf /data/db/*
-        rm -rf /data/mci/multiversion
-        rm -rf /data/mci/install
         exit 0
 
 timeout:
@@ -1004,39 +1039,6 @@ tasks:
         test_path: "test/legacy30"
         smoke_args: "--authMechanism SCRAM-SHA-1"
 
-- name: legacy26
-  depends_on:
-  - name: dist
-  commands:
-    - func: "fetch source"
-    - func: "get buildnumber"
-    - func: "setup credentials"
-    - func: "download mongod"
-      vars:
-        mongo_version: "2.6"
-    - func: "fetch tool"
-      vars:
-        tool: mongoimport
-    - func: "fetch tool"
-      vars:
-        tool: mongoexport
-    - func: "fetch tool"
-      vars:
-        tool: mongodump
-    - func: "fetch tool"
-      vars:
-        tool: mongostat
-    - func: "fetch tool"
-      vars:
-        tool: mongorestore
-    - func: "fetch tool"
-      vars:
-        tool: mongofiles
-    - func: "run legacy tests"
-      vars:
-        test_path: "test/legacy26"
-        smoke_use_ssl: ""
-
 - name: lint-go
   commands:
     - func: "fetch source"
@@ -1065,44 +1067,6 @@ tasks:
           PATH="/opt/node/bin:$PATH"
           /opt/node/bin/npm install eslint@3.2
           /opt/node/bin/node node_modules/eslint/bin/eslint.js test/qa-tests/jstests/**/*.js
-
-- name: qa-tests-unstable
-  depends_on:
-  - name: dist
-  commands:
-    - func: "fetch source"
-    - func: "get buildnumber"
-    - func: "setup credentials"
-    - func: "download mongod"
-      vars:
-        mongo_version: "latest"
-    - func: "fetch tool"
-      vars:
-        tool: mongoimport
-    - func: "fetch tool"
-      vars:
-        tool: mongoexport
-    - func: "fetch tool"
-      vars:
-        tool: mongodump
-    - func: "fetch tool"
-      vars:
-        tool: mongorestore
-    - func: "fetch tool"
-      vars:
-        tool: mongostat
-    - func: "fetch tool"
-      vars:
-        tool: mongotop
-    - func: "fetch tool"
-      vars:
-        tool: mongofiles
-    - func: "fetch tool"
-      vars:
-        tool: bsondump
-    - func: "run qa-tests"
-      vars:
-        resmoke_suite: "core${resmoke_use_ssl}"
 
 - name: qa-tests-4.0
   depends_on:
@@ -1141,7 +1105,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_unstable,${excludes}"
+        excludes: "requires_mongo_26,requires_unstable,${excludes}"
 
 - name: qa-tests-3.6
   depends_on:
@@ -1180,7 +1144,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_unstable,${excludes}"
+        excludes: "requires_mongo_26,requires_mongo_40,requires_unstable,${excludes}"
 
 - name: qa-tests-3.4
   depends_on:
@@ -1219,7 +1183,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_unstable,requires_mongo_36,${excludes}"
+        excludes: "requires_mongo_26,requires_mongo_36,requires_mongo_40,requires_unstable,${excludes}"
 
 - name: qa-tests-3.2
   depends_on:
@@ -1258,7 +1222,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        excludes: "requires_unstable,requires_mongo_34,requires_mongo_36,${excludes}"
+        excludes: "requires_mongo_26,requires_mongo_34,requires_mongo_36,requires_mongo_40,requires_unstable,,${excludes}"
 
 - name: native-cert-ssl
   depends_on:
@@ -1304,11 +1268,8 @@ tasks:
           set -e
           chmod +x ../../bin/*
           mv ../../bin/* .
-          rm -rf /data/mci/install /data/mci/multiversion
-          mkdir -p /data/mci/install /data/mci/multiversion
-          python buildscripts/setup_multiversion_mongodb.py /data/mci/install /data/mci/multiversion ${arch} "2.6" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
           chmod 400 jstests/libs/key*
-          PATH=$PATH:/data/mci/multiversion python buildscripts/resmoke.py --suite=native_cert_ssl  --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
+          python buildscripts/resmoke.py --suite=native_cert_ssl  --continueOnFailure --log=buildlogger --reportFile=../../report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
 
 - name: qa-dump-restore-archiving
   depends_on:
@@ -1329,7 +1290,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_archive"
-        excludes: "requires_unstable,${excludes}"
+        excludes: "requires_mongo_26,requires_unstable,${excludes}"
 
 - name: qa-dump-restore-archiving-3.2
   depends_on:
@@ -1350,7 +1311,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_archive"
-        excludes: "requires_unstable,requires_mongo_34,requires_mongo_36,${excludes}"
+        excludes: "requires_mongo_26,requires_mongo_34,requires_mongo_36,requires_mongo_40,requires_unstable,${excludes}"
 
 - name: qa-dump-restore-gzip
   depends_on:
@@ -1371,7 +1332,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_gzip"
-        excludes: "requires_unstable,${excludes}"
+        excludes: "requires_mongo_26,requires_unstable,${excludes}"
 
 - name: qa-dump-restore-gzip-3.2
   depends_on:
@@ -1392,7 +1353,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_gzip"
-        excludes: "requires_unstable,requires_mongo_34,requires_mongo_36,${excludes}"
+        excludes: "requires_mongo_26,requires_mongo_34,requires_mongo_36,requires_mongo_40,requires_unstable,${excludes}"
 
 - name: unit
   commands:
@@ -1646,6 +1607,7 @@ buildvariants:
     build_tags: "sasl ssl"
   tasks:
   - name: dist
+  - name: replay-dist
 
 - name: amazon2
   display_name: Amazon Linux 64 v2 (Go 1.10)
@@ -1656,6 +1618,7 @@ buildvariants:
     build_tags: "sasl ssl"
   tasks:
   - name: dist
+  - name: replay-dist
 
 #######################################
 #     Debian x86_64 Buildvariants     #
@@ -1670,6 +1633,7 @@ buildvariants:
     build_tags: "sasl ssl"
   tasks:
   - name: dist
+  - name: replay-dist
 
 - name: debian92
   display_name: Debian 9.2 (Go 1.10)
@@ -1680,6 +1644,7 @@ buildvariants:
     build_tags: "sasl ssl"
   tasks:
   - name: dist
+  - name: replay-dist
 
 #######################################
 #           macOS Buildvariant        #
@@ -1697,7 +1662,7 @@ buildvariants:
     arch: "osx/x86_64"
     excludes: requires_many_files
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-  tasks: *macos_1012_tasks
+  tasks: *macos_tasks
 
 - name: macOS-1012-ssl
   display_name: MacOS 10.12 SSL (Go 1.10)
@@ -1712,7 +1677,7 @@ buildvariants:
     build_tags: "ssl openssl_pre_1.0"
     excludes: requires_many_files
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
-  tasks: *macos_1012_ssl_tasks
+  tasks: *macos_ssl_tasks
 
 #######################################
 #     RHEL x86_64 Buildvariants       #
@@ -1723,10 +1688,55 @@ buildvariants:
   run_on:
   - rhel62-test
   expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel62"
+    mongo_edition: "targeted"
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     build_tags: "sasl ssl"
-  tasks:
-  - name: dist
+    arch: "linux/x86_64"
+    integration_test_args: integration
+    resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
+  tasks: *rhel_x86_64_tasks
+
+- name: rhel62-ssl
+  display_name: RHEL 6.2 SSL (Go 1.10)
+  run_on:
+  - rhel62-test
+  expansions:
+    <<: *mongod_ssl_startup_args
+    <<: *mongo_ssl_startup_args
+    mongo_os: "rhel62"
+    mongo_edition: "enterprise"
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
+    build_tags: "sasl ssl"
+    edition: ssl
+    arch: "linux/x86_64"
+    smoke_use_ssl: --use-ssl
+    resmoke_use_ssl: _ssl
+    resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
+    integration_test_args: "integration,ssl"
+  tasks: *rhel_x86_64_ssl_tasks
+
+- name: rhel62-enterprise
+  display_name: RHEL 6.2 Enterprise (Go 1.10)
+  run_on:
+  - rhel62-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel62"
+    mongo_edition: "enterprise"
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
+    build_tags: "ssl sasl"
+    smoke_use_ssl: --use-ssl
+    resmoke_use_ssl: _ssl
+    arch: "linux/x86_64"
+    edition: enterprise
+    run_kinit: true
+    integration_test_args: integration
+    resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
+  tasks: *rhel_x86_64_enterprise_tasks
 
 - name: rhel70
   display_name: RHEL 7.0 (Go 1.10)
@@ -1737,6 +1747,7 @@ buildvariants:
     build_tags: "sasl ssl"
   tasks:
   - name: dist
+  - name: replay-dist
 
 #######################################
 #     SUSE x86_64 Buildvariants       #
@@ -1751,6 +1762,7 @@ buildvariants:
     build_tags: "sasl ssl"
   tasks:
   - name: dist
+  - name: replay-dist
 
 #######################################
 #    Ubuntu x86_64 Buildvariants      #
@@ -1761,25 +1773,36 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
+    gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
+    build_tags: "sasl ssl"
+  tasks:
+  - name: dist
+  - name: replay-dist
+
+- name: ubuntu1604
+  display_name: Ubuntu 16.04 (Go 1.10)
+  run_on:
+  - ubuntu1604-test
+  expansions:
     <<: *mongod_default_startup_args
     <<: *mongo_default_startup_args
-    mongo_os: "ubuntu1404"
+    mongo_os: "ubuntu1604"
     mongo_edition: "targeted"
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     build_tags: "sasl ssl"
     arch: "linux/x86_64"
     integration_test_args: integration
     resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
-  tasks: *ubuntu1404_x86_64_tasks
+  tasks: *ubuntu_x86_64_tasks
 
-- name: ubuntu1404-ssl
-  display_name: Ubuntu 14.04 SSL (Go 1.10)
+- name: ubuntu1604-ssl
+  display_name: Ubuntu 16.04 SSL (Go 1.10)
   run_on:
-  - ubuntu1404-test
+  - ubuntu1604-test
   expansions:
     <<: *mongod_ssl_startup_args
     <<: *mongo_ssl_startup_args
-    mongo_os: "ubuntu1404"
+    mongo_os: "ubuntu1604"
     mongo_edition: "enterprise"
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     build_tags: "sasl ssl"
@@ -1789,16 +1812,16 @@ buildvariants:
     resmoke_use_ssl: _ssl
     resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
     integration_test_args: "integration,ssl"
-  tasks: *ubuntu1404_x86_64_ssl_tasks
+  tasks: *ubuntu_x86_64_ssl_tasks
 
-- name: ubuntu1404-enterprise
-  display_name: Ubuntu 14.04 Enterprise (Go 1.10)
+- name: ubuntu1604-enterprise
+  display_name: Ubuntu 16.04 Enterprise (Go 1.10)
   run_on:
-  - ubuntu1404-test
+  - ubuntu1604-test
   expansions:
     <<: *mongod_default_startup_args
     <<: *mongo_default_startup_args
-    mongo_os: "ubuntu1404"
+    mongo_os: "ubuntu1604"
     mongo_edition: "enterprise"
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     build_tags: "ssl sasl"
@@ -1809,17 +1832,18 @@ buildvariants:
     run_kinit: true
     integration_test_args: integration
     resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
-  tasks: *ubuntu1404_x86_64_enterprise_tasks
+  tasks: *ubuntu_x86_64_enterprise_tasks
 
-- name: ubuntu1604
-  display_name: Ubuntu 16.04 (Go 1.10)
+- name: ubuntu1804
+  display_name: Ubuntu 18.04 (Go 1.10)
   run_on:
-  - ubuntu1604-test
+  - ubuntu1804-test
   expansions:
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
+  - name: replay-dist
 
 #######################################
 #        Windows Buildvariants        #
@@ -1858,7 +1882,6 @@ buildvariants:
     resmoke_use_ssl: _ssl
     resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
     excludes: requires_large_ram,requires_mongo_24
-    multiversion_override: "2.6"
     extension: .exe
     arch: "win32/x86_64"
     gorootvars: 'PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/golang/go1.10"'
@@ -1881,7 +1904,6 @@ buildvariants:
     resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
     resmoke_use_ssl: _ssl
     excludes: requires_large_ram,requires_mongo_24
-    multiversion_override: "2.6"
     edition: enterprise
     extension: .exe
     arch: "win32/x86_64"
@@ -1911,7 +1933,6 @@ buildvariants:
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc'
     excludes: requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30
     resmoke_args: -j 2
-    multiversion_override: "skip"
     arch: "linux/arm64"
     edition: ssl
     integration_test_args: integration
@@ -1940,7 +1961,6 @@ buildvariants:
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
     resmoke_args: -j 4
     excludes: requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30
-    multiversion_override: "skip"
     arch: "linux/ppc64le"
     edition: enterprise
     run_kinit: true
@@ -1958,6 +1978,7 @@ buildvariants:
     build_tags: 'ssl sasl'
   tasks:
   - name: dist
+  - name: replay-dist
 
 #######################################
 #     Z (s390x) Buildvariants         #
@@ -1980,7 +2001,6 @@ buildvariants:
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10 CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
     excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
     resmoke_args: -j 2
-    multiversion_override: "skip"
     arch: "linux/s390x"
     edition: enterprise
     run_kinit: true
@@ -1998,6 +2018,7 @@ buildvariants:
     build_tags: "sasl ssl"
   tasks:
   - name: dist
+  - name: replay-dist
 
 #######################################
 #     Experimental Buildvariants      #
@@ -2006,13 +2027,13 @@ buildvariants:
 - name: ubuntu-race
   stepback: false
   batchtime: 1440 # daily
-  display_name: z Race Detector Ubuntu 14.04 (Go 1.10)
+  display_name: z Race Detector Ubuntu 16.04 (Go 1.10)
   run_on:
-  - ubuntu1404-test
+  - ubuntu1604-test
   expansions:
     <<: *mongod_default_startup_args
     <<: *mongo_default_startup_args
-    mongo_os: "ubuntu1404"
+    mongo_os: "ubuntu1604"
     mongo_edition: "enterprise"
     gorootvars: 'PATH="/opt/golang/go1.10/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/golang/go1.10'
     build_tags: "sasl ssl"
@@ -2020,5 +2041,5 @@ buildvariants:
     args: "-race"
     excludes: requires_large_ram
     integration_test_args: integration
-  tasks: *ubuntu1404_x86_64_race_tasks
+  tasks: *ubuntu_x86_64_race_tasks
 
