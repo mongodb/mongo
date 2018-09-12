@@ -68,6 +68,10 @@ private:
 
 class IndexKeyComputedData : public WorkingSetComputedData {
 public:
+    // Given an index key 'dehydratedKey' with no field names, returns a new BSONObj after adding
+    // field names according to 'keyPattern'.
+    static BSONObj rehydrateKey(const BSONObj& keyPattern, const BSONObj& dehydratedKey);
+
     IndexKeyComputedData(BSONObj key)
         : WorkingSetComputedData(WSM_INDEX_KEY), _key(key.getOwned()) {}
 

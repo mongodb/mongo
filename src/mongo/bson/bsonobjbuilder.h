@@ -712,8 +712,6 @@ public:
         _doneCalled = true;
     }
 
-    void appendKeys(const BSONObj& keyPattern, const BSONObj& values);
-
     static std::string numStr(int i) {
         if (i >= 0 && i < 100 && numStrsReady)
             return numStrs[i];

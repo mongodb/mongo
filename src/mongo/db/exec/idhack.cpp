@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -146,10 +147,9 @@ PlanStage::StageState IDHackStage::advance(WorkingSetID id,
     invariant(member->hasObj());
 
     if (_addKeyMetadata) {
-        BSONObjBuilder bob;
         BSONObj ownedKeyObj = member->obj.value()["_id"].wrap().getOwned();
-        bob.appendKeys(_key, ownedKeyObj);
-        member->addComputed(new IndexKeyComputedData(bob.obj()));
+        member->addComputed(
+            new IndexKeyComputedData(IndexKeyComputedData::rehydrateKey(_key, ownedKeyObj)));
     }
 
     _done = true;

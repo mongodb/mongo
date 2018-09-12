@@ -214,18 +214,6 @@ BSONObjBuilder& BSONObjBuilder::appendElementsUnique(const BSONObj& x) {
     return *this;
 }
 
-void BSONObjBuilder::appendKeys(const BSONObj& keyPattern, const BSONObj& values) {
-    BSONObjIterator i(keyPattern);
-    BSONObjIterator j(values);
-
-    while (i.more() && j.more()) {
-        appendAs(j.next(), i.next().fieldName());
-    }
-
-    verify(!i.more());
-    verify(!j.more());
-}
-
 BSONObjIterator BSONObjBuilder::iterator() const {
     const char* s = _b.buf() + _offset;
     const char* e = _b.buf() + _b.len();

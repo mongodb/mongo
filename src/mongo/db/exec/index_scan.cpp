@@ -38,6 +38,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -218,9 +219,8 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_params.addKeyMetadata) {
-        BSONObjBuilder bob;
-        bob.appendKeys(_keyPattern, kv->key);
-        member->addComputed(new IndexKeyComputedData(bob.obj()));
+        member->addComputed(
+            new IndexKeyComputedData(IndexKeyComputedData::rehydrateKey(_keyPattern, kv->key)));
     }
 
     *out = id;
