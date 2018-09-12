@@ -709,8 +709,8 @@ private:
         std::array<std::shared_ptr<Node>, 256> children;
 
     private:
-        size_type _numSubtreeElems;
-        size_type _sizeSubtreeElems;
+        size_type _numSubtreeElems = 0;
+        size_type _sizeSubtreeElems = 0;
     };
 
     /**
