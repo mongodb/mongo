@@ -30,6 +30,7 @@
 #include "mongo/util/options_parser/options_parser.h"
 
 #include <algorithm>
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <cerrno>
 #include <fstream>
@@ -61,6 +62,7 @@ using namespace std;
 using std::shared_ptr;
 
 namespace po = boost::program_options;
+namespace fs = boost::filesystem;
 
 stdx::function<bool()> OptionsParser::useStrict;
 
@@ -1258,80 +1260,56 @@ Status OptionsParser::addDefaultValues(const OptionSection& options, Environment
  * simple and works for the current use case of config files which should be limited in size.
  */
 Status OptionsParser::readConfigFile(const std::string& filename, std::string* contents) {
-    FILE* config;
-    config = fopen(filename.c_str(), "r");
-    if (config == NULL) {
+    std::ifstream file;
+    file.open(filename.c_str());
+    if (file.fail()) {
         const int current_errno = errno;
         StringBuilder sb;
-        sb << "Error reading config file: " << strerror(current_errno);
-        return Status(ErrorCodes::InternalError, sb.str());
-    }
-    ON_BLOCK_EXIT(fclose, config);
-
-    // Get length of config file by seeking to the end and getting the cursor position
-    if (fseek(config, 0L, SEEK_END) != 0) {
-        const int current_errno = errno;
-        // TODO: Make sure errno is the correct way to do this
-        // Confirmed that errno gets set in Mac OSX, but not documented
-        StringBuilder sb;
-        sb << "Error seeking in config file: " << strerror(current_errno);
-        return Status(ErrorCodes::InternalError, sb.str());
-    }
-    long configSize = ftell(config);
-
-    // Seek back to the beginning of the file for reading
-    if (fseek(config, 0L, SEEK_SET) != 0) {
-        const int current_errno = errno;
-        // TODO: Make sure errno is the correct way to do this
-        // Confirmed that errno gets set in Mac OSX, but not documented
-        StringBuilder sb;
-        sb << "Error seeking in config file: " << strerror(current_errno);
+        sb << "Error opening config file: " << strerror(current_errno);
         return Status(ErrorCodes::InternalError, sb.str());
     }
 
-    // Read into a vector first since it's guaranteed to have contiguous storage
-    std::vector<char> configVector;
-    configVector.resize(configSize);
+    // check if it's a regular file
+    fs::path configPath(filename);
+    if (!fs::is_regular_file(filename)) {
+        StringBuilder sb;
+        sb << "Error opening config file: " << strerror(EISDIR);
+        return Status(ErrorCodes::InternalError, sb.str());
+    }
 
-    if (configSize > 0) {
-        long nread = 0;
-        while (!feof(config) && nread < configSize) {
-            nread = nread + fread(&configVector[nread], sizeof(char), configSize - nread, config);
-            if (ferror(config)) {
-                const int current_errno = errno;
-                // TODO: Make sure errno is the correct way to do this
-                StringBuilder sb;
-                sb << "Error reading in config file: " << strerror(current_errno);
-                return Status(ErrorCodes::InternalError, sb.str());
-            }
-        }
-        // Resize our config vector to the number of bytes we actually read
-        configVector.resize(nread);
+    // Transfer data to a stringstream
+    std::stringstream config;
+    std::string configString;
+    try {
+        config << file.rdbuf();
+        configString = config.str();
+    } catch (const std::exception& e) {
+        StringBuilder sb;
+        sb << "Error reading in config file: " << e.what();
+        return Status(ErrorCodes::InternalError, sb.str());
     }
 
     // Config files cannot have null bytes
-    if (end(configVector) != std::find(begin(configVector), end(configVector), '\0')) {
+    if (std::count(configString.begin(), configString.end(), '\0') > 0) {
 
 #if defined(_WIN32)
         // On Windows, it is common for files to be saved by Notepad as UTF-16 with a BOM so convert
         // it for the user. If the file lacks a BOM, but is UTF-16 encoded we will fail rather then
         // try to guess the file encoding.
         const std::array<unsigned char, 2> UTF16LEBOM = {0xff, 0xfe};
-        if (configVector.size() >= UTF16LEBOM.size() &&
-            memcmp(configVector.data(), UTF16LEBOM.data(), UTF16LEBOM.size()) == 0) {
-            auto wstr = std::wstring(configVector.begin() + 2, configVector.end());
+        if (configString.size() >= UTF16LEBOM.size() &&
+            memcmp(configString.data(), UTF16LEBOM.data(), UTF16LEBOM.size()) == 0) {
+            auto wstr = std::wstring(configString.begin() + 2, configString.end());
             *contents = toUtf8String(wstr);
             return Status::OK();
         }
 #endif
-
         return Status(
             ErrorCodes::FailedToParse,
             "Config file has null bytes, ensure the file is saved as UTF-8 and not UTF-16.");
     }
-
     // Copy the vector contents into our result string
-    *contents = std::string(configVector.begin(), configVector.end());
+    *contents = std::move(configString);
     return Status::OK();
 }
 

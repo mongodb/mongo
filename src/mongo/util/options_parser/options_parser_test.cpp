@@ -1975,6 +1975,23 @@ TEST(ConfigFromFilesystem, Empty) {
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
 }
 
+TEST(ConfigFromFilesystem, Directory) {
+    moe::OptionsParser parser;
+    moe::Environment environment;
+
+    moe::OptionSection testOpts;
+    testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back(TEST_CONFIG_PATH(""));
+    std::map<std::string, std::string> env_map;
+
+    moe::Value value;
+    ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+}
+
 TEST(ConfigFromFilesystem, NullByte) {
 
     moe::OptionsParser parser;
