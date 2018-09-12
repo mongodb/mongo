@@ -444,14 +444,8 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
 
 void invokeInTransaction(OperationContext* opCtx,
                          CommandInvocation* invocation,
+                         TransactionParticipant* txnParticipant,
                          rpc::ReplyBuilderInterface* replyBuilder) {
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (!txnParticipant) {
-        // Run the command directly if we're not in a transaction.
-        invocation->run(opCtx, replyBuilder);
-        return;
-    }
-
     txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
     ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
         txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
@@ -490,12 +484,16 @@ bool runCommandImpl(OperationContext* opCtx,
 #endif
     replyBuilder->reserveBytes(bytesToReserve);
 
+    auto txnParticipant = TransactionParticipant::get(opCtx);
     if (!invocation->supportsWriteConcern()) {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
-        invokeInTransaction(opCtx, invocation, replyBuilder);
+        if (txnParticipant) {
+            invokeInTransaction(opCtx, invocation, txnParticipant, replyBuilder);
+        } else {
+            invocation->run(opCtx, replyBuilder);
+        }
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
-        auto txnParticipant = TransactionParticipant::get(opCtx);
         uassert(ErrorCodes::InvalidOptions,
                 "writeConcern is not allowed within a multi-statement transaction",
                 wcResult.usedDefault || !txnParticipant ||
@@ -525,7 +523,11 @@ bool runCommandImpl(OperationContext* opCtx,
         };
 
         try {
-            invokeInTransaction(opCtx, invocation, replyBuilder);
+            if (txnParticipant) {
+                invokeInTransaction(opCtx, invocation, txnParticipant, replyBuilder);
+            } else {
+                invocation->run(opCtx, replyBuilder);
+            }
         } catch (const DBException&) {
             waitForWriteConcern(*extraFieldsBuilder);
             throw;
