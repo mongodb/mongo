@@ -227,7 +227,7 @@ protected:
             if (_blockingMode == Sync) {
                 std::error_code ec;
                 _sslSocket->handshake(asio::ssl::stream_base::client, ec);
-                return Future<void>::makeReady(errorCodeToStatus(ec));
+                return futurize(ec);
             } else {
                 return _sslSocket->async_handshake(asio::ssl::stream_base::client, UseFuture{});
             }

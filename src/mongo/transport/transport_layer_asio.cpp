@@ -114,7 +114,7 @@ private:
             });
 
         } catch (asio::system_error& ex) {
-            return Future<void>::makeReady(errorCodeToStatus(ex.code()));
+            return futurize(ex.code());
         }
     }
 
@@ -561,11 +561,15 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
 
     connector->resolver.asyncResolve(connector->peer, _listenerOptions.enableIPv6)
         .then([connector](WrappedResolver::EndpointVector results) {
-            stdx::unique_lock<stdx::mutex> lk(connector->mutex);
-            connector->resolvedEndpoint = results.front();
-            connector->socket.open(connector->resolvedEndpoint->protocol());
-            connector->socket.non_blocking(true);
-            lk.unlock();
+            try {
+                stdx::lock_guard<stdx::mutex> lk(connector->mutex);
+
+                connector->resolvedEndpoint = results.front();
+                connector->socket.open(connector->resolvedEndpoint->protocol());
+                connector->socket.non_blocking(true);
+            } catch (asio::system_error& ex) {
+                return futurize(ex.code());
+            }
 
             return connector->socket.async_connect(*connector->resolvedEndpoint, UseFuture{});
         })
