@@ -142,6 +142,16 @@ public:
     static TransactionParticipant* getFromNonCheckedOutSession(Session* session);
 
     /**
+     * Kills the transaction if it is running, ensuring that it releases all resources, even if the
+     * transaction is in prepare().  Avoids writing any oplog entries or making any changes to the
+     * transaction table.  State for prepared transactions will be re-constituted at startup.
+     * Note that we don't take any active steps to prevent continued use of this
+     * TransactionParticipant after shutdown() is called, but we rely on callers to not
+     * continue using the TransactionParticipant once we are in shutdown.
+     */
+    void shutdown();
+
+    /**
      * Called for speculative transactions to fix the optime of the snapshot to read from.
      */
     void setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opCtx);
@@ -551,6 +561,8 @@ private:
 
     // Protects the member variables below.
     mutable stdx::mutex _mutex;
+
+    bool _inShutdown{false};
 
     // Holds transaction resources between network operations.
     boost::optional<TxnResources> _txnResourceStash;

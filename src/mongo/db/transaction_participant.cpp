@@ -398,8 +398,11 @@ TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
     }
 }
 void TransactionParticipant::_stashActiveTransaction(WithLock, OperationContext* opCtx) {
-    invariant(_activeTxnNumber == opCtx->getTxnNumber());
+    if (_inShutdown) {
+        return;
+    }
 
+    invariant(_activeTxnNumber == opCtx->getTxnNumber());
     {
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx),
@@ -744,6 +747,13 @@ void TransactionParticipant::_commitTransaction(stdx::unique_lock<stdx::mutex> l
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
     _cleanUpTxnResourceOnOpCtx(lk, opCtx, TransactionState::kCommitted);
+}
+
+void TransactionParticipant::shutdown() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    _inShutdown = true;
+    _txnResourceStash = boost::none;
 }
 
 void TransactionParticipant::abortArbitraryTransaction() {

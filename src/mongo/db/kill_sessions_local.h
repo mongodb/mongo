@@ -53,4 +53,9 @@ void killSessionsLocalKillTransactions(OperationContext* opCtx,
  */
 void killAllExpiredTransactions(OperationContext* opCtx);
 
+/**
+ * Run during shutdown to kill all in-progress transactions, including those in prepare.
+ */
+void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx);
+
 }  // namespace mongo

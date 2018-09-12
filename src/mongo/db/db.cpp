@@ -892,9 +892,7 @@ void shutdownTask() {
         ShardingInitializationMongoD::get(serviceContext)->shutDown(opCtx);
 
         // Destroy all stashed transaction resources, in order to release locks.
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
+        killSessionsLocalShutdownAllTransactions(opCtx);
     }
 
     serviceContext->setKillAllOperations();

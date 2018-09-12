@@ -88,4 +88,13 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
         });
 }
 
+void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    SessionCatalog::get(opCtx)->scanSessions(
+        opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
+            TransactionParticipant::getFromNonCheckedOutSession(session)->shutdown();
+        });
+}
+
 }  // namespace mongo
