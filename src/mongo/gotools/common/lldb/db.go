@@ -4,15 +4,15 @@
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// Package db implements generic connection to MongoDB, and contains
+// Package lldb implements generic connection to MongoDB, and contains
 // subpackages for specific methods of connection.
 package lldb
 
 import (
-	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/password"
 	mgo "github.com/10gen/llmgo"
 	"github.com/10gen/llmgo/bson"
+	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/password"
 
 	"fmt"
 	"io"
