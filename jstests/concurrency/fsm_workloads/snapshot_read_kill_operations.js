@@ -24,10 +24,11 @@ var $config = (function() {
 
         snapshotFind: function snapshotFind(db, collName) {
             const sortByAscending = false;
-            doSnapshotFind(sortByAscending,
-                           collName,
-                           this,
-                           [ErrorCodes.NoSuchTransaction, ErrorCodes.LockTimeout]);
+            doSnapshotFind(
+                sortByAscending,
+                collName,
+                this,
+                [ErrorCodes.NoSuchTransaction, ErrorCodes.LockTimeout, ErrorCodes.Interrupted]);
         },
 
         snapshotGetMore: function snapshotGetMore(db, collName) {
@@ -39,7 +40,7 @@ var $config = (function() {
                                 ErrorCodes.Interrupted,
                                 ErrorCodes.LockTimeout
                               ],
-                              [ErrorCodes.NoSuchTransaction]);
+                              [ErrorCodes.NoSuchTransaction, ErrorCodes.Interrupted]);
         },
 
         incrementTxnNumber: function incrementTxnNumber(db, collName) {
@@ -58,27 +59,35 @@ var $config = (function() {
                 sessionDocToKill = db[collName].findOne({"_id": idToKill});
             }
 
-            assert.commandWorked(
-                this.sessionDb.runCommand({killSessions: [{id: sessionDocToKill.id}]}));
+            // This command may get interrupted by another thread's killSessions.
+            assert.commandWorkedOrFailedWithCode(
+                this.sessionDb.runCommand({killSessions: [{id: sessionDocToKill.id}]}),
+                ErrorCodes.Interrupted);
         },
 
         killOp: function killOp(db, collName) {
             // Find the object ID of the getMore in the snapshot read, if it is running, and attempt
-            // to kill the operation.
-            const res = assert.commandWorked(this.sessionDb.adminCommand(
-                {currentOp: 1, ns: {$regex: db.getName() + "\." + collName}, op: "getmore"}));
+            // to kill the operation. This command may get interrupted by another thread's
+            // killSessions.
+            const res = assert.commandWorkedOrFailedWithCode(
+                this.sessionDb.adminCommand(
+                    {currentOp: 1, ns: {$regex: db.getName() + "\." + collName}, op: "getmore"}),
+                ErrorCodes.Interrupted);
             if (res.inprog.length) {
                 const killOpCmd = {killOp: 1, op: res.inprog[0].opid};
                 const killRes = this.sessionDb.adminCommand(killOpCmd);
-                assert.commandWorked(killRes);
+                assert.commandWorkedOrFailedWithCode(killRes, ErrorCodes.Interrupted);
             }
         },
 
         killCursors: function killCursors(db, collName) {
             const killCursorCmd = {killCursors: collName, cursors: [this.cursorId]};
             const res = this.sessionDb.runCommand(killCursorCmd);
+            // This command may get interrupted by another thread's killSessions.
             assert.commandWorkedOrFailedWithCode(
-                res, [ErrorCodes.CursorNotFound], () => `cmd: ${tojson(killCursorCmd)}`);
+                res,
+                [ErrorCodes.CursorNotFound, ErrorCodes.Interrupted],
+                () => `cmd: ${tojson(killCursorCmd)}`);
         },
 
     };
