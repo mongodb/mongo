@@ -98,4 +98,31 @@ TEST(Coordinator, NotHearingSomeParticipantsCommitAckLeadsToStillWaiting) {
     ASSERT_EQ(State::kWaitingForCommitAcks, coordinator.state());
 }
 
+TEST(Coordinator, TryAbortWhileWaitingForParticipantListSuccessfullyAborts) {
+    TransactionCoordinator coordinator;
+    coordinator.recvTryAbort();
+    ASSERT_EQ(State::kAborted, coordinator.state());
+}
+
+TEST(Coordinator, TryAbortWhileWaitingForVotesSuccessfullyAborts) {
+    TransactionCoordinator coordinator;
+    coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
+    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
+    coordinator.recvTryAbort();
+    ASSERT_EQ(State::kAborted, coordinator.state());
+}
+
+TEST(Coordinator, TryAbortWhileWaitingForCommitAcksDoesNotCancelCommit) {
+    TransactionCoordinator coordinator;
+    coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
+    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
+    coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
+    ASSERT_EQ(State::kWaitingForCommitAcks, coordinator.state());
+    coordinator.recvTryAbort();
+    ASSERT_EQ(State::kWaitingForCommitAcks, coordinator.state());
+    coordinator.recvCommitAck(ShardId("shard0000"));
+    coordinator.recvCommitAck(ShardId("shard0001"));
+    ASSERT_EQ(State::kCommitted, coordinator.state());
+}
+
 }  // namespace mongo

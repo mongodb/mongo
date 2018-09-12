@@ -85,6 +85,7 @@ public:
             kRecvParticipantList,
             kRecvFinalVoteCommit,
             kRecvFinalCommitAck,
+            kRecvTryAbort,
         };
 
         // State machine outputs
@@ -141,6 +142,12 @@ public:
      * participants.
      */
     StateMachine::Action recvVoteAbort(const ShardId& shardId);
+
+    /**
+     * A tryAbort event is received by the coordinator when a transaction is implicitly aborted when
+     * a new transaction is received for the same session with a higher transaction number.
+     */
+    StateMachine::Action recvTryAbort();
 
     /**
      * Marks this participant as having completed committing the transaction.

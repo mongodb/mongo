@@ -62,6 +62,11 @@ Action TransactionCoordinator::recvVoteAbort(const ShardId& shardId) {
     return _stateMachine.onEvent(Event::kRecvVoteAbort);
 }
 
+Action TransactionCoordinator::recvTryAbort() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _stateMachine.onEvent(Event::kRecvTryAbort);
+}
+
 void TransactionCoordinator::recvCommitAck(const ShardId& shardId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _participantList.recordCommitAck(shardId);
@@ -92,29 +97,34 @@ const std::map<State, std::map<Event, TransactionCoordinator::StateMachine::Tran
             {Event::kRecvVoteAbort,         {Action::kSendAbort, State::kAborted}},
             {Event::kRecvVoteCommit,        {}},
             {Event::kRecvParticipantList,   {State::kWaitingForVotes}},
+            {Event::kRecvTryAbort,          {Action::kSendAbort, State::kAborted}},
         }},
         {State::kWaitingForVotes, {
             {Event::kRecvVoteAbort,         {Action::kSendAbort, State::kAborted}},
             {Event::kRecvVoteCommit,        {}},
             {Event::kRecvParticipantList,   {}},
             {Event::kRecvFinalVoteCommit,   {Action::kSendCommit, State::kWaitingForCommitAcks}},
+            {Event::kRecvTryAbort,          {Action::kSendAbort, State::kAborted}},
         }},
         {State::kAborted, {
             {Event::kRecvVoteAbort,         {}},
             {Event::kRecvVoteCommit,        {}},
             {Event::kRecvParticipantList,   {}},
+            {Event::kRecvTryAbort,          {}},
         }},
         {State::kWaitingForCommitAcks, {
             {Event::kRecvVoteCommit,        {}},
             {Event::kRecvParticipantList,   {}},
             {Event::kRecvFinalVoteCommit,   {Action::kSendCommit}},
             {Event::kRecvFinalCommitAck,    {State::kCommitted}},
+            {Event::kRecvTryAbort,          {}},
         }},
         {State::kCommitted, {
             {Event::kRecvVoteCommit,        {}},
             {Event::kRecvParticipantList,   {}},
             {Event::kRecvFinalVoteCommit,   {}},
             {Event::kRecvFinalCommitAck,    {}},
+            {Event::kRecvTryAbort,          {}},
         }},
         {State::kBroken, {}},
         // clang-format on
