@@ -493,7 +493,7 @@ StatusWith<YAML::Node> runYAMLExpansion(const YAML::Node& node,
 Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                        const std::vector<OptionDescription>& options_vector,
                        const Key& key,
-                       Key* canonicalKey,
+                       OptionDescription const** option,
                        Value* value,
                        const OptionsParser::ConfigExpand& configExpand) {
     bool isRegistered = false;
@@ -525,7 +525,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
         if (key == iterator->_dottedName || isDeprecated) {
             isRegistered = true;
             type = iterator->_type;
-            *canonicalKey = iterator->_dottedName;
+            *option = &*iterator;
             if (isDeprecated) {
                 warning() << "Option: " << key << " is deprecated. Please use "
                           << iterator->_dottedName << " instead.";
@@ -629,11 +629,17 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
     return stringToValue(stringVal, type, key, value);
 }
 
+Status canonicalizeOption(const OptionDescription& option, Environment* env) {
+    if (!option._canonicalize) {
+        return Status::OK();
+    }
+
+    return option._canonicalize(env);
+}
+
 Status checkLongName(const po::variables_map& vm,
                      const std::string& singleName,
-                     const std::string& canonicalSingleName,
-                     const std::string& dottedName,
-                     const OptionType& type,
+                     const OptionDescription& option,
                      Environment* environment,
                      bool* optionAdded) {
     // Trim off the short option from our name so we can look it up correctly in our map
@@ -654,22 +660,22 @@ Status checkLongName(const po::variables_map& vm,
     }
 
     if (vm.count(long_name)) {
-        if (!vm[long_name].defaulted() && singleName != canonicalSingleName) {
+        if (!vm[long_name].defaulted() && singleName != option._singleName) {
             warning() << "Option: " << singleName << " is deprecated. Please use "
-                      << canonicalSingleName << " instead.";
+                      << option._singleName << " instead.";
         } else if (long_name == "sslMode") {
             warning() << "Option: sslMode is deprecated. Please use tlsMode instead.";
         }
 
         Value optionValue;
-        Status ret = boostAnyToValue(vm[long_name].value(), type, long_name, &optionValue);
+        Status ret = boostAnyToValue(vm[long_name].value(), option._type, long_name, &optionValue);
         if (!ret.isOK()) {
             return ret;
         }
 
         // If this is really a StringMap, try to split on "key=value" for each element
         // in our StringVector
-        if (type == StringMap) {
+        if (option._type == StringMap) {
             StringVector_t keyValueVector;
             ret = optionValue.get(&keyValueVector);
             if (!ret.isOK()) {
@@ -689,7 +695,7 @@ Status checkLongName(const po::variables_map& vm,
                 // Make sure we aren't setting an option to two different values
                 if (mapValue.count(key) > 0 && mapValue[key] != value) {
                     StringBuilder sb;
-                    sb << "Key Value Option: " << dottedName
+                    sb << "Key Value Option: " << option._dottedName
                        << " has a duplicate key from the same source: " << key;
                     return Status(ErrorCodes::BadValue, sb.str());
                 }
@@ -698,7 +704,15 @@ Status checkLongName(const po::variables_map& vm,
             optionValue = Value(mapValue);
         }
         if (!(*optionAdded)) {
-            environment->set(dottedName, optionValue).transitional_ignore();
+            auto ret = environment->set(option._dottedName, optionValue);
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            ret = canonicalizeOption(option, environment);
+            if (!ret.isOK()) {
+                return ret;
+            }
         } else if (!vm[long_name].defaulted()) {
             StringBuilder sb;
             sb << "Error parsing command line:  Multiple occurrences of option \"" << long_name
@@ -727,13 +741,7 @@ Status addBoostVariablesToEnvironment(const po::variables_map& vm,
     for (const OptionDescription& od : options_vector) {
 
         bool optionAdded = false;
-        ret = checkLongName(vm,
-                            od._singleName,
-                            od._singleName,
-                            od._dottedName,
-                            od._type,
-                            environment,
-                            &optionAdded);
+        ret = checkLongName(vm, od._singleName, od, environment, &optionAdded);
 
         if (!ret.isOK()) {
             return ret;
@@ -741,13 +749,7 @@ Status addBoostVariablesToEnvironment(const po::variables_map& vm,
 
         for (const std::string& deprecatedSingleName : od._deprecatedSingleNames) {
 
-            ret = checkLongName(vm,
-                                deprecatedSingleName,
-                                od._singleName,
-                                od._dottedName,
-                                od._type,
-                                environment,
-                                &optionAdded);
+            ret = checkLongName(vm, deprecatedSingleName, od, environment, &optionAdded);
 
             if (!ret.isOK()) {
                 return ret;
@@ -836,26 +838,32 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
                 return ret;
             }
         } else {
-            Key canonicalKey;
+            OptionDescription const* option = nullptr;
             Value optionValue;
             Status ret = YAMLNodeToValue(
-                YAMLNode, options_vector, dottedName, &canonicalKey, &optionValue, expand);
+                YAMLNode, options_vector, dottedName, &option, &optionValue, expand);
             if (!ret.isOK()) {
                 return ret;
             }
+            invariant(option);
 
             Value dummyVal;
-            if (environment->get(canonicalKey, &dummyVal).isOK()) {
+            if (environment->get(option->_dottedName, &dummyVal).isOK()) {
                 StringBuilder sb;
                 sb << "Error parsing YAML config: duplicate key: " << dottedName
-                   << "(canonical key: " << canonicalKey << ")";
+                   << "(canonical key: " << option->_dottedName << ")";
                 return Status(ErrorCodes::BadValue, sb.str());
             }
 
             // Only add the value if it is not empty.  YAMLNodeToValue will set the
             // optionValue to an empty Value if we should not set it in the Environment.
             if (!optionValue.isEmpty()) {
-                ret = environment->set(canonicalKey, optionValue);
+                ret = environment->set(option->_dottedName, optionValue);
+                if (!ret.isOK()) {
+                    return ret;
+                }
+
+                ret = canonicalizeOption(*option, environment);
                 if (!ret.isOK()) {
                     return ret;
                 }
@@ -911,6 +919,11 @@ Status addCompositions(const OptionSection& options, const Environment& source, 
                 if (!ret.isOK()) {
                     return ret;
                 }
+
+                ret = canonicalizeOption(*iterator, dest);
+                if (!ret.isOK()) {
+                    return ret;
+                }
             }
         } else if (iterator->_type == StringMap) {
             StringMap_t sourceValue;
@@ -939,6 +952,11 @@ Status addCompositions(const OptionSection& options, const Environment& source, 
 
                 // Set the resulting value in our output environment
                 ret = dest->set(Key(iterator->_dottedName), Value(destValue));
+                if (!ret.isOK()) {
+                    return ret;
+                }
+
+                ret = canonicalizeOption(*iterator, dest);
                 if (!ret.isOK()) {
                     return ret;
                 }

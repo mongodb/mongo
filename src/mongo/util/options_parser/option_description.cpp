@@ -265,5 +265,10 @@ OptionDescription& OptionDescription::format(const std::string& regexFormat,
     return addConstraint(new StringFormatKeyConstraint(_dottedName, regexFormat, displayFormat));
 }
 
+OptionDescription& OptionDescription::canonicalize(Canonicalize_t canonicalize) {
+    _canonicalize = std::move(canonicalize);
+    return *this;
+}
+
 }  // namespace optionenvironment
 }  // namespace mongo

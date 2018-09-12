@@ -193,6 +193,13 @@ public:
     OptionDescription& format(const std::string& regexFormat, const std::string& displayFormat);
 
     /**
+     * Specifies that this option should be canonicalized immediately after initial parse.
+     * Callback may alter the contents of the setting, rename the key its stored to, etc...
+     */
+    using Canonicalize_t = std::function<Status(Environment*)>;
+    OptionDescription& canonicalize(Canonicalize_t);
+
+    /**
      * Adds a constraint for this option.  During parsing, this Constraint will be added to the
      * result Environment, ensuring that it will get checked when the environment is validated.
      * See the documentation on the Constraint and Environment classes for more details.
@@ -229,6 +236,9 @@ public:
     std::vector<std::string> _deprecatedDottedNames;
     // Deprecated single names - aliases for '_singleName'.
     std::vector<std::string> _deprecatedSingleNames;
+
+    // Canonicalizer method.
+    Canonicalize_t _canonicalize;
 };
 
 }  // namespace optionenvironment

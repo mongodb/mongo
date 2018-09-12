@@ -4721,6 +4721,32 @@ void TestFile(std::vector<unsigned char> contents, bool valid) {
     }
 }
 
+TEST(YAMLConfigFile, canonicalize) {
+    moe::OptionSection opts;
+    opts.addOptionChaining("net.bindIpAll", "bind_ip_all", moe::Switch, "Bind all addresses")
+        .incompatibleWith("net.bindIp")
+        .canonicalize([](moe::Environment* env) {
+            auto status = env->remove("net.bindIpAll");
+            if (!status.isOK()) {
+                return status;
+            }
+            return env->set("net.bindIp", moe::Value("0.0.0.0"));
+        });
+    opts.addOptionChaining("net.bindIp", "bind_ip", moe::String, "Bind specific addresses")
+        .incompatibleWith("net.bindIpAll");
+
+    moe::OptionsParser parser;
+    moe::Environment env;
+    std::vector<std::string> argv = {
+        "binary", "--bind_ip_all",
+    };
+    std::map<std::string, std::string> env_map;
+    ASSERT_OK(parser.run(opts, argv, env_map, &env));
+    ASSERT_EQ(env.count("net.bindIp"), 1);
+    ASSERT_EQ(env.count("net.bindIpAll"), 0);
+    ASSERT_EQ(env["net.bindIp"].as<std::string>(), "0.0.0.0");
+}
+
 #if defined(_WIN32)
 // Positive: Validate a UTF-16 file with a BOM can be parsed
 TEST(YAMLConfigFile, UTF16WithBOMFile) {
