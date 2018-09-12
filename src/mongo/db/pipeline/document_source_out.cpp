@@ -250,6 +250,9 @@ intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
     uassert(ErrorCodes::InvalidOptions,
             "$out cannot be used with a 'majority' read concern level",
             readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern);
+    uassert(ErrorCodes::InvalidOptions,
+            "$out cannot be used with a 'linearizable' read concern level",
+            readConcernLevel != repl::ReadConcernLevel::kLinearizableReadConcern);
 
     // Although we perform a check for "replaceCollection" mode with a sharded output collection
     // during lite parsing, we need to do it here as well in case mongos is stale or the command is

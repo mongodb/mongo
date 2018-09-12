@@ -77,6 +77,12 @@ load('jstests/libs/write_concern_util.js');
     assert.eq(opTimeCmd.errmsg, "afterOpTime not compatible with linearizable read concern");
     assert.eq(opTimeCmd.code, ErrorCodes.FailedToParse);
 
+    // A $out aggregation is not allowed with readConcern level "linearizable".
+    let result = assert.throws(
+        () => primary.getDB("test").foo.aggregate([{$out: {to: "out", mode: "replaceDocuments"}}],
+                                                  {readConcern: {level: "linearizable"}}));
+    assert.eq(result.code, ErrorCodes.InvalidOptions);
+
     primary = replTest.getPrimary();
 
     jsTestLog("Starting linearizablility testing");
@@ -85,7 +91,7 @@ load('jstests/libs/write_concern_util.js');
     secondaries[0].disconnect(primary);
     secondaries[1].disconnect(primary);
 
-    var result = primary.getDB("test").runCommand(
+    result = primary.getDB("test").runCommand(
         {"find": "foo", "readConcern": {level: "linearizable"}, "maxTimeMS": 3000});
     assert.commandFailedWithCode(result, ErrorCodes.MaxTimeMSExpired);
 
