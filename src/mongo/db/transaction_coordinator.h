@@ -67,7 +67,6 @@ public:
         enum class State {
             kWaitingForParticipantList,
             kWaitingForVotes,
-            kWaitingForAbortAcks,
             kAborted,
             kWaitingForCommitAcks,
             kCommitted,
@@ -86,7 +85,6 @@ public:
             kRecvParticipantList,
             kRecvFinalVoteCommit,
             kRecvFinalCommitAck,
-            kRecvFinalAbortAck,
         };
 
         // State machine outputs
@@ -149,17 +147,12 @@ public:
      */
     void recvCommitAck(const ShardId& shardId);
 
-    /**
-     * Marks this participant as having completed aborting the transaction.
-     */
-    void recvAbortAck(const ShardId& shardId);
-
     std::set<ShardId> getNonAckedCommitParticipants() const {
         return _participantList.getNonAckedCommitParticipants();
     }
 
-    std::set<ShardId> getNonAckedAbortParticipants() const {
-        return _participantList.getNonAckedAbortParticipants();
+    std::set<ShardId> getNonVotedAbortParticipants() const {
+        return _participantList.getNonVotedAbortParticipants();
     }
 
     Timestamp getCommitTimestamp() const {
@@ -185,12 +178,12 @@ public:
         Timestamp getHighestPrepareTimestamp() const;
 
         std::set<ShardId> getNonAckedCommitParticipants() const;
-        std::set<ShardId> getNonAckedAbortParticipants() const;
+        std::set<ShardId> getNonVotedAbortParticipants() const;
 
         class Participant {
         public:
             enum class Vote { kUnknown, kAbort, kCommit };
-            enum class Ack { kNone, kAbort, kCommit };
+            enum class Ack { kNone, kCommit };
 
             Vote vote{Vote::kUnknown};
             Ack ack{Ack::kNone};
@@ -218,7 +211,6 @@ inline StringBuilder& operator<<(StringBuilder& sb,
         // clang-format off
         case State::kWaitingForParticipantList:     return sb << "kWaitingForParticipantlist";
         case State::kWaitingForVotes:               return sb << "kWaitingForVotes";
-        case State::kWaitingForAbortAcks:           return sb << "kWaitingForAbortAcks";
         case State::kAborted:                       return sb << "kAborted";
         case State::kWaitingForCommitAcks:          return sb << "kWaitingForCommitAcks";
         case State::kCommitted:                     return sb << "kCommitted";
@@ -246,7 +238,6 @@ inline StringBuilder& operator<<(StringBuilder& sb,
         case Event::kRecvParticipantList:   return sb << "kRecvParticipantList";
         case Event::kRecvFinalVoteCommit:   return sb << "kRecvFinalVoteCommit";
         case Event::kRecvFinalCommitAck:    return sb << "kRecvFinalCommitAck";
-        case Event::kRecvFinalAbortAck:     return sb << "kRecvFinalAbortAck";
         // clang-format on
         default:
             MONGO_UNREACHABLE;

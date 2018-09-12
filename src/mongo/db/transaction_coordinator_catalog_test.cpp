@@ -179,7 +179,6 @@ TEST_F(TransactionCoordinatorCatalogTest, RemovingAnAbortedCoordinatorSucceeds) 
 
     coordinator->recvCoordinateCommit({ShardId("shard0000")});
     coordinator->recvVoteAbort(ShardId("shard0000"));
-    coordinator->recvAbortAck(ShardId("shard0000"));
     ASSERT_EQ(coordinator->state(), CoordinatorState::kAborted);
 
     coordinatorCatalog().remove(lsid, txnNumber);

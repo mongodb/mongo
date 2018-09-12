@@ -65,9 +65,8 @@ void expectScheduleThrows(Schedule schedule) {
 }
 
 TEST(CoordinatorStateMachine, AbortSucceeds) {
-    expectScheduleSucceeds({Event::kRecvVoteAbort, Event::kRecvFinalAbortAck}, State::kAborted);
-    expectScheduleSucceeds(
-        {Event::kRecvVoteAbort, Event::kRecvVoteAbort, Event::kRecvFinalAbortAck}, State::kAborted);
+    expectScheduleSucceeds({Event::kRecvVoteAbort}, State::kAborted);
+    expectScheduleSucceeds({Event::kRecvVoteAbort, Event::kRecvVoteAbort}, State::kAborted);
 }
 
 TEST(CoordinatorStateMachine, CommitSucceeds) {

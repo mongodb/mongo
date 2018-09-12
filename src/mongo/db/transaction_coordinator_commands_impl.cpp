@@ -104,8 +104,7 @@ std::vector<ShardId> sendCommit(OperationContext* opCtx,
     return ackedParticipants;
 }
 
-std::vector<ShardId> sendAbort(OperationContext* opCtx,
-                               const std::set<ShardId>& nonAckedParticipants) {
+void sendAbort(OperationContext* opCtx, const std::set<ShardId>& nonAckedParticipants) {
     StringBuilder ss;
     ss << "[";
 
@@ -138,18 +137,11 @@ std::vector<ShardId> sendAbort(OperationContext* opCtx,
 
     // TODO (SERVER-36638): The ARS does not currently support "fire-and-forget" messages; the ARS
     // uses the caller's thread to send the messages over the network inside calls to next().
-    std::vector<ShardId> ackedParticipants;
     while (!ars.done()) {
         auto response = ars.next();
 
         if (response.swResponse.getStatus().isOK()) {
             auto commandStatus = getStatusFromCommandResult(response.swResponse.getValue().data);
-
-            // TODO (SERVER-36642): Also interpret NoSuchTransaction and TransactionTooOld as
-            // acknowledgment.
-            if (commandStatus.isOK()) {
-                ackedParticipants.push_back(response.shardId);
-            }
 
             // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
             // transactions are stable.
@@ -162,7 +154,6 @@ std::vector<ShardId> sendAbort(OperationContext* opCtx,
                    << " for abortTransaction to " << response.shardId;
         }
     }
-    return ackedParticipants;
 }
 
 void doAction(OperationContext* opCtx,
@@ -183,16 +174,7 @@ void doAction(OperationContext* opCtx,
             return;
         }
         case TransactionCoordinator::StateMachine::Action::kSendAbort: {
-            std::set<ShardId> nonAckedParticipants;
-            nonAckedParticipants = coordinator->getNonAckedAbortParticipants();
-
-            // TODO (SERVER-36638): Spawn a separate thread to do this so that the client's thread
-            // does not block.
-            auto ackedParticipants = sendAbort(opCtx, nonAckedParticipants);
-            for (auto& participant : ackedParticipants) {
-                coordinator->recvAbortAck(participant);
-            }
-
+            sendAbort(opCtx, coordinator->getNonVotedAbortParticipants());
             return;
         }
         case TransactionCoordinator::StateMachine::Action::kNone:

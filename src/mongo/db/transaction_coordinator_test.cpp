@@ -42,8 +42,6 @@ TEST(Coordinator, SomeParticipantVotesAbortLeadsToAbort) {
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
     coordinator.recvVoteAbort(ShardId("shard0000"));
     coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
-    coordinator.recvAbortAck(ShardId("shard0000"));
-    coordinator.recvAbortAck(ShardId("shard0001"));
     ASSERT_EQ(State::kAborted, coordinator.state());
 }
 
@@ -52,8 +50,6 @@ TEST(Coordinator, SomeParticipantsVoteAbortBeforeCoordinatorReceivesParticipantL
     coordinator.recvVoteAbort(ShardId("shard0000"));
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
     coordinator.recvVoteCommit(ShardId("shard0001"), dummyTimestamp);
-    coordinator.recvAbortAck(ShardId("shard0000"));
-    coordinator.recvAbortAck(ShardId("shard0001"));
     ASSERT_EQ(State::kAborted, coordinator.state());
 }
 
@@ -90,15 +86,7 @@ TEST(Coordinator, NotHearingSomeParticipantsVoteAnotherParticipantVotedAbortLead
     TransactionCoordinator coordinator;
     coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
     coordinator.recvVoteAbort(ShardId("shard0000"));
-    ASSERT_EQ(State::kWaitingForAbortAcks, coordinator.state());
-}
-
-TEST(Coordinator, NotHearingSomeParticipantsAbortAckLeadsToStillWaiting) {
-    TransactionCoordinator coordinator;
-    coordinator.recvCoordinateCommit({ShardId("shard0000"), ShardId("shard0001")});
-    coordinator.recvVoteAbort(ShardId("shard0000"));
-    coordinator.recvAbortAck(ShardId("shard0000"));
-    ASSERT_EQ(State::kWaitingForAbortAcks, coordinator.state());
+    ASSERT_EQ(State::kAborted, coordinator.state());
 }
 
 TEST(Coordinator, NotHearingSomeParticipantsCommitAckLeadsToStillWaiting) {
