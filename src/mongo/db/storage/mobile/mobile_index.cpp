@@ -76,7 +76,8 @@ MobileIndex::MobileIndex(OperationContext* opCtx,
       _ordering(Ordering::make(desc->keyPattern())),
       _ident(ident),
       _collectionNamespace(desc->parentNS()),
-      _indexName(desc->indexName()) {}
+      _indexName(desc->indexName()),
+      _keyPattern(desc->keyPattern()) {}
 
 StatusWith<SpecialFormatInserted> MobileIndex::insert(OperationContext* opCtx,
                                                       const BSONObj& key,
@@ -113,7 +114,7 @@ StatusWith<SpecialFormatInserted> MobileIndex::doInsert(OperationContext* opCtx,
             // Return error if duplicate key inserted in a unique index.
             BSONObj bson =
                 KeyString::toBson(key.getBuffer(), key.getSize(), _ordering, key.getTypeBits());
-            return dupKeyError(bson, _collectionNamespace, _indexName);
+            return buildDupKeyErrorStatus(bson, _collectionNamespace, _indexName, _keyPattern);
         } else {
             // A record with same key could already be present in a standard index, that is OK. This
             // can happen when building a background index while documents are being written in
@@ -243,7 +244,7 @@ Status MobileIndex::dupKeyCheck(OperationContext* opCtx,
     invariant(_isUnique);
 
     if (_isDup(opCtx, key, recId))
-        return dupKeyError(key, _collectionNamespace, _indexName);
+        return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
     return Status::OK();
 }
 
@@ -283,12 +284,14 @@ public:
                     OperationContext* opCtx,
                     bool dupsAllowed,
                     const std::string& collectionNamespace,
-                    const std::string& indexName)
+                    const std::string& indexName,
+                    const BSONObj& keyPattern)
         : _index(index),
           _opCtx(opCtx),
           _dupsAllowed(dupsAllowed),
           _collectionNamespace(collectionNamespace),
-          _indexName(indexName) {}
+          _indexName(indexName),
+          _keyPattern(keyPattern) {}
 
     virtual ~BulkBuilderBase() {}
 
@@ -318,7 +321,7 @@ protected:
     Status _checkNextKey(const BSONObj& key) {
         const int cmp = key.woCompare(_lastKey, _index->getOrdering());
         if (!_dupsAllowed && cmp == 0) {
-            return dupKeyError(key, _collectionNamespace, _indexName);
+            return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
         } else if (cmp < 0) {
             return Status(ErrorCodes::InternalError, "expected higher RecordId in bulk builder");
         }
@@ -334,6 +337,7 @@ protected:
     const bool _dupsAllowed;
     const std::string _collectionNamespace;
     const std::string _indexName;
+    const BSONObj _keyPattern;
 };
 
 /**
@@ -345,8 +349,9 @@ public:
                         OperationContext* opCtx,
                         bool dupsAllowed,
                         const std::string& collectionNamespace,
-                        const std::string& indexName)
-        : BulkBuilderBase(index, opCtx, dupsAllowed, collectionNamespace, indexName) {}
+                        const std::string& indexName,
+                        const BSONObj& keyPattern)
+        : BulkBuilderBase(index, opCtx, dupsAllowed, collectionNamespace, indexName, keyPattern) {}
 
 protected:
     StatusWith<SpecialFormatInserted> _addKey(const BSONObj& key, const RecordId& recId) override {
@@ -365,8 +370,9 @@ public:
                       OperationContext* opCtx,
                       bool dupsAllowed,
                       const std::string& collectionNamespace,
-                      const std::string& indexName)
-        : BulkBuilderBase(index, opCtx, dupsAllowed, collectionNamespace, indexName) {
+                      const std::string& indexName,
+                      const BSONObj& keyPattern)
+        : BulkBuilderBase(index, opCtx, dupsAllowed, collectionNamespace, indexName, keyPattern) {
         // Replication is not supported so dups are not allowed.
         invariant(!dupsAllowed);
     }
@@ -666,7 +672,8 @@ MobileIndexStandard::MobileIndexStandard(OperationContext* opCtx,
 SortedDataBuilderInterface* MobileIndexStandard::getBulkBuilder(OperationContext* opCtx,
                                                                 bool dupsAllowed) {
     invariant(dupsAllowed);
-    return new BulkBuilderStandard(this, opCtx, dupsAllowed, _collectionNamespace, _indexName);
+    return new BulkBuilderStandard(
+        this, opCtx, dupsAllowed, _collectionNamespace, _indexName, _keyPattern);
 }
 
 std::unique_ptr<SortedDataInterface::Cursor> MobileIndexStandard::newCursor(OperationContext* opCtx,
@@ -704,7 +711,8 @@ SortedDataBuilderInterface* MobileIndexUnique::getBulkBuilder(OperationContext* 
                                                               bool dupsAllowed) {
     // Replication is not supported so dups are not allowed.
     invariant(!dupsAllowed);
-    return new BulkBuilderUnique(this, opCtx, dupsAllowed, _collectionNamespace, _indexName);
+    return new BulkBuilderUnique(
+        this, opCtx, dupsAllowed, _collectionNamespace, _indexName, _keyPattern);
 }
 
 std::unique_ptr<SortedDataInterface::Cursor> MobileIndexUnique::newCursor(OperationContext* opCtx,

@@ -164,4 +164,34 @@ BSONObj IndexEntryComparison::makeQueryObject(const BSONObj& keyPrefix,
     return bb.obj();
 }
 
+Status buildDupKeyErrorStatus(const BSONObj& key,
+                              const std::string& collectionNamespace,
+                              const std::string& indexName,
+                              const BSONObj& keyPattern) {
+    StringBuilder sb;
+    sb << "E11000 duplicate key error";
+    sb << " collection: " << collectionNamespace;
+    sb << " index: " << indexName;
+    sb << " dup key: ";
+
+    BSONObjBuilder builder;
+    // key is a document with forms like: '{ : 123}', '{ : {num: 123} }', '{ : 123, : "str" }'
+    BSONObjIterator keyValueIt(key);
+    // keyPattern is a document with only one level. e.g. '{a : 1, b : -1}', '{a.b : 1}'
+    BSONObjIterator keyNameIt(keyPattern);
+    // Combine key and keyPattern into one document which represents a mapping from indexFieldName
+    // to indexKey.
+    while (1) {
+        BSONElement keyValueElem = keyValueIt.next();
+        BSONElement keyNameElem = keyNameIt.next();
+        if (keyNameElem.eoo())
+            break;
+
+        builder.appendAs(keyValueElem, keyNameElem.fieldName());
+    }
+
+    sb << builder.obj();
+    return Status(ErrorCodes::DuplicateKey, sb.str());
+}
+
 }  // namespace mongo

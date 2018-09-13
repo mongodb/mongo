@@ -44,7 +44,8 @@ public:
                                const std::string& prefix,
                                const std::string& identEnd,
                                const std::string& collectionNamespace,
-                               const std::string& indexName);
+                               const std::string& indexName,
+                               const BSONObj& keyPattern);
     SpecialFormatInserted commit(bool mayInterrupt) override;
     virtual StatusWith<SpecialFormatInserted> addKey(const BSONObj& key, const RecordId& loc);
 
@@ -59,6 +60,7 @@ private:
     // Index metadata.
     const std::string _collectionNamespace;
     const std::string _indexName;
+    const BSONObj _keyPattern;
     // Whether or not we've already added something before.
     bool _hasLast;
     // This is the KeyString of the last key added.
@@ -76,7 +78,8 @@ public:
                         bool isUnique,
                         StringData ident,
                         const std::string& collectionNamespace,
-                        const std::string& indexName);
+                        const std::string& indexName,
+                        const BSONObj& keyPattern);
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,
                                                        bool dupsAllowed) override;
     virtual StatusWith<SpecialFormatInserted> insert(OperationContext* opCtx,
@@ -180,6 +183,7 @@ private:
     // Index metadata.
     const std::string _collectionNamespace;
     const std::string _indexName;
+    const BSONObj _keyPattern;
     // These are the keystring representations of the _prefix and the _identEnd.
     std::string _KSForIdentStart;
     std::string _KSForIdentEnd;

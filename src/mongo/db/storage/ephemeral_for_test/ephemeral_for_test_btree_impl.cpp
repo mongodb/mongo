@@ -85,13 +85,15 @@ public:
                                      long long* currentKeySize,
                                      bool dupsAllowed,
                                      const std::string& collectionNamespace,
-                                     const std::string& indexName)
+                                     const std::string& indexName,
+                                     const BSONObj& keyPattern)
         : _data(data),
           _currentKeySize(currentKeySize),
           _dupsAllowed(dupsAllowed),
           _comparator(_data->key_comp()),
           _collectionNamespace(collectionNamespace),
-          _indexName(indexName) {
+          _indexName(indexName),
+          _keyPattern(keyPattern) {
         invariant(_data->empty());
     }
 
@@ -108,7 +110,7 @@ public:
                 return Status(ErrorCodes::InternalError,
                               "expected ascending (key, RecordId) order in bulk builder");
             } else if (!_dupsAllowed && cmp == 0 && loc != _last->loc) {
-                return dupKeyError(key, _collectionNamespace, _indexName);
+                return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
             }
         }
 
@@ -129,6 +131,7 @@ private:
 
     const std::string _collectionNamespace;
     const std::string _indexName;
+    const BSONObj _keyPattern;
 };
 
 class EphemeralForTestBtreeImpl : public SortedDataInterface {
@@ -136,17 +139,19 @@ public:
     EphemeralForTestBtreeImpl(IndexSet* data,
                               bool isUnique,
                               const std::string& collectionNamespace,
-                              const std::string& indexName)
+                              const std::string& indexName,
+                              const BSONObj& keyPattern)
         : _data(data),
           _isUnique(isUnique),
           _collectionNamespace(collectionNamespace),
-          _indexName(indexName) {
+          _indexName(indexName),
+          _keyPattern(keyPattern) {
         _currentKeySize = 0;
     }
 
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) {
         return new EphemeralForTestBtreeBuilderImpl(
-            _data, &_currentKeySize, dupsAllowed, _collectionNamespace, _indexName);
+            _data, &_currentKeySize, dupsAllowed, _collectionNamespace, _indexName, _keyPattern);
     }
 
     virtual StatusWith<SpecialFormatInserted> insert(OperationContext* opCtx,
@@ -159,7 +164,7 @@ public:
 
         // TODO optimization: save the iterator from the dup-check to speed up insert
         if (!dupsAllowed && isDup(*_data, key, loc))
-            return dupKeyError(key, _collectionNamespace, _indexName);
+            return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
 
         IndexKeyEntry entry(key.getOwned(), loc);
         if (_data->insert(entry).second) {
@@ -205,7 +210,7 @@ public:
     virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key, const RecordId& loc) {
         invariant(!hasFieldNames(key));
         if (isDup(*_data, key, loc))
-            return dupKeyError(key, _collectionNamespace, _indexName);
+            return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
         return Status::OK();
     }
 
@@ -503,6 +508,7 @@ private:
 
     const std::string _collectionNamespace;
     const std::string _indexName;
+    const BSONObj _keyPattern;
 };
 }  // namespace
 
@@ -512,13 +518,17 @@ SortedDataInterface* getEphemeralForTestBtreeImpl(const Ordering& ordering,
                                                   bool isUnique,
                                                   const std::string& collectionNamespace,
                                                   const std::string& indexName,
+                                                  const BSONObj& keyPattern,
                                                   std::shared_ptr<void>* dataInOut) {
     invariant(dataInOut);
     if (!*dataInOut) {
         *dataInOut = std::make_shared<IndexSet>(IndexEntryComparison(ordering));
     }
-    return new EphemeralForTestBtreeImpl(
-        static_cast<IndexSet*>(dataInOut->get()), isUnique, collectionNamespace, indexName);
+    return new EphemeralForTestBtreeImpl(static_cast<IndexSet*>(dataInOut->get()),
+                                         isUnique,
+                                         collectionNamespace,
+                                         indexName,
+                                         keyPattern);
 }
 
 }  // namespace mongo

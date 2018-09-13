@@ -204,4 +204,12 @@ private:
 
 };  // struct IndexEntryComparison
 
+/**
+ * Returns the formatted error status about the duplicate key.
+ */
+Status buildDupKeyErrorStatus(const BSONObj& key,
+                              const std::string& collectionNamespace,
+                              const std::string& indexName,
+                              const BSONObj& keyPattern);
+
 }  // namespace mongo

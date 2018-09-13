@@ -148,6 +148,10 @@ public:
         return _indexName;
     }
 
+    const BSONObj& keyPattern() const {
+        return _keyPattern;
+    }
+
     bool isIdIndex() const {
         return _isIdIndex;
     }
@@ -182,8 +186,9 @@ protected:
     int _dataFormatVersion;
     std::string _uri;
     uint64_t _tableId;
-    std::string _collectionNamespace;
-    std::string _indexName;
+    const std::string _collectionNamespace;
+    const std::string _indexName;
+    const BSONObj _keyPattern;
     KVPrefix _prefix;
     bool _isIdIndex;
 };

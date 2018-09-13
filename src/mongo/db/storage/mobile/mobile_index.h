@@ -114,8 +114,6 @@ public:
 protected:
     bool _isDup(OperationContext* opCtx, const BSONObj& key, RecordId recId);
 
-    Status _dupKeyError(const BSONObj& key);
-
     /**
      * Performs the deletion from the table matching the given key.
      */
@@ -141,6 +139,7 @@ protected:
     const std::string _ident;
     const std::string _collectionNamespace;
     const std::string _indexName;
+    const BSONObj _keyPattern;
 };
 
 class MobileIndexStandard final : public MobileIndex {

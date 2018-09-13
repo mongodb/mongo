@@ -98,7 +98,8 @@ mongo::SortedDataInterface* KVEngine::getSortedDataInterface(OperationContext* o
                                    desc->unique(),
                                    ident,
                                    desc->parentNS(),
-                                   desc->indexName());
+                                   desc->indexName(),
+                                   desc->keyPattern());
 }
 
 
