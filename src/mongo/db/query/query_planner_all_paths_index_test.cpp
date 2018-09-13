@@ -986,9 +986,112 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexesDoNotSupportElemMatchObject) {
     assertHasOnlyCollscan();
 }
 
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexCanProvideNonBlockingSort) {
+    addAllPathsIndex(BSON("$**" << 1));
+
+    runQuerySortProj(fromjson("{a: 1}"), BSON("a" << 1), BSONObj());
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'$_path': 1, a: 1}, "
+        "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest,
+       AllPathsIndexCanProvideNonBlockingSortWhenFilterIncludesAdditionalFields) {
+    addAllPathsIndex(BSON("$**" << 1));
+
+    runQuerySortProj(fromjson("{a: {$gte: 3}, b: 1}"), BSON("a" << 1), BSONObj());
+    assertNumSolutions(2U);
+    // The non-blocking sort solution.
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'$_path': 1, a: 1}, "
+        "bounds: {'$_path': [['a','a',true,true]], a: [[3,Infinity,true,true]]}}}}}");
+
+    // A blocking sort solution (by doing a scan with a filter on 'b').
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{fetch: {filter: {a: {$gte: 3}}, node: "
+        "{ixscan: {pattern: {'$_path': 1, b: 1},"
+        "bounds: {'$_path': [['b','b',true,true]], b: [[1, 1, true, true]]}}}}}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWithElemMatch) {
+    addAllPathsIndex(BSON("$**" << 1), {"a"});
+
+    runQuerySortProj(fromjson("{a: {$elemMatch: {$eq: 1}}}"), BSON("a" << 1), BSONObj());
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{fetch: {filter: {a: {$elemMatch: {$eq: 1}}}, node: "
+        "{ixscan: {pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[1, 1, true, true]]}}}}}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWithCompoundSort) {
+    addAllPathsIndex(BSON("$**" << 1));
+
+    runQuerySortProj(fromjson("{a: {$lte: 3}}"), BSON("a" << 1 << "b" << 1), BSONObj());
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{fetch: {filter: null, node: "
+        "{ixscan: {pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [[-Infinity, 3, true, true]]}}}}}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWithExistsQueries) {
+    addAllPathsIndex(BSON("$**" << 1));
+
+    runQuerySortProj(fromjson("{a: {$exists: true}}"), BSON("a" << 1), BSONObj());
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{fetch: {filter: null, node: "
+        "{ixscan: {pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: [['MinKey', 'MaxKey', true, "
+        "true]]}}}}}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFilterNotPresent) {
+    // Since there's no filter on the field that we're sorting by, we cannot use an index scan to
+    // answer the query as $** indexes are sparse.
+    runQuerySortProj(BSONObj(), fromjson("{a: 1}"), BSONObj());
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{cscan: {dir: 1}}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFilterDoesNotIncludeSortKey) {
+    addAllPathsIndex(BSON("$**" << 1));
+
+    runQuerySortProj(fromjson("{b: 1, c: 1}"), fromjson("{a: 1}"), BSONObj());
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{fetch: {filter: {c: 1}, node: "
+        "{ixscan: {pattern: {'$_path': 1, b: 1},"
+        "bounds: {'$_path': [['b','b',true,true]], b: [[1, 1, true, true]]}}}}}}}}}");
+    assertSolutionExists(
+        "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{fetch: {filter: {b: 1}, node: "
+        "{ixscan: {pattern: {'$_path': 1, c: 1},"
+        "bounds: {'$_path': [['c','c',true,true]], c: [[1, 1, true, true]]}}}}}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFieldIsNotIncluded) {
+    addAllPathsIndex(BSON("$**" << 1), {}, BSON("b" << 0));
+
+    runQuerySortProj(fromjson("{b: 1}"), fromjson("{b: 1}"), BSONObj());
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{sort: {pattern: {b: 1}, limit: 0, node: "
+        "{sortKeyGen: {node: "
+        "{cscan: {dir: 1, filter: {b: 1}}}"
+        "}}}}");
+}
+
 // TODO SERVER-35335: Add testing for Min/Max.
 // TODO SERVER-36517: Add testing for DISTINCT_SCAN.
 // TODO SERVER-35331: Add testing for hints.
-// TODO SERVER-36145: Add testing for non-blocking sort.
 
 }  // namespace mongo
