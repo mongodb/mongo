@@ -57,7 +57,7 @@ const auto operationSessionDecoration =
 
 SessionCatalog::~SessionCatalog() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    for (const auto& entry : _txnTable) {
+    for (const auto& entry : _sessions) {
         auto& sri = entry.second;
         invariant(!sri->checkedOut);
     }
@@ -65,7 +65,7 @@ SessionCatalog::~SessionCatalog() {
 
 void SessionCatalog::reset_forTest() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    _txnTable.clear();
+    _sessions.clear();
 }
 
 SessionCatalog* SessionCatalog::get(OperationContext* opCtx) {
@@ -173,7 +173,7 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
         // We cannot remove checked-out sessions from the cache, because operations expect to find
         // them there to check back in
         if (!sri->checkedOut) {
-            _txnTable.erase(it);
+            _sessions.erase(it);
         }
     };
 
@@ -183,13 +183,13 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
         const auto lsid = LogicalSessionId::parse(IDLParserErrorContext("lsid"),
                                                   singleSessionDoc->getField("_id").Obj());
 
-        auto it = _txnTable.find(lsid);
-        if (it != _txnTable.end()) {
+        auto it = _sessions.find(lsid);
+        if (it != _sessions.end()) {
             invalidateSessionFn(lg, it);
         }
     } else {
-        auto it = _txnTable.begin();
-        while (it != _txnTable.end()) {
+        auto it = _sessions.begin();
+        while (it != _sessions.end()) {
             invalidateSessionFn(lg, it++);
         }
     }
@@ -200,9 +200,9 @@ void SessionCatalog::scanSessions(OperationContext* opCtx,
                                   stdx::function<void(OperationContext*, Session*)> workerFn) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    LOG(2) << "Beginning scanSessions. Scanning " << _txnTable.size() << " sessions.";
+    LOG(2) << "Beginning scanSessions. Scanning " << _sessions.size() << " sessions.";
 
-    for (auto it = _txnTable.begin(); it != _txnTable.end(); ++it) {
+    for (auto it = _sessions.begin(); it != _sessions.end(); ++it) {
         // TODO SERVER-33850: Rename KillAllSessionsByPattern and
         // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill.
         if (const KillAllSessionsByPattern* pattern = matcher.match(it->first)) {
@@ -216,9 +216,9 @@ std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getOrCreate
     WithLock, OperationContext* opCtx, const LogicalSessionId& lsid) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
-    auto it = _txnTable.find(lsid);
-    if (it == _txnTable.end()) {
-        it = _txnTable.emplace(lsid, std::make_shared<SessionRuntimeInfo>(lsid)).first;
+    auto it = _sessions.find(lsid);
+    if (it == _sessions.end()) {
+        it = _sessions.emplace(lsid, std::make_shared<SessionRuntimeInfo>(lsid)).first;
     }
 
     return it->second;
@@ -227,8 +227,8 @@ std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getOrCreate
 void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    auto it = _txnTable.find(lsid);
-    invariant(it != _txnTable.end());
+    auto it = _sessions.find(lsid);
+    invariant(it != _sessions.end());
 
     auto& sri = it->second;
     invariant(sri->checkedOut);

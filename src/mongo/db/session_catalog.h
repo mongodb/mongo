@@ -162,7 +162,7 @@ private:
     void _releaseSession(const LogicalSessionId& lsid);
 
     stdx::mutex _mutex;
-    SessionRuntimeInfoMap _txnTable;
+    SessionRuntimeInfoMap _sessions;
 };
 
 /**
