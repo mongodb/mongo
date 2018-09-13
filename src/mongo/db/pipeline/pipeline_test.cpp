@@ -57,6 +57,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
+#include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
 namespace {
@@ -99,6 +100,8 @@ void assertPipelineOptimizesAndSerializesTo(std::string inputPipeJson,
     AggregationRequest request(kTestNss, rawPipeline);
     intrusive_ptr<ExpressionContextForTest> ctx =
         new ExpressionContextForTest(opCtx.get(), request);
+    TempDir tempDir("PipelineTest");
+    ctx->tempDir = tempDir.path();
 
     // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
     // operations will be able to have a resolved view definition.
@@ -1612,6 +1615,8 @@ public:
         AggregationRequest request(kTestNss, rawPipeline);
         intrusive_ptr<ExpressionContextForTest> ctx =
             new ExpressionContextForTest(&_opCtx, request);
+        TempDir tempDir("PipelineTest");
+        ctx->tempDir = tempDir.path();
 
         // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
         // operations will be able to have a resolved view definition.

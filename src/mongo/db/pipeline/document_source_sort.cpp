@@ -51,6 +51,7 @@ using std::string;
 using std::vector;
 
 namespace {
+
 Value missingToNull(Value maybeMissing) {
     return maybeMissing.missing() ? Value(BSONNULL) : maybeMissing;
 }
@@ -95,7 +96,23 @@ Value deserializeSortKey(size_t sortPatternSize, BSONObj bsonSortKey) {
     return Value{std::move(keys)};
 }
 
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicUInt32 documentSourceSortFileCounter;
+    return "extsort-doc-source-sort." +
+        std::to_string(documentSourceSortFileCounter.fetchAndAdd(1));
+}
+
 }  // namespace
+
 constexpr StringData DocumentSourceSort::kStageName;
 
 DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
@@ -385,6 +402,9 @@ public:
         }
     }
 
+    void openSource() {}
+    void closeSource() {}
+
 private:
     DocumentSourceSort* _sorter;
     DBClientCursor* _cursor;
@@ -396,7 +416,7 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
         iterators.push_back(std::make_shared<IteratorFromCursor>(this, cursors[i]));
     }
 
-    _output.reset(MySorter::Iterator::merge(iterators, makeSortOptions(), Comparator(*this)));
+    _output.reset(MySorter::Iterator::merge(iterators, "", makeSortOptions(), Comparator(*this)));
     _populated = true;
 }
 
@@ -569,7 +589,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSort::getMergeSources() {
     other->_rawSort = _rawSort;
     return {other};
 }
-}
+
+}  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
 // Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

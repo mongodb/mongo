@@ -46,10 +46,31 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
+#include <memory>
+
+namespace mongo {
+
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicUInt32 sorterTestFileCounter;
+    return "extsort-sorter-test." + std::to_string(sorterTestFileCounter.fetchAndAdd(1));
+}
+
+}  // namespace mongo
+
 // Need access to internal classes
 #include "mongo/db/sorter/sorter.cpp"
 
 namespace mongo {
+
 using namespace mongo::sorter;
 using std::make_shared;
 using std::pair;
@@ -117,6 +138,8 @@ class IntIterator : public IWIterator {
 public:
     IntIterator(int start = 0, int stop = INT_MAX, int increment = 1)
         : _current(start), _increment(increment), _stop(stop) {}
+    void openSource() {}
+    void closeSource() {}
     bool more() {
         if (_increment == 0)
             return true;
@@ -138,6 +161,8 @@ private:
 
 class EmptyIterator : public IWIterator {
 public:
+    void openSource() {}
+    void closeSource() {}
     bool more() {
         return false;
     }
@@ -152,6 +177,9 @@ public:
         : _remaining(limit), _source(source) {
         verify(limit > 0);
     }
+
+    void openSource() {}
+    void closeSource() {}
 
     bool more() {
         return _remaining && _source->more();
@@ -171,6 +199,8 @@ template <typename It1, typename It2>
 void _assertIteratorsEquivalent(It1 it1, It2 it2, int line) {
     int iteration;
     try {
+        it1->openSource();
+        it2->openSource();
         for (iteration = 0; true; iteration++) {
             ASSERT_EQUALS(it1->more(), it2->more());
             ASSERT_EQUALS(it1->more(), it2->more());  // make sure more() is safe to call twice
@@ -182,10 +212,13 @@ void _assertIteratorsEquivalent(It1 it1, It2 it2, int line) {
             ASSERT_EQUALS(pair1.first, pair2.first);
             ASSERT_EQUALS(pair1.second, pair2.second);
         }
-
+        it1->closeSource();
+        it2->closeSource();
     } catch (...) {
         mongo::unittest::log() << "Failure from line " << line << " on iteration " << iteration
                                << std::endl;
+        it1->closeSource();
+        it2->closeSource();
         throw;
     }
 }
@@ -203,10 +236,11 @@ template <typename IteratorPtr, int N>
 std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
                                            Direction Dir = ASC,
                                            const SortOptions& opts = SortOptions()) {
+    invariant(!opts.extSortAllowed);
     std::vector<std::shared_ptr<IWIterator>> vec;
     for (int i = 0; i < N; i++)
         vec.push_back(std::shared_ptr<IWIterator>(array[i]));
-    return std::shared_ptr<IWIterator>(IWIterator::merge(vec, opts, IWComparator(Dir)));
+    return std::shared_ptr<IWIterator>(IWIterator::merge(vec, "", opts, IWComparator(Dir)));
 }
 
 //
@@ -233,6 +267,8 @@ public:
             class UnsortedIter : public IWIterator {
             public:
                 UnsortedIter() : _pos(0) {}
+                void openSource() {}
+                void closeSource() {}
                 bool more() {
                     return _pos < sizeof(unsorted) / sizeof(unsorted[0]);
                 }
@@ -256,7 +292,8 @@ public:
         unittest::TempDir tempDir("sortedFileWriterTests");
         const SortOptions opts = SortOptions().TempDir(tempDir.path());
         {  // small
-            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts);
+            std::string fileName = opts.tempDir + "/" + nextFileName();
+            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, fileName, 0);
             sorter.addAlreadySorted(0, 0);
             sorter.addAlreadySorted(1, -1);
             sorter.addAlreadySorted(2, -2);
@@ -264,14 +301,19 @@ public:
             sorter.addAlreadySorted(4, -4);
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
                                         make_shared<IntIterator>(0, 5));
+
+            ASSERT_TRUE(boost::filesystem::remove(fileName));
         }
         {  // big
-            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts);
+            std::string fileName = opts.tempDir + "/" + nextFileName();
+            SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, fileName, 0);
             for (int i = 0; i < 10 * 1000 * 1000; i++)
                 sorter.addAlreadySorted(i, -i);
 
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
                                         make_shared<IntIterator>(0, 10 * 1000 * 1000));
+
+            ASSERT_TRUE(boost::filesystem::remove(fileName));
         }
 
         ASSERT(boost::filesystem::is_empty(tempDir.path()));
@@ -285,7 +327,7 @@ public:
         {  // test empty (no inputs)
             std::vector<std::shared_ptr<IWIterator>> vec;
             std::shared_ptr<IWIterator> mergeIter(
-                IWIterator::merge(vec, SortOptions(), IWComparator()));
+                IWIterator::merge(vec, "", SortOptions(), IWComparator()));
             ASSERT_ITERATORS_EQUIVALENT(mergeIter, make_shared<EmptyIterator>());
         }
         {  // test empty (only empty inputs)
@@ -497,12 +539,6 @@ public:
     void addData(unowned_ptr<IWSorter> sorter) {
         for (int i = 0; i < NUM_ITEMS; i++)
             sorter->add(_array[i], -_array[i]);
-
-        if (typeid(*this) == typeid(LotsOfDataLittleMemory)) {
-            // don't do this check in subclasses since they may set a limit
-            ASSERT_GREATER_THAN_OR_EQUALS(static_cast<size_t>(sorter->numFiles()),
-                                          (NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT);
-        }
     }
 
     virtual std::shared_ptr<IWIterator> correct() {

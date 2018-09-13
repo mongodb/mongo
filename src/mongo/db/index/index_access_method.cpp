@@ -602,6 +602,20 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
     }
 }
 
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicUInt32 indexAccessMethodFileCounter;
+    return "extsort-index." + std::to_string(indexAccessMethodFileCounter.fetchAndAdd(1));
+}
+
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"

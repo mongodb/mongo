@@ -221,7 +221,7 @@ protected:
         expressionContext->tempDir = _tempDir.path();
 
         _group = DocumentSourceGroup::createFromBson(specElement, expressionContext);
-        assertRoundTrips(_group);
+        assertRoundTrips(_group, expressionContext);
     }
     DocumentSourceGroup* group() {
         return static_cast<DocumentSourceGroup*>(_group.get());
@@ -240,13 +240,14 @@ protected:
 
 private:
     /** Check that the group's spec round trips. */
-    void assertRoundTrips(const intrusive_ptr<DocumentSource>& group) {
+    void assertRoundTrips(const intrusive_ptr<DocumentSource>& group,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
         // We don't check against the spec that generated 'group' originally, because
         // $const operators may be introduced in the first serialization.
         BSONObj spec = toBson(group);
         BSONElement specElement = spec.firstElement();
         intrusive_ptr<DocumentSource> generated =
-            DocumentSourceGroup::createFromBson(specElement, ctx());
+            DocumentSourceGroup::createFromBson(specElement, expCtx);
         ASSERT_BSONOBJ_EQ(spec, toBson(generated));
     }
     std::unique_ptr<QueryTestServiceContext> _queryServiceContext;
