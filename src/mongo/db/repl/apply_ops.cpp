@@ -286,11 +286,15 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
     // Abort transaction unconditionally for now.
     // TODO: SERVER-35875 / SERVER-35877 Abort or commit transactions on secondaries accordingly.
-    ScopeGuard abortGuard = MakeGuard([&] { transaction->abortActiveTransaction(opCtx); });
+    ON_BLOCK_EXIT([&] { transaction->abortActiveTransaction(opCtx); });
 
-    _applyOps(
+    auto status = _applyOps(
         opCtx, dbName, applyOpCmd, info, oplogApplicationMode, result, numApplied, opsBuilder);
+    if (!status.isOK()) {
+        return status;
+    }
     transaction->prepareTransaction(opCtx, optime);
+
     return Status::OK();
 }
 
