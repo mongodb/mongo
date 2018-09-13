@@ -94,11 +94,7 @@ Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
 mongo::SortedDataInterface* KVEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              StringData ident,
                                                              const IndexDescriptor* desc) {
-    return new SortedDataInterface(Ordering::make(desc->keyPattern()),
-                                   desc->unique(),
-                                   ident,
-                                   desc->parentNS(),
-                                   desc->indexName());
+    return new SortedDataInterface(Ordering::make(desc->keyPattern()), desc->unique(), ident);
 }
 
 

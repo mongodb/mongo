@@ -60,10 +60,9 @@ public:
         fassert(37052, status);
 
         if (isUnique) {
-            return stdx::make_unique<MobileIndexUnique>(
-                _ordering, ident, "test.mobile", "indexName");
+            return stdx::make_unique<MobileIndexUnique>(_ordering, ident);
         }
-        return stdx::make_unique<MobileIndexStandard>(_ordering, ident, "test.mobile", "indexName");
+        return stdx::make_unique<MobileIndexStandard>(_ordering, ident);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() {

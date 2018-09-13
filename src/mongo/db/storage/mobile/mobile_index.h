@@ -43,11 +43,7 @@ class MobileIndex : public SortedDataInterface {
 public:
     MobileIndex(OperationContext* opCtx, const IndexDescriptor* desc, const std::string& ident);
 
-    MobileIndex(bool isUnique,
-                const Ordering& ordering,
-                const std::string& ident,
-                const std::string& collectionNamespace,
-                const std::string& indexName);
+    MobileIndex(bool isUnique, const Ordering& ordering, const std::string& ident);
 
     virtual ~MobileIndex() {}
 
@@ -139,8 +135,6 @@ protected:
     const Ordering _ordering;
     const KeyString::Version _keyStringVersion = KeyString::kLatestVersion;
     const std::string _ident;
-    const std::string _collectionNamespace;
-    const std::string _indexName;
 };
 
 class MobileIndexStandard final : public MobileIndex {

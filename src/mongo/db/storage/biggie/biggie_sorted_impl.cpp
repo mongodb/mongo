@@ -83,6 +83,13 @@ BSONObj stripFieldNames(const BSONObj& obj) {
     return bob.obj();
 }
 
+Status dupKeyError(const BSONObj& key) {
+    StringBuilder sb;
+    sb << "E11000 duplicate key error ";
+    sb << "dup key: " << key;
+    return Status(ErrorCodes::DuplicateKey, sb.str());
+}
+
 // This function converts a key and an ordering to a KeyString.
 std::unique_ptr<KeyString> keyToKeyString(const BSONObj& key, Ordering order) {
     KeyString::Version version = KeyString::Version::V1;
@@ -213,17 +220,13 @@ int compareTwoKeys(
 SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
                                                        bool dupsAllowed,
                                                        Ordering order,
-                                                       const std::string& prefix,
-                                                       const std::string& identEnd,
-                                                       const std::string& collectionNamespace,
-                                                       const std::string& indexName)
+                                                       std::string prefix,
+                                                       std::string identEnd)
     : _opCtx(opCtx),
       _dupsAllowed(dupsAllowed),
       _order(order),
       _prefix(prefix),
       _identEnd(identEnd),
-      _collectionNamespace(collectionNamespace),
-      _indexName(indexName),
       _hasLast(false),
       _lastKeyToString(""),
       _lastRID(-1) {}
@@ -258,7 +261,7 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
                       "expected ascending (key, RecordId) order in bulk builder");
     }
     if (!_dupsAllowed && twoKeyCmp == 0 && twoRIDCmp != 0) {
-        return dupKeyError(key, _collectionNamespace, _indexName);
+        return dupKeyError(key);
     }
 
     std::string workingCopyInsertKey = combineKeyAndRID(key, loc, _prefix, _order);
@@ -280,25 +283,18 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
 
 SortedDataBuilderInterface* SortedDataInterface::getBulkBuilder(OperationContext* opCtx,
                                                                 bool dupsAllowed) {
-    return new SortedDataBuilderInterface(
-        opCtx, dupsAllowed, _order, _prefix, _identEnd, _collectionNamespace, _indexName);
+    return new SortedDataBuilderInterface(opCtx, dupsAllowed, _order, _prefix, _identEnd);
 }
 
 // We append \1 to all idents we get, and therefore the KeyString with ident + \0 will only be
 // before elements in this ident, and the KeyString with ident + \2 will only be after elements in
 // this ident.
-SortedDataInterface::SortedDataInterface(const Ordering& ordering,
-                                         bool isUnique,
-                                         StringData ident,
-                                         const std::string& collectionNamespace,
-                                         const std::string& indexName)
+SortedDataInterface::SortedDataInterface(const Ordering& ordering, bool isUnique, StringData ident)
     : _order(ordering),
       // All entries in this ident will have a prefix of ident + \1.
       _prefix(ident.toString().append(1, '\1')),
       // Therefore, the string ident + \2 will be greater than all elements in this ident.
       _identEnd(ident.toString().append(1, '\2')),
-      _collectionNamespace(collectionNamespace),
-      _indexName(indexName),
       _isUnique(isUnique) {
     // This is the string representation of the KeyString before elements in this ident, which is
     // ident + \0. This is before all elements in this ident.
@@ -344,7 +340,7 @@ StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* 
             auto ks1 = keyToKeyString(ike.key, _order);
             auto ks2 = keyToKeyString(key, _order);
             if (ks1->compare(*ks2) == 0 && ike.loc.repr() != loc.repr()) {
-                return dupKeyError(key, _collectionNamespace, _indexName);
+                return dupKeyError(key);
             }
         }
     }
@@ -402,7 +398,7 @@ Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx,
         lowerBoundIterator->first.compare(_KSForIdentEnd) < 0 &&
         lowerBoundIterator->first.compare(
             combineKeyAndRID(key, RecordId::max(), _prefix, _order)) <= 0) {
-        return dupKeyError(key, _collectionNamespace, _indexName);
+        return dupKeyError(key);
     }
     return Status::OK();
 }
