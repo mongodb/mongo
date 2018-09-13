@@ -213,9 +213,10 @@
         assert.throws(() => assert.commandWorked(res));
         assert.throws(() => assert.commandWorkedIgnoringWriteErrors(res));
         assert.doesNotThrow(() => assert.commandFailed(res));
-        assert.doesNotThrow(() => assert.commandFailedWithCode(res, ErrorCodes.InternalError));
-        assert.doesNotThrow(
-            () => assert.commandFailedWithCode(res, [ErrorCodes.InternalError, kFakeErrCode]));
+        assert.doesNotThrow(() =>
+                                assert.commandFailedWithCode(res, ErrorCodes.JSInterpreterFailure));
+        assert.doesNotThrow(() => assert.commandFailedWithCode(
+                                res, [ErrorCodes.JSInterpreterFailure, kFakeErrCode]));
     });
 
     tests.push(function crudInsertOneOk() {
