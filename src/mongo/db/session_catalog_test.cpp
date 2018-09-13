@@ -207,5 +207,74 @@ TEST_F(SessionCatalogTest, ScanSessions) {
     ASSERT_EQ(lsids.front(), lsid2);
 }
 
+TEST_F(SessionCatalogTest, PreventCheckout) {
+    const auto lsid = makeLogicalSessionIdForTest();
+    opCtx()->setLogicalSessionId(lsid);
+    opCtx()->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+
+    {
+        SessionCatalog::PreventCheckingOutSessionsBlock preventCheckoutBlock(catalog());
+
+        ASSERT_THROWS_CODE(
+            catalog()->checkOutSession(opCtx()), AssertionException, ErrorCodes::MaxTimeMSExpired);
+    }
+
+    auto scopedSession = catalog()->checkOutSession(opCtx());
+    ASSERT(scopedSession.get());
+    ASSERT_EQ(lsid, scopedSession->getSessionId());
+}
+
+TEST_F(SessionCatalogTest, WaitForAllSessions) {
+    const auto lsid1 = makeLogicalSessionIdForTest();
+    const auto lsid2 = makeLogicalSessionIdForTest();
+    opCtx()->setLogicalSessionId(lsid1);
+
+    // Check out a Session.
+    boost::optional<OperationContextSession> ocs;
+    ocs.emplace(opCtx(), true);
+    ASSERT_EQ(lsid1, ocs->get(opCtx())->getSessionId());
+
+    // Prevent new Sessions from being checked out.
+    boost::optional<SessionCatalog::PreventCheckingOutSessionsBlock> preventCheckoutBlock;
+    preventCheckoutBlock.emplace(catalog());
+
+    // Enqueue a request to check out a Session.
+    auto future = stdx::async(stdx::launch::async, [&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready();
+        auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+        sideOpCtx->setLogicalSessionId(lsid2);
+        auto asyncScopedSession =
+            SessionCatalog::get(sideOpCtx.get())->checkOutSession(sideOpCtx.get());
+
+        ASSERT(asyncScopedSession.get());
+        ASSERT_EQ(lsid2, asyncScopedSession->getSessionId());
+    });
+
+    // Ensure that waitForAllSessionsToBeCheckedIn() times out since we are holding a Session
+    // checked out.
+    opCtx()->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+    ASSERT_THROWS_CODE(preventCheckoutBlock->waitForAllSessionsToBeCheckedIn(opCtx()),
+                       AssertionException,
+                       ErrorCodes::MaxTimeMSExpired);
+
+    ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+
+    // Release the Session we have checked out.
+    ocs.reset();
+
+    // Now ensure that waitForAllSessionsToBeCheckedIn() can complete.
+    preventCheckoutBlock->waitForAllSessionsToBeCheckedIn(opCtx());
+
+    // Ensure that the async thread trying to check out a Session is still blocked.
+    ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+
+    // Allow checking out Sessions to proceed.
+    preventCheckoutBlock.reset();
+
+    // Ensure that the async thread can now proceed and successfully check out a Session.
+    future.get();
+}
+
 }  // namespace
 }  // namespace mongo
