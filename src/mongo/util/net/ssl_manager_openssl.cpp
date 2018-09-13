@@ -54,6 +54,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/cidr.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_options.h"
@@ -61,6 +62,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
 
+#include <netinet/in.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/evp.h>
@@ -1354,6 +1356,9 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
             SSLPeerInfo(peerSubject, std::move(swPeerCertificateRoles.getValue())));
     }
 
+    // This is to standardize the IPAddress format for comparison.
+    auto swCIDRRemoteHost = CIDR::parse(remoteHost);
+
     // Try to match using the Subject Alternate Name, if it exists.
     // RFC-2818 requires the Subject Alternate Name to be used if present.
     // Otherwise, the most specific Common Name field in the subject field
@@ -1372,12 +1377,44 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
         for (int i = 0; i < sanNamesList; i++) {
             const GENERAL_NAME* currentName = sk_GENERAL_NAME_value(sanNames, i);
             if (currentName && currentName->type == GEN_DNS) {
-                char* dnsName = reinterpret_cast<char*>(ASN1_STRING_data(currentName->d.dNSName));
+                std::string dnsName(
+                    reinterpret_cast<char*>(ASN1_STRING_data(currentName->d.dNSName)));
+                auto swCIDRDNSName = CIDR::parse(dnsName);
+                if (swCIDRDNSName.isOK()) {
+                    warning() << "You have an IP Address in the DNS Name field on your "
+                                 "certificate. This formulation is deprecated.";
+                    if (swCIDRRemoteHost.isOK() &&
+                        swCIDRRemoteHost.getValue() == swCIDRDNSName.getValue()) {
+                        sanMatch = true;
+                        break;
+                    }
+                }
                 if (hostNameMatchForX509Certificates(remoteHost, dnsName)) {
                     sanMatch = true;
                     break;
                 }
-                certificateNames << std::string(dnsName) << " ";
+                certificateNames << std::string(dnsName) << ", ";
+            } else if (currentName && currentName->type == GEN_IPADD) {
+                auto ipAddrStruct = currentName->d.iPAddress;
+                struct sockaddr_storage ss;
+                memset(&ss, 0, sizeof(ss));
+                if (ipAddrStruct->length == 4) {
+                    struct sockaddr_in* sa = reinterpret_cast<struct sockaddr_in*>(&ss);
+                    sa->sin_family = AF_INET;
+                    memcpy(&(sa->sin_addr), ipAddrStruct->data, ipAddrStruct->length);
+                } else if (ipAddrStruct->length == 16) {
+                    struct sockaddr_in6* sa = reinterpret_cast<struct sockaddr_in6*>(&ss);
+                    sa->sin6_family = AF_INET6;
+                    memcpy(&(sa->sin6_addr), ipAddrStruct->data, ipAddrStruct->length);
+                }
+                auto ipAddress = SockAddr(ss, sizeof(ss)).getAddr();
+                auto swIpAddress = CIDR::parse(ipAddress);
+                if (swCIDRRemoteHost.isOK() && swIpAddress.isOK() &&
+                    swCIDRRemoteHost.getValue() == swIpAddress.getValue()) {
+                    sanMatch = true;
+                    break;
+                }
+                certificateNames << ipAddress << ", ";
             }
         }
         sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);

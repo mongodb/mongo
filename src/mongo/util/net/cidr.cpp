@@ -101,6 +101,7 @@ StatusWith<CIDR> CIDR::parse(StringData s) noexcept try {
 }
 
 CIDR::CIDR(StringData s) try {
+    _ip.fill(0);
     auto slash = find(begin(s), end(s), '/');
     auto ip = (slash == end(s)) ? s.toString() : s.substr(0, slash - begin(s)).toString();
 

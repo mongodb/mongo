@@ -42,6 +42,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer_context.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -53,6 +54,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/private/ssl_expiration.h"
+#include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl.hpp"
 #include "mongo/util/net/ssl_options.h"
@@ -1521,10 +1523,29 @@ StatusWith<std::vector<std::string>> getSubjectAlternativeNames(PCCERT_CONTEXT c
     CERT_ALT_NAME_INFO* altNames = reinterpret_cast<CERT_ALT_NAME_INFO*>(swBlob.getValue().data());
     for (size_t i = 0; i < altNames->cAltEntry; i++) {
         if (altNames->rgAltEntry[i].dwAltNameChoice == CERT_ALT_NAME_DNS_NAME) {
-            names.push_back(toUtf8String(altNames->rgAltEntry[i].pwszDNSName));
+            auto san = toUtf8String(altNames->rgAltEntry[i].pwszDNSName);
+            names.push_back(san);
+            auto swCIDRSan = CIDR::parse(san);
+            if (swCIDRSan.isOK()) {
+                warning() << "You have an IP Address in the DNS Name field on your "
+                             "certificate. This formulation is depreceated.";
+            }
+        } else if (altNames->rgAltEntry[i].dwAltNameChoice == CERT_ALT_NAME_IP_ADDRESS) {
+            auto ipAddrStruct = altNames->rgAltEntry[i].IPAddress;
+            struct sockaddr_storage ss;
+            memset(&ss, 0, sizeof(ss));
+            if (ipAddrStruct.cbData == 4) {
+                struct sockaddr_in* sa = reinterpret_cast<struct sockaddr_in*>(&ss);
+                sa->sin_family = AF_INET;
+                memcpy(&(sa->sin_addr), ipAddrStruct.pbData, ipAddrStruct.cbData);
+            } else if (ipAddrStruct.cbData == 16) {
+                struct sockaddr_in6* sa = reinterpret_cast<struct sockaddr_in6*>(&ss);
+                sa->sin6_family = AF_INET6;
+                memcpy(&(sa->sin6_addr), ipAddrStruct.pbData, ipAddrStruct.cbData);
+            }
+            names.push_back(SockAddr(ss, sizeof(struct sockaddr_storage)).getAddr());
         }
     }
-
     return names;
 }
 
@@ -1618,11 +1639,24 @@ Status validatePeerCertificate(const std::string& remoteHost,
     // certificates
     if (certChainPolicyStatus.dwError != S_OK &&
         certChainPolicyStatus.dwError != CRYPT_E_NO_REVOCATION_CHECK) {
+        auto swAltNames = getSubjectAlternativeNames(cert);
         if (certChainPolicyStatus.dwError == CERT_E_CN_NO_MATCH || allowInvalidCertificates) {
+            auto swCIDRRemoteHost = CIDR::parse(remoteHost);
+            if (swAltNames.isOK() && swCIDRRemoteHost.isOK()) {
+                auto remoteHostCIDR = swCIDRRemoteHost.getValue();
+                // Parsing the client's hostname
+                for (const auto& name : swAltNames.getValue()) {
+                    auto swCIDRHost = CIDR::parse(name);
+                    // Checking that the client hostname is an IP address
+                    // and it equals a SAN on the server cert
+                    if (swCIDRHost.isOK() && remoteHostCIDR == swCIDRHost.getValue()) {
+                        return Status::OK();
+                    }
+                }
+            }
 
             // Give the user a hint why the certificate validation failed.
             StringBuilder certificateNames;
-            auto swAltNames = getSubjectAlternativeNames(cert);
             if (swAltNames.isOK() && !swAltNames.getValue().empty()) {
                 for (auto& name : swAltNames.getValue()) {
                     certificateNames << name << " ";
@@ -1657,7 +1691,6 @@ Status validatePeerCertificate(const std::string& remoteHost,
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
-
     return Status::OK();
 }
 

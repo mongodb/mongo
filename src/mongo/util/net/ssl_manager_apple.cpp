@@ -46,6 +46,7 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/cidr.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl/apple.hpp"
@@ -486,11 +487,20 @@ StatusWith<std::vector<std::string>> extractSubjectAlternateNames(::CFDictionary
         if (!swLabel.isOK()) {
             return swLabel.getStatus();
         }
-        if (::CFStringCompare(swLabel.getValue(), CFSTR("DNS Name"), ::kCFCompareCaseInsensitive) !=
+
+        enum SANType { kDNS, kIP };
+        SANType san;
+        if (::CFStringCompare(swLabel.getValue(), CFSTR("DNS Name"), ::kCFCompareCaseInsensitive) ==
             ::kCFCompareEqualTo) {
-            // Skip other elements, e.g. 'Critical'
+            san = kDNS;
+        } else if (::CFStringCompare(swLabel.getValue(),
+                                     CFSTR("IP Address"),
+                                     ::kCFCompareCaseInsensitive) == ::kCFCompareEqualTo) {
+            san = kIP;
+        } else {
             continue;
         }
+
         auto swName = extractDictionaryValue<::CFStringRef>(elem, ::kSecPropertyKeyValue);
         if (!swName.isOK()) {
             return swName.getStatus();
@@ -498,6 +508,16 @@ StatusWith<std::vector<std::string>> extractSubjectAlternateNames(::CFDictionary
         auto swNameStr = toString(swName.getValue());
         if (!swNameStr.isOK()) {
             return swNameStr.getStatus();
+        }
+        // Incase there is an IP Address in the DNS field of a certificate's SAN, we want
+        // to round trip the value through CIDR.
+        auto swCIDRValue = CIDR::parse(swNameStr.getValue());
+        if (swCIDRValue.isOK()) {
+            swNameStr = swCIDRValue.getValue().toString();
+            if (san == kDNS) {
+                warning() << "You have an IP Address in the DNS Name field on your "
+                             "certificate. This formulation is depreceated.";
+            }
         }
         ret.push_back(swNameStr.getValue());
     }
@@ -1367,9 +1387,24 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
         }
     }
 
+    bool ipv6 = false;
+
+    // We want run the hostname through CIDR to standardize the
+    // IP Address notation, making direct comparison possible.
+    auto swCIDRRemoteHost = CIDR::parse(remoteHost);
+    if (swCIDRRemoteHost.isOK() && remoteHost.find(':') != std::string::npos) {
+        ipv6 = true;
+    }
+
     auto result = ::kSecTrustResultInvalid;
     uassertOSStatusOK(::SecTrustEvaluate(cftrust.get(), &result), ErrorCodes::SSLHandshakeFailed);
-    if ((result != ::kSecTrustResultProceed) && (result != ::kSecTrustResultUnspecified)) {
+
+    // ipv6 addresses ignore the results of this check because we
+    // cant guarantee the format of the address apple will return from
+    // comparison between the remote host and the certificate, but
+    // we anyways check the addresses again after they are canonicalized.
+    if ((result != ::kSecTrustResultProceed) && (result != ::kSecTrustResultUnspecified) &&
+        (!ipv6)) {
         return badCert(explainTrustFailure(cftrust.get(), result), _allowInvalidCertificates);
     }
 
@@ -1430,6 +1465,13 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     if (!sans.empty()) {
         certErr << "SAN(s): ";
         for (auto& san : sans) {
+            if (swCIDRRemoteHost.isOK()) {
+                auto swCIDRSan = CIDR::parse(san);
+                if (swCIDRSan.isOK() && swCIDRSan.getValue() == swCIDRRemoteHost.getValue()) {
+                    sanMatch = true;
+                    break;
+                }
+            }
             if (hostNameMatchForX509Certificates(remoteHost, san)) {
                 sanMatch = true;
                 break;
@@ -1441,7 +1483,12 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
         auto swCN = peerSubjectName.getOID(kOID_CommonName);
         if (swCN.isOK()) {
             auto commonName = std::move(swCN.getValue());
-            if (hostNameMatchForX509Certificates(remoteHost, commonName)) {
+            auto swCommonName = CIDR::parse(commonName);
+            if (swCommonName.isOK() && swCIDRRemoteHost.isOK()) {
+                if (swCommonName.getValue() == swCIDRRemoteHost.getValue()) {
+                    cnMatch = true;
+                }
+            } else if (hostNameMatchForX509Certificates(remoteHost, commonName)) {
                 cnMatch = true;
             }
             certErr << "CN: " << commonName;
