@@ -312,7 +312,8 @@ void Cloner::copy(OperationContext* opCtx,
     f.saveLast = time(0);
     f._opts = opts;
 
-    int options = QueryOption_NoCursorTimeout | (opts.slaveOk ? QueryOption_SlaveOk : 0);
+    int options = QueryOption_NoCursorTimeout | (opts.slaveOk ? QueryOption_SlaveOk : 0) |
+        QueryOption_Exhaust;
     {
         Lock::TempRelease tempRelease(opCtx->lockState());
         _conn->query(stdx::function<void(DBClientCursorBatchIterator&)>(f),

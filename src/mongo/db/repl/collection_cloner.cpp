@@ -71,6 +71,8 @@ MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncCollectionCountAttempts, int, 3);
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListIndexesAttempts, int, 3);
 // The number of attempts for the find command, which gets the data.
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncCollectionFindAttempts, int, 3);
+// Whether to use the "exhaust cursor" feature when retrieving collection data.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(collectionClonerUsesExhaust, bool, true);
 }  // namespace
 
 // Failpoint which causes initial sync to hang before establishing its cursor to clone the
@@ -554,7 +556,8 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
             NamespaceStringOrUUID(_sourceNss.db().toString(), *_options.uuid),
             Query(),
             nullptr /* fieldsToReturn */,
-            QueryOption_NoCursorTimeout | QueryOption_SlaveOk,
+            QueryOption_NoCursorTimeout | QueryOption_SlaveOk |
+                (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
             _collectionClonerBatchSize);
     } catch (const DBException& e) {
         auto queryStatus = e.toStatus().withContext(str::stream() << "Error querying collection '"

@@ -510,13 +510,12 @@ unsigned long long DBClientConnection::query(stdx::function<void(DBClientCursorB
                                              const BSONObj* fieldsToReturn,
                                              int queryOptions,
                                              int batchSize) {
-    if (!(availableOptions() & QueryOption_Exhaust)) {
+    if (!(queryOptions & QueryOption_Exhaust) || !(availableOptions() & QueryOption_Exhaust)) {
         return DBClientBase::query(f, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize);
     }
 
     // mask options
-    queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SlaveOk);
-    queryOptions |= (int)QueryOption_Exhaust;
+    queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SlaveOk | QueryOption_Exhaust);
 
     unique_ptr<DBClientCursor> c(
         this->query(nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize));
