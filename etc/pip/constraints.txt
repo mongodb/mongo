@@ -25,7 +25,6 @@ psutil==5.4.3
 pycparser==2.18
 pydocstyle==2.1.1
 PyJWT==1.5.3
-PyKMIP==0.4.0
 pylint==1.8.3
 pymongo==3.6.1
 python-dateutil==2.7.3
@@ -49,6 +48,7 @@ funcsigs==1.0.2; python_version < "3"
 futures==3.2.0; python_version < "3"
 ipaddress==1.0.22; python_version < "3"
 ordereddict==1.1; python_version < "3"
+PyKMIP==0.4.0; python_version < "3"
 singledispatch==3.4.0.3; python_version < "3"
 typing==3.6.1; python_version < "3"
 
