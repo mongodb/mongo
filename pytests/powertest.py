@@ -630,6 +630,17 @@ def install_mongod(bin_dir=None, tarball_url="latest", root_dir=None):
     symlink_dir(tarball_bin_dir, root_bin_dir)
 
 
+def get_boot_datetime(uptime_string):
+    """Return the datetime value of boot_time from formatted print_uptime 'uptime_string'.
+
+    Return -1 if it is not found in 'uptime_string'.
+    """
+    match = re.search(r"last booted (.*), up", uptime_string)
+    if match:
+        return datetime.datetime(*map(int, map(float, re.split("[ :-]", match.groups()[0]))))
+    return -1
+
+
 def print_uptime():
     """Print the last time the system was booted, and the uptime (in seconds)."""
     boot_time_epoch = psutil.boot_time()
@@ -639,7 +650,7 @@ def print_uptime():
 
 
 def call_remote_operation(local_ops, remote_python, script_name, client_args, operation):
-    """Call the remote operation and returns tuple (ret, ouput)."""
+    """Call the remote operation and return tuple (ret, ouput)."""
     client_call = "{} {} {} {}".format(remote_python, script_name, client_args, operation)
     ret, output = local_ops.shell(client_call)
     return ret, output
@@ -1101,13 +1112,18 @@ class MongodControl(object):  # pylint: disable=too-many-instance-attributes
         return self.service.get_pids()
 
 
+def ssh_failure_exit(code, output):
+    """Exit on ssh failure with code."""
+    EXIT_YML["ec2_ssh_failure"] = output
+    local_exit(code)
+
+
 def verify_remote_access(remote_op):
     """Exit if the remote host is not accessible and save result to YML file."""
     if not remote_op.access_established():
         code, output = remote_op.access_info()
         LOGGER.error("Exiting, unable to establish access (%d): %s", code, output)
-        EXIT_YML["ec2_ssh_failure"] = output
-        local_exit(code)
+        ssh_failure_exit(code, output)
 
 
 class LocalToRemoteOperations(object):
@@ -1141,6 +1157,10 @@ class LocalToRemoteOperations(object):
     def access_established(self):
         """Return True if remote access has been established."""
         return self.remote_op.access_established()
+
+    def ssh_error(self, output):
+        """Return True if 'output' contains an ssh error."""
+        return self.remote_op.ssh_error(output)
 
     def access_info(self):
         """Return the return code and output buffer from initial access attempt(s)."""
@@ -1180,11 +1200,14 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
 
     mongo_client_opts = get_mongo_client_args(host=host, port=options.port, options=options)
 
-    # Perform the sequence of operations specified. If any operation fails
-    # then return immediately.
+    # Perform the sequence of operations specified. If any operation fails then return immediately.
     for operation in operations:
+        ret = 0
+        if operation == "noop":
+            pass
+
         # This is the internal "crash" mechanism, which is executed on the remote host.
-        if operation == "crash_server":
+        elif operation == "crash_server":
             ret, output = internal_crash(options.remote_sudo, options.crash_option)
             # An internal crash on Windows is not immediate
             try:
@@ -1244,7 +1267,6 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
             LOGGER.info("Server serverStatus: %s", mongo.admin.command("serverStatus"))
             if options.repl_set:
                 ret = mongo_reconfig_replication(mongo, host_port, options.repl_set)
-            ret = 0 if not ret else 1
 
         elif operation == "stop_mongod":
             ret, output = mongod.stop()
@@ -1299,7 +1321,6 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
 
         elif operation == "remove_lock_file":
             lock_file = os.path.join(options.db_path, "mongod.lock")
-            ret = 0
             if os.path.exists(lock_file):
                 LOGGER.debug("Deleting mongod lockfile %s", lock_file)
                 try:
@@ -2405,6 +2426,8 @@ Examples:
         if ret:
             local_exit(ret)
 
+        boot_time_after_recovery = get_boot_datetime(output)
+
         # Start CRUD clients
         host_port = "{}:{}".format(mongod_host, standard_port)
         for i in xrange(options.num_crud_clients):
@@ -2449,11 +2472,17 @@ Examples:
             crash_canary["args"] = [mongo, options.db_name, options.collection_name, canary_doc]
         ret, output = crash_server_or_kill_mongod(options, crash_canary, standard_port, local_ops,
                                                   script_name, client_args)
+
+        LOGGER.info("Crash server or Kill mongod: %d %s****", ret, output)
+
         # For internal crashes 'ret' is non-zero, because the ssh session unexpectedly terminates.
         if options.crash_method != "internal" and ret:
             raise Exception("Crash of server failed: {}".format(output))
 
         if options.crash_method != "kill":
+            # Check if the crash failed due to an ssh error.
+            if options.crash_method == "internal" and local_ops.ssh_error(output):
+                ssh_failure_exit(ret, output)
             # Wait a bit after sending command to crash the server to avoid connecting to the
             # server before the actual crash occurs.
             time.sleep(10)
@@ -2491,6 +2520,17 @@ Examples:
                                             ssh_connection_options=ssh_connection_options,
                                             ssh_options=ssh_options, use_shell=True)
         verify_remote_access(local_ops)
+        ret, output = call_remote_operation(local_ops, options.remote_python, script_name,
+                                            client_args, "--remoteOperation noop")
+        boot_time_after_crash = get_boot_datetime(output)
+        if boot_time_after_crash == -1 or boot_time_after_recovery == -1:
+            LOGGER.warning(
+                "Cannot compare boot time after recovery: %s with boot time after crash: %s",
+                boot_time_after_recovery, boot_time_after_crash)
+        elif options.crash_method != "kill" and boot_time_after_crash <= boot_time_after_recovery:
+            raise Exception(
+                "System boot time after crash ({}) is not newer than boot time before crash ({})".
+                format(boot_time_after_crash, boot_time_after_recovery))
 
         canary_doc = copy.deepcopy(orig_canary_doc)
 
