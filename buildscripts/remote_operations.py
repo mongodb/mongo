@@ -35,6 +35,7 @@ _OPERATIONS = ["shell", "copy_to", "copy_from"]
 
 _SSH_CONNECTION_ERRORS = [
     "Connection refused",
+    "Connection timed out during banner exchange",
     "Permission denied",
     "System is booting up.",
     "ssh_exchange_identification: read: Connection reset by peer",
@@ -110,12 +111,21 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         return self._call(cmd)
 
     def access_established(self):
-        """Return True if initial access was establsished."""
+        """Return True if initial access was established."""
         return not self._access_code
 
     def access_info(self):
         """Return the return code and output buffer from initial access attempt(s)."""
         return self._access_code, self._access_buff
+
+    @staticmethod
+    def ssh_error(message):
+        """Return True if the error message is generated from the ssh client.
+
+        This can help determine if an error is due to a remote operation failing or an ssh
+        related issue, like a connection issue.
+        """
+        return message.startswith("ssh:")
 
     def operation(  # pylint: disable=too-many-branches
             self, operation_type, operation_param, operation_dir=None):
