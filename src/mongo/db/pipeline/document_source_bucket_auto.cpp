@@ -44,6 +44,44 @@ REGISTER_DOCUMENT_SOURCE(bucketAuto,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceBucketAuto::createFromBson);
 
+namespace {
+
+boost::intrusive_ptr<Expression> parseGroupByExpression(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONElement& groupByField,
+    const VariablesParseState& vps) {
+    if (groupByField.type() == BSONType::Object &&
+        groupByField.embeddedObject().firstElementFieldName()[0] == '$') {
+        return Expression::parseObject(expCtx, groupByField.embeddedObject(), vps);
+    } else if (groupByField.type() == BSONType::String &&
+               groupByField.valueStringData()[0] == '$') {
+        return ExpressionFieldPath::parse(expCtx, groupByField.str(), vps);
+    } else {
+        uasserted(
+            40239,
+            str::stream() << "The $bucketAuto 'groupBy' field must be defined as a $-prefixed "
+                             "path or an expression object, but found: "
+                          << groupByField.toString(false, false));
+    }
+}
+
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicUInt32 documentSourceBucketAutoFileCounter;
+    return "extsort-doc-bucket." +
+        std::to_string(documentSourceBucketAutoFileCounter.fetchAndAdd(1));
+}
+
+}  // namespace
+
 const char* DocumentSourceBucketAuto::getSourceName() const {
     return "$bucketAuto";
 }
@@ -405,28 +443,6 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
     }
 }
 
-namespace {
-
-boost::intrusive_ptr<Expression> parseGroupByExpression(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const BSONElement& groupByField,
-    const VariablesParseState& vps) {
-    if (groupByField.type() == BSONType::Object &&
-        groupByField.embeddedObject().firstElementFieldName()[0] == '$') {
-        return Expression::parseObject(expCtx, groupByField.embeddedObject(), vps);
-    } else if (groupByField.type() == BSONType::String &&
-               groupByField.valueStringData()[0] == '$') {
-        return ExpressionFieldPath::parse(expCtx, groupByField.str(), vps);
-    } else {
-        uasserted(
-            40239,
-            str::stream() << "The $bucketAuto 'groupBy' field must be defined as a $-prefixed "
-                             "path or an expression object, but found: "
-                          << groupByField.toString(false, false));
-    }
-}
-}  // namespace
-
 intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(40240,
@@ -496,6 +512,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
                                             accumulationStatements,
                                             granularityRounder);
 }
+
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"

@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/filesystem/operations.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -39,8 +41,27 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/destructor_guard.h"
 
 namespace mongo {
+
+namespace {
+
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicUInt32 documentSourceGroupFileCounter;
+    return "extsort-doc-group." + std::to_string(documentSourceGroupFileCounter.fetchAndAdd(1));
+}
+
+}  // namespace
 
 using boost::intrusive_ptr;
 using std::shared_ptr;
@@ -276,7 +297,18 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
       _initialized(false),
       _groups(pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false),
-      _extSortAllowed(pExpCtx->extSortAllowed && !pExpCtx->inRouter) {}
+      _extSortAllowed(pExpCtx->extSortAllowed && !pExpCtx->inRouter) {
+    if (!pExpCtx->inRouter && (pExpCtx->extSortAllowed || kDebugBuild)) {
+        // We spill to disk in debug mode, regardless of extSortAllowed, to stress the system.
+        _fileName = pExpCtx->tempDir + "/" + nextFileName();
+    }
+}
+
+DocumentSourceGroup::~DocumentSourceGroup() {
+    if (_ownsFileDeletion) {
+        DESTRUCTOR_GUARD(boost::filesystem::remove(_fileName));
+    }
+}
 
 void DocumentSourceGroup::addAccumulator(AccumulationStatement accumulationStatement) {
     vFieldName.push_back(accumulationStatement.fieldName);
@@ -575,7 +607,11 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
 
                 _sorterIterator.reset(Sorter<Value, Value>::Iterator::merge(
-                    _sortedFiles, SortOptions(), SorterComparator(pExpCtx->getValueComparator())));
+                    _sortedFiles,
+                    _fileName,
+                    SortOptions(),
+                    SorterComparator(pExpCtx->getValueComparator())));
+                _ownsFileDeletion = false;
 
                 // prepare current to accumulate data
                 _currentAccumulators.reserve(numAccumulators);
@@ -608,7 +644,8 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
 
     stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator(pExpCtx->getValueComparator()));
 
-    SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pExpCtx->tempDir));
+    SortedFileWriter<Value, Value> writer(
+        SortOptions().TempDir(pExpCtx->tempDir), _fileName, _nextSortedFileWriterOffset);
     switch (vpAccumulatorFactory.size()) {  // same as ptrs[i]->second.size() for all i.
         case 0:                             // no values, essentially a distinct
             for (size_t i = 0; i < ptrs.size(); i++) {
@@ -636,7 +673,9 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
 
     _groups->clear();
 
-    return shared_ptr<Sorter<Value, Value>::Iterator>(writer.done());
+    Sorter<Value, Value>::Iterator* iteratorPtr = writer.done();
+    _nextSortedFileWriterOffset = writer.getFileEndOffset();
+    return shared_ptr<Sorter<Value, Value>::Iterator>(iteratorPtr);
 }
 
 boost::optional<BSONObj> DocumentSourceGroup::findRelevantInputSort() const {
@@ -878,7 +917,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
 
     return pMerger;
 }
-}
+
+}  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
 // Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

@@ -84,24 +84,28 @@
  */
 
 namespace mongo {
-namespace sorter {
-// Everything in this namespace is internal to the sorter
-class FileDeleter;
-}
 
 /**
  * Runtime options that control the Sorter's behavior
  */
 struct SortOptions {
-    unsigned long long limit;    /// number of KV pairs to be returned. 0 for no limit.
-    size_t maxMemoryUsageBytes;  /// Approximate.
-    bool extSortAllowed;         /// If false, uassert if more mem needed than allowed.
-    std::string tempDir;         /// Directory to directly place files in.
-                                 /// Must be explicitly set if extSortAllowed is true.
+    // The number of KV pairs to be returned. 0 indicates no limit.
+    unsigned long long limit;
+
+    // When in-memory memory usage exceeds this value, we try to spill to disk. This is approximate.
+    size_t maxMemoryUsageBytes;
+
+    // Whether we are allowed to spill to disk. If this is false and in-memory exceeds
+    // maxMemoryUsageBytes, we will uassert.
+    bool extSortAllowed;
+
+    // Directory into which we place a file when spilling to disk. Must be explicitly set if
+    // extSortAllowed is true.
+    std::string tempDir;
 
     SortOptions() : limit(0), maxMemoryUsageBytes(64 * 1024 * 1024), extSortAllowed(false) {}
 
-    /// Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
+    // Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
 
     SortOptions& Limit(unsigned long long newLimit) {
         limit = newLimit;
@@ -124,7 +128,9 @@ struct SortOptions {
     }
 };
 
-/// This is the output from the sorting framework
+/**
+ * This is the sorted output iterator from the sorting framework.
+ */
 template <typename Key, typename Value>
 class SortIteratorInterface {
     MONGO_DISALLOW_COPYING(SortIteratorInterface);
@@ -139,18 +145,37 @@ public:
 
     virtual ~SortIteratorInterface() {}
 
-    /// Returns an iterator that merges the passed in iterators
+    // Returns an iterator that merges the passed in iterators
     template <typename Comparator>
     static SortIteratorInterface* merge(
         const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,
+        const std::string& fileName,
         const SortOptions& opts,
         const Comparator& comp);
+
+    // Opens and closes the source of data over which this class iterates, if applicable.
+    virtual void openSource() = 0;
+    virtual void closeSource() = 0;
 
 protected:
     SortIteratorInterface() {}  // can only be constructed as a base
 };
 
-/// This is the main way to input data to the sorting framework
+/**
+ * This is the way to input data to the sorting framework.
+ *
+ * Each instance of this class will generate a file name and spill sorted data ranges to that file
+ * if allowed in its given Settings. If the instance destructs before done() is called, it will
+ * handle deleting the data file used for spills. Otherwise, if done() is called, responsibility for
+ * file deletion moves to the returned Iterator object, which must then delete the file upon its own
+ * destruction.
+ *
+ * All users of Sorter implementations must define their own nextFileName() function to generate
+ * unique file names for spills to disk. This is necessary because the sorter.cpp file is separately
+ * directly included in multiple places, rather than compiled in one place and linked, and so cannot
+ * itself provide a globally unique ID for file names. See existing function implementations of
+ * nextFileName() for example.
+ */
 template <typename Key, typename Value>
 class Sorter {
     MONGO_DISALLOW_COPYING(Sorter);
@@ -168,19 +193,24 @@ public:
                         const Settings& settings = Settings());
 
     virtual void add(const Key&, const Value&) = 0;
-    virtual Iterator* done() = 0;  /// Can't add more data after calling done()
+
+    /**
+     * Cannot add more data after calling done().
+     *
+     * The returned Iterator must not outlive the Sorter instance, which manages file clean up.
+     */
+    virtual Iterator* done() = 0;
 
     virtual ~Sorter() {}
-
-    // TEMP these are here for compatibility. Will be replaced with a general stats API
-    virtual int numFiles() const = 0;
-    virtual size_t memUsed() const = 0;
 
 protected:
     Sorter() {}  // can only be constructed as a base
 };
 
-/// Writes pre-sorted data to a sorted file and hands-back an Iterator over that file.
+/**
+ * Appends a pre-sorted range of data to a given file and hands back an Iterator over that file
+ * range.
+ */
 template <typename Key, typename Value>
 class SortedFileWriter {
     MONGO_DISALLOW_COPYING(SortedFileWriter);
@@ -191,19 +221,42 @@ public:
                       typename Value::SorterDeserializeSettings>
         Settings;
 
-    explicit SortedFileWriter(const SortOptions& opts, const Settings& settings = Settings());
+    explicit SortedFileWriter(const SortOptions& opts,
+                              const std::string& fileName,
+                              const std::streampos fileStartOffset,
+                              const Settings& settings = Settings());
 
     void addAlreadySorted(const Key&, const Value&);
-    Iterator* done();  /// Can't add more data after calling done()
+
+    /**
+     * Spills any data remaining in the buffer to disk and then closes the file to which data was
+     * written.
+     *
+     * No more data can be added via addAlreadySorted() after calling done().
+     */
+    Iterator* done();
+
+    /**
+     * Only call this after done() has been called to set the end offset.
+     */
+    std::streampos getFileEndOffset() {
+        invariant(!_file.is_open());
+        return _fileEndOffset;
+    }
 
 private:
     void spill();
 
     const Settings _settings;
     std::string _fileName;
-    std::shared_ptr<sorter::FileDeleter> _fileDeleter;  // Must outlive _file
     std::ofstream _file;
     BufBuilder _buffer;
+
+    // Tracks where in the file we started and finished writing the sorted data range so that the
+    // information can be given to the Iterator in done(), and to the user via getFileEndOffset()
+    // for the next SortedFileWriter instance using the same file.
+    std::streampos _fileStartOffset;
+    std::streampos _fileEndOffset;
 };
 }
 
@@ -227,6 +280,7 @@ private:
     template ::mongo::SortIteratorInterface<Key, Value>* ::mongo::                       \
         SortIteratorInterface<Key, Value>::merge<Comparator>(                            \
             const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,            \
+            const std::string& fileName,                                                 \
             const SortOptions& opts,                                                     \
             const Comparator& comp);                                                     \
     template ::mongo::Sorter<Key, Value>* ::mongo::Sorter<Key, Value>::make<Comparator>( \

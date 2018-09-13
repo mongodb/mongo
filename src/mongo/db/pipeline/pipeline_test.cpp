@@ -45,6 +45,7 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
 bool isMongos() {
@@ -94,6 +95,8 @@ public:
         AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
         intrusive_ptr<ExpressionContextForTest> ctx =
             new ExpressionContextForTest(&_opCtx, request);
+        TempDir tempDir("PipelineTest");
+        ctx->tempDir = tempDir.path();
 
         // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
         // operations will be able to have a resolved view definition.
@@ -918,6 +921,8 @@ public:
         AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
         intrusive_ptr<ExpressionContextForTest> ctx =
             new ExpressionContextForTest(&_opCtx, request);
+        TempDir tempDir("PipelineTest");
+        ctx->tempDir = tempDir.path();
 
         // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
         // operations will be able to have a resolved view definition.

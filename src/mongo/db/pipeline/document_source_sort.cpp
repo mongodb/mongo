@@ -46,6 +46,25 @@ using std::make_pair;
 using std::string;
 using std::vector;
 
+namespace {
+
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicUInt32 documentSourceSortFileCounter;
+    return "extsort-doc-source-sort." +
+        std::to_string(documentSourceSortFileCounter.fetchAndAdd(1));
+}
+
+}  // namespace
+
 DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx), _mergingPresorted(false) {}
 
@@ -294,6 +313,9 @@ public:
         return make_pair(_sorter->extractKey(doc), doc);
     }
 
+    void openSource() {}
+    void closeSource() {}
+
 private:
     DocumentSourceSort* _sorter;
     DBClientCursor* _cursor;
@@ -305,7 +327,7 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
         iterators.push_back(std::make_shared<IteratorFromCursor>(this, cursors[i]));
     }
 
-    _output.reset(MySorter::Iterator::merge(iterators, makeSortOptions(), Comparator(*this)));
+    _output.reset(MySorter::Iterator::merge(iterators, "", makeSortOptions(), Comparator(*this)));
     _populated = true;
 }
 
@@ -373,7 +395,8 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::getMergeSource() {
     other->_sort = _sort;
     return other;
 }
-}
+
+}  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
 // Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.
