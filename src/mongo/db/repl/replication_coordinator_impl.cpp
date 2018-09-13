@@ -2368,7 +2368,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     }
 
     BSONObj oldConfigObj = oldConfig.toBSON();
-    audit::logReplSetReconfig(opCtx->getClient(), &newConfigObj, &oldConfigObj);
+    audit::logReplSetReconfig(opCtx->getClient(), &oldConfigObj, &newConfigObj);
 
     Status status = newConfig.initialize(
         newConfigObj, oldConfig.getProtocolVersion() == 1, oldConfig.getReplicaSetId());
