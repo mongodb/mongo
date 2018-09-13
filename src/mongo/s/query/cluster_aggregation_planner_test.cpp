@@ -73,6 +73,7 @@ public:
         _expCtx = new ExpressionContextForTest(operationContext(),
                                                AggregationRequest{kTestAggregateNss, {}});
         _expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
+        _expCtx->inMongos = true;
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx() {

@@ -52,6 +52,7 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
+
 Value missingToNull(Value maybeMissing) {
     return maybeMissing.missing() ? Value(BSONNULL) : maybeMissing;
 }
@@ -96,7 +97,23 @@ Value deserializeSortKey(size_t sortPatternSize, BSONObj bsonSortKey) {
     return Value{std::move(keys)};
 }
 
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicUInt32 documentSourceSortFileCounter;
+    return "extsort-doc-source-sort." +
+        std::to_string(documentSourceSortFileCounter.fetchAndAdd(1));
+}
+
 }  // namespace
+
 constexpr StringData DocumentSourceSort::kStageName;
 
 DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext>& pExpCtx)
@@ -526,6 +543,7 @@ bool DocumentSourceSort::canRunInParallelBeforeOut(
     // would generally require merging the streams before producing output.
     return false;
 }
+
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
