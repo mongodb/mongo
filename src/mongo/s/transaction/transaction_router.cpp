@@ -403,7 +403,7 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     _coordinatorId.reset();
     _atClusterTime.reset();
 
-    // TODO SERVER-XXXXX: Parse statement ids from the client and remember the statement id of the
+    // TODO SERVER-37115: Parse statement ids from the client and remember the statement id of the
     // command that started the transaction, if one was included.
     _latestStmtId = kDefaultFirstStmtId;
     _firstStmtId = kDefaultFirstStmtId;
