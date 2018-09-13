@@ -52,8 +52,6 @@ public:
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) final;
 
-    // TODO: SERVER-37090 bring mongos getIdleCursors to match mongod and pass back GenericCursors
-    // with all available fields.
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
 

@@ -572,6 +572,21 @@ void ClusterCursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) cons
     }
 }
 
+GenericCursor ClusterCursorManager::CursorEntry::cursorToGenericCursor(
+    CursorId cursorId, const NamespaceString& ns) const {
+    invariant(_cursor);
+    GenericCursor gc;
+    gc.setCursorId(cursorId);
+    gc.setNs(ns);
+    gc.setLsid(_cursor->getLsid());
+    gc.setNDocsReturned(_cursor->getNumReturnedSoFar());
+    gc.setTailable(_cursor->isTailable());
+    gc.setAwaitData(_cursor->isTailableAndAwaitData());
+    gc.setOriginatingCommand(_cursor->getOriginatingCommand());
+    gc.setNoCursorTimeout(getLifetimeType() == CursorLifetime::Immortal);
+    return gc;
+}
+
 std::vector<GenericCursor> ClusterCursorManager::getIdleCursors() const {
     std::vector<GenericCursor> cursors;
 
@@ -586,11 +601,8 @@ std::vector<GenericCursor> ClusterCursorManager::getIdleCursors() const {
                 continue;
             }
 
-            cursors.emplace_back();
-            auto& gc = cursors.back();
-            gc.setCursorId(cursorIdEntryPair.first);
-            gc.setNs(nsContainerPair.first);
-            gc.setLsid(entry.getLsid());
+            cursors.emplace_back(
+                entry.cursorToGenericCursor(cursorIdEntryPair.first, nsContainerPair.first));
         }
     }
 

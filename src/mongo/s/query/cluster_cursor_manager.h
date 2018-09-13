@@ -554,6 +554,14 @@ private:
         }
 
         /**
+         * Creates a generic cursor from the cursor inside this entry. Should only be called on
+         * idle cursors. The caller must supply the cursorId and namespace because the CursorEntry
+         * does not have access to them.  Cannot be called if this CursorEntry does not own an
+         * underlying ClusterClientCursor.
+         */
+        GenericCursor cursorToGenericCursor(CursorId cursorId, const NamespaceString& ns) const;
+
+        /**
          * Returns the cursor owned by this CursorEntry for an operation to use. Only one operation
          * may use the cursor at a time, so callers should check that getOperationUsingCursor()
          * returns null before using this function. Callers may pass nullptr, but only if the
