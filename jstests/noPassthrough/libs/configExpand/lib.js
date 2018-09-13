@@ -162,5 +162,8 @@ function configExpandFailure(config, test = null, opts = {}) {
     assert.soon(function() {
         return rawMongoProgramOutput().match(test);
     });
+    if (mongod) {
+        _stopMongoProgram(mongod);
+    }
     removeFile(configFile);
 }
