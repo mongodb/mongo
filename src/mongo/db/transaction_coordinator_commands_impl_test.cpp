@@ -48,7 +48,7 @@ namespace {
 
 const std::vector<ShardId> shardIds{{"s1"}, {"s2"}, {"s3"}};
 const int kMaxNumFailedHostRetryAttempts = 3;
-const Timestamp dummyTimestamp;
+const Timestamp dummyTimestamp = Timestamp::min();
 
 HostAndPort makeHostAndPort(const ShardId& shardId) {
     return HostAndPort(str::stream() << shardId << ":123");

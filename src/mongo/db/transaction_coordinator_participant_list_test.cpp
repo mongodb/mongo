@@ -37,7 +37,7 @@ namespace mongo {
 
 using ParticipantList = TransactionCoordinator::ParticipantList;
 
-const Timestamp dummyTimestamp;
+const Timestamp dummyTimestamp = Timestamp::min();
 
 TEST(ParticipantList, ReceiveSameParticipantListMultipleTimesSucceeds) {
     ParticipantList participantList;

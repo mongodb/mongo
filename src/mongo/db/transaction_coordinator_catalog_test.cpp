@@ -39,7 +39,7 @@
 namespace mongo {
 namespace {
 
-const Timestamp dummyTimestamp;
+const Timestamp dummyTimestamp = Timestamp::min();
 
 class TransactionCoordinatorCatalogTest : public unittest::Test {
 public:

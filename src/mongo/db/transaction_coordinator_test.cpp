@@ -35,7 +35,7 @@ namespace mongo {
 
 using State = TransactionCoordinator::StateMachine::State;
 
-const Timestamp dummyTimestamp;
+const Timestamp dummyTimestamp = Timestamp::min();
 
 TEST(Coordinator, SomeParticipantVotesAbortLeadsToAbort) {
     TransactionCoordinator coordinator;
