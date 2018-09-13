@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -54,6 +55,8 @@ public:
         // context.
         _expCtx = new ExpressionContext(_opCtx.get(), nullptr);
         _expCtx->ns = std::move(nss);
+        unittest::TempDir tempDir("AggregationContextFixture");
+        _expCtx->tempDir = tempDir.path();
     }
 
     boost::intrusive_ptr<ExpressionContext> getExpCtx() {

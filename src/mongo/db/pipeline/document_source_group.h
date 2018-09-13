@@ -112,6 +112,8 @@ private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                  size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
+    ~DocumentSourceGroup();
+
     /**
      * getNext() dispatches to one of these three depending on what type of $group it is. All three
      * of these methods expect '_currentAccumulators' to have been reset before being called, and
@@ -164,6 +166,10 @@ private:
     bool _doingMerge;
     size_t _memoryUsageBytes = 0;
     size_t _maxMemoryUsageBytes;
+    std::string _fileName;
+    unsigned int _nextSortedFileWriterOffset = 0;
+    bool _ownsFileDeletion = true;  // unless a MergeIterator is made that takes over.
+
     std::vector<std::string> _idFieldNames;  // used when id is a document
     std::vector<boost::intrusive_ptr<Expression>> _idExpressions;
 
