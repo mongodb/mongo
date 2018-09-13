@@ -114,15 +114,6 @@ const int kDataFormatV4KeyStringV1UniqueIndexVersionV2 = 12;
 const int kMinimumIndexVersion = kDataFormatV1KeyStringV0IndexVersionV1;
 const int kMaximumIndexVersion = kDataFormatV4KeyStringV1UniqueIndexVersionV2;
 
-Status WiredTigerIndex::dupKeyError(const BSONObj& key) {
-    StringBuilder sb;
-    sb << "E11000 duplicate key error";
-    sb << " collection: " << _collectionNamespace;
-    sb << " index: " << _indexName;
-    sb << " dup key: " << key;
-    return Status(ErrorCodes::DuplicateKey, sb.str());
-}
-
 void WiredTigerIndex::setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
     if (_prefix == KVPrefix::kNotPrefixed) {
         cursor->set_key(cursor, item);
@@ -422,7 +413,7 @@ Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx,
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, c, key, id))
-        return dupKeyError(key);
+        return dupKeyError(key, _collectionNamespace, _indexName);
     return Status::OK();
 }
 
@@ -690,7 +681,7 @@ private:
         if (cmp == 0) {
             // Duplicate found!
             if (!_dupsAllowed) {
-                return _idx->dupKeyError(newKey);
+                return dupKeyError(newKey, _idx->collectionNamespace(), _idx->indexName());
             }
         } else {
             // _previousKey.isEmpty() is only true on the first call to addKey().
@@ -737,7 +728,7 @@ private:
         } else {
             // Dup found!
             if (!_dupsAllowed) {
-                return _idx->dupKeyError(newKey);
+                return dupKeyError(newKey, _idx->collectionNamespace(), _idx->indexName());
             }
 
             // If we get here, we are in the weird mode where dups are allowed on a unique
@@ -1406,7 +1397,7 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampUnsafe(
     }
 
     if (!dupsAllowed)
-        return dupKeyError(key);
+        return dupKeyError(key, _collectionNamespace, _indexName);
 
     if (!insertedId) {
         // This id is higher than all currently in the index for this key
@@ -1452,7 +1443,7 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampSafe(
         // An entry with prefix key already exists. This can happen only during rolling upgrade when
         // both timestamp unsafe and timestamp safe index format keys could be present.
         if (ret == WT_DUPLICATE_KEY) {
-            return dupKeyError(key);
+            return dupKeyError(key, _collectionNamespace, _indexName);
         }
         invariantWTOK(ret);
 
@@ -1465,7 +1456,7 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampSafe(
 
         // Second phase looks up for existence of key to avoid insertion of duplicate key
         if (isDup(opCtx, c, key, id))
-            return dupKeyError(key);
+            return dupKeyError(key, _collectionNamespace, _indexName);
     }
 
     // Now create the table key/value, the actual data record.

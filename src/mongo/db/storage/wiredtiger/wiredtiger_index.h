@@ -155,8 +155,6 @@ public:
     virtual bool unique() const = 0;
     virtual bool isTimestampSafeUniqueIdx() const = 0;
 
-    Status dupKeyError(const BSONObj& key);
-
 protected:
     virtual StatusWith<SpecialFormatInserted> _insert(OperationContext* opCtx,
                                                       WT_CURSOR* c,

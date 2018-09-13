@@ -52,6 +52,20 @@ struct ValidateResults;
 enum SpecialFormatInserted { NoSpecialFormatInserted = 0, LongTypeBitsInserted = 1 };
 
 /**
+ * Returns the formatted error status about the duplicate key.
+ */
+inline Status dupKeyError(const BSONObj& key,
+                          const std::string& collectionNamespace,
+                          const std::string& indexName) {
+    StringBuilder sb;
+    sb << "E11000 duplicate key error";
+    sb << " collection: " << collectionNamespace;
+    sb << " index: " << indexName;
+    sb << " dup key: " << key;
+    return Status(ErrorCodes::DuplicateKey, sb.str());
+}
+
+/**
  * This is the uniform interface for storing indexes and supporting point queries as well as range
  * queries. The actual implementation is up to the storage engine. All the storage engines must
  * support an index key size up to the maximum document size.
