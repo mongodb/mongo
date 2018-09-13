@@ -767,6 +767,41 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotSupplyCandidatePlanForTextS
         "{fetch: {filter: {b: 10}, node: {text: {prefix: {a: 10}, search: 'banana'}}}}");
 }
 
+TEST_F(QueryPlannerAllPathsTest, AllPathsDoesNotSupportNegationPredicate) {
+    // AllPaths indexes can't support negation queries because they are sparse, and {a: {$ne: 5}}
+    // will match documents which don't have an "a" field.
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$ne: 5}}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{a: {$not: {$gt: 3, $lt: 5}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerAllPathsTest,
+       AllPathsDoesNotSupportNegationPredicateInsideElemMatchMultiKeyPath) {
+    // Logically, there's no reason a (sparse) allPaths index could not support a negation inside a
+    // "$elemMatch value", but it is not something we've implemented.
+    addAllPathsIndex(BSON("$**" << 1), {"a"});
+    runQuery(fromjson("{a: {$elemMatch: {$ne: 5}}}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{a: {$elemMatch: {$not: {$gt: 3, $lt: 5}}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerAllPathsTest, AllPathsDoesNotSupportNegationPredicateInsideElemMatch) {
+    // Test the case where we use $elemMatch on a path which isn't even multikey. In this case,
+    // we'd know up front that the results would be empty, but this is not an optimization we
+    // support.
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$elemMatch: {$ne: 5}}}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{a: {$elemMatch: {$not: {$gt: 3, $lt: 5}}}}"));
+    assertHasOnlyCollscan();
+}
+
 // TODO SERVER-35335: Add testing for Min/Max.
 // TODO SERVER-36517: Add testing for DISTINCT_SCAN.
 // TODO SERVER-35331: Add testing for hints.

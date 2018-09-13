@@ -2528,6 +2528,34 @@ TEST_F(QueryPlannerTest, ExprEqCanUseSparseIndexForEqualityToNull) {
         "{a: 1}, bounds: {a: [[undefined,undefined,true,true], [null,null,true,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, NegationCannotUseSparseIndex) {
+    // Sparse indexes can't support negation queries because they are sparse, and {a: {$ne: 5}}
+    // will match documents which don't have an "a" field.
+    addIndex(fromjson("{a: 1}"),
+             false,  // multikey
+             true    // sparse
+             );
+    runQuery(fromjson("{a: {$ne: 5}}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{a: {$not: {$gt: 3, $lt: 5}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, NegationInElemMatchDoesNotUseSparseIndex) {
+    // Logically, there's no reason a sparse index could not support a negation inside a
+    // "$elemMatch value", but it is not something we've implemented.
+    addIndex(fromjson("{a: 1}"),
+             true,  // multikey
+             true   // sparse
+             );
+    runQuery(fromjson("{a: {$elemMatch: {$ne: 5}}}"));
+    assertHasOnlyCollscan();
+
+    runQuery(fromjson("{a: {$elemMatch: {$not: {$gt: 3, $lt: 5}}}}"));
+    assertHasOnlyCollscan();
+}
+
 //
 // Regex
 //
