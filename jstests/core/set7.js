@@ -1,7 +1,11 @@
-// Cannot implicitly shard accessed collections because of following errmsg: A single
-// update/delete on a sharded collection must contain an exact match on _id or contain the shard
-// key.
-// @tags: [assumes_unsharded_collection]
+// @tags: [
+//      # Cannot implicitly shard accessed collections because of following errmsg: A single
+//      # update/delete on a sharded collection must contain an exact match on _id or contain
+//      # the shard key.
+//      assumes_unsharded_collection,
+//      # The {$set: {"a.1500000": 1}} update takes multiple seconds to execute.
+//      operations_longer_than_stepdown_interval,
+// ]
 
 // test $set with array indicies
 

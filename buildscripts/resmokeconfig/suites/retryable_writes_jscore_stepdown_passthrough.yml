@@ -101,7 +101,7 @@ selector:
   #   interrupted by a stepdown"
   - does_not_support_stepdowns
   ##
-  # The next three tags correspond to the special errors thrown by the
+  # The next two tags correspond to the special errors thrown by the
   # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
   # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
   # warranted.
@@ -110,6 +110,9 @@ selector:
   - assumes_read_concern_unchanged
   # "Cowardly refusing to override write concern of command: ..."
   - assumes_write_concern_unchanged
+  ## The next tag corresponds to long running-operations, as they may exhaust their number
+  # of retries and result in a network error being thrown.
+  - operations_longer_than_stepdown_interval
 
 executor:
   archive:

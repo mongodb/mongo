@@ -1,3 +1,6 @@
+// The {$set: {x: maxStr}}} update takes multiple seconds to execute.
+// @tags: [operations_longer_than_stepdown_interval]
+
 /**
  * Confirms that:
  *  - Documents at the maximum BSON size limit can be written and read back.
