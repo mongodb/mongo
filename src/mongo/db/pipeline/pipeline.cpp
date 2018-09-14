@@ -69,12 +69,12 @@ using std::vector;
 
 namespace dps = ::mongo::dotted_path_support;
 
-using ChangeStreamRequirement = DocumentSource::StageConstraints::ChangeStreamRequirement;
-using HostTypeRequirement = DocumentSource::StageConstraints::HostTypeRequirement;
-using PositionRequirement = DocumentSource::StageConstraints::PositionRequirement;
-using DiskUseRequirement = DocumentSource::StageConstraints::DiskUseRequirement;
-using FacetRequirement = DocumentSource::StageConstraints::FacetRequirement;
-using StreamType = DocumentSource::StageConstraints::StreamType;
+using ChangeStreamRequirement = StageConstraints::ChangeStreamRequirement;
+using HostTypeRequirement = StageConstraints::HostTypeRequirement;
+using PositionRequirement = StageConstraints::PositionRequirement;
+using DiskUseRequirement = StageConstraints::DiskUseRequirement;
+using FacetRequirement = StageConstraints::FacetRequirement;
+using StreamType = StageConstraints::StreamType;
 
 constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kAllowedMatcherFeatures;
 constexpr MatchExpressionParser::AllowedFeatureSet Pipeline::kGeoNearMatcherFeatures;

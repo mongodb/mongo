@@ -193,6 +193,50 @@ TEST_F(DocumentSourceLookUpTest, AcceptsPipelineWithLetSyntax) {
     ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
 }
 
+TEST_F(DocumentSourceLookUpTest, LookupEmptyPipelineDoesntUseDiskAndIsOKInATransaction) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    auto docSource = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << fromNs.coll().toString() << "pipeline" << BSONArray()
+                                      << "as"
+                                      << "as"))
+            .firstElement(),
+        expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
+
+    ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
+    ASSERT(lookup->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+           DocumentSource::DiskUseRequirement::kNoDiskUse);
+    ASSERT(lookup->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+           DocumentSource::TransactionRequirement::kAllowed);
+}
+
+TEST_F(DocumentSourceLookUpTest, LookupWithChildStagesInheritsDiskUseRequirement) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    auto docSource =
+        DocumentSourceLookUp::createFromBson(BSON("$lookup" << BSON("from"
+                                                                    << "coll"
+                                                                    << "pipeline"
+                                                                    << BSON_ARRAY(BSON("$out"
+                                                                                       << "target"))
+                                                                    << "as"
+                                                                    << "as"))
+                                                 .firstElement(),
+                                             expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
+
+    ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
+    ASSERT(lookup->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+           DocumentSource::DiskUseRequirement::kWritesPersistentData);
+    ASSERT(lookup->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+           DocumentSource::TransactionRequirement::kNotAllowed);
+}
+
 TEST_F(DocumentSourceLookUpTest, LiteParsedDocumentSourceLookupContainsExpectedNamespaces) {
     auto stageSpec =
         BSON("$lookup" << BSON("from"

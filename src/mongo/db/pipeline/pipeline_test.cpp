@@ -2187,7 +2187,7 @@ public:
     }
 };
 
-using HostTypeRequirement = DocumentSource::StageConstraints::HostTypeRequirement;
+using HostTypeRequirement = StageConstraints::HostTypeRequirement;
 using PipelineMustRunOnMongoSTest = AggregationContextFixture;
 
 TEST_F(PipelineMustRunOnMongoSTest, UnsplittablePipelineMustRunOnMongoS) {

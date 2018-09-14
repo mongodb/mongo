@@ -112,9 +112,7 @@ const char* DocumentSourceOplogMatch::getSourceName() const {
     return DocumentSourceChangeStream::kStageName.rawData();
 }
 
-DocumentSource::StageConstraints DocumentSourceOplogMatch::constraints(
-    Pipeline::SplitState pipeState) const {
-
+StageConstraints DocumentSourceOplogMatch::constraints(Pipeline::SplitState pipeState) const {
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kFirst,
                                  HostTypeRequirement::kAnyShard,

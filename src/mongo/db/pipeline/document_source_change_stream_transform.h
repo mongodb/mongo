@@ -51,7 +51,7 @@ public:
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
-    DocumentSource::StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
     DocumentSource::GetNextResult getNext();
     const char* getSourceName() const {
         return DocumentSourceChangeStream::kStageName.rawData();

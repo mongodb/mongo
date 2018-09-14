@@ -354,6 +354,7 @@ pipelineeEnv.Library(
         'document_source_unwind.cpp',
         'pipeline.cpp',
         'sequential_document_cache.cpp',
+        'stage_constraints.cpp',
         'tee_buffer.cpp',
     ],
     LIBDEPS=[

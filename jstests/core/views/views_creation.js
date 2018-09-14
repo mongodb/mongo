@@ -77,12 +77,24 @@
     assert.commandFailedWithCode(
         viewsDB.runCommand({create: "dollar$", viewOn: "collection", pipeline: pipe}),
         ErrorCodes.InvalidNamespace);
+
+    // You cannot create a view with a $out stage, by itself or nested inside of a different stage.
+    const outStage = {$out: "nonExistentCollection"};
+    assert.commandFailedWithCode(
+        viewsDB.runCommand({create: "viewWithOut", viewOn: "collection", pipeline: [outStage]}),
+        ErrorCodes.OptionNotSupportedOnView);
     assert.commandFailedWithCode(viewsDB.runCommand({
-        create: "viewWithBadPipeline",
+        create: "viewWithOutInLookup",
         viewOn: "collection",
-        pipeline: [{$project: {_id: false}}, {$out: "notExistingCollection"}]
+        pipeline: [{$lookup: {from: "other", pipeline: [outStage], as: "result"}}]
     }),
                                  ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        create: "viewWithOutInFacet",
+        viewOn: "collection",
+        pipeline: [{$facet: {output: [outStage]}}]
+    }),
+                                 40600);
 
     // These test that, when an existing view in system.views is invalid because of a $out in the
     // pipeline, the database errors on creation of a new view.

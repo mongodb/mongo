@@ -117,7 +117,7 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
     }
 }
 
-DocumentSource::StageConstraints DocumentSourceChangeStreamTransform::constraints(
+StageConstraints DocumentSourceChangeStreamTransform::constraints(
     Pipeline::SplitState pipeState) const {
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kNone,

@@ -234,15 +234,7 @@ void DocumentSourceFacet::reattachToOperationContext(OperationContext* opCtx) {
     }
 }
 
-DocumentSource::StageConstraints DocumentSourceFacet::constraints(
-    Pipeline::SplitState pipeState) const {
-    const bool mayUseDisk = std::any_of(_facets.begin(), _facets.end(), [&](const auto& facet) {
-        const auto sources = facet.pipeline->getSources();
-        return std::any_of(sources.begin(), sources.end(), [&](const auto source) {
-            return source->constraints().diskRequirement == DiskUseRequirement::kWritesTmpData;
-        });
-    });
-
+StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
     // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
     // This means that if any stage in any of the $facet pipelines needs to run on the primary shard
     // or on mongoS, then the entire $facet stage must run there.
@@ -266,12 +258,20 @@ DocumentSource::StageConstraints DocumentSourceFacet::constraints(
         }
     }
 
+    // Resolve the disk use and transaction requirement of this $facet by iterating through the
+    // children in its facets.
+    auto diskAndTxnReq = StageConstraints::kDefaultDiskUseAndTransactionRequirement;
+    for (const auto& facet : _facets) {
+        diskAndTxnReq = StageConstraints::resolveDiskUseAndTransactionRequirement(
+            facet.pipeline->getSources(), diskAndTxnReq);
+    }
+
     return {StreamType::kBlocking,
             PositionRequirement::kNone,
             host,
-            mayUseDisk ? DiskUseRequirement::kWritesTmpData : DiskUseRequirement::kNoDiskUse,
+            std::get<StageConstraints::DiskUseRequirement>(diskAndTxnReq),
             FacetRequirement::kNotAllowed,
-            TransactionRequirement::kAllowed};
+            std::get<StageConstraints::TransactionRequirement>(diskAndTxnReq)};
 }
 
 bool DocumentSourceFacet::usedDisk() {

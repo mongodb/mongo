@@ -103,26 +103,11 @@ public:
      */
     GetModPathsReturn getModifiedPaths() const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        const bool mayUseDisk = wasConstructedWithPipelineSyntax() &&
-            std::any_of(_parsedIntrospectionPipeline->getSources().begin(),
-                        _parsedIntrospectionPipeline->getSources().end(),
-                        [](const auto& source) {
-                            return source->constraints().diskRequirement ==
-                                DiskUseRequirement::kWritesTmpData;
-                        });
-
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kNone,
-                                     HostTypeRequirement::kPrimaryShard,
-                                     mayUseDisk ? DiskUseRequirement::kWritesTmpData
-                                                : DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kAllowed,
-                                     TransactionRequirement::kAllowed);
-
-        constraints.canSwapWithMatch = true;
-        return constraints;
-    }
+    /**
+     * Reports the StageConstraints of this $lookup instance. A $lookup constructed with pipeline
+     * syntax will inherit certain constraints from the stages in its pipeline.
+     */
+    StageConstraints constraints(Pipeline::SplitState) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 

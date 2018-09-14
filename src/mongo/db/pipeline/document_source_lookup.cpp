@@ -180,6 +180,31 @@ const char* DocumentSourceLookUp::getSourceName() const {
     return "$lookup";
 }
 
+StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
+    // By default, $lookup is allowed in a transaction and does not use disk.
+    auto diskRequirement = DiskUseRequirement::kNoDiskUse;
+    auto txnRequirement = TransactionRequirement::kAllowed;
+
+    // However, if $lookup is specified with a pipeline, it inherits the strictest disk use and
+    // transaction requirement from the children in its pipeline.
+    if (wasConstructedWithPipelineSyntax()) {
+        const auto resolvedRequirements = StageConstraints::resolveDiskUseAndTransactionRequirement(
+            _parsedIntrospectionPipeline->getSources());
+        diskRequirement = resolvedRequirements.first;
+        txnRequirement = resolvedRequirements.second;
+    }
+
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kNone,
+                                 HostTypeRequirement::kPrimaryShard,
+                                 diskRequirement,
+                                 FacetRequirement::kAllowed,
+                                 txnRequirement);
+
+    constraints.canSwapWithMatch = true;
+    return constraints;
+}
+
 namespace {
 
 /**

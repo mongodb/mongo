@@ -229,6 +229,55 @@ public:
     }
 };
 
+TEST_F(DocumentSourceFacetTest, PassthroughFacetDoesntRequireDiskAndIsOKInaTxn) {
+    auto ctx = getExpCtx();
+    auto passthrough = DocumentSourcePassthrough::create();
+    auto passthroughPipe = uassertStatusOK(Pipeline::createFacetPipeline({passthrough}, ctx));
+
+    std::vector<DocumentSourceFacet::FacetPipeline> facets;
+    facets.emplace_back("passthrough", std::move(passthroughPipe));
+
+    auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+           DocumentSource::DiskUseRequirement::kNoDiskUse);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+           DocumentSource::TransactionRequirement::kAllowed);
+}
+
+/**
+ * A dummy DocumentSource which writes persistent data.
+ */
+class DocumentSourceWritesPersistentData final : public DocumentSourcePassthrough {
+public:
+    StageConstraints constraints(Pipeline::SplitState) const final {
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kNone,
+                DiskUseRequirement::kWritesPersistentData,
+                FacetRequirement::kAllowed,
+                TransactionRequirement::kNotAllowed};
+    }
+
+    static boost::intrusive_ptr<DocumentSourceWritesPersistentData> create() {
+        return new DocumentSourceWritesPersistentData();
+    }
+};
+
+TEST_F(DocumentSourceFacetTest, FacetWithChildThatWritesDataAlsoReportsWritingData) {
+    auto ctx = getExpCtx();
+    auto writesDataStage = DocumentSourceWritesPersistentData::create();
+    auto pipeline = uassertStatusOK(Pipeline::createFacetPipeline({writesDataStage}, ctx));
+
+    std::vector<DocumentSourceFacet::FacetPipeline> facets;
+    facets.emplace_back("writes", std::move(pipeline));
+
+    auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+           DocumentSource::DiskUseRequirement::kWritesPersistentData);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+           DocumentSource::TransactionRequirement::kNotAllowed);
+}
+
 TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
     auto ctx = getExpCtx();
 
@@ -697,7 +746,11 @@ TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresPrima
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
     ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
-           DocumentSource::StageConstraints::HostTypeRequirement::kPrimaryShard);
+           StageConstraints::HostTypeRequirement::kPrimaryShard);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+           StageConstraints::DiskUseRequirement::kNoDiskUse);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+           StageConstraints::TransactionRequirement::kAllowed);
 }
 
 TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPrimaryShard) {
@@ -717,8 +770,55 @@ TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPr
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
     ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
-           DocumentSource::StageConstraints::HostTypeRequirement::kNone);
+           StageConstraints::HostTypeRequirement::kNone);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+           StageConstraints::DiskUseRequirement::kNoDiskUse);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+           StageConstraints::TransactionRequirement::kAllowed);
 }
 
+/**
+ * A dummy DocumentSource that must run on the primary shard, can write temporary data and can't be
+ * used in a transaction.
+ */
+class DocumentSourcePrimaryShardTmpDataNoTxn final : public DocumentSourcePassthrough {
+public:
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        return {StreamType::kStreaming,
+                PositionRequirement::kNone,
+                HostTypeRequirement::kPrimaryShard,
+                DiskUseRequirement::kWritesTmpData,
+                FacetRequirement::kAllowed,
+                TransactionRequirement::kNotAllowed};
+    }
+
+    static boost::intrusive_ptr<DocumentSourcePrimaryShardTmpDataNoTxn> create() {
+        return new DocumentSourcePrimaryShardTmpDataNoTxn();
+    }
+};
+
+TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstraint) {
+    auto ctx = getExpCtx();
+
+    auto firstPassthrough = DocumentSourcePassthrough::create();
+    auto firstPipeline =
+        unittest::assertGet(Pipeline::createFacetPipeline({firstPassthrough}, ctx));
+
+    auto secondPassthrough = DocumentSourcePrimaryShardTmpDataNoTxn::create();
+    auto secondPipeline =
+        unittest::assertGet(Pipeline::createFacetPipeline({secondPassthrough}, ctx));
+
+    std::vector<DocumentSourceFacet::FacetPipeline> facets;
+    facets.emplace_back("first", std::move(firstPipeline));
+    facets.emplace_back("second", std::move(secondPipeline));
+    auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
+
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
+           StageConstraints::HostTypeRequirement::kPrimaryShard);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
+           StageConstraints::DiskUseRequirement::kWritesTmpData);
+    ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
+           StageConstraints::TransactionRequirement::kNotAllowed);
+}
 }  // namespace
 }  // namespace mongo
