@@ -74,11 +74,13 @@ struct IndexInfo {
     // The number of long keys that are not indexed for the index.
     int64_t numLongKeys;
     // The number of records that have a key in their document that referenced back to the
-    // this index
+    // this index.
     int64_t numRecords;
     // Keeps track of how many indexes were removed (-1) and added (+1) after the
     // point of validity was set for this index.
     int64_t numExtraIndexKeys;
+    // A hashed set of indexed multikey paths (applies to $** indexes only).
+    std::set<uint32_t> hashedMultikeyMetadataPaths;
 };
 
 class IndexConsistency final {
@@ -91,13 +93,20 @@ public:
                      const bool background);
 
     /**
-     * Helper functions for `_addDocKey`, `_removeDocKey`, `_addIndexKey`,
-     * and `_removeIndexKey` for concurrency control.
+     * Helper functions for `_addDocKey` and `_addIndexKey` for concurrency control.
      */
     void addDocKey(const KeyString& ks, int indexNumber);
-    void removeDocKey(const KeyString& ks, int indexNumber);
     void addIndexKey(const KeyString& ks, int indexNumber);
-    void removeIndexKey(const KeyString& ks, int indexNumber);
+
+    /**
+     * To validate $** multikey metadata paths, we first scan the collection and add a hash of all
+     * multikey paths encountered to a set. We then scan the index for multikey metadata path
+     * entries and remove any path encountered. As we expect the index to contain a super-set of
+     * the collection paths, a non-empty set represents an invalid index.
+     */
+    void addMultikeyMetadataPath(const KeyString& ks, int indexNumber);
+    void removeMultikeyMetadataPath(const KeyString& ks, int indexNumber);
+    size_t getMultikeyMetadataPathCount(int indexNumber);
 
     /**
      * Add one to the `_longKeys` count for the given `indexNs`.
@@ -201,22 +210,10 @@ private:
     void _addDocKey_inlock(const KeyString& ks, int indexNumber);
 
     /**
-     * Given the document's key KeyString, decrement the corresponding `_indexKeyCount`
-     * by hashing it.
-     */
-    void _removeDocKey_inlock(const KeyString& ks, int indexNumber);
-
-    /**
      * Given the index entry's KeyString, decrement the corresponding `_indexKeyCount`
      * by hashing it.
      */
     void _addIndexKey_inlock(const KeyString& ks, int indexNumber);
-
-    /**
-     * Given the index entry's KeyString, increment the corresponding `_indexKeyCount`
-     * by hashing it.
-     */
-    void _removeIndexKey_inlock(const KeyString& ks, int indexNumber);
 
     /**
      * Returns a hashed value from the given KeyString and index namespace.

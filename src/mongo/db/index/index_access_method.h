@@ -338,6 +338,14 @@ public:
         return {};
     }
 
+    /**
+     * For test use only. Provides direct access to the SortedDataInterface, allowing tests to write
+     * invalid entries that would otherwise not be possible via IndexAccessMethod.
+     */
+    SortedDataInterface* getSortedDataInterface_forTest() {
+        return _newInterface.get();
+    }
+
 protected:
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.

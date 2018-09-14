@@ -114,16 +114,6 @@ void IndexConsistency::addDocKey(const KeyString& ks, int indexNumber) {
     _addDocKey_inlock(ks, indexNumber);
 }
 
-void IndexConsistency::removeDocKey(const KeyString& ks, int indexNumber) {
-
-    if (indexNumber < 0 || indexNumber >= static_cast<int>(_indexesInfo.size())) {
-        return;
-    }
-
-    stdx::lock_guard<stdx::mutex> lock(_classMutex);
-    _removeDocKey_inlock(ks, indexNumber);
-}
-
 void IndexConsistency::addIndexKey(const KeyString& ks, int indexNumber) {
 
     if (indexNumber < 0 || indexNumber >= static_cast<int>(_indexesInfo.size())) {
@@ -134,14 +124,34 @@ void IndexConsistency::addIndexKey(const KeyString& ks, int indexNumber) {
     _addIndexKey_inlock(ks, indexNumber);
 }
 
-void IndexConsistency::removeIndexKey(const KeyString& ks, int indexNumber) {
-
-    if (indexNumber < 0 || indexNumber >= static_cast<int>(_indexesInfo.size())) {
+void IndexConsistency::addMultikeyMetadataPath(const KeyString& ks, int indexNumber) {
+    if (indexNumber < 0) {
         return;
     }
+    invariant(static_cast<size_t>(indexNumber) < _indexesInfo.size());
 
     stdx::lock_guard<stdx::mutex> lock(_classMutex);
-    _removeIndexKey_inlock(ks, indexNumber);
+    _indexesInfo[indexNumber].hashedMultikeyMetadataPaths.emplace(_hashKeyString(ks, indexNumber));
+}
+
+void IndexConsistency::removeMultikeyMetadataPath(const KeyString& ks, int indexNumber) {
+    if (indexNumber < 0) {
+        return;
+    }
+    invariant(static_cast<size_t>(indexNumber) < _indexesInfo.size());
+
+    stdx::lock_guard<stdx::mutex> lock(_classMutex);
+    _indexesInfo[indexNumber].hashedMultikeyMetadataPaths.erase(_hashKeyString(ks, indexNumber));
+}
+
+size_t IndexConsistency::getMultikeyMetadataPathCount(int indexNumber) {
+    if (indexNumber < 0) {
+        return 0;
+    }
+    invariant(static_cast<size_t>(indexNumber) < _indexesInfo.size());
+
+    stdx::lock_guard<stdx::mutex> lock(_classMutex);
+    return _indexesInfo[indexNumber].hashedMultikeyMetadataPaths.size();
 }
 
 void IndexConsistency::addLongIndexKey(int indexNumber) {
@@ -245,18 +255,6 @@ void IndexConsistency::_addDocKey_inlock(const KeyString& ks, int indexNumber) {
     _indexesInfo.at(indexNumber).numRecords++;
 }
 
-void IndexConsistency::_removeDocKey_inlock(const KeyString& ks, int indexNumber) {
-
-    // Ignore indexes that weren't ready before we started validation.
-    if (!_indexesInfo.at(indexNumber).isReady) {
-        return;
-    }
-
-    const uint32_t hash = _hashKeyString(ks, indexNumber);
-    _indexKeyCount[hash]--;
-    _indexesInfo.at(indexNumber).numRecords--;
-}
-
 void IndexConsistency::_addIndexKey_inlock(const KeyString& ks, int indexNumber) {
 
     // Ignore indexes that weren't ready before we started validation.
@@ -267,18 +265,6 @@ void IndexConsistency::_addIndexKey_inlock(const KeyString& ks, int indexNumber)
     const uint32_t hash = _hashKeyString(ks, indexNumber);
     _indexKeyCount[hash]--;
     _indexesInfo.at(indexNumber).numKeys++;
-}
-
-void IndexConsistency::_removeIndexKey_inlock(const KeyString& ks, int indexNumber) {
-
-    // Ignore indexes that weren't ready before we started validation.
-    if (!_indexesInfo.at(indexNumber).isReady) {
-        return;
-    }
-
-    const uint32_t hash = _hashKeyString(ks, indexNumber);
-    _indexKeyCount[hash]++;
-    _indexesInfo.at(indexNumber).numKeys--;
 }
 
 uint32_t IndexConsistency::_hashKeyString(const KeyString& ks, int indexNumber) const {
