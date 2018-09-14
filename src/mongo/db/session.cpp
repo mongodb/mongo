@@ -386,11 +386,15 @@ void Session::beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber t
     _beginOrContinueTxnOnMigration(lg, txnNumber);
 }
 
-void Session::setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opCtx) {
+void Session::setSpeculativeTransactionOpTime(OperationContext* opCtx,
+                                              SpeculativeTransactionOpTime opTimeChoice) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     repl::ReplicationCoordinator* replCoord =
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastAppliedSnapshot);
+    opCtx->recoveryUnit()->setTimestampReadSource(
+        opTimeChoice == SpeculativeTransactionOpTime::kAllCommitted
+            ? RecoveryUnit::ReadSource::kAllCommittedSnapshot
+            : RecoveryUnit::ReadSource::kLastAppliedSnapshot);
     opCtx->recoveryUnit()->preallocateSnapshot();
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
     invariant(readTimestamp);

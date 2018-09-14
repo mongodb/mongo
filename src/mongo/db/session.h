@@ -52,6 +52,11 @@ extern AtomicInt32 transactionLifetimeLimitSeconds;
 class OperationContext;
 class UpdateRequest;
 
+enum class SpeculativeTransactionOpTime {
+    kLastApplied,
+    kAllCommitted,
+};
+
 /**
  * A write through cache for the state of a particular session. All modifications to the underlying
  * session transactions collection must be performed through an object of this class.
@@ -169,7 +174,8 @@ public:
     /**
      * Called for speculative transactions to fix the optime of the snapshot to read from.
      */
-    void setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opCtx);
+    void setSpeculativeTransactionOpTime(OperationContext* opCtx,
+                                         SpeculativeTransactionOpTime opTimeChoice);
 
     /**
      * Called after a write under the specified transaction completes while the node is a primary

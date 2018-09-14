@@ -308,7 +308,11 @@ Status waitForReadConcern(OperationContext* opCtx,
                     "Replica sets running protocol version 0 do not support readConcern: snapshot"};
         }
         if (speculative) {
-            session->setSpeculativeTransactionOpTimeToLastApplied(opCtx);
+            session->setSpeculativeTransactionOpTime(
+                opCtx,
+                readConcernArgs.getOriginalLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+                    ? SpeculativeTransactionOpTime::kAllCommitted
+                    : SpeculativeTransactionOpTime::kLastApplied);
         }
     }
 

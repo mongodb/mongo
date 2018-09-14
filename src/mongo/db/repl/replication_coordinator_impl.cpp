@@ -1279,10 +1279,9 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
                                                     OpTime targetOpTime,
                                                     boost::optional<Date_t> deadline) {
     if (!isMajorityCommittedRead) {
-        // This assumes the read concern is "local" level.
-        // We need to wait for all committed writes to be visible, even in the oplog (which uses
-        // special visibility rules).
-        _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+        if (!_externalState->oplogExists(opCtx)) {
+            return {ErrorCodes::NotYetInitialized, "The oplog does not exist."};
+        }
     }
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
@@ -1344,6 +1343,18 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
         if (!waitStatus.isOK()) {
             return waitStatus;
         }
+    }
+
+    lock.unlock();
+
+    if (!isMajorityCommittedRead) {
+        // This assumes the read concern is "local" level.
+        // We need to wait for all committed writes to be visible, even in the oplog (which uses
+        // special visibility rules).  We must do this after waiting for our target optime, because
+        // only then do we know that it will fill in all "holes" before that time.  If we do it
+        // earlier, we may return when the requested optime has been reached, but other writes
+        // at optimes before that time are not yet visible.
+        _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx);
     }
 
     return Status::OK();

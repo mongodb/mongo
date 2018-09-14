@@ -151,6 +151,8 @@ public:
      *  - when using ReadSource::kProvided, the timestamp provided.
      *  - when using ReadSource::kLastAppliedSnapshot, the timestamp chosen using the storage
      * engine's last applied timestamp.
+     *  - when using ReadSource::kAllCommittedSnapshot, the timestamp chosen using the storage
+     * engine's all-committed timestamp.
      *  - when using ReadSource::kLastApplied, the last applied timestamp at which the current
      * storage transaction was opened, if one is open.
      *  - when using ReadSource::kMajorityCommitted, the majority committed timestamp chosen by the
@@ -226,6 +228,9 @@ public:
         // Read from the last applied timestamp. New transactions will always read from the same
         // timestamp and never advance.
         kLastAppliedSnapshot,
+        // Read from the all-committed timestamp. New transactions will always read from the same
+        // timestamp and never advance.
+        kAllCommittedSnapshot,
         // Read from the timestamp provided to setTimestampReadSource.
         kProvided
     };
