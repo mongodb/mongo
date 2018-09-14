@@ -7,7 +7,10 @@ load('jstests/libs/sessions_collection.js');
     // implicit sessions.
     TestData.disableImplicitSessions = true;
 
-    var replTest = new ReplSetTest({name: 'refresh', nodes: 3});
+    var replTest = new ReplSetTest({
+        name: 'refresh',
+        nodes: [{rsConfig: {votes: 1, priority: 1}}, {rsConfig: {votes: 0, priority: 0}}]
+    });
     var nodes = replTest.startSet();
 
     replTest.initiate();
@@ -15,7 +18,7 @@ load('jstests/libs/sessions_collection.js');
     var primaryAdmin = primary.getDB("admin");
 
     replTest.awaitSecondaryNodes();
-    var secondary = replTest._slaves[0];
+    var secondary = replTest.getSecondary();
     var secondaryAdmin = secondary.getDB("admin");
 
     // Test that we can use sessions on the primary before the sessions collection exists.
