@@ -308,15 +308,6 @@ private:
     class WiredTigerJournalFlusher;
     class WiredTigerCheckpointThread;
 
-    /**
-     * Opens a connection on the WiredTiger database 'path' with the configuration 'wtOpenConfig'.
-     * Only returns when successful. Intializes both '_conn' and '_fileVersion'.
-     *
-     * If corruption is detected and _inRepairMode is 'true', attempts to salvage the WiredTiger
-     * metadata.
-     */
-    void _openWiredTiger(const std::string& path, const std::string& wtOpenConfig);
-
     Status _salvageIfNeeded(const char* uri);
     void _ensureIdentPath(StringData ident);
 
@@ -364,7 +355,6 @@ private:
     void _setOldestTimestamp(Timestamp newOldestTimestamp, bool force);
 
     WT_CONNECTION* _conn;
-    WiredTigerFileVersion _fileVersion;
     WiredTigerEventHandler _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
     ClockSource* const _clockSource;
@@ -400,6 +390,7 @@ private:
 
     std::unique_ptr<WiredTigerSession> _backupSession;
     Timestamp _recoveryTimestamp;
+    WiredTigerFileVersion _fileVersion;
 
     // Tracks the stable and oldest timestamps we've set on the storage engine.
     AtomicWord<std::uint64_t> _oldestTimestamp;
