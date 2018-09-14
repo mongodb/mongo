@@ -64,7 +64,10 @@ public:
      * deadline for the commit decision. If the coordinator has not decided to commit by that
      * deadline, it will abort.
      */
-    void createCoordinator(LogicalSessionId lsid, TxnNumber txnNumber, Date_t commitDeadline);
+    void createCoordinator(OperationContext* opCtx,
+                           LogicalSessionId lsid,
+                           TxnNumber txnNumber,
+                           Date_t commitDeadline);
 
     /**
      * Delivers coordinateCommit to the TransactionCoordinator, asynchronously sends commit or
@@ -107,7 +110,7 @@ public:
     void tryAbort(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber);
 
 private:
-    TransactionCoordinatorCatalog _coordinatorCatalog;
+    std::shared_ptr<TransactionCoordinatorCatalog> _coordinatorCatalog;
 };
 
 }  // namespace mongo

@@ -60,6 +60,17 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::create(Lo
               "the same session ID and transaction number as a previous coordinator");
 
     auto newCoordinator = std::make_shared<TransactionCoordinator>();
+    // Schedule callback to remove coordinator from catalog when it either commits or aborts.
+    newCoordinator->waitForCompletion().getAsync([
+        catalogWeakPtr = std::weak_ptr<TransactionCoordinatorCatalog>(shared_from_this()),
+        lsid,
+        txnNumber
+    ](auto finalState) {
+        if (auto catalog = catalogWeakPtr.lock()) {
+            catalog->remove(lsid, txnNumber);
+        }
+    });
+
     _coordinatorsBySession[lsid][txnNumber] = newCoordinator;
 
     return newCoordinator;

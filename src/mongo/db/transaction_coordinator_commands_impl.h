@@ -49,6 +49,8 @@ void recvVoteCommit(OperationContext* opCtx,
 void recvVoteAbort(OperationContext* opCtx,
                    std::shared_ptr<TransactionCoordinator> coordinator,
                    const ShardId& shardId);
+void recvTryAbort(OperationContext* opCtx, std::shared_ptr<TransactionCoordinator> coordinator);
+
 
 }  // namespace txn
 }  // namespace mongo

@@ -39,6 +39,7 @@ MONGO_REGISTER_SHIM(createTransactionCoordinator)
     // If this shard has been selected as the coordinator, set up the coordinator state
     // to be ready to receive votes.
     TransactionCoordinatorService::get(opCtx)->createCoordinator(
+        opCtx,
         clientLsid,
         clientTxnNumber,
         clockSource->now() + Seconds(transactionLifetimeLimitSeconds.load()));

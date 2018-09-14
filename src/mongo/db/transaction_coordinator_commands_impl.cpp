@@ -250,5 +250,15 @@ void recvVoteAbort(OperationContext* opCtx,
     doAction(opCtx, coordinator, action);
 }
 
+void recvTryAbort(OperationContext* opCtx, std::shared_ptr<TransactionCoordinator> coordinator) {
+    // TODO (SERVER-36687): Remove log line or demote to lower log level once cross-shard
+    // transactions are stable.
+    LOG(0) << "Coordinator shard received tryAbort";
+
+    TransactionCoordinator::StateMachine::Action action;
+    action = coordinator->recvTryAbort();
+    doAction(opCtx, coordinator, action);
+}
+
 }  // namespace txn
 }  // namespace mongo

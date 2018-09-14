@@ -28,8 +28,13 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <map>
+#include <memory>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -41,7 +46,8 @@ class TransactionCoordinator;
  * itself from the config.txnCommitDecisions collection, which will be done on transition to
  * primary (whether from startup or ordinary step up).
  */
-class TransactionCoordinatorCatalog {
+class TransactionCoordinatorCatalog
+    : public std::enable_shared_from_this<TransactionCoordinatorCatalog> {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorCatalog);
 
 public:
@@ -71,7 +77,6 @@ public:
      */
     boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
     getLatestOnSession(LogicalSessionId lsid);
-
 
     /**
      * Removes the coordinator with the given session id and transaction number from the catalog, if
