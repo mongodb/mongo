@@ -148,6 +148,12 @@ private:
     void _txnClose(bool commit);
     void _txnOpen();
 
+    /**
+     * Starts a transaction at the current all-committed timestamp.
+     * Returns the timestamp the transaction was started at.
+     */
+    Timestamp _beginTransactionAtAllCommittedTimestamp(WT_SESSION* session);
+
     WiredTigerSessionCache* _sessionCache;  // not owned
     WiredTigerOplogManager* _oplogManager;  // not owned
     UniqueWiredTigerSession _session;

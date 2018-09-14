@@ -621,6 +621,11 @@ void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(ServiceContext*
     setNewTimestamp(ctx, newTime);
 }
 
+bool ReplicationCoordinatorExternalStateImpl::oplogExists(OperationContext* opCtx) {
+    AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
+    return oplog.getCollection() != nullptr;
+}
+
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
     OperationContext* opCtx) {
     // TODO: handle WriteConflictExceptions below

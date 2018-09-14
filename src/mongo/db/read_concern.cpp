@@ -295,7 +295,11 @@ Status waitForReadConcern(OperationContext* opCtx,
                     "node needs to be a replica set member to use readConcern: snapshot"};
         }
         if (speculative) {
-            txnParticipant->setSpeculativeTransactionOpTimeToLastApplied(opCtx);
+            txnParticipant->setSpeculativeTransactionOpTime(
+                opCtx,
+                readConcernArgs.getOriginalLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+                    ? SpeculativeTransactionOpTime::kAllCommitted
+                    : SpeculativeTransactionOpTime::kLastApplied);
         }
     }
 

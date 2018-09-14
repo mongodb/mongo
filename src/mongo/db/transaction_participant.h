@@ -53,6 +53,11 @@ class OperationContext;
 
 extern AtomicInt32 transactionLifetimeLimitSeconds;
 
+enum class SpeculativeTransactionOpTime {
+    kLastApplied,
+    kAllCommitted,
+};
+
 /**
  * A state machine that coordinates a distributed transaction commit with the transaction
  * coordinator.
@@ -154,7 +159,8 @@ public:
     /**
      * Called for speculative transactions to fix the optime of the snapshot to read from.
      */
-    void setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opCtx);
+    void setSpeculativeTransactionOpTime(OperationContext* opCtx,
+                                         SpeculativeTransactionOpTime opTimeChoice);
 
     /**
      * Transfers management of transaction resources from the OperationContext to the Session.

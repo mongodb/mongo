@@ -101,6 +101,11 @@ namespace {
 // Used below to fail during inserts.
 MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
 
+// Used to pause after inserting collection data and calling the opObservers.  Inserts to
+// replicated collections that are not part of a multi-statement transaction will have generated
+// their OpTime and oplog entry.
+MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
+
 // Uses the collator factory to convert the BSON representation of a collator to a
 // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
 // valid, since it gets validated on collection create.
@@ -364,6 +369,20 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
 
     opCtx->recoveryUnit()->onCommit(
         [this](boost::optional<Timestamp>) { notifyCappedWaitersIfNeeded(); });
+
+    MONGO_FAIL_POINT_BLOCK(hangAfterCollectionInserts, extraData) {
+        const BSONObj& data = extraData.getData();
+        const auto collElem = data["collectionNS"];
+        // If the failpoint specifies no collection or matches the existing one, hang.
+        if (!collElem || _ns.ns() == collElem.str()) {
+            while (MONGO_FAIL_POINT(hangAfterCollectionInserts)) {
+                log() << "hangAfterCollectionInserts fail point enabled for " << _ns.toString()
+                      << ". Blocking until fail point is disabled.";
+                mongo::sleepsecs(1);
+                opCtx->checkForInterrupt();
+            }
+        }
+    }
 
     return Status::OK();
 }

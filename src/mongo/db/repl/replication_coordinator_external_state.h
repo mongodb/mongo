@@ -174,6 +174,11 @@ public:
     virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime) = 0;
 
     /**
+     * Checks if the oplog exists.
+     */
+    virtual bool oplogExists(OperationContext* opCtx) = 0;
+
+    /**
      * Gets the last optime of an operation performed on this host, from stable
      * storage.
      */

@@ -66,6 +66,9 @@ selector:
   - jstests/core/txns/view_reads_in_transaction.js
   - jstests/core/txns/list_collections_not_blocked_by_txn.js
   - jstests/core/txns/statement_ids_accepted.js
+
+  # Uses hangAfterCollectionInserts failpoint not available on mongos.
+  - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 executor:
   archive:
     hooks:
