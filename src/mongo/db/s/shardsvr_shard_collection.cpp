@@ -649,7 +649,6 @@ public:
             uuid = UUID::gen();
         }
 
-        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
         auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         shardRegistry->reload(opCtx);
 
