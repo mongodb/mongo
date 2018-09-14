@@ -48,12 +48,11 @@ var $config = (function() {
             let res = db.runCommand(dropCmd);
             let errorCodes = [ErrorCodes.NamespaceNotFound];
             assertAlways.commandWorkedOrFailedWithCode(
-                db.runCommand(dropCmd), errorCodes, () => `cmd: ${tojson(cmd)}`);
+                db.runCommand(dropCmd), errorCodes, () => `cmd: ${tojson(dropCmd)}`);
 
             res = db.createView(viewName, collName, []);
             errorCodes = [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound];
-            assertAlways.commandWorkedOrFailedWithCode(
-                res, errorCodes, () => `cmd: ${tojson(cmd)}`);
+            assertAlways.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: createView`);
         }
 
         /**

@@ -8,7 +8,7 @@
 function abortTransaction(db, txnNumber, errorCodes) {
     const abortCmd = {abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false};
     const res = db.adminCommand(abortCmd);
-    return assert.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: ${tojson(cmd)}`);
+    return assert.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: ${tojson(abortCmd)}`);
 }
 
 /**
