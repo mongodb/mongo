@@ -2303,6 +2303,64 @@ functions:
         shell: bash
         working_dir: src
         script: |
+          if [ "Windows_NT" = "$OS" ]; then
+            exit 0
+          fi
+          # Enable core dumps on non-Windows remote hosts.
+          # The core pattern must specify a director, since mongod --fork will chdir("/")
+          # and cannot generate a core dump there (see SERVER-21635).
+          # We need to reboot the host for the core limits to take effect.
+          ${set_sudo}
+          core_pattern=${remote_dir}/dump_%e.%p.core
+          sysctl_conf=/etc/sysctl.conf
+          cmds="ulimit -a"
+          cmds="$cmds; echo \"$USER - core unlimited\" | $sudo tee -a /etc/security/limits.conf"
+          cmds="$cmds; if [ -f $sysctl_conf ]"
+          cmds="$cmds; then grep ^kernel.core_pattern $sysctl_conf"
+          cmds="$cmds;    if [ \$? -eq  0 ]"
+          cmds="$cmds;    then $sudo sed -i \"s,kernel.core_pattern=.*,kernel.core_pattern=$core_pattern,\" $sysctl_conf"
+          cmds="$cmds;    else echo \"kernel.core_pattern=$core_pattern\" | $sudo tee -a $sysctl_conf"
+          cmds="$cmds;    fi"
+          cmds="$cmds; else echo Cannot change the core pattern and no core dumps will be generated."
+          cmds="$cmds; fi"
+          cmds="$cmds; $sudo reboot"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
+            --verbose                                        \
+            --userHost $USER@${private_ip_address}           \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --commands "$cmds"
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          if [ "Windows_NT" = "$OS" ]; then
+            exit 0
+          fi
+          # Print the ulimit & kernel.core_pattern
+          cmds="uptime"
+          cmds="$cmds; ulimit -a"
+          cmds="$cmds; if [ -f /sbin/sysctl ]"
+          cmds="$cmds; then /sbin/sysctl kernel.core_pattern"
+          cmds="$cmds; fi"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
+            --verbose                                        \
+            --userHost $USER@${private_ip_address}           \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|3}                       \
+            --commands "$cmds"
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
           set -o errexit
           ${set_sudo}
           # Set up curator to collect system & process stats on remote.
