@@ -42,37 +42,43 @@ using Event = TransactionCoordinator::StateMachine::Event;
 using State = TransactionCoordinator::StateMachine::State;
 
 Action TransactionCoordinator::recvCoordinateCommit(const std::set<ShardId>& participants) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _participantList.recordFullList(participants);
-    return _stateMachine.onEvent(Event::kRecvParticipantList);
+    return _stateMachine.onEvent(std::move(lk), Event::kRecvParticipantList);
 }
 
 Action TransactionCoordinator::recvVoteCommit(const ShardId& shardId, Timestamp prepareTimestamp) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
     _participantList.recordVoteCommit(shardId, prepareTimestamp);
 
     auto event = (_participantList.allParticipantsVotedCommit()) ? Event::kRecvFinalVoteCommit
                                                                  : Event::kRecvVoteCommit;
-    return _stateMachine.onEvent(event);
+    return _stateMachine.onEvent(std::move(lk), event);
 }
 
 Action TransactionCoordinator::recvVoteAbort(const ShardId& shardId) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _participantList.recordVoteAbort(shardId);
-    return _stateMachine.onEvent(Event::kRecvVoteAbort);
+    return _stateMachine.onEvent(std::move(lk), Event::kRecvVoteAbort);
 }
 
 Action TransactionCoordinator::recvTryAbort() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _stateMachine.onEvent(Event::kRecvTryAbort);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return _stateMachine.onEvent(std::move(lk), Event::kRecvTryAbort);
 }
 
 void TransactionCoordinator::recvCommitAck(const ShardId& shardId) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _participantList.recordCommitAck(shardId);
     if (_participantList.allParticipantsAckedCommit()) {
-        _stateMachine.onEvent(Event::kRecvFinalCommitAck);
+        _stateMachine.onEvent(std::move(lk), Event::kRecvFinalCommitAck);
     }
+}
+
+Future<TransactionCoordinator::StateMachine::State> TransactionCoordinator::waitForCompletion() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return _stateMachine.waitForTransitionTo({State::kCommitted, State::kAborted});
 }
 
 //
@@ -130,7 +136,43 @@ const std::map<State, std::map<Event, TransactionCoordinator::StateMachine::Tran
         // clang-format on
 };
 
-Action TransactionCoordinator::StateMachine::onEvent(Event event) {
+TransactionCoordinator::StateMachine::~StateMachine() {
+    // Coordinators should always reach a terminal state prior to destructing, and all calls to
+    // waitForTransitionTo must contain both terminal states, so all outstanding promises should
+    // have been triggered prior to this.
+    invariant(_stateTransitionPromises.size() == 0);
+}
+
+void TransactionCoordinator::StateMachine::_signalAllPromisesWaitingForState(
+    stdx::unique_lock<stdx::mutex> lk, State newState) {
+
+    std::list<StateTransitionPromise> promisesToTrigger;
+    // Reorder promises so that those which were waiting to be signaled on the current state
+    // come first, and those which were not come last.
+    auto partitionPoint =
+        std::partition(_stateTransitionPromises.begin(),
+                       _stateTransitionPromises.end(),
+                       [&](const auto& stateTransitionPromise) {
+                           return stateTransitionPromise.triggeringStates.find(newState) !=
+                               stateTransitionPromise.triggeringStates.end();
+                       });
+    // Remove all of the promises to trigger from _stateTransitionPromises and put them in
+    // promisesToTrigger.
+    promisesToTrigger.splice(promisesToTrigger.begin(),
+                             _stateTransitionPromises,
+                             _stateTransitionPromises.begin(),
+                             partitionPoint);
+
+    // Signaling the promises must be done without holding the mutex to avoid deadlock in case
+    // signaling the promise triggers a callback that requires locking the mutex.
+    lk.unlock();
+    for (auto& stateTransitionPromise : promisesToTrigger) {
+        stateTransitionPromise.promise.emplaceValue(newState);
+    }
+}
+
+Action TransactionCoordinator::StateMachine::onEvent(stdx::unique_lock<stdx::mutex> lk,
+                                                     Event event) {
     const auto legalTransitions = transitionTable.find(_state)->second;
     if (!legalTransitions.count(event)) {
         std::string errmsg = str::stream() << "Transaction coordinator received illegal event '"
@@ -142,8 +184,32 @@ Action TransactionCoordinator::StateMachine::onEvent(Event event) {
     const auto transition = legalTransitions.find(event)->second;
     if (transition.nextState) {
         _state = *transition.nextState;
+        _signalAllPromisesWaitingForState(std::move(lk), _state);
     }
+
     return transition.action;
+}
+
+Future<State> TransactionCoordinator::StateMachine::waitForTransitionTo(
+    const std::set<State>& states) {
+
+    // The set of states waited on MUST include both terminal states of the state machine (committed
+    // and aborted). Otherwise it would be possible to wait on a state which is never reached,
+    // causing the caller to hang forever.
+    invariant(states.find(State::kCommitted) != states.end());
+    invariant(states.find(State::kAborted) != states.end());
+
+    // If we're already in one of the states the caller is waiting for, there's no need for a
+    // promise so we return immediately.
+    if (states.find(_state) != states.end()) {
+        return Future<State>::makeReady(_state);
+    }
+
+    auto promiseAndFuture = makePromiseFuture<TransactionCoordinator::StateMachine::State>();
+
+    _stateTransitionPromises.emplace_back(std::move(promiseAndFuture.promise), states);
+
+    return std::move(promiseAndFuture.future);
 }
 
 //

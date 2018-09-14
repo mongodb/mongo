@@ -29,6 +29,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/transaction_coordinator.h"
+
+#include <future>
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -123,6 +126,47 @@ TEST(Coordinator, TryAbortWhileWaitingForCommitAcksDoesNotCancelCommit) {
     coordinator.recvCommitAck(ShardId("shard0000"));
     coordinator.recvCommitAck(ShardId("shard0001"));
     ASSERT_EQ(State::kCommitted, coordinator.state());
+}
+
+TEST(Coordinator, WaitForCompletionReturnsOnChangeToCommitted) {
+    TransactionCoordinator coordinator;
+    auto future = coordinator.waitForCompletion();
+    coordinator.recvCoordinateCommit({ShardId("shard0000")});
+    coordinator.recvVoteCommit(ShardId("shard0000"), dummyTimestamp);
+    coordinator.recvCommitAck(ShardId("shard0000"));
+    auto finalState = future.get();
+    ASSERT_EQ(finalState, TransactionCoordinator::StateMachine::State::kCommitted);
+}
+
+TEST(Coordinator, WaitForCompletionReturnsOnChangeToAborted) {
+    TransactionCoordinator coordinator;
+    auto future = coordinator.waitForCompletion();
+    coordinator.recvVoteAbort(ShardId("shard0000"));
+    auto finalState = future.get();
+    ASSERT_EQ(finalState, TransactionCoordinator::StateMachine::State::kAborted);
+}
+
+TEST(Coordinator, RepeatedCallsToWaitForCompletionAllReturn) {
+    TransactionCoordinator coordinator;
+    auto futures = {coordinator.waitForCompletion(),
+                    coordinator.waitForCompletion(),
+                    coordinator.waitForCompletion()};
+    coordinator.recvVoteAbort(ShardId("shard0000"));
+
+    for (auto& future : futures) {
+        auto finalState = future.get();
+        ASSERT_EQ(finalState, TransactionCoordinator::StateMachine::State::kAborted);
+    }
+}
+
+TEST(Coordinator, CallingWaitForCompletionAfterAlreadyCompleteReturns) {
+    TransactionCoordinator coordinator;
+    coordinator.recvVoteAbort(ShardId("shard0000"));
+
+    auto future = coordinator.waitForCompletion();
+    auto finalState = future.get();
+
+    ASSERT_EQ(finalState, TransactionCoordinator::StateMachine::State::kAborted);
 }
 
 }  // namespace mongo

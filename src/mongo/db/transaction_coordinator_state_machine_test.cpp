@@ -31,6 +31,7 @@
 #include <deque>
 
 #include "mongo/db/transaction_coordinator.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -45,9 +46,12 @@ using Action = StateMachine::Action;
 
 using Schedule = deque<Event>;
 
-void runSchedule(StateMachine& coordinator, Schedule& schedule) {
+void runSchedule(StateMachine& coordinator, Schedule schedule) {
     while (!schedule.empty()) {
-        coordinator.onEvent(schedule.front());
+        stdx::mutex mutex;
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+
+        coordinator.onEvent(std::move(lk), schedule.front());
         schedule.pop_front();
     }
 }
@@ -79,6 +83,101 @@ TEST(CoordinatorStateMachine, RecvFinalVoteCommitAndRecvVoteAbortThrows) {
     expectScheduleThrows({Event::kRecvVoteAbort, Event::kRecvFinalVoteCommit});
     expectScheduleThrows(
         {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit, Event::kRecvVoteAbort});
+}
+
+TEST(CoordinatorStateMachine, WaitForTransitionToOnlyTerminalStatesReturnsCorrectStateOnAbort) {
+    StateMachine coordinator;
+    auto future = coordinator.waitForTransitionTo({State::kCommitted, State::kAborted});
+    runSchedule(coordinator, {Event::kRecvVoteAbort});
+    ASSERT_EQ(future.get(), State::kAborted);
+}
+
+TEST(CoordinatorStateMachine, WaitForTransitionToStatesThatHaventBeenReachedReturnsNotReadyFuture) {
+    StateMachine coordinator;
+    auto future = coordinator.waitForTransitionTo({State::kCommitted, State::kAborted});
+    ASSERT_FALSE(future.isReady());
+    // We need to abort here because we require that all promises are triggered prior to coordinator
+    // destruction.
+    runSchedule(coordinator, {Event::kRecvVoteAbort});
+}
+
+TEST(CoordinatorStateMachine, WaitForTransitionToOnlyTerminalStatesReturnsCorrectStateOnCommit) {
+    StateMachine coordinator;
+    auto future = coordinator.waitForTransitionTo({State::kCommitted, State::kAborted});
+    runSchedule(
+        coordinator,
+        {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit, Event::kRecvFinalCommitAck});
+    ASSERT_EQ(future.get(), State::kCommitted);
+}
+
+TEST(CoordinatorStateMachine,
+     WaitForTransitionToSingleStateAfterStateHasBeenReachedReturnsCorrectState) {
+    StateMachine coordinator;
+    runSchedule(coordinator, {Event::kRecvParticipantList});
+    auto future = coordinator.waitForTransitionTo(
+        {State::kWaitingForVotes, State::kCommitted, State::kAborted});
+    ASSERT_EQ(future.get(), TransactionCoordinator::StateMachine::State::kWaitingForVotes);
+}
+
+TEST(CoordinatorStateMachine, WaitForTransitionToMultipleStatesReturnsFirstStateToBeHit) {
+    StateMachine coordinator;
+    auto future = coordinator.waitForTransitionTo({State::kWaitingForCommitAcks,
+                                                   State::kWaitingForVotes,
+                                                   State::kCommitted,
+                                                   State::kAborted});
+
+    runSchedule(coordinator, {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit});
+
+    ASSERT_EQ(future.get(), TransactionCoordinator::StateMachine::State::kWaitingForVotes);
+}
+
+TEST(CoordinatorStateMachine,
+     TwoWaitForTransitionCallsToDifferentSetsOfStatesReturnsCorrectStateForEach) {
+    StateMachine coordinator;
+    auto future1 = coordinator.waitForTransitionTo(
+        {State::kWaitingForVotes, State::kCommitted, State::kAborted});
+    auto future2 = coordinator.waitForTransitionTo(
+        {State::kWaitingForCommitAcks, State::kCommitted, State::kAborted});
+    runSchedule(coordinator, {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit});
+
+    ASSERT_EQ(future1.get(), TransactionCoordinator::StateMachine::State::kWaitingForVotes);
+    ASSERT_EQ(future2.get(), TransactionCoordinator::StateMachine::State::kWaitingForCommitAcks);
+}
+
+TEST(CoordinatorStateMachine,
+     SeveralWaitForTransitionCallsToDifferentSetsOfStatesReturnsCorrectStateForEach) {
+
+    StateMachine coordinator;
+    auto futures1 = {coordinator.waitForTransitionTo(
+                         {State::kWaitingForVotes, State::kCommitted, State::kAborted}),
+                     coordinator.waitForTransitionTo(
+                         {State::kWaitingForVotes, State::kCommitted, State::kAborted}),
+                     coordinator.waitForTransitionTo(
+                         {State::kWaitingForVotes, State::kCommitted, State::kAborted})};
+    auto futures2 = {coordinator.waitForTransitionTo(
+                         {State::kWaitingForCommitAcks, State::kCommitted, State::kAborted}),
+                     coordinator.waitForTransitionTo(
+                         {State::kWaitingForCommitAcks, State::kCommitted, State::kAborted}),
+                     coordinator.waitForTransitionTo(
+                         {State::kWaitingForCommitAcks, State::kCommitted, State::kAborted})};
+
+    runSchedule(coordinator, {Event::kRecvParticipantList, Event::kRecvFinalVoteCommit});
+
+    for (auto& future1 : futures1) {
+        ASSERT_EQ(future1.get(), TransactionCoordinator::StateMachine::State::kWaitingForVotes);
+    }
+    for (auto& future2 : futures2) {
+        ASSERT_EQ(future2.get(),
+                  TransactionCoordinator::StateMachine::State::kWaitingForCommitAcks);
+    }
+}
+
+DEATH_TEST(CoordinatorStateMachine,
+           MustNotHaveOutstandingPromisesWhenDestroyed,
+           "Invariant failure") {
+    StateMachine coordinator;
+    auto future = coordinator.waitForTransitionTo(
+        {State::kWaitingForVotes, State::kCommitted, State::kAborted});
 }
 
 }  // namespace mongo
