@@ -66,7 +66,7 @@ public:
      * the Key was already in the cache and was active at the time it was updated.
      */
     void insertOrAssign(const Key& key, std::unique_ptr<Value> value) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        UniqueLockWithPtrGuard lk(this);
         _invalidateKey(lk, key);
         _cache.add(key, std::move(value));
     }
@@ -76,12 +76,13 @@ public:
      * returning a shared_ptr to value to the caller.
      */
     std::shared_ptr<Value> insertOrAssignAndGet(const Key& key, std::unique_ptr<Value> value) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        UniqueLockWithPtrGuard lk(this);
         _invalidateKey(lk, key);
         auto ret = std::shared_ptr<Value>(value.release(), _makeDeleterWithLock(key, _generation));
         bool inserted;
         std::tie(std::ignore, inserted) = _active.emplace(key, ret);
         fassert(50902, inserted);
+
         return ret;
     }
 
@@ -90,8 +91,8 @@ public:
      * will not be invalidated.
      */
     void invalidate(const Key& key) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        return _invalidateKey(lk, key);
+        UniqueLockWithPtrGuard lk(this);
+        _invalidateKey(lk, key);
     }
 
     /*
@@ -100,7 +101,7 @@ public:
      */
     template <typename Pred>
     void invalidateIf(Pred predicate) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        UniqueLockWithPtrGuard lk(this);
 
         // Remove any matching values from the cache (of inactive items). Do not bump the
         // generation - that only happens if any active items are invalidated.
@@ -116,7 +117,7 @@ public:
         auto it = _active.begin();
         while (it != _active.end()) {
             auto& kv = *it;
-            auto value = kv.second.lock();
+            auto value = lk.lockWeakPtr(kv.second);
 
             // If the value is a valid ptr (they're still checked out), and the key/value
             // doesn't match the predicate, then just skip this one.
@@ -220,6 +221,41 @@ private:
         static constexpr bool value = std::is_same<decltype(test<T>(0)), yes>::value;
     };
 
+    /*
+     * When locking weak_ptr's from the _activeMap, the newly locked shared_ptrs must be destroyed
+     * while not holding the _mutex to prevent a deadlock. This is a guard type that ensures
+     * locked weak_ptrs get cleaned up without the _mutex being locked. Holding this is the same
+     * as holding a stdx::unique_ptr<>(_mutex), and this type must be held if you create temporary
+     * shared_ptr's from the _active map (e.g. when you're doing invalidation).
+     */
+    class UniqueLockWithPtrGuard {
+    public:
+        UniqueLockWithPtrGuard(InvalidatingLRUCache<Key, Value, Invalidator>* cache)
+            : _cache(cache), _lk(_cache->_mutex) {}
+
+        ~UniqueLockWithPtrGuard() {
+            // Move the active ptrs to destroy vector into a local variable so it gets destroyed
+            // after the lock is released.
+            auto toCleanup = std::move(_activePtrsToDestroy);
+            _lk.unlock();
+        }
+
+        // Call this method to lock a weak_ptr from the _active map, its lifetime will be extended
+        // to the destructor of this guard type.
+        auto lockWeakPtr(std::weak_ptr<Value>& ptr) -> auto {
+            auto value = ptr.lock();
+            if (value) {
+                _activePtrsToDestroy.push_back(value);
+            }
+            return value;
+        }
+
+    private:
+        InvalidatingLRUCache<Key, Value, Invalidator>* _cache;
+        stdx::unique_lock<stdx::mutex> _lk;
+        std::vector<std::shared_ptr<Value>> _activePtrsToDestroy;
+    };
+
     using ActiveMap = stdx::unordered_map<Key, std::weak_ptr<Value>>;
     using ActiveIterator = typename ActiveMap::iterator;
 
@@ -229,7 +265,7 @@ private:
     /*
      * Invalidates an item in the cache and active map by key.
      */
-    void _invalidateKey(WithLock lk, const Key& key) {
+    void _invalidateKey(UniqueLockWithPtrGuard& lk, const Key& key) {
         // Erase any cached user (one that hasn't been given out yet).
         _cache.erase(key);
 
@@ -246,7 +282,7 @@ private:
      * If the active item's weak_ptr has already been locked, it should be moved into value,
      * otherwise pass nullptr and this function will lock/check the weak_ptr itself.
      */
-    ActiveIterator _invalidateActiveIterator(WithLock,
+    ActiveIterator _invalidateActiveIterator(UniqueLockWithPtrGuard& guard,
                                              const ActiveIterator& it,
                                              std::shared_ptr<Value>&& value) {
         // If the iterator is past-the-end, then just return the iterator
@@ -262,7 +298,7 @@ private:
         // It's valid to pass in a nullptr here, so if value is a nullptr, then try to lock
         // the weak_ptr in the active map.
         if (!value) {
-            value = it->second.lock();
+            value = guard.lockWeakPtr(it->second);
         }
 
         // We only call the invalidator if the value is a valid ptr, otherwise it's about to
