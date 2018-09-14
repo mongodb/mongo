@@ -196,7 +196,7 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock, OperationConte
             // Note: This is an optimization based on the assumption that it is not possible to be
             // touching different namespaces in the same transaction.
             if (!nextStmtId || (nextStmtId && *nextStmtId != kIncompleteHistoryStmtId &&
-                                nextOplog.getNamespace() != _ns)) {
+                                nextOplog.getNss() != _ns)) {
                 _currentOplogIterator.reset();
                 return false;
             }

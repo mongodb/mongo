@@ -54,7 +54,7 @@ structs:
                 type: OpType
                 description: "The operation type"
             ns:
-                cpp_name: namespace
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace on which to apply the operation"
             ui:

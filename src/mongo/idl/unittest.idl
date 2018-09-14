@@ -185,7 +185,7 @@ structs:
         strict: false
         fields:
             field1: RequiredStrictField3
-            field2: 
+            field2:
                 type: RequiredNonStrictField3
                 optional: true
             field3: RequiredStrictField3
@@ -617,3 +617,5 @@ commands:
         type: array<int>
         fields:
             field1: int
+
+

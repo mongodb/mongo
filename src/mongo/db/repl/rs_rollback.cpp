@@ -245,13 +245,13 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
     }
 
     // Extract the op's collection namespace and UUID.
-    NamespaceString nss = oplogEntry.getNamespace();
+    NamespaceString nss = oplogEntry.getNss();
     auto uuid = oplogEntry.getUuid();
 
     if (oplogEntry.getOpType() == OpTypeEnum::kNoop)
         return Status::OK();
 
-    if (oplogEntry.getNamespace().isEmpty()) {
+    if (oplogEntry.getNss().isEmpty()) {
         throw RSFatalException(str::stream() << "Local op on rollback has no ns: "
                                              << redact(oplogEntry.toBSON()));
     }

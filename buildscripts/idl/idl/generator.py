@@ -391,7 +391,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate the declarations for the class constructors."""
         struct_type_info = struct_types.get_struct_info(struct)
 
-        self._writer.write_line(struct_type_info.get_constructor_method().get_declaration())
+        constructor = struct_type_info.get_constructor_method()
+        self._writer.write_line(constructor.get_declaration())
+
+        required_constructor = struct_type_info.get_required_constructor_method()
+        if len(required_constructor.args) != len(constructor.args):
+            self._writer.write_line(required_constructor.get_declaration())
 
     def gen_serializer_methods(self, struct):
         # type: (ast.Struct) -> None
@@ -943,37 +948,40 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('firstFieldFound = true;')
             self._writer.write_line('continue;')
 
-    def gen_constructors(self, struct):
-        # type: (ast.Struct) -> None
+    def _gen_constructor(self, struct, constructor, default_init):
+        # type: (ast.Struct, struct_types.MethodInfo, bool) -> None
         """Generate the C++ constructor definition."""
-
-        struct_type_info = struct_types.get_struct_info(struct)
-        constructor = struct_type_info.get_constructor_method()
 
         initializers = ['_%s(std::move(%s))' % (arg.name, arg.name) for arg in constructor.args]
 
         # Serialize non-has fields first
         # Initialize int and other primitive fields to -1 to prevent Coverity warnings.
-        for field in struct.fields:
-            needs_init = field.cpp_type and not field.array and cpp_types.is_primitive_scalar_type(
-                field.cpp_type)
-            if _is_required_serializer_field(field) and needs_init:
-                initializers.append(
-                    '%s(%s)' % (_get_field_member_name(field),
-                                cpp_types.get_primitive_scalar_type_default_value(field.cpp_type)))
+        if default_init:
+            for field in struct.fields:
+                needs_init = field.cpp_type and not field.array and cpp_types.is_primitive_scalar_type(
+                    field.cpp_type)
+                if _is_required_serializer_field(field) and needs_init:
+                    initializers.append(
+                        '%s(%s)' %
+                        (_get_field_member_name(field),
+                         cpp_types.get_primitive_scalar_type_default_value(field.cpp_type)))
 
         # Serialize the _dbName field second
         initializes_db_name = False
         if [arg for arg in constructor.args if arg.name == 'nss']:
-            initializers.append('_dbName(nss.db().toString())')
-            initializes_db_name = True
+            if [field for field in struct.fields if field.serialize_op_msg_request_only]:
+                initializers.append('_dbName(nss.db().toString())')
+                initializes_db_name = True
 
         # Serialize has fields third
         # Add _has{FIELD} bool members to ensure fields are set before serialization.
         for field in struct.fields:
             if _is_required_serializer_field(field) and not (field.name == "$db"
                                                              and initializes_db_name):
-                initializers.append('%s(false)' % _get_has_field_member_name(field))
+                if default_init:
+                    initializers.append('%s(false)' % _get_has_field_member_name(field))
+                else:
+                    initializers.append('%s(true)' % _get_has_field_member_name(field))
 
         if initializes_db_name:
             initializers.append('_hasDbName(true)')
@@ -984,6 +992,20 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         with self._block('%s %s {' % (constructor.get_definition(), initializers_str), '}'):
             self._writer.write_line('// Used for initialization only')
+
+    def gen_constructors(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate all the C++ constructor definitions."""
+
+        struct_type_info = struct_types.get_struct_info(struct)
+        constructor = struct_type_info.get_constructor_method()
+
+        self._gen_constructor(struct, constructor, True)
+
+        required_constructor = struct_type_info.get_required_constructor_method()
+        if len(required_constructor.args) != len(constructor.args):
+            #print(struct.name + ": "+  str(required_constructor.args))
+            self._gen_constructor(struct, required_constructor, False)
 
     def _gen_command_deserializer(self, struct, bson_object):
         # type: (ast.Struct, unicode) -> None

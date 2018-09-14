@@ -61,7 +61,7 @@ void ApplierHelpers::stableSortByNamespace(MultiApplier::OperationPtrs* oplogEnt
         return;
     }
     auto nssComparator = [](const OplogEntry* l, const OplogEntry* r) {
-        return l->getNamespace() < r->getNamespace();
+        return l->getNss() < r->getNss();
     };
     std::stable_sort(oplogEntryPointers->begin(), oplogEntryPointers->end(), nssComparator);
 }
@@ -99,7 +99,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     // Make sure to include the first op in the batch size.
     auto batchSize = entry.getObject().objsize();
     auto batchCount = OperationPtrs::size_type(1);
-    auto batchNamespace = entry.getNamespace();
+    auto batchNamespace = entry.getNss();
 
     /**
      * Search for the op that delimits this insert batch, and save its position
@@ -117,7 +117,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
      */
     auto endOfGroupableOpsIterator =
         std::find_if(it + 1, _end, [&](const OplogEntry* nextEntry) -> bool {
-            auto opNamespace = nextEntry->getNamespace();
+            auto opNamespace = nextEntry->getNss();
             batchSize += nextEntry->getObject().objsize();
             batchCount += 1;
 

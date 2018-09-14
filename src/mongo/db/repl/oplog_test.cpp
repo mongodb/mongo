@@ -140,7 +140,7 @@ void _checkOplogEntry(const OplogEntry& oplogEntry,
                       const OpTime& expectedOpTime,
                       const NamespaceString& expectedNss) {
     ASSERT_EQUALS(expectedOpTime, oplogEntry.getOpTime()) << oplogEntry.toBSON();
-    ASSERT_EQUALS(expectedNss, oplogEntry.getNamespace()) << oplogEntry.toBSON();
+    ASSERT_EQUALS(expectedNss, oplogEntry.getNss()) << oplogEntry.toBSON();
 }
 void _checkOplogEntry(const OplogEntry& oplogEntry,
                       const std::pair<OpTime, NamespaceString>& expectedOpTimeAndNss) {

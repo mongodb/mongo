@@ -278,7 +278,7 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
 
             result.oplogTime = repl::logOp(opCtx,
                                            "n",
-                                           oplogEntry.getNamespace(),
+                                           oplogEntry.getNss(),
                                            oplogEntry.getUuid(),
                                            object,
                                            &object2,

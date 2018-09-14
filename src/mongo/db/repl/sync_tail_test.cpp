@@ -917,7 +917,7 @@ TEST_F(SyncTailTest, MultiSyncApplyAppliesInsertOpsIndividuallyWhenUnableToCreat
                                                   makeOp(NamespaceString(testNs + "_3"))};
 
     for (const auto& oplogEntry : operationsToApply) {
-        createCollectionWithUuid(_opCtx.get(), oplogEntry.getNamespace());
+        createCollectionWithUuid(_opCtx.get(), oplogEntry.getNss());
     }
 
     // Each element in 'docsInserted' is a grouped insert operation.

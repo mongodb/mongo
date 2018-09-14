@@ -104,7 +104,7 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     builder.append(OplogEntryBase::kHashFieldName, hash);
     builder.append(OplogEntryBase::kVersionFieldName, version);
     builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
-    builder.append(OplogEntryBase::kNamespaceFieldName, nss.toString());
+    builder.append(OplogEntryBase::kNssFieldName, nss.toString());
     if (uuid) {
         uuid->appendToBuilder(&builder, OplogEntryBase::kUuidFieldName);
     }
@@ -150,7 +150,7 @@ ReplOperation OplogEntry::makeInsertOperation(const NamespaceString& nss,
                                               const BSONObj& docToInsert) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kInsert);
-    op.setNamespace(nss);
+    op.setNss(nss);
     op.setUuid(uuid);
     op.setObject(docToInsert.getOwned());
     return op;
@@ -162,7 +162,7 @@ ReplOperation OplogEntry::makeUpdateOperation(const NamespaceString nss,
                                               const BSONObj& criteria) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kUpdate);
-    op.setNamespace(nss);
+    op.setNss(nss);
     op.setUuid(uuid);
     op.setObject(update.getOwned());
     op.setObject2(criteria.getOwned());
@@ -174,14 +174,14 @@ ReplOperation OplogEntry::makeDeleteOperation(const NamespaceString& nss,
                                               const BSONObj& docToDelete) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kDelete);
-    op.setNamespace(nss);
+    op.setNss(nss);
     op.setUuid(uuid);
     op.setObject(docToDelete.getOwned());
     return op;
 }
 
 size_t OplogEntry::getReplOperationSize(const ReplOperation& op) {
-    return sizeof(op) + op.getNamespace().size() + op.getObject().objsize() +
+    return sizeof(op) + op.getNss().size() + op.getObject().objsize() +
         (op.getObject2() ? op.getObject2()->objsize() : 0);
 }
 

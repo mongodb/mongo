@@ -211,8 +211,8 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                    BSONType::String);
     string op = input[repl::OplogEntry::kOpTypeFieldName].getString();
     Value ts = input[repl::OplogEntry::kTimestampFieldName];
-    Value ns = input[repl::OplogEntry::kNamespaceFieldName];
-    checkValueType(ns, repl::OplogEntry::kNamespaceFieldName, BSONType::String);
+    Value ns = input[repl::OplogEntry::kNssFieldName];
+    checkValueType(ns, repl::OplogEntry::kNssFieldName, BSONType::String);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
     std::vector<FieldPath> documentKeyFields;
 
@@ -417,7 +417,7 @@ Value DocumentSourceChangeStreamTransform::serialize(
 DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTracker* deps) const {
     deps->fields.insert(repl::OplogEntry::kOpTypeFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTimestampFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kNamespaceFieldName.toString());
+    deps->fields.insert(repl::OplogEntry::kNssFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kUuidFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kObjectFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kObject2FieldName.toString());

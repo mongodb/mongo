@@ -444,7 +444,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
         ASSERT(OpTypeEnum::kInsert == operation1.getOpType()) << "Unexpected op type: "
                                                               << operation1.toBSON();
         ASSERT_EQUALS(ui1, *operation1.getUuid());
-        ASSERT_EQUALS(ns1, operation1.getNamespace());
+        ASSERT_EQUALS(ns1, operation1.getNss());
         ASSERT_BSONOBJ_EQ(BSON("_id" << 1), operation1.getOperationToApply());
 
         // OpTime of CRUD operation should match applyOps.
@@ -457,7 +457,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
         ASSERT(OpTypeEnum::kInsert == operation2.getOpType()) << "Unexpected op type: "
                                                               << operation2.toBSON();
         ASSERT_EQUALS(ui2, *operation2.getUuid());
-        ASSERT_EQUALS(ns2, operation2.getNamespace());
+        ASSERT_EQUALS(ns2, operation2.getNss());
         ASSERT_BSONOBJ_EQ(BSON("_id" << 2), operation2.getOperationToApply());
 
         // OpTime of CRUD operation should match applyOps.
@@ -470,7 +470,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
         ASSERT(OpTypeEnum::kUpdate == operation3.getOpType()) << "Unexpected op type: "
                                                               << operation3.toBSON();
         ASSERT_EQUALS(ui3, *operation3.getUuid());
-        ASSERT_EQUALS(ns3, operation3.getNamespace());
+        ASSERT_EQUALS(ns3, operation3.getNss());
         ASSERT_BSONOBJ_EQ(BSON("_id" << 3), operation3.getOperationToApply());
 
         auto optionalUpsertBool = operation3.getUpsert();

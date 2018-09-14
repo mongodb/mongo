@@ -50,7 +50,9 @@ structs:
   HealthLogEntry:
     description: "An entry in system.local.healthlog."
     fields:
-      namespace: namespacestring
+      namespace:
+          cpp_name: nss
+          type: namespacestring
       timestamp: date
       severity: Severity
       msg: string

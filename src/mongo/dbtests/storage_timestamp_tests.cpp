@@ -1255,7 +1255,7 @@ public:
         // The next logOp() call will get 'futureTs', which will be the timestamp at which we do
         // the write. Thus we expect the write to appear at 'futureTs' and not before.
         ASSERT_EQ(op.getTimestamp(), futureTs) << op.toBSON();
-        ASSERT_EQ(op.getNamespace().ns(), nss.getCommandNS().ns()) << op.toBSON();
+        ASSERT_EQ(op.getNss().ns(), nss.getCommandNS().ns()) << op.toBSON();
         ASSERT_BSONOBJ_EQ(op.getObject(), BSON("create" << nss.coll()));
 
         assertNamespaceInIdents(nss, pastTs, false);

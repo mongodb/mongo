@@ -39,7 +39,7 @@ namespace repl {
 
 boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateOrFlush(
     const OplogEntry& entry) {
-    auto ns = entry.getNamespace();
+    auto ns = entry.getNss();
     if (ns == NamespaceString::kSessionTransactionsTableNamespace ||
         (ns.isConfigDB() && ns.isCommand())) {
         return flush(entry);

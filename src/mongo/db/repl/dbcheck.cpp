@@ -122,7 +122,7 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const NamespaceString& nss
                                                       OplogEntriesEnum operation,
                                                       const BSONObj& data) {
     auto entry = stdx::make_unique<HealthLogEntry>();
-    entry->setNamespace(nss);
+    entry->setNss(nss);
     entry->setTimestamp(Date_t::now());
     entry->setSeverity(severity);
     entry->setScope(ScopeEnum::Cluster);

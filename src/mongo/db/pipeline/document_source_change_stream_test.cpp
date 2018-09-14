@@ -453,12 +453,12 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
     };
     checkTransformation(insert, expectedInsert, {{"x"}, {"_id"}});
     bool fromMigrate = false;  // also check actual "fromMigrate: false" not filtered
-    auto insert2 = makeOplogEntry(insert.getOpType(),     // op type
-                                  insert.getNamespace(),  // namespace
-                                  insert.getObject(),     // o
-                                  insert.getUuid(),       // uuid
-                                  fromMigrate,            // fromMigrate
-                                  insert.getObject2());   // o2
+    auto insert2 = makeOplogEntry(insert.getOpType(),    // op type
+                                  insert.getNss(),       // namespace
+                                  insert.getObject(),    // o
+                                  insert.getUuid(),      // uuid
+                                  fromMigrate,           // fromMigrate
+                                  insert.getObject2());  // o2
     checkTransformation(insert2, expectedInsert, {{"x"}, {"_id"}});
 }
 
@@ -628,12 +628,12 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
     checkTransformation(deleteEntry, expectedDelete);
 
     bool fromMigrate = false;  // also check actual "fromMigrate: false" not filtered
-    auto deleteEntry2 = makeOplogEntry(deleteEntry.getOpType(),     // op type
-                                       deleteEntry.getNamespace(),  // namespace
-                                       deleteEntry.getObject(),     // o
-                                       deleteEntry.getUuid(),       // uuid
-                                       fromMigrate,                 // fromMigrate
-                                       deleteEntry.getObject2());   // o2
+    auto deleteEntry2 = makeOplogEntry(deleteEntry.getOpType(),    // op type
+                                       deleteEntry.getNss(),       // namespace
+                                       deleteEntry.getObject(),    // o
+                                       deleteEntry.getUuid(),      // uuid
+                                       fromMigrate,                // fromMigrate
+                                       deleteEntry.getObject2());  // o2
 
     checkTransformation(deleteEntry2, expectedDelete);
 }
@@ -1400,12 +1400,12 @@ TEST_F(ChangeStreamStageDBTest, TransformDelete) {
     checkTransformation(deleteEntry, expectedDelete);
 
     bool fromMigrate = false;  // also check actual "fromMigrate: false" not filtered
-    auto deleteEntry2 = makeOplogEntry(deleteEntry.getOpType(),     // op type
-                                       deleteEntry.getNamespace(),  // namespace
-                                       deleteEntry.getObject(),     // o
-                                       deleteEntry.getUuid(),       // uuid
-                                       fromMigrate,                 // fromMigrate
-                                       deleteEntry.getObject2());   // o2
+    auto deleteEntry2 = makeOplogEntry(deleteEntry.getOpType(),    // op type
+                                       deleteEntry.getNss(),       // namespace
+                                       deleteEntry.getObject(),    // o
+                                       deleteEntry.getUuid(),      // uuid
+                                       fromMigrate,                // fromMigrate
+                                       deleteEntry.getObject2());  // o2
 
     checkTransformation(deleteEntry2, expectedDelete);
 }
