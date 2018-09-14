@@ -367,6 +367,15 @@ void TransactionRouter::onStaleShardOrDbError(StringData cmdName) {
     _clearPendingParticipants();
 }
 
+void TransactionRouter::onViewResolutionError() {
+    // The router can always retry on a view resolution error.
+
+    // Requests against views are always routed to the primary shard for its database, but the retry
+    // on the resolved namespace does not have to re-target the primary, so pending participants
+    // should be cleared.
+    _clearPendingParticipants();
+}
+
 bool TransactionRouter::_canContinueOnSnapshotError() const {
     return _latestStmtId == _firstStmtId;
 }

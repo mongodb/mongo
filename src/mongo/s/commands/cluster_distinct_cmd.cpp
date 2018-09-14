@@ -41,6 +41,7 @@
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
 namespace {
@@ -197,6 +198,10 @@ public:
 
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
+
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                txnRouter->onViewResolutionError();
+            }
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx, OpMsgRequest::fromDBAndBody(dbName, std::move(resolvedAggCmd)));

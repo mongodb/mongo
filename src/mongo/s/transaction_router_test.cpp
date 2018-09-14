@@ -1196,5 +1196,50 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipants) {
     ASSERT_FALSE(response.empty());
 }
 
+TEST_F(TransactionRouterTest, OnViewResolutionErrorClearsAllNewParticipants) {
+    TxnNumber txnNum{3};
+
+    TransactionRouter txnRouter({});
+    txnRouter.checkOut();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, true);
+
+    // One shard is targeted by the first statement.
+    auto firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    ASSERT_TRUE(firstShardCmd["startTransaction"].trueValue());
+
+    ASSERT(txnRouter.getCoordinatorId());
+    ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
+
+    // Simulate a view resolution error on the first client statement that leads to a retry which
+    // targets the same shard.
+
+    txnRouter.onViewResolutionError();
+
+    // The only participant was the coordinator, so it should have been reset.
+    ASSERT_FALSE(txnRouter.getCoordinatorId());
+
+    // The first shard is targeted by the retry and should have to start a transaction again.
+    firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    ASSERT_TRUE(firstShardCmd["startTransaction"].trueValue());
+
+    // Advance to a later client statement that targets a new shard.
+
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(operationContext(), txnNum, false);
+
+    auto secondShardCmd = txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+    ASSERT_TRUE(secondShardCmd["startTransaction"].trueValue());
+
+    // Simulate a view resolution error.
+
+    txnRouter.onViewResolutionError();
+
+    // Only the new participant shard was reset.
+    firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    ASSERT_FALSE(firstShardCmd["startTransaction"].trueValue());
+    secondShardCmd = txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+    ASSERT_TRUE(secondShardCmd["startTransaction"].trueValue());
+}
+
 }  // unnamed namespace
 }  // namespace mongo

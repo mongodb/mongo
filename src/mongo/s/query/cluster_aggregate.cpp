@@ -1253,6 +1253,10 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
     result->resetToEmpty();
 
+    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        txnRouter->onViewResolutionError();
+    }
+
     // We pass both the underlying collection namespace and the view namespace here. The
     // underlying collection namespace is used to execute the aggregation on mongoD. Any cursor
     // returned will be registered under the view namespace so that subsequent getMore and

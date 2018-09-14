@@ -50,6 +50,7 @@ selector:
   - jstests/sharding/transactions_snapshot_errors_subsequent_statements.js
   - jstests/sharding/transactions_stale_database_version_errors.js
   - jstests/sharding/transactions_stale_shard_version_errors.js
+  - jstests/sharding/transactions_view_resolution.js
   - jstests/sharding/txn_agg.js
   - jstests/sharding/txn_basic_two_phase_commit.js
   - jstests/sharding/txn_coordinator_commands_basic_requirements.js

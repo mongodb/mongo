@@ -439,13 +439,37 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
 void invokeInTransaction(OperationContext* opCtx,
                          CommandInvocation* invocation,
                          TransactionParticipant* txnParticipant,
+                         const boost::optional<OperationSessionInfoFromClient>& sessionOptions,
                          rpc::ReplyBuilderInterface* replyBuilder) {
     txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
     ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
         txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
     });
 
-    invocation->run(opCtx, replyBuilder);
+    try {
+        invocation->run(opCtx, replyBuilder);
+    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
+        // Exceptions are used to resolve views in a sharded cluster, so they should be handled
+        // specially to avoid unnecessary aborts.
+
+        auto startTransaction = sessionOptions->getStartTransaction();
+        if (startTransaction && *startTransaction) {
+            // If the first command a shard receives in a transactions fails with this code, the
+            // shard may not be included in the final participant list if the router's retry after
+            // resolving the view does not re-target it, which is possible if the underlying
+            // collection is sharded. The shard's transaction should be preemptively aborted to
+            // avoid leaving it orphaned in this case, which is fine even if it is re-targeted
+            // because the retry will include "startTransaction" again and "restart" a transaction
+            // at the active txnNumber.
+            throw;
+        }
+
+        // If this shard has completed an earlier statement for this transaction, it must already be
+        // in the transaction's participant list, so it is guaranteed to learn its outcome.
+        txnParticipant->stashTransactionResources(opCtx);
+        guard.Dismiss();
+        throw;
+    }
 
     if (auto okField = replyBuilder->getBodyBuilder().asTempObj()["ok"]) {
         // If ok is present, use its truthiness.
@@ -482,7 +506,7 @@ bool runCommandImpl(OperationContext* opCtx,
     if (!invocation->supportsWriteConcern()) {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
         if (txnParticipant) {
-            invokeInTransaction(opCtx, invocation, txnParticipant, replyBuilder);
+            invokeInTransaction(opCtx, invocation, txnParticipant, sessionOptions, replyBuilder);
         } else {
             invocation->run(opCtx, replyBuilder);
         }
@@ -518,7 +542,8 @@ bool runCommandImpl(OperationContext* opCtx,
 
         try {
             if (txnParticipant) {
-                invokeInTransaction(opCtx, invocation, txnParticipant, replyBuilder);
+                invokeInTransaction(
+                    opCtx, invocation, txnParticipant, sessionOptions, replyBuilder);
             } else {
                 invocation->run(opCtx, replyBuilder);
             }

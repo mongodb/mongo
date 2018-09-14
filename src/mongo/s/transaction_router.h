@@ -138,6 +138,12 @@ public:
     void onSnapshotError();
 
     /**
+     * Updates the transaction tracking state to allow for a retry attempt on a view resolution
+     * error.
+     */
+    void onViewResolutionError();
+
+    /**
      * Computes and sets the atClusterTime for the current transaction. Does nothing if the given
      * query is not the first statement that this transaction runs (i.e. if the atClusterTime
      * has already been set).
