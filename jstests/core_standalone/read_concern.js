@@ -20,7 +20,7 @@
                          "expected available readConcern to succeed on standalone mongod");
 
     var majority_result = t.runCommand({find: "read_concern", readConcern: {level: "majority"}});
-    if (isWiredTiger(db) || isEphemeral(db)) {
+    if (isWiredTiger(db) || (isEphemeral(db) && !isEphemeralForTest(db))) {
         // Majority readConcern succeed.
         assert.commandWorked(majority_result,
                              "expected majority readConcern to succeed on standalone mongod");
