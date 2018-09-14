@@ -591,23 +591,7 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
     lk.unlock();
     opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(opCtx, prepareOplogSlot);
 
-    // After the oplog entry is written successfully, it is illegal to implicitly abort or fail.
-    try {
-        abortGuard.Dismiss();
-
-        lk.lock();
-
-        // Although we are not allowed to abort here, we check that we don't even try to. If we do
-        // try to, that is a bug and we will fassert below.
-        _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
-
-        // Ensure that the transaction is still prepared.
-        invariant(_txnState.isPrepared(lk), str::stream() << "Current state: " << _txnState);
-    } catch (...) {
-        severe() << "Illegal exception after transaction was prepared.";
-        fassertFailedWithStatus(50906, exceptionToStatus());
-    }
-
+    abortGuard.Dismiss();
     return prepareOplogSlot.opTime.getTimestamp();
 }
 
