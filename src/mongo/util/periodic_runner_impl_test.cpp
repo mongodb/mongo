@@ -134,8 +134,10 @@ TEST_F(PeriodicRunnerImplTestNoSetup, ScheduleBeforeStartupTest) {
 
     clockSource().advance(interval);
 
-    stdx::unique_lock<stdx::mutex> lk(mutex);
-    cv.wait(lk, [&count] { return count > 0; });
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&count] { return count > 0; });
+    }
 
     tearDown();
 }
