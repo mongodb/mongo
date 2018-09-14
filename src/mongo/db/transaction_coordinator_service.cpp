@@ -77,11 +77,11 @@ void TransactionCoordinatorService::createCoordinator(LogicalSessionId lsid,
     // TODO (SERVER-37025): Schedule poke task on executor.
 }
 
-TransactionCoordinatorService::CommitDecision TransactionCoordinatorService::coordinateCommit(
-    OperationContext* opCtx,
-    LogicalSessionId lsid,
-    TxnNumber txnNumber,
-    const std::set<ShardId>& participantList) {
+Future<TransactionCoordinatorService::CommitDecision>
+TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
+                                                LogicalSessionId lsid,
+                                                TxnNumber txnNumber,
+                                                const std::set<ShardId>& participantList) {
 
     auto coordinator = _coordinatorCatalog.get(lsid, txnNumber);
     if (!coordinator) {
@@ -90,8 +90,16 @@ TransactionCoordinatorService::CommitDecision TransactionCoordinatorService::coo
 
     txn::recvCoordinateCommit(opCtx, coordinator.get(), participantList);
 
-    // TODO (SERVER-36640): Return a notification wrapping the decision that the caller can wait on.
-    return TransactionCoordinatorService::CommitDecision::kAbort;
+    return coordinator.get()->waitForCompletion().then([](auto finalState) {
+        switch (finalState) {
+            case TransactionCoordinator::StateMachine::State::kAborted:
+                return TransactionCoordinatorService::CommitDecision::kAbort;
+            case TransactionCoordinator::StateMachine::State::kCommitted:
+                return TransactionCoordinatorService::CommitDecision::kCommit;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    });
 }
 
 void TransactionCoordinatorService::voteCommit(OperationContext* opCtx,

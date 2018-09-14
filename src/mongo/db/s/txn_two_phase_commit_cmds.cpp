@@ -331,6 +331,7 @@ public:
     }
 } voteAbortTransactionCmd;
 
+// TODO (SERVER-37440): Make coordinateCommit idempotent.
 class CoordinateCommitTransactionCmd : public TypedCommand<CoordinateCommitTransactionCmd> {
 public:
     using Request = CoordinateCommitTransaction;
@@ -365,15 +366,29 @@ public:
                 participantList.insert(shardId);
             }
 
-            TransactionCoordinatorService::get(opCtx)->coordinateCommit(
+            auto commitDecisionFuture = TransactionCoordinatorService::get(opCtx)->coordinateCommit(
                 opCtx,
                 opCtx->getLogicalSessionId().get(),
                 opCtx->getTxnNumber().get(),
                 participantList);
 
-            // Execute the 'prepare' logic on the local participant (the router does not send a
-            // separate 'prepare' message to the coordinator shard).
-            _callPrepareOnLocalParticipant(opCtx);
+            // If the commit decision is already available before we prepare locally, it means the
+            // transaction has completed and we should skip preparing locally.
+            //
+            // TODO (SERVER-37440): Reconsider when coordinateCommit is made idempotent.
+            if (!commitDecisionFuture.isReady()) {
+                // Execute the 'prepare' logic on the local participant (the router does not send a
+                // separate 'prepare' message to the coordinator shard).
+                _callPrepareOnLocalParticipant(opCtx);
+            }
+
+            // Block waiting for the commit decision.
+            auto commitDecision = commitDecisionFuture.get(opCtx);
+
+            // If the decision was abort, propagate NoSuchTransaction exception back to mongos.
+            uassert(ErrorCodes::NoSuchTransaction,
+                    "Transaction was aborted",
+                    commitDecision != TransactionCoordinatorService::CommitDecision::kAbort);
         }
 
     private:
