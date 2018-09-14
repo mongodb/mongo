@@ -209,6 +209,7 @@ TEST(IDLOneTypeTests, TestObjectLoopbackTest) {
     assert_same_types<decltype(testStruct.getValue()), const BSONObj&>();
 
     ASSERT_BSONOBJ_EQ(testStruct.getValue(), testValue);
+    ASSERT_TRUE(testStruct.getValue().isOwned());
 
     // Positive: Test we can roundtrip from the just parsed document
     {

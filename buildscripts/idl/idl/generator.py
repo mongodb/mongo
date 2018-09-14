@@ -785,9 +785,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 return common.template_args("${method_name}(${expression})",
                                             method_name=method_name, expression=expression)
 
-            # BSONObjects are allowed to be pass through without deserialization
+            # BSONObjects are allowed to be pass through without deserialization but we must return
+            # them as Owned since we are going to store them in the IDL generated class
             assert field.bson_serialization_type == ['object']
-            return expression
+            return expression + ".getOwned()"
 
         # Call a static class method with the signature:
         # Class Class::method(const BSONElement& value)
