@@ -450,6 +450,8 @@ variables:
   - name: dbtest
   - name: ese
   - name: external_auth
+    distros:
+    - windows-64-2016
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_decimal
@@ -9000,6 +9002,8 @@ buildvariants:
   - name: dbtest
   - name: ese
   - name: external_auth
+    distros:
+    - windows-64-2016
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_decimal
