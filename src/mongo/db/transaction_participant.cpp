@@ -296,6 +296,9 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
     // Release the WUOW state since this WUOW is no longer in use.
     wuow.release();
 
+    // We must lock the Client to change the Locker on the OperationContext.
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+
     // The new transaction should have an empty locker, and thus we do not need to save it.
     invariant(opCtx->lockState()->getClientState() == Locker::ClientState::kInactive);
     _locker = opCtx->swapLockState(stdx::make_unique<LockerImpl>());
