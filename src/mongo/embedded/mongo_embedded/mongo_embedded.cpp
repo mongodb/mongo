@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/embedded/capi.h"
+#include "mongo_embedded/mongo_embedded.h"
 
 #include <cstring>
 #include <exception>

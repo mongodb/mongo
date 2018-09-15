@@ -37,7 +37,7 @@ import static java.lang.String.format;
  * The embedded mongodb CAPI.
  */
 public final class MongoEmbeddedCAPI {
-    private static final String NATIVE_LIBRARY_NAME = "mongo_embedded_capi";
+    private static final String NATIVE_LIBRARY_NAME = "mongo_embedded";
 
     /**
      * Initializes the embedded mongodb library, required before any other call.

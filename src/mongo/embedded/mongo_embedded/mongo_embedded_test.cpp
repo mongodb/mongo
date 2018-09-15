@@ -27,7 +27,7 @@
  */
 
 
-#include "mongo/embedded/capi.h"
+#include "mongo_embedded/mongo_embedded.h"
 
 #include <memory>
 #include <set>

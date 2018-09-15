@@ -1,3 +1,0 @@
-LIBRARY MONGO_EMBEDDED_MONGOC_CLIENT
-EXPORTS
-    mongo_embedded_v1_mongoc_client_create

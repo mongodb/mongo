@@ -1,4 +1,4 @@
-LIBRARY MONGO_EMBEDDED_CAPI
+LIBRARY MONGO_EMBEDDED
 EXPORTS
     mongo_embedded_v1_status_create
     mongo_embedded_v1_status_destroy

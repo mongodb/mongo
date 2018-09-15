@@ -26,20 +26,24 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
-#include "mongo/embedded/mongoc_client.h"
+#include "mongoc_embedded/mongoc_embedded.h"
+
+#include <set>
 
 #include <mongoc/mongoc.h>
-#include <set>
 #include <yaml-cpp/yaml.h>
 
+#include "mongo_embedded/mongo_embedded.h"
+
 #include "mongo/db/server_options.h"
-#include "mongo/embedded/capi.h"
-#include "mongo/embedded/functions_for_test.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
@@ -53,6 +57,75 @@ mongo_embedded_v1_lib* global_lib_handle;
 namespace {
 
 std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
+
+/**
+ * WARNING: This function is an example lifted directly from the C driver
+ * for use testing the connection to the c driver. It is written in C,
+ * and should not be used for anything besides basic testing.
+ */
+bool insert_data(mongoc_collection_t* collection) {
+    mongoc_bulk_operation_t* bulk;
+    const int ndocs = 4;
+    bson_t* docs[ndocs];
+
+    bulk = mongoc_collection_create_bulk_operation(collection, true, NULL);
+
+    docs[0] = BCON_NEW("x", BCON_DOUBLE(1.0), "tags", "[", "dog", "cat", "]");
+    docs[1] = BCON_NEW("x", BCON_DOUBLE(2.0), "tags", "[", "cat", "]");
+    docs[2] = BCON_NEW("x", BCON_DOUBLE(2.0), "tags", "[", "mouse", "cat", "dog", "]");
+    docs[3] = BCON_NEW("x", BCON_DOUBLE(3.0), "tags", "[", "]");
+
+    for (int i = 0; i < ndocs; i++) {
+        mongoc_bulk_operation_insert(bulk, docs[i]);
+        bson_destroy(docs[i]);
+        docs[i] = NULL;
+    }
+
+    bson_error_t error;
+    bool ret = mongoc_bulk_operation_execute(bulk, NULL, &error);
+
+    if (!ret) {
+        ::mongo::log() << "Error inserting data: " << error.message;
+    }
+
+    mongoc_bulk_operation_destroy(bulk);
+    return ret;
+}
+
+/**
+ * WARNING: This function is an example lifted directly from the C driver
+ * for use testing the connection to the c driver. It is written in C,
+ * and should not be used for anything besides basic testing.
+ */
+bool explain(mongoc_collection_t* collection) {
+
+    bson_t* command;
+    bson_t reply;
+    bson_error_t error;
+    bool res;
+
+    command = BCON_NEW("explain",
+                       "{",
+                       "find",
+                       BCON_UTF8((const char*)"things"),
+                       "filter",
+                       "{",
+                       "x",
+                       BCON_INT32(1),
+                       "}",
+                       "}");
+    res = mongoc_collection_command_simple(collection, command, NULL, &reply, &error);
+    if (!res) {
+        ::mongo::log() << "Error with explain: " << error.message;
+        goto explain_cleanup;
+    }
+
+
+explain_cleanup:
+    bson_destroy(&reply);
+    bson_destroy(command);
+    return res;
+}
 
 class MongodbEmbeddedTransportLayerTest : public mongo::unittest::Test {
 protected:
@@ -74,7 +147,7 @@ protected:
 
         db_handle = mongo_embedded_v1_instance_create(global_lib_handle, yaml.c_str(), nullptr);
 
-        cd_client = mongo_embedded_v1_mongoc_client_create(db_handle);
+        cd_client = mongoc_embedded_v1_client_create(db_handle);
         mongoc_client_set_error_api(cd_client, 2);
         cd_db = mongoc_client_get_database(cd_client, "test");
         cd_collection = mongoc_database_get_collection(cd_db, (const char*)"things");
@@ -128,9 +201,9 @@ TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndExplain) {
     ASSERT(client);
 
 
-    ASSERT(mongo::embeddedTest::insert_data(collection));
+    ASSERT(insert_data(collection));
 
-    ASSERT(mongo::embeddedTest::explain(collection));
+    ASSERT(explain(collection));
 }
 TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndCount) {
     auto client = getClient();
@@ -139,7 +212,7 @@ TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndCount) {
     ASSERT(collection);
     bson_error_t err;
     int64_t count;
-    ASSERT(mongo::embeddedTest::insert_data(collection));
+    ASSERT(insert_data(collection));
     count = mongoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err);
     ASSERT(count == 4);
 }

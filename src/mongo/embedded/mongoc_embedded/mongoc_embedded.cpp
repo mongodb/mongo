@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/embedded/mongoc_client.h"
+#include "mongoc_embedded/mongoc_embedded.h"
 
 #include <algorithm>
 #include <cassert>
@@ -37,8 +37,9 @@
 #include <memory>
 #include <stdexcept>
 
+#include "mongo_embedded/mongo_embedded.h"
+
 // Only header-only includes allowed here (except for capi.h)
-#include "mongo/embedded/capi.h"
 #include "mongo/platform/endian.h"
 
 #if defined(_WIN32)
@@ -298,16 +299,16 @@ extern "C" mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
     return nullptr;
 }
 
-}  // namespace
-
 struct ClientDeleter {
     void operator()(mongoc_client_t* x) {
         mongoc_client_destroy(x);
     }
 };
 
+}  // namespace
+
 extern "C" mongoc_client_t* MONGO_API_CALL
-mongo_embedded_v1_mongoc_client_create(mongo_embedded_v1_instance* db) try {
+mongoc_embedded_v1_client_create(mongo_embedded_v1_instance* db) try {
     if (!db) {
         errno = EINVAL;
         return nullptr;
