@@ -3735,17 +3735,17 @@ tasks:
 
           ${activate_virtualenv}
           if [ ${enable_embedded_tests|false} = "ios_tvos_simulator" ]; then
-              ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test" --tempPath /data
-              ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_mongoc_client_test" --tempPath /data
+              ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_test" --tempPath /data
+              ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongoc_embedded_test" --tempPath /data
           elif [ ${enable_embedded_tests|false} = "android_emulator" ]; then
               # strip because the binaries with debug symbols are too big for the default storage on the emulator
               find build/mongo-embedded-sdk-${version}/bin -type f | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
               find build/mongo-embedded-sdk-${version}/lib -type f -name "*.so" | xargs $(dirname $(pwd))/android_toolchain-${android_toolchain_target_arch}-${android_toolchain_api_version}/bin/*-linux-android*-strip
-              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_capi_test" --tempPath /data
-              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_mongoc_client_test" --tempPath /data
+              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_test" --tempPath /data
+              ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} ${android_system_image_version} "build/mongo-embedded-sdk-${version}" "bin/mongoc_embedded_test" --tempPath /data
           elif [ ${enable_embedded_tests|false} = "native" ]; then
-            "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test"
-            "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_mongoc_client_test"
+            "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_test"
+            "build/mongo-embedded-sdk-${version}/bin/mongoc_embedded_test"
           fi
 
     # If this is a patch build, blow away the file so our subsequent and optional s3.put
@@ -3839,12 +3839,12 @@ tasks:
           if [ "${setup_android_toolchain|}" = "true" ]; then
             export ANDROID_HOME=$(pwd)/android_sdk
 
-            cd src/src/mongo/embedded/java
+            cd src/src/mongo/embedded/mongo_embedded/java
 
             chmod +x gradlew
 
             for arch in arm64-v8a armeabi-v7a x86_64 ; do
-                tar zxvf ../../../../../embedded-sdk-android-$arch.tgz
+                tar zxvf ../../../../../../embedded-sdk-android-$arch.tgz
                 mkdir -p jniLibs/$arch
                 cp ./mongo-embedded-sdk-${version}/lib/*.so jniLibs/$arch
                 rm -rf ./mongo-embedded-sdk-${version}
@@ -3852,8 +3852,8 @@ tasks:
 
             ./gradlew clean :aar:build :aar:publishMavenAarPublicationToLocalRepository
 
-            mkdir -p ../../../../build/mongo-embedded-sdk-${version}/android
-            cp -r aar/build/repo/* ../../../../build/mongo-embedded-sdk-${version}/android
+            mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/android
+            cp -r aar/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/android
           fi
     - command: shell.exec
       params:
@@ -3938,24 +3938,24 @@ tasks:
           if [ "${setup_android_toolchain|}" = "true" ]; then
             export ANDROID_HOME=$(pwd)/android_sdk
 
-            cd src/src/mongo/embedded/java
+            cd src/src/mongo/embedded/mongo_embedded/java
 
             chmod +x gradlew
 
-            tar zxvf ../../../../../embedded-sdk-java-linux-x86-64.tgz
+            tar zxvf ../../../../../../embedded-sdk-java-linux-x86-64.tgz
             mkdir -p jniLibs/linux-x86-64
             cp ./mongo-embedded-sdk-${version}/lib/*.so jniLibs/linux-x86-64
             rm -rf ./mongo-embedded-sdk-${version}
 
-            tar zxvf ../../../../../embedded-sdk-java-darwin.tgz
+            tar zxvf ../../../../../../embedded-sdk-java-darwin.tgz
             mkdir -p jniLibs/darwin
             cp ./mongo-embedded-sdk-${version}/lib/*.dylib jniLibs/darwin
             rm -rf ./mongo-embedded-sdk-${version}
 
             ./gradlew clean :jar:build :jar:publishMavenPublicationToLocalRepository
 
-            mkdir -p ../../../../build/mongo-embedded-sdk-${version}/java
-            cp -r jar/build/repo/* ../../../../build/mongo-embedded-sdk-${version}/java
+            mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/java
+            cp -r jar/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/java
           fi
     - command: shell.exec
       params:

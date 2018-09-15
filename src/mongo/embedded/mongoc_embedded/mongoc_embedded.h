@@ -28,7 +28,7 @@
 #ifndef HEADERUUID_8CAAB40D_AC65_46CF_9FA9_B48825C825DC_DEFINED
 #define HEADERUUID_8CAAB40D_AC65_46CF_9FA9_B48825C825DC_DEFINED
 
-#include <mongo/embedded/capi.h>
+#include <mongo_embedded/mongo_embedded.h>
 #include <mongoc/mongoc.h>
 
 #pragma push_macro("MONGO_API_CALL")
@@ -40,8 +40,8 @@
 #pragma push_macro("MONGO_API_EXPORT")
 #undef MONGO_API_EXPORT
 
-#pragma push_macro("MONGO_EMBEDDED_MONGOC_CLIENT_API")
-#undef MONGO_EMBEDDED_MONGOC_CLIENT_API
+#pragma push_macro("MONGOC_EMBEDDED_API")
+#undef MONGOC_EMBEDDED_API
 
 #if defined(_WIN32)
 #define MONGO_API_CALL __cdecl
@@ -53,13 +53,13 @@
 #define MONGO_API_EXPORT __attribute__((used, visibility("default")))
 #endif
 
-#if defined(MONGO_EMBEDDED_MONGOC_CLIENT_STATIC)
-#define MONGO_EMBEDDED_MONGOC_CLIENT_API
+#if defined(MONGOC_EMBEDDED_STATIC)
+#define MONGOC_EMBEDDED_API
 #else
-#if defined(MONGO_EMBEDDED_MONGOC_CLIENT_COMPILING)
-#define MONGO_EMBEDDED_MONGOC_CLIENT_API MONGO_API_EXPORT
+#if defined(MONGOC_EMBEDDED_COMPILING)
+#define MONGOC_EMBEDDED_API MONGO_API_EXPORT
 #else
-#define MONGO_EMBEDDED_MONGOC_CLIENT_API MONGO_API_IMPORT
+#define MONGOC_EMBEDDED_API MONGO_API_IMPORT
 #endif
 #endif
 
@@ -72,15 +72,15 @@ extern "C" {
  * @param db must be a valid instance handle created by `mongo_embedded_v1_instance_create`
  * @returns a mongoc client or `NULL` on error
  */
-MONGO_EMBEDDED_MONGOC_CLIENT_API mongoc_client_t* MONGO_API_CALL
-mongo_embedded_v1_mongoc_client_create(mongo_embedded_v1_instance* instance);
+MONGOC_EMBEDDED_API mongoc_client_t* MONGO_API_CALL
+mongoc_embedded_v1_client_create(mongo_embedded_v1_instance* instance);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
-#undef MONGO_EMBEDDED_MONGOC_CLIENT_API
-#pragma pop_macro("MONGO_EMBEDDED_MONGOC_CLIENT_API")
+#undef MONGOC_EMBEDDED_API
+#pragma pop_macro("MONGOC_EMBEDDED_API")
 
 #undef MONGO_API_EXPORT
 #pragma push_macro("MONGO_API_EXPORT")

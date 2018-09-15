@@ -1,0 +1,134 @@
+# -*- mode: python; -*-
+
+import libdeps
+
+Import("env")
+Import("get_option")
+
+env = env.Clone()
+
+mongoEmbeddedEnv = env.Clone()
+mongoEmbeddedEnv.AppendUnique(
+    CPPDEFINES=[
+        'MONGO_EMBEDDED_COMPILING',
+    ],
+)
+
+if get_option('link-model') == 'static':
+    mongoEmbeddedEnv.AppendUnique(
+        CPPDEFINES=[
+            'MONGO_EMBEDDED_STATIC',
+        ],
+    )
+elif get_option('link-model') == 'dynamic-sdk':
+    mongoEmbeddedEnv['LIBDEPS_SHLIBEMITTER'] = libdeps.make_libdeps_emitter(
+        'SharedArchive',
+        libdeps.dependency_visibility_honored
+    )
+
+mongoEmbeddedEnv.AppendUnique(
+    SHLINKFLAGS=['$MONGO_EXPORT_FILE_SHLINKFLAGS']
+)
+
+mongoEmbeddedEnv.Library(
+    target='mongo_embedded',
+    source=[
+        'mongo_embedded.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/embedded/embedded',
+    ],
+    INSTALL_ALIAS=[
+        'embedded-dev',
+    ],
+)
+
+if get_option('install-mode') == 'hygienic':
+    env.AutoInstall(
+        'include/mongo_embedded/v1/mongo_embedded',
+        source=['mongo_embedded.h'],
+        INSTALL_ALIAS=[
+            'embedded-dev',
+        ],
+    )
+
+yamlEnv = env.Clone()
+yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+
+if get_option('link-model') != 'dynamic-sdk':
+    mongoEmbeddedTest = yamlEnv.Program(
+        target='mongo_embedded_test',
+        source=[
+            'mongo_embedded_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+            '$BUILD_DIR/mongo/db/server_options_core',
+            '$BUILD_DIR/mongo/rpc/protocol',
+            '$BUILD_DIR/mongo/unittest/unittest',
+            '$BUILD_DIR/mongo/util/net/network',
+            '$BUILD_DIR/mongo/util/options_parser/options_parser',
+            'mongo_embedded',
+        ],
+        INSTALL_ALIAS=[
+            'embedded-test',
+        ],
+    )
+
+    env.RegisterUnitTest(mongoEmbeddedTest[0])
+
+# Frameworkization craziness begins here. Honestly, we should do this
+# better in the future in some re-usable way, but we need to get this
+# thing out the door, so here goes.
+
+# First, we only do this in hygienic mode for the mobile targets,
+# which are darwin but not macOS. For all others, we abort here. Maybe
+# this should be a build flag? Since we aren't doing this for macOS,
+# we can also ignore all the framework version nonsense.
+if get_option('link-model') != 'dynamic-sdk' or get_option('install-mode') != 'hygienic' or not env.TargetOSIs('darwin') or env.TargetOSIs('macOS'):
+    Return()
+
+installHeaderRoot = env.Dir('$INSTALL_DIR/include/mongo_embedded/v1/mongo_embedded')
+
+frameworkDir = env.Dir('$INSTALL_DIR/Frameworks/mongo_embedded.framework')
+env.Alias('install-embedded-dev', frameworkDir)
+
+env.Install(
+    target=frameworkDir.Dir('Headers'),
+    source=installHeaderRoot.File('mongo_embedded.h')
+)
+
+env.InstallAs(
+    target=frameworkDir.File('Modules/module.modulemap'),
+    source="mongo_embedded.modulemap"
+)
+
+mongoEmbeddedPlist = env.Substfile(
+    target="Info.plist",
+    source='../Info.plist.in',
+    SUBST_DICT=[
+        ('@CFBundleExecutable@', 'mongo_embedded'),
+        ('@CFBundleIdentifier@', 'org.mongodb.mongo_embedded'),
+        ('@CFBundleVersion@', '$MONGO_VERSION'),
+        ('@CFBundleShortVersionString@', '$MONGO_VERSION')
+    ]
+)
+
+env.Install(
+    target=frameworkDir,
+    source=mongoEmbeddedPlist,
+)
+
+mongoEmbeddedFwLib = env.InstallAs(
+    target=frameworkDir.File('mongo_embedded'),
+    source='$INSTALL_DIR/lib/libmongo_embedded.dylib',
+)
+
+env.AddPostAction(
+    files=mongoEmbeddedFwLib,
+    action="install_name_tool -id @rpath/mongo_embedded.framework/mongo_embedded $TARGET",
+)

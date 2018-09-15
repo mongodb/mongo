@@ -1,4 +1,0 @@
-MONGO_EMBEDDED_MONGOC_CLIENT_ABI_1.0 {
-    global: mongo_embedded_v1_mongoc_client_*;
-    local: *;
-};

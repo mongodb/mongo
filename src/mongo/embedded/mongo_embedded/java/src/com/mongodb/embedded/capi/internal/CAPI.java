@@ -159,7 +159,7 @@ public class CAPI {
                                                              mongo_embedded_v1_status status);
 
     static {
-        Native.register(CAPI.class, "mongo_embedded_capi");
+        Native.register(CAPI.class, "mongo_embedded");
     }
 
 }
