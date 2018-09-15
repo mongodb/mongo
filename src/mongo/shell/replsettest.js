@@ -64,9 +64,6 @@
  *  nodes {Array.<Mongo>} - connection to replica set members
  */
 
-/* Global default timeout variable */
-const kReplDefaultTimeoutMS = 10 * 60 * 1000;
-
 var ReplSetTest = function(opts) {
     'use strict';
 
@@ -91,7 +88,9 @@ var ReplSetTest = function(opts) {
 
     var _causalConsistency;
 
-    this.kDefaultTimeoutMS = kReplDefaultTimeoutMS;
+    // Some code still references kDefaultTimeoutMS as a (non-static) member variable, so make sure
+    // it's still accessible that way.
+    this.kDefaultTimeoutMS = ReplSetTest.kDefaultTimeoutMS;
     var oplogName = 'oplog.rs';
 
     // Publicly exposed variables
@@ -1905,10 +1904,9 @@ var ReplSetTest = function(opts) {
 };
 
 /**
- * Declare kDefaultTimeoutMS as a static property so we don't have to initialize
- * a ReplSetTest object to use it.
+ *  Global default timeout (10 minutes).
  */
-ReplSetTest.kDefaultTimeoutMS = kReplDefaultTimeoutMS;
+ReplSetTest.kDefaultTimeoutMS = 10 * 60 * 1000;
 
 /**
  * Set of states that the replica set can be in. Used for the wait functions.
