@@ -39,6 +39,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/stdx/memory.h"
@@ -250,6 +251,51 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     RecordData data;
     ASSERT_FALSE(rs->findRecord(opCtxPtr.get(), loc, &data));
 #endif
+}
+
+TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
+    auto opCtxPtr = makeOperationContext();
+    // The initial data timestamp has to be set to take stable checkpoints. The first stable
+    // timestamp greater than this will also trigger a checkpoint. The following loop of the
+    // CheckpointThread will observe the new `checkpointDelaySecs` value.
+    _engine->setInitialDataTimestamp(Timestamp(1, 1));
+    wiredTigerGlobalOptions.checkpointDelaySecs = 1;
+
+    // A method that will poll the WiredTigerKVEngine until it sees the amount of oplog necessary
+    // for crash recovery exceeds the input.
+    auto assertPinnedMovesSoon = [this](Timestamp newPinned) {
+        // If the current oplog needed for rollback does not exceed the requested pinned out, we
+        // cannot expect the CheckpointThread to eventually publish a sufficient crash recovery
+        // value.
+        ASSERT_TRUE(_engine->getOplogNeededForRollback() >= newPinned);
+
+        // Do 100 iterations that sleep for 100 milliseconds between polls. This will wait for up
+        // to 10 seconds to observe an asynchronous update that iterates once per second.
+        for (auto iterations = 0; iterations < 100; ++iterations) {
+            if (_engine->getPinnedOplog() >= newPinned) {
+                ASSERT_TRUE(_engine->getOplogNeededForCrashRecovery().get() >= newPinned);
+                return;
+            }
+
+            sleepmillis(100);
+        }
+
+        unittest::log() << "Expected the pinned oplog to advance. Expected value: " << newPinned
+                        << " Published value: " << _engine->getOplogNeededForCrashRecovery();
+        FAIL("");
+    };
+
+    _engine->setStableTimestamp(Timestamp(10, 1), boost::none);
+    assertPinnedMovesSoon(Timestamp(10, 1));
+
+    _engine->setStableTimestamp(Timestamp(20, 1), Timestamp(15, 1));
+    assertPinnedMovesSoon(Timestamp(15, 1));
+
+    _engine->setStableTimestamp(Timestamp(30, 1), Timestamp(19, 1));
+    assertPinnedMovesSoon(Timestamp(19, 1));
+
+    _engine->setStableTimestamp(Timestamp(30, 1), boost::none);
+    assertPinnedMovesSoon(Timestamp(30, 1));
 }
 
 std::unique_ptr<KVHarnessHelper> makeHelper() {

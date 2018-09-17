@@ -300,7 +300,8 @@ public:
     /**
      * See `StorageEngine::setStableTimestamp`
      */
-    virtual void setStableTimestamp(Timestamp stableTimestamp) {}
+    virtual void setStableTimestamp(Timestamp stableTimestamp,
+                                    boost::optional<Timestamp> maximumTruncationTimestamp) {}
 
     /**
      * See `StorageEngine::setInitialDataTimestamp`

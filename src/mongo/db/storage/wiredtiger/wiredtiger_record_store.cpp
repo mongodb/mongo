@@ -196,38 +196,17 @@ void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
             MONGO_IDLE_THREAD_BLOCK;
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (hasExcessStones_inlock()) {
-                // There are now excess oplog stones.
-
-                // We can always truncate the oplog on non recover to stable timestamp storage
-                // engines. Replication does not need the history.
-                if (!_rs->supportsRecoverToStableTimestamp()) {
-                    break;
-                }
-
-                // However, for recover to stable timestamp supporting engines, we cannot delete
-                // oplog entries newer than the last stable recovery timestamp.
+                // There are now excess oplog stones. However, there it may be necessary to keep
+                // additional oplog.
                 //
-                // Recoverable rollback on the replication layer requires oplog history back to the
-                // stable timestamp. The storage engine will delete all regular data newer than
-                // stable on recoverToStableTimestamp, then replication must catch up the rest from
-                // that point via the oplog.
-                //
-                // Furthermore, for the durable engines, replication will need oplog back to the
-                // last stable checkpoint for crash recovery without resync. Replication must play
-                // the oplog history forward from the last checkpoint to the present, because the
-                // engine is not set to journal regular data and thus will only recover checkpointed
-                // data on startup.
-                //
-                // The recovery timestamp contains the above contraints based on the engine in use.
-                auto optionalLastStableRecoveryTimestamp = _rs->getLastStableRecoveryTimestamp();
-                auto lastStableRecoveryTimestamp = optionalLastStableRecoveryTimestamp
-                    ? *optionalLastStableRecoveryTimestamp
-                    : Timestamp::min();
-
+                // During startup or after rollback, the current state of the data goes "back in
+                // time" and replication recovery replays oplog entries to bring the data to a
+                // desired state. This process may require more oplog than the user dictated oplog
+                // size allotment.
                 auto stone = _stones.front();
                 invariant(stone.lastRecord.isValid());
                 if (static_cast<std::uint64_t>(stone.lastRecord.repr()) <
-                    lastStableRecoveryTimestamp.asULL()) {
+                    _rs->getPinnedOplog().asULL()) {
                     break;
                 }
             }
@@ -976,12 +955,8 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded(OperationContext* opCtx,
     return _cappedDeleteAsNeeded_inlock(opCtx, justInserted);
 }
 
-boost::optional<Timestamp> WiredTigerRecordStore::getLastStableRecoveryTimestamp() const {
-    return _kvEngine->getLastStableRecoveryTimestamp();
-}
-
-bool WiredTigerRecordStore::supportsRecoverToStableTimestamp() const {
-    return _kvEngine->supportsRecoverToStableTimestamp();
+Timestamp WiredTigerRecordStore::getPinnedOplog() const {
+    return _kvEngine->getPinnedOplog();
 }
 
 void WiredTigerRecordStore::_positionAtFirstRecordId(OperationContext* opCtx,
@@ -1193,27 +1168,15 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
-    if (!_kvEngine->supportsRecoverToStableTimestamp()) {
-        // For non-RTT storage engines, the oplog can always be truncated. They do not need the
-        // history for recoverable rollback or crash recovery.
-        reclaimOplog(opCtx, Timestamp::max());
-        return;
-    }
-
-    auto optionalLastStableRecoveryTimestamp = _kvEngine->getLastStableRecoveryTimestamp();
-    Timestamp lastStableRecoveryTimestamp = optionalLastStableRecoveryTimestamp
-        ? *optionalLastStableRecoveryTimestamp
-        : Timestamp::min();
-
-    reclaimOplog(opCtx, lastStableRecoveryTimestamp);
+    reclaimOplog(opCtx, _kvEngine->getPinnedOplog());
 }
 
-void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp recoveryTimestamp) {
+void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayTruncateUpTo) {
     Timer timer;
     while (auto stone = _oplogStones->peekOldestStoneIfNeeded()) {
         invariant(stone->lastRecord.isValid());
 
-        if (static_cast<std::uint64_t>(stone->lastRecord.repr()) >= recoveryTimestamp.asULL()) {
+        if (static_cast<std::uint64_t>(stone->lastRecord.repr()) >= mayTruncateUpTo.asULL()) {
             // Do not truncate oplogs needed for replication recovery.
             return;
         }

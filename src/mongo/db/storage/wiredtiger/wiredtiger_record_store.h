@@ -186,9 +186,7 @@ public:
         return true;
     }
 
-    virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const final;
-
-    virtual bool supportsRecoverToStableTimestamp() const final;
+    virtual Timestamp getPinnedOplog() const final;
 
     virtual Status compact(OperationContext* opCtx,
                            RecordStoreCompactAdaptor* adaptor,

@@ -629,8 +629,9 @@ void KVStorageEngine::setJournalListener(JournalListener* jl) {
     _engine->setJournalListener(jl);
 }
 
-void KVStorageEngine::setStableTimestamp(Timestamp stableTimestamp) {
-    _engine->setStableTimestamp(stableTimestamp);
+void KVStorageEngine::setStableTimestamp(Timestamp stableTimestamp,
+                                         boost::optional<Timestamp> maximumTruncationTimestamp) {
+    _engine->setStableTimestamp(stableTimestamp, maximumTruncationTimestamp);
 }
 
 void KVStorageEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {

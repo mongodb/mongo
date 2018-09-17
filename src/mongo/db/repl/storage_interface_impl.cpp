@@ -1053,7 +1053,7 @@ Status StorageInterfaceImpl::upgradeNonReplicatedUniqueIndexes(OperationContext*
 }
 
 void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) {
-    serviceCtx->getStorageEngine()->setStableTimestamp(snapshotName);
+    serviceCtx->getStorageEngine()->setStableTimestamp(snapshotName, boost::none);
 }
 
 void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,

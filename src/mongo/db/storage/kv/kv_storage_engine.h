@@ -122,7 +122,8 @@ public:
 
     virtual void cleanShutdown();
 
-    virtual void setStableTimestamp(Timestamp stableTimestamp) override;
+    virtual void setStableTimestamp(Timestamp stableTimestamp,
+                                    boost::optional<Timestamp> maximumTruncationTimestamp) override;
 
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
