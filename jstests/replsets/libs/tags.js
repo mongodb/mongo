@@ -211,13 +211,13 @@ var TagsTest = function(options) {
         // Depending on the order of heartbeats (containing last committed op time) received
         // by a node, it might hang up on its sync source. This may cause some of the write concern
         // tests to fail.
-        var timeout = 20 * 1000;
+        var failTimeout = 15 * 1000;
 
         jsTestLog('test1');
         primary = ensurePrimary(2, replTest.nodes.slice(0, 3));
 
         jsTestLog('Non-existent write concern should be rejected.');
-        options = {writeConcern: {w: 'blahblah', wtimeout: timeout}};
+        options = {writeConcern: {w: 'blahblah', wtimeout: ReplSetTest.kDefaultTimeoutMS}};
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         var result = assert.writeError(primary.getDB('foo').bar.insert(doc, options));
         assert.neq(null, result.getWriteConcernError());
@@ -226,7 +226,7 @@ var TagsTest = function(options) {
                   tojson(result.getWriteConcernError()));
 
         jsTestLog('Write concern "3 or 4" should fail - 3 and 4 are not connected to the primary.');
-        var options = {writeConcern: {w: '3 or 4', wtimeout: timeout}};
+        var options = {writeConcern: {w: '3 or 4', wtimeout: failTimeout}};
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         result = primary.getDB('foo').bar.insert(doc, options);
         assert.neq(null, result.getWriteConcernError());
@@ -239,12 +239,12 @@ var TagsTest = function(options) {
 
         jsTestLog('Write concern "3 or 4" should work - 4 is now connected to the primary ' +
                   primary.host + ' via node 1 ' + replTest.nodes[1].host);
-        options = {writeConcern: {w: '3 or 4', wtimeout: timeout}};
+        options = {writeConcern: {w: '3 or 4', wtimeout: ReplSetTest.kDefaultTimeoutMS}};
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
         jsTestLog('Write concern "3 and 4" should fail - 3 is not connected to the primary.');
-        options = {writeConcern: {w: '3 and 4', wtimeout: timeout}};
+        options = {writeConcern: {w: '3 and 4', wtimeout: failTimeout}};
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         result = assert.writeError(primary.getDB('foo').bar.insert(doc, options));
         assert.neq(null, result.getWriteConcernError());
@@ -258,7 +258,7 @@ var TagsTest = function(options) {
 
         jsTestLog('Write concern "3 and 4" should work - ' +
                   'nodes 3 and 4 are connected to primary via node 1.');
-        options = {writeConcern: {w: '3 and 4', wtimeout: timeout}};
+        options = {writeConcern: {w: '3 and 4', wtimeout: ReplSetTest.kDefaultTimeoutMS}};
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
@@ -274,7 +274,7 @@ var TagsTest = function(options) {
 
         jsTestLog('Write concern "2 dc and 3 server"');
         primary = ensurePrimary(2, replTest.nodes.slice(0, 3), replTest.nodes.length);
-        options = {writeConcern: {w: '2 dc and 3 server', wtimeout: timeout}};
+        options = {writeConcern: {w: '2 dc and 3 server', wtimeout: ReplSetTest.kDefaultTimeoutMS}};
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
@@ -294,13 +294,13 @@ var TagsTest = function(options) {
 
         jsTestLog('Write concern "3 and 4" should still work with new primary node 1 ' +
                   primary.host);
-        options = {writeConcern: {w: '3 and 4', wtimeout: timeout}};
+        options = {writeConcern: {w: '3 and 4', wtimeout: ReplSetTest.kDefaultTimeoutMS}};
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
         jsTestLog('Write concern "2" should fail because node 2 ' + replTest.nodes[2].host +
                   ' is down.');
-        options = {writeConcern: {w: '2', wtimeout: timeout}};
+        options = {writeConcern: {w: '2', wtimeout: failTimeout}};
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         result = assert.writeError(primary.getDB('foo').bar.insert(doc, options));
         assert.neq(null, result.getWriteConcernError());
