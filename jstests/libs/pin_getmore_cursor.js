@@ -15,6 +15,7 @@ function withPinnedCursor({conn, assertFunction, runGetMoreFunc, failPointName})
     const db = conn.getDB("test");
     const coll = db.jstest_with_pinned_cursor;
     coll.drop();
+    db.active_cursor_sentinel.drop();
     for (let i = 0; i < 100; ++i) {
         assert.writeOK(coll.insert({value: i}));
     }
@@ -23,29 +24,34 @@ function withPinnedCursor({conn, assertFunction, runGetMoreFunc, failPointName})
         // Enable the specified failpoint.
         assert.commandWorked(
             db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
+
         // Issue an initial find in order to create a cursor and obtain its cursorID.
         let cmdRes = db.runCommand({find: coll.getName(), batchSize: 2});
         assert.commandWorked(cmdRes);
-        let cursorId = cmdRes.cursor.id;
+        const cursorId = cmdRes.cursor.id;
         assert.neq(cursorId, NumberLong(0));
-        // Let the cursor hang in a different shell
+
+        // Let the cursor hang in a different shell with the information it needs to do a getMore.
         let code = "let cursorId = " + cursorId.toString() + ";";
         code += "let collName = '" + coll.getName() + "';";
         code += "(" + runGetMoreFunc.toString() + ")();";
+        code += "db.active_cursor_sentinel.insert({});";
         cleanup = startParallelShell(code, conn.port);
+
         // Wait until we know the failpoint has been reached.
         assert.soon(function() {
-            const arr =
-                db.getSiblingDB("admin")
-                    .aggregate([{$currentOp: {localOps: true}}, {$match: {"msg": failPointName}}])
-                    .toArray();
+            const arr = db.getSiblingDB("admin")
+                            .aggregate([
+                                {$currentOp: {localOps: true, allUsers: true}},
+                                {$match: {"msg": failPointName}}
+                            ])
+                            .toArray();
             return arr.length > 0;
         });
         assertFunction(cursorId, coll);
         // Eventually the cursor should be cleaned up.
         assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
-        assert.soon(() => db.serverStatus().metrics.cursor.open.pinned == 0);
-
+        assert.soon(() => db.active_cursor_sentinel.find().itcount() > 0);
         // Trying to kill the cursor again should result in the cursor not being found.
         cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [cursorId]});
         assert.commandWorked(cmdRes);

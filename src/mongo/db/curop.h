@@ -32,6 +32,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/operation_context.h"
@@ -527,6 +528,10 @@ public:
     CurOp* parent() const {
         return _parent;
     }
+    boost::optional<GenericCursor> getGenericCursor_inlock() const {
+        return _genericCursor;
+    }
+
     void yielded(int numYields = 1) {
         _numYields += numYields;
     }  // Should be _inlock()?
@@ -557,6 +562,8 @@ public:
     void setPlanSummary_inlock(std::string summary) {
         _planSummary = std::move(summary);
     }
+
+    void setGenericCursor_inlock(GenericCursor gc);
 
     const boost::optional<SingleThreadedLockStats> getLockStatsBase() {
         return _lockStatsBase;
@@ -602,6 +609,8 @@ private:
     std::string _message;
     ProgressMeter _progressMeter;
     int _numYields{0};
+    // A GenericCursor containing information about the active cursor for a getMore operation.
+    boost::optional<GenericCursor> _genericCursor;
 
     std::string _planSummary;
     boost::optional<SingleThreadedLockStats>

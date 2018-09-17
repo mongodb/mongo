@@ -292,6 +292,10 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     }
 }
 
+void CurOp::setGenericCursor_inlock(GenericCursor gc) {
+    _genericCursor = std::move(gc);
+}
+
 CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {
     // If this is a sub-operation, we store the snapshot of lock stats as the base lock stats of the
     // current operation.
@@ -489,6 +493,10 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
 
     if (!_planSummary.empty()) {
         builder->append("planSummary", _planSummary);
+    }
+
+    if (_genericCursor) {
+        builder->append("cursor", _genericCursor->toBSON());
     }
 
     if (!_message.empty()) {

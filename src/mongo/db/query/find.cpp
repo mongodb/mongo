@@ -39,6 +39,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -72,6 +73,9 @@ using stdx::make_unique;
 
 // Failpoint for checking whether we've received a getmore.
 MONGO_FAIL_POINT_DEFINE(failReceivedGetmore);
+
+// Failpoint to keep a cursor pinned.
+MONGO_FAIL_POINT_DEFINE(legacyGetMoreWaitWithCursor)
 
 bool shouldSaveCursor(OperationContext* opCtx,
                       const Collection* collection,
@@ -404,6 +408,8 @@ Message getMore(OperationContext* opCtx,
             // command or upconverted legacy query in the originatingCommand field.
             curOp.setOpDescription_inlock(upconvertGetMoreEntry(nss, cursorid, ntoreturn));
             curOp.setOriginatingCommand_inlock(cc->getOriginatingCommandObj());
+            // Update the generic cursor in curOp.
+            curOp.setGenericCursor_inlock(cc->toGenericCursor());
         }
 
         PlanExecutor::ExecState state;
@@ -413,6 +419,10 @@ Message getMore(OperationContext* opCtx,
         // metrics, as they accumulate over the course of a cursor's lifetime.
         PlanSummaryStats preExecutionStats;
         Explain::getSummaryStats(*exec, &preExecutionStats);
+        if (MONGO_FAIL_POINT(legacyGetMoreWaitWithCursor)) {
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &legacyGetMoreWaitWithCursor, opCtx, "legacyGetMoreWaitWithCursor", nullptr);
+        }
 
         generateBatch(ntoreturn, cc, &bb, &numResults, &state);
 

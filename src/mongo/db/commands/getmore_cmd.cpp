@@ -424,6 +424,9 @@ public:
                 if (!originatingCommand.isEmpty()) {
                     curOp->setOriginatingCommand_inlock(originatingCommand);
                 }
+
+                // Update the genericCursor stored in curOp with the new cursor stats.
+                curOp->setGenericCursor_inlock(cursor->toGenericCursor());
             }
 
             CursorId respondWithId = 0;

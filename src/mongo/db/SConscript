@@ -211,6 +211,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/progress_meter',
         'server_options',
+        'generic_cursor',
     ],
 )
 

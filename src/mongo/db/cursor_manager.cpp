@@ -622,19 +622,6 @@ void CursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
     }
 }
 
-GenericCursor CursorManager::buildGenericCursor_inlock(const ClientCursor* cursor) const {
-    GenericCursor gc;
-    gc.setCursorId(cursor->_cursorid);
-    gc.setNs(cursor->nss());
-    gc.setLsid(cursor->getSessionId());
-    gc.setNDocsReturned(cursor->pos());
-    gc.setTailable(cursor->isTailable());
-    gc.setAwaitData(cursor->isAwaitData());
-    gc.setOriginatingCommand(cursor->getOriginatingCommandObj());
-    gc.setNoCursorTimeout(cursor->isNoTimeout());
-    return gc;
-}
-
 void CursorManager::appendIdleCursors(AuthorizationSession* ctxAuth,
                                       MongoProcessInterface::CurrentOpUserMode userMode,
                                       std::vector<GenericCursor>* cursors) const {

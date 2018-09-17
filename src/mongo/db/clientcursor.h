@@ -186,6 +186,12 @@ public:
         _pos = n;
     }
 
+    /**
+     * Returns a generic cursor containing diagnostics about this cursor.
+     * The caller must either have this cursor pinned or hold a mutex from the cursor manager.
+     */
+    GenericCursor toGenericCursor() const;
+
     //
     // Timing.
     //

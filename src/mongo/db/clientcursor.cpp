@@ -129,6 +129,22 @@ void ClientCursor::dispose(OperationContext* opCtx) {
     _disposed = true;
 }
 
+GenericCursor ClientCursor::toGenericCursor() const {
+    GenericCursor gc;
+    gc.setCursorId(cursorid());
+    gc.setNs(nss());
+    gc.setNDocsReturned(pos());
+    gc.setTailable(isTailable());
+    gc.setAwaitData(isAwaitData());
+    gc.setNoCursorTimeout(isNoTimeout());
+    gc.setOriginatingCommand(getOriginatingCommandObj());
+    gc.setLsid(getSessionId());
+    if (auto opCtx = _operationUsingCursor) {
+        gc.setOperationUsingCursorId(opCtx->getOpID());
+    }
+    return gc;
+}
+
 //
 // Pin methods
 //

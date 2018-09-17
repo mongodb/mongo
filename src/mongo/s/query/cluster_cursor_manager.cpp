@@ -171,6 +171,18 @@ bool ClusterCursorManager::PinnedCursor::remotesExhausted() {
     return _cursor->remotesExhausted();
 }
 
+GenericCursor ClusterCursorManager::PinnedCursor::toGenericCursor() const {
+    GenericCursor gc;
+    gc.setCursorId(getCursorId());
+    gc.setNs(_nss);
+    gc.setLsid(getLsid());
+    gc.setNDocsReturned(getNumReturnedSoFar());
+    gc.setTailable(isTailable());
+    gc.setAwaitData(isTailableAndAwaitData());
+    gc.setOriginatingCommand(getOriginatingCommand());
+    return gc;
+}
+
 Status ClusterCursorManager::PinnedCursor::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     invariant(_cursor);
     return _cursor->setAwaitDataTimeout(awaitDataTimeout);

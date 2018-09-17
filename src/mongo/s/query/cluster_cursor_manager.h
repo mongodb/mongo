@@ -213,6 +213,11 @@ public:
         long long getNumReturnedSoFar() const;
 
         /**
+         * Returns a GenericCursor version of the pinned cursor.
+         */
+        GenericCursor toGenericCursor() const;
+
+        /**
          * Stashes 'obj' to be returned later by this cursor. A cursor must be owned.
          */
         void queueResult(const ClusterQueryResult& result);

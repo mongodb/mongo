@@ -575,6 +575,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setOriginatingCommand_inlock(
             pinnedCursor.getValue().getOriginatingCommand());
+        CurOp::get(opCtx)->setGenericCursor_inlock(pinnedCursor.getValue().toGenericCursor());
     }
 
     // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the 'msg'
