@@ -323,7 +323,7 @@ private:
                 if (!ec && sslPeerInfo.subjectName.empty()) {
                     auto sslManager = getSSLManager();
                     auto swPeerInfo = sslManager->parseAndValidatePeerCertificate(
-                        _sslSocket->native_handle(), "");
+                        _sslSocket->native_handle(), "", _remote);
 
                     if (swPeerInfo.isOK()) {
                         // The value of swPeerInfo is a bit complicated:

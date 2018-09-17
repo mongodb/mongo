@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 
 Import('env')
+Import("has_option")
 
 env = env.Clone()
 
@@ -67,17 +68,19 @@ env.CppUnitTest(
     ],
 )
 
-
-env.CppUnitTest(
-    target='ssl_manager_test',
-    source=[
-        'ssl_manager_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'network',
-    ],
-)
+if has_option('ssl'):
+    env.CppUnitTest(
+        target='ssl_manager_test',
+        source=[
+            'ssl_manager_test.cpp',
+            'ssl_options_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/server_options',
+            'network',
+        ],
+    )
 
 env.CppIntegrationTest(
     target='op_msg_integration_test',

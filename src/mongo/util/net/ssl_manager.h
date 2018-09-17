@@ -145,7 +145,9 @@ public:
      * a StatusWith instead.
      */
     virtual SSLPeerInfo parseAndValidatePeerCertificateDeprecated(
-        const SSLConnection* conn, const std::string& remoteHost) = 0;
+        const SSLConnection* conn,
+        const std::string& remoteHost,
+        const HostAndPort& hostForLogging) = 0;
 
     /**
      * Gets the SSLConfiguration containing all information about the current SSL setup
@@ -194,7 +196,7 @@ public:
      * X509 authorization will be returned.
      */
     virtual StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
-        SSL* ssl, const std::string& remoteHost) = 0;
+        SSL* ssl, const std::string& remoteHost, const HostAndPort& hostForLogging) = 0;
 };
 
 // Access SSL functions through this instance.
@@ -221,6 +223,27 @@ bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certH
  * packet if the client has selected a protocol which has been disabled by the server.
  */
 boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(ConstDataRange cdr);
+
+/**
+ * Platform neutral TLS version enum
+ */
+enum class TLSVersion {
+    kUnknown,
+    kTLS10,
+    kTLS11,
+    kTLS12,
+};
+
+/**
+ * Map SSL version to platform-neutral enum.
+ */
+StatusWith<TLSVersion> mapTLSVersion(SSLConnection* conn);
+
+/**
+ * Record information about TLS versions and optionally log the TLS version
+ */
+void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging);
+
 
 }  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL
