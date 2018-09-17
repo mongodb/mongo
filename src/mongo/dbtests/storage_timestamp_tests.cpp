@@ -49,7 +49,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/multi_key_path_tracker.h"
-#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context_session_mongod.h"
 #include "mongo/db/repl/apply_ops.h"
@@ -70,6 +69,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
@@ -173,7 +173,7 @@ public:
 
         auto registry = stdx::make_unique<OpObserverRegistry>();
         registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
-        registry->addObserver(stdx::make_unique<OpObserverImpl>());
+        registry->addObserver(stdx::make_unique<OpObserverShardingImpl>());
         _opCtx->getServiceContext()->setOpObserver(std::move(registry));
 
         repl::setOplogCollectionName(getGlobalServiceContext());

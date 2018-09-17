@@ -29,7 +29,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/shard_server_op_observer.h"
+#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/shard_server_test_fixture.h"
 
@@ -72,11 +72,10 @@ TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
                     << true);
 
     // Check that an order for deletion from an unsharded collection extracts just the "_id" field
-    auto deleteState = ShardObserverDeleteState::make(operationContext(), css, doc);
-    ASSERT_BSONOBJ_EQ(deleteState.documentKey,
+    ASSERT_BSONOBJ_EQ(OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc),
                       BSON("_id"
                            << "hello"));
-    ASSERT_FALSE(deleteState.isMigrating);
+    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
@@ -97,13 +96,12 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
                     << true);
 
     // Verify the shard key is extracted, in correct order, followed by the "_id" field.
-    auto deleteState = ShardObserverDeleteState::make(operationContext(), css, doc);
-    ASSERT_BSONOBJ_EQ(deleteState.documentKey,
+    ASSERT_BSONOBJ_EQ(OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc),
                       BSON("key" << 100 << "key3"
                                  << "abc"
                                  << "_id"
                                  << "hello"));
-    ASSERT_FALSE(deleteState.isMigrating);
+    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
@@ -123,13 +121,12 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
                            << 100);
 
     // Verify the shard key is extracted with "_id" in the right place.
-    auto deleteState = ShardObserverDeleteState::make(operationContext(), css, doc);
-    ASSERT_BSONOBJ_EQ(deleteState.documentKey,
+    ASSERT_BSONOBJ_EQ(OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc),
                       BSON("key" << 100 << "_id"
                                  << "hello"
                                  << "key2"
                                  << true));
-    ASSERT_FALSE(deleteState.isMigrating);
+    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
@@ -147,11 +144,10 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
                            << 100);
 
     // Verify the shard key is extracted with "_id" in the right place, not hashed.
-    auto deleteState = ShardObserverDeleteState::make(operationContext(), css, doc);
-    ASSERT_BSONOBJ_EQ(deleteState.documentKey,
+    ASSERT_BSONOBJ_EQ(OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc),
                       BSON("_id"
                            << "hello"));
-    ASSERT_FALSE(deleteState.isMigrating);
+    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
 }  // namespace

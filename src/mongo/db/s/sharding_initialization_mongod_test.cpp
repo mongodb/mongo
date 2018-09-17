@@ -32,10 +32,10 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -142,7 +142,7 @@ public:
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         auto makeOpObserver = [&] {
             auto opObserver = stdx::make_unique<OpObserverRegistry>();
-            opObserver->addObserver(stdx::make_unique<OpObserverImpl>());
+            opObserver->addObserver(stdx::make_unique<OpObserverShardingImpl>());
             opObserver->addObserver(stdx::make_unique<ConfigServerOpObserver>());
             opObserver->addObserver(stdx::make_unique<ShardServerOpObserver>());
             return opObserver;

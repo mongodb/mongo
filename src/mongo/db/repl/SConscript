@@ -99,7 +99,7 @@ env.CppUnitTest(
         'replmocks',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/op_observer_d',
+        '$BUILD_DIR/mongo/db/s/op_observer_sharding_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/rpc/command_status',
     ],
@@ -713,7 +713,7 @@ env.Library(
         'replmocks',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
-        '$BUILD_DIR/mongo/db/op_observer_d',
+        '$BUILD_DIR/mongo/db/s/op_observer_sharding_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
 )

@@ -203,9 +203,10 @@ env.Library(
         'sharding_mongod_test_fixture.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/op_observer_d',
         '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
         '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/s/op_observer_sharding_impl',
+        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         'sharding_test_fixture_common',
     ],

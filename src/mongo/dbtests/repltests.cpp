@@ -43,13 +43,13 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
-#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/sync_tail.h"
+#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/log.h"
@@ -133,7 +133,7 @@ public:
         // to avoid the invariant in ReplClientInfo::setLastOp that the optime only goes forward.
         repl::ReplClientInfo::forClient(_opCtx.getClient()).clearLastOp_forTest();
 
-        getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserverImpl>());
+        getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserverShardingImpl>());
 
         setOplogCollectionName(getGlobalServiceContext());
         createOplog(&_opCtx);

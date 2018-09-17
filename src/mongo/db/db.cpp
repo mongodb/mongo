@@ -91,7 +91,6 @@
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options.h"
-#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
@@ -112,6 +111,7 @@
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
@@ -281,7 +281,7 @@ ExitCode _initAndListen(int listenPort) {
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
     auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(stdx::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(stdx::make_unique<OpObserverShardingImpl>());
     opObserverRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {

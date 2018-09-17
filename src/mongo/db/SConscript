@@ -132,7 +132,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'auth/authmocks',
         'common',
-        'op_observer_d',
+        'op_observer_impl',
         'repl/oplog_interface_local',
         'repl/replmocks',
         'service_context_d_test_fixture',
@@ -778,7 +778,7 @@ env.Library(
 )
 
 env.Library(
-    target="op_observer_d",
+    target="op_observer_impl",
     source=[
         "op_observer_impl.cpp",
     ],
@@ -786,7 +786,7 @@ env.Library(
         'catalog/collection_options',
         'op_observer',
         'repl/oplog',
-        's/sharding_runtime_d',
+        's/sharding_api_d',
         'views/views_mongod',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
@@ -1104,7 +1104,6 @@ env.Library(
         "index_d",
         "introspect",
         "matcher/expressions_mongod_only",
-        "op_observer_d",
         "ops/write_ops_parsers",
         "pipeline/aggregation",
         "query_exec",
@@ -1124,6 +1123,7 @@ env.Library(
         "repl/topology_coordinator",
         "rw_concern_d",
         "s/commands_db_s",
+        "s/op_observer_sharding_impl",
         "s/sharding_runtime_d",
         "startup_warnings_mongod",
         "stats/counters",
