@@ -141,6 +141,7 @@ env.CppUnitTest(
         'sock_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_options_servers',
         '$BUILD_DIR/mongo/util/fail_point',
         'network',
         'socket',

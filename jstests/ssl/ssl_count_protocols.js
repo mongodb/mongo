@@ -17,6 +17,8 @@
             sslMode: 'allowSSL',
             sslPEMKeyFile: SERVER_CERT,
             sslDisabledProtocols: 'none',
+            useLogFiles: true,
+            tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2",
         });
 
         print(disabledProtocols);
@@ -44,6 +46,26 @@
                                 'assert.eq(db.serverStatus().transportSecurity, a);');
 
         assert.eq(0, exitStatus, "");
+
+        print(`Checking ${conn.fullOptions.logFile} for TLS version message`);
+        const log = cat(conn.fullOptions.logFile);
+
+        // Find the last line in the log file and verify it has the right version
+        let re = /Accepted connection with TLS Version (1\.\d) from connection 127.0.0.1:\d+/g;
+        let result = re.exec(log);
+        let lastResult = null;
+        while (result !== null) {
+            lastResult = result;
+            result = re.exec(log);
+        }
+
+        assert(lastResult !== null,
+               "'Accepted connection with TLS Version' log line missing in log file!\n" +
+                   "Log file contents: " + conn.fullOptions.logFile +
+                   "\n************************************************************\n" + log +
+                   "\n************************************************************");
+
+        assert.eq(lastResult['1'], version_number);
 
         MongoRunner.stopMongod(conn);
     }

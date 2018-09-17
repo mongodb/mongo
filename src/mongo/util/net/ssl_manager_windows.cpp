@@ -274,10 +274,11 @@ public:
     SSLConnectionInterface* accept(Socket* socket, const char* initialBytes, int len) final;
 
     SSLPeerInfo parseAndValidatePeerCertificateDeprecated(const SSLConnectionInterface* conn,
-                                                          const std::string& remoteHost) final;
+                                                          const std::string& remoteHost,
+                                                          const HostAndPort& hostForLogging) final;
 
     StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
-        PCtxtHandle ssl, const std::string& remoteHost) final;
+        PCtxtHandle ssl, const std::string& remoteHost, const HostAndPort& hostForLogging) final;
 
 
     const SSLConfiguration& getSSLConfiguration() const final {
@@ -1484,11 +1485,14 @@ Status SSLManagerWindows::_validateCertificate(PCCERT_CONTEXT cert,
 }
 
 SSLPeerInfo SSLManagerWindows::parseAndValidatePeerCertificateDeprecated(
-    const SSLConnectionInterface* conn, const std::string& remoteHost) {
+    const SSLConnectionInterface* conn,
+    const std::string& remoteHost,
+    const HostAndPort& hostForLogging) {
     auto swPeerSubjectName = parseAndValidatePeerCertificate(
         const_cast<SSLConnectionWindows*>(static_cast<const SSLConnectionWindows*>(conn))
             ->_engine.native_handle(),
-        remoteHost);
+        remoteHost,
+        hostForLogging);
     // We can't use uassertStatusOK here because we need to throw a SocketException.
     if (!swPeerSubjectName.isOK()) {
         throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());
@@ -1659,7 +1663,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
     return Status::OK();
 }
 
-Status recordTLSVersion(PCtxtHandle ssl) {
+StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
     SecPkgContext_ConnectionInfo connInfo;
 
     SECURITY_STATUS ss = QueryContextAttributes(ssl, SECPKG_ATTR_CONNECTION_INFO, &connInfo);
@@ -1670,36 +1674,31 @@ Status recordTLSVersion(PCtxtHandle ssl) {
                                     << ss);
     }
 
-    auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());
     switch (connInfo.dwProtocol) {
         case SP_PROT_TLS1_CLIENT:
         case SP_PROT_TLS1_SERVER:
-            counts.tls10.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS10;
         case SP_PROT_TLS1_1_CLIENT:
         case SP_PROT_TLS1_1_SERVER:
-            counts.tls11.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS11;
         case SP_PROT_TLS1_2_CLIENT:
         case SP_PROT_TLS1_2_SERVER:
-            counts.tls12.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS12;
         default:
-            // Do nothing
-            break;
+            return TLSVersion::kUnknown;
     }
-
-    return Status::OK();
 }
 
 StatusWith<boost::optional<SSLPeerInfo>> SSLManagerWindows::parseAndValidatePeerCertificate(
-    PCtxtHandle ssl, const std::string& remoteHost) {
+    PCtxtHandle ssl, const std::string& remoteHost, const HostAndPort& hostForLogging) {
     PCCERT_CONTEXT cert;
 
-    auto countStatus = recordTLSVersion(ssl);
-    if (!countStatus.isOK()) {
-        return countStatus;
+    auto tlsVersionStatus = mapTLSVersion(ssl);
+    if (!tlsVersionStatus.isOK()) {
+        return tlsVersionStatus.getStatus();
     }
+
+    recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
     if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
