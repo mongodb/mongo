@@ -301,11 +301,12 @@ public:
 
     virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len);
 
-    virtual SSLPeerInfo parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
-                                                                  const std::string& remoteHost);
+    SSLPeerInfo parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
+                                                          const std::string& remoteHost,
+                                                          const HostAndPort& hostForLogging) final;
 
     StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
-        SSL* conn, const std::string& remoteHost) final;
+        SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) final;
 
     virtual const SSLConfiguration& getSSLConfiguration() const {
         return _sslConfiguration;
@@ -1387,35 +1388,34 @@ bool SSLManager::_hostNameMatch(const char* nameToMatch, const char* certHostNam
     }
 }
 
-void recordTLSVersion(const SSL* conn) {
+StatusWith<TLSVersion> mapTLSVersion(const SSL* conn) {
     int protocol = SSL_version(conn);
 
-    auto& counts = mongo::TLSVersionCounts::get();
     switch (protocol) {
         case TLS1_VERSION:
-            counts.tls10.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS10;
         case TLS1_1_VERSION:
-            counts.tls11.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS11;
         case TLS1_2_VERSION:
-            counts.tls12.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS12;
 #ifdef TLS1_3_VERSION
         case TLS1_3_VERSION:
-            counts.tls13.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS13;
 #endif
         default:
-            // Do nothing
-            break;
+            return TLSVersion::kUnknown;
     }
 }
 
 StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertificate(
-    SSL* conn, const std::string& remoteHost) {
+    SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) {
 
-    recordTLSVersion(conn);
+    auto tlsVersionStatus = mapTLSVersion(conn);
+    if (!tlsVersionStatus.isOK()) {
+        return tlsVersionStatus.getStatus();
+    }
+
+    recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
     if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
@@ -1529,15 +1529,56 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
 }
 
 
-SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
-                                                                  const std::string& remoteHost) {
-    auto swPeerSubjectName = parseAndValidatePeerCertificate(conn->ssl, remoteHost);
+SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(
+    const SSLConnection* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) {
+    auto swPeerSubjectName = parseAndValidatePeerCertificate(conn->ssl, remoteHost, hostForLogging);
     // We can't use uassertStatusOK here because we need to throw a SocketException.
     if (!swPeerSubjectName.isOK()) {
         throw SocketException(SocketException::CONNECT_ERROR,
                               swPeerSubjectName.getStatus().reason());
     }
     return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
+}
+
+void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
+    StringData versionString;
+    auto& counts = mongo::TLSVersionCounts::get();
+    switch (version) {
+        case TLSVersion::kTLS10:
+            counts.tls10.addAndFetch(1);
+            if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
+                          sslGlobalParams.tlsLogVersions.cend(),
+                          SSLParams::Protocols::TLS1_0) != sslGlobalParams.tlsLogVersions.cend()) {
+                versionString = "1.0"_sd;
+            }
+            break;
+        case TLSVersion::kTLS11:
+            counts.tls11.addAndFetch(1);
+            if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
+                          sslGlobalParams.tlsLogVersions.cend(),
+                          SSLParams::Protocols::TLS1_1) != sslGlobalParams.tlsLogVersions.cend()) {
+                versionString = "1.1"_sd;
+            }
+            break;
+        case TLSVersion::kTLS12:
+            counts.tls12.addAndFetch(1);
+            if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
+                          sslGlobalParams.tlsLogVersions.cend(),
+                          SSLParams::Protocols::TLS1_2) != sslGlobalParams.tlsLogVersions.cend()) {
+                versionString = "1.2"_sd;
+            }
+            break;
+        default:
+            if (!sslGlobalParams.tlsLogVersions.empty()) {
+                versionString = "unkown"_sd;
+            }
+            break;
+    }
+
+    if (!versionString.empty()) {
+        log() << "Accepted connection with TLS Version " << versionString << " from connection "
+              << hostForLogging;
+    }
 }
 
 StatusWith<stdx::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerCert) const {
@@ -1550,6 +1591,7 @@ StatusWith<stdx::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peer
     }
 
     ASN1_OBJECT* rolesObj = OBJ_nid2obj(_rolesNid);
+
 
     // Search all certificate extensions for our own
     stdx::unordered_set<RoleName> roles;

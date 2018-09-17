@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 
 Import('env')
+Import("has_option")
 
 env.Library(
     target='hostandport',
@@ -93,6 +94,19 @@ env.CppUnitTest(
         'network',
     ],
 )
+
+if has_option('ssl'):
+    env.CppUnitTest(
+        target='ssl_manager_test',
+        source=[
+            'ssl_options_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/server_options',
+            'network',
+        ],
+    )
 
 env.Library(
     target='miniwebserver',

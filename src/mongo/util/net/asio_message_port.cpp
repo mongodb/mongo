@@ -384,8 +384,8 @@ bool ASIOMessagingPort::recv(Message& m) {
                     throw asio::system_error(ec);
                 }
 
-                auto swPeerInfo =
-                    getSSLManager()->parseAndValidatePeerCertificate(_sslSock.native_handle(), "");
+                auto swPeerInfo = getSSLManager()->parseAndValidatePeerCertificate(
+                    _sslSock.native_handle(), "", _remote);
                 if (!swPeerInfo.isOK()) {
                     throw SocketException(SocketException::CONNECT_ERROR,
                                           swPeerInfo.getStatus().reason());
@@ -591,8 +591,8 @@ bool ASIOMessagingPort::secure(SSLManagerInterface* ssl, const std::string& remo
         return false;
     }
 
-    auto swPeerInfo =
-        getSSLManager()->parseAndValidatePeerCertificate(_sslSock.native_handle(), remoteHost);
+    auto swPeerInfo = getSSLManager()->parseAndValidatePeerCertificate(
+        _sslSock.native_handle(), remoteHost, _remote);
     if (!swPeerInfo.isOK()) {
         throw SocketException(SocketException::CONNECT_ERROR, swPeerInfo.getStatus().reason());
     }
