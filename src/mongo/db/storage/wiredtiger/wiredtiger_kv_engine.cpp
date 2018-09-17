@@ -71,6 +71,7 @@
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
@@ -158,48 +159,6 @@ std::string WiredTigerFileVersion::getDowngradeString() {
     }
     return "compatibility=(release=3.1)";
 }
-
-namespace {
-void openWiredTiger(const std::string& path,
-                    WT_EVENT_HANDLER* eventHandler,
-                    const std::string& wtOpenConfig,
-                    WT_CONNECTION** connOut,
-                    WiredTigerFileVersion* fileVersionOut) {
-    std::string configStr = wtOpenConfig + ",compatibility=(require_min=\"3.1.0\")";
-    int ret = wiredtiger_open(path.c_str(), eventHandler, configStr.c_str(), connOut);
-    if (!ret) {
-        *fileVersionOut = {WiredTigerFileVersion::StartupVersion::IS_40};
-        return;
-    }
-
-    // Arbiters do not replicate the FCV document. Due to arbiter FCV semantics on 4.0, shutting
-    // down a 4.0 arbiter may either downgrade the data files to WT compatibility 2.9 or 3.0. Thus,
-    // 4.2 binaries must allow starting up on 2.9 and 3.0 files.
-    configStr = wtOpenConfig + ",compatibility=(require_min=\"3.0.0\")";
-    ret = wiredtiger_open(path.c_str(), eventHandler, configStr.c_str(), connOut);
-    if (!ret) {
-        *fileVersionOut = {WiredTigerFileVersion::StartupVersion::IS_36};
-        return;
-    }
-
-    configStr = wtOpenConfig + ",compatibility=(require_min=\"2.9.0\")";
-    ret = wiredtiger_open(path.c_str(), eventHandler, configStr.c_str(), connOut);
-    if (!ret) {
-        *fileVersionOut = {WiredTigerFileVersion::StartupVersion::IS_34};
-        return;
-    }
-
-    severe() << "Failed to start up WiredTiger under any compatibility version.";
-    if (ret == EINVAL) {
-        fassertFailedNoTrace(28561);
-    }
-
-    severe() << "Reason: " << wtRCToStatus(ret).reason();
-    severe() << "Failed to open a WiredTiger connection. This may be due to metadata corruption. "
-             << kWTRepairMsg;
-    fassertFailedNoTrace(28595);
-}
-}  // namespace
 
 using std::set;
 using std::string;
@@ -572,7 +531,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     string config = ss.str();
     log() << "wiredtiger_open config: " << config;
-    openWiredTiger(path, _eventHandler.getWtEventHandler(), config, &_conn, &_fileVersion);
+    _openWiredTiger(path, config);
     _eventHandler.setStartupSuccessful();
     _wtOpenConfig = config;
 
@@ -643,6 +602,64 @@ void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
         bbb.done();
     }
     bb.done();
+}
+
+void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::string& wtOpenConfig) {
+    std::string configStr = wtOpenConfig + ",compatibility=(require_min=\"3.1.0\")";
+
+    auto wtEventHandler = _eventHandler.getWtEventHandler();
+
+    int ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
+    if (!ret) {
+        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_40};
+        return;
+    }
+
+    // Arbiters do not replicate the FCV document. Due to arbiter FCV semantics on 4.0, shutting
+    // down a 4.0 arbiter may either downgrade the data files to WT compatibility 2.9 or 3.0. Thus,
+    // 4.2 binaries must allow starting up on 2.9 and 3.0 files.
+    configStr = wtOpenConfig + ",compatibility=(require_min=\"3.0.0\")";
+    ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
+    if (!ret) {
+        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_36};
+        return;
+    }
+
+    configStr = wtOpenConfig + ",compatibility=(require_min=\"2.9.0\")";
+    ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
+    if (!ret) {
+        _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_34};
+        return;
+    }
+
+    warning() << "Failed to start up WiredTiger under any compatibility version.";
+    if (ret == EINVAL) {
+        fassertFailedNoTrace(28561);
+    }
+
+    if (ret == WT_TRY_SALVAGE) {
+        warning() << "WiredTiger metadata corruption detected";
+
+        if (!_inRepairMode) {
+            severe() << kWTRepairMsg;
+            fassertFailedNoTrace(50944);
+        }
+
+        warning() << "Attempting to salvage WiredTiger metadata";
+        configStr = wtOpenConfig + ",salvage=true";
+        ret = wiredtiger_open(path.c_str(), wtEventHandler, configStr.c_str(), &_conn);
+        if (!ret) {
+            StorageRepairObserver::get(getGlobalServiceContext())
+                ->onModification("WiredTiger metadata salvaged");
+            return;
+        }
+
+        severe() << "Failed to salvage WiredTiger metadata: " + wtRCToStatus(ret).reason();
+        fassertFailedNoTrace(50947);
+    }
+
+    severe() << "Reason: " << wtRCToStatus(ret).reason();
+    fassertFailedNoTrace(28595);
 }
 
 void WiredTigerKVEngine::cleanShutdown() {

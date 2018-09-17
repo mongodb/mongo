@@ -47,7 +47,7 @@
             const WiredTigerWTFile = dbpath + "WiredTiger.wt";
             jsTestLog("corrupting WiredTiger.wt");
             corruptFile(WiredTigerWTFile);
-        }, "Fatal Assertion 28595");
+        }, "Fatal Assertion 50944");
 
     /**
      * Test 4. Corrupt an index file.
