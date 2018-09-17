@@ -759,6 +759,46 @@ public:
     }
 } tlsVersionStatus;
 
+void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
+    StringData versionString;
+    auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());
+    switch (version) {
+        case TLSVersion::kTLS10:
+            counts.tls10.addAndFetch(1);
+            if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
+                          sslGlobalParams.tlsLogVersions.cend(),
+                          SSLParams::Protocols::TLS1_0) != sslGlobalParams.tlsLogVersions.cend()) {
+                versionString = "1.0"_sd;
+            }
+            break;
+        case TLSVersion::kTLS11:
+            counts.tls11.addAndFetch(1);
+            if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
+                          sslGlobalParams.tlsLogVersions.cend(),
+                          SSLParams::Protocols::TLS1_1) != sslGlobalParams.tlsLogVersions.cend()) {
+                versionString = "1.1"_sd;
+            }
+            break;
+        case TLSVersion::kTLS12:
+            counts.tls12.addAndFetch(1);
+            if (std::find(sslGlobalParams.tlsLogVersions.cbegin(),
+                          sslGlobalParams.tlsLogVersions.cend(),
+                          SSLParams::Protocols::TLS1_2) != sslGlobalParams.tlsLogVersions.cend()) {
+                versionString = "1.2"_sd;
+            }
+            break;
+        default:
+            if (!sslGlobalParams.tlsLogVersions.empty()) {
+                versionString = "unkown"_sd;
+            }
+            break;
+    }
+
+    if (!versionString.empty()) {
+        log() << "Accepted connection with TLS Version " << versionString << " from connection "
+              << hostForLogging;
+    }
+}
 
 #endif
 

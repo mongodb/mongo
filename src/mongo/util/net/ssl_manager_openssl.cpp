@@ -343,10 +343,11 @@ public:
     SSLConnectionInterface* accept(Socket* socket, const char* initialBytes, int len) final;
 
     SSLPeerInfo parseAndValidatePeerCertificateDeprecated(const SSLConnectionInterface* conn,
-                                                          const std::string& remoteHost) final;
+                                                          const std::string& remoteHost,
+                                                          const HostAndPort& hostForLogging) final;
 
     StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
-        SSL* conn, const std::string& remoteHost) final;
+        SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) final;
 
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
@@ -1272,35 +1273,34 @@ SSLConnectionInterface* SSLManagerOpenSSL::accept(Socket* socket,
 }
 
 
-void recordTLSVersion(const SSL* conn) {
+StatusWith<TLSVersion> mapTLSVersion(SSL* conn) {
     int protocol = SSL_version(conn);
 
-    auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());
     switch (protocol) {
         case TLS1_VERSION:
-            counts.tls10.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS10;
         case TLS1_1_VERSION:
-            counts.tls11.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS11;
         case TLS1_2_VERSION:
-            counts.tls12.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS12;
 #ifdef TLS1_3_VERSION
         case TLS1_3_VERSION:
-            counts.tls13.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS13;
 #endif
         default:
-            // Do nothing
-            break;
+            return TLSVersion::kUnknown;
     }
 }
 
 StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
-    SSL* conn, const std::string& remoteHost) {
+    SSL* conn, const std::string& remoteHost, const HostAndPort& hostForLogging) {
 
-    recordTLSVersion(conn);
+    auto tlsVersionStatus = mapTLSVersion(conn);
+    if (!tlsVersionStatus.isOK()) {
+        return tlsVersionStatus.getStatus();
+    }
+
+    recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
     if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
@@ -1414,10 +1414,12 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
 
 
 SSLPeerInfo SSLManagerOpenSSL::parseAndValidatePeerCertificateDeprecated(
-    const SSLConnectionInterface* connInterface, const std::string& remoteHost) {
+    const SSLConnectionInterface* connInterface,
+    const std::string& remoteHost,
+    const HostAndPort& hostForLogging) {
     const SSLConnectionOpenSSL* conn = checked_cast<const SSLConnectionOpenSSL*>(connInterface);
 
-    auto swPeerSubjectName = parseAndValidatePeerCertificate(conn->ssl, remoteHost);
+    auto swPeerSubjectName = parseAndValidatePeerCertificate(conn->ssl, remoteHost, hostForLogging);
     // We can't use uassertStatusOK here because we need to throw a NetworkException.
     if (!swPeerSubjectName.isOK()) {
         throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());

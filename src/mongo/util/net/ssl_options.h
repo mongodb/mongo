@@ -72,6 +72,7 @@ struct SSLParams {
 #endif
 
     std::vector<Protocols> sslDisabledProtocols;  // --sslDisabledProtocols
+    std::vector<Protocols> tlsLogVersions;        // --tlsLogVersion
     bool sslWeakCertificateValidation = false;    // --sslWeakCertificateValidation
     bool sslFIPSMode = false;                     // --sslFIPSMode
     bool sslAllowInvalidCertificates = false;     // --sslAllowInvalidCertificates

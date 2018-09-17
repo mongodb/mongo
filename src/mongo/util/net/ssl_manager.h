@@ -159,7 +159,9 @@ public:
      * a StatusWith instead.
      */
     virtual SSLPeerInfo parseAndValidatePeerCertificateDeprecated(
-        const SSLConnectionInterface* conn, const std::string& remoteHost) = 0;
+        const SSLConnectionInterface* conn,
+        const std::string& remoteHost,
+        const HostAndPort& hostForLogging) = 0;
 
     /**
      * Gets the SSLConfiguration containing all information about the current SSL setup
@@ -200,7 +202,9 @@ public:
      * X509 authorization will be returned.
      */
     virtual StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
-        SSLConnectionType ssl, const std::string& remoteHost) = 0;
+        SSLConnectionType ssl,
+        const std::string& remoteHost,
+        const HostAndPort& hostForLogging) = 0;
 };
 
 // Access SSL functions through this instance.
@@ -230,6 +234,27 @@ std::string removeFQDNRoot(std::string name);
  * See "2.4 Converting an AttributeValue from ASN.1 to a String" in RFC 2243
  */
 std::string escapeRfc2253(StringData str);
+
+/**
+ * Platform neutral TLS version enum
+ */
+enum class TLSVersion {
+    kUnknown,
+    kTLS10,
+    kTLS11,
+    kTLS12,
+};
+
+/**
+ * Map SSL version to platform-neutral enum.
+ */
+StatusWith<TLSVersion> mapTLSVersion(SSLConnectionType conn);
+
+/**
+ * Record information about TLS versions and optionally log the TLS version
+ */
+void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging);
+
 
 }  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL

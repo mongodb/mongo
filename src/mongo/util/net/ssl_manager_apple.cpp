@@ -1076,10 +1076,13 @@ public:
     SSLConnectionInterface* accept(Socket* socket, const char* initialBytes, int len) final;
 
     SSLPeerInfo parseAndValidatePeerCertificateDeprecated(const SSLConnectionInterface* conn,
-                                                          const std::string& remoteHost) final;
+                                                          const std::string& remoteHost,
+                                                          const HostAndPort& hostForLogging) final;
 
     StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
-        ::SSLContextRef conn, const std::string& remoteHost) final;
+        ::SSLContextRef conn,
+        const std::string& remoteHost,
+        const HostAndPort& hostForLogging) final;
 
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
@@ -1263,10 +1266,12 @@ SSLConnectionInterface* SSLManagerApple::accept(Socket* socket, const char* init
 }
 
 SSLPeerInfo SSLManagerApple::parseAndValidatePeerCertificateDeprecated(
-    const SSLConnectionInterface* conn, const std::string& remoteHost) {
+    const SSLConnectionInterface* conn,
+    const std::string& remoteHost,
+    const HostAndPort& hostForLogging) {
     auto ssl = checked_cast<const SSLConnectionApple*>(conn)->get();
 
-    auto swPeerSubjectName = parseAndValidatePeerCertificate(ssl, remoteHost);
+    auto swPeerSubjectName = parseAndValidatePeerCertificate(ssl, remoteHost, hostForLogging);
     // We can't use uassertStatusOK here because we need to throw a NetworkException.
     if (!swPeerSubjectName.isOK()) {
         throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());
@@ -1274,44 +1279,34 @@ SSLPeerInfo SSLManagerApple::parseAndValidatePeerCertificateDeprecated(
     return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
 }
 
-void recordTLSVersion(::SSLContextRef ssl) {
+StatusWith<TLSVersion> mapTLSVersion(SSLContextRef ssl) {
     ::SSLProtocol protocol;
 
     uassertOSStatusOK(::SSLGetNegotiatedProtocolVersion(ssl, &protocol));
 
-    auto& counts = mongo::TLSVersionCounts::get(getGlobalServiceContext());
     switch (protocol) {
         case kTLSProtocol1:
-            counts.tls10.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS10;
         case kTLSProtocol11:
-            counts.tls11.addAndFetch(1);
-            break;
+            return TLSVersion::kTLS11;
         case kTLSProtocol12:
-            counts.tls12.addAndFetch(1);
-            break;
-        // case kTLSProtocol13:
-        //     counts.tls13.addAndFetch(1);
-        //     break;
-        case kSSLProtocolUnknown:
-        case kSSLProtocol2:
-        case kSSLProtocol3:
-        case kSSLProtocol3Only:
-        case kTLSProtocol1Only:
-        case kSSLProtocolAll:
-        case kDTLSProtocol1:
+            return TLSVersion::kTLS12;
         default:  // Some system headers may define additional protocols, so suppress warnings.
-            // Do nothing
-            break;
+            return TLSVersion::kUnknown;
     }
 }
 
 
 StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCertificate(
-    ::SSLContextRef ssl, const std::string& remoteHost) {
+    ::SSLContextRef ssl, const std::string& remoteHost, const HostAndPort& hostForLogging) {
 
     // Record TLS version stats
-    recordTLSVersion(ssl);
+    auto tlsVersionStatus = mapTLSVersion(ssl);
+    if (!tlsVersionStatus.isOK()) {
+        return tlsVersionStatus.getStatus();
+    }
+
+    recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
 
     /* While we always have a system CA via the Keychain,
      * we'll pretend not to in terms of validation if the server

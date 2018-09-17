@@ -239,7 +239,7 @@ bool Socket::secure(SSLManagerInterface* mgr, const std::string& remoteHost) {
     }
     _sslManager = mgr;
     _sslConnection.reset(_sslManager->connect(this));
-    mgr->parseAndValidatePeerCertificateDeprecated(_sslConnection.get(), remoteHost);
+    mgr->parseAndValidatePeerCertificateDeprecated(_sslConnection.get(), remoteHost, HostAndPort());
     return true;
 }
 
@@ -257,7 +257,8 @@ SSLPeerInfo Socket::doSSLHandshake(const char* firstBytes, int len) {
                              remoteString());
     }
     _sslConnection.reset(_sslManager->accept(this, firstBytes, len));
-    return _sslManager->parseAndValidatePeerCertificateDeprecated(_sslConnection.get(), "");
+    return _sslManager->parseAndValidatePeerCertificateDeprecated(
+        _sslConnection.get(), "", HostAndPort());
 }
 
 std::string Socket::getSNIServerName() const {

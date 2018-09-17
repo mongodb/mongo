@@ -189,6 +189,8 @@ TEST(SetupOptions, tlsModeRequired) {
     argv.push_back("pw2");
     argv.push_back("--tlsDisabledProtocols");
     argv.push_back("TLS1_1");
+    argv.push_back("--tlsLogVersions");
+    argv.push_back("TLS1_2");
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(mongo::addSSLServerOptions(&options));
@@ -217,6 +219,8 @@ TEST(SetupOptions, tlsModeRequired) {
     ASSERT_EQ(::mongo::sslGlobalParams.sslClusterPassword, "pw2");
     ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.sslDisabledProtocols.back()),
               static_cast<int>(::mongo::SSLParams::Protocols::TLS1_1));
+    ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.tlsLogVersions.back()),
+              static_cast<int>(::mongo::SSLParams::Protocols::TLS1_2));
 }
 
 TEST(SetupOptions, sslModeRequired) {
@@ -253,6 +257,8 @@ TEST(SetupOptions, sslModeRequired) {
     argv.push_back("pw2");
     argv.push_back("--sslDisabledProtocols");
     argv.push_back("TLS1_1");
+    argv.push_back("--tlsLogVersions");
+    argv.push_back("TLS1_0");
     std::map<std::string, std::string> env_map;
 
     ASSERT_OK(mongo::addSSLServerOptions(&options));
@@ -281,6 +287,8 @@ TEST(SetupOptions, sslModeRequired) {
     ASSERT_EQ(::mongo::sslGlobalParams.sslClusterPassword, "pw2");
     ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.sslDisabledProtocols.back()),
               static_cast<int>(::mongo::SSLParams::Protocols::TLS1_1));
+    ASSERT_EQ(static_cast<int>(::mongo::sslGlobalParams.tlsLogVersions.back()),
+              static_cast<int>(::mongo::SSLParams::Protocols::TLS1_0));
 }
 
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
