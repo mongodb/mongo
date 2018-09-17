@@ -39,6 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -167,6 +168,7 @@ BackupCursorState BackupCursorService::openBackupCursor(OperationContext* opCtx)
     }
 
     BSONObjBuilder builder;
+    builder << "dbpath" << storageGlobalParams.dbpath;
     if (!oplogStart.isNull()) {
         builder << "oplogStart" << oplogStart.toBSON();
         builder << "oplogEnd" << oplogEnd.toBSON();
@@ -177,10 +179,7 @@ BackupCursorState BackupCursorService::openBackupCursor(OperationContext* opCtx)
         builder << "checkpointTimestamp" << checkpointTimestamp.get();
     }
 
-    boost::optional<Document> preamble = boost::none;
-    if (!oplogStart.isNull()) {
-        preamble = Document{{"metadata", builder.obj()}};
-    }
+    Document preamble{{"metadata", builder.obj()}};
 
     closeCursorGuard.Dismiss();
     return {_openCursor.get(), preamble, filesToBackup};
