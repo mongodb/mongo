@@ -464,11 +464,8 @@ void invokeInTransaction(OperationContext* opCtx,
                          CommandInvocation* invocation,
                          CommandReplyBuilder* replyBuilder) {
     auto session = OperationContextSession::get(opCtx);
-    if (!session) {
-        // Run the command directly if we're not in a transaction.
-        invocation->run(opCtx, replyBuilder);
-        return;
-    }
+    invariant(session);
+    invariant(opCtx->getTxnNumber() || opCtx->getClient()->isInDirectClient());
 
     session->unstashTransactionResources(opCtx, invocation->definition()->getName());
     ScopeGuard guard = MakeGuard([session, opCtx]() { session->abortActiveTransaction(opCtx); });
@@ -507,13 +504,16 @@ bool runCommandImpl(OperationContext* opCtx,
 #endif
 
     CommandReplyBuilder crb(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
-
+    auto session = OperationContextSession::get(opCtx);
     if (!invocation->supportsWriteConcern()) {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
-        invokeInTransaction(opCtx, invocation, &crb);
+        if (session) {
+            invokeInTransaction(opCtx, invocation, &crb);
+        } else {
+            invocation->run(opCtx, &crb);
+        }
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
-        auto session = OperationContextSession::get(opCtx);
         uassert(ErrorCodes::InvalidOptions,
                 "writeConcern is not allowed within a multi-statement transaction",
                 wcResult.usedDefault || !session || !session->inMultiDocumentTransaction() ||
@@ -541,7 +541,11 @@ bool runCommandImpl(OperationContext* opCtx,
         };
 
         try {
-            invokeInTransaction(opCtx, invocation, &crb);
+            if (session) {
+                invokeInTransaction(opCtx, invocation, &crb);
+            } else {
+                invocation->run(opCtx, &crb);
+            }
         } catch (const DBException&) {
             waitForWriteConcern(*extraFieldsBuilder);
             throw;
