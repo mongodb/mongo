@@ -4742,8 +4742,8 @@ TEST(YAMLConfigFile, canonicalize) {
     };
     std::map<std::string, std::string> env_map;
     ASSERT_OK(parser.run(opts, argv, env_map, &env));
-    ASSERT_EQ(env.count("net.bindIp"), 1);
-    ASSERT_EQ(env.count("net.bindIpAll"), 0);
+    ASSERT_TRUE(env.count("net.bindIp"));
+    ASSERT_FALSE(env.count("net.bindIpAll"));
     ASSERT_EQ(env["net.bindIp"].as<std::string>(), "0.0.0.0");
 }
 
