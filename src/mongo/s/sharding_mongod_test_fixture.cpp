@@ -42,7 +42,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_request.h"
@@ -55,6 +54,7 @@
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -136,7 +136,7 @@ void ShardingMongodTestFixture::setUp() {
     repl::StorageInterface::set(service, std::move(storagePtr));
 
     auto opObserver = checked_cast<OpObserverRegistry*>(service->getOpObserver());
-    opObserver->addObserver(stdx::make_unique<OpObserverImpl>());
+    opObserver->addObserver(stdx::make_unique<OpObserverShardingImpl>());
     opObserver->addObserver(stdx::make_unique<ConfigServerOpObserver>());
     opObserver->addObserver(stdx::make_unique<ShardServerOpObserver>());
 
