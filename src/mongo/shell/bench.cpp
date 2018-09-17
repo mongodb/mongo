@@ -828,10 +828,20 @@ BenchRunWorker::BenchRunWorker(size_t id,
                                int64_t randomSeed)
     : _id(id), _config(config), _brState(brState), _rng(randomSeed) {}
 
-BenchRunWorker::~BenchRunWorker() = default;
+BenchRunWorker::~BenchRunWorker() {
+    try {
+        // We explicitly call join() on the started thread to ensure that any thread-local variables
+        // (e.g. 'currentClient' when running through mongoebench) have been destructed before
+        // returning from BenchRunWorker's destructor.
+        _thread.join();
+    } catch (...) {
+        severe() << "caught exception in destructor: " << exceptionToStatus();
+        std::terminate();
+    }
+}
 
 void BenchRunWorker::start() {
-    stdx::thread([this] { run(); }).detach();
+    _thread = stdx::thread([this] { run(); });
 }
 
 bool BenchRunWorker::shouldStop() const {

@@ -38,6 +38,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/timer.h"
 
 namespace pcrecpp {
@@ -502,6 +503,8 @@ private:
     bool shouldStop() const;
     /// Predicate, used to decide whether or not it's time to collect statistics
     bool shouldCollectStats() const;
+
+    stdx::thread _thread;
 
     const size_t _id;
 
