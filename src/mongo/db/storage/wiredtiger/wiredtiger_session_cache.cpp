@@ -125,7 +125,7 @@ WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, boo
         _session, uri.c_str(), NULL, forRecordStore ? "" : "overwrite=false", &c);
     if (ret != ENOENT && ret != 0) {
         error() << "Failed to open a WiredTiger cursor: " << uri;
-        error() << "This may be due to metadata corruption. " << kWTRepairMsg;
+        error() << "This may be due to data corruption. " << kWTRepairMsg;
 
         fassertFailedNoTrace(50882);
     }

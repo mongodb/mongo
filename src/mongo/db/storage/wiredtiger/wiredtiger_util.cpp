@@ -59,7 +59,8 @@ Status wtRCToStatus_slow(int retCode, const char* prefix) {
         throw WriteConflictException();
     }
 
-    fassert(28559, retCode != WT_PANIC);
+    // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
+    fassert(28559, retCode != WT_PANIC || storageGlobalParams.repair);
 
     str::stream s;
     if (prefix)
@@ -398,6 +399,11 @@ int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
 
         error() << "WiredTiger error (" << errorCode << ") " << redact(message)
                 << " Raw: " << message;
+
+        // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
+        if (storageGlobalParams.repair) {
+            return 0;
+        }
         fassert(50853, errorCode != WT_PANIC);
     } catch (...) {
         std::terminate();
@@ -411,6 +417,11 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
                      const char* message) {
     try {
         error() << "WiredTiger error (" << errorCode << ") " << redact(message);
+
+        // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
+        if (storageGlobalParams.repair) {
+            return 0;
+        }
         fassert(28558, errorCode != WT_PANIC);
     } catch (...) {
         std::terminate();
