@@ -41,6 +41,8 @@ namespace mongo {
 
 class Exchange : public RefCountable {
     static constexpr size_t kInvalidThreadId{std::numeric_limits<size_t>::max()};
+    static constexpr size_t kMaxBufferSize = 100 * 1024 * 1024;  // 100 MB
+    static constexpr size_t kMaxNumberConsumers = 100;
 
     /**
      * Convert the BSON representation of boundaries (as deserialized off the wire) to the internal

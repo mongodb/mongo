@@ -41,6 +41,9 @@
 
 namespace mongo {
 
+constexpr size_t Exchange::kMaxBufferSize;
+constexpr size_t Exchange::kMaxNumberConsumers;
+
 const char* DocumentSourceExchange::getSourceName() const {
     return "$_internalExchange";
 }
@@ -70,6 +73,13 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
       _maxBufferSize(_spec.getBufferSize()),
       _pipeline(std::move(pipeline)) {
     uassert(50901, "Exchange must have at least one consumer", _spec.getConsumers() > 0);
+
+    uassert(50951,
+            str::stream() << "Specified exchange buffer size (" << _maxBufferSize
+                          << ") exceeds the maximum allowable amount ("
+                          << kMaxBufferSize
+                          << ").",
+            _maxBufferSize <= kMaxBufferSize);
 
     for (int idx = 0; idx < _spec.getConsumers(); ++idx) {
         _consumers.emplace_back(std::make_unique<ExchangeBuffer>());
@@ -119,6 +129,13 @@ std::vector<std::string> Exchange::extractBoundaries(
 
 std::vector<size_t> Exchange::extractConsumerIds(
     const boost::optional<std::vector<std::int32_t>>& consumerIds, size_t nConsumers) {
+
+    uassert(50950,
+            str::stream() << "Specified number of exchange consumers (" << nConsumers
+                          << ") exceeds the maximum allowable amount ("
+                          << kMaxNumberConsumers
+                          << ").",
+            nConsumers <= kMaxNumberConsumers);
 
     std::vector<size_t> ret;
 

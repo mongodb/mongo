@@ -9,6 +9,8 @@ TestData.disableImplicitSessions = true;
 (function() {
     "use strict";
 
+    load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+
     const coll = db.testCollection;
     coll.drop();
 
@@ -41,6 +43,29 @@ TestData.disableImplicitSessions = true;
     const numConsumers = 4;
     // For simplicity we assume that we can evenly distribute documents among consumers.
     assert.eq(0, numDocs % numConsumers);
+
+    (function testParameterValidation() {
+        const tooManyConsumers = 101;
+        assertErrorCode(coll, [], 50950, "Expected too many consumers", {
+            exchange: {
+                policy: "roundrobin",
+                consumers: NumberInt(tooManyConsumers),
+                bufferSize: NumberInt(1024)
+            },
+            cursor: {batchSize: 0}
+        });
+
+        const bufferTooLarge = 200 * 1024 * 1024;  // 200 MB
+        assertErrorCode(coll, [], 50951, "Expected buffer too large", {
+            exchange: {
+                policy: "roundrobin",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(bufferTooLarge)
+            },
+            cursor: {batchSize: 0}
+        });
+
+    })();
 
     /**
      * RoundRobin - evenly distribute documents to consumers.
