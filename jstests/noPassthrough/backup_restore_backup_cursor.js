@@ -19,6 +19,10 @@ load("jstests/noPassthrough/libs/backup_restore.js");
 (function() {
     "use strict";
 
+    if (_isWindows()) {
+        return;
+    }
+
     // Run the fsyncLock test. Will return before testing for any engine that doesn't
     // support fsyncLock
     new BackupRestoreTest({backup: 'backupCursor'}).run();
