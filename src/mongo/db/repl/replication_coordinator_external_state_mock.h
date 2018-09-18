@@ -78,6 +78,7 @@ public:
     virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx);
     virtual Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote);
     virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
+    virtual Timestamp getGlobalTimestamp(ServiceContext* service);
     bool oplogExists(OperationContext* opCtx) override;
     virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx);
     virtual void closeConnections();
@@ -197,6 +198,7 @@ private:
     bool _areSnapshotsEnabled = true;
     OpTime _firstOpTimeOfMyTerm;
     double _electionTimeoutOffsetLimitFraction = 0.15;
+    Timestamp _globalTimestamp;
 };
 
 }  // namespace repl

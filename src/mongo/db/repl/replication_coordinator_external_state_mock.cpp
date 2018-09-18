@@ -155,7 +155,15 @@ void ReplicationCoordinatorExternalStateMock::setLocalLastVoteDocument(
 }
 
 void ReplicationCoordinatorExternalStateMock::setGlobalTimestamp(ServiceContext* service,
-                                                                 const Timestamp& newTime) {}
+                                                                 const Timestamp& newTime) {
+    if (newTime > _globalTimestamp) {
+        _globalTimestamp = newTime;
+    }
+}
+
+Timestamp ReplicationCoordinatorExternalStateMock::getGlobalTimestamp(ServiceContext* service) {
+    return _globalTimestamp;
+}
 
 bool ReplicationCoordinatorExternalStateMock::oplogExists(OperationContext* opCtx) {
     return true;
