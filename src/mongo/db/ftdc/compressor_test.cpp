@@ -343,7 +343,7 @@ TEST(FTDCCompressor, TestSchemaChanges) {
 }
 
 // Test various schema changes with strings
-TEST_F(FTDCCompressorTest, TestStringSchemaChanges) {
+TEST(FTDCCompressorTest, TestStringSchemaChanges) {
     TestTie c(FTDCValidationMode::kWeak);
 
     auto st = c.addSample(BSON("str1"
