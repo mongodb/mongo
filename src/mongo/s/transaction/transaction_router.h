@@ -143,8 +143,8 @@ public:
 
     /**
      * Resets the transaction state to allow for a retry attempt. This includes clearing all
-     * participants and adding them to the orphaned list, clearing the coordinator, and resetting
-     * the global read timestamp. Will throw if the transaction cannot be continued.
+     * participants, clearing the coordinator, and resetting the global read timestamp. Will throw
+     * if the transaction cannot be continued.
      */
     void onSnapshotError();
 
@@ -178,10 +178,6 @@ public:
     const LogicalSessionId& getSessionId() const;
 
     boost::optional<ShardId> getCoordinatorId() const;
-
-    const StringMap<bool>& getOrphanedParticipants() const {
-        return _orphanedParticipants;
-    }
 
     /**
      * Commits the transaction. For transactions with multiple participants, this will initiate
@@ -228,6 +224,11 @@ private:
      */
     bool _canContinueOnSnapshotError() const;
 
+    /**
+     * Removes all participants created during the current statement from the participant list.
+     */
+    void _clearPendingParticipants();
+
     const LogicalSessionId _sessionId;
     TxnNumber _txnNumber{kUninitializedTxnNumber};
 
@@ -236,13 +237,6 @@ private:
 
     // Map of current participants of the current transaction.
     StringMap<Participant> _participants;
-
-    // Map of participants that have been sent startTransaction, but are not in the current
-    // participant list.
-    //
-    // TODO SERVER-36589: Send abortTransaction to each shard in the orphaned list when committing
-    // or aborting a transaction to avoid leaving open orphaned transactions.
-    StringMap<bool> _orphanedParticipants;
 
     // The id of coordinator participant, used to construct prepare requests.
     boost::optional<ShardId> _coordinatorId;

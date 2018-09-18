@@ -887,7 +887,7 @@ TEST_F(TransactionRouterTest, CannotChangeAtClusterTimeWithoutSnapshotError) {
     }
 }
 
-TEST_F(TransactionRouterTest, SnapshotErrorsAddAllParticipantsToOrphanedList) {
+TEST_F(TransactionRouterTest, SnapshotErrorsClearsAllParticipants) {
     TxnNumber txnNum{3};
 
     TransactionRouter txnRouter({});
@@ -911,15 +911,12 @@ TEST_F(TransactionRouterTest, SnapshotErrorsAddAllParticipantsToOrphanedList) {
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
 
-    ASSERT(txnRouter.getOrphanedParticipants().empty());
-
     // Simulate a snapshot error and an internal retry that only re-targets one of the original two
     // shards.
 
     txnRouter.onSnapshotError();
 
     ASSERT_FALSE(txnRouter.getCoordinatorId());
-    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 2U);
 
     {
         auto& participant = txnRouter.getOrCreateParticipant(shard2);
@@ -928,11 +925,9 @@ TEST_F(TransactionRouterTest, SnapshotErrorsAddAllParticipantsToOrphanedList) {
         ASSERT_FALSE(participant.mustStartTransaction());
     }
 
-    // There is a new coordinator and shard1 is still in the orphaned list.
+    // There is a new coordinator.
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
-    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 1U);
-    ASSERT_EQ(txnRouter.getOrphanedParticipants().count(shard1), 1U);
 
     {
         // Shard1 has not started a transaction.
@@ -1018,14 +1013,11 @@ TEST_F(TransactionRouterTest, AllParticipantsAndCoordinatorClearedOnStaleErrorOn
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
 
-    ASSERT(txnRouter.getOrphanedParticipants().empty());
-
     // Simulate stale error and internal retry that only re-targets one of the original shards.
 
     txnRouter.onStaleShardOrDbError("find");
 
     ASSERT_FALSE(txnRouter.getCoordinatorId());
-    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 2U);
 
     {
         auto& participant = txnRouter.getOrCreateParticipant(shard2);
@@ -1034,17 +1026,15 @@ TEST_F(TransactionRouterTest, AllParticipantsAndCoordinatorClearedOnStaleErrorOn
         ASSERT_FALSE(participant.mustStartTransaction());
     }
 
-    // There is a new coordinator and shard1 is still in the orphaned list.
+    // There is a new coordinator.
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
-    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 1U);
-    ASSERT_EQ(txnRouter.getOrphanedParticipants().count(shard1), 1U);
 
     // Shard1 has not started a transaction.
     ASSERT(txnRouter.getOrCreateParticipant(shard1).mustStartTransaction());
 }
 
-TEST_F(TransactionRouterTest, OnlyNewlyCreatedParticipantsAddedToOrphanedListOnStaleError) {
+TEST_F(TransactionRouterTest, OnlyNewlyCreatedParticipantsClearedOnStaleError) {
     TxnNumber txnNum{3};
 
     TransactionRouter txnRouter({});
@@ -1058,8 +1048,6 @@ TEST_F(TransactionRouterTest, OnlyNewlyCreatedParticipantsAddedToOrphanedListOnS
     ASSERT(txnRouter.getCoordinatorId());
     ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
 
-    ASSERT(txnRouter.getOrphanedParticipants().empty());
-
     // Start a subsequent statement that targets two new shards and encounters a stale error from at
     // least one of them.
 
@@ -1070,10 +1058,6 @@ TEST_F(TransactionRouterTest, OnlyNewlyCreatedParticipantsAddedToOrphanedListOnS
     txnRouter.getOrCreateParticipant(shard3).markAsCommandSent();
 
     txnRouter.onStaleShardOrDbError("find");
-
-    // Only the two new shards are in the orphaned list.
-    ASSERT_EQ(txnRouter.getOrphanedParticipants().size(), 2U);
-    ASSERT_EQ(txnRouter.getOrphanedParticipants().count(shard1), 0U);
 
     // Shards 2 and 3 must start a transaction, but shard 1 must not.
     ASSERT_FALSE(txnRouter.getOrCreateParticipant(shard1).mustStartTransaction());

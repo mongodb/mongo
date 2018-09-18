@@ -70,6 +70,9 @@ BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
 
             // Transactions will upconvert a read concern with afterClusterTime but no level to have
             // level snapshot, so a command may have a read concern field with no level.
+            //
+            // TODO SERVER-37237: Once read concern handling has been consolidated on mongos, this
+            // assertion can probably be removed.
             if (!readConcernBob.hasField(repl::ReadConcernArgs::kLevelFieldName)) {
                 readConcernBob.append(repl::ReadConcernArgs::kLevelFieldName,
                                       kReadConcernLevelSnapshotName);

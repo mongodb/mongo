@@ -413,7 +413,8 @@ void runCommand(OperationContext* opCtx,
                             str::stream() << "Transaction " << opCtx->getTxnNumber()
                                           << " was aborted after "
                                           << kMaxNumStaleVersionRetries
-                                          << " failed retries",
+                                          << " failed retries. The latest attempt failed with: "
+                                          << ex.toStatus(),
                             canRetry);
                 }
 
@@ -435,7 +436,8 @@ void runCommand(OperationContext* opCtx,
                             str::stream() << "Transaction " << opCtx->getTxnNumber()
                                           << " was aborted after "
                                           << kMaxNumStaleVersionRetries
-                                          << " failed retries",
+                                          << " failed retries. The latest attempt failed with: "
+                                          << ex.toStatus(),
                             canRetry);
                 }
 
@@ -443,7 +445,7 @@ void runCommand(OperationContext* opCtx,
                     continue;
                 }
                 throw;
-            } catch (const ExceptionForCat<ErrorCategory::SnapshotError>&) {
+            } catch (const ExceptionForCat<ErrorCategory::SnapshotError>& ex) {
                 // Simple retry on any type of snapshot error.
 
                 // Update transaction tracking state for a possible retry. Throws if the transaction
@@ -455,7 +457,8 @@ void runCommand(OperationContext* opCtx,
                             str::stream() << "Transaction " << opCtx->getTxnNumber()
                                           << " was aborted after "
                                           << kMaxNumStaleVersionRetries
-                                          << " failed retries",
+                                          << " failed retries. The latest attempt failed with: "
+                                          << ex.toStatus(),
                             canRetry);
                 }
 

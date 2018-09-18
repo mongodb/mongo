@@ -125,6 +125,9 @@ BSONObj appendReadConcernForTxn(BSONObj cmd,
         dassert(existingReadConcernArgs.initialize(cmd));
         // There may be no read concern level if the user only specified afterClusterTime and the
         // transaction provided the default level.
+        //
+        // TODO SERVER-37237: Once read concern handling has been consolidated on mongos, this
+        // assertion can probably be simplified or removed.
         dassert(existingReadConcernArgs.getLevel() == readConcernArgs.getLevel() ||
                 !existingReadConcernArgs.hasLevel());
 
@@ -154,7 +157,8 @@ BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
 
 // Commands that are idempotent in a transaction context and can be blindly retried in the middle of
 // a transaction. Aggregate with $out is disallowed in a transaction, so aggregates must be read
-// operations.
+// operations. Note: aggregate and find do have the side-effect of creating cursors, but any
+// established during an unsuccessful attempt are best-effort killed.
 const StringMap<int> alwaysRetryableCmds = {
     {"aggregate", 1}, {"distinct", 1}, {"find", 1}, {"getMore", 1}, {"killCursors", 1}};
 
@@ -248,12 +252,9 @@ boost::optional<ShardId> TransactionRouter::getCoordinatorId() const {
 }
 
 TransactionRouter::Participant& TransactionRouter::getOrCreateParticipant(const ShardId& shard) {
-    // Remove the shard from the abort list if it is present.
-    _orphanedParticipants.erase(shard.toString());
-
     auto iter = _participants.find(shard.toString());
     if (iter != _participants.end()) {
-        // TODO SERVER-36589: Once mongos aborts transactions by only sending abortTransaction to
+        // TODO SERVER-37223: Once mongos aborts transactions by only sending abortTransaction to
         // shards that have been successfully contacted we should be able to add an invariant here
         // to ensure the atClusterTime on the participant matches that on the transaction router.
         return iter->second;
@@ -269,7 +270,7 @@ TransactionRouter::Participant& TransactionRouter::getOrCreateParticipant(const 
     // The transaction must have been started with a readConcern.
     invariant(!_readConcernArgs.isEmpty());
 
-    // TODO SERVER-36589: Once mongos aborts transactions by only sending abortTransaction to shards
+    // TODO SERVER-37223: Once mongos aborts transactions by only sending abortTransaction to shards
     // that have been successfully contacted we should be able to add an invariant here to ensure
     // that an atClusterTime has been chosen if the read concern level is snapshot.
 
@@ -285,6 +286,26 @@ TransactionRouter::Participant& TransactionRouter::getOrCreateParticipant(const 
 
 const LogicalSessionId& TransactionRouter::getSessionId() const {
     return _sessionId;
+}
+
+void TransactionRouter::_clearPendingParticipants() {
+    for (auto&& it = _participants.begin(); it != _participants.end();) {
+        auto participant = it++;
+        if (participant->second.getStmtIdCreatedAt() == _latestStmtId) {
+            _participants.erase(participant);
+        }
+    }
+
+    // If there are no more participants, also clear the coordinator id because a new one must be
+    // chosen by the retry.
+    if (_participants.empty()) {
+        _coordinatorId.reset();
+        return;
+    }
+
+    // If participants were created by an earlier command, the coordinator must be one of them.
+    invariant(_coordinatorId);
+    invariant(_participants.count(*_coordinatorId) == 1);
 }
 
 bool TransactionRouter::_canContinueOnStaleShardOrDbError(StringData cmdName) const {
@@ -306,28 +327,9 @@ void TransactionRouter::onStaleShardOrDbError(StringData cmdName) {
             "Transaction was aborted due to cluster data placement change",
             _canContinueOnStaleShardOrDbError(cmdName));
 
-    // Remove each participant created at the most recent statement id and add them to the orphaned
-    // list because the retry attempt isn't guaranteed to retarget them. Participants created
-    // earlier are already fixed in the participant list, so they should not be removed.
-    for (auto&& it = _participants.begin(); it != _participants.end();) {
-        auto participant = it++;
-        if (participant->second.getStmtIdCreatedAt() == _latestStmtId) {
-            _orphanedParticipants.try_emplace(participant->first);
-            _participants.erase(participant);
-        }
-    }
-
-    // If there are no more participants, also clear the coordinator id because a new one must be
-    // chosen by the retry.
-    if (_participants.empty()) {
-        _coordinatorId.reset();
-        return;
-    }
-
-    // If this is not the first command, the coordinator must have been chosen and successfully
-    // contacted in an earlier command, and thus must not be in the orphaned list.
-    invariant(_coordinatorId);
-    invariant(_orphanedParticipants.count(*_coordinatorId) == 0);
+    // Remove participants created during the current statement so they are sent the correct options
+    // if they are targeted again by the retry.
+    _clearPendingParticipants();
 }
 
 bool TransactionRouter::_canContinueOnSnapshotError() const {
@@ -340,16 +342,12 @@ void TransactionRouter::onSnapshotError() {
             "Transaction was aborted due to snapshot error on subsequent transaction statement",
             _canContinueOnSnapshotError());
 
-    // Add each participant to the orphaned list because the retry attempt isn't guaranteed to
-    // re-target it.
-    for (const auto& participant : _participants) {
-        _orphanedParticipants.try_emplace(participant.first);
-    }
-
-    // New transactions must be started on each contacted participant since the retry will select a
-    // new read timestamp.
-    _participants.clear();
-    _coordinatorId.reset();
+    // The transaction must be restarted on all participants because a new read timestamp will be
+    // selected, so clear all pending participants. Snapshot errors are only retryable on the first
+    // client statement, so all participants should be cleared, including the coordinator.
+    _clearPendingParticipants();
+    invariant(_participants.empty());
+    invariant(!_coordinatorId);
 
     // Reset the global snapshot timestamp so the retry will select a new one.
     _atClusterTime.reset();
