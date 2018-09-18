@@ -9519,6 +9519,8 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
   - name: replica_sets_auth_0
   - name: replica_sets_auth_1
   - name: replica_sets_auth_2
