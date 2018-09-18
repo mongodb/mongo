@@ -490,7 +490,7 @@ TEST_F(OperationDeadlineTests, DeadlineAfterIgnoreInterruptsReopens) {
 
                 opCtx->checkForInterrupt();
             });
-    } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>& ex) {
+    } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
         reachedC = true;
     }
 
