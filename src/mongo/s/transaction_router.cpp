@@ -38,7 +38,9 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/at_cluster_time_util.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -579,6 +581,28 @@ Shard::CommandResponse TransactionRouter::commitTransaction(OperationContext* op
     }
 
     return _commitMultiShardTransaction(opCtx);
+}
+
+std::vector<AsyncRequestsSender::Response> TransactionRouter::abortTransaction(
+    OperationContext* opCtx) {
+    // The router has yet to send any commands to a remote shard for this transaction.
+    // Return the same error that would have been returned by a shard.
+    uassert(ErrorCodes::NoSuchTransaction,
+            "no known command has been sent by this router for this transaction",
+            !_participants.empty());
+
+    auto abortCmd = BSON("abortTransaction" << 1);
+
+    std::vector<AsyncRequestsSender::Request> abortRequests;
+    for (const auto& participantEntry : _participants) {
+        abortRequests.emplace_back(ShardId(participantEntry.first), abortCmd);
+    }
+
+    return gatherResponses(opCtx,
+                           NamespaceString::kAdminDb,
+                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                           Shard::RetryPolicy::kIdempotent,
+                           abortRequests);
 }
 
 ScopedRouterSession::ScopedRouterSession(OperationContext* opCtx) : _opCtx(opCtx) {

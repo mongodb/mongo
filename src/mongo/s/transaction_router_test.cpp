@@ -1141,5 +1141,98 @@ TEST_F(TransactionRouterTest, WritesCanOnlyBeRetriedIfFirstOverallCommand) {
     }
 }
 
+TEST_F(TransactionRouterTest, AbortThrowsIfNoParticipants) {
+    LogicalSessionId lsid(makeLogicalSessionIdForTest());
+    TxnNumber txnNum{3};
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+    ScopedRouterSession scopedSession(opCtx);
+
+    auto txnRouter = TransactionRouter::get(opCtx);
+    txnRouter->beginOrContinueTxn(opCtx, txnNum, true);
+
+    ASSERT_THROWS_CODE(
+        txnRouter->abortTransaction(opCtx), DBException, ErrorCodes::NoSuchTransaction);
+}
+
+TEST_F(TransactionRouterTest, AbortForSingleParticipant) {
+    LogicalSessionId lsid(makeLogicalSessionIdForTest());
+    TxnNumber txnNum{3};
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    ScopedRouterSession scopedSession(opCtx);
+    auto txnRouter = TransactionRouter::get(opCtx);
+
+    txnRouter->beginOrContinueTxn(opCtx, txnNum, true);
+    txnRouter->getOrCreateParticipant(shard1);
+
+    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(hostAndPort1, request.target);
+        ASSERT_EQ("admin", request.dbname);
+
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "abortTransaction");
+
+        checkSessionDetails(request.cmdObj, lsid, txnNum, true);
+
+        return BSON("ok" << 1);
+    });
+
+    auto response = future.timed_get(kFutureTimeout);
+    ASSERT_FALSE(response.empty());
+}
+
+TEST_F(TransactionRouterTest, AbortForMultipleParticipants) {
+    LogicalSessionId lsid(makeLogicalSessionIdForTest());
+    TxnNumber txnNum{3};
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    ScopedRouterSession scopedSession(opCtx);
+    auto txnRouter = TransactionRouter::get(opCtx);
+
+    txnRouter->beginOrContinueTxn(opCtx, txnNum, true);
+    txnRouter->getOrCreateParticipant(shard1);
+    txnRouter->getOrCreateParticipant(shard2);
+
+    auto future = launchAsync([&] { return txnRouter->abortTransaction(operationContext()); });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(hostAndPort1, request.target);
+        ASSERT_EQ("admin", request.dbname);
+
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "abortTransaction");
+
+        checkSessionDetails(request.cmdObj, lsid, txnNum, true);
+
+        return BSON("ok" << 1);
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(hostAndPort2, request.target);
+        ASSERT_EQ("admin", request.dbname);
+
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "abortTransaction");
+
+        checkSessionDetails(request.cmdObj, lsid, txnNum, boost::none);
+
+        return BSON("ok" << 1);
+    });
+
+    auto response = future.timed_get(kFutureTimeout);
+    ASSERT_FALSE(response.empty());
+}
+
 }  // unnamed namespace
 }  // namespace mongo

@@ -32,6 +32,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
 namespace {
@@ -69,12 +70,13 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
-        auto response = scatterGatherUnversionedTargetAllShards(
-            opCtx,
-            dbName,
-            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-            {},
-            Shard::RetryPolicy::kNoRetry);
+        auto txnRouter = TransactionRouter::get(opCtx);
+        uassert(ErrorCodes::InvalidOptions,
+                "abortTransaction can only be run within a context of a session",
+                txnRouter);
+
+        auto response = txnRouter->abortTransaction(opCtx);
+
         std::string errMsg;
         return appendRawResponses(opCtx, &errMsg, &result, response);
     }

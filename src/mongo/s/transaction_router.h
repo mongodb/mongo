@@ -36,6 +36,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/string_map.h"
@@ -184,6 +185,11 @@ public:
      * the two phase commit procedure.
      */
     Shard::CommandResponse commitTransaction(OperationContext* opCtx);
+
+    /**
+     * Sends abort to all participants and returns the responses from all shards.
+     */
+    std::vector<AsyncRequestsSender::Response> abortTransaction(OperationContext* opCtx);
 
     /**
      * Extract the runtimne state attached to the operation context. Returns nullptr if none is
