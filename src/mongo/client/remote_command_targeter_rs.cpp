@@ -60,7 +60,7 @@ ConnectionString RemoteCommandTargeterRS::connectionString() {
     return uassertStatusOK(ConnectionString::parse(_rsMonitor->getServerAddress()));
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
+Future<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
     const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
     return _rsMonitor->getHostOrRefresh(readPref, maxWait);
 }
@@ -74,7 +74,7 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCt
         if (!interruptStatus.isOK()) {
             return interruptStatus;
         }
-        const auto host = _rsMonitor->getHostOrRefresh(readPref, Milliseconds::zero());
+        auto host = _rsMonitor->getHostOrRefresh(readPref, Milliseconds::zero()).getNoThrow();
         if (host.getStatus() != ErrorCodes::FailedToSatisfyReadPreference) {
             return host;
         }

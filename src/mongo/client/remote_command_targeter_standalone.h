@@ -46,8 +46,8 @@ public:
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                      const ReadPreferenceSetting& readPref) override;
 
-    StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                Milliseconds maxWait) override;
+    Future<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                            Milliseconds maxWait) override;
 
     void markHostNotMaster(const HostAndPort& host, const Status& status) override;
 

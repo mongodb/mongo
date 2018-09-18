@@ -267,8 +267,11 @@ TEST_F(TwoNodeWithTags, SecDownRetryNoTag) {
 
     replSet->restore(secHost);
 
-    HostAndPort node = assertGet(monitor->getHostOrRefresh(
-        ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, TagSet()), Milliseconds(0)));
+    HostAndPort node = monitor
+                           ->getHostOrRefresh(ReadPreferenceSetting(
+                                                  mongo::ReadPreference::SecondaryOnly, TagSet()),
+                                              Milliseconds(0))
+                           .get();
 
     ASSERT_FALSE(monitor->isPrimary(node));
     ASSERT_EQUALS(secHost, node.toString());
@@ -295,8 +298,11 @@ TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
 
     TagSet tags(BSON_ARRAY(BSON("dc"
                                 << "ny")));
-    HostAndPort node = assertGet(monitor->getHostOrRefresh(
-        ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, tags), Milliseconds(0)));
+    HostAndPort node =
+        monitor
+            ->getHostOrRefresh(ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, tags),
+                               Milliseconds(0))
+            .get();
 
     ASSERT_FALSE(monitor->isPrimary(node));
     ASSERT_EQUALS(secHost, node.toString());

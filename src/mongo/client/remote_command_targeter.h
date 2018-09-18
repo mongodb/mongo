@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -76,8 +77,8 @@ public:
      * DEPRECATED. Prefer findHost(OperationContext*, const ReadPreferenceSetting&), whenever
      * an OperationContext is available.
      */
-    virtual StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                        Milliseconds maxWait) = 0;
+    virtual Future<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                    Milliseconds maxWait) = 0;
 
     /**
      * Finds a host matching the given read preference, giving up if a match is not found promptly.
@@ -89,7 +90,7 @@ public:
      * callers have been shown to be safe with this behavior or changed to call findHost.
      */
     StatusWith<HostAndPort> findHostNoWait(const ReadPreferenceSetting& readPref) {
-        return findHostWithMaxWait(readPref, Milliseconds::zero());
+        return findHostWithMaxWait(readPref, Milliseconds::zero()).getNoThrow();
     }
 
     /**

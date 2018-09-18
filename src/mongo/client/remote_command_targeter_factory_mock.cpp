@@ -52,8 +52,8 @@ public:
         return _mock->findHost(opCtx, readPref);
     }
 
-    StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                Milliseconds maxWait) override {
+    Future<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                            Milliseconds maxWait) override {
         return _mock->findHostWithMaxWait(readPref, maxWait);
     }
 

@@ -296,56 +296,13 @@ Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
                       str::stream() << "Could not find shard " << shardId);
     }
 
-    auto clock = ars->_opCtx->getServiceContext()->getFastClockSource();
+    auto findHostStatus =
+        shard->getTargeter()->findHostWithMaxWait(readPref, Seconds{20}).getNoThrow(ars->_opCtx);
 
-    auto deadline = clock->now() + Seconds(20);
+    if (findHostStatus.isOK())
+        shardHostAndPort = std::move(findHostStatus.getValue());
 
-    auto targeter = shard->getTargeter();
-
-    auto findHostStatus = [&] {
-        // If we don't have a baton, just go ahead and block in targeting
-        if (!ars->_baton) {
-            return targeter->findHostWithMaxWait(readPref, Seconds{20});
-        }
-
-        // If we do have a baton, and we can target quickly, just do that
-        {
-            auto findHostStatus = targeter->findHostNoWait(readPref);
-            if (findHostStatus.isOK()) {
-                return findHostStatus;
-            }
-        }
-
-        // If it's going to take a while to target, we spin up a background thread to do our
-        // targeting, while running the baton on the calling thread.  This allows us to make forward
-        // progress on previous requests.
-        auto pf = makePromiseFuture<HostAndPort>();
-
-        stdx::thread bgChecker([&] {
-            pf.promise.setWith(
-                [&] { return targeter->findHostWithMaxWait(readPref, deadline - clock->now()); });
-        });
-        const auto threadGuard = MakeGuard([&] { bgChecker.join(); });
-
-        // We ignore interrupts here because we want to spin the baton for the full duration of the
-        // findHostWithMaxWait.  We set the time limit (although the bg checker should fulfill our
-        // promise) to sync up with the findHostWithMaxWait.
-        //
-        // TODO clean this up after SERVER-35689 when we can do async targeting.
-        return ars->_opCtx->runWithoutInterruption([&] {
-            return ars->_opCtx->runWithDeadline(deadline, ErrorCodes::ExceededTimeLimit, [&] {
-                return pf.future.getNoThrow(ars->_opCtx);
-            });
-        });
-    }();
-
-    if (!findHostStatus.isOK()) {
-        return findHostStatus.getStatus();
-    }
-
-    shardHostAndPort = std::move(findHostStatus.getValue());
-
-    return Status::OK();
+    return findHostStatus.getStatus();
 }
 
 std::shared_ptr<Shard> AsyncRequestsSender::RemoteData::getShard() {

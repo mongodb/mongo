@@ -42,7 +42,7 @@ ConnectionString RemoteCommandTargeterStandalone::connectionString() {
     return ConnectionString(_hostAndPort);
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHostWithMaxWait(
+Future<HostAndPort> RemoteCommandTargeterStandalone::findHostWithMaxWait(
     const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
     return _hostAndPort;
 }

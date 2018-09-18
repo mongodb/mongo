@@ -400,7 +400,7 @@ DBClientConnection& DBClientReplicaSet::slaveConn() {
 bool DBClientReplicaSet::connect() {
     // Returns true if there are any up hosts.
     const ReadPreferenceSetting anyUpHost(ReadPreference::Nearest, TagSet());
-    return _getMonitor()->getHostOrRefresh(anyUpHost).isOK();
+    return _getMonitor()->getHostOrRefresh(anyUpHost).getNoThrow().isOK();
 }
 
 static bool isAuthenticationException(const DBException& ex) {
@@ -671,7 +671,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
 
     ReplicaSetMonitorPtr monitor = _getMonitor();
 
-    auto selectedNodeStatus = monitor->getHostOrRefresh(*readPref);
+    auto selectedNodeStatus = monitor->getHostOrRefresh(*readPref).getNoThrow();
     if (!selectedNodeStatus.isOK()) {
         LOG(3) << "dbclient_rs no compatible node found"
                << causedBy(redact(selectedNodeStatus.getStatus()));

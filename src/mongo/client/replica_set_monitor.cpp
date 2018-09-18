@@ -253,11 +253,11 @@ void ReplicaSetMonitor::_doScheduledRefresh(const CallbackHandle& currentHandle)
     _scheduleRefresh(_executor->now() + _state->refreshPeriod);
 }
 
-StatusWith<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSetting& criteria,
-                                                            Milliseconds maxWait) {
+Future<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSetting& criteria,
+                                                        Milliseconds maxWait) {
     if (_isRemovedFromManager.load()) {
-        return {ErrorCodes::ReplicaSetMonitorRemoved,
-                str::stream() << "ReplicaSetMonitor for set " << getName() << " is removed"};
+        return Status(ErrorCodes::ReplicaSetMonitorRemoved,
+                      str::stream() << "ReplicaSetMonitor for set " << getName() << " is removed");
     }
 
     {
@@ -268,41 +268,58 @@ StatusWith<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreference
             return {std::move(out)};
     }
 
-    const auto startTimeMs = Date_t::now();
+    // TODO early return if maxWait <= 0
 
-    while (true) {
-        // We might not have found any matching hosts due to the scan, which just completed may have
-        // seen stale data from before we joined. Therefore we should participate in a new scan to
-        // make sure all hosts are contacted at least once (possibly by other threads) before this
-        // function gives up.
-        Refresher refresher(startOrContinueRefresh());
+    const auto deadline = Date_t::now() + maxWait;
+    auto pf = makePromiseFuture<HostAndPort>();
 
-        HostAndPort out = refresher.refreshUntilMatches(criteria);
-        if (!out.empty())
-            return {std::move(out)};
+    // TODO SERVER-35688 use a threadpool or async networking here.
+    stdx::thread([
+        deadline,
+        criteria,
+        promise = std::move(pf.promise),
+        self = shared_from_this()
+    ]() mutable {
+        promise.setWith([&]() -> StatusWith<HostAndPort> {
+            while (true) {
+                // We might not have found any matching hosts due to the scan, which just
+                // completed may have seen stale data from before we joined. Therefore we should
+                // participate in a new scan to make sure all hosts are contacted at least once
+                // (possibly by other threads) before this function gives up.
+                Refresher refresher(self->startOrContinueRefresh());
 
-        if (globalInShutdownDeprecated()) {
-            return {ErrorCodes::ShutdownInProgress, str::stream() << "Server is shutting down"};
-        }
+                HostAndPort out = refresher.refreshUntilMatches(criteria);
+                if (!out.empty())
+                    return {std::move(out)};
 
-        const Milliseconds remaining = maxWait - (Date_t::now() - startTimeMs);
+                if (globalInShutdownDeprecated()) {
+                    return {ErrorCodes::ShutdownInProgress,
+                            str::stream() << "Server is shutting down"};
+                }
 
-        if (remaining < kFindHostMaxBackOffTime || areRefreshRetriesDisabledForTest.load()) {
-            break;
-        }
+                const Milliseconds remaining = deadline - Date_t::now();
 
-        // Back-off so we don't spam the replica set hosts too much
-        sleepFor(kFindHostMaxBackOffTime);
-    }
+                if (remaining < kFindHostMaxBackOffTime ||
+                    areRefreshRetriesDisabledForTest.load()) {
+                    break;
+                }
 
-    return {ErrorCodes::FailedToSatisfyReadPreference,
-            str::stream() << "Could not find host matching read preference " << criteria.toString()
-                          << " for set "
-                          << getName()};
+                // Back-off so we don't spam the replica set hosts too much
+                sleepFor(kFindHostMaxBackOffTime);
+            }
+            return Status(ErrorCodes::FailedToSatisfyReadPreference,
+                          str::stream() << "Could not find host matching read preference "
+                                        << criteria.toString()
+                                        << " for set "
+                                        << self->getName());
+        });
+    }).detach();
+
+    return std::move(pf.future);
 }
 
 HostAndPort ReplicaSetMonitor::getMasterOrUassert() {
-    return uassertStatusOK(getHostOrRefresh(kPrimaryOnlyReadPreference));
+    return getHostOrRefresh(kPrimaryOnlyReadPreference).get();
 }
 
 Refresher ReplicaSetMonitor::startOrContinueRefresh() {

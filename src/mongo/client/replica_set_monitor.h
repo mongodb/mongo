@@ -90,8 +90,8 @@ public:
      * Known errors are:
      *  FailedToSatisfyReadPreference, if node cannot be found, which matches the read preference.
      */
-    StatusWith<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
-                                             Milliseconds maxWait = kDefaultFindHostTimeout);
+    Future<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
+                                         Milliseconds maxWait = kDefaultFindHostTimeout);
 
     /**
      * Returns the host we think is the current master or uasserts.
