@@ -51,11 +51,11 @@ public:
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
     virtual void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const NamespaceString& ns,
-                        const std::vector<BSONObj>& objs);
+                        std::vector<BSONObj>&& objs);
     virtual void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const NamespaceString& ns,
-                        const std::vector<BSONObj>& queries,
-                        const std::vector<BSONObj>& updates,
+                        std::vector<BSONObj>&& queries,
+                        std::vector<BSONObj>&& updates,
                         bool upsert,
                         bool multi);
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx, const NamespaceString& ns) final;
@@ -144,7 +144,7 @@ public:
      */
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
-                const std::vector<BSONObj>& objs) final;
+                std::vector<BSONObj>&& objs) final;
 
     /**
      * Replaces the documents matching 'queries' with 'updates' using the ClusterWriter for locking,
@@ -152,8 +152,8 @@ public:
      */
     void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
-                const std::vector<BSONObj>& queries,
-                const std::vector<BSONObj>& updates,
+                std::vector<BSONObj>&& queries,
+                std::vector<BSONObj>&& updates,
                 bool upsert,
                 bool multi) final;
 };

@@ -202,14 +202,16 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
         bufferedBytes += insertObj.objsize();
         if (!batch.empty() &&
             (bufferedBytes > BSONObjMaxUserSize || batch.size() >= write_ops::kMaxWriteBatchSize)) {
-            spill(batch);
+            spill(std::move(batch));
             batch.clear();
             bufferedBytes = insertObj.objsize();
         }
         batch.emplace(std::move(insertObj), std::move(uniqueKey));
     }
-    if (!batch.empty())
-        spill(batch);
+    if (!batch.empty()) {
+        spill(std::move(batch));
+        batch.clear();
+    }
 
     switch (nextInput.getStatus()) {
         case GetNextResult::ReturnStatus::kAdvanced: {

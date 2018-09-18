@@ -128,7 +128,7 @@ public:
      *
      */
     struct BatchedObjects {
-        void emplace(BSONObj obj, BSONObj key) {
+        void emplace(BSONObj&& obj, BSONObj&& key) {
             objects.emplace_back(std::move(obj));
             uniqueKeys.emplace_back(std::move(key));
         }
@@ -155,8 +155,8 @@ public:
     /**
      * Writes the documents in 'batch' to the write namespace.
      */
-    virtual void spill(const BatchedObjects& batch) {
-        pExpCtx->mongoProcessInterface->insert(pExpCtx, getWriteNs(), batch.objects);
+    virtual void spill(BatchedObjects&& batch) {
+        pExpCtx->mongoProcessInterface->insert(pExpCtx, getWriteNs(), std::move(batch.objects));
     };
 
     /**

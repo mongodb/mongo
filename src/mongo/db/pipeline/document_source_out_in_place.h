@@ -61,13 +61,17 @@ class DocumentSourceOutInPlaceReplace final : public DocumentSourceOutInPlace {
 public:
     using DocumentSourceOutInPlace::DocumentSourceOutInPlace;
 
-    void spill(const BatchedObjects& batch) final {
+    void spill(BatchedObjects&& batch) final {
         // Set upsert to true and multi to false as there should be at most one document to update
         // or insert.
         constexpr auto upsert = true;
         constexpr auto multi = false;
-        pExpCtx->mongoProcessInterface->update(
-            pExpCtx, getWriteNs(), batch.uniqueKeys, batch.objects, upsert, multi);
+        pExpCtx->mongoProcessInterface->update(pExpCtx,
+                                               getWriteNs(),
+                                               std::move(batch.uniqueKeys),
+                                               std::move(batch.objects),
+                                               upsert,
+                                               multi);
     }
 };
 

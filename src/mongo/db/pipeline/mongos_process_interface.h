@@ -63,14 +63,14 @@ public:
 
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
-                const std::vector<BSONObj>& objs) final {
+                std::vector<BSONObj>&& objs) final {
         MONGO_UNREACHABLE;
     }
 
     void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
-                const std::vector<BSONObj>& queries,
-                const std::vector<BSONObj>& updates,
+                std::vector<BSONObj>&& queries,
+                std::vector<BSONObj>&& updates,
                 bool upsert,
                 bool multi) final {
         MONGO_UNREACHABLE;
