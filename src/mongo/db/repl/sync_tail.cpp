@@ -1004,16 +1004,13 @@ void SyncTail::_oplogApplication(OplogBuffer* oplogBuffer,
             minValid = lastOpTimeInBatch;
         }
 
-        // Update various things that care about our last applied optime. Tests rely on 2 happening
-        // before 3 even though it isn't strictly necessary. The order of 1 doesn't matter.
+        // Update various things that care about our last applied optime. Tests rely on 1 happening
+        // before 2 even though it isn't strictly necessary.
 
-        // 1. Update the global timestamp.
-        setNewTimestamp(opCtx.getServiceContext(), lastOpTimeInBatch.getTimestamp());
-
-        // 2. Persist our "applied through" optime to disk.
+        // 1. Persist our "applied through" optime to disk.
         _consistencyMarkers->setAppliedThrough(&opCtx, lastOpTimeInBatch);
 
-        // 3. Ensure that the last applied op time hasn't changed since the start of this batch.
+        // 2. Ensure that the last applied op time hasn't changed since the start of this batch.
         const auto lastAppliedOpTimeAtEndOfBatch = replCoord->getMyLastAppliedOpTime();
         invariant(lastAppliedOpTimeAtStartOfBatch == lastAppliedOpTimeAtEndOfBatch,
                   str::stream() << "the last known applied OpTime has changed from "
@@ -1022,13 +1019,14 @@ void SyncTail::_oplogApplication(OplogBuffer* oplogBuffer,
                                 << lastAppliedOpTimeAtEndOfBatch.toString()
                                 << " in the middle of batch application");
 
-        // 4. Update oplog visibility by notifying the storage engine of the new oplog entries.
+        // 3. Update oplog visibility by notifying the storage engine of the new oplog entries.
         const bool orderedCommit = true;
         _storageInterface->oplogDiskLocRegister(
             &opCtx, lastOpTimeInBatch.getTimestamp(), orderedCommit);
 
-        // 5. Finalize this batch. We are at a consistent optime if our current optime is >= the
-        // current 'minValid' optime.
+        // 4. Finalize this batch. We are at a consistent optime if our current optime is >= the
+        // current 'minValid' optime. Note that recording the lastOpTime in the finalizer includes
+        // advancing the global timestamp to at least its timestamp.
         auto consistency = (lastOpTimeInBatch >= minValid)
             ? ReplicationCoordinator::DataConsistency::Consistent
             : ReplicationCoordinator::DataConsistency::Inconsistent;
