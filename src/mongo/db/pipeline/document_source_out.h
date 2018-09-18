@@ -72,7 +72,8 @@ public:
     DocumentSourceOut(NamespaceString outputNs,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       WriteModeEnum mode,
-                      std::set<FieldPath> uniqueKey);
+                      std::set<FieldPath> uniqueKey,
+                      boost::optional<OID> targetEpoch);
 
     virtual ~DocumentSourceOut() = default;
 
@@ -167,7 +168,7 @@ public:
      */
     virtual void spill(BatchedObjects&& batch) {
         pExpCtx->mongoProcessInterface->insert(
-            pExpCtx, getWriteNs(), std::move(batch.objects), _writeConcern);
+            pExpCtx, getWriteNs(), std::move(batch.objects), _writeConcern, _targetEpoch);
     };
 
     /**
@@ -182,7 +183,8 @@ public:
         NamespaceString outputNs,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WriteModeEnum,
-        std::set<FieldPath> uniqueKey = std::set<FieldPath>{"_id"});
+        std::set<FieldPath> uniqueKey = std::set<FieldPath>{"_id"},
+        boost::optional<OID> targetEpoch = boost::none);
 
     /**
      * Parses a $out stage from the user-supplied BSON.
@@ -198,11 +200,13 @@ protected:
     // respect the writeConcern of the original command.
     WriteConcernOptions _writeConcern;
 
+    const NamespaceString _outputNs;
+    boost::optional<OID> _targetEpoch;
+
 private:
     bool _initialized = false;
     bool _done = false;
 
-    const NamespaceString _outputNs;
     WriteModeEnum _mode;
 
     // Holds the unique key used for uniquely identifying documents. There must exist a unique index

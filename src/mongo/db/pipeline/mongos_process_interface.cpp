@@ -104,7 +104,9 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                ? index.getObjectField(IndexDescriptor::kCollationFieldName)
                                : CollationSpec::kSimpleSpec));
 
-    return index.getBoolField(IndexDescriptor::kUniqueFieldName) &&
+    // SERVER-5335: The _id index does not report to be unique, but in fact is unique.
+    auto isIdIndex = index[IndexDescriptor::kIndexNameFieldName].String() == "_id_";
+    return (isIdIndex || index.getBoolField(IndexDescriptor::kUniqueFieldName)) &&
         !index.hasField(IndexDescriptor::kPartialFilterExprFieldName) &&
         MongoProcessCommon::keyPatternNamesExactPaths(
                index.getObjectField(IndexDescriptor::kKeyPatternFieldName), uniqueKeyPaths) &&

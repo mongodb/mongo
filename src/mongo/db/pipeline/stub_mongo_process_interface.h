@@ -62,7 +62,8 @@ public:
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
                 std::vector<BSONObj>&& objs,
-                const WriteConcernOptions& wc) override {
+                const WriteConcernOptions& wc,
+                boost::optional<OID>) override {
         MONGO_UNREACHABLE;
     }
 
@@ -72,7 +73,8 @@ public:
                 std::vector<BSONObj>&& updates,
                 const WriteConcernOptions& wc,
                 bool upsert,
-                bool multi) final {
+                bool multi,
+                boost::optional<OID>) final {
         MONGO_UNREACHABLE;
     }
 
@@ -176,6 +178,11 @@ public:
                                      const NamespaceString& nss,
                                      const std::set<FieldPath>& uniqueKeyPaths) const override {
         return true;
+    }
+
+    boost::optional<OID> refreshAndGetEpoch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                            const NamespaceString& nss) const override {
+        return boost::none;
     }
 };
 }  // namespace mongo

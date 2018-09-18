@@ -270,7 +270,8 @@
     testAgainstDB(mongosDB);
 
     // Then test against a foreign database, with the same expected behavior.
-    testAgainstDB(foreignDB);
+    // TODO SERVER-37871 re-enable this test.
+    // testAgainstDB(foreignDB);
 
     st.stop();
 })();

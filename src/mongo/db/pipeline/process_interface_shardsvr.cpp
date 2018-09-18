@@ -134,7 +134,8 @@ std::pair<std::vector<FieldPath>, bool> MongoInterfaceShardServer::collectDocume
 void MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        const NamespaceString& ns,
                                        std::vector<BSONObj>&& objs,
-                                       const WriteConcernOptions& wc) {
+                                       const WriteConcernOptions& wc,
+                                       boost::optional<OID> targetEpoch) {
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
@@ -144,7 +145,7 @@ void MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionCont
     // If applicable, attach a write concern to the batched command request.
     attachWriteConcern(&insertCommand, wc);
 
-    ClusterWriter::write(expCtx->opCtx, insertCommand, &stats, &response);
+    ClusterWriter::write(expCtx->opCtx, insertCommand, &stats, &response, targetEpoch);
 
     // TODO SERVER-35403: Add more context for which shard produced the error.
     uassertStatusOKWithContext(response.toStatus(), "Insert failed: ");
@@ -156,7 +157,8 @@ void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionCont
                                        std::vector<BSONObj>&& updates,
                                        const WriteConcernOptions& wc,
                                        bool upsert,
-                                       bool multi) {
+                                       bool multi,
+                                       boost::optional<OID> targetEpoch) {
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
@@ -170,7 +172,7 @@ void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionCont
     // If applicable, attach a write concern to the batched command request.
     attachWriteConcern(&updateCommand, wc);
 
-    ClusterWriter::write(expCtx->opCtx, updateCommand, &stats, &response);
+    ClusterWriter::write(expCtx->opCtx, updateCommand, &stats, &response, targetEpoch);
 
     // TODO SERVER-35403: Add more context for which shard produced the error.
     uassertStatusOKWithContext(response.toStatus(), "Update failed: ");

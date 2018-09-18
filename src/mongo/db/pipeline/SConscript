@@ -282,6 +282,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/generic_cursor',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         'field_path',
     ]
 )
@@ -319,7 +320,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/query/async_results_merger',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
         'mongo_process_common',
     ]
 )

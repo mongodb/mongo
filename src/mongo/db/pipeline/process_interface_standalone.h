@@ -59,14 +59,16 @@ public:
     void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
                 std::vector<BSONObj>&& objs,
-                const WriteConcernOptions& wc) override;
+                const WriteConcernOptions& wc,
+                boost::optional<OID> targetEpoch) override;
     void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 const NamespaceString& ns,
                 std::vector<BSONObj>&& queries,
                 std::vector<BSONObj>&& updates,
                 const WriteConcernOptions& wc,
                 bool upsert,
-                bool multi) override;
+                bool multi,
+                boost::optional<OID> targetEpoch) override;
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx, const NamespaceString& ns) final;
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,

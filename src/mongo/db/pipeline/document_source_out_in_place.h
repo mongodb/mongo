@@ -43,7 +43,7 @@ public:
     using DocumentSourceOut::DocumentSourceOut;
 
     const NamespaceString& getWriteNs() const final {
-        return getOutputNs();
+        return _outputNs;
     };
 
     /**
@@ -75,7 +75,8 @@ public:
                                                    std::move(batch.objects),
                                                    _writeConcern,
                                                    upsert,
-                                                   multi);
+                                                   multi,
+                                                   _targetEpoch);
         } catch (const ExceptionFor<ErrorCodes::ImmutableField>& ex) {
             uassertStatusOKWithContext(ex.toStatus(),
                                        "$out failed to update the matching document, did you "

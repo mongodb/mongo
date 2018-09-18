@@ -317,8 +317,9 @@ bool wasMetadataRefreshed(const std::shared_ptr<ChunkManager>& managerA,
 
 }  // namespace
 
-ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss)
-    : _nss(nss), _needsTargetingRefresh(false) {}
+ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss,
+                                           boost::optional<OID> targetEpoch)
+    : _nss(nss), _needsTargetingRefresh(false), _targetEpoch(targetEpoch) {}
 
 
 Status ChunkManagerTargeter::init(OperationContext* opCtx) {
@@ -333,6 +334,13 @@ Status ChunkManagerTargeter::init(OperationContext* opCtx) {
     }
 
     _routingInfo = std::move(routingInfoStatus.getValue());
+
+    if (_targetEpoch) {
+        uassert(ErrorCodes::StaleEpoch, "Collection has been dropped", _routingInfo->cm());
+        uassert(ErrorCodes::StaleEpoch,
+                "Collection has been dropped and recreated",
+                _routingInfo->cm()->getVersion().epoch() == *_targetEpoch);
+    }
 
     return Status::OK();
 }

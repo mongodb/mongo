@@ -67,7 +67,8 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
 void ClusterWriter::write(OperationContext* opCtx,
                           const BatchedCommandRequest& request,
                           BatchWriteExecStats* stats,
-                          BatchedCommandResponse* response) {
+                          BatchedCommandResponse* response,
+                          boost::optional<OID> targetEpoch) {
     const NamespaceString& nss = request.getNS();
 
     LastError::Disabled disableLastError(&LastError::get(opCtx->getClient()));
@@ -77,7 +78,7 @@ void ClusterWriter::write(OperationContext* opCtx,
         Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
     } else {
         {
-            ChunkManagerTargeter targeter(request.getNS());
+            ChunkManagerTargeter targeter(request.getNS(), targetEpoch);
 
             Status targetInitStatus = targeter.init(opCtx);
             if (!targetInitStatus.isOK()) {

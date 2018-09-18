@@ -58,12 +58,19 @@ class ChunkManagerTargeter : public NSTargeter {
 public:
     enum class UpdateType { kReplacement, kOpStyle, kUnknown };
 
-    ChunkManagerTargeter(const NamespaceString& nss);
+    /**
+     * If 'targetEpoch' is not boost::none, throws a 'StaleEpoch' exception if the collection given
+     * by 'nss' is ever found to not have the target epoch.
+     */
+    ChunkManagerTargeter(const NamespaceString& nss,
+                         boost::optional<OID> targetEpoch = boost::none);
 
     /**
      * Initializes the ChunkManagerTargeter with the latest targeting information for the
      * namespace.  May need to block and load information from a remote config server.
      *
+     * Throws a 'StaleEpoch' exception if the collection targeted has an epoch which does not match
+     * '_targetEpoch'
      * Returns !OK if the information could not be initialized.
      */
     Status init(OperationContext* opCtx);
@@ -165,6 +172,10 @@ private:
 
     // The latest loaded routing cache entry
     boost::optional<CachedCollectionRoutingInfo> _routingInfo;
+
+    // Set to the epoch of the namespace we are targeting. If we ever refresh the catalog cache and
+    // find a new epoch, we immediately throw a StaleEpoch exception.
+    boost::optional<OID> _targetEpoch;
 
     // Map of shard->remote shard version reported from stale errors
     ShardVersionMap _remoteShardVersions;

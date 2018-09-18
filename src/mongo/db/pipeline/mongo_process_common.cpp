@@ -39,6 +39,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
@@ -135,4 +137,16 @@ bool MongoProcessCommon::keyPatternNamesExactPaths(const BSONObj& keyPattern,
     return nFieldsMatched == uniqueKeyPaths.size();
 }
 
+boost::optional<OID> MongoProcessCommon::refreshAndGetEpoch(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) const {
+    const bool forceRefreshFromThisThread = false;
+    auto routingInfo = uassertStatusOK(
+        Grid::get(expCtx->opCtx)
+            ->catalogCache()
+            ->getCollectionRoutingInfoWithRefresh(expCtx->opCtx, nss, forceRefreshFromThisThread));
+    if (auto chunkManager = routingInfo.cm()) {
+        return chunkManager->getVersion().epoch();
+    }
+    return boost::none;
+}
 }  // namespace mongo

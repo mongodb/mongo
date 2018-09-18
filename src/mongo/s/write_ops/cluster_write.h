@@ -41,10 +41,15 @@ class OperationContext;
 
 class ClusterWriter {
 public:
+    /**
+     * If 'targetEpoch' is set, throws a 'StaleEpoch' error if the targeted namespace is found to no
+     * longer have the epoch given by 'targetEpoch'.
+     */
     static void write(OperationContext* opCtx,
                       const BatchedCommandRequest& request,
                       BatchWriteExecStats* stats,
-                      BatchedCommandResponse* response);
+                      BatchedCommandResponse* response,
+                      boost::optional<OID> targetEpoch = boost::none);
 };
 
 }  // namespace mongo

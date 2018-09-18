@@ -108,16 +108,20 @@ public:
     virtual bool isSharded(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     /**
-     * Inserts 'objs' into 'ns' and throws a UserException if the insert fails.
+     * Inserts 'objs' into 'ns' and throws a UserException if the insert fails. If 'targetEpoch' is
+     * set, throws ErrorCodes::StaleEpoch if the targeted collection does not have the same epoch or
+     * the epoch changes during the course of the insert.
      */
     virtual void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const NamespaceString& ns,
                         std::vector<BSONObj>&& objs,
-                        const WriteConcernOptions& wc) = 0;
+                        const WriteConcernOptions& wc,
+                        boost::optional<OID> targetEpoch) = 0;
 
     /**
      * Updates the documents matching 'queries' with the objects 'updates'. Throws a UserException
-     * if any of the updates fail.
+     * if any of the updates fail. If 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the
+     * targeted collection does not have the same epoch, or if the epoch changes during the update.
      */
     virtual void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const NamespaceString& ns,
@@ -125,7 +129,8 @@ public:
                         std::vector<BSONObj>&& updates,
                         const WriteConcernOptions& wc,
                         bool upsert,
-                        bool multi) = 0;
+                        bool multi,
+                        boost::optional<OID> targetEpoch) = 0;
 
     virtual CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                                   const NamespaceString& ns) = 0;
@@ -269,6 +274,16 @@ public:
     virtual bool uniqueKeyIsSupportedByIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              const NamespaceString& nss,
                                              const std::set<FieldPath>& uniqueKeyPaths) const = 0;
+
+    /**
+     * Refreshes the CatalogCache entry for the namespace 'nss', and returns the epoch associated
+     * with that namespace, if any. Note that this refresh will not necessarily force a new
+     * request to be sent to the config servers. If another thread has already requested a refresh,
+     * it will instead wait for that response.
+     */
+    virtual boost::optional<OID> refreshAndGetEpoch(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss) const = 0;
 };
 
 }  // namespace mongo

@@ -575,6 +575,45 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
     future.timed_get(kFutureTimeout);
 }
 
+TEST_F(BatchWriteExecTest, StaleEpochIsNotRetryable) {
+    // A StaleEpoch error is not retried.
+
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(5);
+
+    BatchedCommandResponse nonRetryableErrResponse;
+    nonRetryableErrResponse.setStatus({ErrorCodes::StaleEpoch, "mock stale epoch error"});
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+        ASSERT(response.getOk());
+        ASSERT_EQ(0, response.getN());
+        ASSERT(response.isErrDetailsSet());
+        ASSERT_EQUALS(response.getErrDetailsAt(0)->toStatus().code(),
+                      nonRetryableErrResponse.toStatus().code());
+        ASSERT(response.getErrDetailsAt(0)->toStatus().reason().find(
+                   nonRetryableErrResponse.toStatus().reason()) != std::string::npos);
+        ASSERT_EQ(1, stats.numRounds);
+    });
+
+    expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, nonRetryableErrResponse);
+
+    future.timed_get(kFutureTimeout);
+}
 
 class BatchWriteExecTransactionTest : public BatchWriteExecTest {
 public:

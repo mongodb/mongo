@@ -93,6 +93,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpFinishes);
 MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpIsPopped);
 MONGO_FAIL_POINT_DEFINE(hangAfterAllChildRemoveOpsArePopped);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
+MONGO_FAIL_POINT_DEFINE(hangDuringBatchUpdate);
 
 void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
     if (containsRetry) {
@@ -596,6 +597,12 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     boost::optional<AutoGetCollection> collection;
     while (true) {
+        if (MONGO_FAIL_POINT(hangDuringBatchUpdate)) {
+            log() << "batch update - hangDuringBatchUpdate fail point enabled. Blocking until "
+                     "fail point is disabled.";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringBatchUpdate);
+        }
+
         if (MONGO_FAIL_POINT(failAllUpdates)) {
             uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
         }

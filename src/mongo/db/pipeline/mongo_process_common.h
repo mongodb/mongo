@@ -60,6 +60,10 @@ public:
                                        CurrentOpTruncateMode truncateMode,
                                        CurrentOpCursorMode cursorMode) const final;
 
+    virtual boost::optional<OID> refreshAndGetEpoch(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss) const final;
+
 protected:
     /**
      * Returns a BSONObj representing a report of the operation which is currently being

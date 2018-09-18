@@ -339,6 +339,23 @@ TEST_F(DocumentSourceOutTest, FailsToParseIfUniqueKeyHasDuplicateFields) {
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, ErrorCodes::BadValue);
 }
 
+TEST_F(DocumentSourceOutTest, FailsToParseIfTargetEpochIsSpecifiedOnMongos) {
+    BSONObj spec = BSON("$out" << BSON("to"
+                                       << "test"
+                                       << "mode"
+                                       << kDefaultMode
+                                       << "uniqueKey"
+                                       << BSON("_id" << 1)
+                                       << "epoch"
+                                       << OID::gen()));
+    getExpCtx()->inMongos = true;
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 50984);
+
+    // Test that 'targetEpoch' is accepted if not in mongos.
+    getExpCtx()->inMongos = false;
+    ASSERT(createOutStage(spec) != nullptr);
+}
+
 TEST_F(DocumentSourceOutTest, CorrectlyUsesTargetDbThatMatchesAggregationDb) {
     const auto targetDbSameAsAggregationDb = getExpCtx()->ns.db();
     const auto targetColl = "test"_sd;
@@ -350,7 +367,7 @@ TEST_F(DocumentSourceOutTest, CorrectlyUsesTargetDbThatMatchesAggregationDb) {
     ASSERT_EQ(outStage->getOutputNs().coll(), targetColl);
 }
 
-// TODO (SERVER-50939): Allow "replaceCollection" to a foreign database.
+// TODO (SERVER-36832): Allow "replaceCollection" to a foreign database.
 TEST_F(DocumentSourceOutTest, CorrectlyUsesForeignTargetDb) {
     const auto foreignDb = "someOtherDb"_sd;
     const auto targetColl = "test"_sd;
