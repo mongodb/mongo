@@ -84,6 +84,10 @@ protected:
         ShardServerTestFixture::tearDown();
     }
 
+    std::shared_ptr<TransactionCoordinator> coordinator() {
+        return _coordinator;
+    }
+
     /**
      * This is a generic helper that simulates that this shard server received a command by
      * launching a thread to run the command. The 'commandBody' argument should be a function that
@@ -132,13 +136,10 @@ protected:
     }
 
     void expectSendAbortAndReturnRetryableErrror() {
-        for (int i = 0; i <= kMaxNumFailedHostRetryAttempts; i++) {
-            onCommand([](const executor::RemoteCommandRequest& request) -> Status {
-                ASSERT_EQUALS("abortTransaction",
-                              request.cmdObj.firstElement().fieldNameStringData());
-                return {ErrorCodes::HostUnreachable, ""};
-            });
-        }
+        onCommand([](const executor::RemoteCommandRequest& request) -> Status {
+            ASSERT_EQUALS("abortTransaction", request.cmdObj.firstElement().fieldNameStringData());
+            return {ErrorCodes::HostUnreachable, ""};
+        });
     }
 
     void expectSendAbortAndReturnSuccess() {
@@ -149,13 +150,10 @@ protected:
     }
 
     void expectSendCommitAndReturnRetryableError() {
-        for (int i = 0; i <= kMaxNumFailedHostRetryAttempts; i++) {
-            onCommand([](const executor::RemoteCommandRequest& request) -> Status {
-                ASSERT_EQUALS("commitTransaction",
-                              request.cmdObj.firstElement().fieldNameStringData());
-                return {ErrorCodes::HostUnreachable, ""};
-            });
-        }
+        onCommand([](const executor::RemoteCommandRequest& request) -> Status {
+            ASSERT_EQUALS("commitTransaction", request.cmdObj.firstElement().fieldNameStringData());
+            return {ErrorCodes::HostUnreachable, ""};
+        });
     }
 
     void expectSendCommitAndReturnSuccess() {
@@ -248,6 +246,8 @@ TEST_F(TransactionCoordinatorTestFixture, FinalVoteCommitSendsCommit) {
     expectSendCommitAndReturnSuccess();
     expectSendCommitAndReturnSuccess();
     future.timed_get(kFutureTimeout);
+    // Ensure that sendCommit calls recvCommitAck on the coordinator
+    ASSERT_EQUALS(coordinator()->state(), TransactionCoordinator::StateMachine::State::kCommitted);
 }
 
 TEST_F(TransactionCoordinatorTestFixture,
@@ -266,6 +266,8 @@ TEST_F(TransactionCoordinatorTestFixture,
     future = receiveVoteCommit(shardIds[1], dummyTimestamp);
     expectSendCommitAndReturnSuccess();
     future.timed_get(kFutureTimeout);
+    // Ensure that sendCommit calls recvCommitAck on the coordinator
+    ASSERT_EQUALS(coordinator()->state(), TransactionCoordinator::StateMachine::State::kCommitted);
 }
 
 TEST_F(TransactionCoordinatorTestFixture,
