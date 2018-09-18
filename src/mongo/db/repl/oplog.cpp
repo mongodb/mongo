@@ -86,6 +86,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
@@ -998,7 +999,14 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime,
-         OplogApplication::Mode mode) -> Status { return Status::OK(); }}},
+         OplogApplication::Mode mode) -> Status {
+         // Session has been checked out by sync_tail.
+         auto transaction = TransactionParticipant::get(opCtx);
+         invariant(transaction);
+         transaction->unstashTransactionResources(opCtx, "abortTransaction");
+         transaction->abortActiveTransaction(opCtx);
+         return Status::OK();
+     }}},
 };
 
 }  // namespace
@@ -1529,6 +1537,9 @@ Status applyCommand_inlock(OperationContext* opCtx,
         return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(nss.ns())};
     }
     {
+        // Command application doesn't always acquire the global writer lock for transaction
+        // commands, so we acquire its own locks here.
+        Lock::DBLock lock(opCtx, nss.db(), MODE_IS);
         Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.ns());
         if (db && !db->getCollection(opCtx, nss) && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
@@ -1553,10 +1564,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                     << redact(op));
     }
 
-    // Applying commands in repl is done under Global W-lock, so it is safe to not
-    // perform the current DB checks after reacquiring the lock.
-    invariant(opCtx->lockState()->isW());
-
     // Parse optime from oplog entry unless we are applying this command in standalone or on a
     // primary (replicated writes enabled).
     OpTime opTime;
@@ -1567,13 +1574,18 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    const bool assignCommandTimestamp = [opCtx, mode, &op] {
+    const bool assignCommandTimestamp = [opCtx, mode, &op, &o] {
         const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
         if (opCtx->writesAreReplicated()) {
             // We do not assign timestamps on replicated writes since they will get their oplog
             // timestamp once they are logged.
             return false;
         }
+
+        // Don't assign commit timestamp for transaction commands.
+        const StringData commandName(o.firstElementFieldName());
+        if (op.getBoolField("prepare") || commandName == "abortTransaction")
+            return false;
 
         switch (replMode) {
             case ReplicationCoordinator::modeReplSet: {
@@ -1582,9 +1594,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 // command on secondaries. Thus, the timestamps in the command oplog
                 // entries are always real timestamps from this oplog and we should
                 // timestamp our writes with them.
-                //
-                // However, if "prepare" is specified, don't assign commit timestamp.
-                return !op.getBoolField("prepare");
+                return true;
             }
             case ReplicationCoordinator::modeNone: {
                 // Only assign timestamps on standalones during replication recovery when

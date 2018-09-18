@@ -49,6 +49,7 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -303,9 +304,16 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         });
     } else if (opType == OpTypeEnum::kCommand) {
         return writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
-            // a command may need a global write lock. so we will conservatively go
-            // ahead and grab one here. suboptimal. :-(
-            Lock::GlobalWrite globalWriteLock(opCtx);
+            // A command may need a global write lock. so we will conservatively go
+            // ahead and grab one for non-transaction commands.
+            // Transactions have to acquire the same locks on secondaries as on primary.
+            boost::optional<Lock::GlobalWrite> globalWriteLock;
+
+            // TODO SERVER-37180 Remove this double-parsing.
+            const StringData commandName(op["o"].embeddedObject().firstElementFieldName());
+            if (!op.getBoolField("prepare") && commandName != "abortTransaction") {
+                globalWriteLock.emplace(opCtx);
+            }
 
             // special case apply for commands to avoid implicit database creation
             Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);
@@ -1130,7 +1138,10 @@ Status multiSyncApply(OperationContext* opCtx,
 
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
-    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
+    // Since we swap the locker in stash / unstash transaction resources,
+    // ShouldNotConflictWithSecondaryBatchApplicationBlock will touch the locker that has been
+    // destroyed by unstash in its destructor. Thus we set the flag explicitly.
+    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
     // Explicitly start future read transactions without a timestamp.
     opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
@@ -1152,7 +1163,7 @@ Status multiSyncApply(OperationContext* opCtx,
         MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo();
 
         for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
-            const auto& entry = **it;
+            const OplogEntry& entry = **it;
 
             // If we are successful in grouping and applying inserts, advance the current iterator
             // past the end of the inserted group of entries.
@@ -1168,11 +1179,12 @@ Status multiSyncApply(OperationContext* opCtx,
                 // from disk may read that write, causing starting a new transaction on an existing
                 // txnNumber. Thus, we start a new transaction without refreshing state from disk.
                 boost::optional<OperationContextSessionMongodWithoutRefresh> sessionTxnState;
-                if (entry.shouldPrepare()) {
-                    // Prepare transaction is in its own batch. We cannot modify the opCtx for other
-                    // ops.
+                if (entry.shouldPrepare() ||
+                    (entry.isCommand() &&
+                     entry.getCommandType() == OplogEntry::CommandType::kAbortTransaction)) {
                     // The update on transaction table may be scheduled to the same writer.
                     invariant(ops->size() <= 2);
+                    // Transaction operations are in its own batch, so we can modify their opCtx.
                     invariant(entry.getSessionId());
                     invariant(entry.getTxnNumber());
                     opCtx->setLogicalSessionId(*entry.getSessionId());

@@ -81,7 +81,7 @@ OperationContextSessionMongodWithoutRefresh::OperationContextSessionMongodWithou
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(txnParticipant);
-    txnParticipant->beginTransactionUnconditionally(clientTxnNumber);
+    txnParticipant->beginOrContinueTransactionUnconditionally(clientTxnNumber);
 }
 
 }  // namespace mongo

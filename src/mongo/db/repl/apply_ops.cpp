@@ -127,9 +127,15 @@ Status _applyOps(OperationContext* opCtx,
         Status status(ErrorCodes::InternalError, "");
 
         if (haveWrappingWUOW) {
-            invariant(opCtx->lockState()->isW());
+            // Atomic applyOps command already acquired the global write lock.
+            invariant(opCtx->lockState()->isW() ||
+                      oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
+            // Only CRUD operations are allowed in atomic mode.
             invariant(*opType != 'c');
 
+            // ApplyOps does not have the global writer lock when applying transaction
+            // operations, so we need to acquire the DB and Collection locks.
+            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
             auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.ns());
             if (!db) {
                 // Retry in non-atomic mode, since MMAP cannot implicitly create a new database
@@ -144,6 +150,7 @@ Status _applyOps(OperationContext* opCtx,
             // implicitly created on upserts. We detect both cases here and fail early with
             // NamespaceNotFound.
             // Additionally for inserts, we fail early on non-existent collections.
+            Lock::CollectionLock collectionLock(opCtx->lockState(), nss.ns(), MODE_IX);
             auto collection = db->getCollection(opCtx, nss);
             if (!collection && (*opType == 'i' || *opType == 'u')) {
                 uasserted(
@@ -283,18 +290,13 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     invariant(transaction);
 
     transaction->unstashTransactionResources(opCtx, "prepareTransaction");
-
-    // Abort transaction unconditionally for now.
-    // TODO: SERVER-35875 / SERVER-35877 Abort or commit transactions on secondaries accordingly.
-    ON_BLOCK_EXIT([&] { transaction->abortActiveTransaction(opCtx); });
-
     auto status = _applyOps(
         opCtx, dbName, applyOpCmd, info, oplogApplicationMode, result, numApplied, opsBuilder);
     if (!status.isOK()) {
         return status;
     }
     transaction->prepareTransaction(opCtx, optime);
-
+    transaction->stashTransactionResources(opCtx);
     return Status::OK();
 }
 
@@ -383,6 +385,24 @@ Status applyOps(OperationContext* opCtx,
                 BSONObjBuilder* result) {
     auto info = ApplyOpsCommandInfo::parse(applyOpCmd);
 
+    int numApplied = 0;
+
+    // Apply prepare transaction operation if "prepare" is true.
+    // The lock requirement of transaction operations should be the same as that on the primary,
+    // so we don't acquire the locks conservatively for them.
+    if (info.getPrepare().get_value_or(false)) {
+        invariant(optime);
+        return _applyPrepareTransaction(opCtx,
+                                        dbName,
+                                        applyOpCmd,
+                                        info,
+                                        oplogApplicationMode,
+                                        result,
+                                        &numApplied,
+                                        nullptr,
+                                        *optime);
+    }
+
     boost::optional<Lock::GlobalWrite> globalWriteLock;
     boost::optional<Lock::DBLock> dbWriteLock;
 
@@ -409,22 +429,6 @@ Status applyOps(OperationContext* opCtx,
         if (!status.isOK()) {
             return status;
         }
-    }
-
-    int numApplied = 0;
-
-    // Apply prepare transaction operation if "prepare" is true.
-    if (info.getPrepare().get_value_or(false)) {
-        invariant(optime);
-        return _applyPrepareTransaction(opCtx,
-                                        dbName,
-                                        applyOpCmd,
-                                        info,
-                                        oplogApplicationMode,
-                                        result,
-                                        &numApplied,
-                                        nullptr,
-                                        *optime);
     }
 
     if (!info.isAtomic()) {

@@ -352,7 +352,7 @@ public:
                          boost::optional<bool> autocommit,
                          boost::optional<bool> startTransaction);
 
-    void beginTransactionUnconditionally(TxnNumber txnNumber);
+    void beginOrContinueTransactionUnconditionally(TxnNumber txnNumber);
 
     static Status isValid(StringData dbName, StringData cmdName);
 

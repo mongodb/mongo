@@ -818,6 +818,7 @@ void execCommandDatabase(OperationContext* opCtx,
                     opCtx->getTxnNumber());
 
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
+            opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
         }
 
         auto& oss = OperationShardingState::get(opCtx);

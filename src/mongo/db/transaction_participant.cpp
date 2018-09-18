@@ -260,9 +260,12 @@ void TransactionParticipant::beginOrContinue(TxnNumber txnNumber,
     _beginMultiDocumentTransaction(lg, txnNumber);
 }
 
-void TransactionParticipant::beginTransactionUnconditionally(TxnNumber txnNumber) {
+void TransactionParticipant::beginOrContinueTransactionUnconditionally(TxnNumber txnNumber) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    _beginMultiDocumentTransaction(lg, txnNumber);
+    // Continuing transaction unconditionally is a no-op since we don't check any on-disk state.
+    if (_activeTxnNumber != txnNumber) {
+        _beginMultiDocumentTransaction(lg, txnNumber);
+    }
 }
 
 void TransactionParticipant::setSpeculativeTransactionOpTime(
@@ -302,8 +305,13 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
     // The new transaction should have an empty locker, and thus we do not need to save it.
     invariant(opCtx->lockState()->getClientState() == Locker::ClientState::kInactive);
     _locker = opCtx->swapLockState(stdx::make_unique<LockerImpl>());
+    // Inherit the locking setting from the original one.
+    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(
+        _locker->shouldConflictWithSecondaryBatchApplication());
     _locker->unsetThreadId();
 
+    // OplogSlotReserver is only used by primary, so always set max transaction lock timeout.
+    invariant(opCtx->writesAreReplicated());
     // This thread must still respect the transaction lock timeout, since it can prevent the
     // transaction from making progress.
     auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
@@ -337,6 +345,9 @@ TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, bool
     opCtx->setWriteUnitOfWork(nullptr);
 
     _locker = opCtx->swapLockState(stdx::make_unique<LockerImpl>());
+    // Inherit the locking setting from the original one.
+    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(
+        _locker->shouldConflictWithSecondaryBatchApplication());
     if (!keepTicket) {
         _locker->releaseTicket();
     }
@@ -345,9 +356,12 @@ TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, bool
     // This thread must still respect the transaction lock timeout, since it can prevent the
     // transaction from making progress.
     auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
-    if (maxTransactionLockMillis >= 0) {
+    if (opCtx->writesAreReplicated() && maxTransactionLockMillis >= 0) {
         opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
     }
+
+    // On secondaries, max lock timeout must not be set.
+    invariant(opCtx->writesAreReplicated() || !opCtx->lockState()->hasMaxLockTimeout());
 
     _recoveryUnit = opCtx->releaseRecoveryUnit();
     opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
@@ -504,9 +518,12 @@ void TransactionParticipant::unstashTransactionResources(OperationContext* opCtx
         // to acquire a lock. This is to avoid deadlocks and minimize non-transaction
         // operation performance degradations.
         auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
-        if (maxTransactionLockMillis >= 0) {
+        if (opCtx->writesAreReplicated() && maxTransactionLockMillis >= 0) {
             opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
         }
+
+        // On secondaries, max lock timeout must not be set.
+        invariant(opCtx->writesAreReplicated() || !opCtx->lockState()->hasMaxLockTimeout());
 
         stdx::lock_guard<stdx::mutex> lm(_metricsMutex);
         _transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
