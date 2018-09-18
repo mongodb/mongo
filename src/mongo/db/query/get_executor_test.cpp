@@ -107,13 +107,11 @@ void testAllowedIndices(std::vector<IndexEntry> indexes,
 
     // Apply filter in allowed indices.
     filterAllowedIndexEntries(filter, &indexes);
-    size_t matchedIndexes = 0;
+    ASSERT_EQ(std::max<size_t>(expectedFilteredNames.size(), indexNames.size()), indexes.size());
     for (const auto& indexEntry : indexes) {
         ASSERT_TRUE(expectedFilteredNames.find(indexEntry.identifier.catalogName) !=
                     expectedFilteredNames.end());
-        matchedIndexes++;
     }
-    ASSERT_EQ(matchedIndexes, indexes.size());
 }
 
 // Use of index filters to select compound index over single key index.
@@ -166,6 +164,46 @@ TEST(GetExecutorTest, GetAllowedIndicesMatchesMultipleIndexesByKey) {
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1}")}),
         stdx::unordered_set<std::string>{},
         {"a_1", "a_1:en"});
+}
+
+TEST(GetExecutorTest, GetAllowedWildcardIndicesByKey) {
+    testAllowedIndices({IndexEntry(BSON("$**" << 1), "$**_1"),
+                        IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+                       SimpleBSONObjComparator::kInstance.makeBSONObjSet({BSON("$**" << 1)}),
+                       stdx::unordered_set<std::string>{},
+                       {"$**_1"});
+}
+
+TEST(GetExecutorTest, GetAllowedWildcardIndicesByName) {
+    testAllowedIndices({IndexEntry(BSON("$**" << 1), "$**_1"),
+                        IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+                       SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
+                       {"$**_1"},
+                       {"$**_1"});
+}
+
+TEST(GetExecutorTest, GetAllowedPathSpecifiedWildcardIndicesByKey) {
+    testAllowedIndices({IndexEntry(BSON("a.$**" << 1), "a.$**_1"),
+                        IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+                       SimpleBSONObjComparator::kInstance.makeBSONObjSet({BSON("a.$**" << 1)}),
+                       stdx::unordered_set<std::string>{},
+                       {"a.$**_1"});
+}
+
+TEST(GetExecutorTest, GetAllowedPathSpecifiedWildcardIndicesByName) {
+    testAllowedIndices({IndexEntry(BSON("a.$**" << 1), "a.$**_1"),
+                        IndexEntry(fromjson("{a: 1}"), "a_1"),
+                        IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
+                        IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
+                       SimpleBSONObjComparator::kInstance.makeBSONObjSet(),
+                       {"a.$**_1"},
+                       {"a.$**_1"});
 }
 
 }  // namespace
