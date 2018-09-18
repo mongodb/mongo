@@ -271,6 +271,8 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
     boost::filesystem::path programPath = findProgram(program);
     boost::filesystem::path programName = programPath.stem();
 
+    _pipe = -1;
+    _port = -1;
 
     string prefix("mongod-");
     bool isMongodProgram = isMongo && (string("mongod") == programName ||
@@ -292,8 +294,6 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
     }
 
     _argv.push_back(programPath.string());
-
-    _port = -1;
 
     // Parse individual arguments into _argv
     BSONObjIterator j(args);
@@ -457,6 +457,7 @@ void ProgramRunner::start() {
 }
 
 void ProgramRunner::operator()() {
+    invariant(_pipe >= 0);
     // Send the never_close_handle flag so that we can handle closing the fd below with safeClose.
     boost::iostreams::stream_buffer<boost::iostreams::file_descriptor_source> fdBuf(
         _pipe, boost::iostreams::file_descriptor_flags::never_close_handle);
