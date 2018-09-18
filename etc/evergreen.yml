@@ -2341,6 +2341,8 @@ functions:
           if [ "Windows_NT" = "$OS" ]; then
             exit 0
           fi
+          # Always exit successfully, as this is just informational.
+          trap 'echo "Trapped exit code $?, exiting with 0"; exit 0' EXIT
           # Print the ulimit & kernel.core_pattern
           cmds="uptime"
           cmds="$cmds; ulimit -a"
