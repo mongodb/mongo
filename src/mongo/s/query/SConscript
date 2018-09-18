@@ -15,7 +15,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/query/query_common',
-        '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         "cluster_client_cursor",
         "cluster_cursor_cleanup_job",
         "store_possible_cursor",
@@ -101,9 +101,9 @@ env.Library(
         "$BUILD_DIR/mongo/db/query/command_request_response",
         "$BUILD_DIR/mongo/db/query/query_common",
         "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/s/multi_statement_transaction_requests_sender",
         "$BUILD_DIR/mongo/s/client/sharding_client",
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
+        "$BUILD_DIR/mongo/s/sharding_router_api",
     ],
 )
 

@@ -42,7 +42,7 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {

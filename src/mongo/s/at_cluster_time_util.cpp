@@ -30,7 +30,7 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/s/transaction/at_cluster_time_util.h"
+#include "mongo/s/at_cluster_time_util.h"
 
 #include "mongo/db/logical_clock.h"
 #include "mongo/s/grid.h"

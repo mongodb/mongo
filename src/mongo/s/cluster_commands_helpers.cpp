@@ -32,7 +32,7 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/cluster_commands_helpers.h"
 
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -51,7 +51,7 @@
 #include "mongo/s/request_types/create_database_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/s/transaction/transaction_router.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 

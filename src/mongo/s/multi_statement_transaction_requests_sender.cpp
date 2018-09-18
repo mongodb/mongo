@@ -30,7 +30,7 @@
 
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 
-#include "mongo/s/transaction/transaction_router.h"
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
 

@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/transaction/transaction_router.h"
+#include "mongo/s/transaction_router.h"
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -38,8 +38,8 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/s/at_cluster_time_util.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/transaction/at_cluster_time_util.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"

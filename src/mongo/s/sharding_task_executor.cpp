@@ -44,6 +44,7 @@
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 

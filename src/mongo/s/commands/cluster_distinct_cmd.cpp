@@ -37,7 +37,7 @@
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"

@@ -32,7 +32,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

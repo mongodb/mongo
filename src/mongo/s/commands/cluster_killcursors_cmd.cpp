@@ -32,7 +32,7 @@
 #include "mongo/db/commands/killcursors_common.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/transaction/transaction_router.h"
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
 namespace {

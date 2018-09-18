@@ -32,7 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/s/transaction/at_cluster_time_util.h"
+#include "mongo/s/at_cluster_time_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 

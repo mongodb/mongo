@@ -299,7 +299,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/query/async_results_merger',
-        '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         'mongo_process_common',
     ]
 )

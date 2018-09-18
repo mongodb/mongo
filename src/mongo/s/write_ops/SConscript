@@ -32,9 +32,7 @@ env.Library(
         'write_op.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/multi_statement_transaction_requests_sender',
-        '$BUILD_DIR/mongo/s/commands/cluster_commands_helpers',
-        '$BUILD_DIR/mongo/s/transaction/router_session',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         'batch_write_types',
     ],
 )

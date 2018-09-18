@@ -50,7 +50,7 @@
 #include "mongo/s/query/router_stage_skip.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/transaction/transaction_router.h"
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
 namespace cluster_aggregation_planner {

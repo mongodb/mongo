@@ -31,7 +31,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/s/transaction/transaction_router.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 

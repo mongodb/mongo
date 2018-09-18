@@ -40,7 +40,7 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/establish_cursors.h"

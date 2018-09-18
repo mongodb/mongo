@@ -40,7 +40,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point_service.h"

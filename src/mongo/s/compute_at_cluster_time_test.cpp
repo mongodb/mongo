@@ -33,12 +33,12 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/s/at_cluster_time_util.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/client/shard_remote.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/s/transaction/at_cluster_time_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
