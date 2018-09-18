@@ -291,7 +291,7 @@ __wt_meta_ckptlist_get(
 	WT_ERR(__wt_realloc_def(session, &allocated, slot + 2, &ckptbase));
 
 	/* Sort in creation-order. */
-	qsort(ckptbase, slot, sizeof(WT_CKPT), __ckpt_compare_order);
+	__wt_qsort(ckptbase, slot, sizeof(WT_CKPT), __ckpt_compare_order);
 
 	/* Return the array to our caller. */
 	*ckptbasep = ckptbase;

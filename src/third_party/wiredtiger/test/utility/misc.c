@@ -27,6 +27,10 @@
  */
 #include "test_util.h"
 
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
+
 void (*custom_die)(void) = NULL;
 const char *progname = "program name not set";
 
@@ -210,6 +214,38 @@ testutil_is_flag_set(const char *flag)
 
 	return (enable_long_tests);
 }
+
+#ifndef _WIN32
+/*
+ * testutil_sleep_wait --
+ *	Wait for a process up to a number of seconds.
+ */
+void
+testutil_sleep_wait(uint32_t seconds, pid_t pid)
+{
+	pid_t got;
+	int status;
+
+	while (seconds > 0) {
+		if ((got = waitpid(pid, &status, WNOHANG|WUNTRACED)) == pid) {
+			if (WIFEXITED(status))
+				testutil_die(EINVAL,
+				    "Child process %" PRIu64 " exited early"
+				    " with status %d", (uint64_t)pid,
+				    WEXITSTATUS(status));
+			if (WIFSIGNALED(status))
+				testutil_die(EINVAL,
+				    "Child process %" PRIu64 " terminated "
+				    " with signal %d", (uint64_t)pid,
+				    WTERMSIG(status));
+		} else if (got == -1)
+			testutil_die(errno, "waitpid");
+
+		--seconds;
+		sleep(1);
+	}
+}
+#endif
 
 /*
  * dcalloc --

@@ -1257,7 +1257,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		queue->evict_current = NULL;
 
 	entries = queue->evict_entries;
-	qsort(queue->evict_queue,
+	__wt_qsort(queue->evict_queue,
 	    entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
 
 	/* Trim empty entries from the end. */

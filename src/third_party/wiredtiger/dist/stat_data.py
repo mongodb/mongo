@@ -260,6 +260,8 @@ connection_stats = [
     CacheStat('cache_hazard_walks', 'hazard pointer check entries walked'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
     CacheStat('cache_inmem_splittable', 'in-memory page passed criteria to be split'),
+    CacheStat('cache_lookaside_cursor_wait_application', 'cache overflow cursor application thread wait time (usecs)'),
+    CacheStat('cache_lookaside_cursor_wait_internal', 'cache overflow cursor internal thread wait time (usecs)'),
     CacheStat('cache_lookaside_entries', 'cache overflow table entries', 'no_clear,no_scale'),
     CacheStat('cache_lookaside_insert', 'cache overflow table insert calls'),
     CacheStat('cache_lookaside_remove', 'cache overflow table remove calls'),

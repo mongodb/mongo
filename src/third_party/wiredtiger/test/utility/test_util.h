@@ -248,6 +248,9 @@ bool testutil_is_flag_set(const char *);
 void testutil_make_work_dir(const char *);
 int  testutil_parse_opts(int, char * const *, TEST_OPTS *);
 void testutil_progress(TEST_OPTS *, const char *);
+#ifndef _WIN32
+void testutil_sleep_wait(uint32_t, pid_t);
+#endif
 void testutil_work_dir_from_path(char *, size_t, const char *);
 WT_THREAD_RET thread_append(void *);
 

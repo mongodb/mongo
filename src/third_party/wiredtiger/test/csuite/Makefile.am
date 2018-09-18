@@ -11,6 +11,10 @@ test_random_abort_SOURCES = random_abort/main.c
 noinst_PROGRAMS += test_random_abort
 all_TESTS += random_abort/smoke.sh
 
+test_random_directio_SOURCES = random_directio/main.c
+noinst_PROGRAMS += test_random_directio
+all_TESTS += random_directio/smoke.sh
+
 test_rwlock_SOURCES = rwlock/main.c
 noinst_PROGRAMS += test_rwlock
 all_TESTS += test_rwlock
