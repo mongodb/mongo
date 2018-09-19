@@ -47,18 +47,23 @@ namespace mongo {
 
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
-                                        const RemoteCursor& remoteCursor,
+                                        OwnedRemoteCursor&& remoteCursor,
                                         TailableModeEnum tailableMode) {
     auto executorPool = Grid::get(opCtx)->getExecutorPool();
-    return storePossibleCursor(
+    auto result = storePossibleCursor(
         opCtx,
-        remoteCursor.getShardId().toString(),
-        remoteCursor.getHostAndPort(),
-        remoteCursor.getCursorResponse().toBSON(CursorResponse::ResponseType::InitialResponse),
+        remoteCursor->getShardId().toString(),
+        remoteCursor->getHostAndPort(),
+        remoteCursor->getCursorResponse().toBSON(CursorResponse::ResponseType::InitialResponse),
         requestedNss,
         executorPool->getArbitraryExecutor(),
         Grid::get(opCtx)->getCursorManager(),
         tailableMode);
+
+    // On success, release ownership of the cursor because it has been registered with the cursor
+    // manager and is now owned there.
+    remoteCursor.releaseCursor();
+    return result;
 }
 
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,

@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/query/owned_remote_cursor.h"
 
 namespace mongo {
 
@@ -79,11 +80,12 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
 /**
  * Convenience function which extracts all necessary information from the passed RemoteCursor, and
- * stores a ClusterClientCursor based on it.
+ * stores a ClusterClientCursor based on it. The ownership of the remote cursor is transferred to
+ * this function, and will handle killing it upon failure.
  */
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
-                                        const RemoteCursor& remoteCursor,
+                                        OwnedRemoteCursor&& remoteCursor,
                                         TailableModeEnum tailableMode);
 
 /**

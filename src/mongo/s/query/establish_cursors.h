@@ -68,4 +68,19 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                            const std::vector<std::pair<ShardId, BSONObj>>& remotes,
                                            bool allowPartialResults);
 
+/**
+ * Schedules a remote killCursor command for each of the cursors in 'remoteCursors'.
+ *
+ * Note that this method is optimistic and does not check the return status for the killCursors
+ * commands.
+ */
+void killRemoteCursors(OperationContext* opCtx,
+                       executor::TaskExecutor* executor,
+                       std::vector<RemoteCursor>&& remoteCursors,
+                       const NamespaceString& nss);
+
+void killRemoteCursor(OperationContext* opCtx,
+                      executor::TaskExecutor* executor,
+                      RemoteCursor&& cursor,
+                      const NamespaceString& nss);
 }  // namespace mongo

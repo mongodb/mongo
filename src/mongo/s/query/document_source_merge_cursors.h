@@ -126,6 +126,14 @@ public:
         _blockingResultsMerger->addNewShardCursors(std::move(newCursors));
     }
 
+    /**
+     * Marks the remote cursors as unowned, meaning that they won't be killed upon disposing of this
+     * DocumentSource.
+     */
+    void dismissCursorOwnership() {
+        _ownCursors = false;
+    }
+
 protected:
     void doDispose() final;
 
@@ -162,6 +170,10 @@ private:
     // 'await data' if we 1) are in a getMore and 2) don't already have data to return. This context
     // allows us to determine which situation we're in.
     RouterExecStage::ExecContext _execContext = RouterExecStage::ExecContext::kInitialFind;
+
+    // Indicates whether the cursors stored in _armParams are "owned", meaning the cursors should be
+    // killed upon disposal of this DocumentSource.
+    bool _ownCursors = true;
 };
 
 }  // namespace mongo

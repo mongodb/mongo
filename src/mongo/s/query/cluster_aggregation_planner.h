@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
+#include "mongo/s/query/owned_remote_cursor.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
@@ -77,7 +78,7 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
 void addMergeCursorsSource(Pipeline* mergePipeline,
                            const LiteParsedPipeline&,
                            BSONObj cmdSentToShards,
-                           std::vector<RemoteCursor> remoteCursors,
+                           std::vector<OwnedRemoteCursor> remoteCursors,
                            const std::vector<ShardId>& targetedShards,
                            boost::optional<BSONObj> shardCursorsSortSpec,
                            executor::TaskExecutor*);

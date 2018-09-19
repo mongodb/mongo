@@ -34,6 +34,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/establish_cursors.h"
 
 namespace mongo {
 
@@ -73,6 +74,8 @@ void DocumentSourceMergeCursors::populateMerger() {
     invariant(_armParams);
     _blockingResultsMerger.emplace(pExpCtx->opCtx, std::move(*_armParams), _executor);
     _armParams = boost::none;
+    // '_blockingResultsMerger' now owns the cursors.
+    _ownCursors = false;
 }
 
 std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterStage() {
@@ -134,6 +137,10 @@ void DocumentSourceMergeCursors::reattachToOperationContext(OperationContext* op
 
 void DocumentSourceMergeCursors::doDispose() {
     if (_blockingResultsMerger) {
+        invariant(!_ownCursors);
+        _blockingResultsMerger->kill(pExpCtx->opCtx);
+    } else if (_ownCursors) {
+        populateMerger();
         _blockingResultsMerger->kill(pExpCtx->opCtx);
     }
 }

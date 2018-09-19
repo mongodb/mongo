@@ -44,6 +44,7 @@
 #include "mongo/s/query/cluster_query_knobs.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/document_source_update_on_add_shard.h"
+#include "mongo/s/query/owned_remote_cursor.h"
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_pipeline.h"
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
@@ -372,14 +373,13 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
 void addMergeCursorsSource(Pipeline* mergePipeline,
                            const LiteParsedPipeline& liteParsedPipeline,
                            BSONObj cmdSentToShards,
-                           std::vector<RemoteCursor> remoteCursors,
+                           std::vector<OwnedRemoteCursor> ownedCursors,
                            const std::vector<ShardId>& targetedShards,
                            boost::optional<BSONObj> shardCursorsSortSpec,
                            executor::TaskExecutor* executor) {
     auto* opCtx = mergePipeline->getContext()->opCtx;
     AsyncResultsMergerParams armParams;
     armParams.setSort(shardCursorsSortSpec);
-    armParams.setRemotes(std::move(remoteCursors));
     armParams.setTailableMode(mergePipeline->getContext()->tailableMode);
     armParams.setNss(mergePipeline->getContext()->ns);
 
@@ -401,10 +401,21 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
 
     armParams.setOperationSessionInfo(sessionInfo);
 
+    // Convert owned cursors into a vector of remote cursors to be transferred to the merge
+    // pipeline.
+    std::vector<RemoteCursor> remoteCursors;
+    for (auto&& cursor : ownedCursors) {
+        // Transfer ownership of the remote cursor to the $mergeCursors stage.
+        remoteCursors.emplace_back(cursor.releaseCursor());
+    }
+
+    armParams.setRemotes(std::move(remoteCursors));
+
     // For change streams, we need to set up a custom stage to establish cursors on new shards when
     // they are added, to ensure we don't miss results from the new shards.
     auto mergeCursorsStage = DocumentSourceMergeCursors::create(
         executor, std::move(armParams), mergePipeline->getContext());
+
     if (liteParsedPipeline.hasChangeStream()) {
         mergePipeline->addInitialSource(DocumentSourceUpdateOnAddShard::create(
             mergePipeline->getContext(),
@@ -413,6 +424,7 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
             targetedShards,
             cmdSentToShards));
     }
+
     mergePipeline->addInitialSource(std::move(mergeCursorsStage));
 }
 

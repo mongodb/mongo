@@ -10,6 +10,8 @@
 (function() {
     "use strict";
 
+    load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+
     const kFailPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
     const kFailpointOptions = {shouldCheckForInterrupt: true};
 
@@ -38,7 +40,7 @@
         assert.eq(0, cmdRes.cursor.firstBatch.length);
 
         cmdRes = mongosDB.runCommand({getMore: cmdRes.cursor.id, collection: coll.getName()});
-        assert.commandFailedWithCode(cmdRes, 16608);
+        assert.commandFailedWithCode(cmdRes, errCode);
 
         // Neither mongos or the shards should leave cursors open. By the time we get here, the
         // cursor which was hanging on shard 1 will have been marked interrupted, but isn't
@@ -76,6 +78,56 @@
     } finally {
         assert.commandWorked(
             shard0DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
+    }
+
+    // Test that aggregations which fail to establish a merging shard cursor also cleanup the open
+    // shard cursors.
+    try {
+        // Enable the failpoint to fail on establishing a merging shard cursor.
+        assert.commandWorked(mongosDB.adminCommand({
+            configureFailPoint: "clusterAggregateFailToEstablishMergingShardCursor",
+            mode: "alwaysOn"
+        }));
+
+        // Run an aggregation which requires a merging shard pipeline. This should fail because of
+        // the failpoint.
+        assertErrorCode(coll, [{$out: "target"}], ErrorCodes.FailPointEnabled);
+
+        // Neither mongos or the shards should leave cursors open.
+        assert.eq(mongosDB.serverStatus().metrics.cursor.open.total, 0);
+        assert.eq(shard0DB.serverStatus().metrics.cursor.open.total, 0);
+        assert.eq(shard1DB.serverStatus().metrics.cursor.open.total, 0);
+
+    } finally {
+        assert.commandWorked(mongosDB.adminCommand({
+            configureFailPoint: "clusterAggregateFailToEstablishMergingShardCursor",
+            mode: "off"
+        }));
+    }
+
+    // Test that aggregations involving $exchange correctly clean up the producer cursors.
+    try {
+        assert.commandWorked(mongosDB.adminCommand({
+            configureFailPoint: "clusterAggregateFailToDispatchExchangeConsumerPipeline",
+            mode: "alwaysOn"
+        }));
+
+        // Run an aggregation which is eligible for $exchange. This should assert because of
+        // the failpoint.
+        st.shardColl(mongosDB.target, {_id: 1}, {_id: 0}, {_id: 1}, kDBName, false);
+        assertErrorCode(
+            coll, [{$out: {to: "target", mode: "replaceDocuments"}}], ErrorCodes.FailPointEnabled);
+
+        // Neither mongos or the shards should leave cursors open.
+        assert.eq(mongosDB.serverStatus().metrics.cursor.open.total, 0);
+        assert.eq(shard0DB.serverStatus().metrics.cursor.open.total, 0);
+        assert.eq(shard1DB.serverStatus().metrics.cursor.open.total, 0);
+
+    } finally {
+        assert.commandWorked(mongosDB.adminCommand({
+            configureFailPoint: "clusterAggregateFailToDispatchExchangeConsumerPipeline",
+            mode: "off"
+        }));
     }
 
     st.stop();
