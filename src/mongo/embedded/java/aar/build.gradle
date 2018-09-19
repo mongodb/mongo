@@ -90,6 +90,13 @@ publishing {
             }
         }
     }
+
+    repositories {
+        maven {
+            name = 'local'
+            url = "$buildDir/repo"
+        }
+    }
 }
 
 bintray {
