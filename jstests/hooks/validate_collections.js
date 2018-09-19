@@ -103,8 +103,9 @@ function CollectionValidator() {
 
             const dbNames = conn.getDBNames();
             for (let dbName of dbNames) {
-                if (!validatorFunc(conn.getDB(dbName), {full: true})) {
-                    return {ok: 0, host: host};
+                const validateRes = validatorFunc(conn.getDB(dbName), {full: true});
+                if (validateRes.ok !== 1) {
+                    return {ok: 0, host: host, validateRes: validateRes};
                 }
             }
             return {ok: 1};
