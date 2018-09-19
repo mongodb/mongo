@@ -179,7 +179,7 @@ function configExpandFailure(config, test = null, opts = {}) {
         return rawMongoProgramOutput().match(test);
     });
     if (mongod) {
-        _stopMongoProgram(mongod);
+        stopMongoProgramByPid(mongod);
     }
     removeFile(configFile);
 }
