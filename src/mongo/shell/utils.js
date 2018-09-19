@@ -328,6 +328,9 @@ setJsTestOption = function(name, value) {
 };
 
 jsTestLog = function(msg) {
+    if (typeof msg === "object") {
+        msg = tojson(msg);
+    }
     assert.eq(typeof(msg), "string", "Received: " + msg);
     const msgs = ["----", ...msg.split("\n"), "----"].map(s => `[jsTest] ${s}`);
     print(`\n\n${msgs.join("\n")}\n\n`);
