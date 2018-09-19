@@ -810,15 +810,19 @@ var ReplSetTest = function(opts) {
         return this.getSecondaries(timeout)[0];
     };
 
+    function isNodeArbiter(node) {
+        return node.getDB('admin').isMaster('admin').arbiterOnly;
+    }
+
     this.getArbiters = function() {
-        var arbiters = [];
-        for (var i = 0; i < this.nodes.length; i++) {
-            var node = this.nodes[i];
+        let arbiters = [];
+        for (let i = 0; i < this.nodes.length; i++) {
+            const node = this.nodes[i];
 
             let isArbiter = false;
 
             assert.retryNoExcept(() => {
-                isArbiter = node.getDB('admin').isMaster('admin').arbiterOnly;
+                isArbiter = isNodeArbiter(node);
                 return true;
             }, `Could not call 'isMaster' on ${node}.`, 3, 1000);
 
@@ -2002,42 +2006,53 @@ var ReplSetTest = function(opts) {
      */
     function checkOplogs(rst, slaves, msgPrefix = 'checkOplogs') {
         slaves = slaves || rst._slaves;
-        var OplogReader = function(mongo) {
-            this.next = function() {
-                if (!this.cursor)
+        const kCappedPositionLostSentinel = Object.create(null);
+        const OplogReader = function(mongo) {
+            this._safelyPerformCursorOperation = function(name, operation, onCappedPositionLost) {
+                if (!this.cursor) {
                     throw new Error("OplogReader is not open!");
+                }
 
-                var nextDoc = this.cursor.next();
-                if (nextDoc)
-                    this.lastDoc = nextDoc;
-                return nextDoc;
-            };
+                if (this._cursorExhausted) {
+                    return onCappedPositionLost;
+                }
 
-            this.hasNext = function() {
-                if (!this.cursor)
-                    throw new Error("OplogReader is not open!");
                 try {
-                    return this.cursor.hasNext();
+                    return operation(this.cursor);
                 } catch (err) {
-                    print("Error: hasNext threw '" + err.message + "' on " + this.mongo.host);
+                    print("Error: " + name + " threw '" + err.message + "' on " + this.mongo.host);
                     // Occasionally, the capped collection will get truncated while we are iterating
                     // over it. Since we are iterating over the collection in reverse, getting a
                     // truncated item means we've reached the end of the list, so return false.
                     if (err.code === ErrorCodes.CappedPositionLost) {
                         this.cursor.close();
-                        return false;
+                        this._cursorExhausted = true;
+                        return onCappedPositionLost;
                     }
 
                     throw err;
                 }
             };
 
+            this.next = function() {
+                this._safelyPerformCursorOperation('next', function(cursor) {
+                    return cursor.next();
+                }, kCappedPositionLostSentinel);
+            };
+
+            this.hasNext = function() {
+                this._safelyPerformCursorOperation('hasNext', function(cursor) {
+                    return cursor.hasNext();
+                }, false);
+            };
+
             this.query = function(ts) {
-                var coll = this.getOplogColl();
-                var query = {ts: {$gte: ts ? ts : new Timestamp()}};
+                const coll = this.getOplogColl();
+                const query = {ts: {$gte: ts ? ts : new Timestamp()}};
                 // Set the cursor to read backwards, from last to first. We also set the cursor not
                 // to time out since it may take a while to process each batch and a test may have
                 // changed "cursorTimeoutMillis" to a short time period.
+                this._cursorExhausted = false;
                 this.cursor = coll.find(query).sort({$natural: -1}).noCursorTimeout();
             };
 
@@ -2049,18 +2064,28 @@ var ReplSetTest = function(opts) {
                 return this.mongo.getDB("local")[oplogName];
             };
 
-            this.lastDoc = null;
             this.cursor = null;
+            this._cursorExhausted = true;
             this.mongo = mongo;
         };
 
+        function assertOplogEntriesEq(oplogEntry0, oplogEntry1, reader0, reader1, prevOplogEntry) {
+            if (!bsonBinaryEqual(oplogEntry0, oplogEntry1)) {
+                const query = prevOplogEntry ? {ts: {$lte: prevOplogEntry.ts}} : {};
+                rst.nodes.forEach(node => this.dumpOplog(node, query, 100));
+                const log = msgPrefix + ", non-matching oplog entries for the following nodes: \n" +
+                    reader0.mongo.host + ": " + tojsononeline(oplogEntry0) + "\n" +
+                    reader1.mongo.host + ": " + tojsononeline(oplogEntry1);
+                assert(false, log);
+            }
+        }
+
         if (slaves.length >= 1) {
-            var readers = [];
-            var smallestTS = new Timestamp(Math.pow(2, 32) - 1, Math.pow(2, 32) - 1);
-            var nodes = rst.nodes;
-            var rsSize = nodes.length;
-            var firstReaderIndex;
-            for (var i = 0; i < rsSize; i++) {
+            let readers = [];
+            let smallestTS = new Timestamp(Math.pow(2, 32) - 1, Math.pow(2, 32) - 1);
+            const nodes = rst.nodes;
+            let firstReaderIndex;
+            for (let i = 0; i < nodes.length; i++) {
                 const node = nodes[i];
 
                 if (rst._master !== node && !slaves.includes(node)) {
@@ -2068,17 +2093,15 @@ var ReplSetTest = function(opts) {
                 }
 
                 // Arbiters have no documents in the oplog.
-                const isArbiter = node.getDB('admin').isMaster('admin').arbiterOnly;
-                if (isArbiter) {
+                if (isNodeArbiter(node)) {
                     continue;
                 }
 
                 readers[i] = new OplogReader(node);
-                var currTS = readers[i].getFirstDoc().ts;
+                const currTS = readers[i].getFirstDoc().ts;
                 // Find the reader which has the smallestTS. This reader should have the most
                 // number of documents in the oplog.
-                if (currTS.t < smallestTS.t ||
-                    (currTS.t == smallestTS.t && currTS.i < smallestTS.i)) {
+                if (timestampCmp(currTS, smallestTS) < 0) {
                     smallestTS = currTS;
                     firstReaderIndex = i;
                 }
@@ -2088,25 +2111,27 @@ var ReplSetTest = function(opts) {
 
             // Read from the reader which has the most oplog entries.
             // Note, we read the oplog backwards from last to first.
-            var firstReader = readers[firstReaderIndex];
-            var prevOplogEntry;
+            const firstReader = readers[firstReaderIndex];
+            let prevOplogEntry;
             while (firstReader.hasNext()) {
-                var oplogEntry = firstReader.next();
-                for (i = 0; i < rsSize; i++) {
+                const oplogEntry = firstReader.next();
+                if (oplogEntry === kCappedPositionLostSentinel) {
+                    // When using legacy OP_QUERY/OP_GET_MORE reads against mongos, it is
+                    // possible for hasNext() to return true but for next() to throw an exception.
+                    break;
+                }
+
+                for (let i = 0; i < nodes.length; i++) {
                     // Skip reading from this reader if the index is the same as firstReader or
                     // the cursor is exhausted.
                     if (i === firstReaderIndex || !(readers[i] && readers[i].hasNext())) {
                         continue;
                     }
-                    var otherOplogEntry = readers[i].next();
-                    if (!bsonBinaryEqual(oplogEntry, otherOplogEntry)) {
-                        var query = prevOplogEntry ? {ts: {$lte: prevOplogEntry.ts}} : {};
-                        rst.nodes.forEach(node => this.dumpOplog(node, query, 100));
-                        var log = msgPrefix +
-                            ", non-matching oplog entries for the following nodes: \n" +
-                            firstReader.mongo.host + ": " + tojsononeline(oplogEntry) + "\n" +
-                            readers[i].mongo.host + ": " + tojsononeline(otherOplogEntry);
-                        assert(false, log);
+
+                    const otherOplogEntry = readers[i].next();
+                    if (otherOplogEntry && otherOplogEntry !== kCappedPositionLostSentinel) {
+                        assertOplogEntriesEq(
+                            oplogEntry, otherOplogEntry, firstReader, readers[i], prevOplogEntry);
                     }
                 }
                 prevOplogEntry = oplogEntry;
