@@ -63,12 +63,8 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/implicit_create_collection.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharded_connection_info.h"
-#include "mongo/db/s/sharding_config_optime_gossip.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/session_catalog.h"
@@ -86,9 +82,7 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -862,12 +856,11 @@ void execCommandDatabase(OperationContext* opCtx,
                 uassertStatusOK(shardingState->canAcceptShardedCommands());
             }
 
-            // Handle config optime information that may have been sent along with the command.
-            rpc::advanceConfigOptimeFromRequestMetadata(opCtx);
+            behaviors.advanceConfigOptimeFromRequestMetadata(opCtx);
         }
 
         oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);
-        ScopedOperationCompletionShardingActions operationCompletionShardingActions(opCtx);
+        auto scoped = behaviors.scopedOperationCompletionShardingActions(opCtx);
 
         // This may trigger the maxTimeAlwaysTimeOut failpoint.
         auto status = opCtx->checkForInterruptNoAssert();
@@ -911,27 +904,7 @@ void execCommandDatabase(OperationContext* opCtx,
             throw;
         }
     } catch (const DBException& e) {
-        // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (auto sce = e.extraInfo<StaleConfigInfo>()) {
-            if (!opCtx->getClient()->isInDirectClient()) {
-                // We already have the StaleConfig exception, so just swallow any errors due to
-                // refresh
-                onShardVersionMismatchNoExcept(opCtx, sce->getNss(), sce->getVersionReceived())
-                    .ignore();
-            }
-        } else if (auto sce = e.extraInfo<StaleDbRoutingVersion>()) {
-            if (!opCtx->getClient()->isInDirectClient()) {
-                onDbVersionMismatchNoExcept(
-                    opCtx, sce->getDb(), sce->getVersionReceived(), sce->getVersionWanted())
-                    .ignore();
-            }
-        } else if (auto cannotImplicitCreateCollInfo =
-                       e.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-            if (ShardingState::get(opCtx)->enabled()) {
-                onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss())
-                    .ignore();
-            }
-        }
+        behaviors.handleException(e, opCtx);
 
         // Append the error labels for transient transaction errors.
         auto errorLabels = getErrorLabels(sessionOptions, command->getName(), e.code());
@@ -1070,7 +1043,8 @@ DbResponse receivedCommands(OperationContext* opCtx,
 DbResponse receivedQuery(OperationContext* opCtx,
                          const NamespaceString& nss,
                          Client& c,
-                         const Message& m) {
+                         const Message& m,
+                         const ServiceEntryPointCommon::Hooks& behaviors) {
     invariant(!nss.isCommand());
     globalOpCounters.gotQuery();
 
@@ -1088,15 +1062,7 @@ DbResponse receivedQuery(OperationContext* opCtx,
 
         dbResponse.exhaustNS = runQuery(opCtx, q, nss, dbResponse.response);
     } catch (const AssertionException& e) {
-        // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (auto sce = e.extraInfo<StaleConfigInfo>()) {
-            if (!opCtx->getClient()->isInDirectClient()) {
-                // We already have the StaleConfig exception, so just swallow any errors due to
-                // refresh
-                onShardVersionMismatchNoExcept(opCtx, sce->getNss(), sce->getVersionReceived())
-                    .ignore();
-            }
-        }
+        behaviors.handleException(e, opCtx);
 
         dbResponse.response.reset();
         generateLegacyQueryErrorResponse(e, q, &op, &dbResponse.response);
@@ -1327,7 +1293,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         dbresponse = receivedCommands(opCtx, m, behaviors);
     } else if (op == dbQuery) {
         invariant(!isCommand);
-        dbresponse = receivedQuery(opCtx, nsString, c, m);
+        dbresponse = receivedQuery(opCtx, nsString, c, m, behaviors);
     } else if (op == dbGetMore) {
         dbresponse = receivedGetMore(opCtx, m, currentOp, &forceLog);
     } else {
