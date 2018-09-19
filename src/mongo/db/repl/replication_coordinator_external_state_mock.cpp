@@ -196,8 +196,6 @@ void ReplicationCoordinatorExternalStateMock::closeConnections() {
     _connectionsClosed = true;
 }
 
-void ReplicationCoordinatorExternalStateMock::killAllUserOperations(OperationContext* opCtx) {}
-
 void ReplicationCoordinatorExternalStateMock::shardingOnStepDownHook() {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}

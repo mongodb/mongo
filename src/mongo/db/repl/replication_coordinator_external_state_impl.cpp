@@ -682,16 +682,6 @@ void ReplicationCoordinatorExternalStateImpl::closeConnections() {
     _service->getServiceEntryPoint()->endAllSessions(transport::Session::kKeepOpen);
 }
 
-void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* opCtx) {
-    ServiceContext* environment = opCtx->getServiceContext();
-    environment->killAllUserOperations(opCtx, ErrorCodes::InterruptedDueToStepDown);
-
-    // Destroy all stashed transaction resources, in order to release locks.
-    SessionKiller::Matcher matcherAllSessions(
-        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
-}
-
 void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         Balancer::get(_service)->interruptBalancer();

@@ -1891,6 +1891,9 @@ TEST_F(StepDownTest,
         ErrorCodes::ExceededTimeLimit);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
+    ASSERT_TRUE(locker->isW());
+    ASSERT_FALSE(opCtx->lockState()->isLocked());
+
     opCtx.get()->swapLockState(std::move(locker));
 }
 
