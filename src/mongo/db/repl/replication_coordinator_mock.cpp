@@ -118,12 +118,10 @@ void ReplicationCoordinatorMock::setAwaitReplicationReturnValueFunction(
     _awaitReplicationReturnValueFunction = std::move(returnValueFunction);
 }
 
-Status ReplicationCoordinatorMock::stepDown(OperationContext* opCtx,
-                                            bool force,
-                                            const Milliseconds& waitTime,
-                                            const Milliseconds& stepdownTime) {
-    return Status::OK();
-}
+void ReplicationCoordinatorMock::stepDown(OperationContext* opCtx,
+                                          bool force,
+                                          const Milliseconds& waitTime,
+                                          const Milliseconds& stepdownTime) {}
 
 bool ReplicationCoordinatorMock::isMasterForReportingPurposes() {
     // TODO

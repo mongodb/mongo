@@ -1253,7 +1253,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenSteppingDownBeforeSatisfyingAWrite
     awaiter.start();
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1));
-    ASSERT_OK(getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000)));
+    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, statusAndDur.status);
     awaiter.reset();
@@ -1322,7 +1322,12 @@ protected:
             [=](PromisedClientAndOperation operationPromise) -> boost::optional<Status> {
                 auto result = SharedClientAndOperation::make(getServiceContext());
                 operationPromise.set_value(result);
-                return getReplCoord()->stepDown(result.opCtx.get(), force, waitTime, stepDownTime);
+                try {
+                    getReplCoord()->stepDown(result.opCtx.get(), force, waitTime, stepDownTime);
+                    return Status::OK();
+                } catch (const DBException& e) {
+                    return e.toStatus();
+                }
             });
         auto result = task.get_future();
         PromisedClientAndOperation operationPromise;
@@ -1444,9 +1449,8 @@ TEST_F(ReplCoordTest, ElectionIdTracksTermInPV1) {
     }
 
     const auto opCtx = makeOperationContext();
-    auto status = getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
+    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
 
-    ASSERT_OK(status);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
     simulateSuccessfulV1ElectionWithoutExitingDrainMode(
@@ -1851,8 +1855,10 @@ TEST_F(StepDownTest, NodeReturnsNotMasterWhenAskedToStepDownAsANonPrimaryNode) {
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 1, optime1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(1, 2, optime1));
 
-    Status status = getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(0));
-    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    ASSERT_THROWS_CODE(
+        getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(0)),
+        AssertionException,
+        ErrorCodes::NotMaster);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
@@ -1879,9 +1885,10 @@ TEST_F(StepDownTest,
     ASSERT_TRUE(opCtx->lockState()->isW());
     auto locker = opCtx.get()->swapLockState(stdx::make_unique<LockerImpl>());
 
-    Status status =
-        getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000));
-    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
+    ASSERT_THROWS_CODE(
+        getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000)),
+        AssertionException,
+        ErrorCodes::ExceededTimeLimit);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     opCtx.get()->swapLockState(std::move(locker));
@@ -1984,8 +1991,10 @@ TEST_F(StepDownTestFiveNode,
     const auto opCtx = makeOperationContext();
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-    auto status = getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000));
-    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
+    ASSERT_THROWS_CODE(
+        getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000)),
+        AssertionException,
+        ErrorCodes::ExceededTimeLimit);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 }
 
@@ -2019,7 +2028,7 @@ TEST_F(
     const auto opCtx = makeOperationContext();
 
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-    ASSERT_OK(getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000)));
+    getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000));
     enterNetwork();  // So we can safely inspect the topology coordinator
     ASSERT_EQUALS(getNet()->now() + Seconds(1), getTopoCoord().getStepDownTime());
     ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
@@ -2050,7 +2059,7 @@ TEST_F(ReplCoordTest, SingleNodeReplSetStepDownTimeoutAndElectionTimeoutExpiresA
 
     // Stepdown command with "force=true" resets the election timer to election timeout (10 seconds
     // later) and allows the node to resume primary after stepdown timeout (also 10 seconds).
-    ASSERT_OK(getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000)));
+    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     getNet()->enterNetwork();
     ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
@@ -2128,7 +2137,7 @@ TEST_F(ReplCoordTest, NodeBecomesPrimaryAgainWhenStepDownTimeoutExpiresInASingle
     auto opCtx = makeOperationContext();
     runSingleNodeElection(opCtx.get());
 
-    ASSERT_OK(getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000)));
+    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     getNet()->enterNetwork();  // Must do this before inspecting the topocoord
     Date_t stepdownUntil = getNet()->now() + Seconds(1);
     ASSERT_EQUALS(stepdownUntil, getTopoCoord().getStepDownTime());
@@ -2160,7 +2169,7 @@ TEST_F(
     const auto opCtx = makeOperationContext();
     runSingleNodeElection(opCtx.get());
 
-    ASSERT_OK(getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000)));
+    getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     getNet()->enterNetwork();  // Must do this before inspecting the topocoord
     Date_t stepdownUntil = getNet()->now() + Seconds(1);
     ASSERT_EQUALS(stepdownUntil, getTopoCoord().getStepDownTime());
@@ -2199,8 +2208,10 @@ TEST_F(StepDownTest,
     const auto opCtx = makeOperationContext();
 
     // Try to stepDown but time out because no secondaries are caught up.
-    auto status = repl->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000));
-    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
+    ASSERT_THROWS_CODE(
+        getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000)),
+        AssertionException,
+        ErrorCodes::ExceededTimeLimit);
     ASSERT_TRUE(repl->getMemberState().primary());
 
     // Now use "force" to force it to step down even though no one is caught up
@@ -2214,8 +2225,7 @@ TEST_F(StepDownTest,
     }
     getNet()->exitNetwork();
     ASSERT_TRUE(repl->getMemberState().primary());
-    status = repl->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
-    ASSERT_OK(status);
+    repl->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
     ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
@@ -2336,8 +2346,9 @@ TEST_F(StepDownTest, OnlyOneStepDownCmdIsAllowedAtATime) {
     // Now while the first stepdown request is waiting for secondaries to catch up, attempt
     // another stepdown request and ensure it fails.
     const auto opCtx = makeOperationContext();
-    auto status = getReplCoord()->stepDown(opCtx.get(), false, Seconds(10), Seconds(60));
-    ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status);
+    ASSERT_THROWS_CODE(getReplCoord()->stepDown(opCtx.get(), false, Seconds(10), Seconds(60)),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
 
     // Now ensure that the original stepdown command can still succeed.
     catchUpSecondaries(optime2);

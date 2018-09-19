@@ -187,17 +187,13 @@ public:
 
     /**
      * Causes this node to relinquish being primary for at least 'stepdownTime'.  If 'force' is
-     * false, before doing so it will wait for 'waitTime' for one other node to be within 10
-     * seconds of this node's optime before stepping down. Returns a Status with the code
-     * ErrorCodes::ExceededTimeLimit if no secondary catches up within waitTime,
-     * ErrorCodes::NotMaster if you are no longer primary when trying to step down,
-     * ErrorCodes::SecondaryAheadOfPrimary if we are primary but there is another node that
-     * seems to be ahead of us in replication, and Status::OK otherwise.
+     * false, before doing so it will wait for 'waitTime' for one other electable node to be caught
+     * up before stepping down. Throws on error.
      */
-    virtual Status stepDown(OperationContext* opCtx,
-                            bool force,
-                            const Milliseconds& waitTime,
-                            const Milliseconds& stepdownTime) = 0;
+    virtual void stepDown(OperationContext* opCtx,
+                          bool force,
+                          const Milliseconds& waitTime,
+                          const Milliseconds& stepdownTime) = 0;
 
     /**
      * Returns true if the node can be considered master for the purpose of introspective

@@ -97,7 +97,7 @@ public:
     repl::ReplicationCoordinator::StatusAndDuration awaitReplication(
         OperationContext*, const repl::OpTime&, const WriteConcernOptions&) override;
 
-    Status stepDown(OperationContext*, bool, const Milliseconds&, const Milliseconds&) override;
+    void stepDown(OperationContext*, bool, const Milliseconds&, const Milliseconds&) override;
 
     Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions&) const override;
 

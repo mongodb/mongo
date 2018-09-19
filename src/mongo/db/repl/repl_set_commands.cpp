@@ -495,9 +495,8 @@ public:
 
         log() << "Attempting to step down in response to replSetStepDown command";
 
-        status = ReplicationCoordinator::get(opCtx)->stepDown(
+        ReplicationCoordinator::get(opCtx)->stepDown(
             opCtx, force, Seconds(secondaryCatchUpPeriodSecs), Seconds(stepDownForSecs));
-        uassertStatusOK(status);
         return true;
     }
 

@@ -233,10 +233,10 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorEmbedded::awaitR
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::stepDown(OperationContext*,
-                                                const bool,
-                                                const Milliseconds&,
-                                                const Milliseconds&) {
+void ReplicationCoordinatorEmbedded::stepDown(OperationContext*,
+                                              const bool,
+                                              const Milliseconds&,
+                                              const Milliseconds&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

@@ -60,10 +60,13 @@ public:
             timeoutSecs = cmdObj["timeoutSecs"].numberLong();
         }
 
-        Status status = repl::ReplicationCoordinator::get(opCtx)->stepDown(
-            opCtx, force, Seconds(timeoutSecs), Seconds(120));
-        if (!status.isOK() && status.code() != ErrorCodes::NotMaster) {  // ignore not master
-            uassertStatusOK(status);
+        try {
+            repl::ReplicationCoordinator::get(opCtx)->stepDown(
+                opCtx, force, Seconds(timeoutSecs), Seconds(120));
+        } catch (const DBException& e) {
+            if (e.code() != ErrorCodes::NotMaster) {  // ignore not master
+                throw;
+            }
         }
 
         // Never returns
