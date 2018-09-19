@@ -131,20 +131,17 @@ void TaskRunner::join() {
 }
 
 void TaskRunner::_runTasks() {
-    Client* client = nullptr;
+    // We initialize cc() because ServiceContextMongoD::_newOpCtx() expects cc() to be equal to the
+    // client used to create the operation context.
+    Client::initThreadIfNotAlready();
+    Client* client = &cc();
+    if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
+        AuthorizationSession::get(client)->grantInternalAuthorization();
+    }
     ServiceContext::UniqueOperationContext txn;
 
     while (Task task = _waitForNextTask()) {
         if (!txn) {
-            if (!client) {
-                // We initialize cc() because ServiceContextMongoD::_newOpCtx() expects cc()
-                // to be equal to the client used to create the operation context.
-                Client::initThreadIfNotAlready();
-                client = &cc();
-                if (getGlobalAuthorizationManager()->isAuthEnabled()) {
-                    AuthorizationSession::get(client)->grantInternalAuthorization();
-                }
-            }
             txn = client->makeOperationContext();
         }
 
