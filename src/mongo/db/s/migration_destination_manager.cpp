@@ -58,6 +58,7 @@
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -508,6 +509,17 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
     _isActiveCV.notify_all();
 }
 
+// The maximum number of documents to insert in a single batch during migration clone.
+// secondaryThrottle and migrateCloneInsertionBatchDelayMS apply between each batch.
+// 0 or negative values (the default) means no limit to batch size.
+// 1 corresponds to 3.4.16 (and earlier) behavior.
+MONGO_EXPORT_SERVER_PARAMETER(migrateCloneInsertionBatchSize, int, 0);
+
+// Time in milliseconds between batches of insertions during migration clone.
+// This is in addition to any time spent waiting for replication (secondaryThrottle).
+// Defaults to 0.
+MONGO_EXPORT_SERVER_PARAMETER(migrateCloneInsertionBatchDelayMS, int, 0);
+
 void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
                                                  const BSONObj& min,
                                                  const BSONObj& max,
@@ -718,45 +730,55 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
         };
 
         auto insertBatchFn = [&](OperationContext* opCtx, BSONObj arr) {
-            int batchNumCloned = 0;
-            int batchClonedBytes = 0;
+            auto it = arr.begin();
+            while (it != arr.end()) {
+                int batchNumCloned = 0;
+                int batchClonedBytes = 0;
+                int batchMaxCloned = migrateCloneInsertionBatchSize.load();
 
-            assertNotAborted(opCtx);
+                assertNotAborted(opCtx);
 
-            std::vector<BSONObj> toInsert;
-            for (const auto& doc : arr) {
-                BSONObj docToClone = doc.Obj();
-                toInsert.push_back(docToClone);
-                batchNumCloned++;
-                batchClonedBytes += docToClone.objsize();
-            }
-            InsertOp insertOp;
-            insertOp.ns = _nss;
-            insertOp.documents = toInsert;
-
-            const WriteResult reply = performInserts(opCtx, insertOp, true);
-
-            for (unsigned long i = 0; i < reply.results.size(); ++i) {
-                uassertStatusOK(reply.results[i]);
-            }
-
-            {
-                stdx::lock_guard<stdx::mutex> statsLock(_mutex);
-                _numCloned += batchNumCloned;
-                _clonedBytes += batchClonedBytes;
-            }
-            if (writeConcern.shouldWaitForOtherNodes()) {
-                repl::ReplicationCoordinator::StatusAndDuration replStatus =
-                    repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
-                        opCtx,
-                        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                        writeConcern);
-                if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
-                    warning() << "secondaryThrottle on, but doc insert timed out; "
-                                 "continuing";
-                } else {
-                    uassertStatusOK(replStatus.status);
+                std::vector<BSONObj> toInsert;
+                while (it != arr.end() &&
+                       (batchMaxCloned <= 0 || batchNumCloned < batchMaxCloned)) {
+                    const auto& doc = *it;
+                    BSONObj docToClone = doc.Obj();
+                    toInsert.push_back(docToClone);
+                    batchNumCloned++;
+                    batchClonedBytes += docToClone.objsize();
+                    it++;
                 }
+                InsertOp insertOp;
+                insertOp.ns = _nss;
+                insertOp.documents = toInsert;
+
+                const WriteResult reply = performInserts(opCtx, insertOp, true);
+
+                for (unsigned long i = 0; i < reply.results.size(); ++i) {
+                    uassertStatusOK(reply.results[i]);
+                }
+
+                {
+                    stdx::lock_guard<stdx::mutex> statsLock(_mutex);
+                    _numCloned += batchNumCloned;
+                    _clonedBytes += batchClonedBytes;
+                }
+
+                if (writeConcern.shouldWaitForOtherNodes()) {
+                    repl::ReplicationCoordinator::StatusAndDuration replStatus =
+                        repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+                            opCtx,
+                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                            writeConcern);
+                    if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
+                        warning() << "secondaryThrottle on, but doc insert timed out; "
+                                     "continuing";
+                    } else {
+                        uassertStatusOK(replStatus.status);
+                    }
+                }
+
+                sleepmillis(migrateCloneInsertionBatchDelayMS.load());
             }
         };
 
