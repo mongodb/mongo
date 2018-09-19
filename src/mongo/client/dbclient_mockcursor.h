@@ -32,28 +32,46 @@
 #include "mongo/client/dbclient_cursor.h"
 
 namespace mongo {
-
+// DBClientMockCursor supports only a small subset of DBClientCursor operations.
+// It supports only iteration, including use of DBClientCursorBatchIterator.  If a batchsize
+// is given, iteration is broken up into multiple batches at batchSize boundaries.
 class DBClientMockCursor : public DBClientCursor {
 public:
-    DBClientMockCursor(mongo::DBClientBase* client, const BSONArray& mockCollection)
+    DBClientMockCursor(mongo::DBClientBase* client,
+                       const BSONArray& mockCollection,
+                       unsigned long batchSize = 0)
         : mongo::DBClientCursor(client, NamespaceString(), 0, 0, 0),
           _collectionArray(mockCollection),
-          _iter(_collectionArray) {}
+          _iter(_collectionArray),
+          _batchSize(batchSize) {
+        if (_batchSize)
+            setBatchSize(_batchSize);
+        fillNextBatch();
+    }
 
     virtual ~DBClientMockCursor() {}
 
-    bool more() {
-        return _iter.more();
-    }
-    BSONObj next() {
-        return _iter.next().Obj();
+    bool more() override {
+        if (_batchSize && batch.pos == _batchSize) {
+            fillNextBatch();
+        }
+        return batch.pos < batch.objs.size();
     }
 
 private:
+    void fillNextBatch() {
+        int leftInBatch = _batchSize;
+        batch.objs.clear();
+        while (_iter.more() && (!_batchSize || leftInBatch--)) {
+            batch.objs.emplace_back(_iter.next().Obj());
+        }
+        batch.pos = 0;
+    }
     // The BSONObjIterator expects the underlying BSONObj to stay in scope while the
     // iterator is in use, so we store it here.
     BSONArray _collectionArray;
     BSONObjIterator _iter;
+    unsigned long _batchSize;
 
     // non-copyable , non-assignable
     DBClientMockCursor(const DBClientMockCursor&);

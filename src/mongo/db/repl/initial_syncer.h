@@ -41,6 +41,7 @@
 #include "mongo/db/repl/callback_completion_guard.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
+#include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback_checker.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -149,6 +151,8 @@ public:
      */
     using OnCompletionGuard = CallbackCompletionGuard<StatusWith<OpTimeWithHash>>;
 
+    using StartCollectionClonerFn = DatabaseCloner::StartCollectionClonerFn;
+
     struct InitialSyncAttemptInfo {
         int durationMillis;
         Status status;
@@ -217,6 +221,13 @@ public:
      * For testing only.
      */
     void setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& scheduleDbWorkFn);
+
+    /**
+     * Overrides how executor starts a collection cloner.
+     *
+     * For testing only.
+     */
+    void setStartCollectionClonerFn(const StartCollectionClonerFn& startCollectionCloner);
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete
@@ -621,6 +632,7 @@ private:
 
     // Passed to CollectionCloner via DatabasesCloner.
     CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
+    StartCollectionClonerFn _startCollectionClonerFn;      // (M)
 
     // Contains stats on the current initial sync request (includes all attempts).
     // To access these stats in a user-readable format, use getInitialSyncProgress().

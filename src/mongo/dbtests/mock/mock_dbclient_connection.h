@@ -61,10 +61,12 @@ public:
 
     bool connect(const char* hostName, StringData applicationName, std::string& errmsg);
 
-    inline bool connect(const HostAndPort& host,
-                        StringData applicationName,
-                        std::string& errmsg) override {
-        return connect(host.toString().c_str(), applicationName, errmsg);
+    Status connect(const HostAndPort& host, StringData applicationName) override {
+        std::string errmsg;
+        if (!connect(host.toString().c_str(), applicationName, errmsg)) {
+            return {ErrorCodes::HostNotFound, errmsg};
+        }
+        return Status::OK();
     }
 
     using DBClientBase::runCommandWithTarget;
@@ -104,7 +106,8 @@ public:
                              const NamespaceStringOrUUID& nsOrUuid,
                              mongo::Query query,
                              const mongo::BSONObj* fieldsToReturn = 0,
-                             int queryOptions = 0) override;
+                             int queryOptions = 0,
+                             int batchSize = 0) override;
 
     //
     // Unsupported methods (these are pure virtuals in the base class)

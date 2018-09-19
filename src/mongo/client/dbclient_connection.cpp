@@ -508,16 +508,18 @@ unsigned long long DBClientConnection::query(stdx::function<void(DBClientCursorB
                                              const NamespaceStringOrUUID& nsOrUuid,
                                              Query query,
                                              const BSONObj* fieldsToReturn,
-                                             int queryOptions) {
+                                             int queryOptions,
+                                             int batchSize) {
     if (!(availableOptions() & QueryOption_Exhaust)) {
-        return DBClientBase::query(f, nsOrUuid, query, fieldsToReturn, queryOptions);
+        return DBClientBase::query(f, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize);
     }
 
     // mask options
     queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SlaveOk);
     queryOptions |= (int)QueryOption_Exhaust;
 
-    unique_ptr<DBClientCursor> c(this->query(nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions));
+    unique_ptr<DBClientCursor> c(
+        this->query(nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize));
     uassert(13386, "socket error for mapping query", c.get());
 
     unsigned long long n = 0;

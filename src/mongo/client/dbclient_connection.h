@@ -108,9 +108,7 @@ public:
      * @param errmsg any relevant error message will appended to the string
      * @return false if fails to connect.
      */
-    virtual bool connect(const HostAndPort& server,
-                         StringData applicationName,
-                         std::string& errmsg);
+    bool connect(const HostAndPort& server, StringData applicationName, std::string& errmsg);
 
     /**
      * Semantically equivalent to the previous connect method, but returns a Status
@@ -121,7 +119,7 @@ public:
      * @param a hook to validate the 'isMaster' reply received during connection. If the hook
      * fails, the connection will be terminated and a non-OK status will be returned.
      */
-    Status connect(const HostAndPort& server, StringData applicationName);
+    virtual Status connect(const HostAndPort& server, StringData applicationName);
 
     /**
      * This version of connect does not run 'isMaster' after creating a TCP connection to the
@@ -167,7 +165,8 @@ public:
                              const NamespaceStringOrUUID& nsOrUuid,
                              Query query,
                              const BSONObj* fieldsToReturn,
-                             int queryOptions) override;
+                             int queryOptions,
+                             int batchSize = 0) override;
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;

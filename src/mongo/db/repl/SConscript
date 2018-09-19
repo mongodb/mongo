@@ -1246,6 +1246,7 @@ env.Library(
     ],
     LIBDEPS=[
         'task_runner',
+        'oplogreader',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/client/remote_command_retry_scheduler',
@@ -1266,6 +1267,7 @@ env.CppUnitTest(
         'base_cloner_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
@@ -1292,6 +1294,7 @@ env.CppUnitTest(
         'base_cloner_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
@@ -1304,6 +1307,7 @@ env.Library(
     LIBDEPS=[
         'database_cloner',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
     ],
 )
 

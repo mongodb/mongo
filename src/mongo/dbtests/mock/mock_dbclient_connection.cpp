@@ -29,7 +29,7 @@
 
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 
-#include "mongo/dbtests/mock/mock_dbclient_cursor.h"
+#include "mongo/client/dbclient_mockcursor.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/time_support.h"
 
@@ -82,14 +82,11 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
     const BSONObj* fieldsToReturn,
     int queryOptions,
     int batchSize) {
-    // The mock client does not support UUIDs.
-    invariant(nsOrUuid.nss());
-
     checkConnection();
 
     try {
         mongo::BSONArray result(_remoteServer->query(_remoteServerInstanceID,
-                                                     nsOrUuid.nss()->ns(),
+                                                     nsOrUuid,
                                                      query,
                                                      nToReturn,
                                                      nToSkip,
@@ -98,7 +95,7 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
                                                      batchSize));
 
         std::unique_ptr<mongo::DBClientCursor> cursor;
-        cursor.reset(new MockDBClientCursor(this, result));
+        cursor.reset(new DBClientMockCursor(this, BSONArray(result.copy()), batchSize));
         return cursor;
     } catch (const mongo::DBException&) {
         _isFailed = true;
@@ -130,9 +127,9 @@ unsigned long long MockDBClientConnection::query(
     const NamespaceStringOrUUID& nsOrUuid,
     mongo::Query query,
     const mongo::BSONObj* fieldsToReturn,
-    int queryOptions) {
-    verify(false);
-    return 0;
+    int queryOptions,
+    int batchSize) {
+    return DBClientBase::query(f, nsOrUuid, query, fieldsToReturn, queryOptions, batchSize);
 }
 
 uint64_t MockDBClientConnection::getSockCreationMicroSec() const {

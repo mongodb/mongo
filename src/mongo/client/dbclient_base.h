@@ -83,13 +83,15 @@ class DBClientQueryInterface {
                                      const NamespaceStringOrUUID& nsOrUuid,
                                      Query query,
                                      const BSONObj* fieldsToReturn = 0,
-                                     int queryOptions = 0) = 0;
+                                     int queryOptions = 0,
+                                     int batchSize = 0) = 0;
 
     virtual unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
                                      const NamespaceStringOrUUID& nsOrUuid,
                                      Query query,
                                      const BSONObj* fieldsToReturn = 0,
-                                     int queryOptions = 0) = 0;
+                                     int queryOptions = 0,
+                                     int batchSize = 0) = 0;
 };
 
 /**
@@ -604,13 +606,15 @@ public:
                              const NamespaceStringOrUUID& nsOrUuid,
                              Query query,
                              const BSONObj* fieldsToReturn = 0,
-                             int queryOptions = 0) final;
+                             int queryOptions = 0,
+                             int batchSize = 0) final;
 
     unsigned long long query(stdx::function<void(DBClientCursorBatchIterator&)> f,
                              const NamespaceStringOrUUID& nsOrUuid,
                              Query query,
                              const BSONObj* fieldsToReturn = 0,
-                             int queryOptions = 0) override;
+                             int queryOptions = 0,
+                             int batchSize = 0) override;
 
 
     /** don't use this - called automatically by DBClientCursor for you

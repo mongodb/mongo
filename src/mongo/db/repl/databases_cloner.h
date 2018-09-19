@@ -66,6 +66,8 @@ public:
 
     using IncludeDbFilterFn = stdx::function<bool(const BSONObj& dbInfo)>;
     using OnFinishFn = stdx::function<void(const Status&)>;
+    using StartCollectionClonerFn = DatabaseCloner::StartCollectionClonerFn;
+
     DatabasesCloner(StorageInterface* si,
                     executor::TaskExecutor* exec,
                     ThreadPool* dbWorkThreadPool,
@@ -95,6 +97,13 @@ public:
      * For testing only.
      */
     void setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& scheduleDbWorkFn);
+
+    /**
+     * Overrides how executor starts a collection cloner.
+     *
+     * For testing only.
+     */
+    void setStartCollectionClonerFn(const StartCollectionClonerFn& startCollectionCloner);
 
     /**
      * Calls DatabasesCloner::_setAdminAsFirst.
@@ -170,6 +179,7 @@ private:
     ThreadPool* _dbWorkThreadPool;  // (R) db worker thread pool for collection cloning.
     const HostAndPort _source;      // (R) The source to use.
     CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
+    StartCollectionClonerFn _startCollectionClonerFn;      // (M)
 
     const IncludeDbFilterFn _includeDbFn;  // (R) function which decides which dbs are cloned.
     OnFinishFn _finishFn;                  // (M) function called when finished.

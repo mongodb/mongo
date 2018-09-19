@@ -39,7 +39,6 @@ env.Library(
     source=[
         'mock/mock_conn_registry.cpp',
         'mock/mock_dbclient_connection.cpp',
-        'mock/mock_dbclient_cursor.cpp',
         'mock/mock_remote_db_server.cpp',
         'mock/mock_replica_set.cpp'
     ],

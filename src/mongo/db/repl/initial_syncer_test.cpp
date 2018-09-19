@@ -66,6 +66,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 
+#include "mongo/db/server_parameters.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 
@@ -324,6 +325,10 @@ protected:
         _dbWorkThreadPool = stdx::make_unique<ThreadPool>(ThreadPool::Options());
         _dbWorkThreadPool->startup();
 
+        _target = HostAndPort{"localhost:12346"};
+        _mockServer = stdx::make_unique<MockRemoteDBServer>(_target.toString());
+        _options1.uuid = UUID::gen();
+
         Client::initThreadIfNotAlready();
         reset();
 
@@ -401,7 +406,13 @@ protected:
                 [this](const executor::TaskExecutor::CallbackFn& work) {
                     return getExecutor().scheduleWork(work);
                 });
-
+            _initialSyncer->setStartCollectionClonerFn([this](CollectionCloner& cloner) {
+                cloner.setCreateClientFn_forTest([&cloner, this]() {
+                    return std::unique_ptr<DBClientConnection>(
+                        new MockDBClientConnection(_mockServer.get()));
+                });
+                return cloner.startup();
+            });
         } catch (...) {
             ASSERT_OK(exceptionToStatus());
         }
@@ -454,6 +465,9 @@ protected:
     OpTime _myLastOpTime;
     std::unique_ptr<SyncSourceSelectorMock> _syncSourceSelector;
     std::unique_ptr<StorageInterfaceMock> _storageInterface;
+    HostAndPort _target;
+    std::unique_ptr<MockRemoteDBServer> _mockServer;
+    CollectionOptions _options1;
     std::unique_ptr<ReplicationProcess> _replicationProcess;
     std::unique_ptr<ThreadPool> _dbWorkThreadPool;
     std::map<NamespaceString, CollectionMockStats> _collectionStats;
@@ -2875,15 +2889,19 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
+        // Set up data for "a"
+        _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
+        _mockServer->insert(nss.ns(), BSON("_id" << 1 << "a" << 1));
+
         // listCollections for "a"
-        request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, nss, {BSON("name" << nss.coll() << "options" << BSONObj())}));
+        request = net->scheduleSuccessfulResponse(makeCursorResponse(
+            0LL, nss, {BSON("name" << nss.coll() << "options" << _options1.toBSON())}));
         assertRemoteCommandNameEquals("listCollections", request);
 
         // count:a
         request = assertRemoteCommandNameEquals(
             "count", net->scheduleSuccessfulResponse(BSON("n" << 1 << "ok" << 1)));
-        ASSERT_EQUALS(nss.coll(), request.cmdObj.firstElement().String());
+        ASSERT_EQUALS(*_options1.uuid, UUID::parse(request.cmdObj.firstElement()));
         ASSERT_EQUALS(nss.db(), request.dbname);
 
         // listIndexes:a
@@ -2896,14 +2914,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
                           << "_id_"
                           << "ns"
                           << nss.ns())})));
-        ASSERT_EQUALS(nss.coll(), request.cmdObj.firstElement().String());
-        ASSERT_EQUALS(nss.db(), request.dbname);
-
-        // find:a
-        request = assertRemoteCommandNameEquals("find",
-                                                net->scheduleSuccessfulResponse(makeCursorResponse(
-                                                    0LL, nss, {BSON("_id" << 1 << "a" << 1)})));
-        ASSERT_EQUALS(nss.coll(), request.cmdObj.firstElement().String());
+        ASSERT_EQUALS(*_options1.uuid, UUID::parse(request.cmdObj.firstElement()));
         ASSERT_EQUALS(nss.db(), request.dbname);
 
         // Second last oplog entry fetcher.
@@ -3537,9 +3548,13 @@ TEST_F(InitialSyncerTest,
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         net->runReadyNetworkOperations();
 
+        // Set up data for "a"
+        _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
+        _mockServer->insert(nss.ns(), BSON("_id" << 1 << "a" << 1));
+
         // listCollections for "a"
-        request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, nss, {BSON("name" << nss.coll() << "options" << BSONObj())}));
+        request = net->scheduleSuccessfulResponse(makeCursorResponse(
+            0LL, nss, {BSON("name" << nss.coll() << "options" << _options1.toBSON())}));
         assertRemoteCommandNameEquals("listCollections", request);
 
         // Black hole OplogFetcher's getMore request.
@@ -3551,7 +3566,7 @@ TEST_F(InitialSyncerTest,
         // count:a
         request = net->scheduleSuccessfulResponse(BSON("n" << 1 << "ok" << 1));
         assertRemoteCommandNameEquals("count", request);
-        ASSERT_EQUALS(nss.coll(), request.cmdObj.firstElement().String());
+        ASSERT_EQUALS(*_options1.uuid, UUID::parse(request.cmdObj.firstElement()));
         ASSERT_EQUALS(nss.db(), request.dbname);
 
         // listIndexes:a
@@ -3563,14 +3578,7 @@ TEST_F(InitialSyncerTest,
                       << "ns"
                       << nss.ns())}));
         assertRemoteCommandNameEquals("listIndexes", request);
-        ASSERT_EQUALS(nss.coll(), request.cmdObj.firstElement().String());
-        ASSERT_EQUALS(nss.db(), request.dbname);
-
-        // find:a
-        request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, nss, {BSON("_id" << 1 << "a" << 1)}));
-        assertRemoteCommandNameEquals("find", request);
-        ASSERT_EQUALS(nss.coll(), request.cmdObj.firstElement().String());
+        ASSERT_EQUALS(*_options1.uuid, UUID::parse(request.cmdObj.firstElement()));
         ASSERT_EQUALS(nss.db(), request.dbname);
 
         // Second last oplog entry fetcher.
@@ -3761,6 +3769,10 @@ TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
 TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("collectionClonerBatchSize")
+                  ->second->setFromString("1"));
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), 2U));
@@ -3882,9 +3894,15 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         net->runReadyNetworkOperations();
 
+        // Set up data for "a"
+        _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
+        for (int i = 1; i <= 5; ++i) {
+            _mockServer->insert(nss.ns(), BSON("_id" << i << "a" << i));
+        }
+
         // listCollections for "a"
-        request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, nss, {BSON("name" << nss.coll() << "options" << BSONObj())}));
+        request = net->scheduleSuccessfulResponse(makeCursorResponse(
+            0LL, nss, {BSON("name" << nss.coll() << "options" << _options1.toBSON())}));
         assertRemoteCommandNameEquals("listCollections", request);
 
         auto noi = net->getNextReadyRequest();
@@ -3895,7 +3913,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         // count:a
         request = net->scheduleSuccessfulResponse(BSON("n" << 5 << "ok" << 1));
         assertRemoteCommandNameEquals("count", request);
-        ASSERT_EQUALS(nss.coll(), request.cmdObj.firstElement().String());
+        ASSERT_EQUALS(*_options1.uuid, UUID::parse(request.cmdObj.firstElement()));
         ASSERT_EQUALS(nss.db(), request.dbname);
 
         // listIndexes:a
@@ -3907,17 +3925,8 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
                       << "ns"
                       << nss.ns())}));
         assertRemoteCommandNameEquals("listIndexes", request);
-        ASSERT_EQUALS(nss.coll(), request.cmdObj.firstElement().String());
+        ASSERT_EQUALS(*_options1.uuid, UUID::parse(request.cmdObj.firstElement()));
         ASSERT_EQUALS(nss.db(), request.dbname);
-
-        // find:a - 5 batches
-        for (int i = 1; i <= 5; ++i) {
-            request = net->scheduleSuccessfulResponse(
-                makeCursorResponse(i < 5 ? 2LL : 0LL, nss, {BSON("_id" << i << "a" << i)}, i == 1));
-            ASSERT_EQUALS(i == 1 ? "find" : "getMore",
-                          request.cmdObj.firstElement().fieldNameStringData());
-            net->runReadyNetworkOperations();
-        }
 
         // Second last oplog entry fetcher.
         // Send oplog entry with timestamp 2. InitialSyncer will update this end timestamp after
@@ -3950,7 +3959,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         5, collectionProgress.getIntField(CollectionCloner::Stats::kDocumentsCopiedFieldName))
         << collectionProgress;
     ASSERT_EQUALS(1, collectionProgress.getIntField("indexes")) << collectionProgress;
-    ASSERT_EQUALS(5, collectionProgress.getIntField("fetchedBatches")) << collectionProgress;
+    ASSERT_EQUALS(5, collectionProgress.getIntField("receivedBatches")) << collectionProgress;
 
     attempts = progress["initialSyncAttempts"].Obj();
     ASSERT_EQUALS(attempts.nFields(), 1) << progress;
@@ -4061,8 +4070,10 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
         // listCollections for "a"
         std::vector<BSONObj> collectionInfos;
         for (std::size_t i = 0; i < numCollections; ++i) {
+            CollectionOptions options;
             const std::string collName = str::stream() << "coll-" << i;
-            collectionInfos.push_back(BSON("name" << collName << "options" << BSONObj()));
+            options.uuid = UUID::gen();
+            collectionInfos.push_back(BSON("name" << collName << "options" << options.toBSON()));
         }
         request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, nss.getCommandNS(), collectionInfos));

@@ -221,6 +221,18 @@ public:
         return _connectionHasPendingReplies;
     }
 
+protected:
+    struct Batch {
+        // TODO remove constructors after c++17 toolchain upgrade
+        Batch() = default;
+        Batch(std::vector<BSONObj> initial, size_t initialPos = 0)
+            : objs(std::move(initial)), pos(initialPos) {}
+        std::vector<BSONObj> objs;
+        size_t pos = 0;
+    };
+
+    Batch batch;
+
 private:
     DBClientCursor(DBClientBase* client,
                    const NamespaceStringOrUUID& nsOrUuid,
@@ -235,16 +247,6 @@ private:
 
     int nextBatchSize();
 
-    struct Batch {
-        // TODO remove constructors after c++17 toolchain upgrade
-        Batch() = default;
-        Batch(std::vector<BSONObj> initial, size_t initialPos = 0)
-            : objs(std::move(initial)), pos(initialPos) {}
-        std::vector<BSONObj> objs;
-        size_t pos = 0;
-    };
-
-    Batch batch;
     DBClientBase* _client;
     std::string _originalHost;
     NamespaceStringOrUUID _nsOrUuid;

@@ -135,6 +135,11 @@ void MockRemoteDBServer::remove(const string& ns, Query query, int flags) {
     _dataMgr.erase(ns);
 }
 
+void MockRemoteDBServer::assignCollectionUuid(const std::string& ns, const mongo::UUID& uuid) {
+    scoped_spinlock sLock(_lock);
+    _uuidToNs[uuid] = ns;
+}
+
 rpc::UniqueReply MockRemoteDBServer::runCommand(InstanceID id, const OpMsgRequest& request) {
     checkIfUp(id);
     std::string cmdName = request.getCommandName().toString();
@@ -169,7 +174,7 @@ rpc::UniqueReply MockRemoteDBServer::runCommand(InstanceID id, const OpMsgReques
 }
 
 mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
-                                           const string& ns,
+                                           const NamespaceStringOrUUID& nsOrUuid,
                                            mongo::Query query,
                                            int nToReturn,
                                            int nToSkip,
@@ -187,6 +192,7 @@ mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
     scoped_spinlock sLock(_lock);
     _queryCount++;
 
+    auto ns = nsOrUuid.uuid() ? _uuidToNs[*nsOrUuid.uuid()] : nsOrUuid.nss()->ns();
     const vector<BSONObj>& coll = _dataMgr[ns];
     BSONArrayBuilder result;
     for (vector<BSONObj>::const_iterator iter = coll.begin(); iter != coll.end(); ++iter) {

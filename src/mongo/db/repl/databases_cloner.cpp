@@ -230,6 +230,12 @@ void DatabasesCloner::setScheduleDbWorkFn_forTest(const CollectionCloner::Schedu
     _scheduleDbWorkFn = work;
 }
 
+void DatabasesCloner::setStartCollectionClonerFn(
+    const StartCollectionClonerFn& startCollectionCloner) {
+    LockGuard lk(_mutex);
+    _startCollectionClonerFn = startCollectionCloner;
+}
+
 StatusWith<std::vector<BSONElement>> DatabasesCloner::parseListDatabasesResponse_forTest(
     BSONObj dbResponse) {
     return _parseListDatabasesResponse(dbResponse);
@@ -359,6 +365,9 @@ void DatabasesCloner::_onListDatabaseFinish(
                 onDbFinish));
             if (_scheduleDbWorkFn) {
                 dbCloner->setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
+            }
+            if (_startCollectionClonerFn) {
+                dbCloner->setStartCollectionClonerFn(_startCollectionClonerFn);
             }
             // Start first database cloner.
             if (_databaseCloners.empty()) {

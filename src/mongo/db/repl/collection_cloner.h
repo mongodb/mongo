@@ -36,6 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -46,7 +47,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/query/async_results_merger.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -79,7 +79,8 @@ public:
         size_t documentToCopy{0};
         size_t documentsCopied{0};
         size_t indexes{0};
-        size_t fetchBatches{0};
+        size_t fetchedBatches{0};  // This is actually inserted batches.
+        size_t receivedBatches{0};
 
         std::string toString() const;
         BSONObj toBSON() const;
@@ -92,6 +93,13 @@ public:
      */
     using ScheduleDbWorkFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
         const executor::TaskExecutor::CallbackFn&)>;
+
+    /**
+     * Type of function to create a database client
+     *
+     * Used for testing only.
+     */
+    using CreateClientFn = stdx::function<std::unique_ptr<DBClientConnection>()>;
 
     /**
      * Creates CollectionCloner task in inactive state. Use start() to activate cloner.
@@ -145,6 +153,22 @@ public:
     void setScheduleDbWorkFn_forTest(const ScheduleDbWorkFn& scheduleDbWorkFn);
 
     /**
+     * Allows a different client class to be injected.
+     *
+     * For testing only.
+     */
+    void setCreateClientFn_forTest(const CreateClientFn& createClientFn);
+
+    /**
+     * Allows batch size to be changed after construction.
+     *
+     * For testing only.
+     */
+    void setBatchSize_forTest(int batchSize) {
+        const_cast<int&>(_collectionClonerBatchSize) = batchSize;
+    }
+
+    /**
      * Returns the documents currently stored in the '_documents' buffer that is intended
      * to be inserted through the collection loader.
      *
@@ -183,62 +207,39 @@ private:
      *
      * Called multiple times if there are more than one batch of responses from listIndexes
      * cursor.
-     *
-     * 'nextAction' is an in/out arg indicating the next action planned and to be taken
-     *  by the fetcher.
      */
     void _beginCollectionCallback(const executor::TaskExecutor::CallbackArgs& callbackData);
 
     /**
-     * Parses the cursor responses from the 'find' command and passes them into the
-     * 'AsyncResultsMerger'.
+     * Using a DBClientConnection, executes a query to retrieve all documents in the collection.
+     * For each batch returned by the upstream node, _handleNextBatch will be called with the data.
+     * This method will return when the entire query is finished or failed.
      */
-    void _establishCollectionCursorsCallback(const RemoteCommandCallbackArgs& rcbd);
+    void _runQuery(const executor::TaskExecutor::CallbackArgs& callbackData);
 
     /**
-     * Takes a cursors buffer and parses the 'find' response into cursor
-     * responses that are pushed onto the buffer.
+     * Put all results from a query batch into a buffer to be inserted, and schedule
+     * it to be inserted.
      */
-    Status _parseCursorResponse(BSONObj response, std::vector<CursorResponse>* cursors);
+    void _handleNextBatch(std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+                          DBClientCursorBatchIterator& iter);
 
     /**
-     * Calls to get the next event from the 'AsyncResultsMerger'. This schedules
-     * '_handleAsyncResultsCallback' to be run when the event is signaled successfully.
-     */
-    Status _scheduleNextARMResultsCallback(std::shared_ptr<OnCompletionGuard> onCompletionGuard);
-
-    /**
-     * Runs for each time a new batch of documents can be retrieved from the 'AsyncResultsMerger'.
-     * Buffers the documents retrieved for insertion and schedules a '_insertDocumentsCallback'
-     * to insert the contents of the buffer.
-     */
-    void _handleARMResultsCallback(const executor::TaskExecutor::CallbackArgs& cbd,
-                                   std::shared_ptr<OnCompletionGuard> onCompletionGuard);
-
-    /**
-     * Pull all ready results from the ARM into a buffer to be inserted.
-     */
-    Status _bufferNextBatchFromArm(WithLock lock);
-
-    /**
-     * Called whenever there is a new batch of documents ready from the 'AsyncResultsMerger'.
-     * On the last batch, 'lastBatch' will be true.
+     * Called whenever there is a new batch of documents ready from the DBClientConnection.
      *
      * Each document returned will be inserted via the storage interfaceRequest storage
      * interface.
      */
     void _insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd,
-                                  bool lastBatch,
                                   std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
-     * Verifies that an error from the ARM was the result of a collection drop.  If
+     * Verifies that an error from the query was the result of a collection drop.  If
      * so, cloning is stopped with no error.  Otherwise it is stopped with the given error.
      */
     void _verifyCollectionWasDropped(const stdx::unique_lock<stdx::mutex>& lk,
                                      Status batchStatus,
-                                     std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-                                     OperationContext* opCtx);
+                                     std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Reports completion status.
@@ -271,27 +272,30 @@ private:
     Fetcher _listIndexesFetcher;                  // (S)
     std::vector<BSONObj> _indexSpecs;             // (M)
     BSONObj _idIndexSpec;                         // (M)
-    std::vector<BSONObj>
-        _documentsToInsert;        // (M) Documents read from 'AsyncResultsMerger' to insert.
-    TaskRunner _dbWorkTaskRunner;  // (R)
+    std::vector<BSONObj> _documentsToInsert;      // (M) Documents read from source to insert.
+    TaskRunner _dbWorkTaskRunner;                 // (R)
     ScheduleDbWorkFn
-        _scheduleDbWorkFn;         // (RT) Function for scheduling database work using the executor.
-    Stats _stats;                  // (M) stats for this instance.
-    ProgressMeter _progressMeter;  // (M) progress meter for this instance.
-    const int _collectionCloningBatchSize;  // (R) The size of the batches of documents returned in
-                                            // collection cloning.
-
-    // (M) Component responsible for fetching the documents from the collection cloner cursor(s).
-    std::unique_ptr<AsyncResultsMerger> _arm;
-
-    // (M) The event handle for the 'kill' event of the 'AsyncResultsMerger'.
-    executor::TaskExecutor::EventHandle _killArmHandle;
+        _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.
+    CreateClientFn _createClientFn;        // (RT) Function for creating a database client.
+    Stats _stats;                          // (M) stats for this instance.
+    ProgressMeter _progressMeter;          // (M) progress meter for this instance.
+    const int _collectionClonerBatchSize;  // (R) The size of the batches of documents returned in
+                                           // collection cloning.
 
     // (M) Scheduler used to establish the initial cursor or set of cursors.
     std::unique_ptr<RemoteCommandRetryScheduler> _establishCollectionCursorsScheduler;
 
     // (M) Scheduler used to determine if a cursor was closed because the collection was dropped.
     std::unique_ptr<RemoteCommandRetryScheduler> _verifyCollectionDroppedScheduler;
+
+    // (M) State of query.  Set to kCanceling to cause query to stop. If the query is kRunning
+    // or kCanceling, wait for query to reach kFinished using _condition
+    enum class QueryState {
+        kNotStarted,
+        kRunning,
+        kCanceling,
+        kFinished
+    } _queryState = QueryState::kNotStarted;
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete

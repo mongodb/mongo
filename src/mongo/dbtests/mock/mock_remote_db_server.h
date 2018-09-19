@@ -146,13 +146,21 @@ public:
      */
     void remove(const std::string& ns, Query query, int flags = 0);
 
+    /**
+     * Assign a UUID to a collection
+     *
+     * @param ns the namespace to be associated with the uuid.
+     * @param uuid the uuid to associate with the namespace.
+     */
+    void assignCollectionUuid(const std::string& ns, const mongo::UUID& uuid);
+
     //
     // DBClientBase methods
     //
     rpc::UniqueReply runCommand(InstanceID id, const OpMsgRequest& request);
 
     mongo::BSONArray query(InstanceID id,
-                           const std::string& ns,
+                           const NamespaceStringOrUUID& nsOrUuid,
                            mongo::Query query = mongo::Query(),
                            int nToReturn = 0,
                            int nToSkip = 0,
@@ -210,6 +218,7 @@ private:
 
     typedef stdx::unordered_map<std::string, std::shared_ptr<CircularBSONIterator>> CmdToReplyObj;
     typedef stdx::unordered_map<std::string, std::vector<BSONObj>> MockDataMgr;
+    typedef stdx::unordered_map<mongo::UUID, std::string, UUID::Hash> UUIDMap;
 
     bool _isRunning;
 
@@ -221,6 +230,7 @@ private:
     //
     CmdToReplyObj _cmdMap;
     MockDataMgr _dataMgr;
+    UUIDMap _uuidToNs;
 
     //
     // Op Counters

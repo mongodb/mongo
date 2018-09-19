@@ -65,9 +65,18 @@ const char* kOptionsFieldName = "options";
 const char* kInfoFieldName = "info";
 const char* kUUIDFieldName = "uuid";
 
-// The batchSize to use for the find/getMore queries called by the CollectionCloner
-constexpr int kUseARMDefaultBatchSize = -1;
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(collectionClonerBatchSize, int, kUseARMDefaultBatchSize);
+// The batch size (number of documents) to use for the queries in the CollectionCloner.  Default of
+// 0 means the limit is the number of documents which fit in a single BSON object.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(collectionClonerBatchSize, int, 0)
+    ->withValidator([](const int& batchSize) {
+        return (batchSize >= 0)
+            ? Status::OK()
+            : Status(ErrorCodes::Error(50952),
+                     str::stream()
+                         << "collectionClonerBatchSize must be greater than or equal to 0. '"
+                         << batchSize
+                         << "' is an invalid setting.");
+    });
 
 // The number of attempts for the listCollections commands.
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListCollectionsAttempts, int, 3);

@@ -214,13 +214,13 @@ void BaseClonerTest::finishProcessingNetworkResponse() {
 }
 
 void BaseClonerTest::testLifeCycle() {
-    // IsActiveAfterStart
+    log() << "Testing IsActiveAfterStart";
     ASSERT_FALSE(getCloner()->isActive());
     ASSERT_OK(getCloner()->startup());
     ASSERT_TRUE(getCloner()->isActive());
     tearDown();
 
-    // StartWhenActive
+    log() << "Testing StartWhenActive";
     setUp();
     ASSERT_OK(getCloner()->startup());
     ASSERT_TRUE(getCloner()->isActive());
@@ -228,28 +228,28 @@ void BaseClonerTest::testLifeCycle() {
     ASSERT_TRUE(getCloner()->isActive());
     tearDown();
 
-    // CancelWithoutStart
+    log() << "Testing CancelWithoutStart";
     setUp();
     ASSERT_FALSE(getCloner()->isActive());
     getCloner()->shutdown();
     ASSERT_FALSE(getCloner()->isActive());
     tearDown();
 
-    // WaitWithoutStart
+    log() << "Testing WaitWithoutStart";
     setUp();
     ASSERT_FALSE(getCloner()->isActive());
     getCloner()->join();
     ASSERT_FALSE(getCloner()->isActive());
     tearDown();
 
-    // ShutdownBeforeStart
+    log() << "Testing ShutdownBeforeStart";
     setUp();
     getExecutor().shutdown();
     ASSERT_NOT_OK(getCloner()->startup());
     ASSERT_FALSE(getCloner()->isActive());
     tearDown();
 
-    // StartAndCancel
+    log() << "Testing StartAndCancel";
     setUp();
     ASSERT_OK(getCloner()->startup());
     getCloner()->shutdown();
@@ -261,7 +261,7 @@ void BaseClonerTest::testLifeCycle() {
     ASSERT_FALSE(getCloner()->isActive());
     tearDown();
 
-    // StartButShutdown
+    log() << "Testing StartButShutdown";
     setUp();
     ASSERT_OK(getCloner()->startup());
     {

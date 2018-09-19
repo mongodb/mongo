@@ -381,6 +381,12 @@ void InitialSyncer::setScheduleDbWorkFn_forTest(const CollectionCloner::Schedule
     _scheduleDbWorkFn = work;
 }
 
+void InitialSyncer::setStartCollectionClonerFn(
+    const StartCollectionClonerFn& startCollectionCloner) {
+    LockGuard lk(_mutex);
+    _startCollectionClonerFn = startCollectionCloner;
+}
+
 void InitialSyncer::_setUp_inlock(OperationContext* opCtx, std::uint32_t initialSyncMaxAttempts) {
     // 'opCtx' is passed through from startup().
     _replicationProcess->getConsistencyMarkers()->setInitialSyncFlag(opCtx);
@@ -836,6 +842,9 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         // to the CollectionCloner so that CollectionCloner's default TaskRunner can be disabled to
         // facilitate testing.
         _initialSyncState->dbsCloner->setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
+    }
+    if (_startCollectionClonerFn) {
+        _initialSyncState->dbsCloner->setStartCollectionClonerFn(_startCollectionClonerFn);
     }
 
     LOG(2) << "Starting DatabasesCloner: " << _initialSyncState->dbsCloner->toString();
