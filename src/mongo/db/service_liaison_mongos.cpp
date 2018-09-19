@@ -44,15 +44,34 @@ LogicalSessionIdSet ServiceLiaisonMongos::getActiveOpSessions() const {
 
     invariant(hasGlobalServiceContext());
 
-    // Append any in-use session ids from the global cluster cursor managers.
-    auto cursorManager = Grid::get(getGlobalServiceContext())->getCursorManager();
-    cursorManager->appendActiveSessions(&activeSessions);
+    // Walk through the service context and append lsids for all currently-running ops.
+    for (ServiceContext::LockedClientsCursor cursor(getGlobalServiceContext());
+         Client* client = cursor.next();) {
 
+        stdx::lock_guard<Client> lk(*client);
+        auto clientOpCtx = client->getOperationContext();
+
+        // Ignore clients without currently-running operations
+        if (!clientOpCtx)
+            continue;
+
+        // Append this op ctx's session to our list, if it has one
+        auto lsid = clientOpCtx->getLogicalSessionId();
+        if (lsid) {
+            activeSessions.insert(*lsid);
+        }
+    }
     return activeSessions;
 }
 
 LogicalSessionIdSet ServiceLiaisonMongos::getOpenCursorSessions() const {
     LogicalSessionIdSet openCursorSessions;
+
+    invariant(hasGlobalServiceContext());
+
+    // Append any in-use session ids from the global cluster cursor managers.
+    auto cursorManager = Grid::get(getGlobalServiceContext())->getCursorManager();
+    cursorManager->appendActiveSessions(&openCursorSessions);
 
     return openCursorSessions;
 }
