@@ -36,20 +36,6 @@
 namespace mongo {
 namespace {
 
-class UnshardedCollection : public ScopedCollectionMetadata::Impl {
-public:
-    UnshardedCollection() = default;
-
-    const CollectionMetadata& get() override {
-        return _metadata;
-    }
-
-private:
-    CollectionMetadata _metadata;
-};
-
-const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
-
 class CollectionShardingStateFactoryEmbedded final : public CollectionShardingStateFactory {
 public:
     CollectionShardingStateFactoryEmbedded(ServiceContext* serviceContext)
@@ -61,8 +47,9 @@ public:
             CollectionShardingStateStandalone(NamespaceString nss) : CollectionShardingState(nss) {}
 
         private:
-            ScopedCollectionMetadata _getMetadata(OperationContext* opCtx) override {
-                return {kUnshardedCollection};
+            boost::optional<ScopedCollectionMetadata> _getMetadata(
+                const boost::optional<mongo::LogicalTime>& atClusterTime) override {
+                return boost::none;
             }
         };
 
