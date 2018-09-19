@@ -132,8 +132,5 @@
         // Disable $** indexes once the tests have either completed or failed.
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false}));
-
-        // TODO: SERVER-36444 remove calls to drop() once wildcard index validation works.
-        coll.drop();
     }
 })();

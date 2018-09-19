@@ -95,8 +95,5 @@
         // Disable $** indexes once the tests have either completed or failed.
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: false}));
-
-        // TODO: SERVER-36444 remove this coll.drop because validation should work now.
-        coll.drop();
     }
 })();
