@@ -18,17 +18,14 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.prefix = 'reindex_background';
 
     $config.states.createIndexes = function createIndexes(db, collName) {
-        var coll = db[this.threadCollName];
+        const coll = db[this.threadCollName];
+        const options = {background: true};
 
-        // The number of indexes created here is also stored in data.nIndexes
-        var textResult = coll.ensureIndex({text: 'text'}, {background: true});
-        assertAlways.commandWorked(textResult);
-
-        var geoResult = coll.ensureIndex({geo: '2dsphere'}, {background: true});
-        assertAlways.commandWorked(geoResult);
-
-        var integerResult = coll.ensureIndex({integer: 1}, {background: true});
-        assertAlways.commandWorked(integerResult);
+        // The number of indexes created here is also stored in data.nIndexes.
+        assertAlways.commandWorked(coll.createIndex({text: 'text'}, options));
+        assertAlways.commandWorked(coll.createIndex({geo: '2dsphere'}, options));
+        assertAlways.commandWorked(coll.createIndex({integer: 1}, options));
+        assertAlways.commandWorked(coll.createIndex({"$**": 1}, options));
     };
 
     return $config;

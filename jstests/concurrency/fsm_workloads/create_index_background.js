@@ -26,6 +26,13 @@ var $config = (function() {
                 highest = cursor.next().x;
             });
             return highest;
+        },
+        getIndexSpec: function getIndexSpec() {
+            return {x: 1};
+        },
+        extendDocument: function getDocument(originalDocument) {
+            // Only relevant for extended workloads.
+            return originalDocument;
         }
     };
 
@@ -35,7 +42,8 @@ var $config = (function() {
             // Add thread-specific documents
             var bulk = db[collName].initializeUnorderedBulkOp();
             for (var i = 0; i < this.nDocumentsToSeed; ++i) {
-                bulk.insert({x: i, tid: this.tid});
+                const doc = {x: i, tid: this.tid};
+                bulk.insert(this.extendDocument(doc));
             }
             var res = bulk.execute();
             assertAlways.writeOK(res);
@@ -49,7 +57,7 @@ var $config = (function() {
                 assertWhenOwnColl.soon(function() {
                     return coll.find({crud: {$exists: true}}).itcount() > 0;
                 }, 'No documents with "crud" field have been inserted or updated', 60 * 1000);
-                res = coll.ensureIndex({x: 1}, {background: true});
+                res = coll.createIndex(this.getIndexSpec(), {background: true});
                 assertAlways.commandWorked(res, tojson(res));
             }
         }
@@ -62,7 +70,8 @@ var $config = (function() {
 
             var highest = this.getHighestX(coll, this.tid);
             for (var i = 0; i < this.nDocumentsToCreate; ++i) {
-                res = coll.insert({x: i + highest + 1, tid: this.tid, crud: 1});
+                const doc = {x: i + highest + 1, tid: this.tid, crud: 1};
+                res = coll.insert(this.extendDocument(doc));
                 assertAlways.writeOK(res);
                 assertAlways.eq(res.nInserted, 1, tojson(res));
             }
