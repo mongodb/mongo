@@ -414,6 +414,7 @@ mongos = env.Program(
         's/version_mongos.cpp',
     ] + env.WindowsResourceFile("s/server.rc"),
     LIBDEPS=[
+        'db/audit',
         'db/auth/authmongos',
         'db/commands/server_status',
         'db/commands/server_status_core',
@@ -438,12 +439,10 @@ mongos = env.Program(
         'transport/transport_layer_manager',
         'util/clock_sources',
         'util/fail_point',
+        'util/net/ssl_options_server' if has_option('ssl') else '',
         'util/ntservice',
         'util/options_parser/options_parser_init',
         'util/version_impl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/net/ssl_options_server' if has_option('ssl') else '',
     ],
     INSTALL_ALIAS=[
         'servers',
