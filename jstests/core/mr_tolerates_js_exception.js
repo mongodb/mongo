@@ -1,7 +1,11 @@
-// @tags: [does_not_support_stepdowns]
-
 /**
- *  Test that the mapReduce command fails gracefully when user-provided JavaScript code throws.
+ * Test that the mapReduce command fails gracefully when user-provided JavaScript code throws and
+ * that the user gets back a JavaScript stacktrace.
+ *
+ * @tags: [
+ *   does_not_support_stepdowns,
+ *   requires_scripting,
+ * ]
  */
 (function() {
     "use strict";
@@ -20,18 +24,32 @@
             emit(this.a, 1);
         },
         reduce: function(key, value) {
-            throw 42;
+            (function myFunction() {
+                throw new Error("Intentionally thrown inside reduce function");
+            })();
         },
         out: {inline: 1}
     });
     assert.commandFailedWithCode(cmdOutput, ErrorCodes.JSInterpreterFailure, tojson(cmdOutput));
+    assert(/Intentionally thrown inside reduce function/.test(cmdOutput.errmsg),
+           () => "mapReduce didn't include the message from the exception thrown: " +
+               tojson(cmdOutput));
+    assert(/myFunction@/.test(cmdOutput.errmsg),
+           () => "mapReduce didn't return the JavaScript stacktrace: " + tojson(cmdOutput));
+    assert(
+        !cmdOutput.hasOwnProperty("stack"),
+        () => "mapReduce shouldn't return JavaScript stacktrace separately: " + tojson(cmdOutput));
+    assert(!cmdOutput.hasOwnProperty("originalError"),
+           () => "mapReduce shouldn't return wrapped version of the error: " + tojson(cmdOutput));
 
     // Test that the command fails with a JS interpreter failure error when the map function
     // throws.
     cmdOutput = db.runCommand({
         mapReduce: coll.getName(),
         map: function() {
-            throw 42;
+            (function myFunction() {
+                throw new Error("Intentionally thrown inside map function");
+            })();
         },
         reduce: function(key, value) {
             return Array.sum(value);
@@ -39,4 +57,14 @@
         out: {inline: 1}
     });
     assert.commandFailedWithCode(cmdOutput, ErrorCodes.JSInterpreterFailure, tojson(cmdOutput));
+    assert(/Intentionally thrown inside map function/.test(cmdOutput.errmsg),
+           () => "mapReduce didn't include the message from the exception thrown: " +
+               tojson(cmdOutput));
+    assert(/myFunction@/.test(cmdOutput.errmsg),
+           () => "mapReduce didn't return the JavaScript stacktrace: " + tojson(cmdOutput));
+    assert(
+        !cmdOutput.hasOwnProperty("stack"),
+        () => "mapReduce shouldn't return JavaScript stacktrace separately: " + tojson(cmdOutput));
+    assert(!cmdOutput.hasOwnProperty("originalError"),
+           () => "mapReduce shouldn't return wrapped version of the error: " + tojson(cmdOutput));
 }());

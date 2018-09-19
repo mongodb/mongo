@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2017 MongoDB Inc.
+ * Copyright (C) 2018 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,42 +28,36 @@
 
 #pragma once
 
-#include "mongo/scripting/mozjs/wraptype.h"
+#include <string>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
-namespace mozjs {
 
 /**
- * The "MongoStatus" Javascript object.
+ * Represents information about a JavaScript exception. The "message" is stored as the Status's
+ * reason(), so only the "stack" is stored here.
  *
- * This type wraps the "Status" type in the server, allowing for lossless throwing of mongodb native
- * exceptions through javascript.  It can be created (albeit without sidecar) from javascript.
- * These are also created automatically when exceptions are thrown from native c++ functions.
- *
- * They are somewhat special, in that the prototype for each MongoStatus object is actually an Error
- * object specific to that status object.  This allows Error-like behavior such as useful stack
- * traces, and instanceOf Error.
+ * This class wraps an existing error and serializes it in a lossless way, so any other metadata
+ * about the JavaScript exception is also preserved.
  */
-struct MongoStatusInfo : public BaseInfo {
-    static void construct(JSContext* cx, JS::CallArgs args);
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+class JSExceptionInfo final : public ErrorExtraInfo {
+public:
+    static constexpr auto code = ErrorCodes::JSInterpreterFailureWithStack;
 
-    struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(code);
-        MONGO_DECLARE_JS_FUNCTION(reason);
-        MONGO_DECLARE_JS_FUNCTION(stack);
-    };
+    void serialize(BSONObjBuilder*) const override;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-    static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
+    explicit JSExceptionInfo(std::string stack_, Status originalError_)
+        : stack(std::move(stack_)), originalError(std::move(originalError_)) {
+        invariant(!stack.empty());
+        invariant(!originalError.isOK());
+    }
 
-    static const char* const className;
-    static const char* const inheritFrom;
-    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
-
-    static Status toStatus(JSContext* cx, JS::HandleObject object);
-    static Status toStatus(JSContext* cx, JS::HandleValue value);
-    static void fromStatus(JSContext* cx, Status status, JS::MutableHandleValue value);
+    const std::string stack;
+    const Status originalError;
 };
 
-}  // namespace mozjs
 }  // namespace mongo

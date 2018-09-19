@@ -15,6 +15,7 @@ env.Library(
         'deadline_monitor.cpp',
         'dbdirectclient_factory.cpp',
         'engine.cpp',
+        'jsexception.cpp',
         'utils.cpp',
     ],
     LIBDEPS=[

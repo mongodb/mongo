@@ -41,11 +41,13 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/stack_locator.h"
+#include "mongo/scripting/jsexception.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -125,10 +127,6 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
         std::string exceptionMsg;
 
         try {
-            str::stream ss;
-
-            ss << message;
-
             // TODO: something far more elaborate that mimics the stack printing from v8
             JS::RootedValue excn(cx);
             if (JS_GetPendingException(cx, &excn) && excn.isObject()) {
@@ -138,23 +136,24 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
                 ObjectWrapper o(cx, obj);
                 o.getValue("stack", &stack);
 
-                auto str = ValueWriter(cx, stack).toString();
+                auto stackStr = ValueWriter(cx, stack).toString();
 
-                if (str.empty()) {
-                    ss << " @" << report->filename << ":" << report->lineno << ":" << report->column
+                if (stackStr.empty()) {
+                    str::stream ss;
+                    ss << "@" << report->filename << ":" << report->lineno << ":" << report->column
                        << "\n";
-                } else {
-                    ss << " :\n" << str;
+                    stackStr = ss;
                 }
 
-                scope->_status =
+                auto status =
                     jsExceptionToStatus(cx, excn, ErrorCodes::JSInterpreterFailure, message)
-                        .withReason(ss);
+                        .withReason(message);
+                scope->_status = {JSExceptionInfo(std::move(stackStr), std::move(status)), message};
 
                 return;
             }
 
-            exceptionMsg = ss;
+            exceptionMsg = message;
         } catch (const DBException& dbe) {
             exceptionMsg = "Unknown error occured while processing exception";
             log() << exceptionMsg << ":" << dbe.toString() << ":" << message;
@@ -526,12 +525,28 @@ auto MozJSImplScope::_runSafely(ImplScopeFunction&& functionToRun) -> decltype(f
         MozJSEntry entry(this);
         return functionToRun();
     } catch (...) {
+        // There may have already been an error reported by SpiderMonkey. If not, then we use the
+        // active C++ exception as the cause of the error.
+        if (_status.isOK()) {
+            _status = exceptionToStatus();
+        }
+
+        if (auto extraInfo = _status.extraInfo<JSExceptionInfo>()) {
+            // We intentionally don't transmit an JSInterpreterFailureWithStack error over the wire
+            // because of the complexity it'd entail on the recipient to reach inside to the
+            // underlying error for how it should be handled. Instead, the error is unwrapped and
+            // the JavaScript stacktrace is included as part of the error message.
+            str::stream reasonWithStack;
+            reasonWithStack << extraInfo->originalError.reason() << " :\n" << extraInfo->stack;
+            _status = extraInfo->originalError.withReason(reasonWithStack);
+        }
+
         _error = _status.reason();
 
         // Clear the status state
         auto status = std::move(_status);
         uassertStatusOK(status);
-        throw;
+        MONGO_UNREACHABLE;
     }
 }
 
@@ -609,6 +624,10 @@ void MozJSImplScope::_MozJSCreateFunction(StringData raw, JS::MutableHandleValue
 }
 
 BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
+    // The _runSafely() function is called for all codepaths of executing JavaScript other than
+    // callThreadArgs(). We intentionally don't unwrap the JSInterpreterFailureWithStack error to
+    // make it possible for the parent thread to chain its JavaScript stacktrace with the child
+    // thread's JavaScript stacktrace.
     MozJSEntry entry(this);
 
     JS::RootedValue function(_context);
@@ -903,16 +922,21 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
                 ss << "[" << fnameStr << ":" << lineNum << ":" << colNum << "] ";
             }
             ss << ValueWriter(_context, excn).toString();
-            if (stackStr != "") {
-                ss << "\nStack trace:\n" << stackStr << "----------\n";
-            }
-            _status = Status(ErrorCodes::JSInterpreterFailure, ss);
+            _status = {
+                JSExceptionInfo(std::move(stackStr), Status(ErrorCodes::JSInterpreterFailure, ss)),
+                ss};
         } else {
             _status = Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
         }
     }
 
-    _error = _status.reason();
+    if (auto extraInfo = _status.extraInfo<JSExceptionInfo>()) {
+        str::stream reasonWithStack;
+        reasonWithStack << _status.reason() << " :\n" << extraInfo->stack;
+        _error = reasonWithStack;
+    } else {
+        _error = _status.reason();
+    }
 
     if (reportError)
         error() << redact(_error);

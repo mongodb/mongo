@@ -30,6 +30,7 @@
 
 #include "mongo/scripting/mozjs/status.h"
 
+#include "mongo/scripting/jsexception.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -76,6 +77,14 @@ void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandle
         JSPROP_ENUMERATE | JSPROP_SHARED,
         smUtils::wrapConstrainedMethod<Functions::reason, false, MongoStatusInfo>);
 
+    // We intentionally omit JSPROP_ENUMERATE to match how Error.prototype.stack is a non-enumerable
+    // property.
+    thisvObj.defineProperty(
+        InternedString::stack,
+        undef,
+        JSPROP_SHARED,
+        smUtils::wrapConstrainedMethod<Functions::stack, false, MongoStatusInfo>);
+
     JS_SetPrivate(thisv, scope->trackedNew<Status>(std::move(status)));
 
     value.setObjectOrNull(thisv);
@@ -104,6 +113,41 @@ void MongoStatusInfo::Functions::code::call(JSContext* cx, JS::CallArgs args) {
 
 void MongoStatusInfo::Functions::reason::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData(toStatus(cx, args.thisv()).reason());
+}
+
+void MongoStatusInfo::Functions::stack::call(JSContext* cx, JS::CallArgs args) {
+    JS::RootedObject thisv(cx, args.thisv().toObjectOrNull());
+    JS::RootedObject parent(cx);
+
+    if (!JS_GetPrototype(cx, thisv, &parent)) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Couldn't get prototype");
+    }
+
+    ObjectWrapper parentWrapper(cx, parent);
+
+    auto status = toStatus(cx, args.thisv());
+    if (auto extraInfo = status.extraInfo<JSExceptionInfo>()) {
+        // 'status' represents an uncaught JavaScript exception that was handled in C++. It is
+        // expected to have been thrown by a JSThread. We chain its stacktrace together with the
+        // stacktrace of the JavaScript exception in the current thread in order to show more
+        // context about the latter's cause.
+        JS::RootedValue stack(cx);
+        ValueReader(cx, &stack)
+            .fromStringData(extraInfo->stack + parentWrapper.getString(InternedString::stack));
+
+        // We redefine the "stack" property as the combined JavaScript stacktrace. It is important
+        // that we omit JSPROP_SHARED to the thisvObj.defineProperty() call in order to have
+        // SpiderMonkey allocate memory for the string value. We also intentionally omit
+        // JSPROP_ENUMERATE to match how Error.prototype.stack is a non-enumerable property.
+        ObjectWrapper thisvObj(cx, args.thisv());
+        thisvObj.defineProperty(InternedString::stack, stack, 0U);
+
+        // We intentionally use thisvObj.getValue() to access the "stack" property to implicitly
+        // verify it has been redefined correctly, as the alternative would be infinite recursion.
+        thisvObj.getValue(InternedString::stack, args.rval());
+    } else {
+        parentWrapper.getValue(InternedString::stack, args.rval());
+    }
 }
 
 void MongoStatusInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {

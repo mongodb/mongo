@@ -124,6 +124,8 @@ public:
 
         PR_JoinThread(_thread);
         _done = true;
+
+        uassertStatusOK(_sharedData->getErrorStatus());
     }
 
     /**
@@ -134,7 +136,7 @@ public:
     bool hasFailed() const {
         uassert(ErrorCodes::JSInterpreterFailure, "Thread not started", _started);
 
-        return _sharedData->getErrored();
+        return !_sharedData->getErrorStatus().isOK();
     }
 
     BSONObj returnData() {
@@ -154,16 +156,16 @@ private:
      */
     class SharedData {
     public:
-        SharedData() : _errored(false) {}
+        SharedData() = default;
 
-        void setErrored(bool value) {
-            stdx::lock_guard<stdx::mutex> lck(_erroredMutex);
-            _errored = value;
+        void setErrorStatus(Status status) {
+            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
+            _status = std::move(status);
         }
 
-        bool getErrored() {
-            stdx::lock_guard<stdx::mutex> lck(_erroredMutex);
-            return _errored;
+        Status getErrorStatus() {
+            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
+            return _status;
         }
 
         /**
@@ -176,8 +178,8 @@ private:
         std::string _stack;
 
     private:
-        stdx::mutex _erroredMutex;
-        bool _errored;
+        stdx::mutex _statusMutex;
+        Status _status = Status::OK();
     };
 
     /**
@@ -197,10 +199,7 @@ private:
                 thisv->_sharedData->_returnData = scope.callThreadArgs(thisv->_sharedData->_args);
             } catch (...) {
                 auto status = exceptionToStatus();
-
-                log() << "js thread raised js exception: " << redact(status)
-                      << thisv->_sharedData->_stack;
-                thisv->_sharedData->setErrored(true);
+                thisv->_sharedData->setErrorStatus(status);
                 thisv->_sharedData->_returnData = BSON("ret" << BSONUndefined);
             }
         }
