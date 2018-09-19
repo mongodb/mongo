@@ -1440,7 +1440,6 @@ functions:
           PATH="$path_value"                              \
               AWS_PROFILE=${aws_profile_remote}           \
               ${gcov_environment}                         \
-              ${rlp_environment}                          \
               ${lang_environment}                         \
               ${san_options}                              \
               ${san_symbolizer}                           \
@@ -5501,15 +5500,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_simultaneous_replication --storageEngine=wiredTiger
-
-- <<: *task_template
-  name: rlp
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=rlp --storageEngine=wiredTiger
-      run_multiple_jobs: true
 
 - <<: *task_template
   name: read_concern_linearizable_passthrough
@@ -10688,8 +10678,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel62
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -10915,7 +10904,6 @@ buildvariants:
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
     - rhel62-large
-  - name: rlp
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
@@ -12813,9 +12801,8 @@ buildvariants:
   - rhel62-small
   batchtime: 1440 # 1 day
   expansions: &enterprise-rhel-62-64-bit-inmem-expansions
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -12914,7 +12901,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_stepdown_passthrough
-  - name: rlp
   - name: rollback_fuzzer
   - name: sasl
   - name: session_jscore_passthrough
@@ -12982,7 +12968,6 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --mobile-se=on
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-      CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include"
       MONGO_DISTMOD=rhel62
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
