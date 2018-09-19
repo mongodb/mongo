@@ -36,6 +36,18 @@ load('jstests/ssl/libs/ssl_helpers.js');
                                    'quit()') === 0;
         }, "mongo did not initialize properly");
 
+        // Keep checking the log file until client metadata is logged since the SSL warning is
+        // logged before it.
+        assert.soon(
+            () => {
+                const log = rawMongoProgramOutput();
+                return log.search('client metadata') !== -1;
+            },
+            "logfile should contain 'client metadata'.\n" +
+                "Log File Contents\n==============================\n" + rawMongoProgramOutput() +
+                "\n==============================\n");
+
+        // Now check for the message
         const log = rawMongoProgramOutput();
         assert.eq(suppress, log.search('no SSL certificate provided by peer') === -1);
 
