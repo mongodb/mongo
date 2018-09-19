@@ -133,4 +133,7 @@
         assert.neq(queryIndexedExplain.queryPlanner.queryHash,
                    queryUnindexedExplain.queryPlanner.queryHash);
     })();
+
+    // TODO: SERVER-36444 remove calls to drop() once wildcard index validation works.
+    coll.drop();
 })();
