@@ -10,7 +10,7 @@
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryAllowAllPathsIndexes: true}));
 
-    assert.commandWorked(coll.createIndex({"$**": 1}, {starPathsTempName: {"excludedField": 0}}));
+    assert.commandWorked(coll.createIndex({"$**": 1}, {wildcardProjection: {"excludedField": 0}}));
 
     for (let i = 0; i < 50; i++) {
         assert.commandWorked(coll.insert({a: i, b: -i, x: [123], excludedField: i}));

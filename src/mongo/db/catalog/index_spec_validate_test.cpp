@@ -843,7 +843,7 @@ TEST(IndexSpecAllPaths, SucceedsWithInclusion) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("a" << 1 << "b" << 1)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -855,7 +855,7 @@ TEST(IndexSpecAllPaths, SucceedsWithExclusion) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("a" << 0 << "b" << 0)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -867,7 +867,7 @@ TEST(IndexSpecAllPaths, SucceedsWithExclusionIncludingId) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("_id" << 1 << "a" << 0 << "b" << 0)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -879,7 +879,7 @@ TEST(IndexSpecAllPaths, SucceedsWithInclusionExcludingId) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("_id" << 0 << "a" << 1 << "b" << 1)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -891,7 +891,7 @@ TEST(IndexSpecAllPaths, FailsWithInclusionExcludingIdSubfield) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("_id.field" << 0 << "a" << 1 << "b" << 1)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -903,7 +903,7 @@ TEST(IndexSpecAllPaths, FailsWithExclusionIncludingIdSubfield) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("_id.field" << 1 << "a" << 0 << "b" << 0)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -927,7 +927,7 @@ TEST(IndexSpecAllPaths, FailsWithMixedProjection) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("a" << 1 << "b" << 0)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -939,7 +939,7 @@ TEST(IndexSpecAllPaths, FailsWithComputedFieldsInProjection) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("a" << 1 << "b"
                                                            << "string")),
                                     kTestNamespace,
@@ -952,7 +952,7 @@ TEST(IndexSpecAllPaths, FailsWhenProjectionPluginNotAllPaths) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("a" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("a" << 1)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -964,7 +964,7 @@ TEST(IndexSpecAllPaths, FailsWhenProjectionIsNotAnObject) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << 4),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -976,7 +976,7 @@ TEST(IndexSpecAllPaths, FailsWithEmptyProjection) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSONObj()),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -988,7 +988,7 @@ TEST(IndexSpecAllPaths, FailsWhenInclusionWithSubpath) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("a.$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("a" << 1)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
@@ -1000,7 +1000,7 @@ TEST(IndexSpecAllPaths, FailsWhenExclusionWithSubpath) {
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("a.$**" << 1) << "name"
                                                << "indexName"
-                                               << "starPathsTempName"
+                                               << "wildcardProjection"
                                                << BSON("b" << 0)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);

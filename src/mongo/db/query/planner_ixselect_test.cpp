@@ -1426,7 +1426,7 @@ TEST(QueryPlannerIXSelectTest, AllPathsIndicesExcludeNonMatchingKeySubpath) {
 
 TEST(QueryPlannerIXSelectTest, AllPathsIndicesExcludeNonMatchingPathsWithInclusionProjection) {
     auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
-        BSON("$**" << 1), {}, BSON("starPathsTempName" << BSON("abc" << 1 << "subpath.abc" << 1)));
+        BSON("$**" << 1), {}, BSON("wildcardProjection" << BSON("abc" << 1 << "subpath.abc" << 1)));
 
     stdx::unordered_set<string> fields = {"abc", "def", "subpath.abc", "subpath.def", "subpath"};
 
@@ -1438,7 +1438,7 @@ TEST(QueryPlannerIXSelectTest, AllPathsIndicesExcludeNonMatchingPathsWithInclusi
 
 TEST(QueryPlannerIXSelectTest, AllPathsIndicesExcludeNonMatchingPathsWithExclusionProjection) {
     auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
-        BSON("$**" << 1), {}, BSON("starPathsTempName" << BSON("abc" << 0 << "subpath.abc" << 0)));
+        BSON("$**" << 1), {}, BSON("wildcardProjection" << BSON("abc" << 0 << "subpath.abc" << 0)));
 
     stdx::unordered_set<string> fields = {"abc", "def", "subpath.abc", "subpath.def", "subpath"};
 
@@ -1453,7 +1453,7 @@ TEST(QueryPlannerIXSelectTest, AllPathsIndicesWithInclusionProjectionAllowIdExcl
     auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
         BSON("$**" << 1),
         {},
-        BSON("starPathsTempName" << BSON("_id" << 0 << "abc" << 1 << "subpath.abc" << 1)));
+        BSON("wildcardProjection" << BSON("_id" << 0 << "abc" << 1 << "subpath.abc" << 1)));
 
     stdx::unordered_set<string> fields = {
         "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
@@ -1468,7 +1468,7 @@ TEST(QueryPlannerIXSelectTest, AllPathsIndicesWithInclusionProjectionAllowIdIncl
     auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
         BSON("$**" << 1),
         {},
-        BSON("starPathsTempName" << BSON("_id" << 1 << "abc" << 1 << "subpath.abc" << 1)));
+        BSON("wildcardProjection" << BSON("_id" << 1 << "abc" << 1 << "subpath.abc" << 1)));
 
     stdx::unordered_set<string> fields = {
         "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
@@ -1484,7 +1484,7 @@ TEST(QueryPlannerIXSelectTest, AllPathsIndicesWithExclusionProjectionAllowIdIncl
     auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
         BSON("$**" << 1),
         {},
-        BSON("starPathsTempName" << BSON("_id" << 1 << "abc" << 0 << "subpath.abc" << 0)));
+        BSON("wildcardProjection" << BSON("_id" << 1 << "abc" << 0 << "subpath.abc" << 0)));
 
     stdx::unordered_set<string> fields = {
         "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};
@@ -1498,7 +1498,7 @@ TEST(QueryPlannerIXSelectTest, AllPathsIndicesWithExclusionProjectionAllowIdIncl
 
 TEST(QueryPlannerIXSelectTest, AllPathsIndicesIncludeMatchingInternalNodes) {
     auto allPathsIndexEntry = makeIndexEntryWithInfoObj(
-        BSON("$**" << 1), {}, BSON("starPathsTempName" << BSON("_id" << 1 << "subpath" << 1)));
+        BSON("$**" << 1), {}, BSON("wildcardProjection" << BSON("_id" << 1 << "subpath" << 1)));
 
     stdx::unordered_set<string> fields = {
         "_id", "abc", "def", "subpath.abc", "subpath.def", "subpath"};

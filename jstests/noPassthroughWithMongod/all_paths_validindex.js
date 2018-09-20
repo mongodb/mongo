@@ -52,16 +52,16 @@
 
         // Can create an allPaths index with an inclusion projection.
         createIndexAndVerifyWithDrop({"$**": 1},
-                                     {starPathsTempName: {a: 1, b: 1, c: 1}, name: kIndexName});
+                                     {wildcardProjection: {a: 1, b: 1, c: 1}, name: kIndexName});
         // Can create an allPaths index with an exclusion projection.
         createIndexAndVerifyWithDrop({"$**": 1},
-                                     {starPathsTempName: {a: 0, b: 0, c: 0}, name: kIndexName});
+                                     {wildcardProjection: {a: 0, b: 0, c: 0}, name: kIndexName});
         // Can include _id in an exclusion.
         createIndexAndVerifyWithDrop(
-            {"$**": 1}, {starPathsTempName: {_id: 1, a: 0, b: 0, c: 0}, name: kIndexName});
+            {"$**": 1}, {wildcardProjection: {_id: 1, a: 0, b: 0, c: 0}, name: kIndexName});
         // Can exclude _id in an exclusion.
         createIndexAndVerifyWithDrop(
-            {"$**": 1}, {starPathsTempName: {_id: 0, a: 1, b: 1, c: 1}, name: kIndexName});
+            {"$**": 1}, {wildcardProjection: {_id: 0, a: 1, b: 1, c: 1}, name: kIndexName});
 
         // Cannot create an allPaths index with sparse option.
         coll.dropIndexes();
@@ -117,28 +117,29 @@
 
         // Cannot create an all paths index with mixed inclusion exclusion.
         assert.commandFailedWithCode(
-            createIndexHelper({"$**": 1}, {name: kIndexName, starPathsTempName: {a: 1, b: 0}}),
+            createIndexHelper({"$**": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 0}}),
             40178);
         // Cannot create an all paths index with computed fields.
         assert.commandFailedWithCode(
             createIndexHelper({"$**": 1},
-                              {name: kIndexName, starPathsTempName: {a: 1, b: "string"}}),
+                              {name: kIndexName, wildcardProjection: {a: 1, b: "string"}}),
             ErrorCodes.FailedToParse);
         // Cannot create an all paths index with an empty projection.
         assert.commandFailedWithCode(
-            createIndexHelper({"$**": 1}, {name: kIndexName, starPathsTempName: {}}),
+            createIndexHelper({"$**": 1}, {name: kIndexName, wildcardProjection: {}}),
             ErrorCodes.FailedToParse);
-        // Cannot create another index type with "starPathsTempName" projection.
+        // Cannot create another index type with "wildcardProjection" projection.
         assert.commandFailedWithCode(
-            createIndexHelper({"a": 1}, {name: kIndexName, starPathsTempName: {a: 1, b: 1}}),
+            createIndexHelper({"a": 1}, {name: kIndexName, wildcardProjection: {a: 1, b: 1}}),
             ErrorCodes.BadValue);
-        // Cannot create a text index with a "starPathsTempName" projection.
+        // Cannot create a text index with a "wildcardProjection" projection.
         assert.commandFailedWithCode(
-            createIndexHelper({"$**": "text"}, {name: kIndexName, starPathsTempName: {a: 1, b: 1}}),
+            createIndexHelper({"$**": "text"},
+                              {name: kIndexName, wildcardProjection: {a: 1, b: 1}}),
             ErrorCodes.BadValue);
-        // Cannot create an all paths index with a non-object "starPathsTempName" projection.
+        // Cannot create an all paths index with a non-object "wildcardProjection" projection.
         assert.commandFailedWithCode(
-            createIndexHelper({"a.$**": 1}, {name: kIndexName, starPathsTempName: "string"}),
+            createIndexHelper({"a.$**": 1}, {name: kIndexName, wildcardProjection: "string"}),
             ErrorCodes.TypeMismatch);
         // Cannot exclude an subfield of _id in an inclusion.
         assert.commandFailedWithCode(createIndexHelper({"_id.id": 0, a: 1, b: 1, c: 1}),
@@ -149,10 +150,10 @@
 
         // Cannot specify both a subpath and a projection.
         assert.commandFailedWithCode(
-            createIndexHelper({"a.$**": 1}, {name: kIndexName, starPathsTempName: {a: 1}}),
+            createIndexHelper({"a.$**": 1}, {name: kIndexName, wildcardProjection: {a: 1}}),
             ErrorCodes.FailedToParse);
         assert.commandFailedWithCode(
-            createIndexHelper({"a.$**": 1}, {name: kIndexName, starPathsTempName: {b: 0}}),
+            createIndexHelper({"a.$**": 1}, {name: kIndexName, wildcardProjection: {b: 0}}),
             ErrorCodes.FailedToParse);
     } finally {
         assert.commandWorked(

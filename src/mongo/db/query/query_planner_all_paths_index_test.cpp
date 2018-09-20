@@ -50,7 +50,7 @@ protected:
 
     void addAllPathsIndex(BSONObj keyPattern,
                           const std::set<std::string>& multikeyPathSet = {},
-                          BSONObj starPathsTempName = BSONObj{},
+                          BSONObj wildcardProjection = BSONObj{},
                           MatchExpression* partialFilterExpr = nullptr) {
         // Convert the set of std::string to a set of FieldRef.
         std::set<FieldRef> multikeyFieldRefs;
@@ -60,7 +60,7 @@ protected:
         ASSERT_EQ(multikeyPathSet.size(), multikeyFieldRefs.size());
 
         const bool isMultikey = !multikeyPathSet.empty();
-        BSONObj infoObj = BSON("starPathsTempName" << starPathsTempName);
+        BSONObj infoObj = BSON("wildcardProjection" << wildcardProjection);
 
         params.indices.push_back(IndexEntry{std::move(keyPattern),
                                             IndexType::INDEX_ALLPATHS,

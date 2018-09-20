@@ -84,7 +84,7 @@
     function runAllPathsIndexTest(keyPattern, pathProjection, expectedPaths) {
         assert.commandWorked(coll.dropIndexes());
         assert.commandWorked(coll.createIndex(
-            keyPattern, pathProjection ? {starPathsTempName: pathProjection} : {}));
+            keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));
 
         // The 'expectedPaths' argument is the set of paths which we expect to be indexed, based on
         // the keyPattern and projection. Make sure that the caller has provided this argument.

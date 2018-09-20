@@ -63,7 +63,7 @@
     function runAllPathsIndexTest(keyPattern, pathProjection, expectedPaths) {
         assert.commandWorked(coll.dropIndexes());
         assert.commandWorked(coll.createIndex(
-            keyPattern, pathProjection ? {starPathsTempName: pathProjection} : {}));
+            keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));
         assert(expectedPaths);
         // Verify the expected behaviour for every combination of path and operator.
         for (let op of operationList) {

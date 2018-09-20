@@ -117,7 +117,7 @@ void PlanCacheIndexabilityState::processAllPathsIndex(const IndexEntry& ie) {
 
     _allPathsIndexDiscriminators.emplace_back(
         AllPathsKeyGenerator::createProjectionExec(ie.keyPattern,
-                                                   ie.infoObj.getObjectField("starPathsTempName")),
+                                                   ie.infoObj.getObjectField("wildcardProjection")),
         ie.identifier.catalogName,
         ie.filterExpr,
         ie.collator);

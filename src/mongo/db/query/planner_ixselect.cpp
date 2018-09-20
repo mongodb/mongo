@@ -90,7 +90,7 @@ void expandIndex(const IndexEntry& allPathsIndex,
     invariant(allPathsIndex.multikeyPaths.empty());
 
     const auto projExec = AllPathsKeyGenerator::createProjectionExec(
-        allPathsIndex.keyPattern, allPathsIndex.infoObj.getObjectField("starPathsTempName"));
+        allPathsIndex.keyPattern, allPathsIndex.infoObj.getObjectField("wildcardProjection"));
 
     const auto projectedFields = projExec->applyProjectionToFields(fields);
 
