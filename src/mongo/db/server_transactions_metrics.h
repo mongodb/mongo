@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <set>
+
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transactions_stats_gen.h"
@@ -68,6 +71,28 @@ public:
     void incrementTotalCommitted();
 
     /**
+     * Returns the Timestamp of the oldest oplog entry written across all open transactions.
+     * Returns boost::none if there are no transaction oplog entry Timestamps stored.
+     */
+    boost::optional<Timestamp> getOldestActiveTS() const;
+
+    /**
+     * Add the transaction's oplog entry Timestamp to a set of Timestamps.
+     */
+    void addActiveTS(Timestamp oldestOplogEntryTS);
+
+    /**
+     * Remove the corresponding transaction oplog entry Timestamp if the transaction commits or
+     * aborts.
+     */
+    void removeActiveTS(Timestamp oldestOplogEntryTS);
+
+    /**
+     * Returns the number of transaction oplog entry Timestamps currently stored.
+     */
+    unsigned int getTotalActiveTS() const;
+
+    /**
      * Appends the accumulated stats to a transactions stats object.
      */
     void updateStats(TransactionsStats* stats);
@@ -90,6 +115,11 @@ private:
 
     // The total number of multi-document transaction commits.
     AtomicUInt64 _totalCommitted{0};
+
+    // Maintain the oldest oplog entry Timestamp across all active transactions. Currently, we only
+    // write an oplog entry for an ongoing transaction if it is in the `prepare` state. By
+    // maintaining an ordered set of timestamps, the timestamp at the beginning will be the oldest.
+    std::set<Timestamp> _oldestActiveOplogEntryTS;
 };
 
 }  // namespace mongo

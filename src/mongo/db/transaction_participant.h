@@ -626,6 +626,9 @@ private:
 
     // Tracks and updates transaction metrics upon the appropriate transaction event.
     TransactionMetricsObserver _transactionMetricsObserver;
+
+    // Tracks the Timestamp of the first oplog entry written by this TransactionParticipant.
+    boost::optional<Timestamp> _oldestOplogEntryTS;
 };
 
 }  // namespace mongo

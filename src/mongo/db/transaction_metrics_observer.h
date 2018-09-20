@@ -67,25 +67,38 @@ public:
                    unsigned long long curTime);
 
     /**
-     * Updates relevant metrics when a transaction commits.
+     * Updates relevant metrics when a transaction commits. Also removes this transaction's oldest
+     * oplog entry Timestamp from the oldestActiveOplogEntryTS set if it is not boost::none.
      */
     void onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
                   unsigned long long curTime,
+                  boost::optional<Timestamp> oldestOplogEntryTS,
                   Top* top);
 
     /**
-     * Updates relevant metrics when an active transaction aborts.
+     * Updates relevant metrics when an active transaction aborts. Also removes this transaction's
+     * oldest oplog entry Timestamp from the oldestActiveOplogEntryTS set if it is not boost::none.
      */
     void onAbortActive(ServerTransactionsMetrics* serverTransactionsMetrics,
                        unsigned long long curTime,
+                       boost::optional<Timestamp> oldestOplogEntryTS,
                        Top* top);
 
     /**
-     * Updates relevant metrics when an inactive transaction aborts.
+     * Updates relevant metrics when an inactive transaction aborts. Also removes this transaction's
+     * oldest oplog entry Timestamp from the oldestActiveOplogEntryTS set if it is not boost::none.
      */
     void onAbortInactive(ServerTransactionsMetrics* serverTransactionsMetrics,
                          unsigned long long curTime,
+                         boost::optional<Timestamp> oldestOplogEntryTS,
                          Top* top);
+
+    /**
+     * Adds the prepareTimestamp, which is currently the Timestamp of the first oplog entry written
+     * by an active transaction, to the oldestActiveOplogEntryTS set.
+     */
+    void onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,
+                   Timestamp prepareTimestamp);
 
     /**
      * Updates relevant metrics when an operation running on the transaction completes. An operation

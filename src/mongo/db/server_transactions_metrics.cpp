@@ -111,6 +111,36 @@ void ServerTransactionsMetrics::incrementTotalCommitted() {
     _totalCommitted.fetchAndAdd(1);
 }
 
+boost::optional<Timestamp> ServerTransactionsMetrics::getOldestActiveTS() const {
+    if (_oldestActiveOplogEntryTS.empty()) {
+        return boost::none;
+    }
+    return *(_oldestActiveOplogEntryTS.begin());
+}
+
+void ServerTransactionsMetrics::addActiveTS(Timestamp oldestOplogEntryTS) {
+    auto ret = _oldestActiveOplogEntryTS.insert(oldestOplogEntryTS);
+    // If ret.second is false, the timestamp we tried to insert already existed.
+    invariant(ret.second == true,
+              str::stream() << "This oplog entry timestamp already exists."
+                            << "TS: "
+                            << oldestOplogEntryTS.toString());
+}
+
+void ServerTransactionsMetrics::removeActiveTS(Timestamp oldestOplogEntryTS) {
+    auto it = _oldestActiveOplogEntryTS.find(oldestOplogEntryTS);
+    invariant(it != _oldestActiveOplogEntryTS.end(),
+              str::stream() << "This oplog entry timestamp does not exist "
+                            << "or has already been removed."
+                            << "TS: "
+                            << oldestOplogEntryTS.toString());
+    _oldestActiveOplogEntryTS.erase(it);
+}
+
+unsigned int ServerTransactionsMetrics::getTotalActiveTS() const {
+    return _oldestActiveOplogEntryTS.size();
+}
+
 void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setCurrentActive(_currentActive.load());
     stats->setCurrentInactive(_currentInactive.load());

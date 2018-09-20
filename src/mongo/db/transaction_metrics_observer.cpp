@@ -95,6 +95,7 @@ void TransactionMetricsObserver::onUnstash(ServerTransactionsMetrics* serverTran
 
 void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
                                           unsigned long long curTime,
+                                          boost::optional<Timestamp> oldestOplogEntryTS,
                                           Top* top) {
     //
     // Per transaction metrics.
@@ -116,10 +117,16 @@ void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTrans
     serverTransactionsMetrics->decrementCurrentActive();
 
     top->incrementGlobalTransactionLatencyStats(_singleTransactionStats.getDuration(curTime));
+
+    // Remove this transaction's oldest oplog entry Timestamp if one was written.
+    if (oldestOplogEntryTS) {
+        serverTransactionsMetrics->removeActiveTS(*oldestOplogEntryTS);
+    }
 }
 
 void TransactionMetricsObserver::onAbortActive(ServerTransactionsMetrics* serverTransactionsMetrics,
                                                unsigned long long curTime,
+                                               boost::optional<Timestamp> oldestOplogEntryTS,
                                                Top* top) {
     _onAbort(serverTransactionsMetrics, curTime, top);
     //
@@ -135,16 +142,29 @@ void TransactionMetricsObserver::onAbortActive(ServerTransactionsMetrics* server
     // Server wide transactions metrics.
     //
     serverTransactionsMetrics->decrementCurrentActive();
+
+    // Remove this transaction's oldest oplog entry Timestamp if one was written.
+    if (oldestOplogEntryTS) {
+        serverTransactionsMetrics->removeActiveTS(*oldestOplogEntryTS);
+    }
 }
 
 void TransactionMetricsObserver::onAbortInactive(
-    ServerTransactionsMetrics* serverTransactionsMetrics, unsigned long long curTime, Top* top) {
+    ServerTransactionsMetrics* serverTransactionsMetrics,
+    unsigned long long curTime,
+    boost::optional<Timestamp> oldestOplogEntryTS,
+    Top* top) {
     _onAbort(serverTransactionsMetrics, curTime, top);
 
     //
     // Server wide transactions metrics.
     //
     serverTransactionsMetrics->decrementCurrentInactive();
+
+    // Remove this transaction's oldest oplog entry Timestamp if one was written.
+    if (oldestOplogEntryTS) {
+        serverTransactionsMetrics->removeActiveTS(*oldestOplogEntryTS);
+    }
 }
 
 void TransactionMetricsObserver::onTransactionOperation(Client* client,
@@ -174,6 +194,14 @@ void TransactionMetricsObserver::_onAbort(ServerTransactionsMetrics* serverTrans
     serverTransactionsMetrics->decrementCurrentOpen();
 
     top->incrementGlobalTransactionLatencyStats(_singleTransactionStats.getDuration(curTime));
+}
+
+void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,
+                                           Timestamp prepareTimestamp) {
+    // Since we currently only write an oplog entry for an in progress transaction when it is in
+    // the prepare state, the prepareTimestamp is currently the oldest timestamp written to the
+    // oplog for this transaction.
+    serverTransactionsMetrics->addActiveTS(prepareTimestamp);
 }
 
 }  // namespace mongo

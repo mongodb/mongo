@@ -985,6 +985,8 @@ TEST_F(TxnParticipantTest, KillSessionsDuringPrepareDoesNotAbortTransaction) {
     // Check that prepareTimestamp gets set.
     auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
+    // Check that the oldest prepareTimestamp is the one we just set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
     ASSERT(_opObserver->transactionPrepared);
     ASSERT_FALSE(txnParticipant->transactionIsAborted());
 }
@@ -1171,6 +1173,8 @@ TEST_F(TxnParticipantTest, KillSessionsDoesNotAbortPreparedTransactions) {
     // Check that prepareTimestamp gets set.
     auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
+    // Check that the oldest prepareTimestamp is the one we just set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
     txnParticipant->stashTransactionResources(opCtx());
 
     txnParticipant->abortArbitraryTransaction();
@@ -1195,6 +1199,8 @@ TEST_F(TxnParticipantTest, TransactionTimeoutDoesNotAbortPreparedTransactions) {
     // Check that prepareTimestamp gets set.
     auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
+    // Check that the oldest prepareTimestamp is the one we just set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
     txnParticipant->stashTransactionResources(opCtx());
 
     txnParticipant->abortArbitraryTransactionIfExpired();
@@ -1220,6 +1226,9 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
     // Check that prepareTimestamp gets set.
     auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
     ASSERT_EQ(ruPrepareTimestamp, prepareTimestamp);
+
+    // Check that the oldest prepareTimestamp is the one we just set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
 
     txnParticipant->stashTransactionResources(opCtx());
 
@@ -1307,6 +1316,9 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
     txnParticipant->addTransactionOperation(opCtx(), operation);
     auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
 
+    // Check that the oldest prepareTimestamp is the one we just set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), prepareTimestamp);
+
     auto sessionId = *opCtx()->getLogicalSessionId();
     auto txnNum = *opCtx()->getTxnNumber();
     _opObserver->onTransactionCommitFn = [&](bool wasPrepared) {
@@ -1322,6 +1334,8 @@ DEATH_TEST_F(TxnParticipantTest, AbortIsIllegalDuringCommittingPreparedTransacti
     };
 
     txnParticipant->commitPreparedTransaction(opCtx(), prepareTimestamp);
+    // Check that we removed the prepareTimestamp from the set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), boost::none);
 }
 
 TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
@@ -2837,6 +2851,150 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
         txnParticipant->transactionInfoForLogForTest(&lockerInfo->stats, false, readConcernArgs);
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
 }
+
+TEST_F(TxnParticipantTest, WhenOldestTSRemovedNextOldestBecomesNewOldest) {
+    auto totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Check that there are no Timestamps in the set.
+    unsigned int zero = 0;
+    ASSERT_EQ(totalActiveTxnTS, zero);
+
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+    auto firstPrepareTimestamp = txnParticipant->prepareTransaction(opCtx(), {});
+    // Check that we added a Timestamp to the set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(), totalActiveTxnTS + 1);
+    // totalActiveTxnTS = 1
+    totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+    // Check that the oldest prepareTimestamp is equal to firstPrepareTimestamp because there is
+    // only one prepared transaction on this Service.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), firstPrepareTimestamp);
+    ASSERT_FALSE(txnParticipant->transactionIsAborted());
+
+    txnParticipant->stashTransactionResources(opCtx());
+    auto originalClient = Client::releaseCurrent();
+
+    /**
+     * Make a new Session, Client, OperationContext and transaction.
+     */
+    auto service = opCtx()->getServiceContext();
+    auto newClientOwned = service->makeClient("newClient");
+    auto newClient = newClientOwned.get();
+    Client::setCurrent(std::move(newClientOwned));
+
+    const TxnNumber newTxnNum = 10;
+    const auto newSessionId = makeLogicalSessionIdForTest();
+    auto secondPrepareTimestamp = Timestamp();
+
+    {
+        auto newOpCtx = newClient->makeOperationContext();
+        newOpCtx.get()->setLogicalSessionId(newSessionId);
+        newOpCtx.get()->setTxnNumber(newTxnNum);
+
+        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, false, true);
+        auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
+        newTxnParticipant->unstashTransactionResources(newOpCtx.get(), "prepareTransaction");
+
+        // secondPrepareTimestamp should be greater than firstPreparedTimestamp because this
+        // transaction was prepared after.
+        secondPrepareTimestamp = newTxnParticipant->prepareTransaction(newOpCtx.get(), {});
+        ASSERT_GT(secondPrepareTimestamp, firstPrepareTimestamp);
+        // Check that we added a Timestamp to the set.
+        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(),
+                  totalActiveTxnTS + 1);
+        // totalActiveTxnTS = 2
+        totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+        // The oldest prepareTimestamp should still be firstPrepareTimestamp.
+        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(),
+                  firstPrepareTimestamp);
+        ASSERT_FALSE(txnParticipant->transactionIsAborted());
+    }
+
+    Client::releaseCurrent();
+    Client::setCurrent(std::move(originalClient));
+
+    // Switch clients and abort the first transaction. This should cause the oldestActiveTS to be
+    // equal to the secondPrepareTimestamp.
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(txnParticipant->transactionIsAborted());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(), totalActiveTxnTS - 1);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), secondPrepareTimestamp);
+}
+
+TEST_F(TxnParticipantTest, ReturnNullTimestampIfNoOldestActiveTimestamp) {
+    auto totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+    OperationContextSessionMongod opCtxSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Check that there are no Timestamps in the set.
+    unsigned int zero = 0;
+    ASSERT_EQ(totalActiveTxnTS, zero);
+
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant->prepareTransaction(opCtx(), {});
+    // Check that we added a Timestamp to the set.
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(), totalActiveTxnTS + 1);
+    // totalActiveTxnTS = 1
+    totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+    ASSERT_FALSE(txnParticipant->transactionIsAborted());
+
+    txnParticipant->stashTransactionResources(opCtx());
+    auto originalClient = Client::releaseCurrent();
+
+    /**
+    * Make a new Session, Client, OperationContext and transaction.
+    */
+    auto service = opCtx()->getServiceContext();
+    auto newClientOwned = service->makeClient("newClient");
+    auto newClient = newClientOwned.get();
+    Client::setCurrent(std::move(newClientOwned));
+
+    const TxnNumber newTxnNum = 10;
+    const auto newSessionId = makeLogicalSessionIdForTest();
+
+    {
+        auto newOpCtx = newClient->makeOperationContext();
+        newOpCtx.get()->setLogicalSessionId(newSessionId);
+        newOpCtx.get()->setTxnNumber(newTxnNum);
+
+        OperationContextSessionMongod newOpCtxSession(newOpCtx.get(), true, false, true);
+        auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
+        newTxnParticipant->unstashTransactionResources(newOpCtx.get(), "prepareTransaction");
+
+        // secondPrepareTimestamp should be greater than firstPreparedTimestamp because this
+        // transaction was prepared after.
+        newTxnParticipant->prepareTransaction(newOpCtx.get(), {});
+        // Check that we added a Timestamp to the set.
+        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(),
+                  totalActiveTxnTS + 1);
+        // totalActiveTxnTS = 2
+        totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+        // The oldest prepareTimestamp should still be firstPrepareTimestamp.
+        ASSERT_FALSE(txnParticipant->transactionIsAborted());
+
+        // Abort this transaction and check that we have decremented the total active timestamps
+        // count.
+        newTxnParticipant->abortActiveTransaction(newOpCtx.get());
+        ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(),
+                  totalActiveTxnTS - 1);
+    }
+
+    Client::releaseCurrent();
+    Client::setCurrent(std::move(originalClient));
+    // totalActiveTxnTS = 1
+    totalActiveTxnTS = ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS();
+
+    // Switch clients and abort the first transaction. This means we no longer have an oldest active
+    // timestamp.
+    txnParticipant->unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT(txnParticipant->transactionIsAborted());
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveTS(), totalActiveTxnTS - 1);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getOldestActiveTS(), boost::none);
+}
+
 
 }  // namespace
 }  // namespace mongo
