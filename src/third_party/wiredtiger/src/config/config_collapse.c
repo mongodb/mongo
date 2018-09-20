@@ -399,7 +399,7 @@ __wt_config_merge(WT_SESSION_IMPL *session,
 	 * Sort the array by key and, in the case of identical keys, by
 	 * generation.
 	 */
-	qsort(merge.entries, merge.entries_next,
+	__wt_qsort(merge.entries, merge.entries_next,
 	    sizeof(WT_CONFIG_MERGE_ENTRY), __config_merge_cmp);
 
 	/* Convert the array of entries into a string. */

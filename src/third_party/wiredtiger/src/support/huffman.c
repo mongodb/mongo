@@ -352,7 +352,7 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 	 * duplicates.
 	 */
 	sym = symbol_frequency_array;
-	qsort(sym, symcnt, sizeof(INDEXED_SYMBOL), indexed_symbol_compare);
+	__wt_qsort(sym, symcnt, sizeof(INDEXED_SYMBOL), indexed_symbol_compare);
 	for (i = 0; i < symcnt; ++i) {
 		if (i > 0 && sym[i].symbol == sym[i - 1].symbol)
 			WT_ERR_MSG(session, EINVAL,
@@ -397,7 +397,7 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 	 * The array must be sorted by frequency to be able to use a linear time
 	 * construction algorithm.
 	 */
-	qsort((void *)indexed_freqs,
+	__wt_qsort((void *)indexed_freqs,
 	    symcnt, sizeof(INDEXED_SYMBOL), indexed_freq_compare);
 
 	/* We need two node queues to build the tree. */

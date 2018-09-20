@@ -990,9 +990,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		/* Disable metadata tracking during the metadata checkpoint. */
 		saved_meta_next = session->meta_track_next;
 		session->meta_track_next = NULL;
-		WT_WITH_METADATA_LOCK(session,
-		    WT_WITH_DHANDLE(session,
-			WT_SESSION_META_DHANDLE(session),
+		WT_WITH_DHANDLE(session, WT_SESSION_META_DHANDLE(session),
+		    WT_WITH_METADATA_LOCK(session,
 			ret = __wt_checkpoint(session, cfg)));
 		session->meta_track_next = saved_meta_next;
 		WT_ERR(ret);

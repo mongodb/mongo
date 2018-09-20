@@ -775,11 +775,13 @@ FUNC_START(__crc32_vpmsum)
 	b	.Lout
 
 FUNC_END(__crc32_vpmsum)
+#endif
 
-/*
- * Make sure the stack isn't executable with GCC (regardless of platform).
- */
+/* Make sure the stack isn't executable with GCC (regardless of platform). */
 #ifdef __ELF__
 .section	.note.GNU-stack,"",@progbits
 #endif
-#endif
+/*
+ * DO NOT add an #endif after this line, this section must always be output
+ * and can never be #ifdef'd out as part of conditional compilation.
+ */

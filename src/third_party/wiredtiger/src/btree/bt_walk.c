@@ -282,13 +282,13 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *ref, *ref_orig;
-	uint64_t sleep_usecs, yield_count;
+	uint64_t restart_sleep, restart_yield, swap_sleep, swap_yield;
 	uint32_t current_state, slot;
 	bool empty_internal, prev, skip;
 
 	btree = S2BT(session);
 	pindex = NULL;
-	sleep_usecs = yield_count = 0;
+	restart_sleep = restart_yield = swap_sleep = swap_yield = 0;
 	empty_internal = false;
 
 	/*
@@ -358,7 +358,7 @@ restart:		/*
 			 * times, start sleeping so we don't burn CPU to no
 			 * purpose.
 			 */
-			__wt_spin_backoff(&yield_count, &sleep_usecs);
+			__wt_spin_backoff(&restart_yield, &restart_sleep);
 
 			WT_ERR(__wt_page_release(session, couple, flags));
 			couple = NULL;
@@ -446,7 +446,7 @@ restart:		/*
 				WT_ASSERT(session, ret == WT_NOTFOUND);
 				WT_ERR_NOTFOUND_OK(ret);
 
-				__wt_spin_backoff(&yield_count, &sleep_usecs);
+				__wt_spin_backoff(&swap_yield, &swap_sleep);
 			}
 			/* NOTREACHED */
 		}

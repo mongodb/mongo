@@ -20,7 +20,7 @@ type ctags > /dev/null 2>&1 || {
 
 # Test to see what flags this ctags binary supports.
 flags=""
-for i in -d -t -w --language-force=C; do
+for i in -d -t -w --language-force=C '-I WT_GCC_FUNC_ATTRIBUTE+'; do
 	if ctags $i ../src/conn/api_strerror.c 2>/dev/null; then
 		flags="$i $flags"
 	fi

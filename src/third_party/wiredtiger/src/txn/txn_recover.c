@@ -91,12 +91,14 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
  * Helper to a cursor if this operation is to be applied during recovery.
  */
 #define	GET_RECOVERY_CURSOR(session, r, lsnp, fileid, cp)		\
-	WT_ERR(__recovery_cursor(session, r, lsnp, fileid, false, cp));	\
+	ret = __recovery_cursor(session, r, lsnp, fileid, false, cp);	\
 	__wt_verbose(session, WT_VERB_RECOVERY,				\
 	    "%s op %" PRIu32 " to file %" PRIu32 " at LSN %" PRIu32	\
 	    "/%" PRIu32,						\
+	    ret != 0 ? "Error" :					\
 	    cursor == NULL ? "Skipping" : "Applying",			\
 	    optype, fileid, (lsnp)->l.file, (lsnp)->l.offset);		\
+	WT_ERR(ret);							\
 	if (cursor == NULL)						\
 		break
 

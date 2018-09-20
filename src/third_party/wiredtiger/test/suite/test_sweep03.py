@@ -39,7 +39,7 @@ import wttest
 class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
     tablebase = 'test_sweep03'
     uri = 'table:' + tablebase
-    numfiles = 400 # Make this more than the default close_handle_minimum
+    numfiles = 40 # Make this more than the default close_handle_minimum
     numkv = 100
     conn_config = 'file_manager=(close_handle_minimum=10,' + \
                   'close_idle_time=0,close_scan_interval=1),' + \
@@ -55,6 +55,24 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     scenarios = make_scenarios(types)
+
+    # Wait for the sweep server to run - let it run twice, since the statistic
+    # is incrememented at the start of a sweep and the test relies on sweep
+    # completing it's work.
+    def wait_for_sweep(self, baseline):
+        # Check regularly for up to 5 seconds total.
+        for i in range(10):
+            stat_cursor = self.session.open_cursor('statistics:', None, None)
+            sweeps = stat_cursor[stat.conn.dh_sweeps][2]
+            stat_cursor.close()
+            if (sweeps > baseline + 1):
+                return sweeps
+            time.sleep(0.5)
+
+        # If the statistic didn't increase in 5 seconds the sweep server isn't
+        # working as expected.
+        self.assertTrue(sweeps > baseline + 1)
+        return (sweeps)
 
     def test_disable_idle_timeout1(self):
         #
@@ -72,18 +90,15 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
 
         #
         # The idle timeout is disabled - we don't expect the sweep server to
-        # close any regular handles. Give the sweep server 5x the scan
-        # interval to close any handles.
+        # close any regular handles. The function returns the current sweep
+        # count to allow for incremental waits - which this test doesn't need.
         #
-        time.sleep(5)
+        self.wait_for_sweep(0)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         close1 = stat_cursor[stat.conn.dh_sweep_close][2]
-        sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
-        # The sweep server should have run, or the test isn't working.
-        self.assertGreater(sweep1, 0)
         # We expect nothing to have been closed.
         self.assertEqual(close1, 0)
 
@@ -101,23 +116,21 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # We just filled the table, now check what the stats are
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache1 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        sweep_baseline = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
         # We force the drop in this case to confirm that the handle is closed
         self.session.drop(drop_uri, "force=true")
 
-        time.sleep(5)
+        sweep_baseline = self.wait_for_sweep(sweep_baseline)
 
         # Grab the stats post table drop to see things have decremented
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache2 = stat_cursor[stat.conn.cache_bytes_inuse][2]
         close2 = stat_cursor[stat.conn.dh_sweep_close][2]
-        sweep2 = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
-        # Make sure the sweep server is still working.
-        self.assertGreater(sweep2, sweep1)
         # Ensure that the handle has been closed after the drop.
         self.assertEqual(close2, 1)
         # Ensure that any space was reclaimed from cache.
@@ -137,21 +150,19 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache1 = stat_cursor[stat.conn.cache_bytes_inuse][2]
         close1 = stat_cursor[stat.conn.dh_sweep_close][2]
-        sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
+        sweep_baseline = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
         self.session.drop(drop_uri, None)
 
-        time.sleep(5)
+        sweep_baseline = self.wait_for_sweep(sweep_baseline)
 
         # Grab the stats post table drop to see things have decremented
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache2 = stat_cursor[stat.conn.cache_bytes_inuse][2]
         close2 = stat_cursor[stat.conn.dh_sweep_close][2]
-        sweep2 = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
-        self.assertGreater(sweep2, sweep1)
         # The sweep server should not be involved in regular drop cleanup
         self.assertEqual(close2, close1)
         # Ensure that any space was reclaimed from cache.

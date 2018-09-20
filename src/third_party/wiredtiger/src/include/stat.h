@@ -354,6 +354,12 @@ struct __wt_connection_stats {
 	int64_t cache_bytes_other;
 	int64_t cache_bytes_read;
 	int64_t cache_bytes_write;
+	int64_t cache_lookaside_cursor_wait_application;
+	int64_t cache_lookaside_cursor_wait_internal;
+	int64_t cache_lookaside_score;
+	int64_t cache_lookaside_entries;
+	int64_t cache_lookaside_insert;
+	int64_t cache_lookaside_remove;
 	int64_t cache_eviction_checkpoint;
 	int64_t cache_eviction_get_ref;
 	int64_t cache_eviction_get_ref_empty;
@@ -398,10 +404,6 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_internal;
 	int64_t cache_eviction_split_internal;
 	int64_t cache_eviction_split_leaf;
-	int64_t cache_lookaside_score;
-	int64_t cache_lookaside_entries;
-	int64_t cache_lookaside_insert;
-	int64_t cache_lookaside_remove;
 	int64_t cache_bytes_max;
 	int64_t cache_eviction_maximum_page_size;
 	int64_t cache_eviction_dirty;
@@ -584,6 +586,7 @@ struct __wt_connection_stats {
 	int64_t rec_split_stashed_objects;
 	int64_t session_cursor_open;
 	int64_t session_open;
+	int64_t session_query_ts;
 	int64_t session_table_alter_fail;
 	int64_t session_table_alter_success;
 	int64_t session_table_alter_skip;
@@ -621,8 +624,9 @@ struct __wt_connection_stats {
 	int64_t page_sleep;
 	int64_t page_del_rollback_blocked;
 	int64_t child_modify_blocked_page;
+	int64_t txn_commit_queue_walked;
 	int64_t txn_commit_queue_empty;
-	int64_t txn_commit_queue_tail;
+	int64_t txn_commit_queue_head;
 	int64_t txn_commit_queue_inserts;
 	int64_t txn_commit_queue_len;
 	int64_t txn_snapshots_created;
@@ -632,6 +636,7 @@ struct __wt_connection_stats {
 	int64_t txn_prepare_active;
 	int64_t txn_prepare_rollback;
 	int64_t txn_query_ts;
+	int64_t txn_read_queue_walked;
 	int64_t txn_read_queue_empty;
 	int64_t txn_read_queue_head;
 	int64_t txn_read_queue_inserts;

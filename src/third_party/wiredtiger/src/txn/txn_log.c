@@ -71,10 +71,13 @@ __txn_op_log(WT_SESSION_IMPL *session,
 	WT_ITEM value;
 	WT_UPDATE *upd;
 	uint64_t recno;
+	uint32_t fileid;
 
 	cursor = &cbt->iface;
 
-	upd = op->u.upd;
+	fileid = op->btree->id;
+
+	upd = op->u.op_upd;
 	value.data = upd->data;
 	value.size = upd->size;
 
@@ -89,15 +92,15 @@ __txn_op_log(WT_SESSION_IMPL *session,
 		switch (upd->type) {
 		case WT_UPDATE_MODIFY:
 			WT_RET(__wt_logop_row_modify_pack(
-			    session, logrec, op->fileid, &cursor->key, &value));
+			    session, logrec, fileid, &cursor->key, &value));
 			break;
 		case WT_UPDATE_STANDARD:
 			WT_RET(__wt_logop_row_put_pack(
-			    session, logrec, op->fileid, &cursor->key, &value));
+			    session, logrec, fileid, &cursor->key, &value));
 			break;
 		case WT_UPDATE_TOMBSTONE:
 			WT_RET(__wt_logop_row_remove_pack(
-			    session, logrec, op->fileid, &cursor->key));
+			    session, logrec, fileid, &cursor->key));
 			break;
 		WT_ILLEGAL_VALUE(session, upd->type);
 		}
@@ -108,15 +111,15 @@ __txn_op_log(WT_SESSION_IMPL *session,
 		switch (upd->type) {
 		case WT_UPDATE_MODIFY:
 			WT_RET(__wt_logop_col_modify_pack(
-			    session, logrec, op->fileid, recno, &value));
+			    session, logrec, fileid, recno, &value));
 			break;
 		case WT_UPDATE_STANDARD:
 			WT_RET(__wt_logop_col_put_pack(
-			    session, logrec, op->fileid, recno, &value));
+			    session, logrec, fileid, recno, &value));
 			break;
 		case WT_UPDATE_TOMBSTONE:
 			WT_RET(__wt_logop_col_remove_pack(
-			    session, logrec, op->fileid, recno));
+			    session, logrec, fileid, recno));
 			break;
 		WT_ILLEGAL_VALUE(session, upd->type);
 		}
@@ -165,10 +168,20 @@ __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 {
 	switch (op->type) {
 	case WT_TXN_OP_NONE:
-	case WT_TXN_OP_BASIC:
-	case WT_TXN_OP_INMEM:
+		/*
+		 * The free function can be called more than once: when there's
+		 * no operation, a free is unnecessary or has already been done.
+		 */
+		return;
+	case WT_TXN_OP_BASIC_COL:
+	case WT_TXN_OP_INMEM_COL:
 	case WT_TXN_OP_REF_DELETE:
 	case WT_TXN_OP_TRUNCATE_COL:
+		break;
+
+	case WT_TXN_OP_BASIC_ROW:
+	case WT_TXN_OP_INMEM_ROW:
+		__wt_buf_free(session, &op->u.op_row.key);
 		break;
 
 	case WT_TXN_OP_TRUNCATE_ROW:
@@ -176,6 +189,10 @@ __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 		__wt_buf_free(session, &op->u.truncate_row.stop);
 		break;
 	}
+
+	(void)__wt_atomic_subi32(&op->btree->dhandle->session_inuse, 1);
+
+	op->type = WT_TXN_OP_NONE;
 }
 
 /*
@@ -227,6 +244,8 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 
+	uint32_t fileid;
+
 	txn = &session->txn;
 
 	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) ||
@@ -240,27 +259,28 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	WT_ASSERT(session, txn->mod_count > 0);
 	op = txn->mod + txn->mod_count - 1;
+	fileid = op->btree->id;
 
 	WT_RET(__txn_logrec_init(session));
 	logrec = txn->logrec;
 
 	switch (op->type) {
 	case WT_TXN_OP_NONE:
-	case WT_TXN_OP_INMEM:
+	case WT_TXN_OP_INMEM_COL:
+	case WT_TXN_OP_INMEM_ROW:
 	case WT_TXN_OP_REF_DELETE:
 		/* Nothing to log, we're done. */
 		break;
-	case WT_TXN_OP_BASIC:
+	case WT_TXN_OP_BASIC_COL:
+	case WT_TXN_OP_BASIC_ROW:
 		ret = __txn_op_log(session, logrec, op, cbt);
 		break;
 	case WT_TXN_OP_TRUNCATE_COL:
-		ret = __wt_logop_col_truncate_pack(session, logrec,
-		    op->fileid,
+		ret = __wt_logop_col_truncate_pack(session, logrec, fileid,
 		    op->u.truncate_col.start, op->u.truncate_col.stop);
 		break;
 	case WT_TXN_OP_TRUNCATE_ROW:
-		ret = __wt_logop_row_truncate_pack(session, txn->logrec,
-		    op->fileid,
+		ret = __wt_logop_row_truncate_pack(session, logrec, fileid,
 		    &op->u.truncate_row.start, &op->u.truncate_row.stop,
 		    (uint32_t)op->u.truncate_row.mode);
 		break;

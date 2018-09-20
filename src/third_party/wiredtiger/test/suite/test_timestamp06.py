@@ -65,17 +65,15 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
-    def check(self, session, txn_config, tablename, expected, prn=False):
+    def check(self, session, txn_config, tablename, expected):
         if txn_config:
             session.begin_transaction(txn_config)
 
         cur = session.open_cursor(tablename, None)
         actual = dict((k, v) for k, v in cur if v != 0)
-        if prn == True:
-            print "CHECK : Expected"
-            print expected
-            print "CHECK : Actual"
-            print actual
+        if actual != expected:
+            print "missing: ", sorted(set(expected.items()) - set(actual.items()))
+            print "extras: ", sorted(set(actual.items()) - set(expected.items()))
         self.assertTrue(actual == expected)
         # Search for the expected items as well as iterating
         for k, v in expected.iteritems():

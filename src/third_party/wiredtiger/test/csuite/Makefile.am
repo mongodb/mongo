@@ -11,6 +11,10 @@ test_random_abort_SOURCES = random_abort/main.c
 noinst_PROGRAMS += test_random_abort
 all_TESTS += random_abort/smoke.sh
 
+test_random_directio_SOURCES = random_directio/main.c
+noinst_PROGRAMS += test_random_directio
+all_TESTS += random_directio/smoke.sh
+
 test_rwlock_SOURCES = rwlock/main.c
 noinst_PROGRAMS += test_rwlock
 all_TESTS += test_rwlock
@@ -114,6 +118,10 @@ all_TESTS += test_wt4105_large_doc_small_upd
 test_wt4117_checksum_SOURCES = wt4117_checksum/main.c
 noinst_PROGRAMS += test_wt4117_checksum
 all_TESTS += test_wt4117_checksum
+
+test_wt4156_metadata_salvage_SOURCES = wt4156_metadata_salvage/main.c
+noinst_PROGRAMS += test_wt4156_metadata_salvage
+all_TESTS += test_wt4156_metadata_salvage
 
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)

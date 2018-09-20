@@ -50,8 +50,8 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     conncfg = [
-        ('nolog', dict(conn_config='create,cache_size=1M', using_log=False)),
-        ('log', dict(conn_config='create,log=(archive=false,enabled),cache_size=1M', using_log=True)),
+        ('nolog', dict(conn_config='create,cache_size=2M', using_log=False)),
+        ('log', dict(conn_config='create,log=(file_max=1M,archive=false,enabled),cache_size=2M', using_log=True)),
     ]
 
     nkeys = [

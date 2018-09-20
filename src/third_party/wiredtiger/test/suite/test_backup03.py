@@ -48,12 +48,15 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # The way it works is we create 4 objects, only one of which is large, then
     # we do a hot backup of one or more of the objects and compare the original
     # to the backup to confirm the backup is correct.
+    #
+    # Set the chunk size small to avoid needing a lot of data when generating a
+    # complex LSM tree.
     pfx = 'test_backup'
     objs = [                            # Objects
-        ('table:' + pfx + '.1', SimpleDataSet, 0),
-        (  'lsm:' + pfx + '.2', SimpleDataSet, 1),
-        ('table:' + pfx + '.3', ComplexDataSet, 2),
-        ('table:' + pfx + '.4', ComplexLSMDataSet, 3),
+        ('table:' + pfx + '.1', SimpleDataSet, 0, ''),
+        (  'lsm:' + pfx + '.2', SimpleDataSet, 1, ''),
+        ('table:' + pfx + '.3', ComplexDataSet, 2, ''),
+        ('table:' + pfx + '.4', ComplexLSMDataSet, 3, 'lsm=(chunk_size=512k)'),
     ]
     list = [
         ( 'backup_1', dict(big=0,list=[0])),       # Target objects individually
@@ -82,10 +85,10 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     def populate(self):
         for i in self.objs:
             if self.big == i[2]:
-                rows = 200000           # Big object
+                rows = 50000           # Big object
             else:
                 rows = 1000             # Small object
-            i[1](self, i[0], rows).populate()
+            i[1](self, i[0], rows, cgconfig = i[3]).populate()
         # Backup needs a checkpoint
         self.session.checkpoint(None)
 

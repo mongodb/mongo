@@ -279,11 +279,13 @@ crc32_le_vgfm_generic:
 	VLM     %v8,%v15,0,%r15
 	lmg     %r14,%r15,240(%r15)
 	br	%r14
+#endif
 
-/*
- * Make sure the stack isn't executable with GCC (regardless of platform).
- */
-#ifndef __clang__
+/* Make sure the stack isn't executable with GCC (regardless of platform). */
+#ifdef __ELF__
 .section	.note.GNU-stack,"",@progbits
 #endif
-#endif
+/*
+ * DO NOT add an #endif after this line, this section must always be output
+ * and can never be #ifdef'd out as part of conditional compilation.
+ */

@@ -165,11 +165,30 @@ struct __wt_btree {
 	WT_DECL_TIMESTAMP(rec_max_timestamp)
 
 	uint64_t checkpoint_gen;	/* Checkpoint generation */
+	WT_SESSION_IMPL *sync_session;	/* Syncing session */
 	volatile enum {
-		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
-	} checkpointing;		/* Checkpoint in progress */
+		WT_BTREE_SYNC_OFF, WT_BTREE_SYNC_WAIT, WT_BTREE_SYNC_RUNNING
+	} syncing;			/* Sync status */
 
-	uint64_t    bytes_inmem;	/* Cache bytes in memory. */
+	/*
+	 * Helper macros:
+	 * WT_BTREE_SYNCING indicates if a sync is active (either waiting to
+	 * start or already running), so no new operations should start that
+	 * would conflict with the sync.
+	 * WT_SESSION_BTREE_SYNC indicates if the session is performing a sync
+	 * on its current tree.
+	 * WT_SESSION_BTREE_SYNC_SAFE checks whether it is safe to perform an
+	 * operation that would conflict with a sync.
+	 */
+#define	WT_BTREE_SYNCING(btree)						\
+	(btree->syncing != WT_BTREE_SYNC_OFF)
+#define	WT_SESSION_BTREE_SYNC(session)					\
+	(S2BT(session)->sync_session == session)
+#define	WT_SESSION_BTREE_SYNC_SAFE(session, btree)			\
+	((btree)->syncing != WT_BTREE_SYNC_RUNNING ||			\
+	    (btree)->sync_session == session)
+
+	uint64_t    bytes_inmem;        /* Cache bytes in memory. */
 	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
 	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
 
@@ -220,11 +239,12 @@ struct __wt_btree {
 #define	WT_BTREE_LOOKASIDE	0x002000u	/* Look-aside table */
 #define	WT_BTREE_NO_CHECKPOINT	0x004000u	/* Disable checkpoints */
 #define	WT_BTREE_NO_LOGGING	0x008000u	/* Disable logging */
-#define	WT_BTREE_REBALANCE	0x010000u	/* Handle is for rebalance */
-#define	WT_BTREE_SALVAGE	0x020000u	/* Handle is for salvage */
-#define	WT_BTREE_SKIP_CKPT	0x040000u	/* Handle skipped checkpoint */
-#define	WT_BTREE_UPGRADE	0x080000u	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x100000u	/* Handle is for verify */
+#define	WT_BTREE_READONLY	0x010000u	/* Handle is readonly */
+#define	WT_BTREE_REBALANCE	0x020000u	/* Handle is for rebalance */
+#define	WT_BTREE_SALVAGE	0x040000u	/* Handle is for salvage */
+#define	WT_BTREE_SKIP_CKPT	0x080000u	/* Handle skipped checkpoint */
+#define	WT_BTREE_UPGRADE	0x100000u	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x200000u	/* Handle is for verify */
 	uint32_t flags;
 };
 

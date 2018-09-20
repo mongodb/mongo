@@ -505,6 +505,9 @@ __wt_block_alloc(
 	WT_EXT *ext, **estack[WT_SKIP_MAXDEPTH];
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
 
+	/* If a sync is running, no other sessions can allocate blocks. */
+	WT_ASSERT(session, WT_SESSION_BTREE_SYNC_SAFE(session, S2BT(session)));
+
 	/* Assert we're maintaining the by-size skiplist. */
 	WT_ASSERT(session, block->live.avail.track_size != 0);
 
@@ -621,6 +624,9 @@ __wt_block_off_free(
     WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t offset, wt_off_t size)
 {
 	WT_DECL_RET;
+
+	/* If a sync is running, no other sessions can free blocks. */
+	WT_ASSERT(session, WT_SESSION_BTREE_SYNC_SAFE(session, S2BT(session)));
 
 	/*
 	 * Callers of this function are expected to have already acquired any
