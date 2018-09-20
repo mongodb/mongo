@@ -260,18 +260,23 @@ void Pipeline::optimizePipeline() {
     // We could be swapping around stages during this process, so disconnect the pipeline to prevent
     // us from entering a state with dangling pointers.
     unstitch();
-    while (itr != _sources.end()) {
-        invariant((*itr).get());
-        itr = (*itr).get()->optimizeAt(itr, &_sources);
-    }
-
-    // Once we have reached our final number of stages, optimize each individually.
-    for (auto&& source : _sources) {
-        if (auto out = source->optimize()) {
-            optimizedSources.push_back(out);
+    try {
+        while (itr != _sources.end()) {
+            invariant((*itr).get());
+            itr = (*itr).get()->optimizeAt(itr, &_sources);
         }
+
+        // Once we have reached our final number of stages, optimize each individually.
+        for (auto&& source : _sources) {
+            if (auto out = source->optimize()) {
+                optimizedSources.push_back(out);
+            }
+        }
+        _sources.swap(optimizedSources);
+    } catch (DBException& ex) {
+        ex.addContext("Failed to optimize pipeline");
+        throw;
     }
-    _sources.swap(optimizedSources);
     stitch();
 }
 

@@ -149,7 +149,13 @@ public:
         }
 
         auto optimizer = expression->getOptimizer();
-        return optimizer(std::move(expression));
+
+        try {
+            return optimizer(std::move(expression));
+        } catch (DBException& ex) {
+            ex.addContext("Failed to optimize expression");
+            throw;
+        }
     }
 
     MatchExpression(MatchType type);
