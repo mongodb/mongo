@@ -59,7 +59,6 @@ using DeleteStateTest = ShardServerTestFixture;
 
 TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
 
     auto doc = BSON("key3"
                     << "abc"
