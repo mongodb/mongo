@@ -817,7 +817,9 @@ TEST_F(QueryPlannerTest, ChooseAllPathsIndexHint) {
 }
 
 TEST_F(QueryPlannerTest, ChooseAllPathsIndexHintByName) {
-    addIndex(BSON("$**" << 1), nullptr, "allPaths");
+    StringData allPaths = "allPaths";
+    CollatorInterface* nullCollator = nullptr;
+    addIndex(BSON("$**" << 1), nullCollator, allPaths);
     addIndex(BSON("x" << 1));
 
     runQueryHint(fromjson("{x: {$eq: 1}}"),
