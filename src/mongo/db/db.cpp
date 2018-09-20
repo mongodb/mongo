@@ -123,7 +123,7 @@
 #include "mongo/db/session_killer.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/backup_cursor_service.h"
+#include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -532,7 +532,7 @@ ExitCode _initAndListen(int listenPort) {
 
     auto storageEngine = serviceContext->getStorageEngine();
     invariant(storageEngine);
-    BackupCursorService::set(serviceContext, stdx::make_unique<BackupCursorService>(storageEngine));
+    BackupCursorHooks::initialize(serviceContext, storageEngine);
 
     if (!storageGlobalParams.readOnly) {
 

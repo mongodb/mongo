@@ -84,6 +84,11 @@ authorization failure.
 Set of options to be passed to your 'command' function. Can be used to send different versions of
 the command depending on the testcase being run.
 
+10) skipTest
+
+Add "skipTest: <function>" to not run the test for more complex reasons. The function is passed
+one argument, the connection object.
+
 */
 
 // constants
@@ -5945,6 +5950,10 @@ var authCommandsLib = {
           testname: "aggregate_$backupCursor",
           command: {aggregate: 1, cursor: {}, pipeline: [{$backupCursor: {}}]},
           skipSharded: true,
+          // Only enterprise knows of this aggregation stage.
+          skipTest:
+              (conn) =>
+                  !conn.getDB("admin").runCommand({buildInfo: 1}).modules.includes("enterprise"),
           testcases: [{
               runOnDb: adminDbName,
               roles: roles_hostManager,
@@ -5988,6 +5997,9 @@ var authCommandsLib = {
     runOneTest: function(conn, t, impls) {
         jsTest.log("Running test: " + t.testname);
 
+        if (t.skipTest && t.skipTest(conn)) {
+            return [];
+        }
         // some tests shouldn't run in a sharded environment
         if (t.skipSharded && this.isMongos(conn)) {
             return [];

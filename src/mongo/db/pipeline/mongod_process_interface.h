@@ -93,8 +93,6 @@ public:
         boost::optional<BSONObj> readConcern) final;
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
-    void fsyncLock(OperationContext* opCtx) final;
-    void fsyncUnlock(OperationContext* opCtx) final;
     BackupCursorState openBackupCursor(OperationContext* opCtx) final;
     void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) final;
 

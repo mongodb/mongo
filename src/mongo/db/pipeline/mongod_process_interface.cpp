@@ -49,6 +49,7 @@
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
+#include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
@@ -437,24 +438,22 @@ boost::optional<Document> MongoDInterface::lookupSingleDocument(
     return lookedUpDocument;
 }
 
-void MongoDInterface::fsyncLock(OperationContext* opCtx) {
-    auto backupCursorService = BackupCursorService::get(opCtx->getServiceContext());
-    backupCursorService->fsyncLock(opCtx);
-}
-
-void MongoDInterface::fsyncUnlock(OperationContext* opCtx) {
-    auto backupCursorService = BackupCursorService::get(opCtx->getServiceContext());
-    backupCursorService->fsyncUnlock(opCtx);
-}
-
 BackupCursorState MongoDInterface::openBackupCursor(OperationContext* opCtx) {
-    auto backupCursorService = BackupCursorService::get(opCtx->getServiceContext());
-    return backupCursorService->openBackupCursor(opCtx);
+    auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
+    if (backupCursorHooks->enabled()) {
+        return backupCursorHooks->openBackupCursor(opCtx);
+    } else {
+        uasserted(50956, "Backup cursors are an enterprise only feature.");
+    }
 }
 
 void MongoDInterface::closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) {
-    auto backupCursorService = BackupCursorService::get(opCtx->getServiceContext());
-    backupCursorService->closeBackupCursor(opCtx, cursorId);
+    auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
+    if (backupCursorHooks->enabled()) {
+        backupCursorHooks->closeBackupCursor(opCtx, cursorId);
+    } else {
+        uasserted(50955, "Backup cursors are an enterprise only feature.");
+    }
 }
 
 std::vector<BSONObj> MongoDInterface::getMatchingPlanCacheEntryStats(

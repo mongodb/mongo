@@ -154,14 +154,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void fsyncLock(OperationContext* opCtx) final {
-        MONGO_UNREACHABLE;
-    }
-
-    void fsyncUnlock(OperationContext* opCtx) final {
-        MONGO_UNREACHABLE;
-    }
-
     BackupCursorState openBackupCursor(OperationContext* opCtx) final {
         MONGO_UNREACHABLE;
     }

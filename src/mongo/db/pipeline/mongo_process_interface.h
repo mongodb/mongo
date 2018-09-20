@@ -45,7 +45,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/storage/backup_cursor_service.h"
+#include "mongo/db/storage/backup_cursor_state.h"
 
 namespace mongo {
 
@@ -231,12 +231,8 @@ public:
         CurrentOpUserMode userMode) const = 0;
 
     /**
-     * The following methods forward to the BackupCursorService decorating the ServiceContext.
+     * The following methods forward to the BackupCursorHooks decorating the ServiceContext.
      */
-    virtual void fsyncLock(OperationContext* opCtx) = 0;
-
-    virtual void fsyncUnlock(OperationContext* opCtx) = 0;
-
     virtual BackupCursorState openBackupCursor(OperationContext* opCtx) = 0;
 
     virtual void closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) = 0;

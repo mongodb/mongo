@@ -327,7 +327,7 @@ env.Library(
         'db/serveronly',
         'db/service_context_d',
         'db/startup_warnings_mongod',
-        'db/storage/backup_cursor_service',
+        'db/storage/backup_cursor_hooks',
         'db/system_index',
         'db/ttl_d',
         'executor/network_interface_factory',

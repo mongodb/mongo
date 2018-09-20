@@ -48,7 +48,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/backup_cursor_service.h"
+#include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
@@ -355,14 +355,22 @@ void FSyncLockThread::run() {
         }
 
         bool successfulFsyncLock = false;
-        auto backupCursorService = BackupCursorService::get(opCtx.getServiceContext());
+        auto backupCursorHooks = BackupCursorHooks::get(opCtx.getServiceContext());
         try {
             writeConflictRetry(&opCtx,
                                "beginBackup",
                                "global",
-                               [&opCtx, backupCursorService, &successfulFsyncLock] {
-                                   backupCursorService->fsyncLock(&opCtx);
-                                   successfulFsyncLock = true;
+                               [&opCtx, backupCursorHooks, &successfulFsyncLock, storageEngine] {
+                                   if (backupCursorHooks->enabled()) {
+                                       backupCursorHooks->fsyncLock(&opCtx);
+                                       successfulFsyncLock = true;
+                                   } else {
+                                       // Have the uassert be caught by the DBException
+                                       // block. Maintain "allowFsyncFailure" compatibility in
+                                       // community.
+                                       uassertStatusOK(storageEngine->beginBackup(&opCtx));
+                                       successfulFsyncLock = true;
+                                   }
                                });
         } catch (const DBException& e) {
             if (_allowFsyncFailure) {
@@ -385,7 +393,11 @@ void FSyncLockThread::run() {
         }
 
         if (successfulFsyncLock) {
-            backupCursorService->fsyncUnlock(&opCtx);
+            if (backupCursorHooks->enabled()) {
+                backupCursorHooks->fsyncUnlock(&opCtx);
+            } else {
+                storageEngine->endBackup(&opCtx);
+            }
         }
 
     } catch (const std::exception& e) {

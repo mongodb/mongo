@@ -283,10 +283,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/stats/top',
-        '$BUILD_DIR/mongo/db/storage/backup_cursor_service',
         '$BUILD_DIR/mongo/s/sharding_api',
         'mongo_process_common',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
+    ],
 )
 
 env.Library(
@@ -308,7 +310,6 @@ pipelineeEnv.Library(
     source=[
         'document_source.cpp',
         'document_source_add_fields.cpp',
-        'document_source_backup_cursor.cpp',
         'document_source_bucket.cpp',
         'document_source_bucket_auto.cpp',
         'document_source_change_stream.cpp',
