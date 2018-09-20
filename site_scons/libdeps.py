@@ -234,7 +234,7 @@ def __append_direct_libdeps(node, prereq_nodes):
         node.attributes.libdeps_direct = []
     node.attributes.libdeps_direct.extend(prereq_nodes)
 
-def make_libdeps_emitter(dependency_builder, dependency_map=dependency_visibility_ignored):
+def make_libdeps_emitter(dependency_builder, dependency_map=dependency_visibility_ignored, ignore_progdeps=False):
 
     def libdeps_emitter(target, source, env):
         """SCons emitter that takes values from the LIBDEPS environment variable and
@@ -288,20 +288,21 @@ def make_libdeps_emitter(dependency_builder, dependency_map=dependency_visibilit
             dependentNode = lib_node_factory(dependentWithIxes)
             __append_direct_libdeps(dependentNode, [dependency(target[0], dependency_map[visibility])])
 
-        for dependent in env.get('PROGDEPS_DEPENDENTS', []):
-            if dependent is None:
-                continue
+        if not ignore_progdeps:
+            for dependent in env.get('PROGDEPS_DEPENDENTS', []):
+                if dependent is None:
+                    continue
 
-            visibility = dependency.Public
-            if isinstance(dependent, tuple):
-                # TODO: Error here? Non-public PROGDEPS_DEPENDENTS probably are meaningless
-                visibility = dependent[1]
-                dependent = dependent[0]
+                visibility = dependency.Public
+                if isinstance(dependent, tuple):
+                    # TODO: Error here? Non-public PROGDEPS_DEPENDENTS probably are meaningless
+                    visibility = dependent[1]
+                    dependent = dependent[0]
 
-            dependentWithIxes = SCons.Util.adjustixes(
-                dependent, prog_builder.get_prefix(env), prog_builder.get_suffix(env))
-            dependentNode = prog_node_factory(dependentWithIxes)
-            __append_direct_libdeps(dependentNode, [dependency(target[0], dependency_map[visibility])])
+                dependentWithIxes = SCons.Util.adjustixes(
+                    dependent, prog_builder.get_prefix(env), prog_builder.get_suffix(env))
+                dependentNode = prog_node_factory(dependentWithIxes)
+                __append_direct_libdeps(dependentNode, [dependency(target[0], dependency_map[visibility])])
 
         return target, source
 
@@ -344,7 +345,7 @@ def setup_environment(env, emitting_shared=False):
         LIBDEPS_LIBEMITTER=make_libdeps_emitter('StaticLibrary'),
         LIBEMITTER=make_indirect_emitter('LIBDEPS_LIBEMITTER'),
 
-        LIBDEPS_SHAREMITTER=make_libdeps_emitter('SharedArchive'),
+        LIBDEPS_SHAREMITTER=make_libdeps_emitter('SharedArchive', ignore_progdeps=True),
         SHAREMITTER=make_indirect_emitter('LIBDEPS_SHAREMITTER'),
 
         LIBDEPS_SHLIBEMITTER=make_libdeps_emitter('SharedLibrary', dependency_visibility_honored),
