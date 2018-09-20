@@ -258,14 +258,15 @@ void CollectionCloner::shutdown() {
 void CollectionCloner::_cancelRemainingWork_inlock() {
     _countScheduler.shutdown();
     _listIndexesFetcher.shutdown();
-    if (_establishCollectionCursorsScheduler) {
-        _establishCollectionCursorsScheduler->shutdown();
-    }
     if (_verifyCollectionDroppedScheduler) {
         _verifyCollectionDroppedScheduler->shutdown();
     }
-    _queryState =
-        _queryState == QueryState::kRunning ? QueryState::kCanceling : QueryState::kFinished;
+    if (_queryState == QueryState::kRunning) {
+        _queryState = QueryState::kCanceling;
+        _clientConnection->shutdownAndDisallowReconnect();
+    } else {
+        _queryState = QueryState::kFinished;
+    }
     _dbWorkTaskRunner.cancel();
 }
 
@@ -488,6 +489,7 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
                 {
                     stdx::lock_guard<stdx::mutex> lock(_mutex);
                     _queryState = QueryState::kFinished;
+                    _clientConnection.reset();
                 }
                 _condition.notify_all();
             });
@@ -530,13 +532,13 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
         }
     }
 
-    auto conn = _createClientFn();
-    Status clientConnectionStatus = conn->connect(_source, StringData());
+    _clientConnection = _createClientFn();
+    Status clientConnectionStatus = _clientConnection->connect(_source, StringData());
     if (!clientConnectionStatus.isOK()) {
         _finishCallback(clientConnectionStatus);
         return;
     }
-    if (!replAuthenticate(conn.get())) {
+    if (!replAuthenticate(_clientConnection.get())) {
         _finishCallback({ErrorCodes::AuthenticationFailed,
                          str::stream() << "Failed to authenticate to " << _source});
         return;
@@ -549,7 +551,7 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
         std::make_shared<OnCompletionGuard>(cancelRemainingWorkInLock, finishCallbackFn);
 
     try {
-        conn->query(
+        _clientConnection->query(
             [this, onCompletionGuard](DBClientCursorBatchIterator& iter) {
                 _handleNextBatch(onCompletionGuard, iter);
             },

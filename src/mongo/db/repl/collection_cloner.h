@@ -282,20 +282,20 @@ private:
     const int _collectionClonerBatchSize;  // (R) The size of the batches of documents returned in
                                            // collection cloning.
 
-    // (M) Scheduler used to establish the initial cursor or set of cursors.
-    std::unique_ptr<RemoteCommandRetryScheduler> _establishCollectionCursorsScheduler;
-
     // (M) Scheduler used to determine if a cursor was closed because the collection was dropped.
     std::unique_ptr<RemoteCommandRetryScheduler> _verifyCollectionDroppedScheduler;
 
     // (M) State of query.  Set to kCanceling to cause query to stop. If the query is kRunning
-    // or kCanceling, wait for query to reach kFinished using _condition
+    // or kCanceling, wait for query to reach kFinished using _condition.
     enum class QueryState {
         kNotStarted,
         kRunning,
         kCanceling,
         kFinished
     } _queryState = QueryState::kNotStarted;
+
+    // (M) Client connection used for query.
+    std::unique_ptr<DBClientConnection> _clientConnection;
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete
