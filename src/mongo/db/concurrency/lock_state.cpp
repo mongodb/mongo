@@ -130,6 +130,10 @@ OperationContext::Decoration<LockManager::TemporaryResourceQueue*> globalResourc
 }  // namespace
 
 bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
+    if (_prepareModeForLockYields) {
+        return false;
+    }
+
     switch (resId.getType()) {
         case RESOURCE_MUTEX:
             return false;
@@ -587,9 +591,18 @@ boost::optional<Locker::LockerInfo> LockerImpl::getLockerInfo(
     return std::move(lockerInfo);
 }
 
+bool LockerImpl::saveLockStateAndUnlockForPrepare(Locker::LockSnapshot* stateOut) {
+    invariant(!_prepareModeForLockYields);
+    _prepareModeForLockYields = true;
+    ON_BLOCK_EXIT([&] { _prepareModeForLockYields = false; });
+    return saveLockStateAndUnlock(stateOut);
+}
+
 bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
-    // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
-    invariant(!inAWriteUnitOfWork());
+    // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork, excepting the
+    // special behavior for saving/restoring locks for prepared transactions during repl state
+    // transitions.
+    invariant(!inAWriteUnitOfWork() || _prepareModeForLockYields);
 
     // Clear out whatever is in stateOut.
     stateOut->locks.clear();
@@ -646,8 +659,10 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
 }
 
 void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSnapshot& state) {
-    // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
-    invariant(!inAWriteUnitOfWork());
+    // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork, excepting the
+    // special behavior for saving/restoring locks for prepared transactions during repl state
+    // transitions.
+    invariant(!inAWriteUnitOfWork() || _prepareModeForLockYields);
     invariant(_modeForTicket == MODE_NONE);
 
     std::vector<OneLock>::const_iterator it = state.locks.begin();
@@ -670,9 +685,14 @@ void LockerImpl::restoreLockStateWithTemporaryGlobalResource(
     LockManager::TemporaryResourceQueue* tempGlobalResource) {
     invariant(tempGlobalResource->getResourceId().getType() == ResourceType::RESOURCE_GLOBAL);
     invariant(globalResourceShadow(opCtx) == nullptr);
+    invariant(!_prepareModeForLockYields);
 
     globalResourceShadow(opCtx) = tempGlobalResource;
-    ON_BLOCK_EXIT([&] { globalResourceShadow(opCtx) = nullptr; });
+    _prepareModeForLockYields = true;
+    ON_BLOCK_EXIT([&] {
+        globalResourceShadow(opCtx) = nullptr;
+        _prepareModeForLockYields = false;
+    });
 
     restoreLockState(opCtx, state);
 }
@@ -756,7 +776,7 @@ LockResult LockerImpl::lockBegin(OperationContext* opCtx, ResourceId resId, Lock
     _notify.clear();
 
     LockResult result{LockResult::LOCK_INVALID};
-    if (resType == RESOURCE_GLOBAL && opCtx && globalResourceShadow(opCtx)) {
+    if (resId == resourceIdGlobal && opCtx && globalResourceShadow(opCtx)) {
         // If we're trying to lock the global resource and we have a temporary global resource
         // installed, use the temporary resource instead of letting the LockManager look up the
         // true resource for the global lock.

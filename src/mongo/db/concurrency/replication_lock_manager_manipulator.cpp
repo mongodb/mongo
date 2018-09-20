@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -44,6 +44,9 @@ void ReplicationLockManagerManipulator::lockUncontestedTemporaryGlobalResource(
     invariant(request->recursiveCount == 1);
     invariant(!request->partitioned);
     invariant(tempGlobalResource->_lockHead.resourceId.getType() == ResourceType::RESOURCE_GLOBAL);
+    invariant(mode == MODE_IX,
+              str::stream() << "Locking temporary global resource must happen in MODE_IX, found: "
+                            << mode);
 
     request->mode = mode;
     const auto lockResult = tempGlobalResource->_lockHead.newRequest(request);
@@ -81,7 +84,10 @@ void ReplicationLockManagerManipulator::replaceGlobalLocksWithLocksFromTemporary
     for (LockRequest* it = tempGlobalLockHead->grantedList._front; it != nullptr;) {
         LockRequest* next = it->next;
 
-        invariant(it->mode == MODE_IX);
+        invariant(it->mode == MODE_IX,
+                  str::stream() << "Expected granted requests from temporary global resource to be "
+                                   "in MODE_IX but found: "
+                                << it->mode);
         invariant(it->status == LockRequest::Status::STATUS_GRANTED);
         invariant(it->lock == tempGlobalLockHead);
 

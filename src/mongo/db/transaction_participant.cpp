@@ -868,6 +868,22 @@ void TransactionParticipant::abortActiveUnpreparedOrStashPreparedTransaction(
     std::terminate();
 }
 
+void TransactionParticipant::abortOrYieldArbitraryTransaction(
+    std::vector<std::pair<Locker*, Locker::LockSnapshot>>* yieldedLocks) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (_txnState.isInProgress(lk)) {
+        _abortTransactionOnSession(lk);
+        return;
+    }
+
+    if (_txnState.isPrepared(lk)) {
+        Locker::LockSnapshot locks;
+        _txnResourceStash->locker()->saveLockStateAndUnlockForPrepare(&locks);
+        yieldedLocks->push_back(std::make_pair(_txnResourceStash->locker(), std::move(locks)));
+    }
+}
+
 void TransactionParticipant::_abortActiveTransaction(stdx::unique_lock<stdx::mutex> lock,
                                                      OperationContext* opCtx,
                                                      TransactionState::StateSet expectedStates) {

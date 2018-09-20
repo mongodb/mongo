@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -40,7 +41,9 @@ namespace repl {
 /**
  * This object handles acquiring the global exclusive lock for replication state transitions, as
  * well as any actions that need to happen in between enqueuing the global lock request and waiting
- * for it to be granted.
+ * for it to be granted.  One of the main such actions is aborting all in-progress transactions and
+ * causing all prepared transaction to yield their locks during the transition and restoring them
+ * when the transition is complete.
  */
 class ReplicationStateTransitionLockGuard {
     MONGO_DISALLOW_COPYING(ReplicationStateTransitionLockGuard);
@@ -56,27 +59,50 @@ public:
     };
 
     /**
-     * Acquires the global X lock and performs any other required actions accoriding to the Args
-     * provided.
+     * Acquires the global X lock while yielding the locks held by any prepared transactions.
+     * Also performs any other actions required according to the Args provided.
      */
     ReplicationStateTransitionLockGuard(OperationContext* opCtx, const Args& args);
+
+    /**
+     * Releases the global X lock and atomically restores the locks for prepared transactions that
+     * were yielded in the constructor.
+     */
     ~ReplicationStateTransitionLockGuard();
 
     /**
-     * Temporarily releases the global X lock.  Must be followed by a call to reacquireGlobalLock().
+     * Temporarily releases the global X lock.  Must be followed by a call to
+     * reacquireGlobalLockForStepdownAttempt().
      */
-    void releaseGlobalLock();
+    void releaseGlobalLockForStepdownAttempt();
 
     /**
-     * Requires the global X lock after it was released via a call to releaseGlobalLock.  Ignores
-     * the configured 'lockDeadline' and instead waits forever for the lock to be acquired.
+     * Requires the global X lock after it was released via a call to
+     * releaseGlobalLockForStepdownAttempt().  Ignores the configured 'lockDeadline' and instead
+     * waits forever for the lock to be acquired.
      */
-    void reacquireGlobalLock();
+    void reacquireGlobalLockForStepdownAttempt();
 
 private:
+    // OperationContext of the thread driving the state transition.
     OperationContext* const _opCtx;
+
+    // Args to configure what behaviors need to be taken while acquiring the global X lock for the
+    // state transition.
     Args _args;
-    boost::optional<Lock::GlobalLock> _globalLock = boost::none;
+
+    // The global X lock that this object is responsible for acquiring as part of the state
+    // transition.
+    boost::optional<Lock::GlobalLock> _globalLock;
+
+    // Used to prevent Sessions from being checked out, so that we can wait for all sessions to be
+    // checked in and iterate over all Sessions to get Sessions with prepared transactions to yield
+    // their locks.
+    boost::optional<SessionCatalog::PreventCheckingOutSessionsBlock> _preventCheckingOutSessions;
+
+    // Locks that were held by prepared transactions and were yielded in order to allow taking the
+    // global X lock.
+    std::vector<std::pair<Locker*, Locker::LockSnapshot>> _yieldedLocks;
 };
 
 }  // namespace repl

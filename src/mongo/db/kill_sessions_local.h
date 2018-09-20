@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/session_killer.h"
 
 /**
@@ -57,5 +60,12 @@ void killAllExpiredTransactions(OperationContext* opCtx);
  * Run during shutdown to kill all in-progress transactions, including those in prepare.
  */
 void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx);
+
+/**
+ * Run during replication state transitions.  Aborts all unprepared transactions and causes all
+ * prepared transactions to yield their locks into 'yieldedLocks'.
+ */
+void killSessionsLocalAbortOrYieldAllTransactions(
+    OperationContext* opCtx, std::vector<std::pair<Locker*, Locker::LockSnapshot>>* yieldedLocks);
 
 }  // namespace mongo

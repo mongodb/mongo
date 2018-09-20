@@ -171,6 +171,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual bool saveLockStateAndUnlockForPrepare(LockSnapshot* stateOut) {
+        MONGO_UNREACHABLE;
+    }
+
     virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) {
         MONGO_UNREACHABLE;
     }

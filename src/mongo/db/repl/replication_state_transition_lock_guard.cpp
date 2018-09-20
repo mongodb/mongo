@@ -33,6 +33,9 @@
 #include "mongo/db/repl/replication_state_transition_lock_guard.h"
 
 #include "mongo/db/kill_sessions_local.h"
+#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_killer.h"
+#include "mongo/db/transaction_participant.h"
 
 namespace mongo {
 namespace repl {
@@ -40,22 +43,33 @@ namespace repl {
 ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(OperationContext* opCtx,
                                                                          const Args& args)
     : _opCtx(opCtx), _args(args) {
+
+    // First enqueue the request for the global X lock.
     _globalLock.emplace(opCtx,
                         MODE_X,
                         args.lockDeadline,
                         Lock::InterruptBehavior::kThrow,
                         Lock::GlobalLock::EnqueueOnly());
 
+    // Next prevent any Sessions from being created or checked out.
+    _preventCheckingOutSessions.emplace(SessionCatalog::get(opCtx));
+
+    // If we're going to be killing all user operations do it before waiting for the global lock
+    // and for all Sessions to be checked in as killing all running user ops may make those things
+    // happen faster.
     if (args.killUserOperations) {
         ServiceContext* environment = opCtx->getServiceContext();
         environment->killAllUserOperations(opCtx, ErrorCodes::InterruptedDueToStepDown);
-
-        // Destroy all stashed transaction resources, in order to release locks.
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
     }
 
+    // Now wait for all Sessions to be checked in so we can iterate over all of them and abort
+    // any in-progress transactions and yield and gather the LockSnapshots for all prepared
+    // transactions.
+    _preventCheckingOutSessions->waitForAllSessionsToBeCheckedIn(opCtx);
+    killSessionsLocalAbortOrYieldAllTransactions(opCtx, &_yieldedLocks);
+
+    // Now that all transactions have either aborted or yielded their locks, we can wait for the
+    // global X lock to be taken successfully.
     _globalLock->waitForLockUntil(args.lockDeadline);
     uassert(ErrorCodes::ExceededTimeLimit,
             "Could not acquire the global lock before the deadline",
@@ -64,14 +78,31 @@ ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(Operati
 
 ReplicationStateTransitionLockGuard::~ReplicationStateTransitionLockGuard() {
     invariant(_globalLock->isLocked());
+
+    // Restore the locks for the prepared transactions, but put all requests for the global lock
+    // into a TemporaryResourceQueue for the global resource.
+    const ResourceId globalResId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+    LockManager::TemporaryResourceQueue tempGlobalResource(globalResId);
+    for (auto&& pair : _yieldedLocks) {
+        auto locker = pair.first;
+        auto lockSnapshot = pair.second;
+
+        locker->restoreLockStateWithTemporaryGlobalResource(
+            _opCtx, lockSnapshot, &tempGlobalResource);
+    }
+
+    // Now atomically release the global X lock and restore the locks on the global resource from
+    // the TemporaryResourceQueue that was populated with the Global lock requests from the yielded
+    // locks from prepared transactions.
+    _opCtx->lockState()->replaceGlobalLockStateWithTemporaryGlobalResource(&tempGlobalResource);
 }
 
-void ReplicationStateTransitionLockGuard::releaseGlobalLock() {
+void ReplicationStateTransitionLockGuard::releaseGlobalLockForStepdownAttempt() {
     invariant(_globalLock->isLocked());
     _globalLock.reset();
 }
 
-void ReplicationStateTransitionLockGuard::reacquireGlobalLock() {
+void ReplicationStateTransitionLockGuard::reacquireGlobalLockForStepdownAttempt() {
     invariant(!_globalLock);
 
     UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
