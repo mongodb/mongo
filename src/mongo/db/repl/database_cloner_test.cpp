@@ -763,11 +763,7 @@ TEST_F(DatabaseClonerTest, ShutdownCancelsCollectionCloning) {
                                           BSON_ARRAY(BSON("name"
                                                           << "a"
                                                           << "options"
-                                                          << _options1.toBSON())
-                                                     << BSON("name"
-                                                             << "b"
-                                                             << "options"
-                                                             << _options2.toBSON())))));
+                                                          << _options1.toBSON())))));
         net->runReadyNetworkOperations();
 
         // CollectionCloner sends collection count request on startup.
@@ -788,9 +784,8 @@ TEST_F(DatabaseClonerTest, ShutdownCancelsCollectionCloning) {
     ASSERT_FALSE(_databaseCloner->isActive());
     ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
 
-    // This is the error code from attempting to start up the last (of 2) collection cloner which
-    // was shut down before it was ever started.
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, getStatus());
+    // We do not need to attempt a subsequent collection clone to be notified of an error.
+    ASSERT_EQUALS(ErrorCodes::InitialSyncFailure, getStatus());
 }
 
 TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
@@ -833,16 +828,18 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
     ASSERT_FALSE(_databaseCloner->isActive());
     ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
 
-    ASSERT_EQUALS(2U, _collections.size());
+    ASSERT_EQUALS(1U, _collections.size());
 
+    // We have attempted, and failed, to clone the first collection.
     auto collInfo = _collections[NamespaceString{"db.a"}];
     ASSERT_EQUALS(ErrorCodes::CursorNotFound, collInfo.status.code());
     auto stats = collInfo.stats;
     stats.insertCount = 0;
     stats.commitCalled = false;
 
+    // We have not attempted to clone the second collection.
     collInfo = _collections[NamespaceString{"db.b"}];
-    ASSERT_OK(collInfo.status);
+    ASSERT_EQUALS(ErrorCodes::NotYetInitialized, collInfo.status.code());
     stats = collInfo.stats;
     stats.insertCount = 0;
     stats.commitCalled = true;

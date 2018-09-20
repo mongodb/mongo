@@ -232,7 +232,6 @@ private:
     std::vector<NamespaceString> _collectionNamespaces;                  // (M)
     std::list<CollectionCloner> _collectionCloners;                      // (M)
     std::list<CollectionCloner>::iterator _currentCollectionClonerIter;  // (M)
-    std::vector<std::pair<Status, NamespaceString>> _failedNamespaces;   // (M)
     CollectionCloner::ScheduleDbWorkFn
         _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.
     StartCollectionClonerFn _startCollectionCloner;  // (RT)
