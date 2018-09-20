@@ -120,7 +120,9 @@ Status addSSLServerOptions(moe::OptionSection* options) {
     options->addOptionChaining("net.tls.clusterCAFile",
                                "tlsClusterCAFile",
                                moe::String,
-                               "CA used for verifying remotes during outbound connections");
+                               "CA used for verifying remotes during outbound connections",
+                               {"net.ssl.clusterCAFile"},
+                               {"sslClusterCAFile"});
 
     options->addOptionChaining("net.tls.CRLFile",
                                "tlsCRLFile",

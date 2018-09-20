@@ -42,4 +42,12 @@
                                        base_options);
 
     testRS(test_options, true);
+
+    const depr_options = Object.extend({
+        sslAllowConnectionsWithoutCertificates: '',
+        setParameter: 'sslWithholdClientCertificate=true',
+    },
+                                       base_options);
+
+    testRS(depr_options, true);
 }());

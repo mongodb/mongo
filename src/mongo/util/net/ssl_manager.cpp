@@ -68,6 +68,12 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly> tlsWithholdClie
     "tlsWithholdClientCertificate",
     &sslGlobalParams.tlsWithholdClientCertificate);
 
+// Deprecated alias for tlsWithholdClientCertificate
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly> sslWithholdClientCertificate(
+    ServerParameterSet::getGlobal(),
+    "sslWithholdClientCertificate",
+    &sslGlobalParams.tlsWithholdClientCertificate);
+
 }  // namespace
 
 class OpenSSLCipherConfigParameter
