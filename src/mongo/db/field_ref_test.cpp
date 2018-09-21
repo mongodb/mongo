@@ -853,11 +853,11 @@ TEST(RemoveLastPartLong, FieldRefFromCopyAssignmentIsADeepCopy) {
 
 TEST(NumericPathComponents, CanIdentifyNumericPathComponents) {
     FieldRef path("a.0.b.1.c");
-    ASSERT(!path.isNumericPathComponent(0));
-    ASSERT(path.isNumericPathComponent(1));
-    ASSERT(!path.isNumericPathComponent(2));
-    ASSERT(path.isNumericPathComponent(3));
-    ASSERT(!path.isNumericPathComponent(4));
+    ASSERT(!path.isNumericPathComponentStrict(0));
+    ASSERT(path.isNumericPathComponentStrict(1));
+    ASSERT(!path.isNumericPathComponentStrict(2));
+    ASSERT(path.isNumericPathComponentStrict(3));
+    ASSERT(!path.isNumericPathComponentStrict(4));
 }
 
 TEST(NumericPathComponents, CanObtainAllNumericPathComponents) {

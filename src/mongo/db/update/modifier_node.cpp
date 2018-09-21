@@ -189,8 +189,7 @@ UpdateNode::ApplyResult ModifierNode::applyToExistingElement(ApplyParams applyPa
 
     ApplyResult applyResult;
 
-    if (!applyParams.indexData ||
-        !applyParams.indexData->mightBeIndexed(applyParams.pathTaken->dottedField())) {
+    if (!applyParams.indexData || !applyParams.indexData->mightBeIndexed(*applyParams.pathTaken)) {
         applyResult.indexesAffected = false;
     }
 
@@ -270,12 +269,12 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
         }
 
         invariant(!applyParams.pathToCreate->empty());
-        std::string fullPath;
+        FieldRef fullPath;
         if (applyParams.pathTaken->empty()) {
-            fullPath = applyParams.pathToCreate->dottedField().toString();
+            fullPath = *applyParams.pathToCreate;
         } else {
-            fullPath = str::stream() << applyParams.pathTaken->dottedField() << "."
-                                     << applyParams.pathToCreate->dottedField();
+            fullPath = FieldRef(str::stream() << applyParams.pathTaken->dottedField() << "."
+                                              << applyParams.pathToCreate->dottedField());
         }
 
         ApplyResult applyResult;
@@ -289,12 +288,13 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
         if (!applyParams.indexData ||
             !applyParams.indexData->mightBeIndexed(applyParams.element.getType() != BSONType::Array
                                                        ? fullPath
-                                                       : applyParams.pathTaken->dottedField())) {
+                                                       : *applyParams.pathTaken)) {
             applyResult.indexesAffected = false;
         }
 
         if (applyParams.logBuilder) {
-            logUpdate(applyParams.logBuilder, fullPath, newElement, ModifyResult::kCreated);
+            logUpdate(
+                applyParams.logBuilder, fullPath.dottedField(), newElement, ModifyResult::kCreated);
         }
 
         return applyResult;

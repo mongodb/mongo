@@ -102,7 +102,7 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
                 // If a subtree was specified in the keyPattern, or if an inclusion projection is
                 // present, then we need only index the path(s) preserved by the projection.
                 for (const auto& path : pathProj->getExhaustivePaths()) {
-                    _indexedPaths.addPath(path.dottedField());
+                    _indexedPaths.addPath(path);
                 }
             }
         } else if (descriptor->getAccessMethodName() == IndexNames::TEXT) {
@@ -112,15 +112,15 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
                 _indexedPaths.allPathsIndexed();
             } else {
                 for (size_t i = 0; i < ftsSpec.numExtraBefore(); ++i) {
-                    _indexedPaths.addPath(ftsSpec.extraBefore(i));
+                    _indexedPaths.addPath(FieldRef(ftsSpec.extraBefore(i)));
                 }
                 for (fts::Weights::const_iterator it = ftsSpec.weights().begin();
                      it != ftsSpec.weights().end();
                      ++it) {
-                    _indexedPaths.addPath(it->first);
+                    _indexedPaths.addPath(FieldRef(it->first));
                 }
                 for (size_t i = 0; i < ftsSpec.numExtraAfter(); ++i) {
-                    _indexedPaths.addPath(ftsSpec.extraAfter(i));
+                    _indexedPaths.addPath(FieldRef(ftsSpec.extraAfter(i)));
                 }
                 // Any update to a path containing "language" as a component could change the
                 // language of a subdocument.  Add the override field as a path component.
@@ -135,7 +135,7 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
             BSONObjIterator j(key);
             while (j.more()) {
                 BSONElement e = j.next();
-                _indexedPaths.addPath(e.fieldName());
+                _indexedPaths.addPath(FieldRef(e.fieldName()));
             }
         }
 
@@ -146,7 +146,7 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
             stdx::unordered_set<std::string> paths;
             QueryPlannerIXSelect::getFields(filter, &paths);
             for (auto it = paths.begin(); it != paths.end(); ++it) {
-                _indexedPaths.addPath(*it);
+                _indexedPaths.addPath(FieldRef(*it));
             }
         }
     }

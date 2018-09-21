@@ -63,7 +63,7 @@ bool fieldNameOrArrayIndexPathMatches(const FieldRef& fieldNameOrArrayIndexPath,
         if (fieldNameOrArrayIndexPath.getPart(i) == staticComparisonPath.getPart(i - offset)) {
             continue;
         } else if (multikeyPathComponents.count(i - 1) &&
-                   fieldNameOrArrayIndexPath.isNumericPathComponent(i)) {
+                   fieldNameOrArrayIndexPath.isNumericPathComponentStrict(i)) {
             ++offset;
             continue;
         }
@@ -105,7 +105,7 @@ std::vector<size_t> findArrayIndexPathComponents(const std::set<std::size_t>& mu
                                                  const FieldRef& queryPath) {
     std::vector<size_t> arrayIndices;
     for (auto i : multikeyPaths) {
-        if (i < queryPath.numParts() - 1 && queryPath.isNumericPathComponent(i + 1)) {
+        if (i < queryPath.numParts() - 1 && queryPath.isNumericPathComponentStrict(i + 1)) {
             arrayIndices.push_back(i + 1);
         }
     }

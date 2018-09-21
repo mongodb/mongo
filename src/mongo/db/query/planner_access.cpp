@@ -571,7 +571,7 @@ void QueryPlannerAccess::finishWildcardIndexScanNode(QuerySolutionNode* node,
     // Helper function to check whether the final path component in 'queryPath' is an array index.
     const auto lastFieldIsArrayIndex = [&multikeyPaths](const auto& queryPath) {
         return (queryPath.numParts() > 1u && multikeyPaths.count(queryPath.numParts() - 2u) &&
-                queryPath.isNumericPathComponent(queryPath.numParts() - 1u));
+                queryPath.isNumericPathComponentStrict(queryPath.numParts() - 1u));
     };
 
     // For [MinKey,MaxKey] bounds, we build a range interval on all subpaths of the query path(s).

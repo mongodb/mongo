@@ -251,18 +251,23 @@ size_t FieldRef::commonPrefixSize(const FieldRef& other) const {
     return prefixSize;
 }
 
-bool FieldRef::isNumericPathComponent(StringData component) {
+bool FieldRef::isNumericPathComponentStrict(StringData component) {
     return !component.empty() && !(component.size() > 1 && component[0] == '0') &&
+        FieldRef::isNumericPathComponentLenient(component);
+}
+
+bool FieldRef::isNumericPathComponentLenient(StringData component) {
+    return !component.empty() &&
         std::all_of(component.begin(), component.end(), [](auto c) { return std::isdigit(c); });
 }
 
-bool FieldRef::isNumericPathComponent(size_t i) const {
-    return FieldRef::isNumericPathComponent(getPart(i));
+bool FieldRef::isNumericPathComponentStrict(size_t i) const {
+    return FieldRef::isNumericPathComponentStrict(getPart(i));
 }
 
 bool FieldRef::hasNumericPathComponents() const {
     for (size_t i = 0; i < numParts(); ++i) {
-        if (isNumericPathComponent(i))
+        if (isNumericPathComponentStrict(i))
             return true;
     }
     return false;
@@ -271,7 +276,7 @@ bool FieldRef::hasNumericPathComponents() const {
 std::set<size_t> FieldRef::getNumericPathComponents(size_t startPart) const {
     std::set<size_t> numericPathComponents;
     for (auto i = startPart; i < numParts(); ++i) {
-        if (isNumericPathComponent(i))
+        if (isNumericPathComponentStrict(i))
             numericPathComponents.insert(i);
     }
     return numericPathComponents;

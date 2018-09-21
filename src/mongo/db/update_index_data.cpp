@@ -30,21 +30,13 @@
 
 #include "mongo/db/update_index_data.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/field_ref.h"
 
 namespace mongo {
 
-using std::string;
-
 UpdateIndexData::UpdateIndexData() : _allPathsIndexed(false) {}
 
-void UpdateIndexData::addPath(StringData path) {
-    string s;
-    if (getCanonicalIndexField(path, &s)) {
-        _canonicalPaths.insert(s);
-    } else {
-        _canonicalPaths.insert(path.toString());
-    }
+void UpdateIndexData::addPath(const FieldRef& path) {
+    _canonicalPaths.insert(getCanonicalIndexField(path));
 }
 
 void UpdateIndexData::addPathComponent(StringData pathComponent) {
@@ -61,33 +53,21 @@ void UpdateIndexData::clear() {
     _allPathsIndexed = false;
 }
 
-bool UpdateIndexData::mightBeIndexed(StringData path) const {
+bool UpdateIndexData::mightBeIndexed(const FieldRef& path) const {
     if (_allPathsIndexed) {
         return true;
     }
 
-    StringData use = path;
-    string x;
-    if (getCanonicalIndexField(path, &x))
-        use = StringData(x);
+    FieldRef canonicalPath = getCanonicalIndexField(path);
 
-    for (std::set<string>::const_iterator i = _canonicalPaths.begin(); i != _canonicalPaths.end();
-         ++i) {
-        StringData idx(*i);
-
-        if (_startsWith(use, idx))
-            return true;
-
-        if (_startsWith(idx, use))
+    for (const auto& idx : _canonicalPaths) {
+        if (_startsWith(canonicalPath, idx) || _startsWith(idx, canonicalPath))
             return true;
     }
 
-    FieldRef pathFieldRef(path);
-    for (std::set<string>::const_iterator i = _pathComponents.begin(); i != _pathComponents.end();
-         ++i) {
-        const string& pathComponent = *i;
-        for (size_t partIdx = 0; partIdx < pathFieldRef.numParts(); ++partIdx) {
-            if (pathComponent == pathFieldRef.getPart(partIdx)) {
+    for (const auto& pathComponent : _pathComponents) {
+        for (size_t partIdx = 0; partIdx < path.numParts(); ++partIdx) {
+            if (pathComponent == path.getPart(partIdx)) {
                 return true;
             }
         }
@@ -96,74 +76,41 @@ bool UpdateIndexData::mightBeIndexed(StringData path) const {
     return false;
 }
 
-bool UpdateIndexData::_startsWith(StringData a, StringData b) const {
-    if (!a.startsWith(b))
-        return false;
-
-    // make sure there is a dot or EOL right after
-
-    if (a.size() == b.size())
-        return true;
-
-    return a[b.size()] == '.';
+bool UpdateIndexData::_startsWith(const FieldRef& a, const FieldRef& b) const {
+    return (a == b) || (b.isPrefixOf(a));
 }
 
-bool getCanonicalIndexField(StringData fullName, string* out) {
-    // check if fieldName contains ".$" or ".###" substrings (#=digit) and skip them
-    // however do not skip the first field even if it meets these criteria
+FieldRef UpdateIndexData::getCanonicalIndexField(const FieldRef& path) {
+    if (path.numParts() <= 1)
+        return path;
 
-    if (fullName.find('.') == string::npos)
-        return false;
+    // The first part of the path must always be a valid field name, since it's not possible to
+    // store a top-level array or '$' field name in a document.
+    FieldRef buf(path.getPart(0));
+    for (size_t i = 1; i < path.numParts(); ++i) {
+        auto pathComponent = path.getPart(i);
 
-    bool modified = false;
-
-    StringBuilder buf;
-    for (size_t i = 0; i < fullName.size(); i++) {
-        char c = fullName[i];
-
-        if (c != '.') {
-            buf << c;
+        if (pathComponent == "$"_sd) {
             continue;
         }
 
-        if (i + 1 == fullName.size()) {
-            // ends with '.'
-            buf << c;
+        if (FieldRef::isNumericPathComponentLenient(pathComponent)) {
+            // Peek ahead to see if the next component is also all digits. This implies that the
+            // update is attempting to create a numeric field name which would violate the
+            // "ambiguous field name in array" constraint for multi-key indexes. Break early in this
+            // case and conservatively return that this path affects the prefix of the consecutive
+            // numerical path components. For instance, an input such as 'a.0.1.b.c' would return
+            // the canonical index path of 'a'.
+            if ((i + 1) < path.numParts() &&
+                FieldRef::isNumericPathComponentLenient(path.getPart(i + 1))) {
+                break;
+            }
             continue;
         }
 
-        // check for ".$", skip if present
-        if (fullName[i + 1] == '$') {
-            // only do this if its not something like $a
-            if (i + 2 >= fullName.size() || fullName[i + 2] == '.') {
-                i++;
-                modified = true;
-                continue;
-            }
-        }
-
-        // check for ".###" for any number of digits (no letters)
-        if (isdigit(fullName[i + 1])) {
-            size_t j = i;
-            // skip digits
-            while (j + 1 < fullName.size() && isdigit(fullName[j + 1]))
-                j++;
-
-            if (j + 1 == fullName.size() || fullName[j + 1] == '.') {
-                // only digits found, skip forward
-                i = j;
-                modified = true;
-                continue;
-            }
-        }
-
-        buf << c;
+        buf.appendPart(pathComponent);
     }
 
-    if (!modified)
-        return false;
-
-    *out = buf.str();
-    return true;
+    return buf;
 }
 }

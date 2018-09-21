@@ -33,97 +33,100 @@
 
 namespace mongo {
 
-using std::string;
-
 TEST(UpdateIndexDataTest, Simple1) {
     UpdateIndexData a;
-    a.addPath("a.b");
-    ASSERT_TRUE(a.mightBeIndexed("a.b"));
-    ASSERT_TRUE(a.mightBeIndexed("a"));
-    ASSERT_TRUE(a.mightBeIndexed("a.b.c"));
-    ASSERT_TRUE(a.mightBeIndexed("a.$.b"));
+    a.addPath(FieldRef("a.b"_sd));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("a.b")));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("a")));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("a.b.c")));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("a.$.b")));
 
-    ASSERT_FALSE(a.mightBeIndexed("b"));
-    ASSERT_FALSE(a.mightBeIndexed("a.c"));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("b")));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("a.c")));
 
     a.clear();
-    ASSERT_FALSE(a.mightBeIndexed("a.b"));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("a.b")));
 }
 
 TEST(UpdateIndexDataTest, Simple2) {
     UpdateIndexData a;
-    a.addPath("ab");
-    ASSERT_FALSE(a.mightBeIndexed("a"));
+    a.addPath(FieldRef("ab"_sd));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("a")));
     a.clear();
-    ASSERT_FALSE(a.mightBeIndexed("ab"));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("ab")));
 }
 
 TEST(UpdateIndexDataTest, Component1) {
     UpdateIndexData a;
-    a.addPathComponent("a");
-    ASSERT_FALSE(a.mightBeIndexed(""));
-    ASSERT_TRUE(a.mightBeIndexed("a"));
-    ASSERT_TRUE(a.mightBeIndexed("b.a"));
-    ASSERT_TRUE(a.mightBeIndexed("a.b"));
-    ASSERT_TRUE(a.mightBeIndexed("b.a.c"));
-    ASSERT_FALSE(a.mightBeIndexed("b.c"));
-    ASSERT_FALSE(a.mightBeIndexed("ab"));
+    a.addPathComponent("a"_sd);
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("")));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("a")));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("b.a")));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("a.b")));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("b.a.c")));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("b.c")));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("ab")));
     a.clear();
-    ASSERT_FALSE(a.mightBeIndexed("a"));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("a")));
 }
 
 TEST(UpdateIndexDataTest, AllPathsIndexed1) {
     UpdateIndexData a;
     a.allPathsIndexed();
-    ASSERT_TRUE(a.mightBeIndexed("a"));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("a")));
     a.clear();
-    ASSERT_FALSE(a.mightBeIndexed("a"));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("a")));
 }
 
 TEST(UpdateIndexDataTest, AllPathsIndexed2) {
     UpdateIndexData a;
     a.allPathsIndexed();
-    ASSERT_TRUE(a.mightBeIndexed("a"));
-    ASSERT_TRUE(a.mightBeIndexed(""));
-    a.addPathComponent("a");
-    ASSERT_TRUE(a.mightBeIndexed("a"));
-    ASSERT_TRUE(a.mightBeIndexed("b"));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("a")));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("")));
+    a.addPathComponent("a"_sd);
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("a")));
+    ASSERT_TRUE(a.mightBeIndexed(FieldRef("b")));
     a.clear();
-    ASSERT_FALSE(a.mightBeIndexed("a"));
+    ASSERT_FALSE(a.mightBeIndexed(FieldRef("a")));
 }
 
-TEST(UpdateIndexDataTest, getCanonicalIndexField1) {
-    string x;
+TEST(UpdateIndexDataTest, CanonicalIndexField) {
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a")), FieldRef("a"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("aaa")), FieldRef("aaa"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.b")), FieldRef("a.b"_sd));
 
-    ASSERT_FALSE(getCanonicalIndexField("a", &x));
-    ASSERT_FALSE(getCanonicalIndexField("aaa", &x));
-    ASSERT_FALSE(getCanonicalIndexField("a.b", &x));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.$")), FieldRef("a"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.0")), FieldRef("a"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.123")), FieldRef("a"_sd));
 
-    ASSERT_TRUE(getCanonicalIndexField("a.$", &x));
-    ASSERT_EQUALS(x, "a");
-    ASSERT_TRUE(getCanonicalIndexField("a.0", &x));
-    ASSERT_EQUALS(x, "a");
-    ASSERT_TRUE(getCanonicalIndexField("a.123", &x));
-    ASSERT_EQUALS(x, "a");
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.$.b")), FieldRef("a.b"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.0.b")), FieldRef("a.b"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.123.b")), FieldRef("a.b"_sd));
 
-    ASSERT_TRUE(getCanonicalIndexField("a.$.b", &x));
-    ASSERT_EQUALS(x, "a.b");
-    ASSERT_TRUE(getCanonicalIndexField("a.0.b", &x));
-    ASSERT_EQUALS(x, "a.b");
-    ASSERT_TRUE(getCanonicalIndexField("a.123.b", &x));
-    ASSERT_EQUALS(x, "a.b");
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.$ref")), FieldRef("a.$ref"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.$ref.b")),
+              FieldRef("a.$ref.b"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.c$d.b")), FieldRef("a.c$d.b"_sd));
 
-    ASSERT_FALSE(getCanonicalIndexField("a.$ref", &x));
-    ASSERT_FALSE(getCanonicalIndexField("a.$ref.b", &x));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.123a")), FieldRef("a.123a"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.a123")), FieldRef("a.a123"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.123a.b")),
+              FieldRef("a.123a.b"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.a123.b")),
+              FieldRef("a.a123.b"_sd));
 
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.")), FieldRef("a."_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("$")), FieldRef("$"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("$.a")), FieldRef("$.a"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.$")), FieldRef("a"_sd));
+}
 
-    ASSERT_FALSE(getCanonicalIndexField("a.c$d.b", &x));
-
-    ASSERT_FALSE(getCanonicalIndexField("a.123a", &x));
-    ASSERT_FALSE(getCanonicalIndexField("a.a123", &x));
-    ASSERT_FALSE(getCanonicalIndexField("a.123a.b", &x));
-    ASSERT_FALSE(getCanonicalIndexField("a.a123.b", &x));
-
-    ASSERT_FALSE(getCanonicalIndexField("a.", &x));
+TEST(UpdateIndexDataTest, CanonicalIndexFieldForNestedNumericFieldNames) {
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.0.0")), FieldRef("a"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.55.01")), FieldRef("a"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.0.0.b.1")), FieldRef("a"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.0b.1")), FieldRef("a.0b"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.0.b.1.2")), FieldRef("a.b"_sd));
+    ASSERT_EQ(UpdateIndexData::getCanonicalIndexField(FieldRef("a.01.02.b.c")), FieldRef("a"_sd));
 }
 }

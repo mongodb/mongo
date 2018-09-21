@@ -33,15 +33,9 @@
 #include <set>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/field_ref.h"
 
 namespace mongo {
-
-/**
- * a.$ -> a
- * @return true if out is set and we made a change
- */
-bool getCanonicalIndexField(StringData fullName, std::string* out);
-
 
 /**
  * Holds pre-processed index spec information to allow update to quickly determine if an update
@@ -52,10 +46,16 @@ public:
     UpdateIndexData();
 
     /**
+     * Returns the canonicalized index form for 'path', removing numerical path components as well
+     * as '$' path components.
+     */
+    static FieldRef getCanonicalIndexField(const FieldRef& path);
+
+    /**
      * Register a path.  Any update targeting this path (or a parent of this path) will
      * trigger a recomputation of the document's index keys.
      */
-    void addPath(StringData path);
+    void addPath(const FieldRef& path);
 
     /**
      * Register a path component.  Any update targeting a path that contains this exact
@@ -71,12 +71,15 @@ public:
 
     void clear();
 
-    bool mightBeIndexed(StringData path) const;
+    bool mightBeIndexed(const FieldRef& path) const;
 
 private:
-    bool _startsWith(StringData a, StringData b) const;
+    /**
+     * Returns true if 'b' is a prefix of 'a', or if the two paths are equal.
+     */
+    bool _startsWith(const FieldRef& a, const FieldRef& b) const;
 
-    std::set<std::string> _canonicalPaths;
+    std::set<FieldRef> _canonicalPaths;
     std::set<std::string> _pathComponents;
 
     bool _allPathsIndexed;

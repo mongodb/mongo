@@ -55,7 +55,14 @@ public:
      * Returns true if the argument is a numeric string which is eligible to act as the key name for
      * an element in a BSON array; in other words, the string matches the regex ^(0|[1-9]+[0-9]*)$.
      */
-    static bool isNumericPathComponent(StringData component);
+    static bool isNumericPathComponentStrict(StringData component);
+
+    /**
+     * Similar to the function above except strings that contain leading zero's are considered
+     * numeric. For instance, the above function would return false for an input "01" however this
+     * function will return true.
+     */
+    static bool isNumericPathComponentLenient(StringData component);
 
     FieldRef() = default;
 
@@ -115,7 +122,7 @@ public:
      * the key name for an element in a BSON array; in other words, the fieldname matches the regex
      * ^(0|[1-9]+[0-9]*)$.
      */
-    bool isNumericPathComponent(size_t i) const;
+    bool isNumericPathComponentStrict(size_t i) const;
 
     /**
      * Returns true if this FieldRef has any numeric path components.

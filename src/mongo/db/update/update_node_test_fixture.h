@@ -113,7 +113,7 @@ protected:
         if (!_indexData) {
             _indexData = stdx::make_unique<UpdateIndexData>();
         }
-        _indexData->addPath(path);
+        _indexData->addPath(FieldRef(path));
     }
 
     void setLogBuilderToNull() {
