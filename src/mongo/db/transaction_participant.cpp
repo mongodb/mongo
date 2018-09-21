@@ -659,6 +659,8 @@ std::vector<repl::ReplOperation> TransactionParticipant::endTransactionAndRetrie
 
 void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+
     uassert(ErrorCodes::InvalidOptions,
             "commitTransaction must provide commitTimestamp to prepared transaction.",
             !_txnState.isPrepared(lk));
@@ -669,91 +671,121 @@ void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx
                             << "this transaction is not prepared. But, it is currently "
                             << _oldestOplogEntryTS->toString());
 
-    // Always check session's txnNumber and '_txnState', since they can be modified by session kill
-    // and migration, which do not check out the session.
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
-
     // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
     // into the session.
     lk.unlock();
-
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
-    opObserver->onTransactionCommit(opCtx, false /* wasPrepared */);
-
+    opObserver->onTransactionCommit(opCtx, boost::none, boost::none);
     lk.lock();
-
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+
     // The oplog entry is written in the same WUOW with the data change for unprepared transactions.
     // We can still consider the state is InProgress until now, since no externally visible changes
     // have been made yet by the commit operation. If anything throws before this point in the
     // function, entry point will abort the transaction.
     _txnState.transitionTo(lk, TransactionState::kCommittingWithoutPrepare);
-    _commitTransaction(std::move(lk), opCtx);
+
+    lk.unlock();
+    _commitStorageTransaction(opCtx);
+    lk.lock();
+    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), false);
+    invariant(_txnState.isCommittingWithoutPrepare(lk),
+              str::stream() << "Current State: " << _txnState);
+
+    _finishCommitTransaction(lk, opCtx);
 }
 
 void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
                                                        Timestamp commitTimestamp) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+    try {
+        _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+    } catch (...) {
+        // It is illegal for committing a prepared transaction to fail for any reason, other than an
+        // invalid command, so we crash instead.
+        severe() << "Caught exception beginning commit of prepared transaction "
+                 << opCtx->getTxnNumber() << " on " << _getSession()->getSessionId().toBSON()
+                 << ": " << exceptionToStatus();
+        std::terminate();
+    }
+
     uassert(ErrorCodes::InvalidOptions,
             "commitTransaction cannot provide commitTimestamp to unprepared transaction.",
             _txnState.isPrepared(lk));
     uassert(
         ErrorCodes::InvalidOptions, "'commitTimestamp' cannot be null", !commitTimestamp.isNull());
+    uassert(ErrorCodes::InvalidOptions,
+            "'commitTimestamp' must be greater than or equal to 'prepareTimestamp'",
+            commitTimestamp >= _prepareOpTime.getTimestamp());
 
-    // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
-    // and migration, which do not check out the session.
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
     _txnState.transitionTo(lk, TransactionState::kCommittingWithPrepare);
     opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
 
-    // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
-    // into the session.
-    lk.unlock();
+    try {
+        // We reserve an oplog slot before committing the transaction so that no writes that are
+        // causally related to the transaction commit enter the oplog at a timestamp earlier than
+        // the commit oplog entry.
+        OplogSlotReserver oplogSlotReserver(opCtx);
+        const auto commitOplogSlot = oplogSlotReserver.getReservedOplogSlot();
+        invariant(commitOplogSlot.opTime.getTimestamp() >= commitTimestamp,
+                  str::stream() << "Commit oplog entry must be greater than or equal to commit "
+                                   "timestamp due to causal consistency. commit timestamp: "
+                                << commitTimestamp.toBSON()
+                                << ", commit oplog entry optime: "
+                                << commitOplogSlot.opTime.toBSON());
 
-    auto opObserver = opCtx->getServiceContext()->getOpObserver();
-    invariant(opObserver);
-    opObserver->onTransactionCommit(opCtx, true /* wasPrepared */);
+        // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
+        // into the session. We also do not want to write to storage with the mutex locked.
+        lk.unlock();
+        _commitStorageTransaction(opCtx);
 
-    lk.lock();
+        auto opObserver = opCtx->getServiceContext()->getOpObserver();
+        invariant(opObserver);
+        opObserver->onTransactionCommit(opCtx, commitOplogSlot, commitTimestamp);
 
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
+        lk.lock();
+        _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    _commitTransaction(std::move(lk), opCtx);
-    _getSession()->unlockTxnNumber();
+        _finishCommitTransaction(lk, opCtx);
+        _getSession()->unlockTxnNumber();
+
+    } catch (...) {
+        // It is illegal for committing a prepared transaction to fail for any reason, other than an
+        // invalid command, so we crash instead.
+        severe() << "Caught exception during commit of prepared transaction "
+                 << opCtx->getTxnNumber() << " on " << _getSession()->getSessionId().toBSON()
+                 << ": " << exceptionToStatus();
+        std::terminate();
+    }
 }
 
-void TransactionParticipant::_commitTransaction(stdx::unique_lock<stdx::mutex> lk,
-                                                OperationContext* opCtx) {
-    auto abortGuard = MakeGuard([this, opCtx]() {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
-        // It is illegal for this check to fail. We ignore the transaction being aborted since we're
-        // actively aborting the transaction and the transaction could be aborted without checking
-        // out the session.
-        //
-        // TODO (SERVER-36540): Lock the TxnNumber before unlocking the mutex in the caller. The
-        // TxnNumber can change without checking out the session on a migration. For a transaction
-        // that fails to commit without 'prepare', the TxnNumber will not be locked and could
-        // change. That will lead to this assert failing and the server terminating.
-        _checkIsActiveTransaction(lock, *opCtx->getTxnNumber(), true);
-        _abortActiveTransaction(
-            std::move(lock), opCtx, TransactionState::kCommittingWithoutPrepare);
-    });
-    lk.unlock();
-
+void TransactionParticipant::_commitStorageTransaction(OperationContext* opCtx) try {
+    invariant(opCtx->getWriteUnitOfWork());
     opCtx->getWriteUnitOfWork()->commit();
     opCtx->setWriteUnitOfWork(nullptr);
-    abortGuard.Dismiss();
 
-    lk.lock();
+    // We must clear the recovery unit and locker for the 'config.transactions' and oplog entry
+    // writes.
+    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(
+                               opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
-    auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+    opCtx->lockState()->unsetMaxLockTimeout();
+} catch (...) {
+    // It is illegal for committing a storage-transaction to fail so we crash instead.
+    severe() << "Caught exception during commit of storage-transaction " << opCtx->getTxnNumber()
+             << " on " << _getSession()->getSessionId().toBSON() << ": " << exceptionToStatus();
+    std::terminate();
+}
 
+void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationContext* opCtx) {
     // If no writes have been done, set the client optime forward to the read timestamp so waiting
     // for write concern will ensure all read data was committed.
     //
     // TODO(SERVER-34881): Once the default read concern is speculative majority, only set the
     // client optime forward if the original read concern level is "majority" or "snapshot".
+    auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
     if (_speculativeTransactionReadOpTime > clientInfo.getLastOp()) {
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
@@ -1308,7 +1340,8 @@ void TransactionParticipant::checkForNewTxnNumber() {
 }
 
 void TransactionParticipant::_setNewTxnNumber(WithLock wl, const TxnNumber& txnNumber) {
-    invariant(!_txnState.isPrepared(wl));
+    invariant(!_txnState.isInSet(
+        wl, TransactionState::kPrepared | TransactionState::kCommittingWithPrepare));
 
     // Abort the existing transaction if it's not prepared, committed, or aborted.
     if (_txnState.isInProgress(wl)) {

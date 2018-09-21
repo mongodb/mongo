@@ -432,7 +432,7 @@ TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
                   << BSONBinData(halfTransactionData.get(), kHalfTransactionSize, BinDataGeneral)));
     txnParticipant->addTransactionOperation(opCtx.get(), operation);
     txnParticipant->addTransactionOperation(opCtx.get(), operation);
-    ASSERT_THROWS_CODE(opObserver.onTransactionCommit(opCtx.get(), false),
+    ASSERT_THROWS_CODE(opObserver.onTransactionCommit(opCtx.get(), boost::none, boost::none),
                        AssertionException,
                        ErrorCodes::TransactionTooLarge);
 }
@@ -647,6 +647,77 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     ASSERT_EQ(oplogEntry.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
 }
 
+TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
+    const NamespaceString nss("testDB", "testColl");
+    const auto uuid = CollectionUUID::gen();
+    const auto doc = BSON("_id" << 0 << "data"
+                                << "x");
+
+    const TxnNumber txnNum = 2;
+    opCtx()->setTxnNumber(txnNum);
+
+    OperationContextSessionMongod opSession(opCtx(), true, false, true);
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant->unstashTransactionResources(opCtx(), "insert");
+
+    std::vector<InsertStatement> insert;
+    insert.emplace_back(0, doc);
+
+    OplogSlot commitSlot;
+    Timestamp prepareTimestamp;
+    {
+        WriteUnitOfWork wuow(opCtx());
+        AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
+        opObserver().onInserts(opCtx(), nss, uuid, insert.begin(), insert.end(), false);
+
+        txnParticipant->transitionToPreparedforTest();
+        const auto prepareSlot = repl::getNextOpTime(opCtx());
+        prepareTimestamp = prepareSlot.opTime.getTimestamp();
+        opObserver().onTransactionPrepare(opCtx(), prepareSlot);
+        session()->lockTxnNumber(txnNum,
+                                 Status(ErrorCodes::OperationFailed, "unittest lock failed"));
+
+        commitSlot = repl::getNextOpTime(opCtx());
+    }
+
+    // Mimic committing the transaction.
+    opCtx()->setWriteUnitOfWork(nullptr);
+    opObserver().onTransactionCommit(opCtx(), commitSlot, prepareTimestamp);
+
+    repl::OplogInterfaceLocal oplogInterface(opCtx(), NamespaceString::kRsOplogNamespace.ns());
+    auto oplogIter = oplogInterface.makeIterator();
+    {
+        auto oplogEntryObj = unittest::assertGet(oplogIter->next()).first;
+        checkCommonFields(oplogEntryObj, 1);
+        OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+        auto o = oplogEntry.getObject();
+        auto oExpected = BSON("commitTransaction" << 1 << "commitTimestamp" << prepareTimestamp);
+        ASSERT_BSONOBJ_EQ(oExpected, o);
+        ASSERT_FALSE(oplogEntry.getPrepare());
+    }
+
+    {
+        auto oplogEntryObj = unittest::assertGet(oplogIter->next()).first;
+        checkCommonFields(oplogEntryObj);
+        OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+        auto o = oplogEntry.getObject();
+        auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                            << "i"
+                                                            << "ns"
+                                                            << nss.toString()
+                                                            << "ui"
+                                                            << uuid
+                                                            << "o"
+                                                            << doc))
+                                         << "prepare"
+                                         << true);
+        ASSERT_BSONOBJ_EQ(oExpected, o);
+        ASSERT(oplogEntry.getPrepare());
+    }
+
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
+}
+
 TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
     const NamespaceString nss("testDB", "testColl");
     const auto uuid = CollectionUUID::gen();
@@ -662,6 +733,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
 
     std::vector<InsertStatement> insert;
     insert.emplace_back(0, doc);
+
     {
         WriteUnitOfWork wuow(opCtx());
         AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
@@ -799,7 +871,7 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onInserts(opCtx(), nss1, uuid1, inserts1.begin(), inserts1.end(), false);
     opObserver().onInserts(opCtx(), nss2, uuid2, inserts2.begin(), inserts2.end(), false);
-    opObserver().onTransactionCommit(opCtx(), false);
+    opObserver().onTransactionCommit(opCtx(), boost::none, boost::none);
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
@@ -880,7 +952,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
-    opObserver().onTransactionCommit(opCtx(), false);
+    opObserver().onTransactionCommit(opCtx(), boost::none, boost::none);
     auto oplogEntry = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntry);
     auto o = oplogEntry.getObjectField("o");
@@ -937,7 +1009,7 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
                                BSON("_id" << 1 << "data"
                                           << "y"));
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, false, boost::none);
-    opObserver().onTransactionCommit(opCtx(), false);
+    opObserver().onTransactionCommit(opCtx(), boost::none, boost::none);
     auto oplogEntry = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntry);
     auto o = oplogEntry.getObjectField("o");

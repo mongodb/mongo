@@ -131,7 +131,9 @@ public:
                        const NamespaceString& collectionName,
                        OptionalCollectionUUID uuid) final {}
 
-    void onTransactionCommit(OperationContext* opCtx, bool wasPrepared) final {}
+    void onTransactionCommit(OperationContext* opCtx,
+                             boost::optional<OplogSlot> commitOplogEntryOpTime,
+                             boost::optional<Timestamp> commitTimestamp) final {}
 
     void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) final {}
 

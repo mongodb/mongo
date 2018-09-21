@@ -58,14 +58,21 @@ public:
     /**
      * Called by doTxn() when ops are ready to commit.
      */
-    void onTransactionCommit(OperationContext* opCtx, bool wasPrepared) override;
+    void onTransactionCommit(OperationContext* opCtx,
+                             boost::optional<OplogSlot> commitOplogEntryOpTime,
+                             boost::optional<Timestamp> commitTimestamp) override;
 
     // If present, holds the applyOps oplog entry written out by the ObObserverImpl
     // onTransactionCommit.
     boost::optional<OplogEntry> applyOpsOplogEntry;
 };
 
-void OpObserverMock::onTransactionCommit(OperationContext* opCtx, bool wasPrepared) {
+void OpObserverMock::onTransactionCommit(OperationContext* opCtx,
+                                         boost::optional<OplogSlot> commitOplogEntryOpTime,
+                                         boost::optional<Timestamp> commitTimestamp) {
+    ASSERT(!commitOplogEntryOpTime) << commitOplogEntryOpTime->opTime;
+    ASSERT(!commitTimestamp) << *commitTimestamp;
+
     OplogInterfaceLocal oplogInterface(opCtx, NamespaceString::kRsOplogNamespace.ns());
     auto oplogIter = oplogInterface.makeIterator();
     auto opEntry = unittest::assertGet(oplogIter->next());

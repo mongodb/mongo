@@ -110,7 +110,9 @@ public:
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
                        OptionalCollectionUUID uuid);
-    void onTransactionCommit(OperationContext* opCtx, bool wasPrepared) final;
+    void onTransactionCommit(OperationContext* opCtx,
+                             boost::optional<OplogSlot> commitOplogEntryOpTime,
+                             boost::optional<Timestamp> commitTimestamp) final;
     void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) final;
     void onTransactionAbort(OperationContext* opCtx) final;
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;

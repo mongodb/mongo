@@ -9,7 +9,7 @@
     const collName = "foo";
     const ns = dbName + "." + collName;
 
-    let st = new ShardingTest({shards: 3});
+    let st = new ShardingTest({shards: 3, causallyConsistent: true});
 
     let coordinator = st.shard0;
     let participant1 = st.shard1;
@@ -149,6 +149,11 @@
                                              }))
                                              .prepareTimestamp;
 
+    // Run a command that touches all three shards to gossip the cluster time since the three
+    // shells do not gossip amongst themselves.
+    assert.commandWorked(st.s.getDB(dbName).runCommand(
+        {insert: collName, documents: [{_id: -4}, {_id: 6}, {_id: 17}]}));
+
     // Simulate that all participants vote to commit (remove this under SERVER-36304).
     assert.commandWorked(coordinator.adminCommand({
         voteCommitTransaction: 1,
@@ -179,7 +184,7 @@
     }));
 
     // Verify that the transaction was committed on all shards.
-    assert.eq(3, st.s.getDB(dbName).getCollection(collName).find().itcount());
+    assert.eq(6, st.s.getDB(dbName).getCollection(collName).find().itcount());
 
     st.stop();
 

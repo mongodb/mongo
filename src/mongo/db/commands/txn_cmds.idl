@@ -31,3 +31,21 @@ commands:
                 optional: true
                 type: timestamp
 
+structs:
+    CommitTransactionOplogObject:
+        description: A document representing the 'o' field of a 'commitTransaction' oplog entry.
+        fields:
+            commitTransaction:
+                type: int
+                default: 1
+            commitTimestamp:
+                type: timestamp
+                description: "Specifies the timestamp at which the multi-document transaction should
+                              be committed."
+
+    AbortTransactionOplogObject:
+        description: A document representing the 'o' field of an 'abortTransaction' oplog entry.
+        fields:
+            abortTransaction:
+                type: int
+                default: 1

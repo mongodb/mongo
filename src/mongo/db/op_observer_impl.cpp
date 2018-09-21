@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -963,38 +964,75 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
+                                            Session* const session,
+                                            const OplogSlot& oplogSlot,
+                                            const BSONObj& objectField) {
+    invariant(session->isLockedTxnNumber(*opCtx->getTxnNumber()));
+    const NamespaceString cmdNss{"admin", "$cmd"};
+
+    OperationSessionInfo sessionInfo;
+    repl::OplogLink oplogLink;
+    sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+    sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+    oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
+
+    const StmtId stmtId(1);
+    const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
+
+    // There should not be a parent WUOW outside of this one. This guarantees the safety of the
+    // write conflict retry loop.
+    invariant(!opCtx->getWriteUnitOfWork());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    writeConflictRetry(
+        opCtx, "onPreparedTransactionCommitOrAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
+
+            // Writes to the oplog only require a Global intent lock.
+            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
+            WriteUnitOfWork wuow(opCtx);
+            const auto oplogOpTime = logOperation(opCtx,
+                                                  "c",
+                                                  cmdNss,
+                                                  {} /* uuid */,
+                                                  objectField,
+                                                  nullptr /* o2 */,
+                                                  false /* fromMigrate */,
+                                                  wallClockTime,
+                                                  sessionInfo,
+                                                  stmtId,
+                                                  oplogLink,
+                                                  false /* prepare */,
+                                                  oplogSlot);
+            invariant(oplogSlot.opTime.isNull() || oplogSlot.opTime == oplogOpTime);
+
+            onWriteOpCompleted(
+                opCtx, cmdNss, session, {stmtId}, oplogOpTime, wallClockTime, boost::none);
+            wuow.commit();
+        });
+}
+
 }  //  namespace
 
-void OpObserverImpl::onTransactionCommit(OperationContext* opCtx, bool wasPrepared) {
+void OpObserverImpl::onTransactionCommit(OperationContext* opCtx,
+                                         boost::optional<OplogSlot> commitOplogEntryOpTime,
+                                         boost::optional<Timestamp> commitTimestamp) {
     invariant(opCtx->getTxnNumber());
-    if (wasPrepared) {
-        // TODO (SERVER-35865): log commitTransaction oplog entry correctly. We log a dummy entry to
-        // test the timestamping behavior.
-        const NamespaceString cmdNss{"admin", "$cmd"};
-        const auto cmdObj = BSON("commitTransaction" << 1);
-        TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+    Session* const session = OperationContextSession::get(opCtx);
+    invariant(session);
 
-        // Writes to the oplog only require a Global intent lock.
-        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    invariant(txnParticipant);
+    if (commitOplogEntryOpTime) {
+        invariant(commitTimestamp);
+        invariant(!commitTimestamp->isNull());
 
-        WriteUnitOfWork wuow(opCtx);
-        logOperation(opCtx,
-                     "c",
-                     cmdNss,
-                     boost::none,
-                     cmdObj,
-                     nullptr,
-                     false,
-                     getWallClockTimeForOpLog(opCtx),
-                     {},
-                     kUninitializedStmtId,
-                     {},
-                     false /* prepare */,
-                     OplogSlot());
-        wuow.commit();
+        CommitTransactionOplogObject cmdObj;
+        cmdObj.setCommitTimestamp(*commitTimestamp);
+        logCommitOrAbortForPreparedTransaction(
+            opCtx, session, *commitOplogEntryOpTime, cmdObj.toBSON());
     } else {
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        invariant(txnParticipant);
+        invariant(!commitTimestamp);
         const auto stmts = txnParticipant->endTransactionAndRetrieveOperations(opCtx);
 
         // It is possible that the transaction resulted in no changes.  In that case, we should
@@ -1061,54 +1099,12 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
         return;
     }
 
-    invariant(session->isLockedTxnNumber(*opCtx->getTxnNumber()));
-    const auto cmdObj = BSON("abortTransaction" << 1);
-    const NamespaceString cmdNss{"admin", "$cmd"};
-
-    OperationSessionInfo sessionInfo;
-    repl::OplogLink oplogLink;
-    sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
-    sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-    // Note: This could be null if the 'prepareTransaction' call failed and led to the abort after
-    // the TransactionParticipant had already transitioned to 'kPrepared' but before the 'prepare'
-    // oplog entry was written.
-    oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
-
-    const StmtId stmtId(1);
-    const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
-
     // We write the oplog entry in a side transaction so that we do not commit the prepared
     // transaction, since we must write the oplog entry before aborting the prepared transaction.
     TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
-    // There should not be a parent WUOW outside of this one. This guarantees the safety of the
-    // write conflict retry loop.
-    invariant(!opCtx->getWriteUnitOfWork());
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-    writeConflictRetry(opCtx, "onTransactionAbort", NamespaceString::kRsOplogNamespace.ns(), [&] {
-
-        // Writes to the oplog only require a Global intent lock.
-        Lock::GlobalLock globalLock(opCtx, MODE_IX);
-
-        WriteUnitOfWork wuow(opCtx);
-        auto writeOpTime = logOperation(opCtx,
-                                        "c",
-                                        cmdNss,
-                                        {} /* uuid */,
-                                        cmdObj,
-                                        nullptr /* o2 */,
-                                        false /* fromMigrate */,
-                                        wallClockTime,
-                                        sessionInfo,
-                                        stmtId,
-                                        oplogLink,
-                                        false /* prepare */,
-                                        OplogSlot());
-
-        onWriteOpCompleted(
-            opCtx, cmdNss, session, {stmtId}, writeOpTime, wallClockTime, boost::none);
-        wuow.commit();
-    });
+    AbortTransactionOplogObject cmdObj;
+    logCommitOrAbortForPreparedTransaction(opCtx, session, OplogSlot(), cmdObj.toBSON());
 }
 
 void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,

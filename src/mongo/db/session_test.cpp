@@ -90,12 +90,15 @@ public:
     bool transactionPrepared = false;
     stdx::function<void()> onTransactionPrepareFn = [this]() { transactionPrepared = true; };
 
-    void onTransactionCommit(OperationContext* opCtx, bool wasPrepared) override;
+    void onTransactionCommit(OperationContext* opCtx,
+                             boost::optional<OplogSlot> commitOplogEntryOpTime,
+                             boost::optional<Timestamp> commitTimestamp) override;
     bool onTransactionCommitThrowsException = false;
     bool transactionCommitted = false;
-    stdx::function<void(bool)> onTransactionCommitFn = [this](bool wasPrepared) {
-        transactionCommitted = true;
-    };
+    stdx::function<void(boost::optional<OplogSlot>, boost::optional<Timestamp>)>
+        onTransactionCommitFn =
+            [this](boost::optional<OplogSlot> commitOplogEntryOpTime,
+                   boost::optional<Timestamp> commitTimestamp) { transactionCommitted = true; };
 };
 
 void OpObserverMock::onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) {
@@ -109,15 +112,17 @@ void OpObserverMock::onTransactionPrepare(OperationContext* opCtx, const OplogSl
     onTransactionPrepareFn();
 }
 
-void OpObserverMock::onTransactionCommit(OperationContext* opCtx, bool wasPrepared) {
+void OpObserverMock::onTransactionCommit(OperationContext* opCtx,
+                                         boost::optional<OplogSlot> commitOplogEntryOpTime,
+                                         boost::optional<Timestamp> commitTimestamp) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-    OpObserverNoop::onTransactionCommit(opCtx, wasPrepared);
+    OpObserverNoop::onTransactionCommit(opCtx, commitOplogEntryOpTime, commitTimestamp);
 
     uassert(ErrorCodes::OperationFailed,
             "onTransactionCommit() failed",
             !onTransactionCommitThrowsException);
 
-    onTransactionCommitFn(wasPrepared);
+    onTransactionCommitFn(commitOplogEntryOpTime, commitTimestamp);
 }
 
 class SessionTest : public MockReplCoordServerFixture {

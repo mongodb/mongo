@@ -488,19 +488,15 @@ private:
         return (s << txnState.toString());
     }
 
-    // Committing a transaction first changes its state to "Committing*" and writes to the oplog,
-    // then it changes the state to "Committed".
+    // Finishes committing the multi-document transaction after the storage-transaction has been
+    // committed, the oplog entry has been inserted into the oplog, and the transactions table has
+    // been updated.
+    void _finishCommitTransaction(WithLock lk, OperationContext* opCtx);
+
+    // Commits the storage-transaction on the OperationContext.
     //
-    // When a transaction is in "Committing" state, it's not allowed for other threads to change
-    // its state (i.e. abort the transaction), otherwise the on-disk state will diverge from the
-    // in-memory state.
-    // There are 3 cases where the transaction will be aborted.
-    // 1) abortTransaction command. Session check-out mechanism only allows one client to access a
-    // transaction.
-    // 2) killSession, stepdown, transaction timeout and any thread that aborts the transaction
-    // outside of session checkout. They can safely skip the committing transactions.
-    // 3) Migration. Should be able to skip committing transactions.
-    void _commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx);
+    // This should be called *without* the mutex being locked.
+    void _commitStorageTransaction(OperationContext* opCtx);
 
     // Stash transaction resources.
     void _stashActiveTransaction(WithLock, OperationContext* opCtx);

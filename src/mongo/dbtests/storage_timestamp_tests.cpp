@@ -2604,7 +2604,7 @@ public:
         unittest::log() << "Prepare TS: " << prepareTs;
         logTimestamps();
 
-        auto commitTimestamp = Timestamp(99999, 99999);
+        auto commitTimestamp = commitEntryTs;
 
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
@@ -2659,7 +2659,7 @@ public:
             assertDocumentAtTimestamp(coll, presentTs, BSONObj());
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
             assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
-            assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
+            assertDocumentAtTimestamp(coll, commitEntryTs, doc);
             assertDocumentAtTimestamp(coll, commitTimestamp, doc);
             assertDocumentAtTimestamp(coll, nullTs, doc);
 

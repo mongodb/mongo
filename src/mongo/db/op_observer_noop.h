@@ -109,7 +109,9 @@ public:
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
                        OptionalCollectionUUID uuid) override {}
-    void onTransactionCommit(OperationContext* opCtx, bool wasPrepared) override{};
+    void onTransactionCommit(OperationContext* opCtx,
+                             boost::optional<OplogSlot> commitOplogEntryOpTime,
+                             boost::optional<Timestamp> commitTimestamp) override{};
     void onTransactionPrepare(OperationContext* opCtx, const OplogSlot& prepareOpTime) override{};
     void onTransactionAbort(OperationContext* opCtx) override{};
     void onReplicationRollback(OperationContext* opCtx,
