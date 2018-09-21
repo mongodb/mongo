@@ -20,7 +20,7 @@ if [ ! -e  $SDK_ROOT ]; then
         SDK_PACKAGE=sdk-tools-linux-4333796.zip
         curl -O https://dl.google.com/android/repository/$SDK_PACKAGE
         unzip $SDK_PACKAGE
-        yes | ./tools/bin/sdkmanager --channel=1 \
+        yes | ./tools/bin/sdkmanager --channel=0 \
             "platforms;android-28"  \
             "ndk-bundle"  \
             "emulator"  \
