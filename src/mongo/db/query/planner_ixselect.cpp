@@ -44,6 +44,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
+#include "mongo/db/query/planner_allpaths_helpers.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/log.h"
 
@@ -51,29 +52,14 @@ namespace mongo {
 
 namespace {
 
+namespace app = ::mongo::all_paths_planning;
+
 std::size_t numPathComponents(StringData path) {
     return FieldRef{path}.numParts();
 }
 
 /**
- * Returns a MultikeyPaths which indicates which components of 'indexedPath' are multikey, by
- * looking up multikeyness in 'multikeyPathSet'.
- */
-MultikeyPaths buildMultiKeyPathsForExpandedAllPathsIndexEntry(
-    const FieldRef& indexedPath, const std::set<FieldRef>& multikeyPathSet) {
-    FieldRef pathToLookup;
-    std::set<std::size_t> multikeyPathComponents;
-    for (size_t i = 0; i < indexedPath.numParts(); ++i) {
-        pathToLookup.appendPart(indexedPath.getPart(i));
-        if (multikeyPathSet.count(pathToLookup)) {
-            multikeyPathComponents.insert(i);
-        }
-    }
-    return {multikeyPathComponents};
-}
-
-/**
- * Given a single allPaths index, and a set of fields which are being queried, create a virtual
+ * Given a single allPaths index, and a set of fields which are being queried, create 'mock'
  * IndexEntry for each of the appropriate fields.
  */
 void expandIndex(const IndexEntry& allPathsIndex,
@@ -94,15 +80,25 @@ void expandIndex(const IndexEntry& allPathsIndex,
 
     const auto projectedFields = projExec->applyProjectionToFields(fields);
 
+    const auto& includedPaths = projExec->getExhaustivePaths();
+
     out->reserve(out->size() + projectedFields.size());
     for (auto&& fieldName : projectedFields) {
+        // Convert string 'fieldName' into a FieldRef, to better facilitate the subsequent checks.
+        const auto queryPath = FieldRef{fieldName};
         // $** indices hold multikey metadata directly in the index keys, rather than in the index
         // catalog. In turn, the index key data is used to produce a set of multikey paths
         // in-memory. Here we convert this set of all multikey paths into a MultikeyPaths vector
         // which will indicate to the downstream planning code which components of 'fieldName' are
         // multikey.
-        auto multikeyPaths = buildMultiKeyPathsForExpandedAllPathsIndexEntry(
-            FieldRef{fieldName}, allPathsIndex.multikeyPathSet);
+        auto multikeyPaths = app::buildMultiKeyPathsForExpandedAllPathsIndexEntry(
+            queryPath, allPathsIndex.multikeyPathSet);
+
+        // Check whether a query on the current fieldpath is answerable by the $** index, given any
+        // numerical path components that may be present in the path string.
+        if (!app::validateNumericPathComponents(multikeyPaths, includedPaths, queryPath)) {
+            continue;
+        }
 
         // The expanded IndexEntry is only considered multikey if the particular path represented by
         // this IndexEntry has a multikey path component. For instance, suppose we have index {$**:

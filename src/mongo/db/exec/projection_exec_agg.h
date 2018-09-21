@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/field_ref.h"
 
 namespace mongo {
 
@@ -78,7 +79,7 @@ public:
      * empty set if the exhaustive set cannot be determined. An inclusion will always produce an
      * exhaustive set; an exclusion will always produce an empty set.
      */
-    std::set<std::string> getExhaustivePaths() const;
+    const std::set<FieldRef>& getExhaustivePaths() const;
 
     ProjectionType getType() const;
 

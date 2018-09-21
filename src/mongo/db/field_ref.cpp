@@ -26,9 +26,12 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/field_ref.h"
 
-#include <algorithm>  // for min
+#include <algorithm>
+#include <cctype>
 
 #include "mongo/util/assert_util.h"
 
@@ -226,6 +229,10 @@ bool FieldRef::isPrefixOf(const FieldRef& other) const {
     return common == _size && other._size > common;
 }
 
+bool FieldRef::isPrefixOfOrEqualTo(const FieldRef& other) const {
+    return isPrefixOf(other) || *this == other;
+}
+
 size_t FieldRef::commonPrefixSize(const FieldRef& other) const {
     if (_size == 0 || other._size == 0) {
         return 0;
@@ -242,6 +249,32 @@ size_t FieldRef::commonPrefixSize(const FieldRef& other) const {
     }
 
     return prefixSize;
+}
+
+bool FieldRef::isNumericPathComponent(StringData component) {
+    return !component.empty() && !(component.size() > 1 && component[0] == '0') &&
+        std::all_of(component.begin(), component.end(), [](auto c) { return std::isdigit(c); });
+}
+
+bool FieldRef::isNumericPathComponent(size_t i) const {
+    return FieldRef::isNumericPathComponent(getPart(i));
+}
+
+bool FieldRef::hasNumericPathComponents() const {
+    for (size_t i = 0; i < numParts(); ++i) {
+        if (isNumericPathComponent(i))
+            return true;
+    }
+    return false;
+}
+
+std::set<size_t> FieldRef::getNumericPathComponents(size_t startPart) const {
+    std::set<size_t> numericPathComponents;
+    for (auto i = startPart; i < numParts(); ++i) {
+        if (isNumericPathComponent(i))
+            numericPathComponents.insert(i);
+    }
+    return numericPathComponents;
 }
 
 StringData FieldRef::dottedField(size_t offset) const {

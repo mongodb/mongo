@@ -61,6 +61,15 @@ std::unique_ptr<ProjectionExecAgg> makeProjectionWithDefaultIdExclusionAndNested
         projSpec, DefaultIdPolicy::kExcludeId, ArrayRecursionPolicy::kRecurseNestedArrays);
 }
 
+std::set<FieldRef> toFieldRefs(const std::set<std::string>& stringPaths) {
+    std::set<FieldRef> fieldRefs;
+    std::transform(stringPaths.begin(),
+                   stringPaths.end(),
+                   std::inserter(fieldRefs, fieldRefs.begin()),
+                   [](const auto& path) { return FieldRef(path); });
+    return fieldRefs;
+}
+
 //
 // Error cases.
 //
@@ -190,7 +199,7 @@ TEST(ProjectionExecAggTests, InclusionFieldPathsWithImplicitIdInclusion) {
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
     auto exhaustivePaths = parsedProject->getExhaustivePaths();
-    std::set<std::string> expectedPaths{"_id", "a.b.c", "d"};
+    std::set<FieldRef> expectedPaths = toFieldRefs({"_id", "a.b.c", "d"});
 
     // Verify that the exhaustive set of paths is as expected.
     ASSERT(exhaustivePaths == expectedPaths);
@@ -203,7 +212,7 @@ TEST(ProjectionExecAggTests, InclusionFieldPathsWithExplicitIdInclusion) {
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
     auto exhaustivePaths = parsedProject->getExhaustivePaths();
-    std::set<std::string> expectedPaths{"_id", "a.b.c", "d"};
+    std::set<FieldRef> expectedPaths = toFieldRefs({"_id", "a.b.c", "d"});
 
     // Verify that the exhaustive set of paths is as expected.
     ASSERT(exhaustivePaths == expectedPaths);
@@ -216,7 +225,7 @@ TEST(ProjectionExecAggTests, InclusionFieldPathsWithExplicitIdInclusionIdOnly) {
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
     auto exhaustivePaths = parsedProject->getExhaustivePaths();
-    std::set<std::string> expectedPaths{"_id"};
+    std::set<FieldRef> expectedPaths = toFieldRefs({"_id"});
 
     // Verify that the exhaustive set of paths is as expected.
     ASSERT(exhaustivePaths == expectedPaths);
@@ -229,7 +238,7 @@ TEST(ProjectionExecAggTests, InclusionFieldPathsWithImplicitIdExclusion) {
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
     auto exhaustivePaths = parsedProject->getExhaustivePaths();
-    std::set<std::string> expectedPaths{"a.b.c", "d"};
+    std::set<FieldRef> expectedPaths = toFieldRefs({"a.b.c", "d"});
 
     // Verify that the exhaustive set of paths is as expected.
     ASSERT(exhaustivePaths == expectedPaths);
@@ -242,7 +251,7 @@ TEST(ProjectionExecAggTests, InclusionFieldPathsWithExplicitIdExclusion) {
 
     // Extract the exhaustive set of paths that will be preserved by the projection.
     auto exhaustivePaths = parsedProject->getExhaustivePaths();
-    std::set<std::string> expectedPaths{"a.b.c", "d"};
+    std::set<FieldRef> expectedPaths = toFieldRefs({"a.b.c", "d"});
 
     // Verify that the exhaustive set of paths is as expected.
     ASSERT(exhaustivePaths == expectedPaths);

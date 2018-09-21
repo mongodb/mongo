@@ -45,6 +45,7 @@
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
 #include "mongo/db/query/indexability.h"
+#include "mongo/db/query/planner_allpaths_helpers.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/util/log.h"
@@ -55,6 +56,8 @@
 namespace mongo {
 
 namespace {
+
+namespace app = ::mongo::all_paths_planning;
 
 // Helper for checking that an OIL "appears" to be ascending given one interval.
 void assertOILIsAscendingLocally(const vector<Interval>& intervals, size_t idx) {
@@ -335,6 +338,22 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
                                    const IndexEntry& index,
                                    OrderedIntervalList* oilOut,
                                    BoundsTightness* tightnessOut) {
+    // Fill out the bounds and tightness appropriate for the given predicate.
+    _translatePredicate(expr, elt, index, oilOut, tightnessOut);
+
+    // Under certain circumstances, queries on a $** index require that the bounds' tightness be
+    // adjusted regardless of the predicate. Having filled out the initial bounds, we apply any
+    // necessary changes to the tightness here.
+    if (index.type == IndexType::INDEX_ALLPATHS) {
+        *tightnessOut = app::applyAllPathsIndexScanBoundsTightness(index, *tightnessOut);
+    }
+}
+
+void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
+                                             const BSONElement& elt,
+                                             const IndexEntry& index,
+                                             OrderedIntervalList* oilOut,
+                                             BoundsTightness* tightnessOut) {
     // We expect that the OIL we are constructing starts out empty.
     invariant(oilOut->intervals.empty());
 
@@ -352,12 +371,12 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
 
     if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
         OrderedIntervalList acc;
-        translate(expr->getChild(0), elt, index, &acc, tightnessOut);
+        _translatePredicate(expr->getChild(0), elt, index, &acc, tightnessOut);
 
         for (size_t i = 1; i < expr->numChildren(); ++i) {
             OrderedIntervalList next;
             BoundsTightness tightness;
-            translate(expr->getChild(i), elt, index, &next, &tightness);
+            _translatePredicate(expr->getChild(i), elt, index, &next, &tightness);
             intersectize(next, &acc);
         }
 
@@ -395,7 +414,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
             return;
         }
 
-        translate(child, elt, index, oilOut, tightnessOut);
+        _translatePredicate(child, elt, index, oilOut, tightnessOut);
         oilOut->complement();
 
         // Until the index distinguishes between missing values and literal null values, we cannot

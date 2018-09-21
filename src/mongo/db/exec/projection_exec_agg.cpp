@@ -71,12 +71,18 @@ public:
 
         _projection = ParsedAggregationProjection::create(
             expCtx, projSpec, idPolicy, recursionPolicy, ProjectionParseMode::kBanComputedFields);
+
+        // For an inclusion, record the exhaustive set of fields retained by the projection.
+        if (getType() == ProjectionType::kInclusionProjection) {
+            DepsTracker depsTracker;
+            _projection->addDependencies(&depsTracker);
+            for (auto&& field : depsTracker.fields)
+                _exhaustivePaths.insert(FieldRef{field});
+        }
     }
 
-    std::set<std::string> getExhaustivePaths() const {
-        DepsTracker depsTracker;
-        _projection->addDependencies(&depsTracker);
-        return depsTracker.fields;
+    const std::set<FieldRef>& getExhaustivePaths() const {
+        return _exhaustivePaths;
     }
 
     ProjectionType getType() const {
@@ -116,6 +122,7 @@ private:
     }
 
     std::unique_ptr<ParsedAggregationProjection> _projection;
+    std::set<FieldRef> _exhaustivePaths;
 };
 
 // ProjectionExecAgg's constructor and destructor are defined here, at a point where the
@@ -151,7 +158,7 @@ stdx::unordered_set<std::string> ProjectionExecAgg::applyProjectionToFields(
     return _exec->applyProjectionToFields(fields);
 }
 
-std::set<std::string> ProjectionExecAgg::getExhaustivePaths() const {
+const std::set<FieldRef>& ProjectionExecAgg::getExhaustivePaths() const {
     return _exec->getExhaustivePaths();
 }
 }  // namespace mongo

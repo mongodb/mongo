@@ -201,6 +201,16 @@ public:
                                  bool* startKeyInclusive,
                                  BSONObj* endKey,
                                  bool* endKeyInclusive);
+
+private:
+    /**
+     * Performs the heavy lifting for IndexBoundsBuilder::translate().
+     */
+    static void _translatePredicate(const MatchExpression* expr,
+                                    const BSONElement& elt,
+                                    const IndexEntry& index,
+                                    OrderedIntervalList* oilOut,
+                                    BoundsTightness* tightnessOut);
 };
 
 }  // namespace mongo

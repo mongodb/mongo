@@ -69,22 +69,35 @@
         for (let op of operationList) {
             for (let path of pathList) {
                 const query = {[path]: op.expression};
-                // Explain the query, and determine whether an indexed solution is available.
-                const explain = assert.commandWorked(coll.find(query).explain());
-                const ixScans = getPlanStages(explain.queryPlanner.winningPlan, "IXSCAN");
-                // If we expect the current path to have been excluded based on the $** keyPattern
-                // or projection, confirm that no indexed solution was found.
-                if (!expectedPaths.includes(path)) {
-                    assert.eq(ixScans.length, 0, path);
-                    continue;
-                }
-                // Verify that the winning plan uses the $** index with the expected path.
-                assert.eq(ixScans.length, 1);
-                assert.docEq(ixScans[0].keyPattern, {"$_path": 1, [path]: 1});
-                // Verify that the results obtained from the $** index are identical to a COLLSCAN.
-                assertArrayEq(coll.find(query).toArray(),
-                              coll.find(query).hint({$natural: 1}).toArray());
+                assertAllPathsQuery(query, expectedPaths.includes(path) ? path : null);
             }
+        }
+    }
+
+    // Runs a single allPaths query test. If 'expectedPath' is non-null, verifies that there is an
+    // indexed solution that uses the $** index with the given path string. If 'expectedPath' is
+    // null, verifies that no indexed solution was found. If 'explainStats' is non-empty, verifies
+    // that the query's explain output reflects the given stats.
+    function assertAllPathsQuery(query, expectedPath, explainStats = {}) {
+        // Explain the query, and determine whether an indexed solution is available.
+        const explainOutput = coll.find(query).explain("executionStats");
+        const ixScans = getPlanStages(explainOutput.queryPlanner.winningPlan, "IXSCAN");
+        // If we expect the current path to have been excluded based on the $** keyPattern
+        // or projection, confirm that no indexed solution was found.
+        if (!expectedPath) {
+            assert.eq(ixScans.length, 0);
+            return;
+        }
+        // Verify that the winning plan uses the $** index with the expected path.
+        assert.eq(ixScans.length, 1);
+        assert.docEq(ixScans[0].keyPattern, {"$_path": 1, [expectedPath]: 1});
+        // Verify that the results obtained from the $** index are identical to a COLLSCAN.
+        assertArrayEq(coll.find(query).toArray(), coll.find(query).hint({$natural: 1}).toArray());
+        // Verify that the explain output reflects the given 'explainStats'.
+        for (let stat in explainStats) {
+            assert.eq(explainStats[stat],
+                      stat.split('.').reduce((obj, i) => obj[i], explainOutput),
+                      explainOutput);
         }
     }
 
@@ -128,6 +141,109 @@
                   coll.find({"b.c.d": {$elemMatch: {"e.f": {$gt: 0, $lt: 9}}}})
                       .hint({$natural: 1})
                       .itcount());
+
+        // Fieldname-or-array-index query tests.
+        assert(coll.drop());
+        assert.commandWorked(coll.createIndex({"$**": 1}));
+
+        // Insert some documents that exhibit a mix of numeric fieldnames and array indices.
+        assert.commandWorked(coll.insert({_id: 1, a: [{b: [{c: 1}]}]}));
+        assert.commandWorked(coll.insert({_id: 2, a: [{b: [{c: 0}, {c: 1}]}]}));
+        assert.commandWorked(coll.insert({_id: 3, a: {'0': [{b: {'1': {c: 1}}}, {d: 1}]}}));
+        assert.commandWorked(coll.insert({_id: 4, a: [{b: [{1: {c: 1}}]}]}));
+        assert.commandWorked(
+            coll.insert({_id: 5, a: [{b: [{'1': {c: {'2': {d: [0, 1, 2, 3, {e: 1}]}}}}]}]}));
+
+        /*
+         * Multikey Metadata Keys:
+         * {'': 1, '': 'a'}
+         * {'': 1, '': 'a.0'}
+         * {'': 1, '': 'a.b'}
+         * {'': 1, '': 'a.b.1.c.2.d'}
+         * Keys:
+         * {'': 'a.b.c', '': 1}         // _id: 1, a,b multikey
+         * {'': 'a.b.c', '': 0}         // _id: 2, a,b multikey
+         * {'': 'a.b.c', '': 1}         // _id: 2, a,b multikey
+         * {'': 'a.0.b.1.c', '': 1}     // _id: 3, '0, 1' are fieldnames, a.0 multikey
+         * {'': 'a.0.d', '': 1}         // _id: 3, '0' is fieldname, a.0 multikey
+         * {'': 'a.b.1.c', '': 1}       // _id: 4, '1' is fieldname, a,b multikey
+         * {'': 'a.b.1.c.2.d', '': 0}   // _id: 5, a,b,a.b.1.c.2.d multikey, '1' is fieldname
+         * {'': 'a.b.1.c.2.d', '': 1}   // _id: 5
+         * {'': 'a.b.1.c.2.d', '': 2}   // _id: 5
+         * {'': 'a.b.1.c.2.d', '': 3}   // _id: 5
+         * {'': 'a.b.1.c.2.d.e', '': 1} // _id: 5
+         */
+
+        // Test that a query with multiple numeric path components returns all relevant documents,
+        // whether the numeric path component refers to a fieldname or array index in each doc:
+        //
+        // _id:1 will be captured by the special fieldname-or-array-index bounds 'a.b.c', but will
+        // be filtered out by the INEXACT_FETCH since it has no array index or fieldname 'b.1'.
+        // _id:2 will match both 'a.0' and 'b.1' by array index.
+        // _id:3 will match both 'a.0' and 'b.1' by fieldname.
+        // _id:4 will match 'a.0' by array index and 'b.1' by fieldname.
+        // _id:5 is not captured by the special fieldname-or-array-index bounds.
+        //
+        // We examine the solution's 'nReturned' versus 'totalDocsExamined' to confirm this.
+        // totalDocsExamined: [_id:1, _id:2, _id:3, _id:4], nReturned: [_id:2, _id:3, _id:4]
+        assertAllPathsQuery({'a.0.b.1.c': 1},
+                            'a.0.b.1.c',
+                            {'executionStats.nReturned': 3, 'executionStats.totalDocsExamined': 4});
+
+        // Test that we can query a specific field of an array whose fieldname is itself numeric.
+        assertAllPathsQuery({'a.0.1.d': 1},
+                            'a.0.1.d',
+                            {'executionStats.nReturned': 1, 'executionStats.totalDocsExamined': 1});
+
+        // Test that we can query a primitive value at a specific array index.
+        assertAllPathsQuery({'a.0.b.1.c.2.d.3': 3},
+                            'a.0.b.1.c.2.d.3',
+                            {'executionStats.nReturned': 1, 'executionStats.totalDocsExamined': 1});
+
+        // Test that a $** index can't be used for a query through more than 8 nested array indices.
+        assert.commandWorked(
+            coll.insert({_id: 6, a: [{b: [{c: [{d: [{e: [{f: [{g: [{h: [{i: [1]}]}]}]}]}]}]}]}]}));
+        // We can query up to a depth of 8 arrays via specific indices, but not through 9 or more.
+        assertAllPathsQuery({'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i': 1},
+                            'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i');
+        assertAllPathsQuery({'a.0.b.0.c.0.d.0.e.0.f.0.g.0.h.0.i.0': 1}, null);
+
+        // Test that fieldname-or-array-index queries do not inappropriately trim predicates; that
+        // is, all predicates on the field are added to a FETCH filter above the IXSCAN.
+        assert(coll.drop());
+        assert.commandWorked(coll.createIndex({"$**": 1}));
+
+        assert.commandWorked(coll.insert({_id: 1, a: [0, 1, 2]}));
+        assert.commandWorked(coll.insert({_id: 2, a: [1, 2, 3]}));
+        assert.commandWorked(coll.insert({_id: 3, a: [2, 3, 4], b: [5, 6, 7]}));
+        assert.commandWorked(coll.insert({_id: 4, a: [3, 4, 5], b: [6, 7, 8], c: {'0': 9}}));
+        assert.commandWorked(coll.insert({_id: 5, a: [4, 5, 6], b: [7, 8, 9], c: {'0': 10}}));
+        assert.commandWorked(coll.insert({_id: 6, a: [5, 6, 7], b: [8, 9, 10], c: {'0': 11}}));
+
+        assertAllPathsQuery({"a.0": {$gt: 1, $lt: 4}}, 'a.0', {'executionStats.nReturned': 2});
+        assertAllPathsQuery({"a.1": {$gte: 1, $lte: 4}}, 'a.1', {'executionStats.nReturned': 4});
+        assertAllPathsQuery({"b.2": {$in: [5, 9]}}, 'b.2', {'executionStats.nReturned': 1});
+        assertAllPathsQuery({"c.0": {$in: [10, 11]}}, 'c.0', {'executionStats.nReturned': 2});
+
+        // Test that the $** index doesn't trim predicates when planning across multiple nested
+        // $and/$or expressions on various fieldname-or-array-index paths.
+        const trimTestQuery = {
+            $or: [
+                {"a.0": {$gte: 0, $lt: 3}, "a.1": {$in: [2, 3, 4]}},
+                {"b.1": {$gt: 6, $lte: 9}, "c.0": {$gt: 9, $lt: 12}}
+            ]
+        };
+        const trimTestExplain = coll.find(trimTestQuery).explain("executionStats");
+        // Verify that the expected number of documents were matched, and the $** index was used.
+        // Matched documents: [_id:2, _id:3, _id:5, _id:6]
+        assert.eq(trimTestExplain.executionStats.nReturned, 4);
+        const trimTestIxScans = getPlanStages(trimTestExplain.queryPlanner.winningPlan, "IXSCAN");
+        for (let ixScan of trimTestIxScans) {
+            assert.eq(ixScan.keyPattern["$_path"], 1);
+        }
+        // Finally, confirm that a collection scan produces the same results.
+        assertArrayEq(coll.find(trimTestQuery).toArray(),
+                      coll.find(trimTestQuery).hint({$natural: 1}).toArray());
     } finally {
         // Disable $** indexes once the tests have either completed or failed.
         assert.commandWorked(

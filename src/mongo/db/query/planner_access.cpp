@@ -45,6 +45,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
+#include "mongo/db/query/planner_allpaths_helpers.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -56,6 +57,7 @@ namespace {
 
 using namespace mongo;
 
+namespace app = ::mongo::all_paths_planning;
 namespace dps = ::mongo::dotted_path_support;
 
 /**
@@ -528,6 +530,81 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
     tn->indexPrefix = prefixBob.obj();
 }
 
+void QueryPlannerAccess::finishAllPathsIndexScanNode(QuerySolutionNode* node,
+                                                     const IndexEntry& plannerIndex) {
+    // We should only ever reach this point if we are an IndexScanNode for a $** index.
+    invariant(plannerIndex.type == IndexType::INDEX_ALLPATHS);
+    invariant(node && node->getType() == STAGE_IXSCAN);
+
+    // Sanity check the QuerySolutionNode's copy of the IndexEntry.
+    IndexScanNode* scan = static_cast<IndexScanNode*>(node);
+    invariant(scan->index.multikeyPaths.size() == 1);
+    invariant(scan->index == plannerIndex);
+
+    // Obtain some references to make the remainder of this function more legible.
+    auto& bounds = scan->bounds;
+    auto& index = scan->index;
+
+    // For $** indexes, the IndexEntry key pattern is {'path.to.field': ±1} but the actual keys in
+    // the index are of the form {'$_path': ±1, 'path.to.field': ±1}, where the value of the first
+    // field in each key is 'path.to.field'. We push a new entry into the bounds vector for the
+    // leading '$_path' bound here. We also push corresponding fields into the IndexScanNode's
+    // keyPattern and its multikeyPaths vector.
+    invariant(plannerIndex.keyPattern.nFields() == 1);
+    invariant(bounds.fields.size() == 1);
+    invariant(!bounds.fields.front().name.empty());
+    index.multikeyPaths.insert(index.multikeyPaths.begin(), std::set<std::size_t>{});
+    bounds.fields.insert(bounds.fields.begin(), {"$_path"});
+    index.keyPattern =
+        BSON("$_path" << index.keyPattern.firstElement() << index.keyPattern.firstElement());
+
+    // Create a FieldRef to perform any necessary manipulations on the query path string.
+    FieldRef queryPath{plannerIndex.keyPattern.firstElementFieldName()};
+    auto& multikeyPaths = index.multikeyPaths.back();
+
+    // If the bounds are [MinKey,MaxKey] then we must retrieve all documents which include the given
+    // path. We must therefore add bounds that encompass all its subpaths, specifically the interval
+    // ["path.","path/") on "$_path".
+    const bool isMinMaxInclusive = !bounds.fields.back().intervals.empty() &&
+        bounds.fields.back().intervals.front().isMinToMaxInclusive();
+
+    // Helper function to check whether the final path component in 'queryPath' is an array index.
+    const auto lastFieldIsArrayIndex = [&multikeyPaths](const auto& queryPath) {
+        return (queryPath.numParts() > 1u && multikeyPaths.count(queryPath.numParts() - 2u) &&
+                queryPath.isNumericPathComponent(queryPath.numParts() - 1u));
+    };
+
+    // For [MinKey,MaxKey] bounds, we build a range interval on all subpaths of the query path(s).
+    // We must therefore trim any trailing array indices from the query path before generating the
+    // fieldname-or-array power set, in order to avoid overlapping the final set of bounds. For
+    // instance, the untrimmed query path 'a.0' will produce paths 'a' and 'a.0' if 'a' is multikey,
+    // and so we would end up with bounds [['a','a'], ['a.','a/'], ['a.0','a.0'], ['a.0.','a.0/']].
+    // The latter two are subsets of the ['a.', 'a/'] interval.
+    while (isMinMaxInclusive && lastFieldIsArrayIndex(queryPath)) {
+        queryPath.removeLastPart();
+    }
+
+    // Account for fieldname-or-array-index semantics. $** indexes do not explicitly encode array
+    // indices in their keys, so if this query traverses one or more multikey fields via an array
+    // index (e.g. query 'a.0.b' where 'a' is an array), then we must generate bounds on all array-
+    // and non-array permutations of the path in order to produce INEXACT_FETCH bounds.
+    auto paths = app::generateFieldNameOrArrayIndexPathSet(multikeyPaths, queryPath);
+
+    // Add a $_path point-interval for each path that needs to be traversed in the index. If the
+    // bounds on these paths are MinKey-MaxKey, then for each applicable path we must add a range
+    // interval on all its subpaths, i.e. ["path.","path/").
+    static const char subPathStart = '.', subPathEnd = static_cast<char>('.' + 1);
+    auto& pathIntervals = bounds.fields.front().intervals;
+    for (const auto& fieldPath : paths) {
+        auto path = fieldPath.dottedField().toString();
+        pathIntervals.push_back(IndexBoundsBuilder::makePointInterval(path));
+        if (isMinMaxInclusive) {
+            pathIntervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+                path + subPathStart, path + subPathEnd, BoundInclusion::kIncludeStartKeyOnly));
+        }
+    }
+}
+
 bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
     if (scanState->loosestBounds == IndexBoundsBuilder::EXACT) {
         return false;
@@ -577,19 +654,20 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
     const StageType type = node->getType();
 
     if (STAGE_TEXT == type) {
-        finishTextNode(node, index);
-        return;
+        return finishTextNode(node, index);
     }
 
     IndexEntry* nodeIndex = nullptr;
-    IndexBounds* bounds = NULL;
+    IndexBounds* bounds = nullptr;
 
     if (STAGE_GEO_NEAR_2D == type) {
         GeoNear2DNode* gnode = static_cast<GeoNear2DNode*>(node);
         bounds = &gnode->baseBounds;
+        nodeIndex = &gnode->index;
     } else if (STAGE_GEO_NEAR_2DSPHERE == type) {
         GeoNear2DSphereNode* gnode = static_cast<GeoNear2DSphereNode*>(node);
         bounds = &gnode->baseBounds;
+        nodeIndex = &gnode->index;
     } else {
         verify(type == STAGE_IXSCAN);
         IndexScanNode* scan = static_cast<IndexScanNode*>(node);
@@ -597,35 +675,10 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
         bounds = &scan->bounds;
     }
 
-    // For $** indexes, the IndexEntry key pattern is {'path.to.field': ±1} but the actual keys in
-    // the index are of the form {'$_path': ±1, 'path.to.field': ±1}, where the value of the first
-    // field in each key is 'path.to.field'. We push a point-interval on 'path.to.field' into the
-    // bounds vector for the leading '$_path' bound here. We also push corresponding fields into the
-    // IndexScanNode's keyPattern and its multikeyPaths vector.
+    // If this is a $** index, update and populate the keyPattern, bounds, and multikeyPaths.
     if (index.type == IndexType::INDEX_ALLPATHS) {
-        invariant(bounds->fields.size() == 1 && index.keyPattern.nFields() == 1);
-        invariant(!bounds->fields.front().name.empty());
-        invariant(nodeIndex);
-        bounds->fields.insert(bounds->fields.begin(), {"$_path"});
-        bounds->fields.front().intervals.push_back(
-            IndexBoundsBuilder::makePointInterval(nodeIndex->keyPattern.firstElementFieldName()));
-        // If the bounds are [MinKey, MaxKey] then we're querying for any values in the given
-        // path. Therefore we must add bounds that allow subpaths (specifically the bound
-        // ["path.","path/") on "$_path").
-        const auto& intervals = bounds->fields.back().intervals;
-        if (!intervals.empty() && intervals.front().isMinToMaxInclusive()) {
-            bounds->fields.front().intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
-                bounds->fields.back().name + '.',
-                bounds->fields.back().name + static_cast<char>('.' + 1),
-                BoundInclusion::kIncludeStartKeyOnly));
-        }
-        nodeIndex->keyPattern = BSON("$_path" << nodeIndex->keyPattern.firstElement()
-                                              << nodeIndex->keyPattern.firstElement());
-        nodeIndex->multikeyPaths.insert(nodeIndex->multikeyPaths.begin(), std::set<std::size_t>{});
+        finishAllPathsIndexScanNode(node, index);
     }
-
-    // If the QuerySolutionNode's IndexEntry is available, use its keyPattern.
-    const auto& keyPattern = (nodeIndex ? nodeIndex->keyPattern : index.keyPattern);
 
     // Find the first field in the scan's bounds that was not filled out.
     // TODO: could cache this.
@@ -639,12 +692,11 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
 
     // All fields are filled out with bounds, nothing to do.
     if (firstEmptyField == bounds->fields.size()) {
-        IndexBoundsBuilder::alignBounds(bounds, keyPattern);
-        return;
+        return IndexBoundsBuilder::alignBounds(bounds, nodeIndex->keyPattern);
     }
 
     // Skip ahead to the firstEmptyField-th element, where we begin filling in bounds.
-    BSONObjIterator it(keyPattern);
+    BSONObjIterator it(nodeIndex->keyPattern);
     for (size_t i = 0; i < firstEmptyField; ++i) {
         verify(it.more());
         it.next();
@@ -667,7 +719,7 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
 
     // We create bounds assuming a forward direction but can easily reverse bounds to align
     // according to our desired direction.
-    IndexBoundsBuilder::alignBounds(bounds, keyPattern);
+    IndexBoundsBuilder::alignBounds(bounds, nodeIndex->keyPattern);
 }
 
 void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,

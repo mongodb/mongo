@@ -166,25 +166,39 @@ TEST(Prefix, Normal) {
 
     prefix.parse("a.b");
     ASSERT_TRUE(prefix.isPrefixOf(base));
+    ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
 
     prefix.parse("a");
     ASSERT_TRUE(prefix.isPrefixOf(base));
+    ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
+
+    prefix.parse("a.b.c");
+    ASSERT_FALSE(prefix.isPrefixOf(base));
+    ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
 }
 
 TEST(Prefix, Dotted) {
     FieldRef prefix("a.0"), base("a.0.c");
     ASSERT_TRUE(prefix.isPrefixOf(base));
+    ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
+
+    prefix.parse("a.0.c");
+    ASSERT_FALSE(prefix.isPrefixOf(base));
+    ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
 }
 
 TEST(Prefix, NoPrefixes) {
     FieldRef prefix("a.b"), base("a.b");
     ASSERT_FALSE(prefix.isPrefixOf(base));
+    ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
 
     base.parse("a");
     ASSERT_FALSE(prefix.isPrefixOf(base));
+    ASSERT_FALSE(prefix.isPrefixOfOrEqualTo(base));
 
     base.parse("b");
     ASSERT_FALSE(prefix.isPrefixOf(base));
+    ASSERT_FALSE(prefix.isPrefixOfOrEqualTo(base));
 }
 
 TEST(Prefix, EmptyBase) {
@@ -835,6 +849,29 @@ TEST(RemoveLastPartLong, FieldRefFromCopyAssignmentIsADeepCopy) {
     ASSERT_EQ(original, FieldRef("a.foo.c.bar"));
 
     ASSERT_EQ(other, FieldRef("a.b.c"));
+}
+
+TEST(NumericPathComponents, CanIdentifyNumericPathComponents) {
+    FieldRef path("a.0.b.1.c");
+    ASSERT(!path.isNumericPathComponent(0));
+    ASSERT(path.isNumericPathComponent(1));
+    ASSERT(!path.isNumericPathComponent(2));
+    ASSERT(path.isNumericPathComponent(3));
+    ASSERT(!path.isNumericPathComponent(4));
+}
+
+TEST(NumericPathComponents, CanObtainAllNumericPathComponents) {
+    FieldRef path("a.0.b.1.c.2.d");
+    std::set<size_t> expectedComponents{size_t(1), size_t(3), size_t(5)};
+    auto numericPathComponents = path.getNumericPathComponents();
+    ASSERT(numericPathComponents == expectedComponents);
+}
+
+TEST(NumericPathComponents, FieldsWithLeadingZeroesAreNotConsideredNumeric) {
+    FieldRef path("a.0.b.01.c.2.d");
+    std::set<size_t> expectedComponents{size_t(1), size_t(5)};
+    auto numericPathComponents = path.getNumericPathComponents();
+    ASSERT(numericPathComponents == expectedComponents);
 }
 
 }  // namespace

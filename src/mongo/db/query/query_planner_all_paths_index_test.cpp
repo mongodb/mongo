@@ -151,7 +151,7 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverMultikeyFieldNoElemMatch)
     addAllPathsIndex(BSON("$**" << 1), {"a"});
     runQuery(fromjson("{a: {$gt: 0, $lt: 9}}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 2U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{fetch: {filter: {a: {$gt: 0}}, node: "
         "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
@@ -166,7 +166,7 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverMultikeyFieldWithElemMatc
     addAllPathsIndex(BSON("$**" << 1), {"a"});
     runQuery(fromjson("{a: {$elemMatch: {$gt: 0, $lt: 9}}}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {a: {$elemMatch: {$gt: 0, $lt: 9}}}, node: "
         "{ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
@@ -177,7 +177,7 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNonMultikeyFieldWithMulti
     addAllPathsIndex(BSON("$**" << 1), {"b"});
     runQuery(fromjson("{a: {$gt: 0, $lt: 9}}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {'$_path': 1, a: 1},"
         "bounds: {'$_path': [['a','a',true,true]], a: [[0,9,false,false]]}}}}}");
@@ -187,7 +187,7 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNestedFieldWithFirstCompo
     addAllPathsIndex(BSON("$**" << 1), {"a"});
     runQuery(fromjson("{'a.b': {$gt: 0, $lt: 9}}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 2U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{fetch: {filter: {'a.b': {$gt: 0}}, node: "
         "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.b': 1},"
@@ -202,7 +202,7 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNestedFieldWithElemMatchO
     addAllPathsIndex(BSON("$**" << 1), {"a"});
     runQuery(fromjson("{a: {$elemMatch: {b: {$gt: 0, $lt: 9}}}}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {a: {$elemMatch: {b: {$gt: 0, $lt: 9}}}}, node: "
         "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.b': 1},"
@@ -214,7 +214,7 @@ TEST_F(QueryPlannerAllPathsTest,
     addAllPathsIndex(BSON("$**" << 1), {"a", "a.b"});
     runQuery(fromjson("{a: {$elemMatch: {b: {$gt: 0, $lt: 9}}}}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 2U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{fetch: {filter: {a: {$elemMatch: {b: {$gt: 0, $lt: 9}}}}, node: "
         "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.b': 1},"
@@ -229,7 +229,7 @@ TEST_F(QueryPlannerAllPathsTest, MultiplePredicatesOverNestedFieldWithTwoElemMat
     addAllPathsIndex(BSON("$**" << 1), {"a", "a.b"});
     runQuery(fromjson("{a: {$elemMatch: {b: {$elemMatch: {$gt: 0, $lt: 9}}}}}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {a: {$elemMatch: {b: {$elemMatch: {$gt: 0, $lt: 9}}}}}, node: "
         "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.b': 1},"
@@ -240,7 +240,7 @@ TEST_F(QueryPlannerAllPathsTest, ElemMatchOnInnermostMultikeyPathPermitsTightBou
     addAllPathsIndex(BSON("$**" << 1), {"a", "a.b", "a.b.c"});
     runQuery(fromjson("{'a.b.c': {$elemMatch: {'d.e.f': {$gt: 0, $lt: 9}}}}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {'a.b.c': {$elemMatch: {'d.e.f': {$gt: 0, $lt: 9}}}}, node: "
         "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.b.c.d.e.f': 1},"
@@ -253,7 +253,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPredsEligibleForIndexUseGenerateCandidatePla
     runQuery(
         fromjson("{'a.b': {$gt: 0, $lt: 9}, 'a.c': {$gt: 11, $lt: 20}, d: {$gt: 31, $lt: 40}}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 4U);
+    assertNumSolutions(4U);
     assertSolutionExists(
         "{fetch: {filter: {'a.b':{$gt:0,$lt: 9},'a.c':{$gt:11},d:{$gt:31,$lt:40}}, node: "
         "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.c': 1},"
@@ -678,7 +678,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotParticipateInIndexIntersect
     // Run a point query on both fields and confirm that an AND_SORTED plan is generated.
     runQuery(fromjson("{a:10, b:10}"));
     // Three plans are generated: one IXSCAN for each index, and an AND_SORTED on both.
-    ASSERT_EQUALS(getNumSolutions(), 3U);
+    assertNumSolutions(3U);
     assertSolutionExists(
         "{fetch: {filter: {a:10}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
     assertSolutionExists(
@@ -690,7 +690,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotParticipateInIndexIntersect
     // Run a range query on both fields and confirm that an AND_HASH plan is generated.
     runQuery(fromjson("{a:{$gt: 10}, b:{$gt: 10}}"));
     // Three plans are generated: one IXSCAN for each index, and an AND_HASH on both.
-    ASSERT_EQUALS(getNumSolutions(), 3U);
+    assertNumSolutions(3U);
     assertSolutionExists(
         "{fetch: {filter: {a:{$gt: 10}}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
     assertSolutionExists(
@@ -705,7 +705,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotParticipateInIndexIntersect
     // First re-run the AND_SORTED test.
     runQuery(fromjson("{a:10, b:10}"));
     // Solution count has increased from 3 to 5, as $** 'duplicates' the {a:1} and {b:1} IXSCANS.
-    ASSERT_EQUALS(getNumSolutions(), 5U);
+    assertNumSolutions(5U);
     assertSolutionExists(
         "{fetch: {filter: {a:10}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
     assertSolutionExists(
@@ -723,7 +723,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotParticipateInIndexIntersect
     // Now re-run the AND_HASH test.
     runQuery(fromjson("{a:{$gt: 10}, b:{$gt: 10}}"));
     // Solution count has increased from 3 to 5, as $** 'duplicates' the {a:1} and {b:1} IXSCANS.
-    ASSERT_EQUALS(getNumSolutions(), 5U);
+    assertNumSolutions(5U);
     assertSolutionExists(
         "{fetch: {filter: {a:{$gt:10}}, node: {ixscan: {filter: null, pattern: {b:1}}}}}");
     assertSolutionExists(
@@ -753,7 +753,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotSupplyCandidatePlanForTextS
     // Confirm that the allPaths index generates candidate plans for queries which do not include a
     // $text predicate.
     runQuery(fromjson("{a: 10, b: 10}"));
-    ASSERT_EQUALS(getNumSolutions(), 2U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{fetch: {filter: {b: 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, a: 1}}}}}");
     assertSolutionExists(
@@ -762,7 +762,7 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexDoesNotSupplyCandidatePlanForTextS
     // Confirm that the allPaths index does not produce any candidate plans when a query includes a
     // $text predicate, even for non-$text predicates which may be present in the query.
     runQuery(fromjson("{a: 10, b: 10, $text: {$search: 'banana'}}"));
-    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {b: 10}, node: {text: {prefix: {a: 10}, search: 'banana'}}}}");
 }
@@ -1093,5 +1093,342 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFieldIsNotI
 // TODO SERVER-35335: Add testing for Min/Max.
 // TODO SERVER-36517: Add testing for DISTINCT_SCAN.
 // TODO SERVER-35331: Add testing for hints.
+
+//
+// Field name or array index tests.
+//
+
+TEST_F(QueryPlannerAllPathsTest, CannotAnswerQueryThroughArrayIndexProjection) {
+    addAllPathsIndex(BSON("$**" << 1), {"a"}, fromjson("{'a.0': 1, 'a.b': 1}"));
+
+    // Queries whose path lies along a projected array index cannot be answered.
+    runQuery(fromjson("{'a.0': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+
+    runQuery(fromjson("{'a.0.b': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, CanAnswerQueryOnNonProjectedArrayIndex) {
+    addAllPathsIndex(BSON("$**" << 1), {"a", "c"}, fromjson("{'a.0': 1, b: 1, c: 1}"));
+
+    // Queries on fields that are not projected array indices can be answered, even when such a
+    // projection is present in the 'starPathsTempName' spec.
+    runQuery(fromjson("{b: 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {'$_path': 1, b: 1}, "
+        "bounds: {'$_path': [['b','b',true,true]], b: [[10,10,true,true]]}}}}}");
+
+    // Queries on indices of arrays that have been projected in their entirety can be answered.
+    runQuery(fromjson("{'c.0': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'c.0': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, 'c.0': "
+        "1}, bounds: {'$_path': [['c','c',true,true], ['c.0','c.0',true,true]], 'c.0': "
+        "[[10,10,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ShouldGenerateAllPotentialPathBoundsForArrayIndexQueries) {
+    addAllPathsIndex(BSON("a.$**" << 1), {"a", "a.b"});
+
+    // A numeric path component immediately following a multikey path may represent an array index,
+    // a fieldname, or both. The $** index does not record array indices explicitly, so for all such
+    // potential array indices in the query path, we generate bounds that both include and exclude
+    // the numeric path components.
+    runQuery(fromjson("{'a.0': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, 'a.0': "
+        "1}, bounds: {'$_path': [['a','a',true,true], ['a.0','a.0',true,true]], 'a.0': "
+        "[[10,10,true,true]]}}}}}");
+
+    runQuery(fromjson("{'a.0.b': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
+        "'a.0.b': 1}, bounds: {'$_path': [['a.0.b','a.0.b',true,true], ['a.b','a.b',true,true]], "
+        "'a.0.b': [[10,10,true,true]]}}}}}");
+
+    runQuery(fromjson("{'a.0.b.1.c': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b.1.c': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
+        "'a.0.b.1.c': 1}, bounds: {'$_path': [['a.0.b.1.c','a.0.b.1.c',true,true], "
+        "['a.0.b.c','a.0.b.c',true,true], ['a.b.1.c','a.b.1.c',true,true], "
+        "['a.b.c','a.b.c',true,true]], 'a.0.b.1.c': [[10,10,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ShouldAddAllPredicatesToFetchFilterForArrayIndexQueries) {
+    addAllPathsIndex(BSON("$**" << 1), {"a", "a.b"});
+
+    // Ordinarily, a query such as {'a': {$gt: 0, $lt: 5}} on a multikey field 'a' produces an EXACT
+    // IXSCAN on one of the predicates and a FETCH filter on the other. For fieldname-or-array-index
+    // queries on 'a.0' or similar, however, *all* predicates must be added to the FETCH filter to
+    // ensure correctness.
+    runQuery(fromjson("{'a.0': {$gt: 10, $lt: 20}}"));
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0': {$gt: 10, $lt: 20}}, node: {ixscan: {filter: null, pattern: "
+        "{'$_path': 1, 'a.0': 1}, bounds: {'$_path': [['a','a',true,true], "
+        "['a.0','a.0',true,true]], 'a.0': [[-inf,20,true,false]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0': {$gt: 10, $lt: 20}}, node: {ixscan: {filter: null, pattern: "
+        "{'$_path': 1, 'a.0': 1}, bounds: {'$_path': [['a','a',true,true], "
+        "['a.0','a.0',true,true]], 'a.0': [[10,inf,false,true]]}}}}}");
+
+    runQuery(fromjson("{'a.0.b': {$gte: 10, $lte: 20, $ne: 15}}"));
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b': {$gte: 10, $lte: 20, $ne: 15}}, node: {ixscan: {filter: null, "
+        "pattern: {'$_path': 1, 'a.0.b': 1}, bounds: {'$_path': [['a.0.b','a.0.b',true,true], "
+        "['a.b','a.b',true,true]], 'a.0.b': [[-inf,20.0,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b': {$gte: 10, $lte: 20, $ne: 15}}, node: {ixscan: {filter: null, "
+        "pattern: {'$_path': 1, 'a.0.b': 1}, bounds: {'$_path': [['a.0.b','a.0.b',true,true], "
+        "['a.b','a.b',true,true]], 'a.0.b': [[10,inf,true,true]]}}}}}");
+
+    runQuery(fromjson("{'a.0.b.1.c': {$in: [10, 20, 30]}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b.1.c': {$in: [10, 20, 30]}}, node: {ixscan: {filter: null, "
+        "pattern: {'$_path': 1, 'a.0.b.1.c': 1}, bounds: {'$_path': "
+        "[['a.0.b.1.c','a.0.b.1.c',true,true], ['a.0.b.c','a.0.b.c',true,true], "
+        "['a.b.1.c','a.b.1.c',true,true], ['a.b.c','a.b.c',true,true]], 'a.0.b.1.c': "
+        "[[10,10,true,true], [20,20,true,true], [30,30,true,true]]}}}}}");
+
+    runQuery(fromjson("{'a.0.b.1.c': {$gte: 10, $lte: 30}, 'a.1.b.0.c': {$in: [10, 20, 30]}}"));
+    assertNumSolutions(3U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b.1.c': {$gte: 10, $lte: 30}, 'a.1.b.0.c': {$in: [10, 20, 30]}}, "
+        "node: {ixscan: {filter: null, pattern: {'$_path': 1, 'a.0.b.1.c': 1}, bounds: {'$_path': "
+        "[['a.0.b.1.c','a.0.b.1.c',true,true], ['a.0.b.c','a.0.b.c',true,true], "
+        "['a.b.1.c','a.b.1.c',true,true], ['a.b.c','a.b.c',true,true]], 'a.0.b.1.c': "
+        "[[-inf,30,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b.1.c': {$gte: 10, $lte: 30}, 'a.1.b.0.c': {$in: [10, 20, 30]}}, "
+        "node: {ixscan: {filter: null, pattern: {'$_path': 1, 'a.0.b.1.c': 1}, bounds: {'$_path': "
+        "[['a.0.b.1.c','a.0.b.1.c',true,true], ['a.0.b.c','a.0.b.c',true,true], "
+        "['a.b.1.c','a.b.1.c',true,true], ['a.b.c','a.b.c',true,true]], 'a.0.b.1.c': "
+        "[[10,inf,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b.1.c': {$gte: 10, $lte: 30}, 'a.1.b.0.c': {$in: [10, 20, 30]}}, "
+        "node: {ixscan: {filter: null, pattern: {'$_path': 1, 'a.1.b.0.c': 1}, bounds: {'$_path': "
+        "[['a.1.b.0.c','a.1.b.0.c',true,true], ['a.1.b.c','a.1.b.c',true,true], "
+        "['a.b.0.c','a.b.0.c',true,true], ['a.b.c','a.b.c',true,true]], 'a.1.b.0.c': "
+        "[[10,10,true,true], [20,20,true,true], [30,30,true,true]]}}}}}");
+
+    // Finally, confirm that queries which include a numeric path component on a field that is *not*
+    // multikey produce EXACT bounds and do *not* add their predicates to the filter.
+    runQuery(fromjson("{'d.0': {$gt: 10, $lt: 20}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {'$_path': 1, 'd.0': 1}, "
+        "bounds: {'$_path': [['d.0','d.0',true,true]], 'd.0': [[10,20,false,false]]}}}}}");
+
+    // Here, in contrast to the multikey case, we generate one indexed solution for each predicate
+    // and only filter the *other* predicate in the FETCH stage.
+    runQuery(fromjson("{'d.0.e': {$gt: 10, $lt: 20}, 'd.1.f': {$in: [10, 20, 30]}}"));
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {filter: {'d.0.e': {$gt: 10, $lt: 20}}, node: {ixscan: {filter: null, pattern: "
+        "{'$_path': 1, 'd.1.f': 1}, bounds: {'$_path': [['d.1.f','d.1.f',true,true]], 'd.1.f': "
+        "[[10,10,true,true], [20,20,true,true], [30,30,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {'d.1.f': {$in: [10, 20, 30]}}, node: {ixscan: {filter: null, pattern: "
+        "{'$_path': 1, 'd.0.e': 1}, bounds: {'$_path': [['d.0.e','d.0.e',true,true]], 'd.0.e': "
+        "[[10,20,false,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ShouldOnlyBuildSpecialBoundsForMultikeyPaths) {
+    addAllPathsIndex(BSON("a.$**" << 1), {"a.b", "a.b.c.d"});
+
+    // 'a' is not multikey, so 'a.0' refers specifically to a fieldname rather than an array index,
+    // and special bounds will not be generated.
+    runQuery(fromjson("{'a.0': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {'$_path': 1, 'a.0': 1}, "
+        "bounds: {'$_path': [['a.0','a.0',true,true]], 'a.0': [[10,10,true,true]]}}}}}");
+
+    // 'a' is not multikey, so 'a.0.b' does not refer to multikey path 'a.b' and 'b.1' is therefore
+    // also strictly a fieldname. Special bounds will not be generated for either.
+    runQuery(fromjson("{'a.0.b.1': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {'$_path': 1, 'a.0.b.1': "
+        "1}, bounds: {'$_path': [['a.0.b.1','a.0.b.1',true,true]], 'a.0.b.1': "
+        "[[10,10,true,true]]}}}}}");
+
+    // 'a.b' is multikey but 'a.b.c' is not, so special bounds will only be generated for 'b.1'.
+    runQuery(fromjson("{'a.b.1.c.2.d': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.b.1.c.2.d': 10}, node: {ixscan: {filter: null, pattern: {'$_path': "
+        "1, 'a.b.1.c.2.d': 1}, bounds: {'$_path': [['a.b.1.c.2.d','a.b.1.c.2.d',true,true], "
+        "['a.b.c.2.d','a.b.c.2.d',true,true]], 'a.b.1.c.2.d': [[10,10,true,true]]}}}}}");
+
+    // 'a.b' is multikey but 'a.b.c' is not. 'a.b.c.2.d' therefore refers to a different path than
+    // multikey path 'a.[b].c.[d]', so special bounds will be generated for 'b.1' but not for 'd.3'.
+    runQuery(fromjson("{'a.b.1.c.2.d.3.e': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.b.1.c.2.d.3.e': 10}, node: {ixscan: {filter: null, pattern: "
+        "{'$_path': 1, 'a.b.1.c.2.d.3.e': 1}, bounds: "
+        "{'$_path':[['a.b.1.c.2.d.3.e','a.b.1.c.2.d.3.e',true,true], "
+        "['a.b.c.2.d.3.e','a.b.c.2.d.3.e',true,true]], 'a.b.1.c.2.d.3.e':[[10,10,true,true]]}}}}}");
+
+    // 'a.b' and 'a.b.c.d' are both multikey. Special bounds will be generated for 'b.1' and 'd.3'.
+    runQuery(fromjson("{'a.b.1.c.d.3.e': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.b.1.c.d.3.e': 10}, node: {ixscan: {filter: null, pattern: {'$_path': "
+        "1, 'a.b.1.c.d.3.e': 1}, bounds: {'$_path':[['a.b.1.c.d.3.e','a.b.1.c.d.3.e',true,true], "
+        "['a.b.1.c.d.e','a.b.1.c.d.e',true,true], ['a.b.c.d.3.e','a.b.c.d.3.e',true,true], "
+        "['a.b.c.d.e','a.b.c.d.e',true,true]], 'a.b.1.c.d.3.e':[[10,10,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ShouldGenerateSpecialBoundsForNumericMultikeyPaths) {
+    addAllPathsIndex(BSON("a.$**" << 1), {"a.b", "a.b.0"});
+
+    // 'a.b.0' is itself a multikey path, but since 'a.b' is multikey 'b.0' may refer to an array
+    // element of 'b'. We generate special bounds for 'b.0'.
+    runQuery(fromjson("{'a.b.0': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.b.0': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
+        "'a.b.0': 1}, bounds: {'$_path': [['a.b','a.b',true,true], ['a.b.0','a.b.0',true,true]], "
+        "'a.b.0': [[10,10,true,true]]}}}}}");
+
+    // 'a.b' and 'a.b.0' are both multikey paths; we generate special bounds for 'b.0' and '0.1'.
+    runQuery(fromjson("{'a.b.0.1.c': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.b.0.1.c': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
+        "'a.b.0.1.c': 1}, bounds: {'$_path': [['a.b.0.1.c','a.b.0.1.c',true,true], "
+        "['a.b.0.c','a.b.0.c',true,true], ['a.b.1.c','a.b.1.c',true,true], "
+        "['a.b.c','a.b.c',true,true]], 'a.b.0.1.c': [[10,10,true,true]]}}}}}");
+
+    // 'a.b' is multikey but 'a.b.1' is not, so we only generate special bounds for 'b.1'.
+    runQuery(fromjson("{'a.b.1.1.c': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.b.1.1.c': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
+        "'a.b.1.1.c': 1}, bounds: {'$_path': [['a.b.1.1.c','a.b.1.1.c',true,true], "
+        "['a.b.1.c','a.b.1.c',true,true]], 'a.b.1.1.c': [[10,10,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ShouldNotGenerateSpecialBoundsForFieldNamesWithLeadingZeroes) {
+    addAllPathsIndex(BSON("a.$**" << 1), {"a.b"});
+
+    // 'a.b' is multikey, but '01' is not eligible for consideration as a numeric array index; it is
+    // always strictly a field name. We therefore do not generate special bounds.
+    runQuery(fromjson("{'a.b.01': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {'$_path': 1, 'a.b.01': 1}, "
+        "bounds: {'$_path': [['a.b.01','a.b.01',true,true]], 'a.b.01': [[10,10,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, InitialNumericPathComponentIsAlwaysFieldName) {
+    addAllPathsIndex(BSON("$**" << 1), {"0"}, fromjson("{'0': 1}"));
+
+    // '0' is multikey, but the first component in a path can never be an array index since it must
+    // always be a field name. We therefore do not generate special bounds for '0.b'.
+    runQuery(fromjson("{'0.b': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {'$_path': 1, '0.b': 1}, "
+        "bounds: {'$_path': [['0.b','0.b',true,true]], '0.b': [[10,10,true,true]]}}}}}");
+
+    // '0' is multikey, so a query on '0.1.b' will generate special bounds for '1' but not for '0'.
+    runQuery(fromjson("{'0.1.b': 10}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'0.1.b': 10}, node: {ixscan: {filter: null, pattern: {'$_path': 1, "
+        "'0.1.b': 1}, bounds: {'$_path': [['0.1.b','0.1.b',true,true], ['0.b','0.b',true,true]], "
+        "'0.1.b': [[10,10,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ShouldGenerateSpecialBoundsForNullAndExistenceQueries) {
+    addAllPathsIndex(BSON("a.$**" << 1), {"a", "a.b", "a.b.2", "a.b.2.3", "a.b.2.3.4"});
+
+    runQuery(fromjson("{'a.0.b': {$exists: true}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b': {$exists: true}}, node: {ixscan: {filter: null, pattern: "
+        "{'$_path': 1, 'a.0.b': 1}, bounds: {'$_path': [['a.0.b','a.0.b',true,true], "
+        "['a.0.b.','a.0.b/',true,false], ['a.b','a.b',true,true], ['a.b.','a.b/',true,false]], "
+        "'a.0.b': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
+
+    runQuery(fromjson("{'a.0.b.1.c': {$exists: true, $eq: null}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b.1.c': {$exists: true, $eq: null}}, node: {ixscan: {filter:null, "
+        "pattern:{'$_path': 1, 'a.0.b.1.c': 1}, bounds: {'$_path': "
+        "[['a.0.b.1.c','a.0.b.1.c',true,true], ['a.0.b.1.c.','a.0.b.1.c/',true,false], "
+        "['a.0.b.c','a.0.b.c',true,true], ['a.0.b.c.','a.0.b.c/',true,false], "
+        "['a.b.1.c','a.b.1.c',true,true], ['a.b.1.c.','a.b.1.c/',true,false], "
+        "['a.b.c','a.b.c',true,true], ['a.b.c.','a.b.c/',true,false]], 'a.0.b.1.c': [[{$minKey: "
+        "1},{$maxKey: 1},true,true]]}}}}}");
+
+    // Confirm that any trailing array index fields are trimmed before the fieldname-or-array-index
+    // pathset is generated, such that the subpath bounds do not overlap.
+    runQuery(fromjson("{'a.0.b.1': {$exists: true, $eq: null}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b.1': {$exists: true, $eq: null}}, node: {ixscan: {filter:null, "
+        "pattern:{'$_path': 1, 'a.0.b.1': 1}, bounds: {'$_path': [['a.0.b','a.0.b',true,true], "
+        "['a.0.b.','a.0.b/',true,false], ['a.b','a.b',true,true], ['a.b.','a.b/',true,false]], "
+        "'a.0.b.1': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
+
+    runQuery(fromjson("{'a.0.b.2.3.4': {$exists: true, $eq: null}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.0.b.2.3.4': {$exists: true, $eq: null}}, node: {ixscan: {filter:null,"
+        "pattern:{'$_path': 1, 'a.0.b.2.3.4': 1}, bounds: {'$_path': [['a.0.b','a.0.b',true,true], "
+        "['a.0.b.','a.0.b/',true,false], ['a.b','a.b',true,true], ['a.b.','a.b/',true,false]], "
+        "'a.0.b.2.3.4': [[{$minKey: 1},{$maxKey: 1},true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, ShouldDeclineToAnswerQueriesThatTraverseTooManyArrays) {
+    addAllPathsIndex(BSON("$**" << 1),
+                     {"a",
+                      "a.b",
+                      "a.b.c",
+                      "a.b.c.d",
+                      "a.b.c.d.e",
+                      "a.b.c.d.e.f",
+                      "a.b.c.d.e.f.g",
+                      "a.b.c.d.e.f.g.h",
+                      "a.b.c.d.e.f.g.h.i",
+                      "a.b.c.d.e.f.g.h.i.j",
+                      "a.b.c.d.e.f.g.h.i.j.k"});
+
+    // We can query through 8 levels of arrays via explicit array indices...
+    runQuery(fromjson("{'a.1.b.2.c.3.d.4.e.5.f.6.g.7.h.8': 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {$_path: 1, 'a.1.b.2.c.3.d.4.e.5.f.6.g.7.h.8': 1}}}}}");
+
+    // ... but after that, we decline to answer the query using the $** index.
+    runQuery(fromjson("{'a.1.b.2.c.3.d.4.e.5.f.6.g.7.h.8.i.9': 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+
+    // However, we continue to allow implicit (non-indices) traversal of arrays to any depth.
+    runQuery(fromjson("{'a.1.b.2.c.3.d.4.e.5.f.6.g.7.h.8.i.j.k': 1}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch:{node:{ixscan:{pattern:{$_path:1, 'a.1.b.2.c.3.d.4.e.5.f.6.g.7.h.8.i.j.k': 1}}}}}");
+}
+
+// TODO SERVER-35335: Add testing for Min/Max.
+// TODO SERVER-36517: Add testing for DISTINCT_SCAN.
+// TODO SERVER-35336: Add testing for partialFilterExpression.
+// TODO SERVER-35331: Add testing for hints.
+// TODO SERVER-36145: Add testing for non-blocking sort.
 
 }  // namespace mongo

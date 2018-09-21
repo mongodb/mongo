@@ -102,7 +102,7 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
                 // If a subtree was specified in the keyPattern, or if an inclusion projection is
                 // present, then we need only index the path(s) preserved by the projection.
                 for (const auto& path : pathProj->getExhaustivePaths()) {
-                    _indexedPaths.addPath(path);
+                    _indexedPaths.addPath(path.dottedField());
                 }
             }
         } else if (descriptor->getAccessMethodName() == IndexNames::TEXT) {

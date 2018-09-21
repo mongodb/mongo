@@ -24,6 +24,7 @@ env.Library(
         "plan_cache_indexability.cpp",
         "plan_enumerator.cpp",
         "planner_access.cpp",
+        "planner_allpaths_helpers.cpp",
         "planner_analysis.cpp",
         "planner_ixselect.cpp",
         "query_planner.cpp",
