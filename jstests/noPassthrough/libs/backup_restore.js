@@ -196,7 +196,8 @@ var BackupRestoreTest = function(options) {
                         };
                         var result = db.getSiblingDB('test').fsm_teardown.insert({a: 1}, wc);
                         assert.writeOK(result, 'teardown insert failed: ' + tojson(result));
-                        result = db.getSiblingDB('test').fsm_teardown.drop();
+                        result = db.getSiblingDB('test').fsm_teardown.drop(
+                            {writeConcern: {w: "majority"}});
                         assert(result, 'teardown drop failed');
                     });
                 } catch (e) {
@@ -450,6 +451,8 @@ var BackupRestoreTest = function(options) {
         // Wait up to 5 minutes until the new hidden node is in state RECOVERING.
         rst.waitForState(hiddenNode, [ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY]);
 
+        jsTestLog('Stopping CRUD and FSM clients');
+
         // Stop CRUD client and FSM client.
         var crudStatus = checkProgram(crudPid);
         assert(crudStatus.alive,
@@ -462,6 +465,14 @@ var BackupRestoreTest = function(options) {
                testName + ' FSM client was not running at end of test and exited with code: ' +
                    fsmStatus.exitCode);
         stopMongoProgramByPid(fsmPid);
+
+        // Make sure the test database is not in a drop-pending state. This can happen if we
+        // killed the FSM client while it was in the middle of dropping it.
+        assert.soonNoExcept(function() {
+            let result = primary.getDB("test").afterClientKills.insert(
+                {"a": 1}, {writeConcern: {w: "majority"}});
+            return (result.nInserted === 1);
+        }, "failed to insert to test collection", 10 * 60 * 1000);
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
         jsTestLog('CRUD and FSM clients stopped. Waiting for hidden node ' + hiddenHost +
