@@ -56,7 +56,6 @@ namespace biggie {
 namespace {
 
 const Ordering allAscending = Ordering::make(BSONObj());
-const int TempKeyMaxSize = 1024;  // this goes away with SERVER-3372
 
 // This function is the same as the one in record store--basically, using the git analogy, create
 // a working branch if one does not exist.
@@ -89,13 +88,6 @@ BSONObj stripFieldNames(const BSONObj& obj) {
         bob.appendAs(it.next(), "");
     }
     return bob.obj();
-}
-
-Status dupKeyError(const BSONObj& key) {
-    StringBuilder sb;
-    sb << "E11000 duplicate key error ";
-    sb << "dup key: " << key;
-    return Status(ErrorCodes::DuplicateKey, sb.str());
 }
 
 // This function converts a key and an ordering to a KeyString.
@@ -259,17 +251,14 @@ StatusWith<SpecialFormatInserted> SortedDataBuilderInterface::addKey(const BSONO
                       "expected ascending (key, RecordId) order in bulk builder");
     }
     if (!_dupsAllowed && twoKeyCmp == 0 && twoRIDCmp != 0) {
-        return dupKeyError(key);
+        return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
     }
 
     std::string workingCopyInsertKey = combineKeyAndRID(key, loc, _prefix, _order);
-    // TODO: remove this seems to be a duplicate of newKS above
-    std::unique_ptr<KeyString> workingCopyInternalKs = keyToKeyString(key, _order);
     std::unique_ptr<KeyString> workingCopyOuterKs = combineKeyAndRIDKS(key, loc, _prefix, _order);
 
-    std::string internalTbString(
-        reinterpret_cast<const char*>(workingCopyInternalKs->getTypeBits().getBuffer()),
-        workingCopyInternalKs->getTypeBits().getSize());
+    std::string internalTbString(reinterpret_cast<const char*>(newKS->getTypeBits().getBuffer()),
+                                 newKS->getTypeBits().getSize());
 
     workingCopy->insert(StringStore::value_type(workingCopyInsertKey, internalTbString));
 
@@ -411,7 +400,7 @@ Status SortedDataInterface::dupKeyCheck(OperationContext* opCtx,
         lowerBoundIterator->first.compare(_KSForIdentEnd) < 0 &&
         lowerBoundIterator->first.compare(
             combineKeyAndRID(key, RecordId::max(), _prefix, _order)) <= 0) {
-        return dupKeyError(key);
+        return buildDupKeyErrorStatus(key, _collectionNamespace, _indexName, _keyPattern);
     }
     return Status::OK();
 }

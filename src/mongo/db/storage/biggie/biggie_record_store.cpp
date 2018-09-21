@@ -150,7 +150,7 @@ bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, Recor
     if (it == workingCopy->end()) {
         return false;
     }
-    *rd = RecordData(it->second.c_str(), it->second.length()).getOwned();
+    *rd = RecordData(it->second.c_str(), it->second.length());
     return true;
 }
 
@@ -217,21 +217,7 @@ StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
                                                       const RecordData& oldRec,
                                                       const char* damageSource,
                                                       const mutablebson::DamageVector& damages) {
-    return Status::OK();  // See updateWithDamagesSupported above.
-    /*
-    StringStore* workingCopy = getRecoveryUnitBranch_forking(opCtx);
-    std::string key = createKey(_ident, loc.repr());
-    StringStore::iterator doc = workingCopy->find(key);
-    invariant(doc != workingCopy->end());  // Only update existing records.
-    for (const auto& d : damages) {
-        const char* source = damageSource + d.sourceOffset;
-        char* target = (&doc->second[0]) + d.targetOffset;
-        std::memcpy(target, source, d.size);
-    }
-    RecordData updatedRecord(doc->second.c_str(), doc->second.length());
-    dirtyRecoveryUnit(opCtx);
-    return updatedRecord.getOwned();
-    */
+    return RecordData();
 }
 
 std::unique_ptr<SeekableRecordCursor> RecordStore::getCursor(OperationContext* opCtx,
@@ -333,7 +319,7 @@ boost::optional<Record> RecordStore::Cursor::next() {
     if (it != workingCopy->end() && inPrefix(it->first)) {
         _savedPosition = it->first;
         return Record{RecordId(extractRecordId(it->first)),
-                      RecordData(it->second.c_str(), it->second.length()).getOwned()};
+                      RecordData(it->second.c_str(), it->second.length())};
     }
     return boost::none;
 }
@@ -349,7 +335,7 @@ boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
     }
     _needFirstSeek = false;
     _savedPosition = it->first;
-    return Record{id, RecordData(it->second.c_str(), it->second.length()).getOwned()};
+    return Record{id, RecordData(it->second.c_str(), it->second.length())};
 }
 
 // Positions are saved as we go.
@@ -418,7 +404,7 @@ boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id
     }
     it = StringStore::const_reverse_iterator(++canFind);  // reverse iterator returns item 1 before
     _savedPosition = it->first;
-    return Record{id, RecordData(it->second.c_str(), it->second.length()).getOwned()};
+    return Record{id, RecordData(it->second.c_str(), it->second.length())};
 }
 
 void RecordStore::ReverseCursor::save() {}
