@@ -320,7 +320,7 @@ private:
     // Thread safe queue which collects responses from the task executor for execution in next()
     //
     // The queue supports unset jobs for a signal to wake up and check for failure
-    ProducerConsumerQueue<boost::optional<Job>> _responseQueue;
+    MultiProducerSingleConsumerQueue<boost::optional<Job>>::Pipe _responseQueue;
 
     // Used to determine if the ARS should attempt to retry any requests. Is set to true when
     // stopRetrying() or cancelPendingRequests() is called.

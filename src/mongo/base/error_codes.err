@@ -270,6 +270,8 @@ error_code("DataModifiedByRepair", 269);
 error_code("RepairedReplicaSetNode", 270);
 error_code("JSInterpreterFailureWithStack", 271, extra="JSExceptionInfo")
 error_code("MigrationConflict", 272)
+error_code("ProducerConsumerQueueProducerQueueDepthExceeded", 273)
+error_code("ProducerConsumerQueueConsumed", 274)
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)

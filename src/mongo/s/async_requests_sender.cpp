@@ -214,7 +214,7 @@ void AsyncRequestsSender::_scheduleRequests() {
 
                 // Push a noop response to the queue to indicate that a remote is ready for
                 // re-processing due to failure.
-                _responseQueue.push(boost::none);
+                _responseQueue.producer.push(boost::none);
             }
         }
     }
@@ -236,8 +236,9 @@ Status AsyncRequestsSender::_scheduleRequest(size_t remoteIndex) {
 
     auto callbackStatus = _executor->scheduleRemoteCommand(
         request,
-        [remoteIndex, this](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-            _responseQueue.push(Job{cbData, remoteIndex});
+        [ remoteIndex, producer = _responseQueue.producer ](
+            const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+            producer.push(Job{cbData, remoteIndex});
         },
         _baton);
     if (!callbackStatus.isOK()) {
@@ -250,7 +251,7 @@ Status AsyncRequestsSender::_scheduleRequest(size_t remoteIndex) {
 
 // Passing opCtx means you'd like to opt into opCtx interruption.  During cleanup we actually don't.
 void AsyncRequestsSender::_makeProgress() {
-    auto job = _responseQueue.pop(_opCtx);
+    auto job = _responseQueue.consumer.pop(_opCtx);
 
     if (!job) {
         return;
