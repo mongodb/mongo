@@ -69,7 +69,7 @@
 "invalidateUserCache",
 "killAnyCursor",
 "killAnySession",
-"killCursors",
+"killCursors", # Deprecated in favor of killAnyCursor
 "killop",
 "listCachedAndActiveUsers",
 "listCollections",

@@ -53,10 +53,33 @@
             }
 
             doKill({});
+
             if ((authUsers.length === 1) && (killUsers.length === 1)) {
                 // Session variant only makes sense with single auth'd users.
                 doKill({lsid: {id: BinData(4, "QlLfPHTySm6tqfuV+EOsVA==")}});
             }
+        }
+
+        function trySelfKill(user) {
+            const db = user[1];
+            assert(db.auth(user[0], 'pass'));
+
+            assert.commandWorked(db.runCommand({startSession: 1}));
+
+            const cmd = {
+                aggregate: 1,
+                pipeline: [{$listLocalSessions: {}}],
+                cursor: {batchSize: 0}
+            };
+            const res = assert.commandWorked(db.runCommand(cmd));
+            print(tojson(res));
+            const id = res.cursor.id;
+            assert.neq(id, 0, "Invalid cursor ID");
+
+            const killCmdRes = db.runCommand({killCursors: db.getName() + ".$cmd", cursors: [id]});
+            db.logout();
+
+            assert.commandWorked(killCmdRes, "Unable to kill cursor");
         }
 
         /**
@@ -81,6 +104,7 @@
         testA.createUser({user: 'user2', pwd: 'pass', roles: jsTest.basicUserRoles});
         testB.createUser({user: 'user3', pwd: 'pass', roles: jsTest.basicUserRoles});
         testB.createUser({user: 'user4', pwd: 'pass', roles: jsTest.basicUserRoles});
+        testB.createUser({user: 'user5', pwd: 'pass', roles: []});
         admin.logout();
 
         // Create a collection with batchable data
@@ -98,6 +122,9 @@
         tryKill(testA, [['user2', testA]], [['user2', testA]], true);
         tryKill(testB, [['user3', testB]], [['user3', testB]], true);
         tryKill(testB, [['user4', testB]], [['user4', testB]], true);
+        trySelfKill(['user1', testA]);
+        trySelfKill(['user5', testB]);
+        trySelfKill(['admin', admin]);
 
         // A user cannot kill someone else's cursor.
         tryKill(testA, [['user1', testA]], [['user2', testA]], false);
