@@ -351,7 +351,7 @@ def main():
     # Run the executor finder.
     else:
         # Parse the Evergreen project configuration file.
-        evergreen_conf = evergreen.EvergreenProjectConfig(values.evergreen_file)
+        evergreen_conf = evergreen.parse_evergreen_file(values.evergreen_file)
 
         if values.buildvariant is None:
             print "Option buildVariant must be specified to find changed tests.\n", \

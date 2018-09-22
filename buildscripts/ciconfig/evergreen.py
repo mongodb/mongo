@@ -4,21 +4,47 @@ The API also provides methods to access specific fields present in the mongodb/m
 configuration file.
 """
 
+from __future__ import print_function
+
 import datetime
+import distutils.spawn  # pylint: disable=no-name-in-module
 import fnmatch
+import os
 import re
 
 import yaml
+
+import buildscripts.util.runcommand as runcommand
+
+
+def parse_evergreen_file(path, evergreen_binary="evergreen"):
+    """Read an Evergreen file and return EvergreenProjectConfig instance."""
+    if evergreen_binary:
+        if not distutils.spawn.find_executable(evergreen_binary):
+            raise EnvironmentError(
+                "Executable '{}' does not exist or is not in the PATH.".format(evergreen_binary))
+
+        # Call 'evergreen evaluate path' to pre-process the project configuration file.
+        cmd = runcommand.RunCommand(evergreen_binary)
+        cmd.add("evaluate")
+        cmd.add_file(path)
+        error_code, output = cmd.execute()
+        if error_code:
+            raise RuntimeError("Unable to evaluate {}: {}".format(path, output))
+        config = yaml.load(output)
+    else:
+        with open(path, "r") as fstream:
+            config = yaml.load(fstream)
+
+    return EvergreenProjectConfig(config)
 
 
 class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attributes
     """Represent an Evergreen project configuration file."""
 
-    def __init__(self, path):
-        """Initialize the EvergreenProjectConfig from a file path name."""
-        with open(path, "r") as fstream:
-            self._conf = yaml.load(fstream)
-        self.path = path
+    def __init__(self, conf):
+        """Initialize the EvergreenProjectConfig from a YML dictionary."""
+        self._conf = conf
         self.tasks = [Task(task_dict) for task_dict in self._conf["tasks"]]
         self._tasks_by_name = {task.name: task for task in self.tasks}
         self.task_groups = [

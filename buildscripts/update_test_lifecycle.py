@@ -1051,7 +1051,7 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
 
     logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=options.log_level,
                         filename=options.log_file)
-    evg_conf = ci_evergreen.EvergreenProjectConfig(options.evergreen_project_config)
+    evg_conf = ci_evergreen.parse_evergreen_file(options.evergreen_project_config)
     use_test_tasks_membership = False
 
     tasks = options.tasks.split(",") if options.tasks else []

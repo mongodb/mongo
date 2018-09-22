@@ -18,12 +18,12 @@ class TestEvergreenProjectConfig(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conf = _evergreen.EvergreenProjectConfig(TEST_FILE_PATH)
+        cls.conf = _evergreen.parse_evergreen_file(TEST_FILE_PATH, evergreen_binary=None)
 
     def test_invalid_path(self):
         invalid_path = "non_existing_file"
         with self.assertRaises(IOError):
-            _evergreen.EvergreenProjectConfig(invalid_path)
+            _evergreen.parse_evergreen_file(invalid_path, evergreen_binary=None)
 
     def test_list_tasks(self):
         self.assertEqual(6, len(self.conf.tasks))
@@ -135,7 +135,7 @@ class TestVariant(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conf = _evergreen.EvergreenProjectConfig(TEST_FILE_PATH)
+        cls.conf = _evergreen.parse_evergreen_file(TEST_FILE_PATH, evergreen_binary=None)
 
     def test_from_dict(self):
         task = _evergreen.Task({"name": "compile"})
