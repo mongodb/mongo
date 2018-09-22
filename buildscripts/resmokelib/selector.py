@@ -633,11 +633,11 @@ class _DbTestSelector(_Selector):
         return test_files.get_tests()
 
 
-class _JsonSchemaTestSelectorConfig(_SelectorConfig):
+class _JsonTestSelectorConfig(_SelectorConfig):
     """_SelectorConfig subclass for json_schema_test tests."""
 
     def __init__(self, roots, include_files=None, exclude_files=None):
-        """Initialize _JsonSchemaTestSelectorConfig."""
+        """Initialize _JsonTestSelectorConfig."""
         _SelectorConfig.__init__(self, roots=roots, include_files=include_files,
                                  exclude_files=exclude_files)
 
@@ -676,10 +676,11 @@ _SELECTOR_REGISTRY = {
     "cpp_integration_test": (_CppTestSelectorConfig, _CppTestSelector),
     "cpp_unit_test": (_CppTestSelectorConfig, _CppTestSelector),
     "benchmark_test": (_CppTestSelectorConfig, _CppTestSelector),
+    "benchrun_embedded_test": (_JsonTestSelectorConfig, _Selector),
     "db_test": (_DbTestSelectorConfig, _DbTestSelector),
     "fsm_workload_test": (_JSTestSelectorConfig, _JSTestSelector),
     "parallel_fsm_workload_test": (_MultiJSTestSelectorConfig, _MultiJSTestSelector),
-    "json_schema_test": (_JsonSchemaTestSelectorConfig, _Selector),
+    "json_schema_test": (_JsonTestSelectorConfig, _Selector),
     "js_test": (_JSTestSelectorConfig, _JSTestSelector),
     "multi_stmt_txn_passthrough": (_JSTestSelectorConfig, _JSTestSelector),
     "py_test": (_PyTestCaseSelectorConfig, _Selector),
@@ -691,8 +692,7 @@ def filter_tests(test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FI
     """Filter the tests according to a specified configuration.
 
     Args:
-        test_kind: the test kind, one of 'cpp_integration_test', 'cpp_unit_test', 'db_test',
-            'json_schema_test', 'js_test'.
+        test_kind: the test kind, from _SELECTOR_REGISTRY.
         selector_config: a dict containing the selector configuration.
         test_file_explorer: the TestFileExplorer to use. Using a TestFileExplorer other than
         the default one should not be needed except for mocking purposes.
