@@ -34,7 +34,7 @@ pushd $SRC_ROOT
 
 # We pin to a particular commit of the mongodb/mongo-perf repository to make it clear what version
 # of the JavaScript test cases we are running.
-git checkout 824f1672b4e684ea4fdb4399e14374c5969467f9
+git checkout 7070ac74dd35fde2f59af01b155191382357ed1d
 
 # We use Python to get the number of CPUs in a platform-agnostic way.
 NUM_CPUS=$(python -c 'import multiprocessing; print(multiprocessing.cpu_count())')
