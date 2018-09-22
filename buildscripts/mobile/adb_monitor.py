@@ -6,6 +6,7 @@ import logging
 import optparse
 import os
 import pipes
+import re
 import shlex
 import sys
 import tempfile
@@ -52,24 +53,61 @@ class Adb(object):
         self._tempfile = None
 
     @staticmethod
-    def _adb_cmd(adb_command, output_file=None, append_file=False, output_string=False):
+    def adb_cmd(adb_command, output_file=None, append_file=False, output_string=False):
         """Run an adb command and return result."""
         cmd = runcommand.RunCommand("adb {}".format(adb_command), output_file, append_file)
-        if output_string:
+        if output_string or not output_file:
             return cmd.execute_with_output()
         return cmd.execute_save_output()
 
+    @staticmethod
+    def shell(adb_shell_command):
+        """Run an adb shell command and return output_string.
+
+        Raise an exception if the exit status is non-zero.
+
+        Since the adb shell command does not return an exit status. We simulate it by
+        saving the exit code in the output and then stripping if off.
+
+        See https://stackoverflow.com/questions/9379400/adb-error-codes
+        """
+        cmd_prefix = "set -o errexit; function _exit_ { echo __EXIT__:$?; } ; trap _exit_ EXIT ;"
+        cmd = runcommand.RunCommand("adb shell {} {}".format(cmd_prefix, adb_shell_command))
+        cmd_output = cmd.execute_with_output()
+        if "__EXIT__" in cmd_output:
+            exit_code = int(cmd_output.split()[-1].split(":")[1])
+            cmd_output_stripped = re.split("__EXIT__.*\n", cmd_output)[0]
+            if exit_code:
+                raise RuntimeError("{}: {}".format(exit_code, cmd_output_stripped))
+            return cmd_output_stripped
+        return cmd_output
+
     def devices(self):
         """Return the available ADB devices and the uptime."""
-        return self._adb_cmd("devices -l", output_string=True)
+        return self.adb_cmd("devices -l", output_string=True)
 
     def device_available(self):
         """Return the the uptime of the connected device."""
         # If the device is not available this will throw an exception.
-        return self._adb_cmd("shell uptime", output_string=True)
+        return self.adb_cmd("shell uptime", output_string=True)
+
+    def push(self, files, remote_dir, sync=False):
+        """Push a list of files over adb to remote_dir."""
+        # We can specify files as a single file name or a list of files.
+        if isinstance(files, list):
+            files = " ".join(files)
+        sync_opt = "--sync " if sync else ""
+        return self.adb_cmd("push {}{} {}".format(sync_opt, files, remote_dir), output_string=True)
+
+    def pull(self, files, local_dir):
+        """Pull a list of remote files over adb to local_dir."""
+        # We can specify files as a single file name or a list of files.
+        if isinstance(files, list):
+            files = " ".join(files)
+        return self.adb_cmd("pull {} {}".format(files, local_dir), output_string=True)
 
     def _battery_cmd(self, option, output_file=None, append_file=False):
-        self._adb_cmd("shell dumpsys batterystats {}".format(option), output_file, append_file)
+        self.adb_cmd("shell dumpsys batterystats {}".format(option), output_file, append_file)
 
     def battery(self, reset=False, output_file=None, append_file=False):
         """Collect the battery stats and save to the output_file."""
@@ -79,7 +117,7 @@ class Adb(object):
 
     def memory(self, output_file=None, append_file=False):
         """Collect the memory stats and save to the output_file."""
-        self._adb_cmd("shell dumpsys meminfo -c -d", output_file, append_file)
+        self.adb_cmd("shell dumpsys meminfo -c -d", output_file, append_file)
 
     def systrace_start(self, output_file=None):
         """Start the systrace.py script to collect CPU usage."""
@@ -232,7 +270,7 @@ class AdbSampleBasedResourceMonitor(AdbResourceMonitor):
             self, output_file, should_stop, adb_cmd, num_samples, sample_interval_ms):
         """Initialize AdbSampleBasedResourceMonitor."""
         AdbResourceMonitor.__init__(self, output_file, should_stop)
-        self._adb_cmd = adb_cmd
+        self.adb_cmd = adb_cmd
         self._num_samples = num_samples
         self._sample_interval_ms = sample_interval_ms
 
@@ -258,7 +296,7 @@ class AdbSampleBasedResourceMonitor(AdbResourceMonitor):
         """Collect sample."""
         LOGGER.debug("%s: Collecting sample %d of %d", self._output_file, collected_samples,
                      self._num_samples)
-        self._adb_cmd(output_file=self._output_file, append_file=True)
+        self.adb_cmd(output_file=self._output_file, append_file=True)
 
 
 class AdbContinuousResourceMonitor(AdbResourceMonitor):
