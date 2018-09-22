@@ -330,9 +330,9 @@ def main():  #pylint: disable=too-many-statements
         help="The destination file for memory stats (CSV format). [Default: %default].",
         default="memory.csv")
 
-    battery_options.add_option("--noMemory", dest="no_memory",
-                               help="Disable collection of memory samples.", action="store_true",
-                               default=False)
+    memory_options.add_option("--noMemory", dest="no_memory",
+                              help="Disable collection of memory samples.", action="store_true",
+                              default=False)
 
     systrace_options.add_option(
         "--cpuFile", dest="cpu_file",
