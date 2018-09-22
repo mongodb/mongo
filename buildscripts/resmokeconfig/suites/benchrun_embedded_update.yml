@@ -6,4 +6,5 @@ selector:
 
 executor:
   hooks:
+  - class: CollectEmbeddedResources
   - class: CombineBenchrunEmbeddedResults

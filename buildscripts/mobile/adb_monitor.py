@@ -31,9 +31,10 @@ LOGGER = logging.getLogger(__name__)
 class Adb(object):
     """Class to abstract calls to adb."""
 
-    def __init__(self, adb_binary="adb"):
+    def __init__(self, adb_binary="adb", logger=LOGGER):
         """Initialize the Adb object."""
         self._cmd = None
+        self.logger = logger
         self.adb_path = distutils.spawn.find_executable(adb_binary)
         if not self.adb_path:
             raise EnvironmentError(
@@ -137,9 +138,9 @@ class Adb(object):
         with open(self._tempfile) as fh:
             buff = fh.read()
         os.remove(self._tempfile)
-        LOGGER.debug("systrace_stop: %s", buff)
+        self.logger.debug("systrace_stop: %s", buff)
         if "Wrote trace" not in buff:
-            LOGGER.error("CPU file not saved: %s", buff)
+            self.logger.error("CPU file not saved: %s", buff)
             if os.path.isfile(output_file):
                 os.remove(output_file)
 
@@ -150,11 +151,13 @@ class AdbControl(object):  # pylint: disable=too-many-instance-attributes
     _JOIN_TIMEOUT = 24 * 60 * 60  # 24 hours (a long time to have the monitor run for)
 
     def __init__(  # pylint: disable=too-many-arguments
-            self, adb, battery_file=None, memory_file=None, cpu_file=None, append_file=False,
-            num_samples=0, collection_time_secs=0, sample_interval_ms=0):
+            self, adb, logger=LOGGER, battery_file=None, memory_file=None, cpu_file=None,
+            append_file=False, num_samples=0, collection_time_secs=0, sample_interval_ms=0):
         """Initialize AdbControl object."""
 
         self.adb = adb
+
+        self.logger = logger
 
         output_files = [battery_file, memory_file, cpu_file]
         if not any(output_files):
@@ -234,7 +237,7 @@ class AdbControl(object):  # pylint: disable=too-many-instance-attributes
             for thread in self.all_threads:
                 thread.join(self._JOIN_TIMEOUT)
 
-        LOGGER.info("Collections stopped.")
+        self.logger.info("Collections stopped.")
 
         # If any of the monitor threads encountered an error, then reraise the exception in the
         # main thread.
@@ -246,11 +249,12 @@ class AdbControl(object):  # pylint: disable=too-many-instance-attributes
 class AdbResourceMonitor(threading.Thread):
     """Thread to collect information about a specific resource using adb."""
 
-    def __init__(self, output_file, should_stop):
+    def __init__(self, output_file, should_stop, logger=LOGGER):
         """Initialize the AdbResourceMonitor object."""
         threading.Thread.__init__(self, name="AdbResourceMonitor {}".format(output_file))
         self._output_file = output_file
         self._should_stop = should_stop
+        self.logger = logger
         self.exception = None
 
     def run(self):
@@ -258,7 +262,7 @@ class AdbResourceMonitor(threading.Thread):
         try:
             self._do_monitoring()
         except Exception as err:  # pylint: disable=broad-except
-            LOGGER.error("%s: Encountered an error: %s", self._output_file, err)
+            self.logger.error("%s: Encountered an error: %s", self._output_file, err)
             self.exception = err
             self._should_stop.set()
 
@@ -283,19 +287,20 @@ class AdbSampleBasedResourceMonitor(AdbResourceMonitor):
             if self._num_samples > 0 and collected_samples >= self._num_samples:
                 break
             if collected_samples > 0:
-                LOGGER.debug("%s: Sleeping %d ms.", self._output_file, self._sample_interval_ms)
+                self.logger.debug("%s: Sleeping %d ms.", self._output_file,
+                                  self._sample_interval_ms)
                 self._should_stop.wait(self._sample_interval_ms / 1000.0)
             collected_samples += 1
             self._take_sample(collected_samples)
 
         total_time_ms = (time.time() - now) * 1000
-        LOGGER.info("%s: Stopping monitoring, %d samples collected in %d ms.", self._output_file,
-                    collected_samples, total_time_ms)
+        self.logger.info("%s: Stopping monitoring, %d samples collected in %d ms.",
+                         self._output_file, collected_samples, total_time_ms)
 
     def _take_sample(self, collected_samples):
         """Collect sample."""
-        LOGGER.debug("%s: Collecting sample %d of %d", self._output_file, collected_samples,
-                     self._num_samples)
+        self.logger.debug("%s: Collecting sample %d of %d", self._output_file, collected_samples,
+                          self._num_samples)
         self.adb_cmd(output_file=self._output_file, append_file=True)
 
 
@@ -310,12 +315,12 @@ class AdbContinuousResourceMonitor(AdbResourceMonitor):
 
     def _do_monitoring(self):
         """Monitor function."""
-        LOGGER.debug("%s: Starting monitoring.", self._output_file)
+        self.logger.debug("%s: Starting monitoring.", self._output_file)
         now = time.time()
         self._adb_start_cmd(output_file=self._output_file)
         self._should_stop.wait()
         total_time_ms = (time.time() - now) * 1000
-        LOGGER.info("%s: Stopping monitoring after %d ms.", self._output_file, total_time_ms)
+        self.logger.info("%s: Stopping monitoring after %d ms.", self._output_file, total_time_ms)
         self._adb_stop_cmd(output_file=self._output_file)
 
 
