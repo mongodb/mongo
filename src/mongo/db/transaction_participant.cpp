@@ -699,16 +699,7 @@ void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx
 void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
                                                        Timestamp commitTimestamp) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    try {
-        _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
-    } catch (...) {
-        // It is illegal for committing a prepared transaction to fail for any reason, other than an
-        // invalid command, so we crash instead.
-        severe() << "Caught exception beginning commit of prepared transaction "
-                 << opCtx->getTxnNumber() << " on " << _getSession()->getSessionId().toBSON()
-                 << ": " << exceptionToStatus();
-        std::terminate();
-    }
+    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
     uassert(ErrorCodes::InvalidOptions,
             "commitTransaction cannot provide commitTimestamp to unprepared transaction.",
