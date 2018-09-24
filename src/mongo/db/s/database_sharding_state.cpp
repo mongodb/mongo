@@ -125,8 +125,6 @@ void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
 
 void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
-    invariant(_sourceMgr);
-
     _sourceMgr = nullptr;
 }
 
