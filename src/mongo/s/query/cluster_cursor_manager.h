@@ -213,6 +213,31 @@ public:
         long long getNumReturnedSoFar() const;
 
         /**
+         * Returns the creation date of the cursor.
+         */
+        Date_t getCreatedDate() const;
+
+        /**
+         * Returns the time the cursor was last used.
+         */
+        Date_t getLastUseDate() const;
+
+        /**
+         * Set the cursor's lastUseDate to the given time.
+         */
+        void setLastUseDate(Date_t now);
+
+        /**
+         * Increment the number of batches returned by this cursor.
+         */
+        void incNBatches();
+
+        /**
+         * Get the number of batches returned by this cursor.
+         */
+        long long getNBatches() const;
+
+        /**
          * Returns a GenericCursor version of the pinned cursor.
          */
         GenericCursor toGenericCursor() const;

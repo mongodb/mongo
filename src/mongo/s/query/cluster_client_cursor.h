@@ -160,6 +160,31 @@ public:
      */
     virtual boost::optional<ReadPreferenceSetting> getReadPreference() const = 0;
 
+    /**
+     * Returns the creation date of the cursor.
+     */
+    virtual Date_t getCreatedDate() const = 0;
+
+    /**
+     * Returns the date the cursor was last used.
+     */
+    virtual Date_t getLastUseDate() const = 0;
+
+    /**
+     * Set the last use date to the provided time.
+     */
+    virtual void setLastUseDate(Date_t now) = 0;
+
+    /**
+     * Returns the number of batches returned by this cursor.
+     */
+    virtual std::uint64_t getNBatches() const = 0;
+
+    /**
+     * Increment the number of batches returned so far by one.
+     */
+    virtual void incNBatches() = 0;
+
     //
     // maxTimeMS support.
     //

@@ -187,7 +187,7 @@ public:
                              const GetMoreRequest& request,
                              CursorResponseBuilder* nextBatch,
                              PlanExecutor::ExecState* state,
-                             long long* numResults) {
+                             std::uint64_t* numResults) {
             PlanExecutor* exec = cursor->getExecutor();
 
             // If an awaitData getMore is killed during this process due to our max time expiring at
@@ -434,7 +434,7 @@ public:
             CursorResponseBuilder nextBatch(reply, CursorResponseBuilder::Options());
             BSONObj obj;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
-            long long numResults = 0;
+            std::uint64_t numResults = 0;
 
             // We report keysExamined and docsExamined to OpDebug for a given getMore operation. To
             // obtain these values we need to take a diff of the pre-execution and post-execution
@@ -495,7 +495,8 @@ public:
                 exec->detachFromOperationContext();
 
                 cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-                cursor->incPos(numResults);
+                cursor->incNReturnedSoFar(numResults);
+                cursor->incNBatches();
             } else {
                 curOp->debug().cursorExhausted = true;
             }

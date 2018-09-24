@@ -326,7 +326,7 @@ public:
             CursorResponseBuilder firstBatch(result, options);
             BSONObj obj;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
-            long long numResults = 0;
+            std::uint64_t numResults = 0;
             while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
                    PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
                 // If we can't fit this result inside the current batch, then we stash it for later.
@@ -384,7 +384,8 @@ public:
                     pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(
                         opCtx->getRemainingMaxTimeMicros());
                 }
-                pinnedCursor.getCursor()->setPos(numResults);
+                pinnedCursor.getCursor()->setNReturnedSoFar(numResults);
+                pinnedCursor.getCursor()->incNBatches();
 
                 // Fill out curop based on the results.
                 endQueryOp(opCtx, collection, *cursorExec, numResults, cursorId);

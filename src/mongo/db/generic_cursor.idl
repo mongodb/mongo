@@ -36,9 +36,25 @@ structs:
         description: The namespace of the cursor. 
         type: namespacestring
         optional: true
+      createdDate:
+        description: The time and date the cursor was created.
+        type: date
+        optional: true
+      lastAccessDate:
+        description: The last time the cursor was used (was pinned).
+        type: date
+        optional: true
       nDocsReturned:
         description: The number of docs returned by the cursor.
         type: long
+        optional: true
+      nBatchesReturned:
+        description: The number of batches returned by the cursor.
+        type: long
+        optional: true
+      noCursorTimeout:
+        description: If true the cursor will not be timed out because of inactivity. 
+        type: bool
         optional: true
       tailable: 
         description: Whether the cursor is tailable and remains open after exhausting all documents in the find.
@@ -46,10 +62,6 @@ structs:
         optional: true
       awaitData:
         description: Whether this is a tailable and awaitData cursor that will block waiting for new data to be inserted into a capped collection. 
-        type: bool
-        optional: true
-      noCursorTimeout:
-        description: If true the cursor will not be timed out because of inactivity. 
         type: bool
         optional: true
       originatingCommand:

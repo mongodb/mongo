@@ -79,7 +79,9 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
     : _params(std::move(params)),
       _root(buildMergerPlan(opCtx, executor, &_params)),
       _lsid(lsid),
-      _opCtx(opCtx) {
+      _opCtx(opCtx),
+      _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
+      _lastUseDate(_createdDate) {
     dassert(!_params.compareWholeSortKey ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sort == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -89,7 +91,12 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
                                                  std::unique_ptr<RouterExecStage> root,
                                                  ClusterClientCursorParams&& params,
                                                  boost::optional<LogicalSessionId> lsid)
-    : _params(std::move(params)), _root(std::move(root)), _lsid(lsid), _opCtx(opCtx) {
+    : _params(std::move(params)),
+      _root(std::move(root)),
+      _lsid(lsid),
+      _opCtx(opCtx),
+      _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
+      _lastUseDate(_createdDate) {
     dassert(!_params.compareWholeSortKey ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sort == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -179,6 +186,26 @@ boost::optional<LogicalSessionId> ClusterClientCursorImpl::getLsid() const {
 
 boost::optional<TxnNumber> ClusterClientCursorImpl::getTxnNumber() const {
     return _params.txnNumber;
+}
+
+Date_t ClusterClientCursorImpl::getCreatedDate() const {
+    return _createdDate;
+}
+
+Date_t ClusterClientCursorImpl::getLastUseDate() const {
+    return _lastUseDate;
+}
+
+void ClusterClientCursorImpl::setLastUseDate(Date_t now) {
+    _lastUseDate = std::move(now);
+}
+
+std::uint64_t ClusterClientCursorImpl::getNBatches() const {
+    return _nBatchesReturned;
+}
+
+void ClusterClientCursorImpl::incNBatches() {
+    ++_nBatchesReturned;
 }
 
 boost::optional<ReadPreferenceSetting> ClusterClientCursorImpl::getReadPreference() const {

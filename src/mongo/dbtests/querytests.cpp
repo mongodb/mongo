@@ -284,7 +284,7 @@ public:
             dbtests::WriteContextForTests ctx(&_opCtx, ns);
             auto pinnedCursor = unittest::assertGet(
                 ctx.getCollection()->getCursorManager()->pinCursor(&_opCtx, cursorId));
-            ASSERT_EQUALS(2, pinnedCursor.getCursor()->pos());
+            ASSERT_EQUALS(std::uint64_t(2), pinnedCursor.getCursor()->nReturnedSoFar());
         }
 
         cursor = _client.getMore(ns, cursorId);

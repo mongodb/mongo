@@ -91,7 +91,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _queryOptions(params.queryOptions),
       _exec(std::move(params.exec)),
       _operationUsingCursor(operationUsingCursor),
-      _lastUseDate(now) {
+      _lastUseDate(now),
+      _createdDate(now) {
     invariant(_cursorManager);
     invariant(_exec);
     invariant(_operationUsingCursor);
@@ -133,12 +134,15 @@ GenericCursor ClientCursor::toGenericCursor() const {
     GenericCursor gc;
     gc.setCursorId(cursorid());
     gc.setNs(nss());
-    gc.setNDocsReturned(pos());
+    gc.setNDocsReturned(nReturnedSoFar());
     gc.setTailable(isTailable());
     gc.setAwaitData(isAwaitData());
     gc.setNoCursorTimeout(isNoTimeout());
     gc.setOriginatingCommand(getOriginatingCommandObj());
     gc.setLsid(getSessionId());
+    gc.setLastAccessDate(getLastUseDate());
+    gc.setCreatedDate(getCreatedDate());
+    gc.setNBatchesReturned(getNBatches());
     if (auto opCtx = _operationUsingCursor) {
         gc.setOperationUsingCursorId(opCtx->getOpID());
     }

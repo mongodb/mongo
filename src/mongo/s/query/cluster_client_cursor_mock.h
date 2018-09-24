@@ -84,6 +84,16 @@ public:
 
     boost::optional<ReadPreferenceSetting> getReadPreference() const final;
 
+    Date_t getCreatedDate() const final;
+
+    Date_t getLastUseDate() const final;
+
+    void setLastUseDate(Date_t now) final;
+
+    std::uint64_t getNBatches() const final;
+
+    void incNBatches() final;
+
     /**
      * Returns true unless marked as having non-exhausted remote cursors via
      * markRemotesNotExhausted().
@@ -116,6 +126,12 @@ private:
     boost::optional<TxnNumber> _txnNumber;
 
     OperationContext* _opCtx = nullptr;
+
+    Date_t _createdDate;
+
+    Date_t _lastUseDate;
+
+    std::uint64_t _nBatchesReturned = 0;
 };
 
 }  // namespace mongo

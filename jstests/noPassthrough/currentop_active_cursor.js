@@ -29,7 +29,6 @@
         const cursorObject = activeCursors[0].cursor;
         assert.eq(cursorObject.originatingCommand.find, coll.getName(), tojson(activeCursors));
         assert.eq(cursorObject.nDocsReturned, 2, tojson(activeCursors));
-        assert.eq(cursorObject.ns, coll.getFullName(), tojson(activeCursors));
         assert.eq(cursorObject.tailable, false, tojson(activeCursors));
         assert.eq(cursorObject.awaitData, false, tojson(activeCursors));
     }

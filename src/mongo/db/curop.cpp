@@ -500,7 +500,15 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
             "truncatedObj", _genericCursor->getOriginatingCommand().get(), maxQuerySize, &tempObj);
         auto originatingCommand = tempObj.done().getObjectField("truncatedObj");
         _genericCursor->setOriginatingCommand(originatingCommand.getOwned());
+        // lsid and ns exist in the top level curop object, so they need to be temporarily
+        // removed from the cursor object to avoid duplicating information.
+        auto lsid = _genericCursor->getLsid();
+        auto ns = _genericCursor->getNs();
+        _genericCursor->setLsid(boost::none);
+        _genericCursor->setNs(boost::none);
         builder->append("cursor", _genericCursor->toBSON());
+        _genericCursor->setLsid(lsid);
+        _genericCursor->setNs(ns);
     }
 
     if (!_message.empty()) {

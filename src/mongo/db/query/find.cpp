@@ -174,7 +174,7 @@ namespace {
 void generateBatch(int ntoreturn,
                    ClientCursor* cursor,
                    BufBuilder* bb,
-                   int* numResults,
+                   std::uint64_t* numResults,
                    PlanExecutor::ExecState* state) {
     PlanExecutor* exec = cursor->getExecutor();
 
@@ -312,7 +312,7 @@ Message getMore(OperationContext* opCtx,
     // These are set in the QueryResult msg we return.
     int resultFlags = ResultFlag_AwaitCapable;
 
-    int numResults = 0;
+    std::uint64_t numResults = 0;
     int startingResult = 0;
 
     const int InitialBufSize =
@@ -377,7 +377,7 @@ Message getMore(OperationContext* opCtx,
         opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
         // What number result are we starting at?  Used to fill out the reply.
-        startingResult = cc->pos();
+        startingResult = cc->nReturnedSoFar();
 
         uint64_t notifierVersion = 0;
         std::shared_ptr<CappedInsertNotifier> notifier;
@@ -486,7 +486,8 @@ Message getMore(OperationContext* opCtx,
                    << PlanExecutor::statestr(state);
         } else {
             // Continue caching the ClientCursor.
-            cc->incPos(numResults);
+            cc->incNReturnedSoFar(numResults);
+            cc->incNBatches();
             exec->saveState();
             exec->detachFromOperationContext();
             LOG(5) << "getMore saving client cursor ended with state "
@@ -685,7 +686,8 @@ std::string runQuery(OperationContext* opCtx,
             curOp.debug().exhaust = true;
         }
 
-        pinnedCursor.getCursor()->setPos(numResults);
+        pinnedCursor.getCursor()->setNReturnedSoFar(numResults);
+        pinnedCursor.getCursor()->incNBatches();
 
         // We assume that cursors created through a DBDirectClient are always used from their
         // original OperationContext, so we do not need to move time to and from the cursor.

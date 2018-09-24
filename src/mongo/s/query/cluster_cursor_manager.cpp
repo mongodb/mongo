@@ -161,6 +161,29 @@ long long ClusterCursorManager::PinnedCursor::getNumReturnedSoFar() const {
     return _cursor->getNumReturnedSoFar();
 }
 
+Date_t ClusterCursorManager::PinnedCursor::getLastUseDate() const {
+    invariant(_cursor);
+    return _cursor->getLastUseDate();
+}
+
+void ClusterCursorManager::PinnedCursor::setLastUseDate(Date_t now) {
+    invariant(_cursor);
+    _cursor->setLastUseDate(now);
+}
+Date_t ClusterCursorManager::PinnedCursor::getCreatedDate() const {
+    invariant(_cursor);
+    return _cursor->getCreatedDate();
+}
+void ClusterCursorManager::PinnedCursor::incNBatches() {
+    invariant(_cursor);
+    return _cursor->incNBatches();
+}
+
+long long ClusterCursorManager::PinnedCursor::getNBatches() const {
+    invariant(_cursor);
+    return _cursor->getNBatches();
+}
+
 void ClusterCursorManager::PinnedCursor::queueResult(const ClusterQueryResult& result) {
     invariant(_cursor);
     _cursor->queueResult(result);
@@ -180,6 +203,9 @@ GenericCursor ClusterCursorManager::PinnedCursor::toGenericCursor() const {
     gc.setTailable(isTailable());
     gc.setAwaitData(isTailableAndAwaitData());
     gc.setOriginatingCommand(getOriginatingCommand());
+    gc.setLastAccessDate(getLastUseDate());
+    gc.setCreatedDate(getCreatedDate());
+    gc.setNBatchesReturned(getNBatches());
     return gc;
 }
 
@@ -342,7 +368,6 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
             return vivifyCursorStatus;
         }
     }
-
     cursor->reattachToOperationContext(opCtx);
     return PinnedCursor(this, std::move(cursor), nss, cursorId);
 }
@@ -359,6 +384,7 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
     OperationContext* opCtx = cursor->getCurrentOperationContext();
     invariant(opCtx);
     cursor->detachFromOperationContext();
+    cursor->setLastUseDate(now);
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -590,12 +616,15 @@ GenericCursor ClusterCursorManager::CursorEntry::cursorToGenericCursor(
     GenericCursor gc;
     gc.setCursorId(cursorId);
     gc.setNs(ns);
+    gc.setCreatedDate(_cursor->getCreatedDate());
+    gc.setLastAccessDate(_cursor->getLastUseDate());
     gc.setLsid(_cursor->getLsid());
     gc.setNDocsReturned(_cursor->getNumReturnedSoFar());
     gc.setTailable(_cursor->isTailable());
     gc.setAwaitData(_cursor->isTailableAndAwaitData());
     gc.setOriginatingCommand(_cursor->getOriginatingCommand());
     gc.setNoCursorTimeout(getLifetimeType() == CursorLifetime::Immortal);
+    gc.setNBatchesReturned(_cursor->getNBatches());
     return gc;
 }
 
