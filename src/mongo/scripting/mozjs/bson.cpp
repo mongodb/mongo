@@ -261,10 +261,18 @@ void BSONInfo::Functions::bsonWoCompare::call(JSContext* cx, JS::CallArgs args) 
     if (!args.get(1).isObject())
         uasserted(ErrorCodes::BadValue, "second argument to bsonWoCompare must be an object");
 
-    BSONObj firstObject = ValueWriter(cx, args.get(0)).toBSON();
-    BSONObj secondObject = ValueWriter(cx, args.get(1)).toBSON();
+    JS::RootedObject rout1(cx, JS_NewPlainObject(cx));
+    JS::RootedObject rout2(cx, JS_NewPlainObject(cx));
+    ObjectWrapper object1(cx, rout1);
+    ObjectWrapper object2(cx, rout2);
 
-    args.rval().setInt32(firstObject.woCompare(secondObject));
+    object1.setValue("a", args.get(0));
+    object2.setValue("a", args.get(1));
+
+    BSONObj bsonObject1 = object1.toBSON();
+    BSONObj bsonObject2 = object2.toBSON();
+
+    args.rval().setInt32(bsonObject1.woCompare(bsonObject2));
 }
 
 void BSONInfo::Functions::bsonBinaryEqual::call(JSContext* cx, JS::CallArgs args) {
@@ -277,10 +285,18 @@ void BSONInfo::Functions::bsonBinaryEqual::call(JSContext* cx, JS::CallArgs args
     if (!args.get(1).isObject())
         uasserted(ErrorCodes::BadValue, "second argument to bsonBinaryEqual must be an object");
 
-    BSONObj firstObject = ValueWriter(cx, args.get(0)).toBSON();
-    BSONObj secondObject = ValueWriter(cx, args.get(1)).toBSON();
+    JS::RootedObject rout1(cx, JS_NewPlainObject(cx));
+    JS::RootedObject rout2(cx, JS_NewPlainObject(cx));
+    ObjectWrapper object1(cx, rout1);
+    ObjectWrapper object2(cx, rout2);
 
-    args.rval().setBoolean(firstObject.binaryEqual(secondObject));
+    object1.setValue("a", args.get(0));
+    object2.setValue("a", args.get(1));
+
+    BSONObj bsonObject1 = object1.toBSON();
+    BSONObj bsonObject2 = object2.toBSON();
+
+    args.rval().setBoolean(bsonObject1.binaryEqual(bsonObject2));
 }
 
 void BSONInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {

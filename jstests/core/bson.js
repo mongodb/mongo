@@ -23,8 +23,8 @@
         testObjectsAreEqual({a: 1.1}, {a: 1.10}, func, testFunc);
         var nl0 = new NumberLong("18014398509481984");
         var nl1 = new NumberLong("18014398509481985");
-        testObjectsAreEqual({a: nl0}, {a: nl0}, func, testFunc);
-        testObjectsAreNotEqual({a: nl0}, {a: nl1}, func, testFunc);
+        testObjectsAreEqual(nl0, nl0, func, testFunc);
+        testObjectsAreNotEqual(nl0, nl1, func, testFunc);
 
         // Test on key name.
         testObjectsAreNotEqual({a: 0}, {A: 0}, func, testFunc);
@@ -43,11 +43,11 @@
         var d1 = new Date(1);
         var ts0 = new Timestamp(0, 1);
         var ts1 = new Timestamp(1, 1);
-        testObjectsAreEqual({a: d0}, {a: d0}, func, testFunc);
-        testObjectsAreNotEqual({a: d1}, {a: d0}, func, testFunc);
-        testObjectsAreNotEqual({a: d1}, {a: ts1}, func, testFunc);
-        testObjectsAreEqual({a: ts0}, {a: ts0}, func, testFunc);
-        testObjectsAreNotEqual({a: ts0}, {a: ts1}, func, testFunc);
+        testObjectsAreEqual(d0, d0, func, testFunc);
+        testObjectsAreNotEqual(d0, d1, func, testFunc);
+        testObjectsAreNotEqual(d1, ts1, func, testFunc);
+        testObjectsAreEqual(ts0, ts0, func, testFunc);
+        testObjectsAreNotEqual(ts0, ts1, func, testFunc);
 
         // Tests on regex.
         testObjectsAreEqual({a: /3/}, {a: /3/}, func, testFunc);
@@ -56,14 +56,14 @@
         // Tests on DBPointer.
         var dbp0 = new DBPointer("test", new ObjectId());
         var dbp1 = new DBPointer("test", new ObjectId());
-        testObjectsAreEqual({a: dbp0}, {a: dbp0}, func, testFunc);
-        testObjectsAreNotEqual({a: dbp0}, {a: dbp1}, func, testFunc);
+        testObjectsAreEqual(dbp0, dbp0, func, testFunc);
+        testObjectsAreNotEqual(dbp0, dbp1, func, testFunc);
 
         // Tests on JavaScript.
         var js0 = Function.prototype;
         var js1 = function() {};
-        testObjectsAreEqual({a: js0}, {a: Function.prototype}, func, testFunc);
-        testObjectsAreNotEqual({a: js0}, {a: js1}, func, testFunc);
+        testObjectsAreEqual(js0, Function.prototype, func, testFunc);
+        testObjectsAreNotEqual(js0, js1, func, testFunc);
 
         // Tests on arrays.
         testObjectsAreEqual({a: [0, 1]}, {a: [0, 1]}, func, testFunc);
@@ -71,28 +71,24 @@
         testObjectsAreNotEqual({a: [1, 0]}, {a: [0, 1]}, func, testFunc);
 
         // Tests on BinData & HexData.
-        testObjectsAreEqual({a: new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")},
-                            {a: new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq")},
+        testObjectsAreEqual(new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq"),
+                            new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq"),
                             func,
                             testFunc);
-        testObjectsAreEqual(
-            {a: new BinData(0, "AAaa")}, {a: new BinData(0, "AAaa")}, func, testFunc);
-        testObjectsAreNotEqual(
-            {a: new BinData(0, "AAaa")}, {a: new BinData(0, "aaAA")}, func, testFunc);
-        testObjectsAreEqual(
-            {a: new HexData(0, "AAaa")}, {a: new HexData(0, "AAaa")}, func, testFunc);
-        testObjectsAreEqual(
-            {a: new HexData(0, "AAaa")}, {a: new HexData(0, "aaAA")}, func, testFunc);
-        testObjectsAreNotEqual(
-            {a: new HexData(0, "AAaa")}, {a: new BinData(0, "AAaa")}, func, testFunc);
+        testObjectsAreEqual(new BinData(0, "AAaa"), new BinData(0, "AAaa"), func, testFunc);
+        testObjectsAreNotEqual(new BinData(0, "AAaa"), new BinData(0, "aaAA"), func, testFunc);
+
+        testObjectsAreEqual(new HexData(0, "AAaa"), new HexData(0, "AAaa"), func, testFunc);
+        testObjectsAreEqual(new HexData(0, "AAaa"), new HexData(0, "aaAA"), func, testFunc);
+        testObjectsAreNotEqual(new HexData(0, "AAaa"), new BinData(0, "AAaa"), func, testFunc);
 
         // Tests on ObjectId
-        testObjectsAreEqual({a: new ObjectId("57d1b31cd311a43091fe592f")},
-                            {a: new ObjectId("57d1b31cd311a43091fe592f")},
+        testObjectsAreEqual(new ObjectId("57d1b31cd311a43091fe592f"),
+                            new ObjectId("57d1b31cd311a43091fe592f"),
                             func,
                             testFunc);
-        testObjectsAreNotEqual({a: new ObjectId("57d1b31cd311a43091fe592f")},
-                               {a: new ObjectId("57d1b31ed311a43091fe5930")},
+        testObjectsAreNotEqual(new ObjectId("57d1b31cd311a43091fe592f"),
+                               new ObjectId("57d1b31ed311a43091fe5930"),
                                func,
                                testFunc);
 
@@ -138,5 +134,4 @@
         {a: NumberLong("1")}, {a: NumberDecimal("1.0")}, bsonWoCompareWrapper, "bsonWoCompare");
     testObjectsAreNotEqual(
         {a: NumberLong("1")}, {a: NumberDecimal("1.0")}, bsonBinaryEqual, "bsonBinaryEqual");
-
 })();
