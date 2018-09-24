@@ -49,7 +49,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/pipeline/mongod_process_interface.h"
+#include "mongo/db/pipeline/mongo_process_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -328,7 +328,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         new ExpressionContext(opCtx,
                               request,
                               std::move(collator),
-                              MongoDInterface::create(opCtx),
+                              MongoProcessInterface::create(opCtx),
                               uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
                               uuid);
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";

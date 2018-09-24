@@ -38,26 +38,26 @@ namespace mongo {
  * Class to provide access to mongod-specific implementations of methods required by some
  * document sources.
  */
-class MongoDInterface : public MongoProcessCommon {
+class MongoInterfaceStandalone : public MongoProcessCommon {
 public:
-    static std::shared_ptr<MongoProcessInterface> create(OperationContext* opCtx);
+    // static std::shared_ptr<MongoProcessInterface> create(OperationContext* opCtx);
 
-    MongoDInterface(OperationContext* opCtx);
+    MongoInterfaceStandalone(OperationContext* opCtx);
 
-    virtual ~MongoDInterface() = default;
+    virtual ~MongoInterfaceStandalone() = default;
 
     void setOperationContext(OperationContext* opCtx) final;
     DBClientBase* directClient() final;
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
-    virtual void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                        const NamespaceString& ns,
-                        std::vector<BSONObj>&& objs);
-    virtual void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                        const NamespaceString& ns,
-                        std::vector<BSONObj>&& queries,
-                        std::vector<BSONObj>&& updates,
-                        bool upsert,
-                        bool multi);
+    void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                const NamespaceString& ns,
+                std::vector<BSONObj>&& objs) override;
+    void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                const NamespaceString& ns,
+                std::vector<BSONObj>&& queries,
+                std::vector<BSONObj>&& updates,
+                bool upsert,
+                bool multi) override;
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx, const NamespaceString& ns) final;
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -84,7 +84,7 @@ public:
                                         Pipeline* pipeline) final;
     std::string getShardName(OperationContext* opCtx) const final;
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(
-        OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const final;
+        OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const override;
     boost::optional<Document> lookupSingleDocument(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
@@ -127,33 +127,6 @@ private:
 
     DBDirectClient _client;
     std::map<UUID, std::unique_ptr<const CollatorInterface>> _collatorCache;
-};
-
-/**
- * Specialized version of the MongoDInterface when this node is a shard server.
- */
-class MongoDInterfaceShardServer final : public MongoDInterface {
-public:
-    using MongoDInterface::MongoDInterface;
-
-    /**
-     * Inserts the documents 'objs' into the namespace 'ns' using the ClusterWriter for locking,
-     * routing, stale config handling, etc.
-     */
-    void insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                const NamespaceString& ns,
-                std::vector<BSONObj>&& objs) final;
-
-    /**
-     * Replaces the documents matching 'queries' with 'updates' using the ClusterWriter for locking,
-     * routing, stale config handling, etc.
-     */
-    void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                const NamespaceString& ns,
-                std::vector<BSONObj>&& queries,
-                std::vector<BSONObj>&& updates,
-                bool upsert,
-                bool multi) final;
 };
 
 }  // namespace mongo

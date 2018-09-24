@@ -243,7 +243,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
-        '$BUILD_DIR/mongo/db/pipeline/mongod_process_interface',
+        '$BUILD_DIR/mongo/db/pipeline/mongo_process_interface',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/stats/counters',

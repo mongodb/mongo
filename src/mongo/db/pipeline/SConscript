@@ -264,6 +264,16 @@ env.Library(
 )
 
 env.Library(
+    target='mongo_process_interface',
+    source=[
+        'mongo_process_interface.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.Library(
     target='mongo_process_common',
     source=[
         'mongo_process_common.cpp',
@@ -276,19 +286,28 @@ env.Library(
 )
 
 env.Library(
-    target='mongod_process_interface',
+    target='process_interface_standalone',
     source=[
-        'mongod_process_interface.cpp',
+        'process_interface_standalone.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/stats/top',
-        '$BUILD_DIR/mongo/s/sharding_api',
         'mongo_process_common',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
+    ],
+)
+
+env.Library(
+    target='process_interface_shardsvr',
+    source=[
+        'process_interface_shardsvr.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/sharding_api',
+        'process_interface_standalone',
     ],
 )
 
@@ -302,6 +321,16 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'mongo_process_common',
     ]
+)
+
+env.Library(
+    target="process_interface_factory_mongod",
+    source=[
+        "process_interface_factory_mongod.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        'process_interface_shardsvr',
+    ],
 )
 
 pipelineeEnv = env.Clone()

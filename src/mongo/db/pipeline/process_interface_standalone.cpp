@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/mongod_process_interface.h"
+#include "mongo/db/pipeline/process_interface_standalone.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
@@ -148,32 +148,25 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-// static
-std::shared_ptr<MongoProcessInterface> MongoDInterface::create(OperationContext* opCtx) {
-    return ShardingState::get(opCtx)->enabled()
-        ? std::make_shared<MongoDInterfaceShardServer>(opCtx)
-        : std::make_shared<MongoDInterface>(opCtx);
-}
+MongoInterfaceStandalone::MongoInterfaceStandalone(OperationContext* opCtx) : _client(opCtx) {}
 
-MongoDInterface::MongoDInterface(OperationContext* opCtx) : _client(opCtx) {}
-
-void MongoDInterface::setOperationContext(OperationContext* opCtx) {
+void MongoInterfaceStandalone::setOperationContext(OperationContext* opCtx) {
     _client.setOpCtx(opCtx);
 }
 
-DBClientBase* MongoDInterface::directClient() {
+DBClientBase* MongoInterfaceStandalone::directClient() {
     return &_client;
 }
 
-bool MongoDInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
+bool MongoInterfaceStandalone::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     auto const css = CollectionShardingState::get(opCtx, nss);
     return css->getMetadata(opCtx)->isSharded();
 }
 
-void MongoDInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             const NamespaceString& ns,
-                             std::vector<BSONObj>&& objs) {
+void MongoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const NamespaceString& ns,
+                                      std::vector<BSONObj>&& objs) {
     auto writeResults = performInserts(
         expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
 
@@ -182,12 +175,12 @@ void MongoDInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expC
     uassertStatusOKWithContext(writeResults.results.back().getStatus(), "Insert failed: ");
 }
 
-void MongoDInterface::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             const NamespaceString& ns,
-                             std::vector<BSONObj>&& queries,
-                             std::vector<BSONObj>&& updates,
-                             bool upsert,
-                             bool multi) {
+void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const NamespaceString& ns,
+                                      std::vector<BSONObj>&& queries,
+                                      std::vector<BSONObj>&& updates,
+                                      bool upsert,
+                                      bool multi) {
     auto writeResults = performUpdates(expCtx->opCtx,
                                        buildUpdateOp(ns,
                                                      std::move(queries),
@@ -201,8 +194,8 @@ void MongoDInterface::update(const boost::intrusive_ptr<ExpressionContext>& expC
     uassertStatusOKWithContext(writeResults.results.back().getStatus(), "Update failed: ");
 }
 
-CollectionIndexUsageMap MongoDInterface::getIndexStats(OperationContext* opCtx,
-                                                       const NamespaceString& ns) {
+CollectionIndexUsageMap MongoInterfaceStandalone::getIndexStats(OperationContext* opCtx,
+                                                                const NamespaceString& ns) {
     AutoGetCollectionForReadCommand autoColl(opCtx, ns);
 
     Collection* collection = autoColl.getCollection();
@@ -214,32 +207,32 @@ CollectionIndexUsageMap MongoDInterface::getIndexStats(OperationContext* opCtx,
     return collection->infoCache()->getIndexUsageStats();
 }
 
-void MongoDInterface::appendLatencyStats(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         bool includeHistograms,
-                                         BSONObjBuilder* builder) const {
+void MongoInterfaceStandalone::appendLatencyStats(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  bool includeHistograms,
+                                                  BSONObjBuilder* builder) const {
     Top::get(opCtx->getServiceContext()).appendLatencyStats(nss.ns(), includeHistograms, builder);
 }
 
-Status MongoDInterface::appendStorageStats(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           const BSONObj& param,
-                                           BSONObjBuilder* builder) const {
+Status MongoInterfaceStandalone::appendStorageStats(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const BSONObj& param,
+                                                    BSONObjBuilder* builder) const {
     return appendCollectionStorageStats(opCtx, nss, param, builder);
 }
 
-Status MongoDInterface::appendRecordCount(OperationContext* opCtx,
-                                          const NamespaceString& nss,
-                                          BSONObjBuilder* builder) const {
+Status MongoInterfaceStandalone::appendRecordCount(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   BSONObjBuilder* builder) const {
     return appendCollectionRecordCount(opCtx, nss, builder);
 }
 
-BSONObj MongoDInterface::getCollectionOptions(const NamespaceString& nss) {
+BSONObj MongoInterfaceStandalone::getCollectionOptions(const NamespaceString& nss) {
     const auto infos = _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
     return infos.empty() ? BSONObj() : infos.front().getObjectField("options").getOwned();
 }
 
-void MongoDInterface::renameIfOptionsAndIndexesHaveNotChanged(
+void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
     const BSONObj& renameCommandObj,
     const NamespaceString& targetNs,
@@ -272,7 +265,7 @@ void MongoDInterface::renameIfOptionsAndIndexesHaveNotChanged(
             _client.runCommand("admin", renameCommandObj, info));
 }
 
-StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> MongoDInterface::makePipeline(
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> MongoInterfaceStandalone::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MakePipelineOptions opts) {
@@ -294,7 +287,7 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> MongoDInterface::makePipe
     return cursorStatus.isOK() ? std::move(pipeline) : cursorStatus;
 }
 
-Status MongoDInterface::attachCursorSourceToPipeline(
+Status MongoInterfaceStandalone::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) {
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceCursor*>(pipeline->getSources().front().get()));
@@ -331,7 +324,7 @@ Status MongoDInterface::attachCursorSourceToPipeline(
     return Status::OK();
 }
 
-std::string MongoDInterface::getShardName(OperationContext* opCtx) const {
+std::string MongoInterfaceStandalone::getShardName(OperationContext* opCtx) const {
     if (ShardingState::get(opCtx)->enabled()) {
         return ShardingState::get(opCtx)->shardId().toString();
     }
@@ -339,71 +332,17 @@ std::string MongoDInterface::getShardName(OperationContext* opCtx) const {
     return std::string();
 }
 
-std::pair<std::vector<FieldPath>, bool> MongoDInterface::collectDocumentKeyFields(
+std::pair<std::vector<FieldPath>, bool> MongoInterfaceStandalone::collectDocumentKeyFields(
     OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) const {
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-        return {{"_id"}, false};  // Nothing is sharded.
-    }
-    boost::optional<UUID> uuid;
-    NamespaceString nss;
-    if (nssOrUUID.uuid()) {
-        uuid = *(nssOrUUID.uuid());
-        nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(*uuid);
-        // An empty namespace indicates that the collection has been dropped. Treat it as unsharded
-        // and mark the fields as final.
-        if (nss.isEmpty()) {
-            return {{"_id"}, true};
-        }
-    } else if (nssOrUUID.nss()) {
-        nss = *(nssOrUUID.nss());
-    }
-
-    // Before taking a collection lock to retrieve the shard key fields, consult the catalog cache
-    // to determine whether the collection is sharded in the first place.
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-
-    const bool collectionIsSharded = catalogCache && [&]() {
-        auto routingInfo = catalogCache->getCollectionRoutingInfo(opCtx, nss);
-        return routingInfo.isOK() && routingInfo.getValue().cm();
-    }();
-
-    // Collection exists and is not sharded, mark as not final.
-    if (!collectionIsSharded) {
-        return {{"_id"}, false};
-    }
-
-    auto scm = [opCtx, &nss]() -> ScopedCollectionMetadata {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
-    }();
-
-    // If the UUID is set in 'nssOrUuid', check that the UUID in the ScopedCollectionMetadata
-    // matches. Otherwise, this implies that the collection has been dropped and recreated as
-    // sharded.
-    if (!scm->isSharded() || (uuid && !scm->uuidMatches(*uuid))) {
-        return {{"_id"}, false};
-    }
-
-    // Unpack the shard key.
-    std::vector<FieldPath> result;
-    bool gotId = false;
-    for (auto& field : scm->getKeyPatternFields()) {
-        result.emplace_back(field->dottedField());
-        gotId |= (result.back().fullPath() == "_id");
-    }
-    if (!gotId) {  // If not part of the shard key, "_id" comes last.
-        result.emplace_back("_id");
-    }
-    // Collection is now sharded so the document key fields will never change, mark as final.
-    return {result, true};
+    return {{"_id"}, false};  // Nothing is sharded.
 }
 
-std::vector<GenericCursor> MongoDInterface::getIdleCursors(
+std::vector<GenericCursor> MongoInterfaceStandalone::getIdleCursors(
     const intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
     return CursorManager::getIdleCursors(expCtx->opCtx, userMode);
 }
 
-boost::optional<Document> MongoDInterface::lookupSingleDocument(
+boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,
@@ -438,7 +377,7 @@ boost::optional<Document> MongoDInterface::lookupSingleDocument(
     return lookedUpDocument;
 }
 
-BackupCursorState MongoDInterface::openBackupCursor(OperationContext* opCtx) {
+BackupCursorState MongoInterfaceStandalone::openBackupCursor(OperationContext* opCtx) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
         return backupCursorHooks->openBackupCursor(opCtx);
@@ -447,7 +386,7 @@ BackupCursorState MongoDInterface::openBackupCursor(OperationContext* opCtx) {
     }
 }
 
-void MongoDInterface::closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) {
+void MongoInterfaceStandalone::closeBackupCursor(OperationContext* opCtx, std::uint64_t cursorId) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
         backupCursorHooks->closeBackupCursor(opCtx, cursorId);
@@ -456,7 +395,7 @@ void MongoDInterface::closeBackupCursor(OperationContext* opCtx, std::uint64_t c
     }
 }
 
-std::vector<BSONObj> MongoDInterface::getMatchingPlanCacheEntryStats(
+std::vector<BSONObj> MongoInterfaceStandalone::getMatchingPlanCacheEntryStats(
     OperationContext* opCtx, const NamespaceString& nss, const MatchExpression* matchExp) const {
     const auto serializer = [](const PlanCacheEntry& entry) {
         BSONObjBuilder out;
@@ -481,7 +420,7 @@ std::vector<BSONObj> MongoDInterface::getMatchingPlanCacheEntryStats(
     return planCache->getMatchingStats(serializer, predicate);
 }
 
-bool MongoDInterface::uniqueKeyIsSupportedByIndex(
+bool MongoInterfaceStandalone::uniqueKeyIsSupportedByIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const std::set<FieldPath>& uniqueKeyPaths) const {
@@ -509,9 +448,8 @@ bool MongoDInterface::uniqueKeyIsSupportedByIndex(
     return false;
 }
 
-BSONObj MongoDInterface::_reportCurrentOpForClient(OperationContext* opCtx,
-                                                   Client* client,
-                                                   CurrentOpTruncateMode truncateOps) const {
+BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
+    OperationContext* opCtx, Client* client, CurrentOpTruncateMode truncateOps) const {
     BSONObjBuilder builder;
 
     CurOp::reportCurrentOpForClient(
@@ -534,9 +472,9 @@ BSONObj MongoDInterface::_reportCurrentOpForClient(OperationContext* opCtx,
     return builder.obj();
 }
 
-void MongoDInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
-                                                       CurrentOpUserMode userMode,
-                                                       std::vector<BSONObj>* ops) const {
+void MongoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                                                CurrentOpUserMode userMode,
+                                                                std::vector<BSONObj>* ops) const {
     auto sessionCatalog = SessionCatalog::get(opCtx);
 
     const bool authEnabled =
@@ -562,7 +500,7 @@ void MongoDInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
         });
 }
 
-std::unique_ptr<CollatorInterface> MongoDInterface::_getCollectionDefaultCollator(
+std::unique_ptr<CollatorInterface> MongoInterfaceStandalone::_getCollectionDefaultCollator(
     OperationContext* opCtx, StringData dbName, UUID collectionUUID) {
     auto it = _collatorCache.find(collectionUUID);
     if (it == _collatorCache.end()) {
@@ -584,42 +522,6 @@ std::unique_ptr<CollatorInterface> MongoDInterface::_getCollectionDefaultCollato
 
     auto& collator = it->second;
     return collator ? collator->clone() : nullptr;
-}
-
-void MongoDInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        const NamespaceString& ns,
-                                        std::vector<BSONObj>&& objs) {
-    BatchedCommandResponse response;
-    BatchWriteExecStats stats;
-
-    ClusterWriter::write(
-        expCtx->opCtx,
-        BatchedCommandRequest(buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation)),
-        &stats,
-        &response);
-    // TODO SERVER-35403: Add more context for which shard produced the error.
-    uassertStatusOKWithContext(response.toStatus(), "Insert failed: ");
-}
-
-void MongoDInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        const NamespaceString& ns,
-                                        std::vector<BSONObj>&& queries,
-                                        std::vector<BSONObj>&& updates,
-                                        bool upsert,
-                                        bool multi) {
-    BatchedCommandResponse response;
-    BatchWriteExecStats stats;
-    ClusterWriter::write(expCtx->opCtx,
-                         BatchedCommandRequest(buildUpdateOp(ns,
-                                                             std::move(queries),
-                                                             std::move(updates),
-                                                             upsert,
-                                                             multi,
-                                                             expCtx->bypassDocumentValidation)),
-                         &stats,
-                         &response);
-    // TODO SERVER-35403: Add more context for which shard produced the error.
-    uassertStatusOKWithContext(response.toStatus(), "Update failed: ");
 }
 
 }  // namespace mongo
