@@ -200,10 +200,11 @@
     // bring B back in contact with A
     // as A is primary, B will roll back and then catch up
     replTest.restart(1);
-    authutil.asCluster(replTest.nodes, 'jstests/libs/key1', function() {
-        replTest.awaitReplication();
-    });
-    assert.soon(function() {
+    assert.soonNoExcept(function() {
+        authutil.asCluster(replTest.nodes, 'jstests/libs/key1', function() {
+            replTest.awaitReplication();
+        });
+
         return b.auth('spencer', 'pwd');
     });
     // Now both A and B should agree
