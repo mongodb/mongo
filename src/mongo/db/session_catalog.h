@@ -163,6 +163,10 @@ private:
      */
     void _releaseSession(const LogicalSessionId& lsid);
 
+    bool _isSessionCheckoutAllowed() const {
+        return _preventSessionCheckoutRequests == 0;
+    };
+
     // Protects members below.
     stdx::mutex _mutex;
 
@@ -172,8 +176,8 @@ private:
     // Count of the number of Sessions that are currently checked out.
     uint32_t _numCheckedOutSessions{0};
 
-    // Set to false to cause all Session checkout or creation requests to block.
-    bool _allowCheckingOutSessions{true};
+    // When >0 all Session checkout or creation requests will block.
+    uint32_t _preventSessionCheckoutRequests{0};
 
     // Condition that is signaled when the number of checked out sessions goes to 0.
     stdx::condition_variable _allSessionsCheckedInCond;

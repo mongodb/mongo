@@ -128,7 +128,7 @@ ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx)
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
-    while (!_allowCheckingOutSessions) {
+    while (!_isSessionCheckoutAllowed()) {
         opCtx->waitForConditionOrInterrupt(_checkingOutSessionsAllowedCond, ul);
     }
 
@@ -220,7 +220,7 @@ void SessionCatalog::scanSessions(OperationContext* opCtx,
 std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getOrCreateSessionRuntimeInfo(
     WithLock, OperationContext* opCtx, const LogicalSessionId& lsid) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-    invariant(_allowCheckingOutSessions);
+    invariant(_isSessionCheckoutAllowed());
 
     auto it = _sessions.find(lsid);
     if (it == _sessions.end()) {
@@ -253,23 +253,24 @@ SessionCatalog::PreventCheckingOutSessionsBlock::PreventCheckingOutSessionsBlock
     invariant(sessionCatalog);
 
     stdx::lock_guard<stdx::mutex> lg(sessionCatalog->_mutex);
-    invariant(sessionCatalog->_allowCheckingOutSessions);
-    sessionCatalog->_allowCheckingOutSessions = false;
+    ++sessionCatalog->_preventSessionCheckoutRequests;
 }
 
 SessionCatalog::PreventCheckingOutSessionsBlock::~PreventCheckingOutSessionsBlock() {
     stdx::lock_guard<stdx::mutex> lg(_sessionCatalog->_mutex);
 
-    invariant(!_sessionCatalog->_allowCheckingOutSessions);
-    _sessionCatalog->_allowCheckingOutSessions = true;
-    _sessionCatalog->_checkingOutSessionsAllowedCond.notify_all();
+    invariant(_sessionCatalog->_preventSessionCheckoutRequests > 0);
+    --_sessionCatalog->_preventSessionCheckoutRequests;
+    if (_sessionCatalog->_preventSessionCheckoutRequests == 0) {
+        _sessionCatalog->_checkingOutSessionsAllowedCond.notify_all();
+    }
 }
 
 void SessionCatalog::PreventCheckingOutSessionsBlock::waitForAllSessionsToBeCheckedIn(
     OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> ul(_sessionCatalog->_mutex);
 
-    invariant(!_sessionCatalog->_allowCheckingOutSessions);
+    invariant(!_sessionCatalog->_isSessionCheckoutAllowed());
     while (_sessionCatalog->_numCheckedOutSessions > 0) {
         opCtx->waitForConditionOrInterrupt(_sessionCatalog->_allSessionsCheckedInCond, ul);
     }

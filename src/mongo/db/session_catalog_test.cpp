@@ -276,5 +276,39 @@ TEST_F(SessionCatalogTest, WaitForAllSessions) {
     future.get();
 }
 
+TEST_F(SessionCatalogTest, MultiplePreventCheckingOutSessionsBlocks) {
+    const auto lsid1 = makeLogicalSessionIdForTest();
+    opCtx()->setLogicalSessionId(lsid1);
+    opCtx()->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+
+    boost::optional<OperationContextSession> ocs;
+
+    // Prevent new Sessions from being checked out.
+    boost::optional<SessionCatalog::PreventCheckingOutSessionsBlock> preventCheckoutBlock1,
+        preventCheckoutBlock2;
+    preventCheckoutBlock1.emplace(catalog());
+
+    // Ensure that checking out a Session fails
+    ASSERT_THROWS_CODE(
+        ocs.emplace(opCtx(), true), AssertionException, ErrorCodes::MaxTimeMSExpired);
+
+    // A second request to prevent checking out Sessions is legal.
+    preventCheckoutBlock2.emplace(catalog());
+    ASSERT_THROWS_CODE(
+        ocs.emplace(opCtx(), true), AssertionException, ErrorCodes::MaxTimeMSExpired);
+
+    // The first request completing before the second is valid and doesn't start allowing checkouts.
+    preventCheckoutBlock1.reset();
+    ASSERT_THROWS_CODE(
+        ocs.emplace(opCtx(), true), AssertionException, ErrorCodes::MaxTimeMSExpired);
+
+    // Releasing the last PreventCheckingOutSessionsBlock allows Session checkout to proceed.
+    preventCheckoutBlock2.reset();
+
+    ASSERT_TRUE(ocs == boost::none);
+    ocs.emplace(opCtx(), true);
+    ASSERT_EQ(lsid1, ocs->get(opCtx())->getSessionId());
+}
+
 }  // namespace
 }  // namespace mongo
