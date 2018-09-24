@@ -573,6 +573,70 @@ TEST_F(QueryPlannerAllPathsTest, InBasic) {
         "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true],[2,2,true,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerAllPathsTest, EqualsEmptyArray) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: []}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: "
+        "[[undefined,undefined,true,true],[[],[],true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, EqualsNonEmptyArray) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: [1]}"));
+
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerAllPathsTest, EqualsNestedEmptyArray) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: [[]]}"));
+
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerAllPathsTest, EqualsArrayWithValue) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: [[1]]}"));
+
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerAllPathsTest, InEmptyArray) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$in: [[]]}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'$_path': 1, a: 1},"
+        "bounds: {'$_path': [['a','a',true,true]], a: "
+        "[[undefined,undefined,true,true],[[],[],true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerAllPathsTest, InNonEmptyArray) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$in: [[1]]}}"));
+
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerAllPathsTest, InNestedEmptyArray) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$in: [[[]]]}}"));
+
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerAllPathsTest, InArrayWithValue) {
+    addAllPathsIndex(BSON("$**" << 1));
+    runQuery(fromjson("{a: {$in: [[[1]]]}}"));
+
+    assertHasOnlyCollscan();
+}
+
 // Logically equivalent to the preceding $in query.
 // Indexed solution should be the same.
 TEST_F(QueryPlannerAllPathsTest, InBasicOrEquivalent) {

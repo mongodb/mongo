@@ -73,6 +73,7 @@
         {expression: {$ne: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
         // In principle we could have tighter bounds for this. See SERVER-36765.
         {expression: {$eq: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
+        {expression: {$eq: []}, bounds: ['[undefined, undefined]', '[[], []]']}
     ];
 
     // Given a keyPattern and (optional) pathProjection, this function builds a $** index on the
