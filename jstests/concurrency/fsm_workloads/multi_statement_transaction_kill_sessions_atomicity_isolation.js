@@ -39,7 +39,8 @@ var $config = extendWorkload($config, ($config, $super) => {
                 res = db.runCommand({killSessions: [{id: sessionUUID}]});
                 assertAlways.commandWorked(res);
             } catch (e) {
-                if (e.code == ErrorCodes.Interrupted || e.code == ErrorCodes.CursorKilled) {
+                if (e.code == ErrorCodes.Interrupted || e.code == ErrorCodes.CursorKilled ||
+                    e.code == ErrorCodes.CursorNotFound) {
                     // This session was killed when running either listSessions or killSesssions.
                     // We should retry.
                     ourSessionWasKilled = true;

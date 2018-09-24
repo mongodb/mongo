@@ -67,7 +67,8 @@ var {withTxnAndAutoRetry} = (function() {
                 if ((e.hasOwnProperty('errorLabels') &&
                      e.errorLabels.includes('TransientTransactionError')) ||
                     (retryOnKilledSession &&
-                     (e.code === ErrorCodes.Interrupted || e.code === ErrorCodes.CursorKilled))) {
+                     (e.code === ErrorCodes.Interrupted || e.code === ErrorCodes.CursorKilled ||
+                      e.code == ErrorCodes.CursorNotFound))) {
                     hasTransientError = true;
                     continue;
                 }
