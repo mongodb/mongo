@@ -28,7 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_merge_cursors.h"
+#include "mongo/s/query/document_source_merge_cursors.h"
+
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/executor/task_executor_pool.h"

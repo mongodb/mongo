@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {

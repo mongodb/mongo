@@ -64,15 +64,17 @@ env.Library(
 env.Library(
     target="router_exec_stage",
     source=[
-        "router_stage_limit.cpp",
-        "router_stage_mock.cpp",
-        "router_stage_pipeline.cpp",
-        "router_stage_remove_metadata_fields.cpp",
-        "router_stage_skip.cpp",
+        'document_source_merge_cursors.cpp',
+        'document_source_update_on_add_shard.cpp',
+        'router_stage_limit.cpp',
+        'router_stage_mock.cpp',
+        'router_stage_pipeline.cpp',
+        'router_stage_remove_metadata_fields.cpp',
+        'router_stage_skip.cpp',
     ],
     LIBDEPS=[
-        "async_results_merger",
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        'async_results_merger',
     ],
 )
 

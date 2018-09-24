@@ -31,8 +31,8 @@
 #include "mongo/s/query/router_exec_stage.h"
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/s/query/document_source_merge_cursors.h"
 
 namespace mongo {
 

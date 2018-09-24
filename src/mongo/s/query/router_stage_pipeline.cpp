@@ -33,8 +33,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
-#include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/s/query/document_source_merge_cursors.h"
 
 namespace mongo {
 

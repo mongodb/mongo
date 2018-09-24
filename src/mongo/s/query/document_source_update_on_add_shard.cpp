@@ -26,7 +26,7 @@
  * then also delete it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_update_on_add_shard.h"
+#include "mongo/s/query/document_source_update_on_add_shard.h"
 
 #include <algorithm>
 

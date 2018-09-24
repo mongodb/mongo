@@ -640,6 +640,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/stats/fill_locker_info',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/s/async_requests_sender',
+        '$BUILD_DIR/mongo/s/grid',
         'catalog/collection',
         'catalog/database',
         'catalog/database_holder',
