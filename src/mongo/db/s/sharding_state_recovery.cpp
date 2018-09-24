@@ -218,9 +218,9 @@ void ShardingStateRecovery::endMetadataOp(OperationContext* opCtx) {
 }
 
 Status ShardingStateRecovery::recover(OperationContext* opCtx) {
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-        return Status::OK();
-    }
+    Grid* const grid = Grid::get(opCtx);
+    ShardingState* const shardingState = ShardingState::get(opCtx);
+    invariant(shardingState->enabled());
 
     BSONObj recoveryDocBSON;
 
@@ -241,10 +241,6 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
     const auto recoveryDoc = std::move(recoveryDocStatus.getValue());
 
     log() << "Sharding state recovery process found document " << redact(recoveryDoc.toBSON());
-
-    Grid* const grid = Grid::get(opCtx);
-    ShardingState* const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->enabled());
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
         // Treat the minOpTime as up-to-date

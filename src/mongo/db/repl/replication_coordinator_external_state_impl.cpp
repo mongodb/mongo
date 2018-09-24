@@ -686,7 +686,6 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         Balancer::get(_service)->interruptBalancer();
     } else if (ShardingState::get(_service)->enabled()) {
-        invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
         ChunkSplitter::get(_service).onStepDown();
         CatalogCacheLoader::get(_service).onStepDown();
         PeriodicBalancerConfigRefresher::get(_service).onStepDown();
@@ -706,24 +705,16 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
 
 void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook(
     OperationContext* opCtx) {
-    auto status = ShardingStateRecovery::recover(opCtx);
-
-    if (ErrorCodes::isShutdownError(status.code())) {
-        // Note: callers of this method don't expect exceptions, so throw only unexpected fatal
-        // errors.
-        return;
-    }
-
-    fassert(40107, status);
-
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
+        Status status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
         if (!status.isOK() && status != ErrorCodes::AlreadyInitialized) {
-            if (ErrorCodes::isShutdownError(status.code())) {
-                // Don't fassert if we're mid-shutdown, let the shutdown happen gracefully.
+            // If the node is shutting down or it lost quorum just as it was becoming primary, don't
+            // run the sharding onStepUp machinery. The onStepDown counterpart to these methods is
+            // already idempotent, so the machinery will remain in the stepped down state.
+            if (ErrorCodes::isShutdownError(status.code()) ||
+                ErrorCodes::isNotMasterError(status.code())) {
                 return;
             }
-
             fassertFailedWithStatus(
                 40184,
                 status.withContext("Failed to initialize config database on config server's "
@@ -735,17 +726,16 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             // readConcern in drain mode because the global lock prevents replication. This is
             // safe, since if the clusterId write is rolled back, any writes that depend on it will
             // also be rolled back.
-            // Since we *just* wrote the cluster ID to the config.version document (via
-            // ShardingCatalogManager::initializeConfigDatabaseIfNeeded), this should always
-            // succeed.
+            //
+            // Since we *just* wrote the cluster ID to the config.version document (via the call to
+            // ShardingCatalogManager::initializeConfigDatabaseIfNeeded above), this read can only
+            // meaningfully fail if the node is shutting down.
             status = ClusterIdentityLoader::get(opCtx)->loadClusterId(
                 opCtx, repl::ReadConcernLevel::kLocalReadConcern);
 
             if (ErrorCodes::isShutdownError(status.code())) {
-                // Don't fassert if we're mid-shutdown, let the shutdown happen gracefully.
                 return;
             }
-
             fassert(40217, status);
         }
 
@@ -760,11 +750,20 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             validator->enableKeyGenerator(opCtx, true);
         }
     } else if (ShardingState::get(opCtx)->enabled()) {
-        invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+        Status status = ShardingStateRecovery::recover(opCtx);
+
+        // If the node is shutting down or it lost quorum just as it was becoming primary, don't run
+        // the sharding onStepUp machinery. The onStepDown counterpart to these methods is already
+        // idempotent, so the machinery will remain in the stepped down state.
+        if (ErrorCodes::isShutdownError(status.code()) ||
+            ErrorCodes::isNotMasterError(status.code())) {
+            return;
+        }
+        fassert(40107, status);
 
         const auto configsvrConnStr =
             Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
-        auto status = ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(
+        status = ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(
             opCtx, configsvrConnStr);
         if (!status.isOK()) {
             warning() << "error encountered while trying to update config connection string to "
