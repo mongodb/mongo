@@ -12,7 +12,7 @@ var $config = (function() {
 
     const states = {
         init: function init(db, collName) {
-            let session = db.getMongo().startSession({causalConsistency: false});
+            let session = db.getMongo().startSession({causalConsistency: true});
             // Store the session ID in the database so any unterminated transactions can be aborted
             // at teardown.
             insertSessionDoc(db, collName, this.tid, session.getSessionId().id);

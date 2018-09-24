@@ -17,7 +17,7 @@ var $config = (function() {
 
     const states = {
         init: function init(db, collName) {
-            this.session = db.getMongo().startSession({causalConsistency: false});
+            this.session = db.getMongo().startSession({causalConsistency: true});
             this.sessionDb = this.session.getDatabase(db.getName());
             this.txnNumber = 0;
             this.stmtId = 0;

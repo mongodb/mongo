@@ -30,7 +30,7 @@ var $config = (function() {
         }
 
         function init(db, collName) {
-            this.session = db.getMongo().startSession({causalConsistency: false});
+            this.session = db.getMongo().startSession({causalConsistency: true});
         }
 
         function checkMoneyBalance(db, collName) {

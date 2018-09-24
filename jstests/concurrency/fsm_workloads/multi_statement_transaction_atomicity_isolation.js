@@ -35,14 +35,21 @@
  *   (b) transaction C's (tid, txnNumber, numToUpdate) element doesn't appear numToUpdate times
  *       across a consistent snapshot of all of the documents. This would suggest that the database
  *       failed to atomically update all documents modified in a concurrent transaction.
+ *   (c) transaction D's (tid, txnNumber) for a given (docId, dbName, collName) doesn't match the
+ *       (tid, txnNumber) for the thread with threadId == tid. This indicates that there are writes
+ *       that exist in the database that were not committed.
  *
  * @tags: [uses_transactions]
  */
 
-load('jstests/libs/cycle_detection.js');  // for Graph
+// for Graph
+load('jstests/libs/cycle_detection.js');
 
 // For withTxnAndAutoRetry.
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
+
+// For arrayEq.
+load("jstests/aggregation/extras/utils.js");
 
 var $config = (function() {
 
@@ -97,6 +104,41 @@ var $config = (function() {
         }
     }
 
+    // Check that only writes that were committed are reflected in the database. Writes that were
+    // committed are reflected in $config.data.updatedDocsClientHistory.
+    function checkWritesOfCommittedTxns(data, documents) {
+        // updatedDocsServerHistory is a dictionary of {txnNum: [list of {docId, dbName, collName}]}
+        // that were updated by this thread (this.tid) and exist in the database.
+        let updatedDocsServerHistory = [];
+        for (let doc of documents) {
+            for (let i = 0; i < doc.order.length; i++) {
+                // Pull out only those docIds and txnNums that were updated by this thread.
+                if (doc.order[i].tid === data.tid) {
+                    const txnNum = doc.metadata[i].txnNum;
+                    updatedDocsServerHistory[txnNum] = updatedDocsServerHistory[txnNum] || [];
+                    updatedDocsServerHistory[txnNum].push({
+                        _id: doc._id,
+                        dbName: doc.metadata[i].dbName,
+                        collName: doc.metadata[i].collName
+                    });
+                }
+            }
+        }
+
+        // Assert that any transaction written down in $config.data also exists in the database
+        // and that the docIds associated with this txnNum in $config.data match those docIds
+        // associated with this txnNum in the database.
+        const highestTxnNum =
+            Math.max(updatedDocsServerHistory.length, data.updatedDocsClientHistory.length);
+        for (let txnNum = 0; txnNum < highestTxnNum; ++txnNum) {
+            assertAlways((arrayEq(updatedDocsServerHistory[txnNum] || [],
+                                  data.updatedDocsClientHistory[txnNum] || [])),
+                         () => 'expected ' + tojson(data.updatedDocsClientHistory[txnNum]) +
+                             ' but instead have ' + tojson(updatedDocsServerHistory[txnNum]) +
+                             ' for txnNumber ' + txnNum);
+        }
+    }
+
     // Overridable functions for subclasses to do more complex transactions.
     const getAllCollections = (db, collName) => [db.getCollection(collName)];
 
@@ -144,19 +186,28 @@ var $config = (function() {
         return {
             init: function init(db, collName) {
                 this.iteration = 0;
-                this.session = db.getMongo().startSession({causalConsistency: false});
+                // Set causalConsistency = true to ensure that in the checkConsistency state
+                // function, we will be able to read our own writes that were committed as a
+                // part of the update state function.
+                this.session = db.getMongo().startSession({causalConsistency: true});
                 this.collections = this.getAllCollections(db, collName);
+                this.totalIteration = 1;
             },
 
             update: function update(db, collName) {
                 const docIds = this.getDocIdsToUpdate(this.numDocs);
+                let committedTxnInfo;
+                let txnNumber;
 
                 withTxnAndAutoRetry(this.session, () => {
+                    committedTxnInfo = [];
                     for (let [i, docId] of docIds.entries()) {
                         const collection =
                             this.collections[Random.randInt(this.collections.length)];
                         const txnDbName = collection.getDB().getName();
                         const txnCollName = collection.getName();
+                        txnNumber = this.session.getTxnNumber_forTesting();
+
                         // We apply the following update to each of the 'docIds' documents
                         // to record the number of times we expect to see the transaction
                         // being run in this execution of the update() state function by this
@@ -173,6 +224,7 @@ var $config = (function() {
                                 metadata: {
                                     dbName: txnDbName,
                                     collName: txnCollName,
+                                    txnNum: txnNumber,
                                 }
                             }
                         };
@@ -186,9 +238,12 @@ var $config = (function() {
                         assertAlways.commandWorked(res);
                         assertWhenOwnColl.eq(res.n, 1, () => tojson(res));
                         assertWhenOwnColl.eq(res.nModified, 1, () => tojson(res));
+                        committedTxnInfo.push(
+                            {_id: docId, dbName: txnDbName, collName: txnCollName});
                     }
                 }, {retryOnKilledSession: this.retryOnKilledSession});
 
+                this.updatedDocsClientHistory[txnNumber] = committedTxnInfo;
                 ++this.iteration;
             },
 
@@ -196,9 +251,35 @@ var $config = (function() {
                 const documents = this.getAllDocuments(db, collName, this.numDocs, {useTxn: true});
                 checkTransactionCommitOrder(documents);
                 checkNumUpdatedByEachTransaction(documents);
+                checkWritesOfCommittedTxns(this, documents);
             }
         };
     })();
+
+    /**
+     * This function wraps the state functions and causes each thread to run checkConsistency()
+     * before
+     * teardown.
+     */
+    function checkConsistencyOnLastIteration(data, func, checkConsistencyFunc) {
+        let lastIteration = ++data.totalIteration >= data.iterations;
+
+        func();
+        if (lastIteration) {
+            checkConsistencyFunc();
+        }
+    }
+
+    // Wrap each state in a checkConsistencyOnLastIteration() invocation.
+    for (let stateName of Object.keys(states)) {
+        const stateFn = states[stateName];
+        const checkConsistencyFn = states['checkConsistency'];
+        states[stateName] = function(db, collName) {
+            checkConsistencyOnLastIteration(this,
+                                            () => stateFn.apply(this, arguments),
+                                            () => checkConsistencyFn.apply(this, arguments));
+        };
+    }
 
     const transitions = {
         init: {update: 0.9, checkConsistency: 0.1},
@@ -239,6 +320,7 @@ var $config = (function() {
             getDocIdsToUpdate,
             numDocs: 10,
             retryOnKilledSession: false,
+            updatedDocsClientHistory: [],
         },
         setup: setup,
         teardown: teardown,

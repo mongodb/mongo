@@ -20,7 +20,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.states.init = function init(db, collName) {
         const lsid = eval(`(${this.lsid})`);
-        this.session = db.getMongo().startSession({causalConsistency: false});
+        this.session = db.getMongo().startSession({causalConsistency: true});
         // Force the session to use `lsid` for its session id. This way all threads will use
         // the same session.
         this.session._serverSession.handle.getId = () => lsid;
