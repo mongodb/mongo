@@ -4,6 +4,9 @@
 //     assumes_unsharded_collection,
 //     requires_fastcount,
 //     requires_collstats,
+//     # rollbacks make WT RecordStore dataSize go out of sync, which negatively impacts the
+//     # splitVector calculations.
+//     does_not_support_stepdowns,
 //
 //     # splitVector command is not available on embedded
 //     incompatible_with_embedded,
