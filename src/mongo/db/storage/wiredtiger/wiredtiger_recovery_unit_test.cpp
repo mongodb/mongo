@@ -529,5 +529,54 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnAbor
     ASSERT(!commitTs);
 }
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
+    auto opCtx = clientAndCtx1.second.get();
+    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+
+    std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.read_once"));
+    auto uri = rs->getIdent();
+
+    // Insert a record.
+    ru->beginUnitOfWork(opCtx);
+    StatusWith<RecordId> s = rs->insertRecord(opCtx, "data", 4, Timestamp());
+    ASSERT_TRUE(s.isOK());
+    ASSERT_EQUALS(1, rs->numRecords(NULL));
+    ru->commitUnitOfWork();
+
+    // Test 1: A normal read should create a new cursor and release it into the session cache.
+
+    // Close all cached cursors to establish a 'before' state.
+    ru->getSession()->closeAllCursors(uri);
+    int cachedCursorsBefore = ru->getSession()->cachedCursors();
+
+    RecordData rd;
+    ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
+
+    // A cursor should have been checked out and released into the cache.
+    ASSERT_GT(ru->getSession()->cachedCursors(), cachedCursorsBefore);
+    // All opened cursors are returned.
+    ASSERT_EQ(0, ru->getSession()->cursorsOut());
+
+    ru->abandonSnapshot();
+
+    // Test 2: A read-once operation should create a new cursor and immediately close it when done.
+
+    ru->setReadOnce(true);
+
+    // Close any cached cursors to establish a new 'before' state.
+    ru->getSession()->closeAllCursors(uri);
+    cachedCursorsBefore = ru->getSession()->cachedCursors();
+
+    // The subsequent read operation will use a read_once cursor, which will not be from the cache,
+    // and will not be released into the cache.
+    ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
+
+    // No new cursors should have been released into the cache.
+    ASSERT_EQ(ru->getSession()->cachedCursors(), cachedCursorsBefore);
+    // All opened cursors are closed.
+    ASSERT_EQ(0, ru->getSession()->cursorsOut());
+
+    ASSERT(ru->getReadOnce());
+}
 }  // namespace
 }  // namespace mongo

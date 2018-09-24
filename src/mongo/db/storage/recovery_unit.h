@@ -294,6 +294,18 @@ public:
     };
 
     /**
+     * Sets whether this operation intends to perform reads that do not need to keep data in the
+     * storage engine cache. This can be useful for operations that do large, one-time scans of
+     * data, and will attempt to keep higher-priority data from being evicted from the cache. This
+     * may not be called in an active transaction.
+     */
+    virtual void setReadOnce(bool readOnce){};
+
+    virtual bool getReadOnce() const {
+        return false;
+    };
+
+    /**
      * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
      * change is either rollback()'d or commit()'d when the WriteUnitOfWork goes out of scope.
      *

@@ -110,7 +110,29 @@ WiredTigerSession::~WiredTigerSession() {
     }
 }
 
-WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, bool forRecordStore) {
+namespace {
+void _openCursor(WT_SESSION* session,
+                 const std::string& uri,
+                 const char* config,
+                 WT_CURSOR** cursorOut) {
+    int ret = session->open_cursor(session, uri.c_str(), NULL, config, cursorOut);
+    if (ret == EBUSY) {
+        // This can only happen when trying to open a cursor on the oplog and it is currently locked
+        // by a verify or salvage, because we don't employ database locks to protect the oplog.
+        throw WriteConflictException();
+    }
+    if (ret != 0) {
+        error() << "Failed to open a WiredTiger cursor. Reason: " << wtRCToStatus(ret)
+                << ", uri: " << uri << ", config: " << config;
+        error() << "This may be due to data corruption. " << kWTRepairMsg;
+
+        fassertFailedNoTrace(50882);
+    }
+}
+}  // namespace
+
+
+WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, bool allowOverwrite) {
     // Find the most recently used cursor
     for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
         if (i->_id == id) {
@@ -121,22 +143,19 @@ WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, boo
         }
     }
 
-    WT_CURSOR* c = NULL;
-    int ret = _session->open_cursor(
-        _session, uri.c_str(), NULL, forRecordStore ? "" : "overwrite=false", &c);
-    if (ret == EBUSY) {
-        // This can only happen when trying to open a cursor on the oplog and it is currently locked
-        // by a verify or salvage, because we don't employ database locks to protect the oplog.
-        throw WriteConflictException();
-    }
-    if (ret != 0) {
-        error() << "Failed to open a WiredTiger cursor: " << uri;
-        error() << "This may be due to data corruption. " << kWTRepairMsg;
-
-        fassertFailedNoTrace(50882);
-    }
+    WT_CURSOR* cursor = NULL;
+    _openCursor(_session, uri, allowOverwrite ? "" : "overwrite=false", &cursor);
     _cursorsOut++;
-    return c;
+    return cursor;
+}
+
+WT_CURSOR* WiredTigerSession::getReadOnceCursor(const std::string& uri, bool allowOverwrite) {
+    const char* config = allowOverwrite ? "read_once=true" : "read_once=true,overwrite=false";
+
+    WT_CURSOR* cursor = NULL;
+    _openCursor(_session, uri, config, &cursor);
+    _cursorsOut++;
+    return cursor;
 }
 
 void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
@@ -157,6 +176,14 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
         _cursors.pop_back();
         invariantWTOK(cursor->close(cursor));
     }
+}
+
+void WiredTigerSession::closeCursor(WT_CURSOR* cursor) {
+    invariant(_session);
+    invariant(cursor);
+    _cursorsOut--;
+
+    invariantWTOK(cursor->close(cursor));
 }
 
 void WiredTigerSession::closeAllCursors(const std::string& uri) {

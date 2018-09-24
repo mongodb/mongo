@@ -106,6 +106,15 @@ public:
         _orderedCommit = orderedCommit;
     }
 
+    void setReadOnce(bool readOnce) override {
+        invariant(!_active);
+        _readOnce = readOnce;
+    };
+
+    bool getReadOnce() const override {
+        return _readOnce;
+    };
+
     // ---- WT STUFF
 
     WiredTigerSession* getSession();
@@ -169,6 +178,9 @@ private:
     // new optime, and thus always call oplogDiskLocRegister() on the record store.
     bool _orderedCommit = true;
 
+    // When 'true', data read from disk should not be kept in the storage engine cache.
+    bool _readOnce = false;
+
     // Ignoring prepared transactions will not return prepare conflicts and allow seeing prepared,
     // but uncommitted data.
     WiredTigerBeginTxnBlock::IgnorePrepared _ignorePrepared{
@@ -183,44 +195,5 @@ private:
     bool _isOplogReader = false;
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
-};
-
-/**
- * This is a smart pointer that wraps a WT_CURSOR and knows how to obtain and get from pool.
- */
-class WiredTigerCursor {
-public:
-    WiredTigerCursor(const std::string& uri,
-                     uint64_t tableID,
-                     bool forRecordStore,
-                     OperationContext* opCtx);
-
-    ~WiredTigerCursor();
-
-
-    WT_CURSOR* get() const {
-        // TODO(SERVER-16816): assertInActiveTxn();
-        return _cursor;
-    }
-
-    WT_CURSOR* operator->() const {
-        return get();
-    }
-
-    WiredTigerSession* getSession() {
-        return _session;
-    }
-
-    void reset();
-
-    void assertInActiveTxn() const {
-        _ru->assertInActiveTxn();
-    }
-
-private:
-    uint64_t _tableID;
-    WiredTigerRecoveryUnit* _ru;  // not owned
-    WiredTigerSession* _session;
-    WT_CURSOR* _cursor;  // owned, but pulled
 };
 }

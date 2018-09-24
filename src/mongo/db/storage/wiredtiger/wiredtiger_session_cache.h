@@ -92,9 +92,37 @@ public:
         return _session;
     }
 
-    WT_CURSOR* getCursor(const std::string& uri, uint64_t id, bool forRecordStore);
+    /**
+     * Get a cursor on the table id 'id'. If 'allowOverwrite' is true, insert operations will not
+     * return an error if the record already exists, and update/remove operations will not return
+     * error if the record does not exist.
+     *
+     * This may return a cursor from the cursor cache and these cursors should *always* be released
+     * into the cache by calling releaseCursor().
+     */
+    WT_CURSOR* getCursor(const std::string& uri, uint64_t id, bool allowOverwrite);
 
+    /**
+     * Get a cursor with the 'read_once=true' configuration. This is intended for operations that
+     * will be sequentially scanning large amounts of data. If 'allowOverwrite' is true, insert
+     * operations will not return an error if the record already exists, and update/remove
+     * operations will not return error if the record does not exist.
+     *
+     * This will never return a cursor from the cursor cache, and these cursors should *never* be
+     * released into the cache by calling releaseCursor(). Use closeCursor() instead.
+     */
+    WT_CURSOR* getReadOnceCursor(const std::string& uri, bool allowOverwrite);
+
+    /**
+     * Release a cursor into the cursor cache and close old cursors if the number of cursors in the
+     * cache exceeds kWiredTigerCursorCacheSize.
+     */
     void releaseCursor(uint64_t id, WT_CURSOR* cursor);
+
+    /**
+     * Close a cursor without releasing it into the cursor cache.
+     */
+    void closeCursor(WT_CURSOR* cursor);
 
     void closeCursorsForQueuedDrops(WiredTigerKVEngine* engine);
 
@@ -106,6 +134,10 @@ public:
 
     int cursorsOut() const {
         return _cursorsOut;
+    }
+
+    int cachedCursors() const {
+        return _cursors.size();
     }
 
     bool isDropQueuedIdentsAtSessionEndAllowed() const {

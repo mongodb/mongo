@@ -72,6 +72,7 @@
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"

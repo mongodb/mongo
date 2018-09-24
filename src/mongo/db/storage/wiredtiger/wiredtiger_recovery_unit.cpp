@@ -547,25 +547,4 @@ void WiredTigerRecoveryUnit::beginIdle() {
         _session->closeAllCursors("");
     }
 }
-
-// ---------------------
-
-WiredTigerCursor::WiredTigerCursor(const std::string& uri,
-                                   uint64_t tableId,
-                                   bool forRecordStore,
-                                   OperationContext* opCtx) {
-    _tableID = tableId;
-    _ru = WiredTigerRecoveryUnit::get(opCtx);
-    _session = _ru->getSession();
-    _cursor = _session->getCursor(uri, tableId, forRecordStore);
-}
-
-WiredTigerCursor::~WiredTigerCursor() {
-    _session->releaseCursor(_tableID, _cursor);
-    _cursor = NULL;
-}
-
-void WiredTigerCursor::reset() {
-    invariantWTOK(_cursor->reset(_cursor));
-}
 }
