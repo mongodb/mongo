@@ -516,7 +516,7 @@ Status runAggregate(OperationContext* opCtx,
 
         std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
 
-        if (request.getExchangeSpec()) {
+        if (request.getExchangeSpec() && !expCtx->explain) {
             boost::intrusive_ptr<Exchange> exchange =
                 new Exchange(request.getExchangeSpec().get(), std::move(pipeline));
 
