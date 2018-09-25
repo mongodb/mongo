@@ -99,7 +99,6 @@
             [{a: 2, b: 2, c: {d: 1, e: 2}}, {a: 1, b: 1, c: {d: 1, e: 1}}]);
 
         // Min/max with $** index hint.
-        // TODO SERVER-35335: Confirm expected $** min/max behavior when hint is specified.
         assert.commandFailedWithCode(
             db.runCommand(
                 {find: coll.getName(), filter: {"b": 1}, min: {"a": 1}, hint: {"$**": 1}}),

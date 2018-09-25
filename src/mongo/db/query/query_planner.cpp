@@ -150,6 +150,10 @@ static BSONObj getKeyFromQuery(const BSONObj& keyPattern, const BSONObj& query) 
 static bool indexCompatibleMaxMin(const BSONObj& obj,
                                   const CollatorInterface* queryCollator,
                                   const IndexEntry& indexEntry) {
+    if (indexEntry.type == IndexType::INDEX_ALLPATHS) {
+        return false;
+    }
+
     BSONObjIterator kpIt(indexEntry.keyPattern);
     BSONObjIterator objIt(obj);
 

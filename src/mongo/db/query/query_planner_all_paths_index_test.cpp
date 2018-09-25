@@ -1154,10 +1154,6 @@ TEST_F(QueryPlannerAllPathsTest, AllPathsIndexMustUseBlockingSortWhenFieldIsNotI
         "}}}}");
 }
 
-// TODO SERVER-35335: Add testing for Min/Max.
-// TODO SERVER-36517: Add testing for DISTINCT_SCAN.
-// TODO SERVER-35331: Add testing for hints.
-
 //
 // Field name or array index tests.
 //
@@ -1489,10 +1485,94 @@ TEST_F(QueryPlannerAllPathsTest, ShouldDeclineToAnswerQueriesThatTraverseTooMany
         "{fetch:{node:{ixscan:{pattern:{$_path:1, 'a.1.b.2.c.3.d.4.e.5.f.6.g.7.h.8.i.j.k': 1}}}}}");
 }
 
-// TODO SERVER-35335: Add testing for Min/Max.
+//
+// Min/max with wildcard index.
+//
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportMin) {
+    addIndex(BSON("$**" << 1));
+
+    runInvalidQueryHintMinMax(BSONObj(), BSON("$**" << 1), fromjson("{x: 1}"), BSONObj());
+}
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportMax) {
+    addIndex(BSON("$**" << 1));
+
+    runInvalidQueryHintMinMax(BSONObj(), BSON("$**" << 1), BSONObj(), fromjson("{x: 10}"));
+}
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportMinMax) {
+    addIndex(BSON("$**" << 1));
+
+    runInvalidQueryHintMinMax(BSONObj(), BSON("$**" << 1), fromjson("{x: 1}"), fromjson("{x: 10}"));
+}
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportCompoundMinMax) {
+    addIndex(BSON("$**" << 1));
+
+    runInvalidQueryHintMinMax(
+        BSONObj(), BSON("$**" << 1), fromjson("{x: 1, y: 1}"), fromjson("{x: 10, y:10}"));
+}
+
+// Test with a query argument to check that the expanded indices are not used.
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportMinWithFilter) {
+    addIndex(BSON("$**" << 1));
+
+    runInvalidQueryHintMinMax(
+        fromjson("{x: {$eq: 5}}"), BSON("$**" << 1), fromjson("{x: 1}"), BSONObj());
+}
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportMaxWithFilter) {
+    addIndex(BSON("$**" << 1));
+
+    runInvalidQueryHintMinMax(
+        fromjson("{x: {$eq: 5}}"), BSON("$**" << 1), BSONObj(), fromjson("{x: 10}"));
+}
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportMinMaxWithFilter) {
+    addIndex(BSON("$**" << 1));
+
+    runInvalidQueryHintMinMax(
+        fromjson("{x: {$eq: 5}}"), BSON("$**" << 1), fromjson("{x: 1}"), fromjson("{x: 10}"));
+}
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportCompoundMinMaxWithFilter) {
+    addIndex(BSON("$**" << 1));
+
+    runInvalidQueryHintMinMax(fromjson("{x: 5, y: 5}"),
+                              BSON("$**" << 1),
+                              fromjson("{x: 1, y: 1}"),
+                              fromjson("{x: 10, y:10}"));
+}
+
+TEST_F(QueryPlannerTest, PathSpecifiedWildcardIndexDoesNotSupportMinMax) {
+    addIndex(BSON("x.$**" << 1));
+
+    runInvalidQueryHintMinMax(
+        fromjson("{x: {$eq: 5}}"), BSON("x.$**" << 1), fromjson("{x: 1}"), fromjson("{x: 10}"));
+}
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotEffectValidMinMax) {
+    addIndex(BSON("$**" << 1));
+    addIndex(BSON("x" << 1));
+
+    runQueryHintMinMax(
+        fromjson("{x: {$eq: 5}}"), BSONObj(), fromjson("{x: 1}"), fromjson("{x: 10}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {x: {$eq: 5}}, "
+        "node: {ixscan: {filter: null, pattern: {x: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, WildcardIndexDoesNotSupportMinMaxWithoutHint) {
+    addIndex(BSON("$**" << 1));
+
+    runInvalidQueryHintMinMax(
+        fromjson("{x: {$eq: 5}}"), BSONObj(), fromjson("{x: 1}"), fromjson("{x: 10}"));
+}
+
 // TODO SERVER-36517: Add testing for DISTINCT_SCAN.
-// TODO SERVER-35336: Add testing for partialFilterExpression.
-// TODO SERVER-35331: Add testing for hints.
-// TODO SERVER-36145: Add testing for non-blocking sort.
 
 }  // namespace mongo
