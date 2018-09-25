@@ -241,39 +241,22 @@ Status _applyOps(OperationContext* opCtx,
                         NamespaceString indexNss;
                         std::tie(indexSpec, indexNss) =
                             repl::prepForApplyOpsIndexInsert(fieldO, opObj, nss);
-                        if (!indexSpec["collation"]) {
-                            // If the index spec does not include a collation, explicitly specify
-                            // the simple collation, so the index does not inherit the collection
-                            // default collation.
-                            auto indexVersion = indexSpec["v"];
-                            // The index version is populated by prepForApplyOpsIndexInsert().
-                            invariant(indexVersion);
-                            if (indexVersion.isNumber() &&
-                                (indexVersion.numberInt() >=
-                                 static_cast<int>(IndexDescriptor::IndexVersion::kV2))) {
-                                BSONObjBuilder bob;
-                                bob.append("collation", CollationSpec::kSimpleSpec);
-                                bob.appendElements(indexSpec);
-                                indexSpec = bob.obj();
-                            }
-                        }
                         BSONObjBuilder command;
                         command.append("createIndexes", indexNss.coll());
-                        {
-                            BSONArrayBuilder indexes(command.subarrayStart("indexes"));
-                            indexes.append(indexSpec);
-                            indexes.doneFast();
-                        }
+                        command.appendElements(indexSpec);
                         const BSONObj commandObj = command.done();
 
-                        DBDirectClient client(opCtx);
-                        BSONObj infoObj;
-                        client.runCommand(nss.db().toString(), commandObj, infoObj);
+                        BSONObjBuilder createIndexesOp;
+                        createIndexesOp.append("op", "c");
+                        createIndexesOp.append("ns", nss.getCommandNS().toString());
+                        createIndexesOp.append("o", commandObj);
+                        auto createIndexesOpObj = createIndexesOp.done();
 
                         // Uassert to stop applyOps only when building indexes, but not for CRUD
                         // ops.
-                        uassertStatusOK(getStatusFromCommandResult(infoObj));
-
+                        invariant(opCtx->lockState()->isW());
+                        uassertStatusOK(repl::applyCommand_inlock(
+                            opCtx, createIndexesOpObj, oplogApplicationMode));
                         return Status::OK();
                     });
             } catch (const DBException& ex) {
