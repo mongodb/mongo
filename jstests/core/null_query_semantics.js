@@ -360,19 +360,23 @@
     // Test without any indexes.
     testNotEqualsNullSemantics(coll);
 
+    const keyPatterns = [
+        {keyPattern: {a: 1}},
+        {keyPattern: {a: -1}},
+        {keyPattern: {a: "hashed"}},
+        {keyPattern: {a: 1}, options: {partialFilterExpression: {a: {$exists: true}}}},
+        {keyPattern: {a: 1}, options: {sparse: true}},
+        {keyPattern: {"a.b": 1}},
+        {keyPattern: {_id: 1, "a.b": 1}},
+        {keyPattern: {"a.b": 1, _id: 1}},
+        {keyPattern: {"a.b": 1}, options: {partialFilterExpression: {a: {$exists: true}}}},
+        {keyPattern: {"a.b": 1, _id: 1}, options: {sparse: true}},
+        {keyPattern: {"$**": 1}},
+        {keyPattern: {"a.$**": 1}}
+    ];
+
     // Test with a variety of other indexes.
-    for (let indexSpec
-             of[{keyPattern: {a: 1}},
-                {keyPattern: {a: -1}},
-                {keyPattern: {a: "hashed"}},
-                {keyPattern: {a: 1}, options: {partialFilterExpression: {a: {$exists: true}}}},
-                {keyPattern: {a: 1}, options: {sparse: true}},
-                {keyPattern: {"a.b": 1}},
-                {keyPattern: {_id: 1, "a.b": 1}},
-                {keyPattern: {"a.b": 1, _id: 1}},
-                {keyPattern: {"a.b": 1}, options: {partialFilterExpression: {a: {$exists: true}}}},
-                {keyPattern: {"a.b": 1, _id: 1}, options: {sparse: true}},
-    ]) {
+    for (let indexSpec of keyPatterns) {
         coll.drop();
         jsTestLog(`Index spec: ${tojson(indexSpec)}`);
         assert.commandWorked(coll.createIndex(indexSpec.keyPattern, indexSpec.options));

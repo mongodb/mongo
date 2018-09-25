@@ -135,9 +135,9 @@ struct Interval {
     bool precedes(const Interval& other) const;
 
     /**
-     * Returns true if the interval includes [MinKey, MaxKey].
+     * Returns true if the interval is from MinKey to MaxKey.
      */
-    bool isMinToMaxInclusive() const;
+    bool isMinToMax() const;
 
     /** Returns how 'this' compares to 'other' */
     enum IntervalComparison {

@@ -295,6 +295,88 @@ TEST_F(QueryPlannerTest, ExistsFalseSparseIndex) {
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
+TEST_F(QueryPlannerTest, NotEqualsNullSparseIndex) {
+    addIndex(BSON("x" << 1),
+             false,  // multikey
+             true    // sparse
+             );
+
+    runQuery(fromjson("{x: {$ne: null}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {x: 1}},"
+        "bounds: [['MinKey', undefined, true, false], [null, 'MaxKey', false, true]]}}}");
+}
+
+TEST_F(QueryPlannerTest, NotEqualsNullSparseMultiKeyIndex) {
+    addIndex(BSON("x" << 1),
+             true,  // multikey
+             true   // sparse
+             );
+
+    runQuery(fromjson("{x: {$ne: null}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchValueSparseMultiKeyIndex) {
+    MultikeyPaths multikeyPaths{{0U}};
+    addIndex(BSON("x" << 1),
+             true,  // multikey
+             true   // sparse
+             );
+
+    runQuery(fromjson("{'x': {$elemMatch: {$ne: null}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {x: 1},"
+        "bounds: {'x': [['MinKey', undefined, true, false], [null, 'MaxKey',false,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyAboveElemMatch) {
+    IndexEntry ind(BSON("a.b.c.d" << 1),
+                   true,
+                   true,
+                   false,
+                   IndexEntry::Identifier{"ind"},
+                   NULL,  // filterExpr
+                   BSONObj());
+    ind.multikeyPaths = {{0U, 1U}};
+    addIndex(ind);
+
+    runQuery(fromjson("{'a.b': {$elemMatch: {'c.d': {$ne: null}}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b.c.d': 1},"
+        "bounds: {'a.b.c.d': [['MinKey', undefined, true, false], [null, 'MaxKey',false,true]]"
+        "}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyBelowElemMatch) {
+    // "a.b.c" being multikey will prevent us from using the index since $elemMatch doesn't do
+    // implicit array traversal.
+    IndexEntry ind(BSON("a.b.c.d" << 1),
+                   true,
+                   true,
+                   false,
+                   IndexEntry::Identifier{"ind"},
+                   NULL,  // filterExpr
+                   BSONObj());
+    ind.multikeyPaths = {{2U}};
+    addIndex(ind);
+
+    runQuery(fromjson("{'a.b': {$elemMatch: {'c.d.': {$ne: null}}}}"));
+
+    assertHasOnlyCollscan();
+}
+
 TEST_F(QueryPlannerTest, ExistsTrueOnUnindexedField) {
     addIndex(BSON("x" << 1));
 

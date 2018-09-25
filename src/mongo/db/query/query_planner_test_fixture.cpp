@@ -174,6 +174,10 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern,
     params.indices.push_back(entry);
 }
 
+void QueryPlannerTest::addIndex(const IndexEntry& ie) {
+    params.indices.push_back(ie);
+}
+
 void QueryPlannerTest::runQuery(BSONObj query) {
     runQuerySortProjSkipNToReturn(query, BSONObj(), BSONObj(), 0, 0);
 }

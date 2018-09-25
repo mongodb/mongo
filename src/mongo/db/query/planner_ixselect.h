@@ -74,23 +74,6 @@ public:
         const stdx::unordered_set<std::string>& fields, const std::vector<IndexEntry>& allIndices);
 
     /**
-     * Return true if the index key pattern field 'keyPatternElt' (which belongs to 'index' and is
-     * at position 'keyPatternIndex' in the index's keyPattern) can be used to answer the predicate
-     * 'node'. When 'node' is a sub-tree of a larger MatchExpression, 'fullPathToNode' is the path
-     * traversed to get to this node, otherwise it is empty.
-     *
-     * For example, {field: "hashed"} can only be used with sets of equalities.
-     *              {field: "2d"} can only be used with some geo predicates.
-     *              {field: "2dsphere"} can only be used with some other geo predicates.
-     */
-    static bool compatible(const BSONElement& keyPatternElt,
-                           const IndexEntry& index,
-                           std::size_t keyPatternIndex,
-                           MatchExpression* node,
-                           StringData fullPathToNode,
-                           const CollatorInterface* collator);
-
-    /**
      * Determine how useful all of our relevant 'indices' are to all predicates in the subtree
      * rooted at 'node'.  Affixes a RelevantTag to all predicate nodes which can use an index.
      *
@@ -176,6 +159,16 @@ private:
         StringData fullPathToParentElemMatch{""_sd};
     };
 
+    /**
+     * Return true if the index key pattern field 'keyPatternElt' (which belongs to 'index' and is
+     * at position 'keyPatternIndex' in the index's keyPattern) can be used to answer the predicate
+     * 'node'. When 'node' is a sub-tree of a larger MatchExpression, 'fullPathToNode' is the path
+     * traversed to get to this node, otherwise it is empty.
+     *
+     * For example, {field: "hashed"} can only be used with sets of equalities.
+     *              {field: "2d"} can only be used with some geo predicates.
+     *              {field: "2dsphere"} can only be used with some other geo predicates.
+     */
     static bool _compatible(const BSONElement& keyPatternElt,
                             const IndexEntry& index,
                             std::size_t keyPatternIndex,

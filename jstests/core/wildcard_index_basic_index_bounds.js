@@ -61,14 +61,14 @@
         },
         {expression: {$exists: false}, bounds: null},
         {expression: {$eq: null}, bounds: null},
-        {expression: {$ne: null}, bounds: null},
         {expression: {$eq: {abc: 1}}, bounds: null},
         {expression: {$lt: {abc: 1}}, bounds: null},
         {expression: {$ne: {abc: 1}}, bounds: null},
         {expression: {$lt: {abc: 1}, $gt: {abc: 1}}, bounds: null},
         {expression: {$in: [{abc: 1}, 1, 2, 3]}, bounds: null},
         {expression: {$in: [null, 1, 2, 3]}, bounds: null},
-        {expression: {$ne: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
+        {expression: {$ne: null}, bounds: ["[MinKey, MaxKey]"], subpathBounds: true},
+        {expression: {$ne: null, $exists: true}, bounds: ["[MinKey, MaxKey]"], subpathBounds: true},
         // In principle we could have tighter bounds for this. See SERVER-36765.
         {expression: {$eq: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
         {expression: {$eq: []}, bounds: ['[undefined, undefined]', '[[], []]']}

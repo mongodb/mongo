@@ -316,20 +316,22 @@ TEST(Introspection, GetDirection) {
 }
 
 TEST(Introspection, MinToMax) {
-    Interval a(BSON("" << 10 << "" << 20), true, true);
-    ASSERT_FALSE(a.isMinToMaxInclusive());
-
-    Interval b(BSON("" << BSONType::MinKey << "" << BSONType::MaxKey), false, true);
-    ASSERT_FALSE(b.isMinToMaxInclusive());
-
-    Interval c(BSON("" << BSONType::MinKey << "" << BSONType::MaxKey), true, false);
-    ASSERT_FALSE(c.isMinToMaxInclusive());
-
     BSONObjBuilder builder;
     builder.appendMinKey("");
     builder.appendMaxKey("");
-    Interval d(builder.obj(), true, true);
-    ASSERT_TRUE(d.isMinToMaxInclusive());
+    BSONObj minMaxObj = builder.obj();
+
+    Interval a(BSON("" << 10 << "" << 20), true, true);
+    ASSERT_FALSE(a.isMinToMax());
+
+    Interval b(minMaxObj, false, true);
+    ASSERT_TRUE(b.isMinToMax());
+
+    Interval c(minMaxObj, true, false);
+    ASSERT_TRUE(c.isMinToMax());
+
+    Interval d(minMaxObj, true, true);
+    ASSERT_TRUE(d.isMinToMax());
 }
 
 TEST(Copying, ReverseClone) {

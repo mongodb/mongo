@@ -206,11 +206,11 @@ bool QueryPlannerIXSelect::notEqualsNullCanUseIndex(const IndexEntry& index,
         //
         // For example, take the query {"a.b": {$elemMatch: {"c.d": {$ne: null}}}}. We can use an
         // "a.b.c.d" index if _only_ "a" and/or "a.b" is/are multikey, because there will be no
-        // array traversal for the "c.d" part of the query. If "a.b.c" or "a.b.c.d" are multikey, we
-        // cannot use this index. As an example of what would go wrong, suppose the collection
-        // contained the document {a: [{b: []}]}. The "a.b.c.d" index key for that document would be
-        // undefined, and so would be excluded from the index bounds. However, that document should
-        // match the query.
+        // array traversal for the "c.d" part of the query. If "a.b.c" or "a.b.c.d" are multikey,
+        // we cannot use this index. As an example of what would go wrong, suppose the collection
+        // contained the document {a: {b: {c: []}}}. The "a.b.c.d" index key for that document
+        // would be null, and so would be excluded from the index bounds. However, that document
+        // should match the query.
         const std::size_t firstComponentAfterElemMatch =
             numPathComponents(elemMatchContext.fullPathToParentElemMatch);
         for (auto&& multikeyComponent : index.multikeyPaths[keyPatternIndex]) {
@@ -395,18 +395,6 @@ std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(
 }
 
 // static
-// This is the public method which does not accept an ElemMatchContext.
-bool QueryPlannerIXSelect::compatible(const BSONElement& keyPatternElt,
-                                      const IndexEntry& index,
-                                      std::size_t keyPatternIdx,
-                                      MatchExpression* node,
-                                      StringData fullPathToNode,
-                                      const CollatorInterface* collator) {
-    return _compatible(
-        keyPatternElt, index, keyPatternIdx, node, fullPathToNode, collator, ElemMatchContext{});
-}
-
-// static
 bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                                        const IndexEntry& index,
                                        std::size_t keyPatternIdx,
@@ -461,23 +449,38 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
         // There are restrictions on when we can use the index if the expression is a NOT.
         if (exprtype == MatchExpression::NOT) {
-            // Don't allow indexed NOT on special index types such as geo or text indices.
+            // Don't allow indexed NOT on special index types such as geo or text indices. The
+            // exception is that $** indexes may be used for {$ne: null} queries.
+            //
             // TODO: SERVER-30994 should remove this check entirely and allow $not on the
-            // 'non-special' fields of non-btree indices.
-            // (e.g. {a: 1, geo: "2dsphere"})
-            if (INDEX_BTREE != index.type && !isChildOfElemMatchValue) {
+            // 'non-special' fields of non-btree indices (e.g. {a: 1, geo: "2dsphere"}).
+            if (INDEX_BTREE != index.type && INDEX_WILDCARD != index.type &&
+                !isChildOfElemMatchValue) {
                 return false;
             }
 
-            // Prevent negated preds from using sparse indices. Doing so would cause us to
-            // miss documents which do not contain the indexed fields.
-            if (index.sparse) {
+            const auto* child = node->getChild(0);
+            MatchExpression::MatchType childtype = child->matchType();
+            const bool isNotEqualsNull =
+                (childtype == MatchExpression::EQ &&
+                 static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
+                     BSONType::jstNULL);
+
+            // The type being INDEX_WILDCARD implies that the index is sparse.
+            invariant(!(index.type == INDEX_WILDCARD && !index.sparse));
+
+            // Prevent negated predicates from using sparse indices. Doing so would cause us to
+            // miss documents which do not contain the indexed fields. The only case where we may
+            // use a sparse index for a negation is when the query is {$ne: null}. This is due to
+            // the behavior of {$eq: null} matching documents where the field does not exist OR the
+            // field is equal to literal null. The negation of {$eq: null} therefore matches
+            // documents where the field does exist AND the field is not equal to literal
+            // null. Since the field must exist, it is safe to use a sparse index.
+            if (index.sparse && !isNotEqualsNull) {
                 return false;
             }
 
             // Can't index negations of MOD, REGEX, TYPE_OPERATOR, or ELEM_MATCH_VALUE.
-            auto* child = node->getChild(0);
-            MatchExpression::MatchType childtype = child->matchType();
             if (MatchExpression::REGEX == childtype || MatchExpression::MOD == childtype ||
                 MatchExpression::TYPE_OPERATOR == childtype ||
                 MatchExpression::ELEM_MATCH_VALUE == childtype) {
@@ -486,10 +489,6 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
             // Most of the time we can't use a multikey index for a $ne: null query, however there
             // are a few exceptions around $elemMatch.
-            const bool isNotEqualsNull =
-                (childtype == MatchExpression::EQ &&
-                 static_cast<ComparisonMatchExpression*>(child)->getData().type() ==
-                     BSONType::jstNULL);
             if (isNotEqualsNull &&
                 !notEqualsNullCanUseIndex(index, keyPatternElt, keyPatternIdx, elemMatchContext)) {
                 return false;

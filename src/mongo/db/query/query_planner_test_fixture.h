@@ -77,6 +77,8 @@ protected:
 
     void addIndex(BSONObj keyPattern, const CollatorInterface* collator, StringData indexName);
 
+    void addIndex(const IndexEntry& ie);
+
     //
     // Execute planner.
     //

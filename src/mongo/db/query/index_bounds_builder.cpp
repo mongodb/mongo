@@ -345,7 +345,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
     // adjusted regardless of the predicate. Having filled out the initial bounds, we apply any
     // necessary changes to the tightness here.
     if (index.type == IndexType::INDEX_WILDCARD) {
-        *tightnessOut = app::applyWildcardIndexScanBoundsTightness(index, *tightnessOut);
+        *tightnessOut = app::translateWildcardIndexBoundsAndTightness(index, *tightnessOut, oilOut);
     }
 }
 
@@ -422,9 +422,6 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // build exact bounds for the inverse, for example the query {a: {$ne: null}}.
         if (MatchExpression::EQ == child->matchType() &&
             static_cast<ComparisonMatchExpression*>(child)->getData().type() == BSONType::jstNULL) {
-            // We don't expect to try to use a sparse index for $ne: null. While this should be
-            // correct, it is not currently supported.
-            invariant(!index.sparse);
             *tightnessOut = IndexBoundsBuilder::EXACT;
         }
 

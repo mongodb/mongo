@@ -163,10 +163,9 @@ bool Interval::precedes(const Interval& other) const {
     return false;
 }
 
-bool Interval::isMinToMaxInclusive() const {
-    return (start.type() == BSONType::MinKey && end.type() == BSONType::MaxKey && startInclusive &&
-            endInclusive);
-};
+bool Interval::isMinToMax() const {
+    return (start.type() == BSONType::MinKey && end.type() == BSONType::MaxKey);
+}
 
 Interval::IntervalComparison Interval::compare(const Interval& other) const {
     //

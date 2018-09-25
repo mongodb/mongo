@@ -107,13 +107,59 @@ TEST_F(QueryPlannerWildcardTest, EqualsNullQueriesDontUseWildcardIndexes) {
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
-TEST_F(QueryPlannerWildcardTest, NotEqualsNullQueriesDontUseWildcardIndexes) {
+TEST_F(QueryPlannerWildcardTest, NotEqualsNullQueriesUseWildcardIndexes) {
     addIndex(BSON("$**" << 1));
 
     runQuery(fromjson("{x: {$ne: null}}"));
 
     assertNumSolutions(1U);
-    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {x: {$ne: null}}, node: {ixscan: {pattern: {$_path: 1, x: 1},"
+        "bounds: {'$_path': [['x','x',true,true], ['x.','x/',true,false]],"
+        "x: [['MinKey','MaxKey',true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, NotEqualsNullQueriesDoNotUseWildcardIndexesWhenMultiKey) {
+    addWildcardIndex(BSON("$**" << 1), {"x"});
+
+    runQuery(fromjson("{'x': {$ne: null}}"));
+
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerWildcardTest, NotEqualsNullInElemMatchQueriesUseWildcardIndexesWhenMultiKey) {
+    addWildcardIndex(BSON("$**" << 1), {"x"});
+
+    runQuery(fromjson("{'x': {$elemMatch: {$ne: null}}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {$_path: 1, 'x': 1},"
+        "bounds: {'$_path': [['x','x',true,true], ['x.','x/',true,false]],"
+        "'x': [['MinKey', 'MaxKey',true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, NotEqualsNullInElemMatchObjectSparseMultiKeyAboveElemMatch) {
+    addWildcardIndex(BSON("$**" << 1), {"a", "a.b"});
+
+    runQuery(fromjson("{'a.b': {$elemMatch: {'c.d': {$ne: null}}}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'$_path': 1, 'a.b.c.d': 1},"
+        "bounds: {'$_path': [['a.b.c.d','a.b.c.d',true,true], ['a.b.c.d.','a.b.c.d/',true,false]],"
+        "'a.b.c.d': [['MinKey', 'MaxKey', true, true]]"
+        "}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, NotEqualsNullInElemMatchObjectSparseMultiKeyBelowElemMatch) {
+    // "a.b.c" being multikey will prevent us from using the index since $elemMatch doesn't do
+    // implicit array traversal.
+    addWildcardIndex(BSON("$**" << 1), {"a.b.c"});
+
+    runQuery(fromjson("{'a.b': {$elemMatch: {'c.d': {$ne: null}}}}"));
+
+    assertHasOnlyCollscan();
 }
 
 TEST_F(QueryPlannerWildcardTest, NotEqualsNullAndExistsQueriesUseWildcardIndexes) {

@@ -562,25 +562,23 @@ void QueryPlannerAccess::finishWildcardIndexScanNode(QuerySolutionNode* node,
     FieldRef queryPath{plannerIndex.keyPattern.firstElementFieldName()};
     auto& multikeyPaths = index.multikeyPaths.back();
 
-    // If the bounds are [MinKey,MaxKey] then we must retrieve all documents which include the given
-    // path. We must therefore add bounds that encompass all its subpaths, specifically the interval
-    // ["path.","path/") on "$_path".
-    const bool isMinMaxInclusive = !bounds.fields.back().intervals.empty() &&
-        bounds.fields.back().intervals.front().isMinToMaxInclusive();
-
     // Helper function to check whether the final path component in 'queryPath' is an array index.
     const auto lastFieldIsArrayIndex = [&multikeyPaths](const auto& queryPath) {
         return (queryPath.numParts() > 1u && multikeyPaths.count(queryPath.numParts() - 2u) &&
                 queryPath.isNumericPathComponentStrict(queryPath.numParts() - 1u));
     };
 
-    // For [MinKey,MaxKey] bounds, we build a range interval on all subpaths of the query path(s).
-    // We must therefore trim any trailing array indices from the query path before generating the
-    // fieldname-or-array power set, in order to avoid overlapping the final set of bounds. For
-    // instance, the untrimmed query path 'a.0' will produce paths 'a' and 'a.0' if 'a' is multikey,
-    // and so we would end up with bounds [['a','a'], ['a.','a/'], ['a.0','a.0'], ['a.0.','a.0/']].
-    // The latter two are subsets of the ['a.', 'a/'] interval.
-    while (isMinMaxInclusive && lastFieldIsArrayIndex(queryPath)) {
+    // If the bounds intersect with any objects, we must add bounds that encompass all its
+    // subpaths, specifically the interval ["path.","path/") on "$_path".
+    const bool requiresSubpathBounds = app::requiresSubpathBounds(bounds.fields.back());
+
+    // For bounds which contain objects, we build a range interval on all subpaths of the query
+    // path(s). We must therefore trim any trailing array indices from the query path before
+    // generating the fieldname-or-array power set, in order to avoid overlapping the final set of
+    // bounds. For instance, the untrimmed query path 'a.0' will produce paths 'a' and 'a.0' if 'a'
+    // is multikey, and so we would end up with bounds [['a','a'], ['a.','a/'], ['a.0','a.0'],
+    // ['a.0.','a.0/']]. The latter two are subsets of the ['a.', 'a/'] interval.
+    while (requiresSubpathBounds && lastFieldIsArrayIndex(queryPath)) {
         queryPath.removeLastPart();
     }
 
@@ -591,14 +589,14 @@ void QueryPlannerAccess::finishWildcardIndexScanNode(QuerySolutionNode* node,
     auto paths = app::generateFieldNameOrArrayIndexPathSet(multikeyPaths, queryPath);
 
     // Add a $_path point-interval for each path that needs to be traversed in the index. If the
-    // bounds on these paths are MinKey-MaxKey, then for each applicable path we must add a range
+    // bounds on these paths include objects, then for each applicable path we must add a range
     // interval on all its subpaths, i.e. ["path.","path/").
     static const char subPathStart = '.', subPathEnd = static_cast<char>('.' + 1);
     auto& pathIntervals = bounds.fields.front().intervals;
     for (const auto& fieldPath : paths) {
         auto path = fieldPath.dottedField().toString();
         pathIntervals.push_back(IndexBoundsBuilder::makePointInterval(path));
-        if (isMinMaxInclusive) {
+        if (requiresSubpathBounds) {
             pathIntervals.push_back(IndexBoundsBuilder::makeRangeInterval(
                 path + subPathStart, path + subPathEnd, BoundInclusion::kIncludeStartKeyOnly));
         }
