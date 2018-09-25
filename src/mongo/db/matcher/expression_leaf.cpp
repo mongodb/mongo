@@ -215,6 +215,7 @@ inline pcrecpp::RE_Options flags2options(const char* flags) {
     return options;
 }
 
+const std::set<char> RegexMatchExpression::kValidRegexFlags = {'i', 'm', 's', 'x'};
 constexpr size_t RegexMatchExpression::kMaxPatternSize;
 
 RegexMatchExpression::RegexMatchExpression(StringData path, const BSONElement& e)

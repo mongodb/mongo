@@ -32,6 +32,8 @@
 
 #include "mongo/db/query/plan_cache.h"
 
+#include <boost/iterator/transform_iterator.hpp>
+
 #include <algorithm>
 #include <math.h>
 #include <memory>
@@ -55,14 +57,15 @@ namespace mongo {
 namespace {
 
 // Delimiters for cache key encoding.
-const char kEncodeDiscriminatorsBegin = '<';
-const char kEncodeDiscriminatorsEnd = '>';
 const char kEncodeChildrenBegin = '[';
 const char kEncodeChildrenEnd = ']';
 const char kEncodeChildrenSeparator = ',';
-const char kEncodeSortSection = '~';
-const char kEncodeProjectionSection = '|';
 const char kEncodeCollationSection = '#';
+const char kEncodeDiscriminatorsBegin = '<';
+const char kEncodeDiscriminatorsEnd = '>';
+const char kEncodeProjectionSection = '|';
+const char kEncodeRegexFlagsSeparator = '/';
+const char kEncodeSortSection = '~';
 
 /**
  * Encode user-provided string. Cache key delimiters seen in the
@@ -72,14 +75,15 @@ void encodeUserString(StringData s, StringBuilder* keyBuilder) {
     for (size_t i = 0; i < s.size(); ++i) {
         char c = s[i];
         switch (c) {
-            case kEncodeDiscriminatorsBegin:
-            case kEncodeDiscriminatorsEnd:
             case kEncodeChildrenBegin:
             case kEncodeChildrenEnd:
             case kEncodeChildrenSeparator:
-            case kEncodeSortSection:
-            case kEncodeProjectionSection:
             case kEncodeCollationSection:
+            case kEncodeDiscriminatorsBegin:
+            case kEncodeDiscriminatorsEnd:
+            case kEncodeProjectionSection:
+            case kEncodeRegexFlagsSeparator:
+            case kEncodeSortSection:
             case '\\':
                 *keyBuilder << '\\';
             // Fall through to default case.
@@ -340,6 +344,44 @@ void encodeIndexability(const MatchExpression* tree,
     *keyBuilder << kEncodeDiscriminatorsEnd;
 }
 
+template <class RegexIterator>
+void encodeRegexFlagsForMatch(RegexIterator first, RegexIterator last, StringBuilder* keyBuilder) {
+    // We sort the flags, so that queries with the same regex flags in different orders will have
+    // the same shape. We then add them to a set, so that identical flags across multiple regexes
+    // will be deduplicated and the resulting set of unique flags will be ordered consistently.
+    // Regex flags are not validated at parse-time, so we also ensure that only valid flags
+    // contribute to the encoding.
+    static const auto maxValidFlags = RegexMatchExpression::kValidRegexFlags.size();
+    std::set<char> flags;
+    for (auto it = first; it != last && flags.size() < maxValidFlags; ++it) {
+        auto inserter = std::inserter(flags, flags.begin());
+        std::copy_if((*it)->getFlags().begin(), (*it)->getFlags().end(), inserter, [](auto flag) {
+            return RegexMatchExpression::kValidRegexFlags.count(flag);
+        });
+    }
+    if (!flags.empty()) {
+        *keyBuilder << kEncodeRegexFlagsSeparator;
+        for (const auto& flag : flags) {
+            invariant(RegexMatchExpression::kValidRegexFlags.count(flag));
+            encodeUserString(StringData(&flag, 1), keyBuilder);
+        }
+        *keyBuilder << kEncodeRegexFlagsSeparator;
+    }
+}
+
+// Helper overload to prepare a vector of unique_ptrs for the heavy-lifting function above.
+void encodeRegexFlagsForMatch(const std::vector<std::unique_ptr<RegexMatchExpression>>& regexes,
+                              StringBuilder* keyBuilder) {
+    const auto transformFunc = [](const auto& regex) { return regex.get(); };
+    encodeRegexFlagsForMatch(boost::make_transform_iterator(regexes.begin(), transformFunc),
+                             boost::make_transform_iterator(regexes.end(), transformFunc),
+                             keyBuilder);
+}
+// Helper that passes a range covering the entire source set into the heavy-lifting function above.
+void encodeRegexFlagsForMatch(const std::vector<const RegexMatchExpression*>& regexes,
+                              StringBuilder* keyBuilder) {
+    encodeRegexFlagsForMatch(regexes.begin(), regexes.end(), keyBuilder);
+}
 }  // namespace
 
 //
@@ -620,15 +662,16 @@ void PlanCache::encodeKeyForMatch(const MatchExpression* tree, StringBuilder* ke
         encodeGeoNearMatchExpression(static_cast<const GeoNearMatchExpression*>(tree), keyBuilder);
     }
 
-    // REGEX requires that we encode the flags so that regexes with different options appear
-    // as different query shapes.
+    // We encode regular expression flags such that different options produce different shapes.
     if (MatchExpression::REGEX == tree->matchType()) {
-        const auto reMatchExpression = static_cast<const RegexMatchExpression*>(tree);
-        std::string flags = reMatchExpression->getFlags();
-        // Sort the flags, so that queries with the same regex flags in different orders will have
-        // the same shape.
-        std::sort(flags.begin(), flags.end());
-        encodeUserString(flags, keyBuilder);
+        encodeRegexFlagsForMatch({static_cast<const RegexMatchExpression*>(tree)}, keyBuilder);
+    } else if (MatchExpression::MATCH_IN == tree->matchType()) {
+        const auto* inMatch = static_cast<const InMatchExpression*>(tree);
+        if (!inMatch->getRegexes().empty()) {
+            // Append '_re' to distinguish an $in without regexes from an $in with regexes.
+            encodeUserString("_re"_sd, keyBuilder);
+            encodeRegexFlagsForMatch(inMatch->getRegexes(), keyBuilder);
+        }
     }
 
     encodeIndexability(tree, _indexabilityState, keyBuilder);
@@ -645,6 +688,7 @@ void PlanCache::encodeKeyForMatch(const MatchExpression* tree, StringBuilder* ke
         }
         encodeKeyForMatch(tree->getChild(i), keyBuilder);
     }
+
     if (tree->numChildren() > 0) {
         *keyBuilder << kEncodeChildrenEnd;
     }
