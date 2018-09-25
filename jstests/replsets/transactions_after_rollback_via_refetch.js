@@ -3,6 +3,8 @@
  * refetch based rollback of a few basic CRUD and DDL ops. Local writes done during the rollback
  * process are not timestamped, so we want to ensure that transactions can be started against a
  * valid snapshot post-rollback and read data correctly.
+ *
+ * @tags: [uses_transactions]
  */
 (function() {
     'use strict';
