@@ -97,14 +97,14 @@
     }
 
     // Create an index by inserting into system.indexes in applyOps.
-    let insertFormatIndexName = "b_1";
+    let insertFormatIndexName = "c_1";
     cmd = {
         applyOps: [{
             "op": "i",
             "ns": dbName + ".system.indexes",
             "o": {
                 ns: dbName + "." + collName,
-                key: {b: 1},
+                key: {c: 1},
                 name: insertFormatIndexName,
             }
         }]
@@ -112,13 +112,13 @@
     res = primaryTestDB.adminCommand(cmd);
     assert.commandWorked(res, "could not run " + tojson(cmd));
     rst.awaitReplication();
-    ensureIndexExists(primaryTestDB, collName, insertFormatIndexName, 3);
+    ensureIndexExists(primaryTestDB, collName, insertFormatIndexName, 4);
 
     // Make sure the index was replicated to the secondaries.
     secondaries = rst.getSecondaries();
     for (let j = 0; j < secondaries.length; j++) {
         let secondaryTestDB = secondaries[j].getDB(dbName);
-        ensureIndexExists(secondaryTestDB, collName, insertFormatIndexName, 3);
+        ensureIndexExists(secondaryTestDB, collName, insertFormatIndexName, 4);
     }
 
     localDB = rst.getPrimary().getDB("local");
