@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_query_knobs.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
@@ -462,8 +463,8 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
         return boost::none;
     }
 
-    const auto routingInfo = uassertStatusOK(
-        grid->catalogCache()->getCollectionRoutingInfo(opCtx, outStage->getOutputNs()));
+    const auto routingInfo =
+        uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, outStage->getOutputNs()));
     if (!routingInfo.cm()) {
         return boost::none;
     }

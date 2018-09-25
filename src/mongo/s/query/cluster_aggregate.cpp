@@ -147,8 +147,9 @@ StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationConte
         return {ErrorCodes::ShardNotFound, "No shards are present in the cluster"};
     }
 
-    // This call to getCollectionRoutingInfo will return !OK if the database does not exist.
-    return Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, execNss);
+    // This call to getCollectionRoutingInfoForTxnCmd will return !OK if the database does not
+    // exist.
+    return getCollectionRoutingInfoForTxnCmd(opCtx, execNss);
 }
 
 std::set<ShardId> getTargetedShards(OperationContext* opCtx,
@@ -916,7 +917,7 @@ StringMap<ExpressionContext::ResolvedNamespace> resolveInvolvedNamespaces(
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     for (auto&& nss : litePipe.getInvolvedNamespaces()) {
         const auto resolvedNsRoutingInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
         uassert(28769,
                 str::stream() << nss.ns() << " cannot be sharded",
                 !resolvedNsRoutingInfo.cm() || litePipe.allowShardedForeignCollection(nss));

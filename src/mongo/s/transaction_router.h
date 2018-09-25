@@ -108,6 +108,44 @@ public:
         const SharedTransactionOptions _sharedOptions;
     };
 
+    /**
+     * Encapsulates the logic around selecting a global read timestamp for a sharded transaction at
+     * snapshot level read concern.
+     *
+     * The first command in a transaction to target at least one shard must select a cluster time
+     * timestamp before targeting, but may change the timestamp before contacting any shards to
+     * allow optimizing the timestamp based on the targeted shards. If the first command encounters
+     * a retryable error, e.g. StaleShardVersion or SnapshotTooOld, the retry may also select a new
+     * timestamp. Once the first command has successfully completed, the timestamp cannot be
+     * changed.
+     */
+    class AtClusterTime {
+    public:
+        /**
+         * Cannot be called until a timestamp has been set.
+         */
+        LogicalTime getTime() const;
+
+        /**
+         * Sets the timestamp and remembers the statement id of the command that set it.
+         */
+        void setTime(LogicalTime atClusterTime, StmtId currentStmtId);
+
+        /**
+         * True if the timestamp has been set to a non-null value.
+         */
+        bool isSet() const;
+
+        /**
+         * True if the timestamp can be changed by a command running at the given statement id.
+         */
+        bool canChange(StmtId currentStmtId) const;
+
+    private:
+        StmtId _stmtIdSelectedAt = kUninitializedStmtId;
+        LogicalTime _atClusterTime;
+    };
+
     TransactionRouter(LogicalSessionId sessionId);
 
     /**
@@ -173,7 +211,13 @@ public:
      * Sets the atClusterTime for the current transaction to the latest time in the router's logical
      * clock.
      */
-    void setAtClusterTimeToLatestTime(OperationContext* opCtx);
+    void setDefaultAtClusterTime(OperationContext* opCtx);
+
+    /**
+     * Returns the global read timestamp for this transaction. Returns boost::none for transactions
+     * that don't run at snapshot level read concern or if a timestamp has not yet been selected.
+     */
+    const boost::optional<AtClusterTime>& getAtClusterTime() const;
 
     bool isCheckedOut();
 
@@ -280,9 +324,9 @@ private:
     repl::ReadConcernArgs _readConcernArgs;
 
     // The cluster time of the timestamp all participant shards in the current transaction with
-    // snapshot level read concern must read from. Selected during the first statement of the
-    // transaction. Should not be changed after the first statement has completed successfully.
-    boost::optional<LogicalTime> _atClusterTime;
+    // snapshot level read concern must read from. Only set for transactions running with snapshot
+    // level read concern.
+    boost::optional<AtClusterTime> _atClusterTime;
 
     // The statement id of the latest received command for this transaction. For batch writes, this
     // will be the highest stmtId contained in the batch. Incremented by one if new commands do not

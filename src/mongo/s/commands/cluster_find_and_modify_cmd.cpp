@@ -167,8 +167,7 @@ public:
         // that the parsing be pulled into this function.
         uassertStatusOK(createShardDatabase(opCtx, nss.db()));
 
-        const auto routingInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        const auto routingInfo = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
         if (!routingInfo.cm()) {
             _runCommand(opCtx,
                         routingInfo.db().primaryId(),
@@ -203,10 +202,6 @@ private:
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
                             BSONObjBuilder* result) {
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter->setAtClusterTimeToLatestTime(opCtx);
-        }
-
         const auto response = [&] {
             std::vector<AsyncRequestsSender::Request> requests;
             requests.emplace_back(

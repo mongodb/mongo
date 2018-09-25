@@ -248,10 +248,6 @@ private:
             batchedRequest.setAllowImplicitCreate(false);
         }
 
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter->setAtClusterTimeToLatestTime(opCtx);
-        }
-
         BatchWriteExecStats stats;
         BatchedCommandResponse response;
         ClusterWriter::write(opCtx, batchedRequest, &stats, &response);

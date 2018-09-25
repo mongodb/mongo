@@ -210,40 +210,6 @@ TEST_F(AtClusterTimeTargetingTest, ReturnsLatestTimeFromShard) {
                   operationContext(), true, shards, kNss, query, collation));
 }
 
-// Verifies that a null logical time is returned for all requests without snapshot readConcern.
-TEST_F(AtClusterTimeTargetingTest, NonSnapshotReadConcern) {
-    auto routingInfo = loadRoutingTableWithTwoChunksAndTwoShards(kNss);
-    auto query = BSON("find" << kNss.coll());
-    auto collation = BSONObj();
-    auto shards = getTargetedShardsForQuery(operationContext(), routingInfo, query, collation);
-
-    // Uninitialized read concern.
-    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
-        operationContext(), true, shards, kNss, query, collation));
-
-    auto& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
-
-    // Local readConcern.
-    readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
-        operationContext(), true, shards, kNss, query, collation));
-
-    // Majority readConcern.
-    readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
-        operationContext(), true, shards, kNss, query, collation));
-
-    // Linearizable readConcern.
-    readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLinearizableReadConcern);
-    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
-        operationContext(), true, shards, kNss, query, collation));
-
-    // Available readConcern.
-    readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kAvailableReadConcern);
-    ASSERT_FALSE(at_cluster_time_util::computeAtClusterTime(
-        operationContext(), true, shards, kNss, query, collation));
-}
-
 // Verifies that if atClusterTime is specified in the request, atClusterTime is always greater than
 // or equal to it.
 TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {

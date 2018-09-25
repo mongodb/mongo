@@ -177,6 +177,10 @@ selector:
   #  - jstests/sharding/remove1.js
   #  - jstests/sharding/remove2.js
 
+  # Moves a chunk before continuing a transaction, which can lead to snapshot errors if the
+  # CSRS failovers are sufficiently slow.
+  - jstests/sharding/transactions_target_at_point_in_time.js
+
 executor:
   config:
     shell_options:

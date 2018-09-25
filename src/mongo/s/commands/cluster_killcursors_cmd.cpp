@@ -52,16 +52,6 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
-        // killCursors must choose a global read timestamp if it is the first command in a
-        // transaction with snapshot level read concern because any shards it may contact will not
-        // be able to change the snapshot of the local transactions they begin.
-        //
-        // TODO SERVER-37045: This can be removed once killCursors is not allowed to start a
-        // cross-shard transaction.
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter->setAtClusterTimeToLatestTime(opCtx);
-        }
-
         return runImpl(opCtx, dbname, cmdObj, result);
     }
 

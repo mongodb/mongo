@@ -426,7 +426,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
     for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
-        auto routingInfoStatus = catalogCache->getCollectionRoutingInfo(opCtx, query.nss());
+        auto routingInfoStatus = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
         if (routingInfoStatus == ErrorCodes::NamespaceNotFound) {
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.

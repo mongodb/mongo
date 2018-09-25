@@ -596,7 +596,7 @@ public:
         auto txnRouter = TransactionRouter::get(operationContext());
         txnRouter->checkOut();
         txnRouter->beginOrContinueTxn(operationContext(), kTxnNumber, true);
-        txnRouter->setAtClusterTimeToLatestTime(operationContext());
+        txnRouter->setDefaultAtClusterTime(operationContext());
     }
 
     void tearDown() override {

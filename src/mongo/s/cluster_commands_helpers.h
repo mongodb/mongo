@@ -203,4 +203,15 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
                                             const BSONObj& query,
                                             const BSONObj& collation);
 
+/**
+ * If the command is running in a transaction, returns the proper routing table to use for targeting
+ * shards. If there is no active transaction or the transaction is not running with snapshot level
+ * read concern, the latest routing table is returned, otherwise a historical routing table is
+ * returned at the global read timestamp, which must have been selected by this point.
+ *
+ * Should be used by all router commands that can be run in a transaction when targeting shards.
+ */
+StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(
+    OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace mongo

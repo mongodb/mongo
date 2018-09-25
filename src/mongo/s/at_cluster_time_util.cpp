@@ -95,13 +95,6 @@ boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   const BSONObj query,
                                                   const BSONObj collation) {
-
-    // TODO SERVER-36688: Move this check to TransactionRouter::computeAtClusterTime.
-    if (repl::ReadConcernArgs::get(opCtx).getLevel() !=
-        repl::ReadConcernLevel::kSnapshotReadConcern) {
-        return boost::none;
-    }
-
     auto atClusterTime =
         _computeAtClusterTime(opCtx, mustRunOnAll, shardIds, nss, query, collation);
 
@@ -116,13 +109,6 @@ boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
 
 boost::optional<LogicalTime> computeAtClusterTimeForOneShard(OperationContext* opCtx,
                                                              const ShardId& shardId) {
-
-    // TODO SERVER-36688: Move this check to TransactionRouter::computeAtClusterTime.
-    if (repl::ReadConcernArgs::get(opCtx).getLevel() !=
-        repl::ReadConcernLevel::kSnapshotReadConcern) {
-        return boost::none;
-    }
-
     // TODO SERVER-36312: Re-enable algorithm using the cached opTimes of the targeted shard.
     // TODO SERVER-37549: Use the shard's cached lastApplied opTime instead of lastCommitted.
     auto atClusterTime = LogicalClock::get(opCtx)->getClusterTime();

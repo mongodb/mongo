@@ -158,6 +158,9 @@ void invokeInTransactionRouter(OperationContext* opCtx,
                                CommandInvocation* invocation,
                                TransactionRouter* txnRouter,
                                rpc::ReplyBuilderInterface* result) {
+    // No-op if the transaction is not running with snapshot read concern.
+    txnRouter->setDefaultAtClusterTime(opCtx);
+
     try {
         invocation->run(opCtx, result);
     } catch (const DBException& e) {

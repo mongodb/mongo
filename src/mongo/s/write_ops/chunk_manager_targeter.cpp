@@ -325,8 +325,7 @@ Status ChunkManagerTargeter::init(OperationContext* opCtx) {
         return shardDbStatus.getStatus();
     }
 
-    const auto routingInfoStatus =
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _nss);
+    const auto routingInfoStatus = getCollectionRoutingInfoForTxnCmd(opCtx, _nss);
     if (!routingInfoStatus.isOK()) {
         return routingInfoStatus.getStatus();
     }
