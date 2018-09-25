@@ -505,6 +505,13 @@ void PlanCache::encodeKeyForMatch(const MatchExpression* tree, StringBuilder* ke
         encodeGeoNearMatchExpression(static_cast<const GeoNearMatchExpression*>(tree), keyBuilder);
     }
 
+    // We must encode the presence of any regular expressions within MATCH_IN to ensure correctness.
+    if (MatchExpression::MATCH_IN == tree->matchType()) {
+        if (!static_cast<const InMatchExpression*>(tree)->getRegexes().empty()) {
+            encodeUserString("_re"_sd, keyBuilder);
+        }
+    }
+
     // Encode indexability.
     const IndexToDiscriminatorMap& discriminators =
         _indexabilityState.getDiscriminators(tree->path());
