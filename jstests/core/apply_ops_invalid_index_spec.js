@@ -43,16 +43,15 @@
             o: {v: 2, key: {a: 1}, name: 'a_1_system_v2', ns: collNs, unknown: 1},
         }],
     }),
-                                 ErrorCodes.UnknownError);
+                                 ErrorCodes.InvalidIndexSpecificationOption);
 
     // Inserting a v:1 index directly into system.indexes with an unknown field in the index spec
     // should ignore the unrecognized field and create the index.
-    assert.commandFailedWithCode(db.adminCommand({
+    assert.commandWorked(db.adminCommand({
         applyOps: [{
             op: 'i',
             ns: systemIndexesNs,
             o: {v: 1, key: {a: 1}, name: 'a_1_system_v1', ns: collNs, unknown: 1},
         }],
-    }),
-                                 ErrorCodes.UnknownError);
+    }));
 })();

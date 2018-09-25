@@ -180,39 +180,23 @@ Status _applyOps(OperationContext* opCtx,
                         NamespaceString requestNss{ns};
 
                         if (nss.isSystemDotIndexes()) {
-                            BSONObj indexSpec;
-                            NamespaceString indexNss;
-                            std::tie(indexSpec, indexNss) =
-                                repl::prepForApplyOpsIndexInsert(fieldO, opObj, requestNss);
-                            if (!indexSpec["collation"]) {
-                                // If the index spec does not include a collation, explicitly
-                                // specify the simple collation, so the index does not inherit the
-                                // collection default collation.
-                                auto indexVersion = indexSpec["v"];
-                                // The index version is populated by prepForApplyOpsIndexInsert().
-                                invariant(indexVersion);
-                                if (indexVersion.isNumber() &&
-                                    (indexVersion.numberInt() >=
-                                     static_cast<int>(IndexDescriptor::IndexVersion::kV2))) {
-                                    BSONObjBuilder bob;
-                                    bob.append("collation", CollationSpec::kSimpleSpec);
-                                    bob.appendElements(indexSpec);
-                                    indexSpec = bob.obj();
-                                }
-                            }
-                            BSONObjBuilder command;
-                            command.append("createIndexes", indexNss.coll());
-                            {
-                                BSONArrayBuilder indexes(command.subarrayStart("indexes"));
-                                indexes.append(indexSpec);
-                                indexes.doneFast();
-                            }
-                            const BSONObj commandObj = command.done();
+                            invariant(opCtx->lockState()->isW());
+                            OldClientContext ctx(opCtx, nss.ns());
+                            status =
+                                repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
 
-                            DBDirectClient client(opCtx);
-                            BSONObj infoObj;
-                            client.runCommand(nsToDatabase(ns), commandObj, infoObj);
-                            status = getStatusFromCommandResult(infoObj);
+                            // applyOperation_inlock() builds the index but does not notify the
+                            // OpObserver. Previously, applyOps relied on the createIndexes command
+                            // to perform this function. The value used for the 'forMigrate'
+                            // argument is consistent with create_indexes.cpp.
+                            if (status.isOK()) {
+                                WriteUnitOfWork wuow(opCtx);
+                                auto opObserver = getGlobalServiceContext()->getOpObserver();
+                                invariant(opObserver);
+                                auto indexSpec = fieldO.embeddedObject();
+                                opObserver->onCreateIndex(opCtx, nss.ns(), indexSpec, false);
+                                wuow.commit();
+                            }
                         } else {
                             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                             if (!autoColl.getCollection() && !nss.isSystemDotIndexes()) {
