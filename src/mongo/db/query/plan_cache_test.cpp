@@ -1474,6 +1474,40 @@ TEST(PlanCacheTest, ComputeKeyGeoNear) {
         "gnanrsp");
 }
 
+TEST(PlanCacheTest, ComputeKeyMatchInDependsOnPresenceOfRegex) {
+    // Test that an $in containing a single regex is unwrapped to $regex.
+    testComputeKey("{a: {$in: [/foo/]}}", "{}", "{}", "rea");
+    testComputeKey("{a: {$in: [/foo/i]}}", "{}", "{}", "rea");
+
+    // Test that an $in with no regexes does not include any regex information.
+    testComputeKey("{a: {$in: [1, 'foo']}}", "{}", "{}", "ina");
+
+    // Test that an $in with a regex encodes the presence of the regex.
+    testComputeKey("{a: {$in: [1, /foo/]}}", "{}", "{}", "ina_re");
+
+    // Test that an $in with a regex and flags encodes the presence of the regex.
+    testComputeKey("{a: {$in: [1, /foo/is]}}", "{}", "{}", "ina_re");
+    testComputeKey("{a: {$in: [1, /foo/i]}}", "{}", "{}", "ina_re");
+
+    // Test that an $in with multiple regexes encodes their presence only once.
+    testComputeKey("{a: {$in: [1, /foo/i, /bar/m, /baz/s]}}", "{}", "{}", "ina_re");
+    testComputeKey(
+        "{a: {$in: [1, /foo/i, /bar/m, /baz/s, /qux/i, /quux/s]}}", "{}", "{}", "ina_re");
+    testComputeKey(
+        "{a: {$in: [1, /foo/ism, /bar/msi, /baz/im, /qux/si, /quux/im]}}", "{}", "{}", "ina_re");
+    testComputeKey(
+        "{a: {$in: [1, /foo/msi, /bar/ism, /baz/is, /qux/mi, /quux/im]}}", "{}", "{}", "ina_re");
+
+    // Test that $not-$in-$regex similarly records the presence of any regexes.
+    testComputeKey("{a: {$not: {$in: [1, 'foo']}}}", "{}", "{}", "nt[ina]");
+    testComputeKey("{a: {$not: {$in: [1, /foo/]}}}", "{}", "{}", "nt[ina_re]");
+    testComputeKey("{a: {$not: {$in: [1, /foo/i, /bar/i, /baz/msi]}}}", "{}", "{}", "nt[ina_re]");
+
+    // Test that a $not-$in containing a single regex is unwrapped to $not-$regex.
+    testComputeKey("{a: {$not: {$in: [/foo/]}}}", "{}", "{}", "nt[rea]");
+    testComputeKey("{a: {$not: {$in: [/foo/i]}}}", "{}", "{}", "nt[rea]");
+}
+
 // When a sparse index is present, computeKey() should generate different keys depending on
 // whether or not the predicates in the given query can use the index.
 TEST(PlanCacheTest, ComputeKeySparseIndex) {
