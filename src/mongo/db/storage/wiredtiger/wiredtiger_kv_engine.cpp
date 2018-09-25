@@ -1461,6 +1461,14 @@ bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
     return true;
 }
 
+bool WiredTigerKVEngine::supportsRecoveryTimestamp() const {
+    if (_ephemeral) {
+        return false;
+    }
+
+    return true;
+}
+
 StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationContext* opCtx) {
     if (!supportsRecoverToStableTimestamp()) {
         severe() << "WiredTiger is configured to not support recover to a stable timestamp";
@@ -1515,6 +1523,11 @@ Timestamp WiredTigerKVEngine::getAllCommittedTimestamp() const {
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {
+    if (!supportsRecoveryTimestamp()) {
+        severe() << "WiredTiger is configured to not support providing a recovery timestamp";
+        fassertFailed(50745);
+    }
+
     if (_recoveryTimestamp.isNull()) {
         return boost::none;
     }

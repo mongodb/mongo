@@ -320,6 +320,13 @@ public:
     }
 
     /**
+     * Returns whether the storage engine can provide a recovery timestamp.
+     */
+    virtual bool supportsRecoveryTimestamp() const {
+        return false;
+    }
+
+    /**
      * Returns true if the storage engine supports the readConcern level "snapshot".
      */
     virtual bool supportsReadConcernSnapshot() const {

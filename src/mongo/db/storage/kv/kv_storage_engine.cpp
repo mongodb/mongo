@@ -638,6 +638,10 @@ bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
     return _engine->supportsRecoverToStableTimestamp();
 }
 
+bool KVStorageEngine::supportsRecoveryTimestamp() const {
+    return _engine->supportsRecoveryTimestamp();
+}
+
 StatusWith<Timestamp> KVStorageEngine::recoverToStableTimestamp(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
 

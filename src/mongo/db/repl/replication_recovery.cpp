@@ -247,10 +247,9 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     // recovery timestamp. If the storage engine returns a timestamp, we recover from that point.
     // However, if the storage engine returns "none", the storage engine does not have a stable
     // checkpoint and we must recover from an unstable checkpoint instead.
-    const bool supportsRecoverToStableTimestamp =
-        _storageInterface->supportsRecoverToStableTimestamp(opCtx->getServiceContext());
-    if (!stableTimestamp &&
-        (supportsRecoverToStableTimestamp || !serverGlobalParams.enableMajorityReadConcern)) {
+    const bool supportsRecoveryTimestamp =
+        _storageInterface->supportsRecoveryTimestamp(opCtx->getServiceContext());
+    if (!stableTimestamp && supportsRecoveryTimestamp) {
         stableTimestamp = _storageInterface->getRecoveryTimestamp(opCtx->getServiceContext());
     }
 
@@ -262,8 +261,7 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
                             << appliedThrough.toString());
 
     if (stableTimestamp) {
-        invariant(supportsRecoverToStableTimestamp ||
-                  !serverGlobalParams.enableMajorityReadConcern);
+        invariant(supportsRecoveryTimestamp);
         _recoverFromStableTimestamp(opCtx, *stableTimestamp, appliedThrough, topOfOplog);
     } else {
         _recoverFromUnstableCheckpoint(opCtx, appliedThrough, topOfOplog);

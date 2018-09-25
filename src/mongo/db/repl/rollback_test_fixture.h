@@ -137,6 +137,10 @@ public:
         return true;
     }
 
+    bool supportsRecoveryTimestamp(ServiceContext* serviceCtx) const override {
+        return true;
+    }
+
     void setRecoverToTimestampStatus(Status status) {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _recoverToTimestampStatus = status;

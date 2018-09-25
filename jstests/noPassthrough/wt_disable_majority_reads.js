@@ -1,4 +1,4 @@
-// @tags: [requires_wiredtiger]
+// @tags: [requires_wiredtiger, requires_replication]
 (function() {
     "use strict";
 

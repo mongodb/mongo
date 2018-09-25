@@ -306,6 +306,13 @@ public:
     }
 
     /**
+     * See `StorageEngine::supportsRecoveryTimestamp`
+     */
+    virtual bool supportsRecoveryTimestamp() const {
+        return false;
+    }
+
+    /**
      * See `StorageEngine::recoverToStableTimestamp`
      */
     virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) {
