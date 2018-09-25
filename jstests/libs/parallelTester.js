@@ -285,6 +285,7 @@ if (typeof _threadInject != "undefined") {
 
             // These tests rely on a deterministically refreshable logical session cache. If they
             // run in parallel, they could interfere with the cache and cause failures.
+            parallelFilesDir + "/list_all_local_sessions.js",
             parallelFilesDir + "/list_all_sessions.js",
             parallelFilesDir + "/list_local_sessions.js",
             parallelFilesDir + "/list_sessions.js",
