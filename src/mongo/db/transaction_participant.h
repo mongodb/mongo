@@ -354,8 +354,6 @@ public:
 
     void beginOrContinueTransactionUnconditionally(TxnNumber txnNumber);
 
-    static Status isValid(StringData dbName, StringData cmdName);
-
     void transitionToPreparedforTest() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _txnState.transitionTo(lk, TransactionState::kPrepared);

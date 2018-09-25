@@ -680,7 +680,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         if (autocommitVal) {
-            uassertStatusOK(TransactionParticipant::isValid(dbname, command->getName()));
+            uassertStatusOK(CommandHelpers::canUseTransactions(dbname, command->getName()));
         }
 
         // This constructor will check out the session and start a transaction, if necessary. It

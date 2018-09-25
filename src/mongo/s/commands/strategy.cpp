@@ -365,6 +365,8 @@ void runCommand(OperationContext* opCtx,
             auto startTxnSetting = osi->getStartTransaction();
             bool startTransaction = startTxnSetting ? *startTxnSetting : false;
 
+            uassertStatusOK(CommandHelpers::canUseTransactions(nss.db(), command->getName()));
+
             txnRouter->beginOrContinueTxn(opCtx, *txnNumber, startTransaction);
         }
 
