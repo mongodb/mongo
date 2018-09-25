@@ -542,6 +542,40 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundaries) {
         50893);
 }
 
+TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMin) {
+    BSONObj spec = BSON("policy"
+                        << "range"
+                        << "consumers"
+                        << 1
+                        << "key"
+                        << BSON("a" << 1)
+                        << "boundaries"
+                        << BSON_ARRAY(BSON("a" << 0) << BSON("a" << MAXKEY))
+                        << "consumerIds"
+                        << BSON_ARRAY(0));
+    ASSERT_THROWS_CODE(
+        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
+        AssertionException,
+        50958);
+}
+
+TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesMissingMax) {
+    BSONObj spec = BSON("policy"
+                        << "range"
+                        << "consumers"
+                        << 1
+                        << "key"
+                        << BSON("a" << 1)
+                        << "boundaries"
+                        << BSON_ARRAY(BSON("a" << MINKEY) << BSON("a" << 0))
+                        << "consumerIds"
+                        << BSON_ARRAY(0));
+    ASSERT_THROWS_CODE(
+        Exchange(parseSpec(spec), unittest::assertGet(Pipeline::create({}, getExpCtx()))),
+        AssertionException,
+        50959);
+}
+
 TEST_F(DocumentSourceExchangeTest, RejectInvalidBoundariesAndConsumerIds) {
     BSONObj spec = BSON("policy"
                         << "range"

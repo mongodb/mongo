@@ -49,7 +49,7 @@ class Exchange : public RefCountable {
      * format (KeyString).
      */
     static std::vector<std::string> extractBoundaries(
-        const boost::optional<std::vector<BSONObj>>& obj);
+        const boost::optional<std::vector<BSONObj>>& obj, Ordering ordering);
 
     /**
      * Validate consumer ids coming off the wire. If the ids pass the validation then return them.
