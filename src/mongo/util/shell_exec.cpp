@@ -193,6 +193,8 @@ public:
 
 private:
     ProcessStream() = delete;
+    ProcessStream(const ProcessStream&) = delete;
+    ProcessStream& operator=(const ProcessStream&) = delete;
 
     HANDLE _stdout, _stderr;
     STARTUPINFO _startup;
@@ -253,6 +255,8 @@ public:
 
 private:
     ProcessStream() = delete;
+    ProcessStream(const ProcessStream&) = delete;
+    ProcessStream& operator=(const ProcessStream&) = delete;
 
     FILE* _fp;
     int _fd;
