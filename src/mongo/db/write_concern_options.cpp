@@ -69,6 +69,11 @@ const BSONObj WriteConcernOptions::Default = BSONObj();
 const BSONObj WriteConcernOptions::Acknowledged(BSON("w" << W_NORMAL));
 const BSONObj WriteConcernOptions::Unacknowledged(BSON("w" << W_NONE));
 const BSONObj WriteConcernOptions::Majority(BSON("w" << WriteConcernOptions::kMajority));
+const Seconds WriteConcernOptions::kWriteConcernTimeoutSystem{15};
+const Seconds WriteConcernOptions::kWriteConcernTimeoutMigration{30};
+const Seconds WriteConcernOptions::kWriteConcernTimeoutSharding{60};
+const Seconds WriteConcernOptions::kWriteConcernTimeoutUserCommand{60};
+
 
 WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, int timeout)
     : WriteConcernOptions(numNodes, sync, Milliseconds(timeout)) {}

@@ -43,7 +43,7 @@ namespace {
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(15));
+                                                WriteConcernOptions::kWriteConcernTimeoutMigration);
 const int kDuplicateKeyErrorMaxRetries = 2;
 
 }  // namespace

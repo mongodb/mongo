@@ -50,6 +50,11 @@ public:
     static const StringData kWriteConcernField;
     static const char kMajority[];  // = "majority"
 
+    static const Seconds kWriteConcernTimeoutSystem;
+    static const Seconds kWriteConcernTimeoutMigration;
+    static const Seconds kWriteConcernTimeoutSharding;
+    static const Seconds kWriteConcernTimeoutUserCommand;
+
     WriteConcernOptions() {
         reset();
     }

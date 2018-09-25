@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
@@ -38,7 +39,7 @@ const WriteConcernOptions ShardingCatalogClient::kMajorityWriteConcern(
     // supported by mongod and writeConcernMajorityJournalDefault is set to true in the
     // ReplSetConfig.
     WriteConcernOptions::SyncMode::UNSET,
-    Seconds(15));
+    WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 const WriteConcernOptions ShardingCatalogClient::kLocalWriteConcern(
     1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));

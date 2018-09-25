@@ -72,7 +72,7 @@ const WriteConcernOptions kMajorityWriteConcern(
     // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
     // supported by the mongod.
     WriteConcernOptions::SyncMode::UNSET,
-    Seconds(60));
+    WriteConcernOptions::kWriteConcernTimeoutUserCommand);
 
 // Returns true if found to be authorized, false if undecided. Throws if unauthorized.
 bool checkAuthorizationImplPreParse(OperationContext* opCtx,

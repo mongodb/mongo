@@ -58,10 +58,11 @@ constexpr size_t kMaxBatchSize = 1000;
 
 // Used to refresh or remove items from the session collection with write
 // concern majority
-const BSONObj kMajorityWriteConcern = WriteConcernOptions(WriteConcernOptions::kMajority,
-                                                          WriteConcernOptions::SyncMode::UNSET,
-                                                          Seconds(15))
-                                          .toBSON();
+const BSONObj kMajorityWriteConcern =
+    WriteConcernOptions(WriteConcernOptions::kMajority,
+                        WriteConcernOptions::SyncMode::UNSET,
+                        WriteConcernOptions::kWriteConcernTimeoutSystem)
+        .toBSON();
 
 
 BSONObj lsidQuery(const LogicalSessionId& lsid) {

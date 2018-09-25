@@ -41,7 +41,7 @@ const WriteConcernOptions DistLockCatalog::kMajorityWriteConcern(
     // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
     // supported by this mongod.
     WriteConcernOptions::SyncMode::UNSET,
-    Seconds(15));
+    WriteConcernOptions::kWriteConcernTimeoutSystem);
 
 DistLockCatalog::DistLockCatalog() = default;
 

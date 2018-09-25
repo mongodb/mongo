@@ -58,7 +58,7 @@ namespace {
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(60));
+                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 /**
  * Internal sharding command run on config servers to change a database's primary shard.

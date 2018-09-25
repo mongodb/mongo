@@ -76,7 +76,7 @@ using DeleteNotification = CollectionRangeDeleter::DeleteNotification;
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(60));
+                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 boost::optional<DeleteNotification> checkOverlap(std::list<Deletion> const& deletions,
                                                  ChunkRange const& range) {

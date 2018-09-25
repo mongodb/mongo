@@ -370,7 +370,7 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
                                 << BSON("w"
                                         << "majority"
                                         << "wtimeout"
-                                        << 15000)
+                                        << 60000)
                                 << "allowImplicitCollectionCreation"
                                 << true);
     auto addShardCmd = add_shard_util::createAddShardCmd(operationContext(), shardName);
