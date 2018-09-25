@@ -46,14 +46,20 @@ public:
     /**
      * @param testSoln -- a BSON representation of a query solution
      * @param trueSoln -- the root node of a query solution tree
+     * @param: relaxBoundsCheck -- If 'true', will perform a relaxed "subset" check on index bounds.
+     *         Will perform a full check otherwise.
      *
      * Returns true if the BSON representation matches the actual
      * tree, otherwise returns false.
      */
-    static bool solutionMatches(const BSONObj& testSoln, const QuerySolutionNode* trueSoln);
+    static bool solutionMatches(const BSONObj& testSoln,
+                                const QuerySolutionNode* trueSoln,
+                                bool relaxBoundsCheck = false);
 
-    static bool solutionMatches(const std::string& testSoln, const QuerySolutionNode* trueSoln) {
-        return solutionMatches(fromjson(testSoln), trueSoln);
+    static bool solutionMatches(const std::string& testSoln,
+                                const QuerySolutionNode* trueSoln,
+                                bool relaxBoundsCheck = false) {
+        return solutionMatches(fromjson(testSoln), trueSoln, relaxBoundsCheck);
     }
 };
 

@@ -57,6 +57,12 @@ void QueryPlannerTest::setUp() {
     addIndex(BSON("_id" << 1));
 }
 
+void QueryPlannerTest::clearState() {
+    solns.clear();
+    cq.reset();
+    relaxBoundsCheck = false;
+}
+
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey) {
     params.indices.push_back(IndexEntry(keyPattern,
                                         multikey,
@@ -226,9 +232,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                     const BSONObj& hint,
                                     const BSONObj& minObj,
                                     const BSONObj& maxObj) {
-    // Clean up any previous state from a call to runQueryFull
-    solns.clear();
-    cq.reset();
+    clearState();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
@@ -309,8 +313,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                            const BSONObj& hint,
                                            const BSONObj& minObj,
                                            const BSONObj& maxObj) {
-    solns.clear();
-    cq.reset();
+    clearState();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
@@ -345,8 +348,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
 }
 
 void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
-    solns.clear();
-    cq.reset();
+    clearState();
 
     invariant(nss.isValid());
 
@@ -370,8 +372,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
 }
 
 void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
-    solns.clear();
-    cq.reset();
+    clearState();
 
     invariant(nss.isValid());
 
@@ -425,7 +426,7 @@ size_t QueryPlannerTest::numSolutionMatches(const std::string& solnJson) const {
     size_t matches = 0;
     for (auto&& soln : solns) {
         QuerySolutionNode* root = soln->root.get();
-        if (QueryPlannerTestLib::solutionMatches(testSoln, root)) {
+        if (QueryPlannerTestLib::solutionMatches(testSoln, root, relaxBoundsCheck)) {
             ++matches;
         }
     }

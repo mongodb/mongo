@@ -1112,8 +1112,8 @@ TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWithExistsQueri
         "{sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: {node: "
         "{fetch: {filter: null, node: "
         "{ixscan: {pattern: {'$_path': 1, a: 1},"
-        "bounds: {'$_path': [['a','a',true,true]], a: [['MinKey', 'MaxKey', true, "
-        "true]]}}}}}}}}}");
+        "bounds: {'$_path': [['a','a',true,true], ['a.', 'a/', true, false]],"
+        "a: [['MinKey', 'MaxKey', true, true]]}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, WildcardIndexMustUseBlockingSortWhenFilterNotPresent) {

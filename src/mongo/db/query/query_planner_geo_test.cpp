@@ -95,6 +95,10 @@ TEST_F(QueryPlannerTest, Basic2DCompound) {
         fromjson("{ loc: { $geoWithin: { $box : [[0, 0],[10, 10]] } },"
                  "a: 'mouse' }"));
     assertNumSolutions(2U);
+
+    // This query will generate complex bounds, so we relax the checks to make the test readable.
+    relaxBoundsCheckingToSubsetOnly();
+
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
         "{fetch: {node: {ixscan: {pattern: {loc : '2d', a: 1},"
@@ -1713,6 +1717,10 @@ TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverLeadingField) {
 
     runQuery(
         fromjson("{a: {$_internalExprEq: 0}, b: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}"));
+
+    // This query will generate complex bounds, so we relax the checks to make the test readable.
+    relaxBoundsCheckingToSubsetOnly();
+
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {b: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}, node: "
@@ -1741,11 +1749,16 @@ TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverTrailingField) {
 
     runQuery(
         fromjson("{b: {$_internalExprEq: 0}, a: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}"));
+
+    // This query will generate complex bounds, so we relax the checks to make the test readable.
+    relaxBoundsCheckingToSubsetOnly();
+
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {a: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}, node: "
         "{ixscan: {pattern: {a : '2dsphere', b: 1}, filter: null, bounds:"
-        "{a: [], b: [[0,0,true,true]]}}}}}");
+        "{a: [],"  // Complex, so leaving empty.
+        "b: [[0,0,true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverTrailingFieldMultikey) {
@@ -1759,11 +1772,16 @@ TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverTrailingFieldMulti
 
     runQuery(
         fromjson("{a: {$geoWithin: {$centerSphere: [[0, 0], 10]}}, b: {$_internalExprEq: 0}}"));
+
+    // This query will generate complex bounds, so we relax the checks to make the test readable.
+    relaxBoundsCheckingToSubsetOnly();
+
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {a: {$geoWithin: {$centerSphere: [[0,0],10]}}, b: {$_internalExprEq: 0}},"
         "node: {ixscan: {pattern: {a : '2dsphere', b: 1}, filter: null, bounds:"
-        "{a: [], b: [['MinKey','MaxKey',true,true]]}}}}}");
+        "{a: [],"  // Complex, so leaving empty.
+        "b: [['MinKey','MaxKey',true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, 2dWithinPredicateOverTrailingFieldElemMatchMultikey) {
