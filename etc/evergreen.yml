@@ -7014,6 +7014,20 @@ tasks:
   name: ssl
   commands:
   - func: "do setup"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${activate_virtualenv}
+        if [ "Windows_NT" = "$OS" ]; then
+          /cygdrive/c/python/python36/python.exe -m pip install -r etc/pip/evgtest-requirements.txt
+        else
+          python3 -m pip install -r etc/pip/evgtest-requirements.txt
+        fi
   - func: "run tests"
     vars:
       resmoke_args: --suites=ssl --storageEngine=wiredTiger
