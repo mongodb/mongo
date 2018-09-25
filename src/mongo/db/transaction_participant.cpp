@@ -304,9 +304,9 @@ TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
     if (_recoveryUnit) {
         // We should be at WUOW nesting level 1, only the top level WUOW for the oplog reservation
         // side transaction.
+        _recoveryUnit->abortUnitOfWork();
         _locker->endWriteUnitOfWork();
         invariant(!_locker->inAWriteUnitOfWork());
-        _recoveryUnit->abortUnitOfWork();
     }
 }
 
@@ -349,9 +349,9 @@ TransactionParticipant::TxnResources::~TxnResources() {
         // This should only be reached when aborting a transaction that isn't active, i.e.
         // when starting a new transaction before completing an old one.  So we should
         // be at WUOW nesting level 1 (only the top level WriteUnitOfWork).
+        _recoveryUnit->abortUnitOfWork();
         _locker->endWriteUnitOfWork();
         invariant(!_locker->inAWriteUnitOfWork());
-        _recoveryUnit->abortUnitOfWork();
     }
 }
 
