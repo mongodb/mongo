@@ -64,7 +64,7 @@ const char kShardName[] = "shardName";                            // TODO(SERVER
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(15));
+                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 const WriteConcernOptions kLocalWriteConcern(1,
                                              WriteConcernOptions::SyncMode::UNSET,

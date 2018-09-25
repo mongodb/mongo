@@ -52,7 +52,7 @@ const BSONField<long long> AddShardRequest::maxSizeMB("maxSize");
 namespace {
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
-                                                Seconds(15));
+                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 }
 
 AddShardRequest::AddShardRequest(ConnectionString connString)
