@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/operation_context_session_mongod.h"
@@ -37,6 +38,10 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/transaction_coordinator_service.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/grid.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -87,6 +92,8 @@ public:
                     "Transaction isn't in progress",
                     txnParticipant->inMultiDocumentTransaction());
 
+            const auto& cmd = request();
+
             if (txnParticipant->transactionIsPrepared()) {
                 auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
                 auto prepareOpTime = txnParticipant->getPrepareOpTime();
@@ -104,15 +111,94 @@ public:
                                         << " participant prepareOpTime: "
                                         << prepareOpTime.toString());
 
+                // A participant should re-send its vote if it re-received prepare.
+                _sendVoteCommit(opCtx, prepareOpTime.getTimestamp(), cmd.getCoordinatorId());
+
                 return PrepareTimestamp(prepareOpTime.getTimestamp());
             }
 
             // TODO (SERVER-36839): Pass coordinatorId into prepareTransaction() so that the
             // coordinatorId can be included in the write to config.transactions.
-            return PrepareTimestamp(txnParticipant->prepareTransaction(opCtx, {}));
+            const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx, {});
+            _sendVoteCommit(opCtx, prepareTimestamp, cmd.getCoordinatorId());
+
+            return PrepareTimestamp(prepareTimestamp);
         }
 
     private:
+        void _sendVoteCommit(OperationContext* opCtx,
+                             Timestamp prepareTimestamp,
+                             ShardId coordinatorId) {
+            // In a production cluster, a participant should always send its vote to the coordinator
+            // as part of prepareTransaction. However, many test suites test the replication and
+            // storage parts of prepareTransaction against a standalone replica set, so allow
+            // skipping sending a vote.
+            if (MONGO_FAIL_POINT(skipShardingPartsOfPrepareTransaction)) {
+                return;
+            }
+
+            VoteCommitTransaction voteCommit;
+            voteCommit.setDbName("admin");
+            voteCommit.setShardId(ShardingState::get(opCtx)->shardId());
+            voteCommit.setPrepareTimestamp(prepareTimestamp);
+            BSONObj voteCommitObj = voteCommit.toBSON(
+                BSON("lsid" << opCtx->getLogicalSessionId()->toBSON() << "txnNumber"
+                            << *opCtx->getTxnNumber()
+                            << "autocommit"
+                            << false));
+            _sendVote(opCtx, voteCommitObj, coordinatorId);
+        }
+
+        void _sendVoteAbort(OperationContext* opCtx, ShardId coordinatorId) {
+            // In a production cluster, a participant should always send its vote to the coordinator
+            // as part of prepareTransaction. However, many test suites test the replication and
+            // storage parts of prepareTransaction against a standalone replica set, so allow
+            // skipping sending a vote.
+            if (MONGO_FAIL_POINT(skipShardingPartsOfPrepareTransaction)) {
+                return;
+            }
+
+            VoteAbortTransaction voteAbort;
+            voteAbort.setDbName("admin");
+            voteAbort.setShardId(ShardingState::get(opCtx)->shardId());
+            BSONObj voteAbortObj = voteAbort.toBSON(
+                BSON("lsid" << opCtx->getLogicalSessionId()->toBSON() << "txnNumber"
+                            << *opCtx->getTxnNumber()
+                            << "autocommit"
+                            << false));
+            _sendVote(opCtx, voteAbortObj, coordinatorId);
+        }
+
+        void _sendVote(OperationContext* opCtx, const BSONObj& voteObj, ShardId coordinatorId) {
+            try {
+                // TODO (SERVER-37328): Participant should wait for writeConcern before sending its
+                // vote.
+
+                const auto coordinatorPrimaryHost = [&] {
+                    auto coordinatorShard = uassertStatusOK(
+                        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, coordinatorId));
+                    return uassertStatusOK(coordinatorShard->getTargeter()->findHostNoWait(
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
+                }();
+
+                const executor::RemoteCommandRequest request(
+                    coordinatorPrimaryHost,
+                    NamespaceString::kAdminDb.toString(),
+                    voteObj,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toContainingBSON(),
+                    opCtx,
+                    executor::RemoteCommandRequest::kNoTimeout);
+
+                auto noOp = [](const executor::TaskExecutor::RemoteCommandCallbackArgs&) {};
+                uassertStatusOK(
+                    Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()->scheduleRemoteCommand(
+                        request, noOp));
+            } catch (const DBException& ex) {
+                LOG(0) << "Failed to send vote " << voteObj << " to " << coordinatorId
+                       << causedBy(ex.toStatus());
+            }
+        }
+
         bool supportsWriteConcern() const override {
             return true;
         }
@@ -286,27 +372,37 @@ public:
                 participantList);
 
             // Execute the 'prepare' logic on the local participant (the router does not send a
-            // separate 'prepare' message to the coordinator shard.
+            // separate 'prepare' message to the coordinator shard).
             _callPrepareOnLocalParticipant(opCtx);
         }
 
     private:
-        Timestamp _callPrepareOnLocalParticipant(OperationContext* opCtx) {
-            OperationContextSessionMongod checkOutSession(opCtx, true, false, boost::none, false);
+        void _callPrepareOnLocalParticipant(OperationContext* opCtx) {
+            auto localParticipantPrepareTimestamp = [&]() -> Timestamp {
+                OperationContextSessionMongod checkOutSession(
+                    opCtx, true, false, boost::none, false);
 
-            auto txnParticipant = TransactionParticipant::get(opCtx);
+                auto txnParticipant = TransactionParticipant::get(opCtx);
 
-            txnParticipant->unstashTransactionResources(opCtx, "prepareTransaction");
-            ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
-                txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
-            });
+                txnParticipant->unstashTransactionResources(opCtx, "prepareTransaction");
+                ScopeGuard guard = MakeGuard([&txnParticipant, opCtx]() {
+                    txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
+                });
 
-            auto localParticipantPrepareTimestamp = txnParticipant->prepareTransaction(opCtx, {});
+                auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx, {});
 
-            txnParticipant->stashTransactionResources(opCtx);
-            guard.Dismiss();
+                txnParticipant->stashTransactionResources(opCtx);
+                guard.Dismiss();
+                return prepareTimestamp;
+            }();
 
-            return localParticipantPrepareTimestamp;
+            // Deliver the local participant's vote to the coordinator.
+            TransactionCoordinatorService::get(opCtx)->voteCommit(
+                opCtx,
+                opCtx->getLogicalSessionId().get(),
+                opCtx->getTxnNumber().get(),
+                ShardingState::get(opCtx)->shardId(),
+                localParticipantPrepareTimestamp);
         }
 
         bool supportsWriteConcern() const override {

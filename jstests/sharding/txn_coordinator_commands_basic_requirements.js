@@ -12,61 +12,6 @@
     const txnNumber = 0;
     const lsid = {id: UUID()};
 
-    const checkCoordinatorCommandsAccepted = function(conn) {
-        const testDB = conn.getDB(dbName);
-
-        // Set up the in-memory coordinator state on the node by simulating a transaction statement
-        // with "coordinator: true" against the node.
-        assert.commandWorked(testDB.runCommand({
-            find: collName,
-            readConcern: {level: "snapshot"},
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            startTransaction: true,
-            autocommit: false,
-            coordinator: true
-        }));
-
-        assert.commandWorked(conn.adminCommand({
-            coordinateCommitTransaction: 1,
-            participants: [{shardId: "voteCommitDummy"}, {shardId: "voteAbortDummy"}],
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(1),
-            autocommit: false
-        }));
-
-        assert.commandWorked(conn.adminCommand({
-            voteCommitTransaction: 1,
-            shardId: "voteCommitDummy",
-            prepareTimestamp: Timestamp(0, 0),
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(1),
-            autocommit: false
-        }));
-
-        assert.commandWorked(conn.adminCommand({
-            voteAbortTransaction: 1,
-            shardId: "voteAbortDummy",
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(1),
-            autocommit: false
-        }));
-
-        // Manually abort the transaction on the coordinator. This is required to release the
-        // transaction's locks before the post-test validate hook runs.
-        assert.commandWorked(conn.adminCommand({
-            abortTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            autocommit: false,
-        }));
-    };
-
     const checkCoordinatorCommandsRejected = function(conn, expectedErrorCode) {
         assert.commandFailedWithCode(conn.adminCommand({
             coordinateCommitTransaction: 1,
@@ -136,10 +81,6 @@
     };
 
     const st = new ShardingTest({shards: 1});
-
-    jsTest.log("Verify that config servers and shard servers accept coordinator commands");
-    checkCoordinatorCommandsAccepted(st.rs0.getPrimary());
-    checkCoordinatorCommandsAccepted(st.configRS.getPrimary());
 
     jsTest.log("Verify that coordinator commands are only accepted against the admin database");
     checkCoordinatorCommandsAgainstNonAdminDbRejected(st.rs0.getPrimary());

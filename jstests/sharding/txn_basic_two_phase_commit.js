@@ -128,55 +128,17 @@
 
     // Simulate that mongos sends 'prepare' with the coordinator's id to the non-coordinator
     // participants.
-    const participant1PrepareTimestamp = assert
-                                             .commandWorked(participant1.adminCommand({
-                                                 prepareTransaction: 1,
-                                                 coordinatorId: coordinator.shardName,
-                                                 lsid: lsid,
-                                                 txnNumber: NumberLong(txnNumber),
-                                                 stmtId: NumberInt(0),
-                                                 autocommit: false
-                                             }))
-                                             .prepareTimestamp;
-    const participant2PrepareTimestamp = assert
-                                             .commandWorked(participant2.adminCommand({
-                                                 prepareTransaction: 1,
-                                                 coordinatorId: coordinator.shardName,
-                                                 lsid: lsid,
-                                                 txnNumber: NumberLong(txnNumber),
-                                                 stmtId: NumberInt(0),
-                                                 autocommit: false
-                                             }))
-                                             .prepareTimestamp;
-
-    // Run a command that touches all three shards to gossip the cluster time since the three
-    // shells do not gossip amongst themselves.
-    assert.commandWorked(st.s.getDB(dbName).runCommand(
-        {insert: collName, documents: [{_id: -4}, {_id: 6}, {_id: 17}]}));
-
-    // Simulate that all participants vote to commit (remove this under SERVER-36304).
-    assert.commandWorked(coordinator.adminCommand({
-        voteCommitTransaction: 1,
-        shardId: participant1.shardName,
-        prepareTimestamp: participant1PrepareTimestamp,
+    assert.commandWorked(participant1.adminCommand({
+        prepareTransaction: 1,
+        coordinatorId: coordinator.shardName,
         lsid: lsid,
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
         autocommit: false,
     }));
-    assert.commandWorked(coordinator.adminCommand({
-        voteCommitTransaction: 1,
-        shardId: participant2.shardName,
-        prepareTimestamp: participant2PrepareTimestamp,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        autocommit: false,
-    }));
-    assert.commandWorked(coordinator.adminCommand({
-        voteCommitTransaction: 1,
-        shardId: coordinator.shardName,
-        prepareTimestamp: Timestamp(0, 0),
+    assert.commandWorked(participant2.adminCommand({
+        prepareTransaction: 1,
+        coordinatorId: coordinator.shardName,
         lsid: lsid,
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
@@ -184,7 +146,14 @@
     }));
 
     // Verify that the transaction was committed on all shards.
-    assert.eq(6, st.s.getDB(dbName).getCollection(collName).find().itcount());
+    // Use assert.soon(), because none of the above commands (prepareTransaction or
+    // coordinateCommitTransaction) currently block until the decision is made. Once
+    // coordinateCommitTransaction *blocks* until a commit decision is *written*, the test can pass
+    // the operationTime returned by coordinateCommitTransaction as 'afterClusterTime' in the read
+    // to ensure the read sees the transaction's writes (TODO SERVER-37165).
+    assert.soon(function() {
+        return 3 === st.s.getDB(dbName).getCollection(collName).find().itcount();
+    });
 
     st.stop();
 
