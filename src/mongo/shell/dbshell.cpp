@@ -108,6 +108,15 @@ const auto kAuthParam = "authSource"s;
 
 namespace mongo {
 
+enum ShellExitCode : int {
+    kDBException = 1,
+    kInputFileError = -3,
+    kEvalError = -4,
+    kMongorcError = -5,
+    kUnterminatedProcess = -6,
+    kProcessTerminationError = -7,
+};
+
 Scope* shellMainScope;
 }
 
@@ -925,8 +934,10 @@ int _main(int argc, char* argv[], char** envp) {
 
     if (!shellGlobalParams.script.empty()) {
         mongo::shell_utils::MongoProgramScope s;
-        if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false))
-            return -4;
+        if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false)) {
+            error() << "exiting with code " << static_cast<int>(kEvalError);
+            return kEvalError;
+        }
         scope->exec("shellPrintHelper( __lastres__ );", "(shell2 eval)", true, true, false);
     }
 
@@ -937,8 +948,9 @@ int _main(int argc, char* argv[], char** envp) {
             cout << "loading file: " << shellGlobalParams.files[i] << endl;
 
         if (!scope->execFile(shellGlobalParams.files[i], false, true)) {
-            cout << "failed to load: " << shellGlobalParams.files[i] << endl;
-            return -3;
+            severe() << "failed to load: " << shellGlobalParams.files[i];
+            error() << "exiting with code " << static_cast<int>(kInputFileError);
+            return kInputFileError;
         }
 
         // Check if the process left any running child processes.
@@ -951,9 +963,10 @@ int _main(int argc, char* argv[], char** envp) {
             cout << endl;
 
             if (mongo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
-                cout << "one more more child processes exited with an error during "
-                     << shellGlobalParams.files[i] << endl;
-                return -3;
+                severe() << "one more more child processes exited with an error during "
+                         << shellGlobalParams.files[i];
+                error() << "exiting with code " << static_cast<int>(kProcessTerminationError);
+                return kProcessTerminationError;
             }
 
             bool failIfUnterminatedProcesses = false;
@@ -965,11 +978,11 @@ int _main(int argc, char* argv[], char** envp) {
             failIfUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
 
             if (failIfUnterminatedProcesses) {
-                cout << "exiting with a failure due to unterminated processes" << endl
-                     << "a call to MongoRunner.stopMongod(), ReplSetTest#stopSet(), or "
-                        "ShardingTest#stop() may be missing from the test"
-                     << endl;
-                return -6;
+                severe() << "exiting with a failure due to unterminated processes, "
+                            "a call to MongoRunner.stopMongod(), ReplSetTest#stopSet(), or "
+                            "ShardingTest#stop() may be missing from the test";
+                error() << "exiting with code " << static_cast<int>(kUnterminatedProcess);
+                return kUnterminatedProcess;
             }
         }
     }
@@ -996,10 +1009,10 @@ int _main(int argc, char* argv[], char** envp) {
             if (!rcLocation.empty() && ::mongo::shell_utils::fileExists(rcLocation)) {
                 hasMongoRC = true;
                 if (!scope->execFile(rcLocation, false, true)) {
-                    cout << "The \".mongorc.js\" file located in your home folder could not be "
-                            "executed"
-                         << endl;
-                    return -5;
+                    severe() << "The \".mongorc.js\" file located in your home folder could not be "
+                                "executed";
+                    error() << "exiting with code " << static_cast<int>(kMongorcError);
+                    return kMongorcError;
                 }
             }
         }
@@ -1171,8 +1184,9 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
         WindowsCommandLine wcl(argc, argvW, envpW);
         returnCode = _main(argc, wcl.argv(), wcl.envp());
     } catch (mongo::DBException& e) {
-        cerr << "exception: " << e.what() << endl;
-        returnCode = 1;
+        severe() << "exception: " << e.what();
+        error() << "exiting with code " << static_cast<int>(kDBException);
+        returnCode = kDBException;
     }
     quickExit(returnCode);
 }
@@ -1182,8 +1196,9 @@ int main(int argc, char* argv[], char** envp) {
     try {
         returnCode = _main(argc, argv, envp);
     } catch (mongo::DBException& e) {
-        cerr << "exception: " << e.what() << endl;
-        returnCode = 1;
+        severe() << "exception: " << e.what();
+        error() << "exiting with code " << static_cast<int>(kDBException);
+        returnCode = kDBException;
     }
     quickExit(returnCode);
 }
