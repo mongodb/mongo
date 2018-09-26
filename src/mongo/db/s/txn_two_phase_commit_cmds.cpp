@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kTransaction
 
 #include "mongo/platform/basic.h"
 
@@ -40,6 +40,8 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(skipShardingPartsOfPrepareTransaction);
 
 class PrepareTransactionCmd : public TypedCommand<PrepareTransactionCmd> {
 public:
@@ -62,6 +64,15 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            // In production, only config servers or initialized shard servers can participate in a
+            // sharded transaction. However, many test suites test the replication and storage parts
+            // of prepareTransaction against a standalone replica set, so allow skipping the check.
+            if (!MONGO_FAIL_POINT(skipShardingPartsOfPrepareTransaction)) {
+                if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+                    uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+                }
+            }
+
             auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::CommandFailed,
                     "prepareTransaction must be run within a transaction",

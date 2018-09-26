@@ -1135,6 +1135,16 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
 
+                // New mongod-specific options in 4.1.x.
+                if (!programMajorMinorVersion || programMajorMinorVersion >= 410) {
+                    if (jsTest.options().setSkipShardingPartsOfPrepareTransactionFailpoint &&
+                        jsTest.options().enableTestCommands) {
+                        argArray.push(
+                            ...["--setParameter",
+                                "failpoint.skipShardingPartsOfPrepareTransaction={mode:'alwaysOn'}"]);
+                    }
+                }
+
                 // New mongod-specific options in 4.0.x
                 if (!programMajorMinorVersion || programMajorMinorVersion >= 400) {
                     if (jsTest.options().transactionLifetimeLimitSeconds !== undefined) {

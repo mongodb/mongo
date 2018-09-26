@@ -57,5 +57,6 @@ executor:
             rollback: 2
           storage:
             recovery: 2
+        failpoint.skipShardingPartsOfPrepareTransaction: "{mode:'alwaysOn'}"
     num_nodes: 2
     voting_secondaries: false

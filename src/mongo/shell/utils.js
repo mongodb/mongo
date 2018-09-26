@@ -318,6 +318,8 @@ jsTestOptions = function() {
             mqlTestFile: TestData.mqlTestFile,
             mqlRootPath: TestData.mqlRootPath,
             disableImplicitSessions: TestData.disableImplicitSessions || false,
+            setSkipShardingPartsOfPrepareTransactionFailpoint:
+                TestData.setSkipShardingPartsOfPrepareTransactionFailpoint || false,
         });
     }
     return _jsTestOptions;

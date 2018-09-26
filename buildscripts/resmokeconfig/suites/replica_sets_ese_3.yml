@@ -49,4 +49,5 @@ executor:
         TestData:
           enableEncryption: ''
           encryptionKeyFile: *keyFile
+          setSkipShardingPartsOfPrepareTransactionFailpoint: true
       readMode: commands
