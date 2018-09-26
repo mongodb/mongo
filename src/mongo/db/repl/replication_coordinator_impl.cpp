@@ -240,15 +240,19 @@ public:
      * _list is guarded by ReplicationCoordinatorImpl::_mutex, thus it is illegal to construct one
      * of these without holding _mutex
      */
-    WaiterGuard(WaiterList* list, Waiter* waiter) : _list(list), _waiter(waiter) {
+    WaiterGuard(const stdx::unique_lock<stdx::mutex>& lock, WaiterList* list, Waiter* waiter)
+        : _lock(lock), _list(list), _waiter(waiter) {
+        invariant(_lock.owns_lock());
         list->add_inlock(_waiter);
     }
 
     ~WaiterGuard() {
+        invariant(_lock.owns_lock());
         _list->remove_inlock(_waiter);
     }
 
 private:
+    const stdx::unique_lock<stdx::mutex>& _lock;
     WaiterList* _list;
     Waiter* _waiter;
 };
@@ -1318,7 +1322,7 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
         // We just need to wait for the opTime to catch up to what we need (not majority RC).
         stdx::condition_variable condVar;
         ThreadWaiter waiter(targetOpTime, nullptr, &condVar);
-        WaiterGuard guard(&_opTimeWaiterList, &waiter);
+        WaiterGuard guard(lock, &_opTimeWaiterList, &waiter);
 
         LOG(3) << "waitUntilOpTime: OpID " << opCtx->getOpID() << " is waiting for OpTime "
                << waiter << " until " << opCtx->getDeadline();
@@ -1613,7 +1617,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
     stdx::condition_variable condVar;
     ThreadWaiter waiter(opTime, &writeConcern, &condVar);
-    WaiterGuard guard(&_replicationWaiterList, &waiter);
+    WaiterGuard guard(*lock, &_replicationWaiterList, &waiter);
 
     ScopeGuard failGuard = MakeGuard([&]() {
         if (getTestCommandsEnabled()) {
@@ -1742,47 +1746,51 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     auto waitTimeout = std::min(waitTime, stepdownTime);
     auto lastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
 
-    // Set up a waiter which will be signalled when we process a heartbeat or updatePosition
-    // and have a majority of nodes at our optime.
-    stdx::condition_variable condVar;
-    const WriteConcernOptions waiterWriteConcern(
-        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::NONE, waitTimeout);
-    ThreadWaiter waiter(lastAppliedOpTime, &waiterWriteConcern, &condVar);
-    WaiterGuard guard(&_replicationWaiterList, &waiter);
+    {  // Add a scope to ensure that the WaiterGuard destructor runs before the mutex is released.
 
-    while (!_topCoord->attemptStepDown(
-        termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
+        // Set up a waiter which will be signalled when we process a heartbeat or updatePosition
+        // and have a majority of nodes at our optime.
+        stdx::condition_variable condVar;
+        const WriteConcernOptions waiterWriteConcern(
+            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::NONE, waitTimeout);
+        ThreadWaiter waiter(lastAppliedOpTime, &waiterWriteConcern, &condVar);
+        WaiterGuard guard(lk, &_replicationWaiterList, &waiter);
 
-        // The stepdown attempt failed. We now release the global lock to allow secondaries
-        // to read the oplog, then wait until enough secondaries are caught up for us to
-        // finish stepdown.
-        transitionGuard.releaseGlobalLock();
-        invariant(!opCtx->lockState()->isLocked());
+        while (!_topCoord->attemptStepDown(
+            termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
 
-        // Make sure we re-acquire the global lock before returning so that we're always holding
-        // the global lock when the onExitGuard set up earlier runs.
-        ON_BLOCK_EXIT([&] {
-            // Need to release _mutex before re-acquiring the global lock to preserve lock
-            // acquisition order rules.
-            lk.unlock();
+            // The stepdown attempt failed. We now release the global lock to allow secondaries
+            // to read the oplog, then wait until enough secondaries are caught up for us to
+            // finish stepdown.
+            transitionGuard.releaseGlobalLock();
+            invariant(!opCtx->lockState()->isLocked());
 
-            // Need to re-acquire the global lock before re-attempting stepdown.
-            // We use no timeout here even though that means the lock acquisition could take
-            // longer than the stepdown window.  If that happens, the call to _tryToStepDown
-            // immediately after will error.  Since we'll need the global lock no matter what to
-            // clean up a failed stepdown attempt, we might as well spend whatever time we need
-            // to acquire it now.  For the same reason, we also disable lock acquisition
-            // interruption, to guarantee that we get the lock eventually.
-            transitionGuard.reacquireGlobalLock();
-            invariant(opCtx->lockState()->isW());
-            lk.lock();
-        });
+            // Make sure we re-acquire the global lock before returning so that we're always holding
+            // the global lock when the onExitGuard set up earlier runs.
+            ON_BLOCK_EXIT([&] {
+                // Need to release _mutex before re-acquiring the global lock to preserve lock
+                // acquisition order rules.
+                lk.unlock();
 
-        // We ignore the case where waitForConditionOrInterruptUntil returns
-        // stdx::cv_status::timeout because in that case coming back around the loop and calling
-        // attemptStepDown again will cause attemptStepDown to return ExceededTimeLimit with
-        // the proper error message.
-        opCtx->waitForConditionOrInterruptUntil(condVar, lk, std::min(stepDownUntil, waitUntil));
+                // Need to re-acquire the global lock before re-attempting stepdown.
+                // We use no timeout here even though that means the lock acquisition could take
+                // longer than the stepdown window.  If that happens, the call to _tryToStepDown
+                // immediately after will error.  Since we'll need the global lock no matter what to
+                // clean up a failed stepdown attempt, we might as well spend whatever time we need
+                // to acquire it now.  For the same reason, we also disable lock acquisition
+                // interruption, to guarantee that we get the lock eventually.
+                transitionGuard.reacquireGlobalLock();
+                invariant(opCtx->lockState()->isW());
+                lk.lock();
+            });
+
+            // We ignore the case where waitForConditionOrInterruptUntil returns
+            // stdx::cv_status::timeout because in that case coming back around the loop and calling
+            // attemptStepDown again will cause attemptStepDown to return ExceededTimeLimit with
+            // the proper error message.
+            opCtx->waitForConditionOrInterruptUntil(
+                condVar, lk, std::min(stepDownUntil, waitUntil));
+        }
     }
 
     // Stepdown success!
