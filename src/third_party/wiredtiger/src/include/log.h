@@ -404,12 +404,15 @@ __wt_log_desc_byteswap(WT_LOG_DESC *desc)
 #endif
 }
 
-/*
- * Flags for __wt_txn_op_printlog.
- */
+/* Cookie passed through the transaction printlog routines. */
+struct __wt_txn_printlog_args {
+	WT_FSTREAM *fs;
+
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_TXN_PRINTLOG_HEX	0x1u	/* Add hex output */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+	uint32_t flags;
+};
 
 /*
  * WT_LOG_REC_DESC --

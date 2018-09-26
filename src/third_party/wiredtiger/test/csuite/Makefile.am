@@ -123,6 +123,10 @@ test_wt4156_metadata_salvage_SOURCES = wt4156_metadata_salvage/main.c
 noinst_PROGRAMS += test_wt4156_metadata_salvage
 all_TESTS += test_wt4156_metadata_salvage
 
+test_wt4333_handle_locks_SOURCES = wt4333_handle_locks/main.c
+noinst_PROGRAMS += test_wt4333_handle_locks
+all_TESTS += test_wt4333_handle_locks
+
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)
 LOG_COMPILER = $(TEST_WRAPPER)

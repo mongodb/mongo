@@ -29,6 +29,8 @@ static int dup_json_string(const char *, char **);
 static int print_config(WT_SESSION *, const char *, const char *, bool, bool);
 static int usage(void);
 
+static FILE *fp;
+
 int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
@@ -37,23 +39,21 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session_impl;
 	int ch, i;
-	char *checkpoint, *p, *simpleuri, *uri;
+	char *checkpoint, *ofile, *p, *simpleuri, *uri;
 	bool hex, json, reverse;
 
 	session_impl = (WT_SESSION_IMPL *)session;
 
-	hex = json = reverse = false;
-	checkpoint = simpleuri = uri = NULL;
 	cursor = NULL;
+	checkpoint = ofile = simpleuri = uri = NULL;
+	hex = json = reverse = false;
 	while ((ch = __wt_getopt(progname, argc, argv, "c:f:jrx")) != EOF)
 		switch (ch) {
 		case 'c':
 			checkpoint = __wt_optarg;
 			break;
-		case 'f':			/* output file */
-			if (freopen(__wt_optarg, "w", stdout) == NULL)
-				return (util_err(
-				    session, errno, "%s: reopen", __wt_optarg));
+		case 'f':
+			ofile = __wt_optarg;
 			break;
 		case 'j':
 			json = true;
@@ -71,17 +71,23 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
+	/* The remaining argument is the uri. */
+	if (argc < 1 || (argc != 1 && !json))
+		return (usage());
+
 	/* -j and -x are incompatible. */
 	if (hex && json) {
 		fprintf(stderr,
 		    "%s: the -j and -x dump options are incompatible\n",
 		    progname);
-		goto err;
+		return (usage());
 	}
 
-	/* The remaining argument is the uri. */
-	if (argc < 1 || (argc != 1 && !json))
-		return (usage());
+	/* Open any optional output file. */
+	if (ofile == NULL)
+		fp = stdout;
+	else if ((fp = fopen(ofile, "w")) == NULL)
+		return (util_err(session, errno, "%s: open", ofile));
 
 	if (json &&
 	    (dump_json_begin(session) != 0 ||
@@ -141,13 +147,15 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 err:		ret = 1;
 	}
 
+	if (cursor != NULL && (ret = cursor->close(cursor)) != 0)
+		ret = util_err(session, ret, NULL);
+	if (ofile != NULL && (ret = fclose(fp)) != 0)
+		ret = util_err(session, errno, NULL);
+
 	__wt_scr_free(session_impl, &tmp);
 	free(uri);
 	free(simpleuri);
-	if (cursor != NULL && (ret = cursor->close(cursor)) != 0) {
-		(void)util_err(session, ret, NULL);
-		ret = 1;
-	}
+
 	return (ret);
 }
 
@@ -203,7 +211,7 @@ dump_config(WT_SESSION *session, const char *uri, WT_CURSOR *cursor, bool hex,
 static int
 dump_json_begin(WT_SESSION *session)
 {
-	if (printf("{\n") < 0)
+	if (fprintf(fp, "{\n") < 0)
 		return (util_err(session, EIO, NULL));
 	return (0);
 }
@@ -215,7 +223,7 @@ dump_json_begin(WT_SESSION *session)
 static int
 dump_json_end(WT_SESSION *session)
 {
-	if (printf("\n}\n") < 0)
+	if (fprintf(fp, "\n}\n") < 0)
 		return (util_err(session, EIO, NULL));
 	return (0);
 }
@@ -227,7 +235,7 @@ dump_json_end(WT_SESSION *session)
 static int
 dump_json_separator(WT_SESSION *session)
 {
-	if (printf(",\n") < 0)
+	if (fprintf(fp, ",\n") < 0)
 		return (util_err(session, EIO, NULL));
 	return (0);
 }
@@ -239,7 +247,7 @@ dump_json_separator(WT_SESSION *session)
 static int
 dump_json_table_end(WT_SESSION *session)
 {
-	if (printf("            ]\n        }\n    ]") < 0)
+	if (fprintf(fp, "            ]\n        }\n    ]") < 0)
 		return (util_err(session, EIO, NULL));
 	return (0);
 }
@@ -424,7 +432,7 @@ dump_table_parts_config(WT_SESSION *session, WT_CURSOR *cursor,
 		} else {
 			groupname = "indices";
 		}
-		if (printf("            \"%s\" : [", groupname) < 0)
+		if (fprintf(fp, "            \"%s\" : [", groupname) < 0)
 			return (util_err(session, EIO, NULL));
 	}
 
@@ -470,7 +478,7 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 		if ((ret = cursor->get_value(cursor, &v)) != 0)
 			return (util_cerr(cursor, "get_value", ret));
 
-		if (json && printf("%s\n", (multiple ? "," : "")) < 0)
+		if (json && fprintf(fp, "%s\n", (multiple ? "," : "")) < 0)
 			return (util_err(session, EIO, NULL));
 		/*
 		 * The dumped configuration string is the original key plus the
@@ -481,7 +489,7 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 			return (util_err(session, EIO, NULL));
 		multiple = true;
 	}
-	if (json && printf("%s]%s\n",
+	if (json && fprintf(fp, "%s]%s\n",
 	    (multiple ? "\n            " : ""), sep) < 0)
 		return (util_err(session, EIO, NULL));
 
@@ -501,17 +509,17 @@ dump_prefix(WT_SESSION *session, bool hex, bool json)
 
 	(void)wiredtiger_version(&vmajor, &vminor, &vpatch);
 
-	if (json && printf(
+	if (json && fprintf(fp,
 	    "    \"%s\" : \"%d (%d.%d.%d)\",\n",
 	    DUMP_JSON_VERSION_MARKER, DUMP_JSON_CURRENT_VERSION,
 	    vmajor, vminor, vpatch) < 0)
 		return (util_err(session, EIO, NULL));
 
-	if (!json && (printf(
+	if (!json && (fprintf(fp,
 	    "WiredTiger Dump (WiredTiger Version %d.%d.%d)\n",
 	    vmajor, vminor, vpatch) < 0 ||
-	    printf("Format=%s\n", hex ? "hex" : "print") < 0 ||
-	    printf("Header\n") < 0))
+	    fprintf(fp, "Format=%s\n", hex ? "hex" : "print") < 0 ||
+	    fprintf(fp, "Header\n") < 0))
 		return (util_err(session, EIO, NULL));
 
 	return (0);
@@ -548,12 +556,12 @@ dump_record(WT_CURSOR *cursor, bool reverse, bool json)
 			return (util_cerr(cursor, "get_key", ret));
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (util_cerr(cursor, "get_value", ret));
-		if (printf("%s%s%s%s%s%s", json && once ? "," : "",
+		if (fprintf(fp, "%s%s%s%s%s%s", json && once ? "," : "",
 		    prefix, key, infix, value, suffix) < 0)
 			return (util_err(session, EIO, NULL));
 		once = true;
 	}
-	if (json && once && printf("\n") < 0)
+	if (json && once && fprintf(fp, "\n") < 0)
 		return (util_err(session, EIO, NULL));
 	return (ret == WT_NOTFOUND ? 0 :
 	    util_cerr(cursor, (reverse ? "prev" : "next"), ret));
@@ -567,13 +575,13 @@ static int
 dump_suffix(WT_SESSION *session, bool json)
 {
 	if (json) {
-		if (printf(
+		if (fprintf(fp,
 		    "        },\n"
 		    "        {\n"
 		    "            \"data\" : [") < 0)
 			return (util_err(session, EIO, NULL));
 	} else {
-		if (printf("Data\n") < 0)
+		if (fprintf(fp, "Data\n") < 0)
 			return (util_err(session, EIO, NULL));
 	}
 	return (0);
@@ -631,17 +639,17 @@ print_config(WT_SESSION *session, const char *key, const char *cfg, bool json,
 
 	if (json) {
 		if (toplevel)
-			ret = printf(
+			ret = fprintf(fp,
 			    "    \"%s\" : [\n        {\n            "
 			    "\"config\" : \"%s\",\n", key, jsonconfig);
 		else
-			ret = printf(
+			ret = fprintf(fp,
 			    "                {\n"
 			    "                    \"uri\" : \"%s\",\n"
 			    "                    \"config\" : \"%s\"\n"
 			    "                }", key, jsonconfig);
 	} else
-		ret = printf("%s\n%s\n", key, cfg);
+		ret = fprintf(fp, "%s\n%s\n", key, cfg);
 	free(jsonconfig);
 	if (ret < 0)
 		return (util_err(session, EIO, NULL));
