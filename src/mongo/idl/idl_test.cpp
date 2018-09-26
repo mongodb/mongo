@@ -2401,6 +2401,214 @@ TEST(IDLChainedStruct, TestInline) {
     }
 }
 
+TEST(IDLValidatedField, Int_basic_ranges) {
+    // Explicitly call setters.
+    Int_basic_ranges obj0;
+    obj0.setPositive_int(42);
+    ASSERT_THROWS(obj0.setPositive_int(0), AssertionException);
+    ASSERT_THROWS(obj0.setPositive_int(-42), AssertionException);
+
+    ASSERT_THROWS(obj0.setNegative_int(42), AssertionException);
+    ASSERT_THROWS(obj0.setNegative_int(0), AssertionException);
+    obj0.setNegative_int(-42);
+
+    obj0.setNon_negative_int(42);
+    obj0.setNon_negative_int(0);
+    ASSERT_THROWS(obj0.setNon_negative_int(-42), AssertionException);
+
+    ASSERT_THROWS(obj0.setNon_positive_int(42), AssertionException);
+    obj0.setNon_positive_int(0);
+    obj0.setNon_positive_int(-42);
+
+    ASSERT_THROWS(obj0.setByte_range_int(-1), AssertionException);
+    obj0.setByte_range_int(0);
+    obj0.setByte_range_int(127);
+    obj0.setByte_range_int(128);
+    obj0.setByte_range_int(255);
+    ASSERT_THROWS(obj0.setByte_range_int(256), AssertionException);
+
+    // IDL ints *are* int32_t, so no number we can pass to the func will actually fail.
+    obj0.setRange_int(-2147483648);
+    obj0.setRange_int(-65536);
+    obj0.setRange_int(0);
+    obj0.setRange_int(65536);
+    obj0.setRange_int(2147483647);
+
+    // Positive case parsing.
+    const auto tryPass = [](std::int32_t pos,
+                            std::int32_t neg,
+                            std::int32_t nonneg,
+                            std::int32_t nonpos,
+                            std::int32_t byte_range,
+                            std::int32_t int_range) {
+        IDLParserErrorContext ctxt("root");
+        auto doc =
+            BSON("positive_int" << pos << "negative_int" << neg << "non_negative_int" << nonneg
+                                << "non_positive_int"
+                                << nonpos
+                                << "byte_range_int"
+                                << byte_range
+                                << "range_int"
+                                << int_range);
+        auto obj = Int_basic_ranges::parse(ctxt, doc);
+        ASSERT_EQUALS(obj.getPositive_int(), pos);
+        ASSERT_EQUALS(obj.getNegative_int(), neg);
+        ASSERT_EQUALS(obj.getNon_negative_int(), nonneg);
+        ASSERT_EQUALS(obj.getNon_positive_int(), nonpos);
+        ASSERT_EQUALS(obj.getByte_range_int(), byte_range);
+        ASSERT_EQUALS(obj.getRange_int(), int_range);
+    };
+
+    // Negative case parsing.
+    const auto tryFail = [](std::int32_t pos,
+                            std::int32_t neg,
+                            std::int32_t nonneg,
+                            std::int32_t nonpos,
+                            std::int32_t byte_range,
+                            std::int32_t int_range) {
+        IDLParserErrorContext ctxt("root");
+        auto doc =
+            BSON("positive_int" << pos << "negative_int" << neg << "non_negative_int" << nonneg
+                                << "non_positive_int"
+                                << nonpos
+                                << "byte_range_int"
+                                << byte_range
+                                << "range_int"
+                                << int_range);
+        ASSERT_THROWS(Int_basic_ranges::parse(ctxt, doc), AssertionException);
+    };
+
+    tryPass(1, -1, 0, 0, 128, 65537);
+    tryFail(0, -1, 0, 0, 128, 65537);
+    tryFail(1, 0, 0, 0, 128, 65537);
+    tryFail(1, -1, -1, 0, 128, 65537);
+    tryFail(1, -1, 0, 1, 128, 65537);
+    tryFail(1, -1, 0, 0, 256, 65537);
+    tryFail(0, 0, -1, 1, 257, 0);
+
+    tryPass(1000, -1000, 1, -1, 127, 0x7FFFFFFF);
+}
+
+TEST(IDLValidatedField, Double_basic_ranges) {
+    // Explicitly call setters.
+    Double_basic_ranges obj0;
+    obj0.setPositive_double(42.0);
+    obj0.setPositive_double(0.000000000001);
+    ASSERT_THROWS(obj0.setPositive_double(0.0), AssertionException);
+    ASSERT_THROWS(obj0.setPositive_double(-42.0), AssertionException);
+
+    ASSERT_THROWS(obj0.setNegative_double(42.0), AssertionException);
+    ASSERT_THROWS(obj0.setNegative_double(0.0), AssertionException);
+    obj0.setNegative_double(-0.000000000001);
+    obj0.setNegative_double(-42.0);
+
+    obj0.setNon_negative_double(42.0);
+    obj0.setNon_negative_double(0.0);
+    ASSERT_THROWS(obj0.setNon_negative_double(-42.0), AssertionException);
+
+    ASSERT_THROWS(obj0.setNon_positive_double(42.0), AssertionException);
+    obj0.setNon_positive_double(0.0);
+    obj0.setNon_positive_double(-42.0);
+
+    ASSERT_THROWS(obj0.setRange_double(-12345678901234600000.0), AssertionException);
+    obj0.setRange_double(-12345678901234500000.0);
+    obj0.setRange_double(-3000000000.0);
+    obj0.setRange_double(0);
+    obj0.setRange_double(3000000000);
+    obj0.setRange_double(12345678901234500000.0);
+    ASSERT_THROWS(obj0.setRange_double(12345678901234600000.0), AssertionException);
+
+    // Positive case parsing.
+    const auto tryPass =
+        [](double pos, double neg, double nonneg, double nonpos, double double_range) {
+            IDLParserErrorContext ctxt("root");
+            auto doc =
+                BSON("positive_double" << pos << "negative_double" << neg << "non_negative_double"
+                                       << nonneg
+                                       << "non_positive_double"
+                                       << nonpos
+                                       << "range_double"
+                                       << double_range);
+            auto obj = Double_basic_ranges::parse(ctxt, doc);
+            ASSERT_EQUALS(obj.getPositive_double(), pos);
+            ASSERT_EQUALS(obj.getNegative_double(), neg);
+            ASSERT_EQUALS(obj.getNon_negative_double(), nonneg);
+            ASSERT_EQUALS(obj.getNon_positive_double(), nonpos);
+            ASSERT_EQUALS(obj.getRange_double(), double_range);
+        };
+
+    // Negative case parsing.
+    const auto tryFail =
+        [](double pos, double neg, double nonneg, double nonpos, double double_range) {
+            IDLParserErrorContext ctxt("root");
+            auto doc =
+                BSON("positive_double" << pos << "negative_double" << neg << "non_negative_double"
+                                       << nonneg
+                                       << "non_positive_double"
+                                       << nonpos
+                                       << "range_double"
+                                       << double_range);
+            ASSERT_THROWS(Double_basic_ranges::parse(ctxt, doc), AssertionException);
+        };
+
+    tryPass(1, -1, 0, 0, 123456789012345);
+    tryFail(0, -1, 0, 0, 123456789012345);
+    tryFail(1, 0, 0, 0, 123456789012345);
+    tryFail(1, -1, -1, 0, 123456789012345);
+    tryFail(1, -1, 0, 1, 123456789012345);
+    tryFail(1, -1, 0, -1, 12345678901234600000.0);
+    tryPass(0.00000000001, -0.00000000001, 0.0, 0.0, 1.23456789012345);
+}
+
+TEST(IDLValidatedField, Callback_validators) {
+    // Explicitly call setters.
+    Callback_validators obj0;
+    obj0.setInt_even(42);
+    ASSERT_THROWS(obj0.setInt_even(7), AssertionException);
+    obj0.setInt_even(0);
+    ASSERT_THROWS(obj0.setInt_even(-7), AssertionException);
+    obj0.setInt_even(-42);
+
+    ASSERT_THROWS(obj0.setDouble_nearly_int(3.141592), AssertionException);
+    ASSERT_THROWS(obj0.setDouble_nearly_int(-2.71828), AssertionException);
+    obj0.setDouble_nearly_int(0.0);
+    obj0.setDouble_nearly_int(1.0);
+    obj0.setDouble_nearly_int(1.05);
+    obj0.setDouble_nearly_int(-123456789.01234500000);
+
+    ASSERT_THROWS(obj0.setString_starts_with_x("whiskey"), AssertionException);
+    obj0.setString_starts_with_x("x-ray");
+    ASSERT_THROWS(obj0.setString_starts_with_x("yankee"), AssertionException);
+
+    // Positive case parsing.
+    const auto tryPass =
+        [](std::int32_t int_even, double double_nearly_int, StringData string_starts_with_x) {
+            IDLParserErrorContext ctxt("root");
+            auto doc = BSON("int_even" << int_even << "double_nearly_int" << double_nearly_int
+                                       << "string_starts_with_x"
+                                       << string_starts_with_x);
+            auto obj = Callback_validators::parse(ctxt, doc);
+            ASSERT_EQUALS(obj.getInt_even(), int_even);
+            ASSERT_EQUALS(obj.getDouble_nearly_int(), double_nearly_int);
+            ASSERT_EQUALS(obj.getString_starts_with_x(), string_starts_with_x);
+        };
+
+    // Negative case parsing.
+    const auto tryFail =
+        [](std::int32_t int_even, double double_nearly_int, StringData string_starts_with_x) {
+            IDLParserErrorContext ctxt("root");
+            auto doc = BSON("int_even" << int_even << "double_nearly_int" << double_nearly_int
+                                       << "string_starts_with_x"
+                                       << string_starts_with_x);
+            ASSERT_THROWS(Callback_validators::parse(ctxt, doc), AssertionException);
+        };
+
+    tryPass(42, 123456789.01, "x-ray");
+    tryFail(43, 123456789.01, "x-ray");
+    tryFail(42, 123456789.11, "x-ray");
+    tryFail(42, 123456789.01, "uniform");
+}
+
 // Positive: verify a command a string arg
 TEST(IDLTypeCommand, TestString) {
     IDLParserErrorContext ctxt("root");

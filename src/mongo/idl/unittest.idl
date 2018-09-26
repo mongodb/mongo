@@ -19,6 +19,7 @@ global:
     cpp_namespace: "mongo::idl::test"
     cpp_includes:
         - "mongo/idl/idl_test_types.h"
+        - "mongo/idl/idl_test.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -498,6 +499,67 @@ structs:
 
 ##################################################################################################
 #
+# Using Validators
+#
+##################################################################################################
+
+    int_basic_ranges:
+        description: Struct using basic range validators on ints
+        fields:
+            positive_int:
+                type: int
+                validator: { gt: 0 }
+            negative_int:
+                type: int
+                validator: { lt: 0 }
+            non_negative_int:
+                type: int
+                validator: { gte: 0 }
+            non_positive_int:
+                type: int
+                validator: { lte: 0 }
+            byte_range_int:
+                type: int
+                validator: { gte: 0, lt: 256 }
+            range_int:
+                type: int
+                validator: { gte: -2147483658, lte: 2147483647 }
+
+    double_basic_ranges:
+        description: Struct using basic range validators on doubles
+        fields:
+            positive_double:
+                type: double
+                validator: { gt: 0.0 }
+            negative_double:
+                type: double
+                validator: { lt: 0.0 }
+            non_negative_double:
+                type: double
+                validator: { gte: 0.0 }
+            non_positive_double:
+                type: double
+                validator: { lte: 0.0 }
+            range_double:
+                type: double
+                validator: { gte: -12345678901234500000, lte: 12345678901234500000 }
+
+    callback_validators:
+        description: Struct using fields with callback validators
+        fields:
+            int_even:
+                type: int
+                validator: { callback: 'validateEvenNumber' }
+            double_nearly_int:
+                type: double
+                validator: { callback: 'validateNearlyInt' }
+            string_starts_with_x:
+                type: string
+                validator: { callback: "validateStartsWith<'x'>" }
+
+
+##################################################################################################
+#
 # Test commands
 #
 ##################################################################################################
@@ -617,5 +679,4 @@ commands:
         type: array<int>
         fields:
             field1: int
-
 

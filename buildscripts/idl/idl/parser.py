@@ -191,6 +191,23 @@ def _parse_type(ctxt, spec, name, node):
     spec.symbols.add_type(ctxt, idltype)
 
 
+def _parse_validator(ctxt, node):
+    # type: (errors.ParserContext, yaml.nodes.MappingNode) -> syntax.Validator
+    """Parse a validator for a field."""
+    validator = syntax.Validator(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+
+    _generic_parser(
+        ctxt, node, "validator", validator, {
+            "gt": _RuleDesc("scalar"),
+            "lt": _RuleDesc("scalar"),
+            "gte": _RuleDesc("scalar"),
+            "lte": _RuleDesc("scalar"),
+            "callback": _RuleDesc("scalar"),
+        })
+
+    return validator
+
+
 def _parse_field(ctxt, name, node):
     # type: (errors.ParserContext, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> syntax.Field
     """Parse a field in a struct/command in the IDL file."""
@@ -207,6 +224,7 @@ def _parse_field(ctxt, name, node):
             "default": _RuleDesc('scalar'),
             "supports_doc_sequence": _RuleDesc("bool_scalar"),
             "comparison_order": _RuleDesc("int_scalar"),
+            "validator": _RuleDesc('mapping', mapping_parser_func=_parse_validator),
         })
 
     return field

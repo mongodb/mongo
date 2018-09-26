@@ -505,6 +505,34 @@ def _normalize_method_name(cpp_type_name, cpp_method_name):
     return cpp_method_name
 
 
+def _bind_validator(ctxt, validator):
+    # type: (errors.ParserContext, syntax.Validator) -> ast.Validator
+    """Bind a validator from the idl.syntax tree."""
+
+    ast_validator = ast.Validator(validator.file_name, validator.line, validator.column)
+
+    # Parse syntax value as numeric if possible.
+    for pred in ["gt", "lt", "gte", "lte"]:
+        val = getattr(validator, pred)
+        if val is None:
+            continue
+
+        try:
+            intval = int(val)
+            if (intval < -0x80000000) or (intval > 0x7FFFFFFF):
+                raise ValueError('IDL ints are limited to int32_t')
+            setattr(ast_validator, pred, intval)
+        except ValueError:
+            try:
+                setattr(ast_validator, pred, float(val))
+            except ValueError:
+                ctxt.add_value_not_numeric_error(ast_validator, pred, val)
+                return None
+
+    ast_validator.callback = validator.callback
+    return ast_validator
+
+
 def _bind_field(ctxt, parsed_spec, field):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Field) -> ast.Field
     """
@@ -597,6 +625,11 @@ def _bind_field(ctxt, parsed_spec, field):
 
         # Validation doc_sequence types
         _validate_doc_sequence_field(ctxt, ast_field)
+
+    if field.validator is not None:
+        ast_field.validator = _bind_validator(ctxt, field.validator)
+        if ast_field.validator is None:
+            return None
 
     return ast_field
 

@@ -85,6 +85,7 @@ ERROR_ID_IS_NODE_VALID_INT = "ID0049"
 ERROR_ID_IS_NODE_VALID_NON_NEGATIVE_INT = "ID0050"
 ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER = "ID0051"
 ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS = "ID0052"
+ERROR_ID_VALUE_NOT_NUMERIC = "ID0053"
 
 
 class IDLError(Exception):
@@ -664,6 +665,14 @@ class ParserContext(object):
             location, ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS,
             ("Command '%s' cannot have a 'type' property unless namespace equals 'type'.") %
             (command_name))
+
+    def add_value_not_numeric_error(self, location, attrname, value):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error about non-numeric value where number expected."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_VALUE_NOT_NUMERIC,
+                        ("'%s' requires a numeric value, but %s can not be cast") % (attrname,
+                                                                                     value))
 
 
 def _assert_unique_error_messages():
