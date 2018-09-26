@@ -257,8 +257,11 @@ public:
      * callback ran.
      *
      * NOTE: Do not call from a callback running in the executor.
+     *
+     * Prefer the version that takes an OperationContext* to this version.
      */
-    virtual void wait(const CallbackHandle& cbHandle) = 0;
+    virtual void wait(const CallbackHandle& cbHandle,
+                      Interruptible* interruptible = Interruptible::notInterruptible()) = 0;
 
     /**
      * Appends information about the underlying network interface's connections to the given

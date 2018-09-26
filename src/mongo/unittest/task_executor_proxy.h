@@ -70,7 +70,8 @@ public:
         const RemoteCommandCallbackFn& cb,
         const transport::BatonHandle& baton = nullptr) override;
     virtual void cancel(const CallbackHandle& cbHandle) override;
-    virtual void wait(const CallbackHandle& cbHandle) override;
+    virtual void wait(const CallbackHandle& cbHandle,
+                      Interruptible* interruptible = Interruptible::notInterruptible()) override;
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
 private:

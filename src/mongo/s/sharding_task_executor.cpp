@@ -211,8 +211,8 @@ void ShardingTaskExecutor::cancel(const CallbackHandle& cbHandle) {
     _executor->cancel(cbHandle);
 }
 
-void ShardingTaskExecutor::wait(const CallbackHandle& cbHandle) {
-    _executor->wait(cbHandle);
+void ShardingTaskExecutor::wait(const CallbackHandle& cbHandle, Interruptible* interruptible) {
+    _executor->wait(cbHandle, interruptible);
 }
 
 void ShardingTaskExecutor::appendConnectionStats(ConnectionPoolStats* stats) const {

@@ -86,7 +86,7 @@ OperationContext::OperationContext(Client* client, unsigned int opId)
 void OperationContext::setDeadlineAndMaxTime(Date_t when,
                                              Microseconds maxTime,
                                              ErrorCodes::Error timeoutError) {
-    invariant(!getClient()->isInDirectClient());
+    invariant(!getClient()->isInDirectClient() || _hasArtificialDeadline);
     invariant(ErrorCodes::isExceededTimeLimitError(timeoutError));
     uassert(40120,
             "Illegal attempt to change operation deadline",

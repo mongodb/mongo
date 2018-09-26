@@ -473,7 +473,7 @@ void ThreadPoolTaskExecutor::cancel(const CallbackHandle& cbHandle) {
     }
 }
 
-void ThreadPoolTaskExecutor::wait(const CallbackHandle& cbHandle) {
+void ThreadPoolTaskExecutor::wait(const CallbackHandle& cbHandle, Interruptible* interruptible) {
     invariant(cbHandle.isValid());
     auto cbState = checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle));
     if (cbState->isFinished.load()) {
@@ -484,7 +484,7 @@ void ThreadPoolTaskExecutor::wait(const CallbackHandle& cbHandle) {
         cbState->finishedCondition.emplace();
     }
     while (!cbState->isFinished.load()) {
-        cbState->finishedCondition->wait(lk);
+        interruptible->waitForConditionOrInterrupt(*cbState->finishedCondition, lk);
     }
 }
 

@@ -109,8 +109,8 @@ void TaskExecutorProxy::cancel(const CallbackHandle& cbHandle) {
     _executor->cancel(cbHandle);
 }
 
-void TaskExecutorProxy::wait(const CallbackHandle& cbHandle) {
-    _executor->wait(cbHandle);
+void TaskExecutorProxy::wait(const CallbackHandle& cbHandle, Interruptible* interruptible) {
+    _executor->wait(cbHandle, interruptible);
 }
 
 void TaskExecutorProxy::appendConnectionStats(executor::ConnectionPoolStats* stats) const {

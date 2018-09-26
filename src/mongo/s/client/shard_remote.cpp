@@ -210,7 +210,18 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
 
     // Block until the command is carried out
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    executor->wait(asyncHandle.handle);
+    try {
+        executor->wait(asyncHandle.handle, opCtx);
+    } catch (const DBException& e) {
+        // If waiting for the response is interrupted, then we still have a callback out and
+        // registered with the TaskExecutor to run when the response finally does come back.
+        // Since the callback references local state, it would be invalid for the callback to run
+        // after leaving the scope of this method.  Therefore we cancel the callback and wait
+        // uninterruptably for the callback to be run.
+        executor->cancel(asyncHandle.handle);
+        executor->wait(asyncHandle.handle);
+        return e.toStatus();
+    }
 
     const auto& host = asyncHandle.hostTargetted;
     updateReplSetMonitor(host, response.status);

@@ -72,7 +72,8 @@ public:
         const RemoteCommandCallbackFn& cb,
         const transport::BatonHandle& baton = nullptr) override;
     void cancel(const CallbackHandle& cbHandle) override;
-    void wait(const CallbackHandle& cbHandle) override;
+    void wait(const CallbackHandle& cbHandle,
+              Interruptible* interruptible = Interruptible::notInterruptible()) override;
 
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
 
