@@ -46,7 +46,7 @@
     var sortCode = 16819;
     var sortLimitCode = 16820;
 
-    test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], groupCode);
+    test([{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}], groupCode);
 
     // sorting with _id would use index which doesn't require extsort
     test([{$sort: {random: 1}}], sortCode);
@@ -56,9 +56,9 @@
     test([{$sort: {bigStr: 1}}, {$limit: 1000 * 1000 * 1000}], sortLimitCode);
 
     // test combining two extSorts in both same and different orders
-    test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id: 1}}], groupCode);
-    test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id: -1}}], groupCode);
-    test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {random: 1}}], groupCode);
+    test([{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {_id: 1}}], groupCode);
+    test([{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {_id: -1}}], groupCode);
+    test([{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {random: 1}}], groupCode);
     test([{$sort: {random: 1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], sortCode);
 
     var origDB = db;

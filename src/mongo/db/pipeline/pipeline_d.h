@@ -34,7 +34,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
@@ -46,8 +48,6 @@ class ExpressionContext;
 class OperationContext;
 class Pipeline;
 struct PlanSummaryStats;
-class BSONObj;
-struct DepsTracker;
 
 /**
  * PipelineD is an extension of the Pipeline class, but with additional material that references
@@ -113,6 +113,10 @@ private:
      * 'sortObj' will be set to an empty object if the query system cannot provide a non-blocking
      * sort, and 'projectionObj' will be set to an empty object if the query system cannot provide a
      * covered projection.
+     *
+     * Set 'rewrittenGroupStage' when the pipeline uses $match+$sort+$group stages that are
+     * compatible with a DISTINCT_SCAN plan that visits the first document in each group
+     * (SERVER-9507).
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor(
         OperationContext* opCtx,
@@ -122,6 +126,7 @@ private:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         bool oplogReplay,
         const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
+        std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
         const DepsTracker& deps,
         const BSONObj& queryObj,
         const AggregationRequest* aggRequest,

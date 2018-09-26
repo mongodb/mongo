@@ -147,6 +147,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     BSONObj queryObj,
     BSONObj projectionObj,
     BSONObj sortObj,
+    boost::optional<std::string> groupIdForDistinctScan,
     const AggregationRequest* aggRequest,
     const size_t plannerOpts,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures) {
@@ -183,6 +184,29 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         // will fail, but will succeed when the corresponding '$meta' projection is passed in
         // another attempt.
         return {cq.getStatus()};
+    }
+
+    if (groupIdForDistinctScan) {
+        // When the pipeline includes a $group that groups by a single field
+        // (groupIdForDistinctScan), we use getExecutorDistinct() to attempt to get an executor that
+        // uses a DISTINCT_SCAN to scan exactly one document for each group. When that's not
+        // possible, we return nullptr, and the caller is responsible for trying again without
+        // passing a 'groupIdForDistinctScan' value.
+        ParsedDistinct parsedDistinct(std::move(cq.getValue()), *groupIdForDistinctScan);
+        auto distinctExecutor =
+            getExecutorDistinct(opCtx,
+                                collection,
+                                plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
+                                &parsedDistinct);
+        if (!distinctExecutor.isOK()) {
+            return distinctExecutor.getStatus().withContext(
+                "Unable to use distinct scan to optimize $group stage");
+        } else if (!distinctExecutor.getValue()) {
+            return {ErrorCodes::OperationFailed,
+                    "Unable to use distinct scan to optimize $group stage"};
+        } else {
+            return distinctExecutor;
+        }
     }
 
     return getExecutorFind(opCtx, collection, nss, std::move(cq.getValue()), plannerOpts);
@@ -291,6 +315,45 @@ void PipelineD::prepareCursorSource(Collection* collection,
     }
 }
 
+namespace {
+
+/**
+ * Look for $sort, $group at the beginning of the pipeline, potentially returning either or both.
+ * Returns nullptr for any of the stages that are not found. Note that we are not looking for the
+ * opposite pattern ($group, $sort). In that case, this function will return only the $group stage.
+ *
+ * This function will not return the $group in the case that there is an initial $sort with
+ * intermediate stages that separate it from the $group (e.g.: $sort, $limit, $group). That includes
+ * the case of a $sort with a non-null value for getLimitSrc(), indicating that there was previously
+ * a $limit stage that was optimized away.
+ */
+std::pair<boost::intrusive_ptr<DocumentSourceSort>, boost::intrusive_ptr<DocumentSourceGroup>>
+getSortAndGroupStagesFromPipeline(const Pipeline::SourceContainer& sources) {
+    boost::intrusive_ptr<DocumentSourceSort> sortStage = nullptr;
+    boost::intrusive_ptr<DocumentSourceGroup> groupStage = nullptr;
+
+    auto sourcesIt = sources.begin();
+    if (sourcesIt != sources.end()) {
+        sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
+        if (sortStage) {
+            if (!sortStage->getLimitSrc()) {
+                ++sourcesIt;
+            } else {
+                // This $sort stage was previously followed by a $limit stage.
+                sourcesIt = sources.end();
+            }
+        }
+    }
+
+    if (sourcesIt != sources.end()) {
+        groupStage = dynamic_cast<DocumentSourceGroup*>(sourcesIt->get());
+    }
+
+    return std::make_pair(sortStage, groupStage);
+}
+
+}  // namespace
+
 void PipelineD::prepareGenericCursorSource(Collection* collection,
                                            const NamespaceString& nss,
                                            const AggregationRequest* aggRequest,
@@ -323,19 +386,21 @@ void PipelineD::prepareGenericCursorSource(Collection* collection,
 
     BSONObj projForQuery = deps.toProjection();
 
-    // Look for an initial sort; we'll try to add this to the Cursor we create. If we're successful
-    // in doing that, we'll remove the $sort from the pipeline, because the documents will already
-    // come sorted in the specified order as a result of the index scan.
-    intrusive_ptr<DocumentSourceSort> sortStage;
+    boost::intrusive_ptr<DocumentSourceSort> sortStage;
+    boost::intrusive_ptr<DocumentSourceGroup> groupStage;
+    std::tie(sortStage, groupStage) = getSortAndGroupStagesFromPipeline(pipeline->_sources);
+
     BSONObj sortObj;
-    if (!sources.empty()) {
-        sortStage = dynamic_cast<DocumentSourceSort*>(sources.front().get());
-        if (sortStage) {
-            sortObj = sortStage
-                          ->sortKeyPattern(
-                              DocumentSourceSort::SortKeySerialization::kForPipelineSerialization)
-                          .toBson();
-        }
+    if (sortStage) {
+        sortObj = sortStage
+                      ->sortKeyPattern(
+                          DocumentSourceSort::SortKeySerialization::kForPipelineSerialization)
+                      .toBson();
+    }
+
+    std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage;
+    if (groupStage) {
+        rewrittenGroupStage = groupStage->rewriteGroupAsTransformOnFirstDocument();
     }
 
     // Create the PlanExecutor.
@@ -346,6 +411,7 @@ void PipelineD::prepareGenericCursorSource(Collection* collection,
                                                 expCtx,
                                                 oplogReplay,
                                                 sortStage,
+                                                std::move(rewrittenGroupStage),
                                                 deps,
                                                 queryObj,
                                                 aggRequest,
@@ -407,6 +473,7 @@ void PipelineD::prepareGeoNearCursorSource(Collection* collection,
                                                 expCtx,
                                                 false,   /* oplogReplay */
                                                 nullptr, /* sortStage */
+                                                nullptr, /* rewrittenGroupStage */
                                                 deps,
                                                 std::move(fullQuery),
                                                 aggRequest,
@@ -438,7 +505,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     Pipeline* pipeline,
     const intrusive_ptr<ExpressionContext>& expCtx,
     bool oplogReplay,
-    const intrusive_ptr<DocumentSourceSort>& sortStage,
+    const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
+    std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
     const DepsTracker& deps,
     const BSONObj& queryObj,
     const AggregationRequest* aggRequest,
@@ -471,6 +539,63 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         plannerOpts |= QueryPlannerParams::IS_COUNT;
     }
 
+    if (expCtx->needsMerge && expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+        plannerOpts |= QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
+    }
+
+    if (rewrittenGroupStage) {
+        BSONObj emptySort;
+
+        // See if the query system can handle the $group and $sort stage using a DISTINCT_SCAN
+        // (SERVER-9507). Note that passing the empty projection (as we do for some of the
+        // attemptToGetExecutor() calls below) causes getExecutorDistinct() to ignore some otherwise
+        // valid DISTINCT_SCAN plans, so we pass the projection and exclude the
+        // NO_UNCOVERED_PROJECTIONS planner parameter.
+        auto swExecutorGrouped = attemptToGetExecutor(opCtx,
+                                                      collection,
+                                                      nss,
+                                                      expCtx,
+                                                      oplogReplay,
+                                                      queryObj,
+                                                      *projectionObj,
+                                                      sortObj ? *sortObj : emptySort,
+                                                      rewrittenGroupStage->groupId(),
+                                                      aggRequest,
+                                                      plannerOpts,
+                                                      matcherFeatures);
+
+        if (swExecutorGrouped.isOK()) {
+            // Any $limit stage before the $group stage should make the pipeline ineligible for this
+            // optimization.
+            invariant(!sortStage || !sortStage->getLimitSrc());
+
+            // We remove the $sort and $group stages that begin the pipeline, because the executor
+            // will handle the sort, and the groupTransform (added below) will handle the $group
+            // stage.
+            pipeline->popFrontWithName(DocumentSourceSort::kStageName);
+            pipeline->popFrontWithName(DocumentSourceGroup::kStageName);
+
+            boost::intrusive_ptr<DocumentSource> groupTransform(
+                new DocumentSourceSingleDocumentTransformation(
+                    expCtx,
+                    std::move(rewrittenGroupStage),
+                    "$groupByDistinctScan",
+                    false /* independentOfAnyCollection */));
+            pipeline->addInitialSource(groupTransform);
+
+            return swExecutorGrouped;
+        } else if (swExecutorGrouped == ErrorCodes::QueryPlanKilled) {
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "Failed to determine whether query system can provide a "
+                                     "DISTINCT_SCAN grouping: "
+                                  << swExecutorGrouped.getStatus().toString()};
+        }
+    }
+
+    const BSONObj emptyProjection;
+    const BSONObj metaSortProjection = BSON("$meta"
+                                            << "sortKey");
+
     // The only way to get meta information (e.g. the text score) is to let the query system handle
     // the projection. In all other cases, unless the query system can do an index-covered
     // projection and avoid going to the raw record at all, it is faster to have ParsedDeps filter
@@ -479,13 +604,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
     }
 
-    if (expCtx->needsMerge && expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
-        plannerOpts |= QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
-    }
-
-    const BSONObj emptyProjection;
-    const BSONObj metaSortProjection = BSON("$meta"
-                                            << "sortKey");
     if (sortStage) {
         // See if the query system can provide a non-blocking sort.
         auto swExecutorSort =
@@ -497,23 +615,26 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                  queryObj,
                                  expCtx->needsMerge ? metaSortProjection : emptyProjection,
                                  *sortObj,
+                                 boost::none, /* groupIdForDistinctScan */
                                  aggRequest,
                                  plannerOpts,
                                  matcherFeatures);
 
         if (swExecutorSort.isOK()) {
             // Success! Now see if the query system can also cover the projection.
-            auto swExecutorSortAndProj = attemptToGetExecutor(opCtx,
-                                                              collection,
-                                                              nss,
-                                                              expCtx,
-                                                              oplogReplay,
-                                                              queryObj,
-                                                              *projectionObj,
-                                                              *sortObj,
-                                                              aggRequest,
-                                                              plannerOpts,
-                                                              matcherFeatures);
+            auto swExecutorSortAndProj =
+                attemptToGetExecutor(opCtx,
+                                     collection,
+                                     nss,
+                                     expCtx,
+                                     oplogReplay,
+                                     queryObj,
+                                     *projectionObj,
+                                     *sortObj,
+                                     boost::none, /* groupIdForDistinctScan */
+                                     aggRequest,
+                                     plannerOpts,
+                                     matcherFeatures);
 
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
             if (swExecutorSortAndProj.isOK()) {
@@ -572,6 +693,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                queryObj,
                                                *projectionObj,
                                                *sortObj,
+                                               boost::none, /* groupIdForDistinctScan */
                                                aggRequest,
                                                plannerOpts,
                                                matcherFeatures);
@@ -596,6 +718,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                 queryObj,
                                 *projectionObj,
                                 *sortObj,
+                                boost::none, /* groupIdForDistinctScan */
                                 aggRequest,
                                 plannerOpts,
                                 matcherFeatures);

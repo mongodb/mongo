@@ -34,14 +34,63 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
+
+/**
+ * GroupFromFirstTransformation consists of a list of (field name, expression pairs). It returns a
+ * document synthesized by assigning each field name in the output document to the result of
+ * evaluating the corresponding expression. If the expression evaluates to missing, we assign a
+ * value of BSONNULL. This is necessary to match the semantics of $first for missing fields.
+ */
+class GroupFromFirstDocumentTransformation final : public TransformerInterface {
+public:
+    GroupFromFirstDocumentTransformation(
+        const std::string& groupId,
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs)
+        : _accumulatorExprs(std::move(accumulatorExprs)), _groupId(groupId) {}
+
+    TransformerType getType() const final {
+        return TransformerType::kGroupFromFirstDocument;
+    }
+
+    /**
+     * The path of the field that we are grouping on: i.e., the field in the input document that we
+     * will use to create the _id field of the ouptut document.
+     */
+    const std::string& groupId() const {
+        return _groupId;
+    }
+
+    Document applyTransformation(const Document& input) final;
+
+    void optimize() final;
+
+    Document serializeTransformation(
+        boost::optional<ExplainOptions::Verbosity> explain) const final;
+
+    DepsTracker::State addDependencies(DepsTracker* deps) const final;
+
+    DocumentSource::GetModPathsReturn getModifiedPaths() const final;
+
+    static std::unique_ptr<GroupFromFirstDocumentTransformation> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const std::string& groupId,
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs);
+
+private:
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> _accumulatorExprs;
+    std::string _groupId;
+};
 
 class DocumentSourceGroup final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
+
+    static constexpr StringData kStageName = "$group"_sd;
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
@@ -116,6 +165,18 @@ public:
     MergingLogic mergingLogic() final;
     bool canRunInParallelBeforeOut(
         const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final;
+
+    /**
+     * When possible, creates a document transformer that transforms the first document in a group
+     * into one of the output documents of the $group stage. This is possible when we are grouping
+     * on a single field and all accumulators are $first (or there are no accumluators).
+     *
+     * It is sometimes possible to use a DISTINCT_SCAN to scan the first document of each group,
+     * in which case this transformation can replace the actual $group stage in the pipeline
+     * (SERVER-9507).
+     */
+    std::unique_ptr<GroupFromFirstDocumentTransformation> rewriteGroupAsTransformOnFirstDocument()
+        const;
 
 protected:
     void doDispose() final;

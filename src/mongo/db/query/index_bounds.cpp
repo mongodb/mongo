@@ -387,6 +387,22 @@ IndexBounds IndexBounds::forwardize() const {
     return newBounds;
 }
 
+IndexBounds IndexBounds::reverse() const {
+    IndexBounds reversed(*this);
+
+    if (reversed.isSimpleRange) {
+        std::swap(reversed.startKey, reversed.endKey);
+        // If only one bound is included, swap which one is included.
+        reversed.boundInclusion = reverseBoundInclusion(reversed.boundInclusion);
+    } else {
+        for (auto& orderedIntervalList : reversed.fields) {
+            orderedIntervalList.reverse();
+        }
+    }
+
+    return reversed;
+}
+
 //
 // Validity checking for bounds
 //

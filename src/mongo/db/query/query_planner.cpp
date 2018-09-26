@@ -131,6 +131,9 @@ string optionString(size_t options) {
             case QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE:
                 ss << "OPLOG_SCAN_WAIT_FOR_VISIBLE ";
                 break;
+            case QueryPlannerParams::STRICT_DISTINCT_ONLY:
+                ss << "STRICT_DISTINCT_ONLY ";
+                break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
                 break;

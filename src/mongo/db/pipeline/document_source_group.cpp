@@ -47,12 +47,67 @@ using std::pair;
 using std::shared_ptr;
 using std::vector;
 
+Document GroupFromFirstDocumentTransformation::applyTransformation(const Document& input) {
+    MutableDocument output(_accumulatorExprs.size());
+
+    for (auto&& expr : _accumulatorExprs) {
+        auto value = expr.second->evaluate(input);
+        output.addField(expr.first, value.missing() ? Value(BSONNULL) : value);
+    }
+
+    return output.freeze();
+}
+
+void GroupFromFirstDocumentTransformation::optimize() {
+    for (auto&& expr : _accumulatorExprs) {
+        expr.second = expr.second->optimize();
+    }
+}
+
+Document GroupFromFirstDocumentTransformation::serializeTransformation(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+
+    MutableDocument newRoot(_accumulatorExprs.size());
+    for (auto&& expr : _accumulatorExprs) {
+        newRoot.addField(expr.first, expr.second->serialize(static_cast<bool>(explain)));
+    }
+
+    return {{"newRoot", newRoot.freezeToValue()}};
+}
+
+DepsTracker::State GroupFromFirstDocumentTransformation::addDependencies(DepsTracker* deps) const {
+    for (auto&& expr : _accumulatorExprs) {
+        expr.second->addDependencies(deps);
+    }
+
+    // This stage will replace the entire document with a new document, so any existing fields
+    // will be replaced and cannot be required as dependencies. We use EXHAUSTIVE_ALL here
+    // instead of EXHAUSTIVE_FIELDS, as in ReplaceRootTransformation, because the stages that
+    // follow a $group stage should not depend on document metadata.
+    return DepsTracker::State::EXHAUSTIVE_ALL;
+}
+
+DocumentSource::GetModPathsReturn GroupFromFirstDocumentTransformation::getModifiedPaths() const {
+    // Replaces the entire root, so all paths are modified.
+    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
+}
+
+std::unique_ptr<GroupFromFirstDocumentTransformation> GroupFromFirstDocumentTransformation::create(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const std::string& groupId,
+    vector<pair<std::string, intrusive_ptr<Expression>>> accumulatorExprs) {
+    return std::make_unique<GroupFromFirstDocumentTransformation>(groupId,
+                                                                  std::move(accumulatorExprs));
+}
+
+constexpr StringData DocumentSourceGroup::kStageName;
+
 REGISTER_DOCUMENT_SOURCE(group,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceGroup::createFromBson);
 
 const char* DocumentSourceGroup::getSourceName() const {
-    return "$group";
+    return kStageName.rawData();
 }
 
 DocumentSource::GetNextResult DocumentSourceGroup::getNext() {
@@ -914,6 +969,39 @@ bool DocumentSourceGroup::canRunInParallelBeforeOut(
         }
     }
     return true;
+}
+
+std::unique_ptr<GroupFromFirstDocumentTransformation>
+DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
+    if (!_idFieldNames.empty()) {
+        // This transformation is only intended for $group stages that group on a single field.
+        return nullptr;
+    }
+
+    invariant(_idExpressions.size() == 1);
+    auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(_idExpressions.front().get());
+    if (!fieldPathExpr || !fieldPathExpr->isRootFieldPath()) {
+        return nullptr;
+    }
+
+    auto groupId = fieldPathExpr->getFieldPath().tail().fullPath();
+
+    // We can't do this transformation if there are any non-$first accumulators.
+    for (auto&& accumulator : _accumulatedFields) {
+        if (AccumulatorDocumentsNeeded::kFirstDocument !=
+            accumulator.makeAccumulator(pExpCtx)->documentsNeeded()) {
+            return nullptr;
+        }
+    }
+
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fields;
+    fields.push_back(std::make_pair("_id", ExpressionFieldPath::create(pExpCtx, groupId)));
+
+    for (auto&& accumulator : _accumulatedFields) {
+        fields.push_back(std::make_pair(accumulator.fieldName, accumulator.expression));
+    }
+
+    return GroupFromFirstDocumentTransformation::create(pExpCtx, groupId, std::move(fields));
 }
 }  // namespace mongo
 

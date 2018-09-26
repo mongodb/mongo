@@ -91,6 +91,11 @@ struct QueryPlannerParams {
 
         // Set this so that collection scans on the oplog wait for visibility before reading.
         OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 10,
+
+        // Set this so that getExecutorDistinct() will only use a plan that _guarantees_ it will
+        // return exactly one document per value of the distinct field. See the comments above the
+        // declaration of getExecutorDistinct() for more detail.
+        STRICT_DISTINCT_ONLY = 1 << 11,
     };
 
     // See Options enum above.

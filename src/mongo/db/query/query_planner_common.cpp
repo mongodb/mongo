@@ -43,24 +43,23 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
         IndexScanNode* isn = static_cast<IndexScanNode*>(node);
         isn->direction *= -1;
 
-        if (isn->bounds.isSimpleRange) {
-            std::swap(isn->bounds.startKey, isn->bounds.endKey);
-            // If only one bound is included, swap which one is included.
-            isn->bounds.boundInclusion =
-                IndexBounds::reverseBoundInclusion(isn->bounds.boundInclusion);
-        } else {
-            for (size_t i = 0; i < isn->bounds.fields.size(); ++i) {
-                isn->bounds.fields[i].reverse();
-            }
-        }
+        isn->bounds = isn->bounds.reverse();
 
-        if (!isn->bounds.isValidFor(isn->index.keyPattern, isn->direction)) {
-            severe() << "Invalid bounds: " << redact(isn->bounds.toString());
-            MONGO_UNREACHABLE;
-        }
+        invariant(isn->bounds.isValidFor(isn->index.keyPattern, isn->direction),
+                  str::stream() << "Invalid bounds: " << redact(isn->bounds.toString()));
 
         // TODO: we can just negate every value in the already computed properties.
         isn->computeProperties();
+    } else if (STAGE_DISTINCT_SCAN == type) {
+        DistinctNode* dn = static_cast<DistinctNode*>(node);
+        dn->direction *= -1;
+
+        dn->bounds = dn->bounds.reverse();
+
+        invariant(dn->bounds.isValidFor(dn->index.keyPattern, dn->direction),
+                  str::stream() << "Invalid bounds: " << redact(dn->bounds.toString()));
+
+        dn->computeProperties();
     } else if (STAGE_SORT_MERGE == type) {
         // reverse direction of comparison for merge
         MergeSortNode* msn = static_cast<MergeSortNode*>(node);

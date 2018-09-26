@@ -157,6 +157,12 @@ struct IndexBounds {
      */
     IndexBounds forwardize() const;
 
+    /**
+     * Return a copy of the index bounds that has each OIL going in the direction opposite to its
+     * direction in this IndexBounds.
+     */
+    IndexBounds reverse() const;
+
     // TODO: we use this for max/min scan.  Consider migrating that.
     bool isSimpleRange;
     BSONObj startKey;

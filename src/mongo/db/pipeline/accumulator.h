@@ -46,6 +46,22 @@
 
 namespace mongo {
 
+/**
+ * This enum indicates which documents an accumulator needs to see in order to compute its output.
+ */
+enum class AccumulatorDocumentsNeeded {
+    // Accumulator needs to see all documents in a group.
+    kAllDocuments,
+
+    // Accumulator only needs to see one document in a group, and when there is a sort order, that
+    // document must be the first document.
+    kFirstDocument,
+
+    // Accumulator only needs to see one document in a group, and when there is a sort order, that
+    // document must be the last document.
+    kLastDocument,
+};
+
 class Accumulator : public RefCountable {
 public:
     using Factory = boost::intrusive_ptr<Accumulator> (*)(
@@ -83,6 +99,10 @@ public:
 
     virtual bool isCommutative() const {
         return false;
+    }
+
+    virtual AccumulatorDocumentsNeeded documentsNeeded() const {
+        return AccumulatorDocumentsNeeded::kAllDocuments;
     }
 
 protected:
@@ -138,6 +158,10 @@ public:
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    AccumulatorDocumentsNeeded documentsNeeded() const final {
+        return AccumulatorDocumentsNeeded::kFirstDocument;
+    }
+
 private:
     bool _haveFirst;
     Value _first;
@@ -155,6 +179,10 @@ public:
 
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    AccumulatorDocumentsNeeded documentsNeeded() const final {
+        return AccumulatorDocumentsNeeded::kLastDocument;
+    }
 
 private:
     Value _last;

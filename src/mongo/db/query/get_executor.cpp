@@ -88,8 +88,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
 
@@ -1300,13 +1300,10 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
 // Distinct hack
 //
 
-bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
+bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
+                                  const string& field,
+                                  bool strictDistinctOnly) {
     QuerySolutionNode* root = soln->root.get();
-
-    // Solution must have a filter.
-    if (soln->filterData.isEmpty()) {
-        return false;
-    }
 
     // Root stage must be a project.
     if (STAGE_PROJECTION != root->getType()) {
@@ -1363,6 +1360,23 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
         ++fieldNo;
     }
 
+    if (strictDistinctOnly) {
+        // If the "distinct" field is not the first field in the index bounds then the only way we
+        // can guarantee that we'll never see duplicate values for the distinct field is to make
+        // sure every field before the distinct field has equality bounds. For example, a
+        // DISTINCT_SCAN on 'b' over the {a: 1, b: 1} index will scan a particular 'b' value
+        // multiple times if that 'b' value exists in documents with different 'a' values. The
+        // equality bounds on 'a' prevent the scan from seeing duplicate 'b' values by ensuring the
+        // scan is limited to a single value for the 'a' field.
+        for (size_t i = 0; i < static_cast<size_t>(fieldNo); ++i) {
+            invariant(i < indexScanNode->bounds.size());
+            if (indexScanNode->bounds.fields[i].intervals.size() != 1 ||
+                !indexScanNode->bounds.fields[i].intervals[0].isPoint()) {
+                return false;
+            }
+        }
+    }
+
     // We should not use a distinct scan if the field over which we are computing the distinct is
     // multikey.
     if (indexScanNode->index.multikey) {
@@ -1383,6 +1397,7 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
     auto distinctNode = stdx::make_unique<DistinctNode>(indexScanNode->index);
     distinctNode->direction = indexScanNode->direction;
     distinctNode->bounds = indexScanNode->bounds;
+    distinctNode->queryCollator = indexScanNode->queryCollator;
     distinctNode->fieldNo = fieldNo;
 
     if (fetchNode) {
@@ -1419,10 +1434,176 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
     return true;
 }
 
+namespace {
+
+// Get the list of indexes that include the "distinct" field.
+QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
+                                                   Collection* collection,
+                                                   size_t plannerOptions,
+                                                   const std::string& distinctKey) {
+    QueryPlannerParams plannerParams;
+    plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN | plannerOptions;
+
+    IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
+    while (ii.more()) {
+        const IndexDescriptor* desc = ii.next();
+        IndexCatalogEntry* ice = ii.catalogEntry(desc);
+        if (desc->keyPattern().hasField(distinctKey)) {
+            plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
+        }
+    }
+
+    return plannerParams;
+}
+
+// Pass this to getExecutorForSimpleDistinct() or getExecutorDistinctFromIndexSolutions()
+// which will either move the query into a newly created executor or leave the executor as nullptr
+// to indicate that no solution was found.
+struct QueryOrExecutor {
+    QueryOrExecutor(unique_ptr<CanonicalQuery> cq) : cq(std::move(cq)) {}
+
+    std::unique_ptr<CanonicalQuery> cq;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> executor;
+};
+
+/**
+ * A simple DISTINCT_SCAN has an empty query and no sort, so we just need to find a suitable index
+ * that has the "distinct" field the first component of its key pattern.
+ *
+ * If a suitable solution is found, this function will create a new executor in
+ * queryOrExecutor->executor and move the query into it, leaving queryOrExecutor->cq in a "moved
+ * from" state. Otherwise, it will leave queryOrExecutor->cq as is and set queryOrExecutor->executor
+ * to nullptr (but still return Status::OK).
+ */
+Status getExecutorForSimpleDistinct(OperationContext* opCtx,
+                                    Collection* collection,
+                                    const QueryPlannerParams& plannerParams,
+                                    PlanExecutor::YieldPolicy yieldPolicy,
+                                    ParsedDistinct* parsedDistinct,
+                                    QueryOrExecutor* queryOrExecutor) {
+    invariant(queryOrExecutor);
+    invariant(queryOrExecutor->cq);
+    invariant(!queryOrExecutor->executor);
+
+    // If there's no query, we can just distinct-scan one of the indices.
+    // Not every index in plannerParams.indices may be suitable. Refer to
+    // getDistinctNodeIndex().
+    size_t distinctNodeIndex = 0;
+    if (!parsedDistinct->getQuery()->getQueryRequest().getFilter().isEmpty() ||
+        !parsedDistinct->getQuery()->getQueryRequest().getSort().isEmpty() ||
+        !getDistinctNodeIndex(plannerParams.indices,
+                              parsedDistinct->getKey(),
+                              queryOrExecutor->cq->getCollator(),
+                              &distinctNodeIndex)) {
+        // Not a "simple" DISTINCT_SCAN or no suitable index was found.
+        queryOrExecutor->executor = nullptr;
+        return Status::OK();
+    }
+
+    auto dn = stdx::make_unique<DistinctNode>(plannerParams.indices[distinctNodeIndex]);
+    dn->direction = 1;
+    IndexBoundsBuilder::allValuesBounds(dn->index.keyPattern, &dn->bounds);
+    dn->queryCollator = queryOrExecutor->cq->getCollator();
+    dn->fieldNo = 0;
+
+    // An index with a non-simple collation requires a FETCH stage.
+    std::unique_ptr<QuerySolutionNode> solnRoot = std::move(dn);
+    if (plannerParams.indices[distinctNodeIndex].collator) {
+        if (!solnRoot->fetched()) {
+            auto fetch = stdx::make_unique<FetchNode>();
+            fetch->children.push_back(solnRoot.release());
+            solnRoot = std::move(fetch);
+        }
+    }
+
+    QueryPlannerParams params;
+
+    auto soln =
+        QueryPlannerAnalysis::analyzeDataAccess(*queryOrExecutor->cq, params, std::move(solnRoot));
+    invariant(soln);
+
+    unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+    PlanStage* rawRoot;
+    verify(StageBuilder::build(opCtx, collection, *queryOrExecutor->cq, *soln, ws.get(), &rawRoot));
+    unique_ptr<PlanStage> root(rawRoot);
+
+    LOG(2) << "Using fast distinct: " << redact(queryOrExecutor->cq->toStringShort())
+           << ", planSummary: " << Explain::getPlanSummary(root.get());
+
+    auto executor = PlanExecutor::make(opCtx,
+                                       std::move(ws),
+                                       std::move(root),
+                                       std::move(soln),
+                                       std::move(queryOrExecutor->cq),
+                                       collection,
+                                       yieldPolicy);
+
+    if (executor.isOK()) {
+        queryOrExecutor->executor = std::move(executor.getValue());
+        return Status::OK();
+    } else {
+        return executor.getStatus();
+    }
+}
+
+// Checks each solution in the 'solutions' vector to see if one includes an IXSCAN that can be
+// rewritten as a DISTINCT_SCAN, assuming we want distinct scan behavior on the getKey() property of
+// the 'parsedDistinct' argument.
+//
+// If a suitable solution is found, this function will create a new executor in
+// queryOrExecutor->executor and move the query into it, leaving queryOrExecutor->cq in a "moved
+// from" state. Otherwise, it will leave queryOrExecutor->cq as is and set queryOrExecutor->executor
+// to nullptr (but still return Status::OK).
+//
+// See the declaration of turnIxscanIntoDistinctIxscan() for an explanation of the
+// 'strictDistinctOnly' parameter.
+Status getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
+                                             Collection* collection,
+                                             std::vector<std::unique_ptr<QuerySolution>> solutions,
+                                             PlanExecutor::YieldPolicy yieldPolicy,
+                                             ParsedDistinct* parsedDistinct,
+                                             bool strictDistinctOnly,
+                                             QueryOrExecutor* queryOrExecutor) {
+    // We look for a solution that has an ixscan we can turn into a distinctixscan
+    for (size_t i = 0; i < solutions.size(); ++i) {
+        if (turnIxscanIntoDistinctIxscan(
+                solutions[i].get(), parsedDistinct->getKey(), strictDistinctOnly)) {
+            // Build and return the SSR over solutions[i].
+            unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+            unique_ptr<QuerySolution> currentSolution = std::move(solutions[i]);
+            PlanStage* rawRoot;
+            verify(StageBuilder::build(
+                opCtx, collection, *queryOrExecutor->cq, *currentSolution, ws.get(), &rawRoot));
+            unique_ptr<PlanStage> root(rawRoot);
+
+            LOG(2) << "Using fast distinct: " << redact(queryOrExecutor->cq->toStringShort())
+                   << ", planSummary: " << Explain::getPlanSummary(root.get());
+
+            auto executor = PlanExecutor::make(opCtx,
+                                               std::move(ws),
+                                               std::move(root),
+                                               std::move(currentSolution),
+                                               std::move(queryOrExecutor->cq),
+                                               collection,
+                                               yieldPolicy);
+
+            if (executor.isOK()) {
+                queryOrExecutor->executor = std::move(executor.getValue());
+                return Status::OK();
+            } else {
+                return executor.getStatus();
+            }
+        }
+    }
+
+    return Status::OK();
+}
+}  // namespace
+
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     OperationContext* opCtx,
     Collection* collection,
-    const std::string& ns,
+    size_t plannerOptions,
     ParsedDistinct* parsedDistinct) {
     const auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     const auto yieldPolicy =
@@ -1451,37 +1632,37 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     // We go through normal planning (with limited parameters) to see if we can produce
     // a soln with the above properties.
 
-    QueryPlannerParams plannerParams;
-    plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
-
-    IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
-    while (ii.more()) {
-        const IndexDescriptor* desc = ii.next();
-        IndexCatalogEntry* ice = ii.catalogEntry(desc);
-        if (desc->keyPattern().hasField(parsedDistinct->getKey())) {
-            plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(opCtx, *ice));
-        }
-    }
+    auto plannerParams = fillOutPlannerParamsForDistinct(
+        opCtx, collection, plannerOptions, parsedDistinct->getKey());
 
     const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
 
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
     if (plannerParams.indices.empty()) {
-        return getExecutor(opCtx, collection, parsedDistinct->releaseQuery(), yieldPolicy);
+        if (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY) {
+            // STRICT_DISTINCT_ONLY indicates that we should not return any plan if we can't return
+            // a DISTINCT_SCAN plan.
+            return {nullptr};
+        } else {
+            return getExecutor(
+                opCtx, collection, parsedDistinct->releaseQuery(), yieldPolicy, plannerOptions);
+        }
     }
 
     //
-    // If we're here, we have an index prefixed by the field we're distinct-ing over.
+    // If we're here, we have an index that includes the field we're distinct-ing over.
     //
+
+    auto qr = stdx::make_unique<QueryRequest>(parsedDistinct->getQuery()->getQueryRequest());
 
     // Applying a projection allows the planner to try to give us covered plans that we can turn
     // into the projection hack.  getDistinctProjection deals with .find() projection semantics
     // (ie _id:1 being implied by default).
-    BSONObj projection = getDistinctProjection(parsedDistinct->getKey());
-
-    auto qr = stdx::make_unique<QueryRequest>(parsedDistinct->getQuery()->getQueryRequest());
-    qr->setProj(projection);
+    if (qr->getProj().isEmpty()) {
+        BSONObj projection = getDistinctProjection(parsedDistinct->getKey());
+        qr->setProj(projection);
+    }
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
@@ -1494,94 +1675,65 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
         return statusWithCQ.getStatus();
     }
 
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    QueryOrExecutor queryOrExecutor(std::move(statusWithCQ.getValue()));
 
     // If the canonical query does not have a user-specified collation, set it from the collection
     // default.
-    if (cq->getQueryRequest().getCollation().isEmpty() && collection->getDefaultCollator()) {
-        cq->setCollator(collection->getDefaultCollator()->clone());
+    if (queryOrExecutor.cq->getQueryRequest().getCollation().isEmpty() &&
+        collection->getDefaultCollator()) {
+        queryOrExecutor.cq->setCollator(collection->getDefaultCollator()->clone());
     }
 
-    // If there's no query, we can just distinct-scan one of the indices.
-    // Not every index in plannerParams.indices may be suitable. Refer to
-    // getDistinctNodeIndex().
-    size_t distinctNodeIndex = 0;
-    if (parsedDistinct->getQuery()->getQueryRequest().getFilter().isEmpty() &&
-        getDistinctNodeIndex(plannerParams.indices,
-                             parsedDistinct->getKey(),
-                             cq->getCollator(),
-                             &distinctNodeIndex)) {
-        auto dn = stdx::make_unique<DistinctNode>(plannerParams.indices[distinctNodeIndex]);
-        dn->direction = 1;
-        IndexBoundsBuilder::allValuesBounds(dn->index.keyPattern, &dn->bounds);
-        dn->fieldNo = 0;
-
-        // An index with a non-simple collation requires a FETCH stage.
-        std::unique_ptr<QuerySolutionNode> solnRoot = std::move(dn);
-        if (plannerParams.indices[distinctNodeIndex].collator) {
-            if (!solnRoot->fetched()) {
-                auto fetch = stdx::make_unique<FetchNode>();
-                fetch->children.push_back(solnRoot.release());
-                solnRoot = std::move(fetch);
-            }
-        }
-
-        QueryPlannerParams params;
-
-        auto soln = QueryPlannerAnalysis::analyzeDataAccess(*cq, params, std::move(solnRoot));
-        invariant(soln);
-
-        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-        PlanStage* rawRoot;
-        verify(StageBuilder::build(opCtx, collection, *cq, *soln, ws.get(), &rawRoot));
-        unique_ptr<PlanStage> root(rawRoot);
-
-        LOG(2) << "Using fast distinct: " << redact(cq->toStringShort())
-               << ", planSummary: " << Explain::getPlanSummary(root.get());
-
-        return PlanExecutor::make(opCtx,
-                                  std::move(ws),
-                                  std::move(root),
-                                  std::move(soln),
-                                  std::move(cq),
-                                  collection,
-                                  yieldPolicy);
+    auto getExecutorStatus = getExecutorForSimpleDistinct(
+        opCtx, collection, plannerParams, yieldPolicy, parsedDistinct, &queryOrExecutor);
+    if (!getExecutorStatus.isOK()) {
+        return getExecutorStatus;
+    } else if (queryOrExecutor.executor) {
+        return std::move(queryOrExecutor.executor);
+    } else {
+        // A "simple" DISTINCT plan wasn't possible, but we can try again with the QueryPlanner.
     }
 
-    // See if we can answer the query in a fast-distinct compatible fashion.
-    auto statusWithSolutions = QueryPlanner::plan(*cq, plannerParams);
+    // Ask the QueryPlanner for a list of solutions that scan one of the indexes from
+    // fillOutPlannerParamsForDistinct() (i.e., the indexes that include the distinct field).
+    auto statusWithSolutions = QueryPlanner::plan(*queryOrExecutor.cq, plannerParams);
     if (!statusWithSolutions.isOK()) {
-        return getExecutor(opCtx, collection, std::move(cq), yieldPolicy);
+        if (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY) {
+            return {nullptr};
+        } else {
+            return getExecutor(
+                opCtx, collection, std::move(queryOrExecutor.cq), yieldPolicy, plannerOptions);
+        }
     }
     auto solutions = std::move(statusWithSolutions.getValue());
 
-    // We look for a solution that has an ixscan we can turn into a distinctixscan
-    for (size_t i = 0; i < solutions.size(); ++i) {
-        if (turnIxscanIntoDistinctIxscan(solutions[i].get(), parsedDistinct->getKey())) {
-            // Build and return the SSR over solutions[i].
-            unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-            unique_ptr<QuerySolution> currentSolution = std::move(solutions[i]);
-            PlanStage* rawRoot;
-            verify(
-                StageBuilder::build(opCtx, collection, *cq, *currentSolution, ws.get(), &rawRoot));
-            unique_ptr<PlanStage> root(rawRoot);
-
-            LOG(2) << "Using fast distinct: " << redact(cq->toStringShort())
-                   << ", planSummary: " << Explain::getPlanSummary(root.get());
-
-            return PlanExecutor::make(opCtx,
-                                      std::move(ws),
-                                      std::move(root),
-                                      std::move(currentSolution),
-                                      std::move(cq),
-                                      collection,
-                                      yieldPolicy);
-        }
+    // See if any of the solutions can be rewritten using a DISTINCT_SCAN. Note that, if the
+    // STRICT_DISTINCT_ONLY flag is not set, we may get a DISTINCT_SCAN plan that filters out some
+    // but not all duplicate values of the distinct field, meaning that the output from this
+    // executor will still need deduplication.
+    getExecutorStatus = getExecutorDistinctFromIndexSolutions(
+        opCtx,
+        collection,
+        std::move(solutions),
+        yieldPolicy,
+        parsedDistinct,
+        (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY),
+        &queryOrExecutor);
+    if (!getExecutorStatus.isOK()) {
+        return getExecutorStatus;
+    } else if (queryOrExecutor.executor) {
+        return std::move(queryOrExecutor.executor);
+    } else if (!(plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY)) {
+        // We did not find a solution that we could convert to a DISTINCT_SCAN, so we fall back to
+        // regular planning.
+        return getExecutor(
+            opCtx, collection, parsedDistinct->releaseQuery(), yieldPolicy, plannerOptions);
+    } else {
+        // We did not find a solution that we could convert to DISTINCT_SCAN, and the
+        // STRICT_DISTINCT_ONLY prohibits us from using any other kind of plan, so we return
+        // nullptr.
+        return {nullptr};
     }
-
-    // If we're here, the planner made a soln with the restricted index set but we couldn't
-    // translate any of them into a distinct-compatible soln. Just go through normal planning.
-    return getExecutor(opCtx, collection, parsedDistinct->releaseQuery(), yieldPolicy);
 }
 
 }  // namespace mongo
