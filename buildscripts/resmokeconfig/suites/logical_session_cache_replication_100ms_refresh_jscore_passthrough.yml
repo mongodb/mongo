@@ -27,14 +27,18 @@ selector:
   - jstests/core/list_all_sessions.js
   - jstests/core/list_local_sessions.js
   - jstests/core/list_sessions.js
+  # The awaitdata_getmore_cmd.js test tails the oplog and waits for the getMore batch size to equal
+  # zero. The CheckReplDBHashInBackground hook consistently runs and creates sessions. At the same
+  # time, the logical session cache refresh thread will flush these sessions to disk, creating more
+  # opLog entries. To avoid this infinite loop, we will blacklist the test from this suite.
+  - jstests/core/awaitdata_getmore_cmd.js
   # TODO (SERVER-35865): Unblacklist when we correctly write and apply 'commitTransaction' oplog
   # entries.
   - jstests/core/txns/commit_prepared_transaction.js
   - jstests/core/txns/disallow_operations_on_prepared_transaction.js
   - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
   - jstests/core/txns/prepare_requires_fcv42.js
-  # TODO (SERVER-36988)
-  - jstests/core/awaitdata_getmore_cmd.js
+
 
 executor:
   archive:
