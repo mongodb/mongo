@@ -1,4 +1,4 @@
-// @tags: [requires_find_command]
+// @tags: [uses_transactions, requires_find_command]
 (function() {
 
     "use strict";
