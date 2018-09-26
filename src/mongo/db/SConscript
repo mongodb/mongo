@@ -634,6 +634,7 @@ env.Library(
         'transaction_history_iterator.cpp',
         env.Idlc('session_txn_record.idl')[0],
         env.Idlc('transactions_stats.idl')[0],
+        env.Idlc('transaction_commit_decision.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/stats/fill_locker_info',
